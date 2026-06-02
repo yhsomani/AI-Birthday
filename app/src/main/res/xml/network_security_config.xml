@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Pinning Google APIs to prevent MITM attacks (CRIT-02) -->
+    <domain-config>
+        <domain includeSubdomains="true">generativelanguage.googleapis.com</domain>
+        <domain includeSubdomains="true">people.googleapis.com</domain>
+        <pin-set expiration="2027-06-01">
+            <!-- GTS Root R1 -->
+            <pin digest="SHA-256">hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=</pin>
+            <!-- GTS Root R2 -->
+            <pin digest="SHA-256">Vfd95BwDeSQo+NUYxVEEIlvkOlWY2SalKK1lPhzOx78=</pin>
+            <!-- GlobalSign Root CA - R1 -->
+            <pin digest="SHA-256">K87oWBWMP0Zfydd/DfoxL+8lpNyIUB2ptGtn0fv6O2Q=</pin>
+        </pin-set>
+    </domain-config>
+</network-security-config>

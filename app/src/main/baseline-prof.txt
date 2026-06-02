@@ -1,0 +1,15 @@
+# RelateAI Baseline Profile — generated manually (Phase 1)
+# Re-generate with ./gradlew :app:generateBaselineProfile after Macrobenchmark setup
+Lcom/example/MainActivity;
+Lcom/example/RelateAIApp;
+Lcom/example/core/db/AppDatabase;
+Lcom/example/core/db/DatabaseKeyDerivation;
+Lcom/example/core/prefs/SecurePrefs;
+Lcom/example/feature/splash/SplashScreen;
+Lcom/example/feature/dashboard/MainViewModel;
+Lcom/example/feature/dashboard/DashboardScreen;
+Lcom/example/ui/theme/Theme;
+Lcoil/ImageLoader;
+Landroidx/compose/runtime/ComposerImpl;
+Landroidx/compose/ui/platform/AndroidComposeView;
+Landroidx/navigation/compose/NavHostController;

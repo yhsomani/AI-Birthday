@@ -1,0 +1,6 @@
+{
+  "name": "RelateAI",
+  "description": "On-Device AI Relationship OS",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

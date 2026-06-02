@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">RelateAI</string>
+    <string name="widget_birthday_description">Shows today\'s birthdays from your contacts</string>
+    <string name="shortcut_compose">Compose</string>
+    <string name="shortcut_compose_long">Compose a message</string>
+    <string name="shortcut_contacts">Contacts</string>
+    <string name="shortcut_contacts_long">View your contacts</string>
+    <string name="accessibility_service_description">RelateAI uses this permission to automatically send birthday wishes via WhatsApp on your behalf, exactly as if you typed and sent them yourself. RelateAI only reads WhatsApp screens to find the send button — it never reads your messages.</string>
+    <string name="onboarding_welcome_title">Never lose contact with the ones who matter.</string>
+    <string name="onboarding_welcome_subtitle">Relate AI runs seamlessly on your device to help you analyze relationship health, track important events, and write personalized greetings.</string>
+    <string name="onboarding_get_started">Get Started</string>
+    <string name="onboarding_step_text">Step %1$d of %2$d</string>
+    <string name="onboarding_skip">Skip</string>
+</resources>
