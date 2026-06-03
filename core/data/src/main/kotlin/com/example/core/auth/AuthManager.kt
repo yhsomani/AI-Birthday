@@ -13,7 +13,7 @@ open class AuthManager @Inject constructor() {
     // Lazy initialization for testing
     private val auth by lazy { FirebaseAuth.getInstance() }
 
-    fun signInWithGoogle(account: GoogleSignInAccount, onComplete: (Boolean) -> Unit) {
+    open fun signInWithGoogle(account: GoogleSignInAccount, onComplete: (Boolean) -> Unit) {
         val credential = GoogleAuthProvider.getCredential(account.idToken, null)
         auth.signInWithCredential(credential)
             .addOnCompleteListener { task ->
@@ -26,11 +26,11 @@ open class AuthManager @Inject constructor() {
             }
     }
 
-    fun signOut() {
+    open fun signOut() {
         auth.signOut()
     }
 
-    fun getCurrentUser() = auth.currentUser
+    open fun getCurrentUser() = auth.currentUser
 
     open fun getUserDisplayName(): String = auth.currentUser?.displayName ?: "User"
 
