@@ -1,7 +1,7 @@
 package com.example.core.backup
 
+import android.util.Base64
 import java.security.SecureRandom
-import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
@@ -29,11 +29,11 @@ object BackupEncryption {
         
         // Layout: [Salt (16)] [IV (12)] [CipherText (n)]
         val combined = salt + iv + cipherText
-        return Base64.getEncoder().encodeToString(combined)
+        return Base64.encodeToString(combined, Base64.NO_WRAP)
     }
 
     fun decrypt(encryptedData: String, passphrase: String): String {
-        val combined = Base64.getDecoder().decode(encryptedData)
+        val combined = Base64.decode(encryptedData, Base64.NO_WRAP)
         
         val salt = combined.sliceArray(0 until SALT_LENGTH)
         val iv = combined.sliceArray(SALT_LENGTH until SALT_LENGTH + IV_LENGTH)
