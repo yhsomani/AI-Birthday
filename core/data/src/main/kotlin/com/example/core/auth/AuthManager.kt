@@ -9,10 +9,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AuthManager @Inject constructor() {
-    private val auth = FirebaseAuth.getInstance()
+open class AuthManager @Inject constructor() {
+    private val auth by lazy { FirebaseAuth.getInstance() }
 
-    fun signInWithGoogle(account: GoogleSignInAccount, onComplete: (Boolean) -> Unit) {
+    open fun signInWithGoogle(account: GoogleSignInAccount, onComplete: (Boolean) -> Unit) {
         val credential = GoogleAuthProvider.getCredential(account.idToken, null)
         auth.signInWithCredential(credential)
             .addOnCompleteListener { task ->
@@ -25,13 +25,13 @@ class AuthManager @Inject constructor() {
             }
     }
 
-    fun signOut() {
+    open fun signOut() {
         auth.signOut()
     }
 
-    fun getCurrentUser() = auth.currentUser
+    open fun getCurrentUser() = auth.currentUser
 
-    fun getUserDisplayName(): String = auth.currentUser?.displayName ?: "User"
+    open fun getUserDisplayName(): String = auth.currentUser?.displayName ?: "User"
 
-    fun getUserEmail(): String = auth.currentUser?.email ?: ""
+    open fun getUserEmail(): String = auth.currentUser?.email ?: ""
 }

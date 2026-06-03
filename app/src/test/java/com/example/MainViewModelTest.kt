@@ -43,7 +43,7 @@ class MainViewModelTest {
         messageRepo = FakeMessageRepository()
         styleProfileRepo = FakeStyleProfileRepository()
         getDashboardMetrics = GetDashboardMetricsUseCase(contactRepo, eventRepo, messageRepo)
-        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, getDashboardMetrics)
+        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, getDashboardMetrics, FakeAuthManager())
     }
 
     @After
@@ -62,11 +62,17 @@ class MainViewModelTest {
             ContactEntity(id = "1", name = "A", healthScore = 80),
             ContactEntity(id = "2", name = "B", healthScore = 60)
         )
-        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, getDashboardMetrics)
+        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, getDashboardMetrics, FakeAuthManager())
         testScheduler.advanceUntilIdle()
         assertEquals(70, viewModel.healthScore.value)
     }
 }
+
+class FakeAuthManager : com.example.core.auth.AuthManager() {
+    override fun getUserDisplayName(): String = "Test User"
+    override fun getUserEmail(): String = "test@example.com"
+}
+
 
 class FakeContactRepository : ContactRepository {
     var contactsList = emptyList<ContactEntity>()
