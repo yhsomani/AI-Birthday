@@ -3,7 +3,7 @@ package com.example.core.db.entities
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "memory_notes", indices = [androidx.room.Index(value = ["contactId"])])
+@Entity(tableName = "memory_notes", indices = [androidx.room.Index(value = ["contactId"], name = "idx_memory_notes_contactId")])
 data class MemoryNoteEntity(
     @PrimaryKey val id: String,
     val contactId: String,

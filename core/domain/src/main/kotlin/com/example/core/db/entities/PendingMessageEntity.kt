@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "pending_messages",
-    indices = [Index(value = ["scheduledForMs"], name = "idx_pending_messages_scheduledForMs")]
+    indices = [Index(value = ["scheduledForMs"], name = "idx_pending_messages_scheduledForMs"), Index(value = ["contactId"], name = "idx_pending_messages_contactId")]
 )
 data class PendingMessageEntity(
     @PrimaryKey val id: String,

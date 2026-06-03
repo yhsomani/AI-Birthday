@@ -8,7 +8,7 @@ import java.util.Calendar
 
 @Entity(
     tableName = "events",
-    indices = [Index(value = ["nextOccurrenceMs"], name = "idx_events_nextOccurrenceMs")]
+    indices = [Index(value = ["nextOccurrenceMs"], name = "idx_events_nextOccurrenceMs"), Index(value = ["contactId"], name = "idx_events_contactId")]
 )
 data class EventEntity(
     @PrimaryKey val id: String,
