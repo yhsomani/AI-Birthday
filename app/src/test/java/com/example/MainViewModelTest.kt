@@ -33,6 +33,7 @@ class MainViewModelTest {
     private lateinit var messageRepo: FakeMessageRepository
     private lateinit var styleProfileRepo: FakeStyleProfileRepository
     private lateinit var getDashboardMetrics: GetDashboardMetricsUseCase
+    private lateinit var authManager: FakeAuthManager
     private lateinit var viewModel: MainViewModel
 
     @Before
@@ -42,8 +43,9 @@ class MainViewModelTest {
         eventRepo = FakeEventRepository()
         messageRepo = FakeMessageRepository()
         styleProfileRepo = FakeStyleProfileRepository()
+        authManager = FakeAuthManager()
         getDashboardMetrics = GetDashboardMetricsUseCase(contactRepo, eventRepo, messageRepo)
-        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, getDashboardMetrics, FakeAuthManager())
+        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, getDashboardMetrics, authManager)
     }
 
     @After
@@ -62,17 +64,18 @@ class MainViewModelTest {
             ContactEntity(id = "1", name = "A", healthScore = 80),
             ContactEntity(id = "2", name = "B", healthScore = 60)
         )
-        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, getDashboardMetrics, FakeAuthManager())
+        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, getDashboardMetrics, authManager)
         testScheduler.advanceUntilIdle()
         assertEquals(70, viewModel.healthScore.value)
     }
 }
 
-class FakeAuthManager : com.example.core.auth.AuthManager() {
+class FakeAuthManager : com.example.core.auth.AuthManager {
+    constructor() : super()
+
     override fun getUserDisplayName(): String = "Test User"
     override fun getUserEmail(): String = "test@example.com"
 }
-
 
 class FakeContactRepository : ContactRepository {
     var contactsList = emptyList<ContactEntity>()

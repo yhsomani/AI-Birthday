@@ -10,6 +10,7 @@ import javax.inject.Singleton
 
 @Singleton
 open class AuthManager @Inject constructor() {
+    // Lazy initialization for testing
     private val auth by lazy { FirebaseAuth.getInstance() }
 
     open fun signInWithGoogle(account: GoogleSignInAccount, onComplete: (Boolean) -> Unit) {
