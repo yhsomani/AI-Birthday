@@ -30,11 +30,6 @@ class ContactSyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            if (prefs.getGeminiApiKey().isEmpty()) {
-                Log.i(TAG, "Gemini API key not set yet; skipping sync (Result.success no-op)")
-                return Result.success()
-            }
-
             val reader = DeviceContactsReader(applicationContext)
             val gSync = GoogleContactsSync(applicationContext)
 
@@ -62,11 +57,15 @@ class ContactSyncWorker @AssistedInject constructor(
             mappedContacts.forEach { contactDao.upsert(it) }
 
             // 3. Then, classify contacts that are still UNKNOWN using Gemini
-            mappedContacts
-                .filter { it.relationshipType == "UNKNOWN" }
-                .forEach { contact ->
-                    classifyContactUseCase(contact.id)
-                }
+            if (prefs.getGeminiApiKey().isEmpty()) {
+                Log.i(TAG, "Gemini API key not set yet; skipping AI classification")
+            } else {
+                mappedContacts
+                    .filter { it.relationshipType == "UNKNOWN" }
+                    .forEach { contact ->
+                        classifyContactUseCase(contact.id)
+                    }
+            }
 
             Result.success()
         } catch (e: Exception) {
