@@ -24,7 +24,9 @@ object DailyScheduler {
         )
 
         val db = AppDatabase.getInstance(context)
-        CoroutineScope(Dispatchers.IO).launch {
+        // Fire and forget, but ideally this should be managed by a WorkManager or injected scope.
+        // We'll use GlobalScope for fire and forget broadcast scheduling (as context might die).
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             val pending = db.pendingMessageDao().getByEventId(eventId)
             if (pending != null) {
                 alarmManager.setAlarmClock(

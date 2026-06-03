@@ -20,10 +20,9 @@ import java.io.File
         SentMessageEntity::class,
         StyleProfileEntity::class,
         MemoryNoteEntity::class,
-        GiftHistoryEntity::class,
-        MoodLogEntity::class
+        GiftHistoryEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,7 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun styleProfileDao(): StyleProfileDao
     abstract fun memoryNoteDao(): MemoryNoteDao
     abstract fun giftHistoryDao(): GiftHistoryDao
-    abstract fun moodLogDao(): MoodLogDao
+    // abstract fun moodLogDao(): MoodLogDao
 
     companion object {
         private const val TAG = "AppDatabase"
@@ -106,6 +105,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Drop dead schema bloat
+                db.execSQL("DROP TABLE IF EXISTS mood_logs")
+
+                // Add missing indices
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_contactId ON events(contactId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_pending_messages_contactId ON pending_messages(contactId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_memory_notes_contactId ON memory_notes(contactId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_gift_history_contactId ON gift_history(contactId)")
+
+                // Note: Adding ON DELETE CASCADE to existing tables requires table recreation in SQLite.
+                // For this migration, we rely on Repository-level cleanup or skip full recreation to avoid risk.
+            }
+        }
+
         private fun isDatabaseUnencrypted(context: Context): Boolean {
             val dbFile = context.getDatabasePath("relateai.db")
             if (!dbFile.exists() || dbFile.length() < 16) return false
@@ -148,7 +163,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "relateai.db"
                 )
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

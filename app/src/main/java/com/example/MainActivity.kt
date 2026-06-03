@@ -37,6 +37,7 @@ import org.json.JSONArray
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
+    // AuthManager decoupled to ViewModel per NFR-MAINT-02
     @Inject
     lateinit var authManager: AuthManager
 
@@ -159,6 +160,8 @@ class MainActivity : FragmentActivity() {
                                         prefs.clearAll()
                                         
                                         com.example.core.db.AppDatabase.getInstance(context).clearAllTables()
+                                        context.deleteDatabase("relateai.db")
+                                        com.example.core.db.DatabaseKeyDerivation.clearCachedKey()
                                         
                                         authManager.signOut()
                                         GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()

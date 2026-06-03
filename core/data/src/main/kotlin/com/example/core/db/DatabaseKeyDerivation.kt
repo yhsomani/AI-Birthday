@@ -56,7 +56,7 @@ object DatabaseKeyDerivation {
         val androidId = Settings.Secure.getString(
             context.contentResolver,
             Settings.Secure.ANDROID_ID
-        ) ?: throw SecurityException("ANDROID_ID unavailable — cannot derive database key")
+        ) ?: java.util.UUID.randomUUID().toString() // Fallback if unavailable, will trigger destructive migration on next run but won't crash
 
         val appSignatureHash = getAppCertificateHash(context)
         val keyMaterial = "$androidId:$appSignatureHash:relateai_v2"
@@ -116,5 +116,9 @@ object DatabaseKeyDerivation {
                 Log.w(TAG, "Background DB-key warmup failed (will retry on first DB access)", e)
             }
         }, "db-key-warmup").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1 }.start()
+    }
+    @Synchronized
+    fun clearCachedKey() {
+        cachedKey = null
     }
 }
