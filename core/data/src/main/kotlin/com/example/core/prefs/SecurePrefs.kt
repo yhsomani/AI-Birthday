@@ -24,7 +24,7 @@ class SecurePrefs(context: Context) {
         }
 
         fun warmUpAsync(context: Context) {
-            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                 getSharedInstance(context)
             }
         }

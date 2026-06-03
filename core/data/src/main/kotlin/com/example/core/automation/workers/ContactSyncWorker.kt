@@ -42,11 +42,27 @@ class ContactSyncWorker @AssistedInject constructor(
             val googleContacts = gSync.fetchAll()
             val merged = ContactMerger.merge(deviceContacts, googleContacts)
 
-            // 1. First, upsert all merged contacts to ensure they exist in DB with IDs
-            merged.forEach { contactDao.upsert(it) }
+            // 1. First, map contactGroup to relationshipType before inserting to DB
+            val mappedContacts = merged.map { contact ->
+                if (contact.relationshipType == "UNKNOWN" && contact.contactGroup != null) {
+                    val groupLower = contact.contactGroup!!.lowercase()
+                    val newRelation = when {
+                        groupLower.contains("family") -> "FAMILY"
+                        groupLower.contains("coworker") || groupLower.contains("work") -> "COLLEAGUE"
+                        groupLower.contains("friend") -> "FRIEND"
+                        else -> "ACQUAINTANCE"
+                    }
+                    contact.copy(relationshipType = newRelation)
+                } else {
+                    contact
+                }
+            }
 
-            // 2. Then, classify contacts that are still UNKNOWN
-            merged
+            // 2. Upsert all mapped contacts to ensure they exist in DB with IDs
+            mappedContacts.forEach { contactDao.upsert(it) }
+
+            // 3. Then, classify contacts that are still UNKNOWN using Gemini
+            mappedContacts
                 .filter { it.relationshipType == "UNKNOWN" }
                 .forEach { contact ->
                     classifyContactUseCase(contact.id)

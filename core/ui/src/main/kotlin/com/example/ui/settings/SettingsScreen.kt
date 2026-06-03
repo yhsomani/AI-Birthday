@@ -58,6 +58,8 @@ fun SettingsScreen(
     var testMessageSent by remember { mutableStateOf(false) }
     var testMessageError by remember { mutableStateOf<String?>(null) }
     var backupStatus by remember { mutableStateOf<String?>(null) }
+    var showBackupDialog by remember { mutableStateOf(false) }
+    var backupPassphrase by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     val restoreLauncher = rememberLauncherForActivityResult(
@@ -305,7 +307,7 @@ fun SettingsScreen(
                                         com.google.firebase.FirebaseApp.getInstance(),
                                         "us-central1"
                                     ).generativeModel("gemini-1.5-flash")
-                                    val client = GeminiClient(model)
+                                    val client = GeminiClient(model, prefs)
                                     val prompt = "Generate a short test message (under 50 words) that someone might send to a friend named Alex for their birthday. Make it warm and personal. Return ONLY the message text, no JSON."
                                     val result = client.generate(prompt)
                                     if (result.contains("error")) {
@@ -550,17 +552,7 @@ fun SettingsScreen(
                     ) {
                         SecondaryButton(
                             text = "Backup",
-                            onClick = {
-                                scope.launch {
-                                    backupStatus = "Creating backup..."
-                                    try {
-                                        val file = BackupManager.createBackup(context, "")
-                                        backupStatus = "Backup saved: ${file.name}"
-                                    } catch (e: Exception) {
-                                        backupStatus = "Backup failed: ${e.message}"
-                                    }
-                                }
-                            },
+                            onClick = { showBackupDialog = true },
                             icon = Icons.Default.Backup,
                             modifier = Modifier.weight(1f)
                         )
@@ -582,6 +574,40 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+
+
+            if (showBackupDialog) {
+                AlertDialog(
+                    onDismissRequest = { showBackupDialog = false },
+                    title = { Text("Backup Encryption Passphrase") },
+                    text = {
+                        OutlinedTextField(
+                            value = backupPassphrase,
+                            onValueChange = { backupPassphrase = it },
+                            label = { Text("Passphrase") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            singleLine = true
+                        )
+                    },
+                    confirmButton = {
+                        PrimaryButton(text = "Backup", onClick = {
+                            if (backupPassphrase.isNotEmpty()) {
+                                showBackupDialog = false
+                                scope.launch {
+                                    backupStatus = "Creating backup..."
+                                    try {
+                                        val file = BackupManager.createBackup(context, backupPassphrase)
+                                        backupStatus = "Backup saved: ${file.name}"
+                                    } catch (e: Exception) {
+                                        backupStatus = "Backup failed: ${e.message}"
+                                    }
+                                }
+                            }
+                        })
+                    },
+                    dismissButton = { SecondaryButton(text = "Cancel", onClick = { showBackupDialog = false }) }
+                )
             }
 
             // Save Settings Primary Button

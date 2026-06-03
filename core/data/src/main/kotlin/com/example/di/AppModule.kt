@@ -107,7 +107,7 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideGeminiClient(model: GenerativeModel): GeminiClient {
-        return GeminiClient(model)
+    fun provideGeminiClient(model: GenerativeModel, securePrefs: SecurePrefs): GeminiClient {
+        return GeminiClient(model, securePrefs)
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.ui.components.ElevatedCard
@@ -35,7 +36,9 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MessagesScreen(pendingMessages: List<PendingMessageEntity>, contacts: List<ContactEntity>) {
+fun MessagesScreen(
+    viewModel: MessagesViewModel = hiltViewModel(),
+pendingMessages: List<PendingMessageEntity>, contacts: List<ContactEntity>) {
     var selectedTone by remember { mutableStateOf("Warm") }
     var selectedLength by remember { mutableStateOf("Standard") }
     
@@ -238,14 +241,24 @@ fun MessagesScreen(pendingMessages: List<PendingMessageEntity>, contacts: List<C
             PrimaryButton(
                 text = "Approve & Send",
                 icon = Icons.Default.Send,
-                onClick = { /* Approve send trigger */ },
-                modifier = Modifier.fillMaxWidth()
+                onClick = {
+                    pending?.let {
+                        viewModel.approveMessage(it.id, draftText)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = pending != null
             )
             SecondaryButton(
                 text = "Regenerate Wish",
                 icon = Icons.Default.AutoAwesome,
-                onClick = { /* Regnerate action */ },
-                modifier = Modifier.fillMaxWidth()
+                onClick = {
+                    pending?.let {
+                        viewModel.regenerateMessage(it.contactId, it.eventId)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = pending != null
             )
         }
 
@@ -260,20 +273,15 @@ fun MessagesScreen(pendingMessages: List<PendingMessageEntity>, contacts: List<C
             modifier = Modifier.padding(bottom = 12.dp)
         )
 
-        ElevatedCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
-            Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                ListItem(
-                    headlineContent = { Text("To $recipientName: 'Hope your 28th is as legendary...'", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, color = Color.White) },
-                    supportingContent = { Text("Sent via WhatsApp • May 30", style = MaterialTheme.typography.bodySmall, color = RelateAIColors.OnSurfaceVariantDark) },
-                    trailingContent = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Check, contentDescription = "Sent", tint = RelateAIColors.Secondary, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Delivered", style = MaterialTheme.typography.labelSmall, color = RelateAIColors.Secondary, fontWeight = FontWeight.Bold)
-                        }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                )
+        ElevatedCard(modifier = Modifier.fillMaxWidth(), padding = 16.dp) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = RelateAIColors.OnSurfaceVariantDark, modifier = Modifier.size(48.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("No recent messages", style = MaterialTheme.typography.bodyMedium, color = RelateAIColors.OnSurfaceVariantDark)
             }
         }
     }

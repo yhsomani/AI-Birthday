@@ -16,6 +16,7 @@ class RelateAIApp : Application(), androidx.work.Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        SecurityChecks.checkCertificatePinExpiry()
         com.example.automation.notifications.NotificationHelper.createChannels(this)
         if (!isUnderTest()) {
             com.example.core.db.DatabaseKeyDerivation.warmUpAsync(this)
