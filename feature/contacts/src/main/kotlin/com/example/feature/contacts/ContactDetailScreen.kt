@@ -93,8 +93,17 @@ fun ContactDetailScreen(
             Box(modifier = Modifier.weight(1f).padding(horizontal = 24.dp, vertical = 16.dp)) {
                 when (selectedTab) {
                     "OVERVIEW" -> ContactOverview(contact, onToggleDnd, onEditSendTime)
-                    "MEMORIES" -> MemoryVaultView()
-                    "GIFTS" -> GiftAdvisorView()
+                    "MEMORIES" -> MemoryVaultView(
+                        notes = emptyList(), // TODO: Wire to ViewModel
+                        onAddNote = { title, content, mood -> /* TODO: Implement */ },
+                        onDeleteNote = { id -> /* TODO: Implement */ }
+                    )
+                    "GIFTS" -> GiftAdvisorView(
+                        gifts = emptyList(), // TODO: Wire to ViewModel
+                        contactInterests = contact.interests ?: "[]",
+                        onAddGift = { name, occasion, price -> /* TODO: Implement */ },
+                        onDeleteGift = { id -> /* TODO: Implement */ }
+                    )
                 }
             }
         }
