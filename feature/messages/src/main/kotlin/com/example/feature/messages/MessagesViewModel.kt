@@ -18,7 +18,7 @@ class MessagesViewModel @Inject constructor(
 
     fun approveMessage(pendingMessageId: String, finalEditedText: String) {
         viewModelScope.launch {
-            approvePendingMessageUseCase(pendingMessageId)
+            approvePendingMessageUseCase(pendingMessageId, finalEditedText)
         }
     }
 

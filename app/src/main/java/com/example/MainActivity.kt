@@ -49,13 +49,21 @@ class MainActivity : FragmentActivity() {
             val context = LocalContext.current
             val prefs = remember { SecurePrefs(context) }
             val systemDark = isSystemInDarkTheme()
-            val themeModePref = remember { mutableStateOf(prefs.getThemeMode()) }
+            
+            // Read theme mode asynchronously to avoid blocking the main thread during app launch
+            val themeModePref = remember { mutableStateOf("SYSTEM") }
+            LaunchedEffect(Unit) {
+                themeModePref.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    prefs.getThemeMode()
+                }
+            }
             
             val isDark = when(themeModePref.value) {
                 "DARK" -> true
                 "LIGHT" -> false
                 else -> systemDark
             }
+
             
             MyApplicationTheme(darkTheme = isDark) {
                 Box(

@@ -155,7 +155,7 @@ abstract class AppDatabase : RoomDatabase() {
                 }
 
                 val passphrase = DatabaseKeyDerivation.deriveKey(context)
-                val factory = SupportFactory(passphrase)
+                val factory = SupportFactory(passphrase, null, false)
 
                 val instance = Room.databaseBuilder(
                     context.applicationContext,

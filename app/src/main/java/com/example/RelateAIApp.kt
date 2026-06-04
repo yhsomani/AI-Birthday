@@ -2,6 +2,8 @@ package com.example
 
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.launch
+
 
 @HiltAndroidApp
 class RelateAIApp : Application(), androidx.work.Configuration.Provider {
@@ -21,9 +23,12 @@ class RelateAIApp : Application(), androidx.work.Configuration.Provider {
         if (!isUnderTest()) {
             com.example.core.db.DatabaseKeyDerivation.warmUpAsync(this)
             com.example.core.prefs.SecurePrefs.warmUpAsync(this)
-            com.example.automation.scheduler.WorkerScheduler.scheduleAll(this)
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                com.example.automation.scheduler.WorkerScheduler.scheduleAll(this@RelateAIApp)
+            }
         }
     }
+
 
     private fun isUnderTest(): Boolean {
         return try {

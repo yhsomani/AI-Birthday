@@ -18,37 +18,110 @@ class StyleAnalysisUseCase @Inject constructor(
 
         val texts = sentMessages.map { it.messageText }
         
-        // Basic analysis
+        // 1. Average Length
         val avgLength = texts.map { it.length }.average()
-        val emojiCount = texts.sumOf { text -> 
-            text.count { it.isEmoji() } 
+        
+        // 2. Emojis Count (Iterating over surrogate code points)
+        var totalEmojis = 0
+        var totalChars = 0
+        texts.forEach { text ->
+            totalChars += text.length
+            var i = 0
+            while (i < text.length) {
+                val codePoint = text.codePointAt(i)
+                if (codePoint.isEmojiCodePoint()) totalEmojis++
+                i += Character.charCount(codePoint)
+            }
         }
-        val emojiDensity = emojiCount.toDouble() / texts.sumOf { it.length }.toDouble()
+        val emojiDensity = if (totalChars > 0) totalEmojis.toDouble() / totalChars.toDouble() else 0.0
 
-        // Identify common phrases (simple n-gram approach)
+        // 3. Identify common phrases
         val commonPhrases = findCommonPhrases(texts)
+        val commonPhrasesJson = org.json.JSONArray(commonPhrases).toString()
 
+        // 4. Identify top emojis
+        val topEmojis = findTopEmojis(texts)
+        val emojiSetJson = org.json.JSONArray(topEmojis).toString()
+
+        // 5. Tone & Formality analysis
+        val toneList = mutableListOf<String>()
+        val allTextJoined = texts.joinToString(" ").lowercase()
+        
+        val informalWords = listOf("hey", "hi", "dude", "yaar", "bro", "wassup", "bday", "congrats", "party", "haha", "lol")
+        val formalWords = listOf("dear", "hello", "regards", "warm", "wishing", "sincere", "success", "career", "health", "prosperous")
+        
+        val informalCount = informalWords.sumOf { word -> allTextJoined.split(word).size - 1 }
+        val formalCount = formalWords.sumOf { word -> allTextJoined.split(word).size - 1 }
+        
+        val formality = if (formalCount > informalCount) "FORMAL" else "CASUAL"
+        
+        if (formality == "FORMAL") {
+            toneList.add("polite")
+            toneList.add("courteous")
+        } else {
+            toneList.add("casual")
+            toneList.add("friendly")
+        }
+        
+        if (allTextJoined.contains("haha") || allTextJoined.contains("lol") || allTextJoined.contains("joke") || allTextJoined.contains("fun")) {
+            toneList.add("funny")
+        }
+        if (allTextJoined.contains("love") || allTextJoined.contains("miss") || allTextJoined.contains("dear") || allTextJoined.contains("warm")) {
+            toneList.add("warm")
+        }
+        if (emojiDensity > 0.02) {
+            toneList.add("expressive")
+        }
+        if (avgLength < 50) {
+            toneList.add("concise")
+        } else if (avgLength > 120) {
+            toneList.add("detailed")
+        }
+
+        val toneDescriptorsJson = org.json.JSONArray(toneList.distinct()).toString()
         val currentProfile = styleProfileRepository.getProfileOnce() ?: StyleProfileEntity()
         
-        // Update profile with analyzed data
+        // Update profile with fully analyzed data
         styleProfileRepository.upsert(currentProfile.copy(
-            // We store analysis results in common phrases or a dedicated field if available
-            // For now, let's add them to sampleMessagesJson or a new field
-            // Since we don't have an 'analysis' field, we'll augment the samples
             sampleMessagesJson = augmentSamplesWithAnalysis(currentProfile.sampleMessagesJson, texts),
+            usesEmoji = emojiDensity > 0.01,
+            avgMessageLength = avgLength.toInt(),
+            commonPhrasesJson = commonPhrasesJson,
+            formalityLevel = formality,
+            emojiSetJson = emojiSetJson,
+            toneDescriptors = toneDescriptorsJson,
+            sampleCount = texts.size,
             updatedAtMs = System.currentTimeMillis()
         ))
     }
 
     private fun findCommonPhrases(texts: List<String>): List<String> {
-        // Simple implementation: find words appearing in > 20% of messages
         val wordFreq = mutableMapOf<String, Int>()
         texts.forEach { text ->
             text.lowercase().split(Regex("\\s+")).distinct().forEach { word ->
-                if (word.length > 3) wordFreq[word] = wordFreq.getOrDefault(word, 0) + 1
+                val cleanWord = word.replace(Regex("[^a-zA-Z0-9]"), "")
+                if (cleanWord.length > 3) {
+                    wordFreq[cleanWord] = wordFreq.getOrDefault(cleanWord, 0) + 1
+                }
             }
         }
         return wordFreq.filter { it.value > texts.size * 0.2 }.keys.toList()
+    }
+
+    private fun findTopEmojis(texts: List<String>): List<String> {
+        val emojiFreq = mutableMapOf<String, Int>()
+        texts.forEach { text ->
+            var i = 0
+            while (i < text.length) {
+                val codePoint = text.codePointAt(i)
+                if (codePoint.isEmojiCodePoint()) {
+                    val emojiStr = String(Character.toChars(codePoint))
+                    emojiFreq[emojiStr] = emojiFreq.getOrDefault(emojiStr, 0) + 1
+                }
+                i += Character.charCount(codePoint)
+            }
+        }
+        return emojiFreq.entries.sortedByDescending { it.value }.take(5).map { it.key }
     }
 
     private fun augmentSamplesWithAnalysis(existingJson: String, texts: List<String>): String {
@@ -65,8 +138,11 @@ class StyleAnalysisUseCase @Inject constructor(
         return org.json.JSONArray(samples.distinct()).toString()
     }
 
-    private fun Char.isEmoji(): Boolean {
-        // Simplified emoji check
-        return this.code in 0x1F600..0x1F64F || this.code in 0x1F300..0x1F5FF || this.code in 0x1F680..0x1F6FF
+    private fun Int.isEmojiCodePoint(): Boolean {
+        return this in 0x1F600..0x1F64F || // Emoticons
+               this in 0x1F300..0x1F5FF || // Misc Symbols
+               this in 0x1F680..0x1F6FF || // Transport and Map
+               this in 0x1F1E6..0x1F1FF || // Flag indicators
+               this in 0x2600..0x27BF      // Dingbats & Misc
     }
 }

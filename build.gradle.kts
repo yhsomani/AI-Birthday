@@ -11,3 +11,25 @@ plugins {
   alias(libs.plugins.hilt.android) apply false
   alias(libs.plugins.google.services) apply false
 }
+
+subprojects {
+    plugins.withId("org.jetbrains.kotlin.android") {
+        extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension> {
+            jvmToolchain(17)
+        }
+    }
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+        }
+    }
+    tasks.withType<Test>().configureEach {
+        val toolchainService = project.extensions.findByType<org.gradle.jvm.toolchain.JavaToolchainService>()
+            ?: project.rootProject.extensions.getByType<org.gradle.jvm.toolchain.JavaToolchainService>()
+        javaLauncher.set(toolchainService.launcherFor {
+            languageVersion.set(org.gradle.jvm.toolchain.JavaLanguageVersion.of(17))
+        })
+    }
+}
+
+
