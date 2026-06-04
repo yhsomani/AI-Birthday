@@ -34,6 +34,8 @@
     <string name="gift_log_title">Log Gift</string>
     <string name="gift_description_label">Gift description</string>
     <string name="gift_price_label">Price (₹)</string>
+    <string name="gift_occasion_format">Occasion: %1$s • %2$s</string>
+    <string name="gift_year_format">%1$d</string>
     
     <!-- Contact Detail -->
     <string name="contact_health_score">Health Score: %1$d%%</string>
@@ -52,10 +54,61 @@
     
     <!-- Analytics -->
     <string name="analytics_reconnect">Reconnect</string>
+    <string name="analytics_relationship_insights">Relationship Insights</string>
+    <string name="analytics_thriving_health">Thriving • Health: %1$d%%</string>
+    <string name="analytics_fading_health">Fading • Health: %1$d%%</string>
     
     <!-- Events -->
     <string name="events_send_message">Send Message</string>
     <string name="events_generate_wish">Generate Wish</string>
+    <string name="events_no_upcoming_reminders">No upcoming reminders.</string>
+    <string name="events_contact_label">Contact</string>
+    <string name="events_day_label">Day</string>
+    <string name="events_month_label">Month</string>
+    <string name="events_year_label">Year</string>
+    <string name="events_birthdays_this_month">Birthdays This Month</string>
+    
+    <!-- Dashboard -->
+    <string name="dashboard_start_syncing">Start by syncing your contacts.</string>
+    <string name="dashboard_no_upcoming_reminders">No upcoming reminders.</string>
+    
+    <!-- Onboarding -->
+    <string name="onboarding_write_sample_a">Write Sample Text A</string>
+    <string name="onboarding_write_sample_b">Write Sample Text B</string>
+    <string name="onboarding_sample_a_placeholder">e.g. \'Hey! Happy birthday buddy! Hope you have an awesome year ahead directly filled with joy! Cheers\'</string>
+    <string name="onboarding_sample_b_placeholder">e.g. \'Hi Prof! Hope you are doing well. Just wanted to catch up on the research details sometime...\'</string>
+    
+    <!-- Settings -->
+    <string name="settings_configuration">Configuration</string>
+    <string name="settings_gemini_api_key">Gemini API Key</string>
+    <string name="settings_sender_email">Sender Email (Gmail)</string>
+    <string name="settings_app_password">App Password</string>
+    <string name="settings_quiet_hrs_start">Quiet Hrs Start (24h)</string>
+    <string name="settings_quiet_hrs_end">Quiet Hrs End (24h)</string>
+    <string name="settings_backup_encryption_passphrase">Backup Encryption Passphrase</string>
+    <string name="settings_restore_encryption_passphrase">Restore Encryption Passphrase</string>
+    <string name="settings_passphrase">Passphrase</string>
+    <string name="settings_style_coach">Style Coach</string>
+    <string name="settings_paste_samples">Paste message or email samples</string>
+    <string name="settings_samples_placeholder">e.g., \'Hey everyone! Hope you have an awesome week ahead. Talk soon!\'</string>
+    
+    <!-- Edit Contact -->
+    <string name="edit_contact_title">Edit Contact</string>
+    <string name="edit_contact_full_name">Full Name</string>
+    <string name="edit_contact_relationship">Relationship (e.g. Sister, Colleague)</string>
+    <string name="edit_contact_job_title">Job Title (Optional)</string>
+    <string name="edit_contact_communication_style">Communication Style</string>
+    
+    <!-- Contacts -->
+    <string name="contacts_search_placeholder">Search your contacts...</string>
+    <string name="contacts_no_contacts_found">No contacts found.</string>
+    
+    <!-- Notification -->
+    <string name="notification_content_text">You haven\'t spoken in %1$d days</string>
+    <string name="notification_big_text">Suggested message:\n\n%1$s\n\nYou can edit and approve this in the Messages screen.</string>
+    
+    <!-- Message Edit -->
+    <string name="message_edit_content_label">Message Content</string>
     
     <!-- Common -->
     <string name="add">Add</string>
