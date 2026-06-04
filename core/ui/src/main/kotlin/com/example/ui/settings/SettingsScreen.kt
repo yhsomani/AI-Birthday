@@ -60,20 +60,18 @@ fun SettingsScreen(
     var backupStatus by remember { mutableStateOf<String?>(null) }
     var showBackupDialog by remember { mutableStateOf(false) }
     var backupPassphrase by remember { mutableStateOf("") }
+    var showRestoreDialog by remember { mutableStateOf(false) }
+    var restoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var restorePassphrase by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     val restoreLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            scope.launch {
-                backupStatus = "Restoring..."
-                val result = BackupManager.restoreBackup(context, uri, "")
-                backupStatus = result.fold(
-                    onSuccess = { "Restored $it records" },
-                    onFailure = { "Restore failed: ${it.message}" }
-                )
-            }
+            restoreUri = uri
+            restorePassphrase = ""
+            showRestoreDialog = true
         }
     }
 
@@ -607,6 +605,38 @@ fun SettingsScreen(
                         })
                     },
                     dismissButton = { SecondaryButton(text = "Cancel", onClick = { showBackupDialog = false }) }
+                )
+            }
+
+            if (showRestoreDialog) {
+                AlertDialog(
+                    onDismissRequest = { showRestoreDialog = false },
+                    title = { Text("Restore Encryption Passphrase") },
+                    text = {
+                        OutlinedTextField(
+                            value = restorePassphrase,
+                            onValueChange = { restorePassphrase = it },
+                            label = { Text("Passphrase") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            singleLine = true
+                        )
+                    },
+                    confirmButton = {
+                        PrimaryButton(text = "Restore", onClick = {
+                            if (restorePassphrase.isNotEmpty()) {
+                                showRestoreDialog = false
+                                scope.launch {
+                                    backupStatus = "Restoring..."
+                                    val result = BackupManager.restoreBackup(context, restoreUri!!, restorePassphrase)
+                                    backupStatus = result.fold(
+                                        onSuccess = { "Restored $it records" },
+                                        onFailure = { "Restore failed: ${it.message}" }
+                                    )
+                                }
+                            }
+                        })
+                    },
+                    dismissButton = { SecondaryButton(text = "Cancel", onClick = { showRestoreDialog = false }) }
                 )
             }
 

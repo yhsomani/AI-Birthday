@@ -8,7 +8,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
 class SecurePrefs(context: Context) {
-    private val prefs: SharedPreferences = getSharedInstance(context)
+    private val prefs: SharedPreferences by lazy { getSharedInstance(context) }
 
     companion object {
         @Volatile

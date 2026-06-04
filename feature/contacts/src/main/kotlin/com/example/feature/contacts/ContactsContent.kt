@@ -125,12 +125,17 @@ fun ContactsContent(contacts: LazyPagingItems<ContactEntity>, onContactClick: (S
                     if (searchQuery.isNotEmpty() && !contact.name.contains(searchQuery, ignoreCase = true)) {
                         return@items
                     }
-                    if (selectedFilter != "All" && selectedFilter != contact.relationshipType) {
-                        if (selectedFilter == "VIPs" && contact.automationMode != "VIP_APPROVE") {
-                            return@items
-                        } else if (selectedFilter != "VIPs") {
-                            return@items
-                        }
+                    
+                    val matchesFilter = when (selectedFilter) {
+                        "All" -> true
+                        "Family" -> contact.relationshipType.equals("FAMILY", ignoreCase = true) || contact.relationshipType.equals("RELATIVE", ignoreCase = true)
+                        "Friends" -> contact.relationshipType.equals("FRIEND", ignoreCase = true) || contact.relationshipType.equals("BEST_FRIEND", ignoreCase = true) || contact.relationshipType.equals("CLOSE_FRIEND", ignoreCase = true)
+                        "Work" -> contact.relationshipType.equals("WORK", ignoreCase = true) || contact.relationshipType.equals("COLLEAGUE", ignoreCase = true) || contact.relationshipType.equals("CLIENT", ignoreCase = true) || contact.relationshipType.equals("MANAGER", ignoreCase = true) || contact.relationshipType.equals("MENTOR", ignoreCase = true) || contact.relationshipType.equals("VENDOR", ignoreCase = true)
+                        "VIPs" -> contact.automationMode == "VIP_APPROVE"
+                        else -> false
+                    }
+                    if (!matchesFilter) {
+                        return@items
                     }
 
                     ElevatedCard(

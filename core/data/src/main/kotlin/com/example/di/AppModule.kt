@@ -18,6 +18,12 @@ import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.StyleProfileRepository
+import com.example.domain.repository.MemoryNoteRepository
+import com.example.domain.repository.GiftHistoryRepository
+import com.example.data.repository.MemoryNoteRepositoryImpl
+import com.example.data.repository.GiftHistoryRepositoryImpl
+import com.example.core.db.dao.MemoryNoteDao
+import com.example.core.db.dao.GiftHistoryDao
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -46,6 +52,14 @@ abstract class AppModuleBinds {
     @Binds
     @Singleton
     abstract fun bindStyleProfileRepository(impl: StyleProfileRepositoryImpl): StyleProfileRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMemoryNoteRepository(impl: MemoryNoteRepositoryImpl): MemoryNoteRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindGiftHistoryRepository(impl: GiftHistoryRepositoryImpl): GiftHistoryRepository
 }
 
 @Module
@@ -72,6 +86,12 @@ object AppModule {
 
     @Provides
     fun provideStyleProfileDao(database: AppDatabase): com.example.core.db.dao.StyleProfileDao = database.styleProfileDao()
+
+    @Provides
+    fun provideMemoryNoteDao(database: AppDatabase): MemoryNoteDao = database.memoryNoteDao()
+
+    @Provides
+    fun provideGiftHistoryDao(database: AppDatabase): GiftHistoryDao = database.giftHistoryDao()
 
     @Provides
     @Singleton

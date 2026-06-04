@@ -30,16 +30,29 @@ import com.example.ui.theme.MyApplicationTheme
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import java.util.Calendar
 import javax.inject.Inject
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface MainActivityEntryPoint {
+    fun authManager(): AuthManager
+}
+
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
-    // AuthManager decoupled to ViewModel per NFR-MAINT-02
-    @Inject
-    lateinit var authManager: AuthManager
+    private val authManager by lazy {
+        EntryPointAccessors.fromApplication(
+            applicationContext,
+            MainActivityEntryPoint::class.java
+        ).authManager()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
@@ -49,13 +62,21 @@ class MainActivity : FragmentActivity() {
             val context = LocalContext.current
             val prefs = remember { SecurePrefs(context) }
             val systemDark = isSystemInDarkTheme()
-            val themeModePref = remember { mutableStateOf(prefs.getThemeMode()) }
+            
+            // Read theme mode asynchronously to avoid blocking the main thread during app launch
+            val themeModePref = remember { mutableStateOf("SYSTEM") }
+            LaunchedEffect(Unit) {
+                themeModePref.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    prefs.getThemeMode()
+                }
+            }
             
             val isDark = when(themeModePref.value) {
                 "DARK" -> true
                 "LIGHT" -> false
                 else -> systemDark
             }
+
             
             MyApplicationTheme(darkTheme = isDark) {
                 Box(
@@ -161,7 +182,7 @@ class MainActivity : FragmentActivity() {
                                         
                                         com.example.core.db.AppDatabase.getInstance(context).clearAllTables()
                                         context.deleteDatabase("relateai.db")
-                                        com.example.core.db.DatabaseKeyDerivation.clearCachedKey()
+                                        com.example.core.db.DatabaseKeyDerivation.clearCachedKey(context)
                                         
                                         authManager.signOut()
                                         GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()

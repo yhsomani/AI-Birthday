@@ -75,11 +75,35 @@ fun MainAppScreen(
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp > 600
     
+    val contactNotes by viewModel.contactNotes.collectAsStateWithLifecycle()
+    val contactGifts by viewModel.contactGifts.collectAsStateWithLifecycle()
+    
+    LaunchedEffect(selectedContactId) {
+        selectedContactId?.let { id ->
+            viewModel.loadNotesForContact(id)
+            viewModel.loadGiftsForContact(id)
+        }
+    }
+
     if (selectedContactId != null) {
         val contact = contacts.find { it.id == selectedContactId }
         if (contact != null) {
             ContactDetailScreen(
                 contact = contact,
+                notes = contactNotes,
+                gifts = contactGifts,
+                onAddNote = { category, noteText, mood ->
+                    viewModel.addMemoryNote(contact.id, category, noteText, mood)
+                },
+                onDeleteNote = { noteId ->
+                    viewModel.deleteMemoryNote(noteId, contact.id)
+                },
+                onAddGift = { giftName, occasion, price ->
+                    viewModel.addGiftHistory(contact.id, giftName, occasion, price)
+                },
+                onDeleteGift = { giftId ->
+                    viewModel.deleteGiftHistory(giftId, contact.id)
+                },
                 onBack = { selectedContactId = null },
                 onEditContact = { editingContactId = contact.id },
                 onToggleDnd = { enabled -> 

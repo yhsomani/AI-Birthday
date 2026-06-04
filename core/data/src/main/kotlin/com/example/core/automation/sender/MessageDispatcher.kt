@@ -21,10 +21,14 @@ class MessageDispatcher(
     suspend fun dispatch(message: PendingMessageEntity, contact: ContactEntity) = withContext(Dispatchers.IO) {
         val prefs = SecurePrefs(context)
 
-        val messageText = when (message.selectedVariant) {
-            "short" -> message.shortVariant
-            "long" -> message.longVariant
-            else -> message.standardVariant
+        val messageText: String = (if (message.editedByUser) message.userEditedText else null) ?: message.selectedVariantText.ifBlank {
+            when (message.selectedVariant) {
+                "short" -> message.shortVariant
+                "long" -> message.longVariant
+                "funny" -> message.funnyVariant
+                "formal" -> message.formalVariant
+                else -> message.standardVariant
+            }
         }
 
         var success = false

@@ -7,6 +7,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
+import kotlinx.coroutines.flow.first
+
 /**
  * Approves a pending message. Sets its status to APPROVED and, if the approval mode
  * is FULLY_AUTO, schedules an exact-time dispatch via DailyScheduler.
@@ -16,16 +18,29 @@ class ApprovePendingMessageUseCase @Inject constructor(
     @ApplicationContext private val context: Context,
     private val messageRepository: MessageRepository
 ) {
-    suspend operator fun invoke(pendingMessageId: String): ApprovalOutcome {
-        messageRepository.updatePendingStatus(pendingMessageId, "APPROVED")
-        val pending = messageRepository.getAllApproved().firstOrNull { it.id == pendingMessageId }
+    suspend operator fun invoke(pendingMessageId: String, finalEditedText: String? = null): ApprovalOutcome {
+        val allPending = messageRepository.getAllPending().first()
+        val pending = allPending.find { it.id == pendingMessageId }
             ?: return ApprovalOutcome.PendingNotFound
 
-        if (pending.approvalMode == "FULLY_AUTO") {
-            DailyScheduler.scheduleExactSend(context, pending.eventId)
+        val updatedPending = if (finalEditedText != null && finalEditedText != pending.selectedVariantText) {
+            pending.copy(
+                status = "APPROVED",
+                editedByUser = true,
+                userEditedText = finalEditedText,
+                selectedVariantText = finalEditedText
+            )
+        } else {
+            pending.copy(status = "APPROVED")
         }
 
-        return ApprovalOutcome.Approved(pending.id, pending.approvalMode)
+        messageRepository.insertPending(updatedPending)
+
+        if (updatedPending.approvalMode == "FULLY_AUTO") {
+            DailyScheduler.scheduleExactSend(context, updatedPending.eventId)
+        }
+
+        return ApprovalOutcome.Approved(updatedPending.id, updatedPending.approvalMode)
     }
 
     sealed class ApprovalOutcome {

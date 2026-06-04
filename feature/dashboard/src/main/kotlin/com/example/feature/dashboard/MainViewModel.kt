@@ -22,15 +22,91 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import com.example.domain.repository.MemoryNoteRepository
+import com.example.domain.repository.GiftHistoryRepository
+import com.example.core.db.entities.MemoryNoteEntity
+import com.example.core.db.entities.GiftHistoryEntity
+import kotlinx.coroutines.flow.asStateFlow
+
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val contactRepository: ContactRepository,
     private val eventRepository: EventRepository,
     private val messageRepository: MessageRepository,
     private val styleProfileRepository: StyleProfileRepository,
+    private val memoryNoteRepository: MemoryNoteRepository,
+    private val giftHistoryRepository: GiftHistoryRepository,
     private val getDashboardMetrics: GetDashboardMetricsUseCase,
     private val authManager: AuthManager
 ) : ViewModel() {
+
+    private val _contactNotes = MutableStateFlow<List<MemoryNoteEntity>>(emptyList())
+    val contactNotes: StateFlow<List<MemoryNoteEntity>> = _contactNotes.asStateFlow()
+
+    private val _contactGifts = MutableStateFlow<List<GiftHistoryEntity>>(emptyList())
+    val contactGifts: StateFlow<List<GiftHistoryEntity>> = _contactGifts.asStateFlow()
+
+    fun loadNotesForContact(contactId: String) {
+        viewModelScope.launch {
+            _contactNotes.value = memoryNoteRepository.getByContact(contactId)
+        }
+    }
+
+    fun addMemoryNote(contactId: String, title: String, content: String, mood: String) {
+        viewModelScope.launch {
+            val note = MemoryNoteEntity(
+                id = java.util.UUID.randomUUID().toString(),
+                contactId = contactId,
+                noteText = content,
+                category = title,
+                dateMs = System.currentTimeMillis()
+            )
+            memoryNoteRepository.upsert(note)
+            loadNotesForContact(contactId)
+        }
+    }
+
+    fun deleteMemoryNote(noteId: String, contactId: String) {
+        viewModelScope.launch {
+            val note = _contactNotes.value.find { it.id == noteId }
+            if (note != null) {
+                memoryNoteRepository.delete(note)
+                loadNotesForContact(contactId)
+            }
+        }
+    }
+
+    fun loadGiftsForContact(contactId: String) {
+        viewModelScope.launch {
+            _contactGifts.value = giftHistoryRepository.getByContact(contactId)
+        }
+    }
+
+    fun addGiftHistory(contactId: String, giftName: String, occasion: String, priceInr: Int) {
+        viewModelScope.launch {
+            val gift = GiftHistoryEntity(
+                id = java.util.UUID.randomUUID().toString(),
+                contactId = contactId,
+                giftName = giftName,
+                giftCategory = "GIFT",
+                occasionType = occasion,
+                year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR),
+                approxCostInr = priceInr
+            )
+            giftHistoryRepository.upsert(gift)
+            loadGiftsForContact(contactId)
+        }
+    }
+
+    fun deleteGiftHistory(giftId: String, contactId: String) {
+        viewModelScope.launch {
+            val gift = _contactGifts.value.find { it.id == giftId }
+            if (gift != null) {
+                giftHistoryRepository.delete(gift)
+                loadGiftsForContact(contactId)
+            }
+        }
+    }
 
     val userName: String
         get() = authManager.getUserDisplayName()
