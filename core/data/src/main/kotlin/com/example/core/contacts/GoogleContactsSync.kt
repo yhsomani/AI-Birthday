@@ -136,14 +136,17 @@ class GoogleContactsSync(private val context: Context) {
                 }
                 
                 var contactGroup: String? = null
-                val memberships = person.optJSONArray("contactGroupMemberships")
+                val memberships = person.optJSONArray("memberships")
                 if (memberships != null && memberships.length() > 0) {
                     for (k in 0 until memberships.length()) {
                         val membership = memberships.getJSONObject(k)
-                        val resourceName = membership.optString("contactGroupResourceName", "")
-                        if (resourceName.isNotEmpty()) {
-                            contactGroup = resourceName.removePrefix("contactGroups/")
-                            break
+                        val cgMembership = membership.optJSONObject("contactGroupMembership")
+                        if (cgMembership != null) {
+                            val resourceName = cgMembership.optString("contactGroupResourceName", "")
+                            if (resourceName.isNotEmpty()) {
+                                contactGroup = resourceName.removePrefix("contactGroups/")
+                                break
+                            }
                         }
                     }
                 }

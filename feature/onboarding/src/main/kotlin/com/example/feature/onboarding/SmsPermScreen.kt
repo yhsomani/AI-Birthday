@@ -27,12 +27,11 @@ fun SmsPermScreen(navController: NavController) {
 
     OnboardingWrapper(
         title = "Permit Draft Despatch",
-        subtitle = "Automate outbound messaging directly over SMS when reminders fire. Relate AI reads SMS log timelines purely to monitor last-contact age.",
+        subtitle = "Automate outbound messaging directly over SMS when reminders fire.",
         currentStep = 5,
         onNext = {
             permissionLauncher.launch(arrayOf(
-                Manifest.permission.SEND_SMS,
-                Manifest.permission.READ_SMS
+                Manifest.permission.SEND_SMS
             ))
         },
         nextText = "Grant SMS Transmission",

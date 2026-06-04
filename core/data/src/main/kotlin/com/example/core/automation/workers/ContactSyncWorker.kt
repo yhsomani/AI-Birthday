@@ -43,7 +43,7 @@ class ContactSyncWorker @AssistedInject constructor(
                     val groupLower = contact.contactGroup!!.lowercase()
                     val newRelation = when {
                         groupLower.contains("family") -> "FAMILY"
-                        groupLower.contains("coworker") || groupLower.contains("work") -> "COLLEAGUE"
+                        groupLower.contains("coworker") || groupLower.contains("work") || groupLower.contains("colleague") -> "WORK"
                         groupLower.contains("friend") -> "FRIEND"
                         else -> "ACQUAINTANCE"
                     }

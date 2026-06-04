@@ -118,7 +118,15 @@ object DatabaseKeyDerivation {
         }, "db-key-warmup").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1 }.start()
     }
     @Synchronized
-    fun clearCachedKey() {
+    fun clearCachedKey(context: Context? = null) {
         cachedKey = null
+        context?.let {
+            try {
+                val prefs = it.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                prefs.edit().clear().apply()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to clear DB key preferences on sign-out", e)
+            }
+        }
     }
 }

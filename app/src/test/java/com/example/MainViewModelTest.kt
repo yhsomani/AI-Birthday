@@ -24,6 +24,9 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 
+import com.example.domain.repository.MemoryNoteRepository
+import com.example.domain.repository.GiftHistoryRepository
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -32,6 +35,8 @@ class MainViewModelTest {
     private lateinit var eventRepo: FakeEventRepository
     private lateinit var messageRepo: FakeMessageRepository
     private lateinit var styleProfileRepo: FakeStyleProfileRepository
+    private lateinit var memoryNoteRepo: FakeMemoryNoteRepository
+    private lateinit var giftHistoryRepo: FakeGiftHistoryRepository
     private lateinit var getDashboardMetrics: GetDashboardMetricsUseCase
     private lateinit var authManager: FakeAuthManager
     private lateinit var viewModel: MainViewModel
@@ -43,9 +48,11 @@ class MainViewModelTest {
         eventRepo = FakeEventRepository()
         messageRepo = FakeMessageRepository()
         styleProfileRepo = FakeStyleProfileRepository()
+        memoryNoteRepo = FakeMemoryNoteRepository()
+        giftHistoryRepo = FakeGiftHistoryRepository()
         authManager = FakeAuthManager()
         getDashboardMetrics = GetDashboardMetricsUseCase(contactRepo, eventRepo, messageRepo)
-        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, getDashboardMetrics, authManager)
+        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, memoryNoteRepo, giftHistoryRepo, getDashboardMetrics, authManager)
     }
 
     @After
@@ -64,10 +71,22 @@ class MainViewModelTest {
             ContactEntity(id = "1", name = "A", healthScore = 80),
             ContactEntity(id = "2", name = "B", healthScore = 60)
         )
-        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, getDashboardMetrics, authManager)
+        viewModel = MainViewModel(contactRepo, eventRepo, messageRepo, styleProfileRepo, memoryNoteRepo, giftHistoryRepo, getDashboardMetrics, authManager)
         testScheduler.advanceUntilIdle()
         assertEquals(70, viewModel.healthScore.value)
     }
+}
+
+class FakeMemoryNoteRepository : MemoryNoteRepository {
+    override suspend fun getByContact(contactId: String) = emptyList<com.example.core.db.entities.MemoryNoteEntity>()
+    override suspend fun upsert(note: com.example.core.db.entities.MemoryNoteEntity) {}
+    override suspend fun delete(note: com.example.core.db.entities.MemoryNoteEntity) {}
+}
+
+class FakeGiftHistoryRepository : GiftHistoryRepository {
+    override suspend fun getByContact(contactId: String) = emptyList<com.example.core.db.entities.GiftHistoryEntity>()
+    override suspend fun upsert(gift: com.example.core.db.entities.GiftHistoryEntity) {}
+    override suspend fun delete(gift: com.example.core.db.entities.GiftHistoryEntity) {}
 }
 
 class FakeAuthManager : com.example.core.auth.AuthManager {

@@ -22,23 +22,9 @@ class BirthdayWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        for (appWidgetId in appWidgetIds) {
-            updateAppWidget(context, appWidgetManager, appWidgetId)
-        }
-    }
-
-    companion object {
-        fun updateAppWidget(
-            context: Context,
-            appWidgetManager: AppWidgetManager,
-            appWidgetId: Int
-        ) {
-            val pendingResult = (context.getSystemService(Context.APPWIDGET_SERVICE) as? AppWidgetManager)?.let {
-                // Not strictly needed since AppWidgetProvider goes out of scope quickly
-            }
-
-            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-                val views = RemoteViews(context.packageName, R.layout.widget_birthday)
+        val pendingResult = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
                 val db = AppDatabase.getInstance(context)
                 val events = db.eventDao().getAll().first()
                 val contacts = db.contactDao().getAll().first()
@@ -51,19 +37,25 @@ class BirthdayWidgetProvider : AppWidgetProvider() {
                     it.type == "BIRTHDAY" && it.dayOfMonth == todayDay && it.month == todayMonth
                 }
 
-                if (todayBirthdays.isEmpty()) {
-                    views.setTextViewText(R.id.widget_title, "No birthdays today")
-                    views.setTextViewText(R.id.widget_subtitle, "Enjoy your day!")
-                } else {
-                    val names = todayBirthdays.mapNotNull { bday ->
-                        contacts.find { it.id == bday.contactId }?.name
-                    }.joinToString(", ")
+                for (appWidgetId in appWidgetIds) {
+                    val views = RemoteViews(context.packageName, R.layout.widget_birthday)
+                    if (todayBirthdays.isEmpty()) {
+                        views.setTextViewText(R.id.widget_title, "No birthdays today")
+                        views.setTextViewText(R.id.widget_subtitle, "Enjoy your day!")
+                    } else {
+                        val names = todayBirthdays.mapNotNull { bday ->
+                            contacts.find { it.id == bday.contactId }?.name ?: "Unknown Contact"
+                        }.joinToString(", ")
 
-                    views.setTextViewText(R.id.widget_title, "🎂 ${todayBirthdays.size} Birthday(s) Today!")
-                    views.setTextViewText(R.id.widget_subtitle, names.ifEmpty { "Wishes to send!" })
+                        views.setTextViewText(R.id.widget_title, "🎂 ${todayBirthdays.size} Birthday(s) Today!")
+                        views.setTextViewText(R.id.widget_subtitle, names.ifEmpty { "Wishes to send!" })
+                    }
+                    appWidgetManager.updateAppWidget(appWidgetId, views)
                 }
-
-                appWidgetManager.updateAppWidget(appWidgetId, views)
+            } catch (e: Exception) {
+                android.util.Log.e("BirthdayWidgetProvider", "Failed to update widget", e)
+            } finally {
+                pendingResult.finish()
             }
         }
     }

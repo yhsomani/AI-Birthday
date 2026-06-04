@@ -26,10 +26,19 @@ import com.example.core.db.entities.ContactEntity
 import com.example.ui.components.ElevatedCard
 import com.example.ui.theme.RelateAIColors
 
+import com.example.core.db.entities.MemoryNoteEntity
+import com.example.core.db.entities.GiftHistoryEntity
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactDetailScreen(
     contact: ContactEntity, 
+    notes: List<MemoryNoteEntity> = emptyList(),
+    gifts: List<GiftHistoryEntity> = emptyList(),
+    onAddNote: (category: String, noteText: String, mood: String) -> Unit = { _, _, _ -> },
+    onDeleteNote: (String) -> Unit = {},
+    onAddGift: (giftName: String, occasion: String, price: Int) -> Unit = { _, _, _ -> },
+    onDeleteGift: (String) -> Unit = {},
     onBack: () -> Unit,
     onEditContact: () -> Unit = {},
     onToggleDnd: (Boolean) -> Unit = {},
@@ -93,8 +102,8 @@ fun ContactDetailScreen(
             Box(modifier = Modifier.weight(1f).padding(horizontal = 24.dp, vertical = 16.dp)) {
                 when (selectedTab) {
                     "OVERVIEW" -> ContactOverview(contact, onToggleDnd, onEditSendTime)
-                    "MEMORIES" -> MemoryVaultView()
-                    "GIFTS" -> GiftAdvisorView()
+                    "MEMORIES" -> MemoryVaultView(notes = notes, onAddNote = onAddNote, onDeleteNote = onDeleteNote)
+                    "GIFTS" -> GiftAdvisorView(gifts = gifts, contactInterests = contact.interestsJson, onAddGift = onAddGift, onDeleteGift = onDeleteGift)
                 }
             }
         }
