@@ -189,7 +189,7 @@ fun ContactsContent(contacts: LazyPagingItems<ContactEntity>, onContactClick: (S
                                 }
                             },
                             trailingContent = {
-                                IconButton(onClick = { /* Quick actions menu */ }) {
+                                IconButton(onClick = { /* TODO: Show quick actions menu (message, call, edit) */ }) {
                                     Icon(
                                         imageVector = Icons.Default.MoreVert,
                                         contentDescription = "Actions",

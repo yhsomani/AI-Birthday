@@ -1,14 +1,1 @@
-*.iml
-.gradle
-.kotlin
-/local.properties
-/.idea/
-/build
-**/build/
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-.env
-debug.keystore
-*.dex
+Nothing should be ignored based on the provided file changes, as they consist only of source code and configuration files (.md, .sh, .xml, .kt). No build artifacts, dependencies, or temporary files are present in the changes.
