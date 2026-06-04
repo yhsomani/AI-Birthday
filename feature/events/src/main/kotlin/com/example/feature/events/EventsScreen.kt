@@ -302,7 +302,7 @@ fun EventsScreen(
                                 },
                                 trailingContent = {
                                     Button(
-                                        onClick = { /* Action callback */ },
+                                        onClick = { /* TODO: Navigate to Messages screen to generate/send message */ },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = if (isAnniversary) RelateAIColors.Tertiary else RelateAIColors.Primary
                                         ),

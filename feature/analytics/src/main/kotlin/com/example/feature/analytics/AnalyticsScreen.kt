@@ -245,7 +245,7 @@ fun AnalyticsScreen(
                                 },
                                 trailingContent = {
                                     Button(
-                                        onClick = { /* Launch write draft */ },
+                                        onClick = { /* TODO: Navigate to Messages screen to compose message */ },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = RelateAIColors.Primary
                                         ),

@@ -11,4 +11,55 @@
     <string name="onboarding_get_started">Get Started</string>
     <string name="onboarding_step_text">Step %1$d of %2$d</string>
     <string name="onboarding_skip">Skip</string>
+    
+    <!-- Memory Vault -->
+    <string name="memory_vault_title">Memory Vault</string>
+    <string name="memory_vault_subtitle">Log meaningful moments and insights</string>
+    <string name="memory_no_memories">No memories yet</string>
+    <string name="memory_add_prompt">Tap + to log a meaningful moment</string>
+    <string name="memory_add_title">Add Memory</string>
+    <string name="memory_category_label">Category</string>
+    <string name="memory_content_label">What happened?</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    
+    <!-- Gift Advisor -->
+    <string name="gift_advisor_title">Gift Advisor</string>
+    <string name="gift_advisor_subtitle">Track past gifts and get AI suggestions</string>
+    <string name="gift_suggestions_title">AI Gift Suggestions</string>
+    <string name="gift_search_button">Search Gift Ideas</string>
+    <string name="gift_no_gifts">No gifts logged yet</string>
+    <string name="gift_add_prompt">Tap + to track a gift you\'ve given</string>
+    <string name="gift_history_title">Gift History</string>
+    <string name="gift_log_title">Log Gift</string>
+    <string name="gift_description_label">Gift description</string>
+    <string name="gift_price_label">Price (₹)</string>
+    
+    <!-- Contact Detail -->
+    <string name="contact_health_score">Health Score: %1$d%%</string>
+    <string name="contact_engagement_score">Engagement Score</string>
+    <string name="contact_points">%1$d points</string>
+    <string name="contact_communication_style">Communication Style</string>
+    <string name="contact_automation_settings">Automation Settings</string>
+    <string name="contact_dnd_label">Do Not Disturb</string>
+    <string name="contact_dnd_subtitle">Never auto-send messages</string>
+    <string name="contact_send_time_label">Custom Send Time</string>
+    <string name="contact_send_time_default">Default (09:00 AM)</string>
+    <string name="edit">EDIT</string>
+    
+    <!-- Messages -->
+    <string name="messages_no_recent">No recent messages</string>
+    
+    <!-- Analytics -->
+    <string name="analytics_reconnect">Reconnect</string>
+    
+    <!-- Events -->
+    <string name="events_send_message">Send Message</string>
+    <string name="events_generate_wish">Generate Wish</string>
+    
+    <!-- Common -->
+    <string name="add">Add</string>
+    <string name="delete">Delete</string>
+    <string name="back">Back</string>
+    <string name="edit_contact">Edit</string>
 </resources>
