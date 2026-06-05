@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    // alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.devtools.ksp)
     alias(libs.plugins.hilt.android)
@@ -45,8 +46,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
@@ -86,17 +87,17 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:data"))
+    implementation(project(":core:ui"))
     implementation(project(":feature:splash"))
     implementation(project(":feature:login"))
+    implementation(project(":feature:onboarding"))
     implementation(project(":feature:dashboard"))
     implementation(project(":feature:contacts"))
     implementation(project(":feature:events"))
-    implementation(project(":feature:analytics"))
-    implementation(project(":feature:onboarding"))
-    implementation(project(":feature:settings"))
     implementation(project(":feature:messages"))
-    implementation(project(":core:ui"))
-    implementation(project(":core:data"))
+    implementation(project(":feature:analytics"))
+    implementation(project(":feature:settings"))
 
     // Hilt
     implementation(libs.hilt.android)
@@ -122,7 +123,6 @@ dependencies {
     implementation(libs.google.api.people)
     implementation(libs.play.services.auth)
     implementation(libs.converter.moshi)
-    implementation(libs.coil.compose)
     implementation(libs.sqlcipher)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
@@ -131,24 +131,18 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.retrofit)
 
-    // Android & Compose core dependencies missing in app module
+    // Android core dependencies
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
-    implementation("androidx.activity:activity-compose:1.9.0")
-    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.navigation:navigation-compose:2.7.7")
     
     // Room
-    implementation("androidx.room:room-runtime:2.6.1")
+    implementation(libs.androidx.room.runtime)
 
     // Paging
     implementation(libs.androidx.paging.runtime)
+    implementation(libs.androidx.paging.compose)
     testImplementation(libs.androidx.paging.runtime)
 
     // Testing

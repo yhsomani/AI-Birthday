@@ -17,6 +17,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.ui.theme.CyberRose
+import com.example.ui.theme.DarkSlate
+import com.example.ui.theme.Emerald
+import com.example.ui.theme.GlassEdge
+import com.example.ui.theme.NeonViolet
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
 
 @Composable
 fun WelcomeScreen(navController: NavController) {
@@ -36,37 +43,37 @@ fun WelcomeScreen(navController: NavController) {
                     .fillMaxWidth()
                     .height(140.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = 0.03f))
-                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+                    .background(DarkSlate.copy(alpha = 0.7f))
+                    .border(1.dp, GlassEdge, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 androidx.compose.foundation.Canvas(modifier = Modifier.size(80.dp)) {
                     val center = this.center
                     // Draw connections
                     drawLine(
-                        color = Color(0xFF6366F1),
+                        color = NeonViolet,
                         start = center,
                         end = center.copy(x = center.x - 26.dp.toPx(), y = center.y - 18.dp.toPx()),
                         strokeWidth = 2.dp.toPx()
                     )
                     drawLine(
-                        color = Color(0xFF6366F1),
+                        color = NeonViolet,
                         start = center,
                         end = center.copy(x = center.x + 26.dp.toPx(), y = center.y - 18.dp.toPx()),
                         strokeWidth = 2.dp.toPx()
                     )
                     drawLine(
-                        color = Color(0xFF6366F1),
+                        color = NeonViolet,
                         start = center,
                         end = center.copy(y = center.y + 30.dp.toPx()),
                         strokeWidth = 2.dp.toPx()
                     )
                     
                     // Draw nodes
-                    drawCircle(color = Color(0xFF6366F1), radius = 9.dp.toPx(), center = center)
-                    drawCircle(color = Color(0xFF34D399), radius = 6.dp.toPx(), center = center.copy(x = center.x - 26.dp.toPx(), y = center.y - 18.dp.toPx()))
-                    drawCircle(color = Color(0xFF34D399), radius = 6.dp.toPx(), center = center.copy(x = center.x + 26.dp.toPx(), y = center.y - 18.dp.toPx()))
-                    drawCircle(color = Color(0xFFF43F5E), radius = 6.dp.toPx(), center = center.copy(y = center.y + 30.dp.toPx()))
+                    drawCircle(color = NeonViolet, radius = 9.dp.toPx(), center = center)
+                    drawCircle(color = Emerald, radius = 6.dp.toPx(), center = center.copy(x = center.x - 26.dp.toPx(), y = center.y - 18.dp.toPx()))
+                    drawCircle(color = Emerald, radius = 6.dp.toPx(), center = center.copy(x = center.x + 26.dp.toPx(), y = center.y - 18.dp.toPx()))
+                    drawCircle(color = CyberRose, radius = 6.dp.toPx(), center = center.copy(y = center.y + 30.dp.toPx()))
                 }
             }
 
@@ -74,7 +81,7 @@ fun WelcomeScreen(navController: NavController) {
                 text = "Key Intelligence Capabilities:",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = TextPrimary
             )
 
             CapabilityOption(
@@ -104,8 +111,8 @@ fun CapabilityOption(icon: ImageVector, title: String, desc: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = 0.05f))
-            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+            .background(DarkSlate.copy(alpha = 0.7f))
+            .border(1.dp, GlassEdge, RoundedCornerShape(12.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -113,13 +120,13 @@ fun CapabilityOption(icon: ImageVector, title: String, desc: String) {
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                .background(NeonViolet.copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = NeonViolet,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -129,13 +136,13 @@ fun CapabilityOption(icon: ImageVector, title: String, desc: String) {
                 title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = TextPrimary
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 desc,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.7f)
+                color = TextSecondary
             )
         }
     }

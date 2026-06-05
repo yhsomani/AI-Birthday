@@ -1,7 +1,7 @@
-package com.example.automation.sender
+package com.example.core.automation.sender
 
 import android.content.Context
-import com.example.accessibility.WhatsAppAccessibilityService
+import com.example.core.accessibility.WhatsAppAccessibilityService
 import com.example.core.prefs.SecurePrefs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers

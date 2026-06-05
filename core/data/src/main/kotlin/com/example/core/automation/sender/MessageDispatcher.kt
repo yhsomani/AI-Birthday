@@ -1,4 +1,4 @@
-package com.example.automation.sender
+package com.example.core.automation.sender
 
 import android.content.Context
 import android.util.Log

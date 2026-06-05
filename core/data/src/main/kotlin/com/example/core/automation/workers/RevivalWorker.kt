@@ -1,11 +1,11 @@
-package com.example.automation.workers
+package com.example.core.automation.workers
 
 import android.content.Context
 import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.automation.notifications.NotificationHelper
+import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.entities.PendingMessageEntity
@@ -28,8 +28,8 @@ class RevivalWorker @AssistedInject constructor(
 ) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         return try {
-            if (prefs.getGeminiApiKey().isEmpty()) {
-                Log.i(TAG, "Gemini API key not set yet; skipping revival scan (Result.success no-op)")
+            if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
+                Log.i(TAG, "User not authenticated; skipping revival scan")
                 return Result.success()
             }
 

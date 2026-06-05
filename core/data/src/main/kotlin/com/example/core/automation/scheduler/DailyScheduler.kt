@@ -1,4 +1,4 @@
-package com.example.automation.scheduler
+package com.example.core.automation.scheduler
 
 import android.app.AlarmManager
 import android.app.PendingIntent
@@ -26,6 +26,7 @@ object DailyScheduler {
         val db = AppDatabase.getInstance(context)
         // Fire and forget, but ideally this should be managed by a WorkManager or injected scope.
         // We'll use GlobalScope for fire and forget broadcast scheduling (as context might die).
+        @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             val pending = db.pendingMessageDao().getByEventId(eventId)
             if (pending != null) {
@@ -44,7 +45,7 @@ class MessageDispatchReceiver : BroadcastReceiver() {
         
         val workManager = androidx.work.WorkManager.getInstance(context)
         val data = androidx.work.Data.Builder().putString("event_id", eventId).build()
-        val request = androidx.work.OneTimeWorkRequestBuilder<com.example.automation.workers.MessageDispatchWorker>()
+        val request = androidx.work.OneTimeWorkRequestBuilder<com.example.core.automation.workers.MessageDispatchWorker>()
             .setInputData(data)
             .build()
             
@@ -66,7 +67,7 @@ class BootReceiver : BroadcastReceiver() {
                     }
                     
                     // 2. Reschedule periodic workers
-                    com.example.automation.scheduler.WorkerScheduler.scheduleAll(context)
+                    com.example.core.automation.scheduler.WorkerScheduler.scheduleAll(context)
                 } finally {
                     pendingResult.finish()
                 }

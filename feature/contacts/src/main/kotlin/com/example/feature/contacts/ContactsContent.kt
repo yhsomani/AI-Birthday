@@ -24,7 +24,11 @@ import androidx.paging.compose.itemKey
 import com.example.core.db.entities.ContactEntity
 import com.example.ui.components.ElevatedCard
 import com.example.ui.components.StatusBadge
+import com.example.ui.theme.DarkSlate
+import com.example.ui.theme.GlassEdge
+import com.example.ui.theme.GlassEdgeStrong
 import com.example.ui.theme.RelateAIColors
+import com.example.ui.theme.TextPrimary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +46,7 @@ fun ContactsContent(contacts: LazyPagingItems<ContactEntity>, onContactClick: (S
             text = "Contacts",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
-            color = Color.White,
+            color = TextPrimary,
             modifier = Modifier.padding(bottom = 16.dp),
             letterSpacing = (-0.5).sp
         )
@@ -55,10 +59,10 @@ fun ContactsContent(contacts: LazyPagingItems<ContactEntity>, onContactClick: (S
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = RelateAIColors.OnSurfaceVariantDark) },
             singleLine = true,
             colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.White.copy(alpha = 0.04f),
-                unfocusedContainerColor = Color.White.copy(alpha = 0.04f),
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
+                focusedContainerColor = DarkSlate,
+                unfocusedContainerColor = DarkSlate,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary,
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent,
                 disabledIndicatorColor = Color.Transparent
@@ -66,7 +70,7 @@ fun ContactsContent(contacts: LazyPagingItems<ContactEntity>, onContactClick: (S
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                .border(1.dp, GlassEdge, RoundedCornerShape(12.dp))
                 .padding(bottom = 16.dp)
         )
 
@@ -83,10 +87,10 @@ fun ContactsContent(contacts: LazyPagingItems<ContactEntity>, onContactClick: (S
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(if (isSelected) RelateAIColors.Primary else Color.White.copy(alpha = 0.04f))
+                        .background(if (isSelected) RelateAIColors.Primary else DarkSlate.copy(alpha = 0.7f))
                         .border(
                             1.dp,
-                            if (isSelected) Color.Transparent else Color.White.copy(alpha = 0.06f),
+                            if (isSelected) Color.Transparent else GlassEdge,
                             RoundedCornerShape(20.dp)
                         )
                         .clickable { selectedFilter = filter }
@@ -94,7 +98,7 @@ fun ContactsContent(contacts: LazyPagingItems<ContactEntity>, onContactClick: (S
                 ) {
                     Text(
                         text = filter,
-                        color = if (isSelected) Color.White else RelateAIColors.OnSurfaceVariantDark,
+                        color = if (isSelected) TextPrimary else RelateAIColors.OnSurfaceVariantDark,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -144,7 +148,7 @@ fun ContactsContent(contacts: LazyPagingItems<ContactEntity>, onContactClick: (S
                         onClick = { onContactClick(contact.id) }
                     ) {
                         ListItem(
-                            headlineContent = { Text(contact.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White) },
+                            headlineContent = { Text(contact.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimary) },
                             supportingContent = { 
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -189,12 +193,34 @@ fun ContactsContent(contacts: LazyPagingItems<ContactEntity>, onContactClick: (S
                                 }
                             },
                             trailingContent = {
-                                IconButton(onClick = { /* TODO: Show quick actions menu (message, call, edit) */ }) {
-                                    Icon(
-                                        imageVector = Icons.Default.MoreVert,
-                                        contentDescription = "Actions",
-                                        tint = RelateAIColors.OnSurfaceVariantDark
-                                    )
+                                var expanded by remember { mutableStateOf(false) }
+                                Box {
+                                    IconButton(onClick = { expanded = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.MoreVert,
+                                            contentDescription = "Actions",
+                                            tint = RelateAIColors.OnSurfaceVariantDark
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = expanded,
+                                        onDismissRequest = { expanded = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("View Details") },
+                                            onClick = {
+                                                expanded = false
+                                                onContactClick(contact.id)
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Quick Message") },
+                                            onClick = {
+                                                expanded = false
+                                                // Trigger quick message
+                                            }
+                                        )
+                                    }
                                 }
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)

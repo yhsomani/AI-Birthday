@@ -1,11 +1,11 @@
-package com.example.automation.notifications
+package com.example.core.automation.notifications
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.work.HiltWorkerFactory
-import com.example.automation.scheduler.DailyScheduler
+import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.db.dao.PendingMessageDao
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn

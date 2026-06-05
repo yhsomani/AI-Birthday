@@ -1,4 +1,4 @@
-package com.example.contacts
+package com.example.core.contacts
 
 import com.example.core.db.entities.ContactEntity
 

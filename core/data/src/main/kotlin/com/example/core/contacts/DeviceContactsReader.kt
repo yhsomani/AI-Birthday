@@ -1,4 +1,4 @@
-package com.example.contacts
+package com.example.core.contacts
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -40,60 +40,64 @@ class DeviceContactsReader(private val context: Context) {
             Log.w("DeviceContactsReader", "Missing call log permission", e)
         }
 
-        val cursor = contentResolver.query(
-            ContactsContract.Contacts.CONTENT_URI,
-            arrayOf(
-                ContactsContract.Contacts._ID,
-                ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
-                ContactsContract.Contacts.HAS_PHONE_NUMBER
-            ),
-            null,
-            null,
-            null
-        )
-        
-        cursor?.use {
-            while (it.moveToNext()) {
-                val id = it.getString(it.getColumnIndex(ContactsContract.Contacts._ID))
-                val name = it.getString(it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY))
-                val hasPhone = it.getInt(it.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER)) > 0
-                
-                var phone: String? = null
-                var interactionCount = 0
-                var lastInteractionDate: Long? = null
-                
-                if (hasPhone) {
-                    val pCursor = contentResolver.query(
-                        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                        null,
-                        ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
-                        arrayOf(id),
-                        null
-                    )
-                    if (pCursor != null && pCursor.moveToFirst()) {
-                        phone = pCursor.getString(pCursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER))
-                        pCursor.close()
-                        
-                        val cleanPhone = phone.replace(Regex("[^0-9+]"), "")
-                        if (callMap.containsKey(cleanPhone)) {
-                            interactionCount = callMap[cleanPhone]!!.first
-                            lastInteractionDate = callMap[cleanPhone]!!.second
+        try {
+            val cursor = contentResolver.query(
+                ContactsContract.Contacts.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.Contacts._ID,
+                    ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
+                    ContactsContract.Contacts.HAS_PHONE_NUMBER
+                ),
+                null,
+                null,
+                null
+            )
+
+            cursor?.use {
+                while (it.moveToNext()) {
+                    val id = it.getString(it.getColumnIndex(ContactsContract.Contacts._ID))
+                    val name = it.getString(it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY))
+                    val hasPhone = it.getInt(it.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER)) > 0
+
+                    var phone: String? = null
+                    var interactionCount = 0
+                    var lastInteractionDate: Long? = null
+
+                    if (hasPhone) {
+                        val pCursor = contentResolver.query(
+                            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                            null,
+                            ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ?",
+                            arrayOf(id),
+                            null
+                        )
+                        if (pCursor != null && pCursor.moveToFirst()) {
+                            phone = pCursor.getString(pCursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER))
+                            pCursor.close()
+
+                            val cleanPhone = phone.replace(Regex("[^0-9+]"), "")
+                            if (callMap.containsKey(cleanPhone)) {
+                                interactionCount = callMap[cleanPhone]!!.first
+                                lastInteractionDate = callMap[cleanPhone]!!.second
+                            }
                         }
                     }
-                }
-                
-                if (name != null) {
-                    val health = if (interactionCount > 10) 90 else if (interactionCount > 3) 70 else if (interactionCount > 0) 50 else 20
-                    contacts.add(ContactEntity(
-                        id = id,
-                        name = name,
-                        primaryPhone = phone,
-                        interactionFrequencyPerMonth = interactionCount.toFloat(),
-                        lastInteractionDate = lastInteractionDate,
-                        healthScore = health
-                    ))
+
+                    if (name != null) {
+                        val health = if (interactionCount > 10) 90 else if (interactionCount > 3) 70 else if (interactionCount > 0) 50 else 20
+                        contacts.add(ContactEntity(
+                            id = id,
+                            name = name,
+                            primaryPhone = phone,
+                            interactionFrequencyPerMonth = interactionCount.toFloat(),
+                            lastInteractionDate = lastInteractionDate,
+                            healthScore = health
+                        ))
+                    }
                 }
             }
+        } catch (e: SecurityException) {
+            Log.w("DeviceContactsReader", "Missing contacts permission", e)
         }
         
         return contacts

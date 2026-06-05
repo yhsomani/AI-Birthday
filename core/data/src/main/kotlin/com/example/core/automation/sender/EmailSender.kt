@@ -1,4 +1,4 @@
-package com.example.automation.sender
+package com.example.core.automation.sender
 
 import com.example.core.prefs.SecurePrefs
 import kotlinx.coroutines.Dispatchers

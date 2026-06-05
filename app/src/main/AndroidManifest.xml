@@ -43,13 +43,9 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
-        <activity
-            android:name=".automation.notifications.MessageEditActivity"
-            android:exported="false"
-            android:theme="@style/Theme.MyApplication" />
 
         <service
-            android:name=".accessibility.WhatsAppAccessibilityService"
+            android:name="com.example.core.accessibility.WhatsAppAccessibilityService"
             android:exported="true"
             android:label="RelateAI — Auto WhatsApp"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
@@ -61,24 +57,14 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <receiver android:name=".automation.scheduler.MessageDispatchReceiver" android:exported="false" />
-        <receiver android:name=".automation.notifications.ApprovalReceiver" android:exported="false" />
-        <receiver android:name=".automation.scheduler.BootReceiver" android:exported="true">
+        <receiver android:name="com.example.core.automation.scheduler.MessageDispatchReceiver" android:exported="false" />
+        <receiver android:name="com.example.core.automation.notifications.ApprovalReceiver" android:exported="false" />
+        <receiver android:name="com.example.core.automation.scheduler.BootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 
-        <receiver
-            android:name=".widget.BirthdayWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_birthday_info" />
-        </receiver>
 
         <provider
             android:name="androidx.startup.InitializationProvider"

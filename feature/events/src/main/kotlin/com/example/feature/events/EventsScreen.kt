@@ -3,500 +3,352 @@ package com.example.feature.events
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
-import com.example.ui.components.ElevatedCard
-import com.example.ui.components.PrimaryButton
-import com.example.ui.components.StatusBadge
-import com.example.ui.theme.RelateAIColors
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
+import com.example.ui.theme.DarkSlate
+import com.example.ui.theme.ElectricCyan
+import com.example.ui.theme.Emerald
+import com.example.ui.theme.GlassEdge
+import com.example.ui.theme.NeonViolet
+import com.example.ui.theme.ObsidianBlack
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.TextTertiary
 
-@OptIn(ExperimentalMaterial3Api::class)
+data class TimelineEvent(
+    val emoji: String,
+    val title: String,
+    val subtitle: String,
+    val dateLabel: String,
+    val isToday: Boolean = false,
+    val status: EventStatus = EventStatus.NOT_STARTED,
+    val statusText: String = "",
+    val hasAvatar: Boolean = false
+)
+
+enum class EventStatus { READY, GENERATING, SCHEDULED, NOT_STARTED, SENT }
+
+private val sampleEvents = listOf(
+    TimelineEvent("🎂", "Raj Patel's Birthday", "College Friend • Turning 33", "TODAY", true, EventStatus.READY, "Message ready for approval", true),
+    TimelineEvent("🎂", "Mom's Birthday", "Family • Turning 58", "Jun 5", false, EventStatus.READY, "3 variants generated"),
+    TimelineEvent("💍", "Vikram & Neha Anniversary", "Best Friend • 5th Anniversary", "Jun 8", false, EventStatus.GENERATING, "Generating message..."),
+    TimelineEvent("🎉", "Priya's Work Anniversary", "Colleague • 3 years", "Jun 15", false, EventStatus.SCHEDULED, "Scheduled"),
+    TimelineEvent("🎂", "Arjun Kapoor Birthday", "Work • Turning 29", "Jun 22", false, EventStatus.NOT_STARTED, "Not started"),
+)
+
+private val eventFilters = listOf("All", "Birthdays", "Anniversaries", "Work", "Custom")
+
 @Composable
 fun EventsScreen(
-    contacts: List<ContactEntity>,
-    events: List<EventEntity>,
-    onAddBirthday: (contactId: String, dayOfMonth: Int, month: Int, year: Int?) -> Unit = { _: String, _: Int, _: Int, _: Int? -> }
+    onCalendarView: () -> Unit = {},
+    onEventReview: (String) -> Unit = {}
 ) {
-    var showAddSheet by remember { mutableStateOf(false) }
-    val scrollState = rememberScrollState()
+    var selectedFilter by remember { mutableStateOf("All") }
 
-    // Calendar state
-    val calendarInstance = remember { Calendar.getInstance() }
-    var currentMonth by remember { mutableIntStateOf(calendarInstance.get(Calendar.MONTH)) }
-    var currentYear by remember { mutableIntStateOf(calendarInstance.get(Calendar.YEAR)) }
-
-    val monthName = remember(currentMonth) {
-        calendarInstance.apply { set(Calendar.MONTH, currentMonth) }
-            .getDisplayName(Calendar.MONTH, Calendar.LONG, Locale.getDefault()) ?: ""
-    }
-
-    val daysInMonth = remember(currentMonth, currentYear) {
-        calendarInstance.apply {
-            set(Calendar.YEAR, currentYear)
-            set(Calendar.MONTH, currentMonth)
-            set(Calendar.DAY_OF_MONTH, 1)
-        }.getActualMaximum(Calendar.DAY_OF_MONTH)
-    }
-
-    val firstDayOfWeek = remember(currentMonth, currentYear) {
-        calendarInstance.apply {
-            set(Calendar.YEAR, currentYear)
-            set(Calendar.MONTH, currentMonth)
-            set(Calendar.DAY_OF_MONTH, 1)
-        }.get(Calendar.DAY_OF_WEEK) - 1
-    }
-
-    val birthdaysThisMonth = remember(events, currentMonth) {
-        events.filter {
-            it.month == currentMonth + 1
-        }.groupBy { it.dayOfMonth }
-    }
-
-    if (showAddSheet) {
-        AddBirthdaySheet(
-            contacts = contacts.filter { c ->
-                events.none { it.contactId == c.id && it.type == "BIRTHDAY" }
-            },
-            onDismiss = { showAddSheet = false },
-            onSave = { contactId, day, month, year ->
-                onAddBirthday(contactId, day, month, year)
-                showAddSheet = false
-            }
-        )
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(ObsidianBlack)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(bottom = 80.dp)
+                .verticalScroll(rememberScrollState())
         ) {
-            Text(
-                text = "Events",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White,
-                modifier = Modifier.padding(bottom = 16.dp),
-                letterSpacing = (-0.5).sp
-            )
-
-            // Mini Calendar Card Widget
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth(),
-                padding = 16.dp
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ObsidianBlack.copy(alpha = 0.85f))
+                    .padding(horizontal = 20.dp)
+                    .height(64.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    // Month Picker Headers
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = {
-                            if (currentMonth == 0) {
-                                currentMonth = 11
-                                currentYear--
-                            } else {
-                                currentMonth--
-                            }
-                        }) {
-                            Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Month", tint = Color.White)
-                        }
-                        Text(
-                            text = "$monthName $currentYear",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        IconButton(onClick = {
-                            if (currentMonth == 11) {
-                                currentMonth = 0
-                                currentYear++
-                            } else {
-                                currentMonth++
-                            }
-                        }) {
-                            Icon(Icons.Default.ChevronRight, contentDescription = "Next Month", tint = Color.White)
-                        }
+                Text("Events", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(DarkSlate)
+                        .border(1.dp, GlassEdge, RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    IconButton(onClick = onCalendarView) {
+                        Icon(Icons.Default.CalendarMonth, contentDescription = "Calendar", tint = NeonViolet)
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-                    // Days of week
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {}) {
+                    Icon(Icons.Default.ChevronLeft, contentDescription = "Previous", tint = TextSecondary)
+                }
+                Text("June 2026", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), color = TextSecondary)
+                IconButton(onClick = {}) {
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Next", tint = TextSecondary)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                eventFilters.forEach { chip ->
+                    val isActive = chip == selectedFilter
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isActive) NeonViolet else DarkSlate.copy(alpha = 0.7f))
+                            .border(1.dp, if (isActive) NeonViolet else GlassEdge, RoundedCornerShape(8.dp))
+                            .clickable { selectedFilter = chip }
+                            .padding(horizontal = 14.dp, vertical = 7.dp)
                     ) {
-                        listOf("S", "M", "T", "W", "T", "F", "S").forEach { day ->
-                            Text(
-                                text = day,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = RelateAIColors.OnSurfaceVariantDark,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Calendar Grid Layout
-                    val totalCells = firstDayOfWeek + daysInMonth
-                    val rowsCount = (totalCells + 6) / 7
-                    
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (r in 0 until rowsCount) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                for (c in 0..6) {
-                                    val cellIndex = r * 7 + c
-                                    if (cellIndex < firstDayOfWeek || cellIndex >= totalCells) {
-                                        Spacer(modifier = Modifier.size(32.dp).weight(1f))
-                                    } else {
-                                        val day = cellIndex - firstDayOfWeek + 1
-                                        val hasEvent = birthdaysThisMonth.containsKey(day)
-                                        Box(
-                                            modifier = Modifier
-                                                .size(32.dp)
-                                                .weight(1f)
-                                                .clip(CircleShape)
-                                                .background(if (hasEvent) RelateAIColors.Primary.copy(alpha = 0.12f) else Color.Transparent)
-                                                .border(
-                                                    1.dp,
-                                                    if (hasEvent) RelateAIColors.Primary.copy(alpha = 0.3f) else Color.Transparent,
-                                                    CircleShape
-                                                ),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(
-                                                    text = day.toString(),
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    fontWeight = if (hasEvent) FontWeight.Bold else FontWeight.Normal,
-                                                    color = if (hasEvent) RelateAIColors.PrimaryLight else Color.White
-                                                )
-                                                if (hasEvent) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(4.dp)
-                                                            .clip(CircleShape)
-                                                            .background(RelateAIColors.Secondary)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        Text(chip, style = MaterialTheme.typography.labelLarge, color = if (isActive) TextPrimary else TextSecondary)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Timelines of upcoming reminders
-            Text(
-                text = "Timeline Feed",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            val sortedTimelineEvents = remember(events) {
-                events.sortedBy { it.nextOccurrenceMs }
-            }
-
-            if (sortedTimelineEvents.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Event,
-                            contentDescription = null,
-                            tint = RelateAIColors.OnSurfaceVariantDark.copy(alpha = 0.5f),
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("No upcoming reminders.", style = MaterialTheme.typography.bodyMedium, color = RelateAIColors.OnSurfaceVariantDark)
-                    }
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    sortedTimelineEvents.forEach { event ->
-                        val contact = contacts.find { it.id == event.contactId }
-                        val name = contact?.name ?: "Unknown"
-                        val dateStr = SimpleDateFormat("MMMM d", Locale.getDefault()).format(Date(event.nextOccurrenceMs))
-                        val isAnniversary = event.type == "ANNIVERSARY" || event.type == "WORK_ANNIVERSARY"
-
-                        ElevatedCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
-                            ListItem(
-                                headlineContent = { Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White) },
-                                supportingContent = {
-                                    Column(modifier = Modifier.padding(top = 2.dp)) {
-                                        Text(
-                                            text = "${event.type} • $dateStr",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = RelateAIColors.OnSurfaceVariantDark
-                                        )
-                                        if (!event.isVerified) {
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            StatusBadge(
-                                                text = "Verify Event?",
-                                                containerColor = RelateAIColors.Tertiary.copy(alpha = 0.15f),
-                                                contentColor = RelateAIColors.Tertiary
-                                            )
-                                        }
-                                    }
-                                },
-                                leadingContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(
-                                                if (isAnniversary) RelateAIColors.Tertiary.copy(alpha = 0.12f)
-                                                else RelateAIColors.Primary.copy(alpha = 0.12f)
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isAnniversary) Icons.Default.Chat else Icons.Default.Event,
-                                            contentDescription = null,
-                                            tint = if (isAnniversary) RelateAIColors.Tertiary else RelateAIColors.Primary,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                },
-                                trailingContent = {
-                                    Button(
-                                        onClick = { /* TODO: Navigate to Messages screen to generate/send message */ },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (isAnniversary) RelateAIColors.Tertiary else RelateAIColors.Primary
-                                        ),
-                                        shape = RoundedCornerShape(8.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(
-                                            text = if (isAnniversary) "Send Message" else "Generate Wish",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-                                },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                            )
-                        }
+            Box(modifier = Modifier.padding(start = 20.dp, end = 20.dp)) {
+                Column {
+                    sampleEvents.forEachIndexed { index, event ->
+                        EventTimelineRow(event, index == sampleEvents.lastIndex, onEventReview)
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(88.dp))
         }
 
-        // FAB styled in vibrant Indigo
-        FloatingActionButton(
-            onClick = { showAddSheet = true },
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            containerColor = RelateAIColors.Primary,
-            contentColor = Color.White
+                .padding(end = 20.dp, bottom = 88.dp)
         ) {
-            Icon(Icons.Default.Add, contentDescription = "Add Birthday")
+            FloatingActionButton(
+                onClick = {},
+                containerColor = NeonViolet,
+                contentColor = TextPrimary,
+                shape = CircleShape,
+                modifier = Modifier.size(56.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add event")
+            }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddBirthdaySheet(
-    contacts: List<ContactEntity>,
-    onDismiss: () -> Unit,
-    onSave: (contactId: String, dayOfMonth: Int, month: Int, year: Int?) -> Unit
+private fun EventTimelineRow(
+    event: TimelineEvent,
+    isLast: Boolean,
+    onEventReview: (String) -> Unit
 ) {
-    var selectedContactId by remember { mutableStateOf<String?>(null) }
-    var dayText by remember { mutableStateOf("") }
-    var monthText by remember { mutableStateOf("") }
-    var yearText by remember { mutableStateOf("") }
-    var hasYear by remember { mutableStateOf(true) }
-    var expanded by remember { mutableStateOf(false) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = RelateAIColors.SurfaceDark,
-        contentColor = Color.White
-    ) {
+    Row(modifier = Modifier.height(IntrinsicSize.Min)) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.width(24.dp).fillMaxHeight()
         ) {
-            Text(
-                text = "Add Birthday",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+            Box(
+                modifier = Modifier
+                    .size(if (event.isToday) 16.dp else 12.dp)
+                    .clip(CircleShape)
+                    .background(if (event.isToday) NeonViolet else NeonViolet.copy(alpha = 0.4f))
+                    .border(if (event.isToday) 4.dp else 2.dp, ObsidianBlack, CircleShape)
             )
-
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = it }
-            ) {
-                val selectedName = contacts.find { it.id == selectedContactId }?.name ?: ""
-                OutlinedTextField(
-                    value = selectedName,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Contact", color = RelateAIColors.OnSurfaceVariantDark) },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RelateAIColors.Primary,
-                        unfocusedBorderColor = RelateAIColors.OutlineDark,
-                        focusedLabelColor = RelateAIColors.Primary,
-                        unfocusedLabelColor = RelateAIColors.OnSurfaceVariantDark,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White
-                    )
+            if (!isLast) {
+                val lineColor = if (event.isToday) {
+                    Brush.verticalGradient(listOf(NeonViolet, NeonViolet.copy(alpha = 0.1f)))
+                } else {
+                    Brush.verticalGradient(listOf(NeonViolet.copy(alpha = 0.2f), NeonViolet.copy(alpha = 0.1f)))
+                }
+                Box(
+                    modifier = Modifier
+                        .width(2.dp)
+                        .weight(1f)
+                        .background(lineColor)
                 )
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                    modifier = Modifier.background(RelateAIColors.SurfaceDark)
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(bottom = 16.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(DarkSlate.copy(alpha = 0.7f))
+                .border(
+                    width = 1.dp,
+                    color = if (event.isToday) NeonViolet.copy(alpha = 0.4f) else GlassEdge,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(16.dp)
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
                 ) {
-                    contacts.forEach { contact ->
-                        DropdownMenuItem(
-                            text = { Text(contact.name, color = Color.White) },
-                            onClick = {
-                                selectedContactId = contact.id
-                                expanded = false
-                            }
-                        )
+                    if (event.isToday) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(NeonViolet.copy(alpha = 0.2f))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("TODAY", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = NeonViolet)
+                        }
+                    } else {
+                        Text(event.dateLabel, style = MaterialTheme.typography.labelSmall, color = TextTertiary)
+                    }
+
+                    if (event.hasAvatar) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, NeonViolet.copy(alpha = 0.3f), CircleShape)
+                                .background(NeonViolet.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                event.title.substringAfter("'s").substringBefore(" ").trim().take(1).ifEmpty { "R" },
+                                color = NeonViolet,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
                     }
                 }
-            }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = dayText,
-                    onValueChange = { if (it.length <= 2) dayText = it.filter { c -> c.isDigit() } },
-                    label = { Text("Day", color = RelateAIColors.OnSurfaceVariantDark) },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RelateAIColors.Primary,
-                        unfocusedBorderColor = RelateAIColors.OutlineDark,
-                        focusedTextColor = Color.White
-                    )
-                )
-                OutlinedTextField(
-                    value = monthText,
-                    onValueChange = { if (it.length <= 2) monthText = it.filter { c -> c.isDigit() } },
-                    label = { Text("Month", color = RelateAIColors.OnSurfaceVariantDark) },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RelateAIColors.Primary,
-                        unfocusedBorderColor = RelateAIColors.OutlineDark,
-                        focusedTextColor = Color.White
-                    )
-                )
-            }
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedTextField(
-                    value = yearText,
-                    onValueChange = { if (it.length <= 4) yearText = it.filter { c -> c.isDigit() } },
-                    label = { Text("Year", color = RelateAIColors.OnSurfaceVariantDark) },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    enabled = hasYear,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = RelateAIColors.Primary,
-                        unfocusedBorderColor = RelateAIColors.OutlineDark,
-                        focusedTextColor = Color.White
-                    )
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = hasYear,
-                        onCheckedChange = {
-                            hasYear = it
-                            if (!it) yearText = ""
-                        },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = RelateAIColors.Primary
-                        )
-                    )
-                    Text(
-                        text = "Has year",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RelateAIColors.OnSurfaceVariantDark
-                    )
+                Text("${event.emoji} ${event.title}", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(event.subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+
+                when (event.status) {
+                    EventStatus.READY -> {
+                        if (event.isToday) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = ElectricCyan, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Message ready for approval", style = MaterialTheme.typography.labelSmall, color = ElectricCyan)
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = { onEventReview(event.title) },
+                                modifier = Modifier.fillMaxWidth().height(44.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonViolet),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Review & Send", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("\u2728", color = ElectricCyan, fontSize = 14.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(event.statusText, style = MaterialTheme.typography.labelSmall, color = ElectricCyan)
+                                }
+                                Button(
+                                    onClick = { onEventReview(event.title) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = NeonViolet),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text("Review", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                    EventStatus.GENERATING -> {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(DarkSlate.copy(alpha = 0.5f)).padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = ElectricCyan)
+                            Text(event.statusText, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        }
+                    }
+                    EventStatus.SCHEDULED -> {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Schedule, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(event.statusText, style = MaterialTheme.typography.labelSmall, color = TextTertiary)
+                        }
+                    }
+                    EventStatus.NOT_STARTED -> {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text("NOT STARTED", style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp), color = TextTertiary, fontWeight = FontWeight.Bold)
+                    }
+                    EventStatus.SENT -> {}
                 }
             }
-
-            val isValid = selectedContactId != null &&
-                    dayText.toIntOrNull()?.let { it in 1..31 } == true &&
-                    monthText.toIntOrNull()?.let { it in 1..12 } == true &&
-                    (!hasYear || yearText.toIntOrNull()?.let { it in 1900..2100 } == true)
-
-            PrimaryButton(
-                text = "Save Birthday",
-                onClick = {
-                    val day = dayText.toInt()
-                    val month = monthText.toInt()
-                    val year = if (hasYear) yearText.toIntOrNull() else null
-                    selectedContactId?.let { onSave(it, day, month, year) }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = isValid
-            )
         }
     }
 }

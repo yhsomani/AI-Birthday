@@ -1,6 +1,7 @@
 package com.example.contacts
 
 import com.example.core.db.entities.ContactEntity
+import com.example.core.contacts.ContactMerger
 import org.junit.Test
 import org.junit.Assert.*
 

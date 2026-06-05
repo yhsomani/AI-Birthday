@@ -17,9 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.ui.theme.SurfaceElevated
+import com.example.ui.theme.TextTertiary
 
 @Composable
 fun ShimmerBox(modifier: Modifier = Modifier) {
@@ -35,9 +36,9 @@ fun ShimmerBox(modifier: Modifier = Modifier) {
     )
     val shimmerBrush = Brush.linearGradient(
         colors = listOf(
-            Color.LightGray.copy(alpha = 0.3f),
-            Color.White.copy(alpha = 0.2f),
-            Color.LightGray.copy(alpha = 0.3f)
+            SurfaceElevated,
+            TextTertiary.copy(alpha = 0.15f),
+            SurfaceElevated
         ),
         start = Offset(translateX, 0f),
         end = Offset(translateX + 200f, 0f)
@@ -58,7 +59,7 @@ fun ShimmerTextLine(width: Dp = 200.dp, height: Dp = 16.dp) {
 @Composable
 fun ShimmerCard(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.05f)).padding(16.dp),
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(SurfaceElevated.copy(alpha = 0.3f)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

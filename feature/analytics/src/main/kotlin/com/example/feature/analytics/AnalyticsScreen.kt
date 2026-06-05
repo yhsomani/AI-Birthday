@@ -1,315 +1,171 @@
 package com.example.feature.analytics
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.TrendingUp
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.ui.components.ElevatedCard
-import com.example.ui.theme.RelateAIColors
+import com.example.ui.components.GlassmorphicCard
+import com.example.ui.components.HealthScoreRing
+import com.example.ui.theme.CyberRose
+import com.example.ui.theme.DarkSlate
+import com.example.ui.theme.ElectricCyan
+import com.example.ui.theme.Emerald
+import com.example.ui.theme.GlassEdge
+import com.example.ui.theme.NeonViolet
+import com.example.ui.theme.ObsidianBlack
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Analytics Dashboard matching Stitch "RelateAI Analytics Dashboard" design.
+ */
 @Composable
 fun AnalyticsScreen(
-    onNavigateBack: () -> Unit,
-    modifier: Modifier = Modifier,
-    viewModel: AnalyticsViewModel = hiltViewModel()
+    onBack: () -> Unit = {},
+    onReconnectClick: (String) -> Unit = {}
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ObsidianBlack)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp)
+    ) {
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary) }
+            Text("Analytics", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
+        }
+        Spacer(modifier = Modifier.height(16.dp))
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Relationship Insights", fontWeight = FontWeight.Bold, color = Color.White) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    titleContentColor = Color.White
-                )
-            )
-        },
-        containerColor = Color.Transparent
-    ) { padding ->
-        LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            item { Spacer(modifier = Modifier.height(4.dp)) }
-
-            // Large Central Card - Relationship Health Ring (Average computed dynamically)
-            item {
-                val averageHealth = uiState.averageHealthScore
-                val healthLabel = when {
-                    averageHealth >= 80 -> "Excellent"
-                    averageHealth >= 60 -> "Good"
-                    averageHealth >= 40 -> "Needs Work"
-                    averageHealth > 0 -> "At Risk"
-                    else -> "No Data"
-                }
-                
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Overall Network Health",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.size(140.dp)
-                        ) {
-                            Canvas(modifier = Modifier.size(120.dp)) {
-                                // Background circle
-                                drawArc(
-                                    color = Color.White.copy(alpha = 0.06f),
-                                    startAngle = 0f,
-                                    sweepAngle = 360f,
-                                    useCenter = false,
-                                    style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
-                                )
-                                // Glowing gradient ring (Emerald to Indigo)
-                                val sweep = (averageHealth / 100f) * 360f
-                                drawArc(
-                                    brush = Brush.sweepGradient(
-                                        colors = listOf(RelateAIColors.Secondary, RelateAIColors.Primary, RelateAIColors.Secondary)
-                                    ),
-                                    startAngle = -90f,
-                                    sweepAngle = sweep,
-                                    useCenter = false,
-                                    style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
-                                )
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "$averageHealth%",
-                                    style = MaterialTheme.typography.headlineLarge,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color.White,
-                                    fontSize = 32.sp
-                                )
-                                Text(
-                                    text = healthLabel,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = RelateAIColors.Secondary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
+        // Hero Health Score
+        GlassmorphicCard {
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                HealthScoreRing(score = 78, size = 110.dp, strokeWidth = 8.dp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Overall Health", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("↑ +5 from last month", style = MaterialTheme.typography.labelSmall, color = Emerald)
             }
+        }
 
-            // Glowing line chart card showing "Weekly Engagement" over the last 6 months
-            item {
-                ElevatedCard(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.TrendingUp,
-                                contentDescription = "Health",
-                                tint = RelateAIColors.Secondary
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                "Weekly Engagement",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Interaction trends over the past 6 months",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = RelateAIColors.OnSurfaceVariantDark
-                        )
-                        Spacer(modifier = Modifier.height(28.dp))
-                        GlowingLineChart(modifier = Modifier.fillMaxWidth().height(120.dp))
-                    }
-                }
-            }
+        Spacer(modifier = Modifier.height(16.dp))
 
-            // Strongest Connections List
-            if (uiState.topHealthContacts.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "Top Connections",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                    )
-                }
-                uiState.topHealthContacts.take(3).forEach { contact ->
-                    item {
-                        ElevatedCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
-                            ListItem(
-                                headlineContent = { Text(contact.name, fontWeight = FontWeight.Bold, color = Color.White) },
-                                supportingContent = { Text("Thriving • Health: ${contact.healthScore}%", style = MaterialTheme.typography.bodySmall, color = RelateAIColors.OnSurfaceVariantDark) },
-                                leadingContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(RelateAIColors.Secondary.copy(alpha = 0.12f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Default.Star, contentDescription = "Star", tint = RelateAIColors.Secondary, modifier = Modifier.size(20.dp))
-                                    }
-                                },
-                                trailingContent = {
-                                    Text(
-                                        text = "${contact.healthScore}%",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = RelateAIColors.Secondary
-                                    )
-                                },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                            )
-                        }
-                    }
-                }
-            }
+        // Stats row
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatMiniCard("Messages\nSent", "47", "↑ 12%", Emerald, Modifier.weight(1f))
+            StatMiniCard("Events\nCovered", "23/28", "82%", ElectricCyan, Modifier.weight(1f))
+            StatMiniCard("Avg\nResponse", "4.2h", "↓ -15%", Emerald, Modifier.weight(1f))
+        }
 
-            // Neglected Contacts - with Reconnect Prompt Action Button
-            if (uiState.neglectedContacts.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "Needs Attention",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                    )
-                }
-                uiState.neglectedContacts.take(3).forEach { contact ->
-                    item {
-                        ElevatedCard(modifier = Modifier.fillMaxWidth(), padding = 0.dp) {
-                            ListItem(
-                                headlineContent = { Text(contact.name, fontWeight = FontWeight.Bold, color = Color.White) },
-                                supportingContent = { Text("Fading • Health: ${contact.healthScore}%", style = MaterialTheme.typography.bodySmall, color = RelateAIColors.OnSurfaceVariantDark) },
-                                leadingContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(RelateAIColors.Tertiary.copy(alpha = 0.12f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Default.Info, contentDescription = "Info", tint = RelateAIColors.Tertiary, modifier = Modifier.size(20.dp))
-                                    }
-                                },
-                                trailingContent = {
-                                    Button(
-                                        onClick = { /* TODO: Navigate to Messages screen to compose message */ },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = RelateAIColors.Primary
-                                        ),
-                                        shape = RoundedCornerShape(8.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(
-                                            text = "Reconnect",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White
-                                        )
-                                    }
-                                },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                            )
-                        }
-                    }
-                }
-            }
+        Spacer(modifier = Modifier.height(24.dp))
 
-            item { Spacer(modifier = Modifier.height(32.dp)) }
+        // Relationship Breakdown
+        Text("Relationship Breakdown", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
+        Spacer(modifier = Modifier.height(12.dp))
+        BreakdownBar("Family", 92, ElectricCyan)
+        BreakdownBar("Friends", 78, NeonViolet)
+        BreakdownBar("Work", 65, NeonViolet.copy(alpha = 0.6f))
+        BreakdownBar("Extended", 45, CyberRose)
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Revival Suggestions
+        Text("Revival Suggestions", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), color = TextPrimary)
+        Spacer(modifier = Modifier.height(12.dp))
+        RevivalCard("Meera Deshpande", "Aunt • Score: 45 → declining", CyberRose, onReconnect = { onReconnectClick("Meera Deshpande") })
+        Spacer(modifier = Modifier.height(8.dp))
+        RevivalCard("Sanjay Kumar", "College Friend • Score: 38 → declining", CyberRose, onReconnect = { onReconnectClick("Sanjay") })
+
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun StatMiniCard(label: String, value: String, trend: String, trendColor: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(DarkSlate.copy(alpha = 0.7f))
+            .border(1.dp, GlassEdge, RoundedCornerShape(12.dp))
+            .padding(12.dp)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+            Text(value, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
+            Text(trend, style = MaterialTheme.typography.labelSmall, color = trendColor)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
     }
 }
 
 @Composable
-fun GlowingLineChart(modifier: Modifier = Modifier) {
-    val primaryColor = RelateAIColors.Primary
-    val secondaryColor = RelateAIColors.Secondary
-    
-    Canvas(modifier = modifier) {
-        val width = size.width
-        val height = size.height
-        
-        val path = Path().apply {
-            moveTo(0f, height * 0.7f)
-            cubicTo(width * 0.2f, height * 0.75f, width * 0.35f, height * 0.25f, width * 0.5f, height * 0.35f)
-            cubicTo(width * 0.65f, height * 0.45f, width * 0.8f, height * 0.05f, width, height * 0.15f)
+private fun BreakdownBar(category: String, score: Int, color: Color) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(category, style = MaterialTheme.typography.bodyMedium, color = TextPrimary, modifier = Modifier.width(80.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(10.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(GlassEdge)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(score / 100f)
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(color)
+            )
         }
-        
-        // Background glow
-        drawPath(
-            path = path,
-            color = primaryColor.copy(alpha = 0.15f),
-            style = Stroke(
-                width = 12.dp.toPx(),
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
-        )
-        
-        // Foreground line
-        val gradient = Brush.linearGradient(
-            colors = listOf(primaryColor, secondaryColor)
-        )
-        drawPath(
-            path = path,
-            brush = gradient,
-            style = Stroke(
-                width = 3.dp.toPx(),
-                cap = StrokeCap.Round,
-                join = StrokeJoin.Round
-            )
-        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text("$score", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = TextPrimary)
+    }
+}
+
+@Composable
+private fun RevivalCard(name: String, subtitle: String, accentColor: Color, onReconnect: () -> Unit) {
+    GlassmorphicCard(contentPadding = 14.dp, cornerRadius = 12.dp) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(name, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = accentColor)
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(NeonViolet)
+                    .clickable { onReconnect() }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text("Reconnect", style = MaterialTheme.typography.labelSmall, color = TextPrimary)
+            }
+        }
     }
 }

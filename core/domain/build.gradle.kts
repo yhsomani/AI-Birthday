@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
+    // alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -21,20 +22,16 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
-kotlin {
-    jvmToolchain(11)
-}
-
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.paging.runtime)
+    implementation("javax.inject:javax.inject:1")
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

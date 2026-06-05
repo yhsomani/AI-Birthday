@@ -1,17 +1,15 @@
-package com.example.automation.workers
+package com.example.core.automation.workers
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.contacts.ContactMerger
-import com.example.contacts.DeviceContactsReader
-import com.example.contacts.GoogleContactsSync
-import com.example.core.db.AppDatabase
-import com.example.core.gemini.GeminiClient
-import com.example.core.gemini.PromptBuilder
-import com.example.core.gemini.RateLimiter
-import com.example.core.gemini.ResponseParser
+import com.example.core.contacts.ContactMerger
+import com.example.core.contacts.DeviceContactsReader
+import com.example.core.contacts.GoogleContactsSync
 import com.example.core.db.dao.ContactDao
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.usecase.ClassifyContactUseCase
@@ -30,10 +28,16 @@ class ContactSyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            val reader = DeviceContactsReader(applicationContext)
-            val gSync = GoogleContactsSync(applicationContext)
+            val hasContactsPerm = ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+            val hasCallLogPerm = ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED
+            val deviceContacts = if (hasContactsPerm || hasCallLogPerm) {
+                DeviceContactsReader(applicationContext).readAll()
+            } else {
+                Log.i(TAG, "Contacts permissions not granted; skipping device contact sync")
+                emptyList()
+            }
 
-            val deviceContacts = reader.readAll()
+            val gSync = GoogleContactsSync(applicationContext)
             val googleContacts = gSync.fetchAll()
             val merged = ContactMerger.merge(deviceContacts, googleContacts)
 
@@ -57,8 +61,8 @@ class ContactSyncWorker @AssistedInject constructor(
             mappedContacts.forEach { contactDao.upsert(it) }
 
             // 3. Then, classify contacts that are still UNKNOWN using Gemini
-            if (prefs.getGeminiApiKey().isEmpty()) {
-                Log.i(TAG, "Gemini API key not set yet; skipping AI classification")
+            if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
+                Log.i(TAG, "User not authenticated; skipping AI classification")
             } else {
                 mappedContacts
                     .filter { it.relationshipType == "UNKNOWN" }

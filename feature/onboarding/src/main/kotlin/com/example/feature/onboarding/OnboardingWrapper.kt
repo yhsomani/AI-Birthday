@@ -22,6 +22,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.PrimaryButton
+import com.example.ui.theme.DarkSlate
+import com.example.ui.theme.ObsidianBlack
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
 
 @Composable
 fun OnboardingWrapper(
@@ -41,7 +45,7 @@ fun OnboardingWrapper(
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF1E1B4B), Color(0xFF0F172A))
+                    colors = listOf(ObsidianBlack, DarkSlate)
                 )
             )
     ) {
@@ -106,7 +110,7 @@ fun OnboardingWrapper(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(5.dp)
-                                .clip(RoundedCornerShape(3.dp))
+                                .clip(RoundedCornerShape(4.dp))
                                 .background(
                                     if (isPassedOrCurrent) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
@@ -122,14 +126,14 @@ fun OnboardingWrapper(
                         text = title,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
+                        color = TextPrimary,
                         lineHeight = 32.sp
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = TextSecondary,
                         lineHeight = 22.sp
                     )
                     Spacer(modifier = Modifier.height(32.dp))

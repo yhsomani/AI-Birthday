@@ -25,6 +25,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.example.core.prefs.SecurePrefs
 import com.example.ui.components.PrimaryButton
 import com.example.ui.components.StandardCard
+import com.example.ui.theme.DarkSlate
+import com.example.ui.theme.GlassEdge
+import com.example.ui.theme.NeonViolet
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -96,8 +101,8 @@ fun GoogleSignInScreen(navController: NavController) {
                     .fillMaxWidth()
                     .padding(vertical = 16.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White.copy(alpha = 0.05f))
-                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                    .background(DarkSlate.copy(alpha = 0.7f))
+                    .border(1.dp, GlassEdge, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -107,7 +112,7 @@ fun GoogleSignInScreen(navController: NavController) {
                     Icon(
                         imageVector = Icons.Default.AlternateEmail,
                         contentDescription = "Google Contacts",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = NeonViolet,
                         modifier = Modifier.size(56.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -115,13 +120,13 @@ fun GoogleSignInScreen(navController: NavController) {
                         "Secure Address Syncer",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = TextPrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         "Downloads phone book nodes & dates perfectly",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = TextSecondary,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -164,6 +169,7 @@ fun GoogleSignInScreen(navController: NavController) {
                             com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
                         )
                             .requestEmail()
+                            .requestIdToken("339889410493-g5klr4838kfibddoqvk1rbbt39dblffp.apps.googleusercontent.com")
                             .requestScopes(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/contacts.readonly"))
                             .build()
                         val mGoogleSignInClient = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)

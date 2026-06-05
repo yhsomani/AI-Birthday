@@ -1,80 +1,93 @@
 package com.example.ui.theme
 
-import android.os.Build
+import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = RelateAIColors.Primary,
-    onPrimary = Color.White,
-    primaryContainer = RelateAIColors.PrimaryDark,
-    onPrimaryContainer = RelateAIColors.PrimaryLight,
-    secondary = RelateAIColors.Secondary,
-    onSecondary = Color.White,
-    secondaryContainer = RelateAIColors.SecondaryDark,
-    onSecondaryContainer = RelateAIColors.SecondaryLight,
-    tertiary = RelateAIColors.Tertiary,
-    onTertiary = Color.White,
-    error = RelateAIColors.AtRisk,
-    onError = Color.White,
-    background = RelateAIColors.BackgroundDark,
-    onBackground = RelateAIColors.OnSurfaceDark,
-    surface = RelateAIColors.SurfaceDark,
-    onSurface = RelateAIColors.OnSurfaceDark,
-    surfaceVariant = RelateAIColors.SurfaceVariantDark,
-    onSurfaceVariant = RelateAIColors.OnSurfaceVariantDark,
-    outline = RelateAIColors.OutlineDark,
-    outlineVariant = RelateAIColors.OutlineDark.copy(alpha = 0.5f)
-)
+// ═══════════════════════════════════════════════
+// RelateAI Material 3 Theme
+// Neon Glassmorphic Dark Mode
+// ═══════════════════════════════════════════════
 
-private val LightColorScheme = lightColorScheme(
-    primary = RelateAIColors.Primary,
-    onPrimary = Color.White,
-    primaryContainer = RelateAIColors.PrimaryLight,
-    onPrimaryContainer = RelateAIColors.PrimaryDark,
-    secondary = RelateAIColors.Secondary,
-    onSecondary = Color.White,
-    secondaryContainer = RelateAIColors.SecondaryLight,
-    onSecondaryContainer = RelateAIColors.SecondaryDark,
-    tertiary = RelateAIColors.Tertiary,
-    onTertiary = Color.White,
-    error = RelateAIColors.AtRisk,
-    onError = Color.White,
-    background = RelateAIColors.Background,
-    onBackground = RelateAIColors.OnSurface,
-    surface = RelateAIColors.Surface,
-    onSurface = RelateAIColors.OnSurface,
-    surfaceVariant = RelateAIColors.SurfaceVariant,
-    onSurfaceVariant = RelateAIColors.OnSurfaceVariant,
-    outline = RelateAIColors.Outline,
-    outlineVariant = RelateAIColors.Outline.copy(alpha = 0.5f)
+private val RelateAIDarkColorScheme = darkColorScheme(
+    // Primary
+    primary = NeonViolet,
+    onPrimary = TextOnPrimary,
+    primaryContainer = NeonVioletContainer,
+    onPrimaryContainer = NeonVioletLight,
+
+    // Secondary
+    secondary = ElectricCyan,
+    onSecondary = OnElectricCyan,
+    secondaryContainer = ElectricCyanContainer,
+    onSecondaryContainer = ElectricCyanLight,
+
+    // Tertiary
+    tertiary = CyberRose,
+    onTertiary = OnCyberRose,
+    tertiaryContainer = CyberRoseContainer,
+    onTertiaryContainer = CyberRoseLight,
+
+    // Error
+    error = ErrorRed,
+    onError = OnError,
+    errorContainer = ErrorRedContainer,
+    onErrorContainer = ErrorRed,
+
+    // Background
+    background = ObsidianBlack,
+    onBackground = TextPrimary,
+
+    // Surface
+    surface = ObsidianBlack,
+    onSurface = TextPrimary,
+    surfaceVariant = DarkSlate,
+    onSurfaceVariant = TextSecondary,
+    surfaceContainerHigh = SurfaceContainerHigh,
+    surfaceContainerHighest = SurfaceContainerHighest,
+
+    // Outline
+    outline = Outline,
+    outlineVariant = OutlineVariant,
+
+    // Inverse
+    inverseSurface = InverseSurface,
+    inverseOnSurface = InverseOnSurface,
+    inversePrimary = InversePrimary,
+
+    // Scrim
+    scrim = ObsidianBlack
 )
 
 @Composable
-fun MyApplicationTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
-    content: @Composable () -> Unit,
+fun RelateAITheme(
+    content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    val colorScheme = RelateAIDarkColorScheme
+    val view = LocalView.current
+
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = ObsidianBlack.toArgb()
+            window.navigationBarColor = ObsidianBlack.toArgb()
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = false
+                isAppearanceLightNavigationBars = false
+            }
         }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
     }
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = RelateAITypography,
+        shapes = RelateAIShapes,
         content = content
     )
 }

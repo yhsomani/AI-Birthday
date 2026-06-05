@@ -29,8 +29,8 @@ fun ImportProgressScreen(onFinish: () -> Unit) {
     var eventDiscoveryId by remember { mutableStateOf<java.util.UUID?>(null) }
 
     LaunchedEffect(Unit) {
-        val req1 = androidx.work.OneTimeWorkRequestBuilder<com.example.automation.workers.ContactSyncWorker>().build()
-        val req2 = androidx.work.OneTimeWorkRequestBuilder<com.example.automation.workers.EventDiscoveryWorker>().build()
+        val req1 = androidx.work.OneTimeWorkRequestBuilder<com.example.core.automation.workers.ContactSyncWorker>().build()
+        val req2 = androidx.work.OneTimeWorkRequestBuilder<com.example.core.automation.workers.EventDiscoveryWorker>().build()
 
         contactSyncId = req1.id
         eventDiscoveryId = req2.id

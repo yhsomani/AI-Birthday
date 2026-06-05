@@ -2,52 +2,106 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+// ═══════════════════════════════════════════════
+// RelateAI Neon Glassmorphic Color Palette
+// Matches Stitch Design System: assets/6577782804216846461
+// ═══════════════════════════════════════════════
+
+// Primary — Neon Violet
+val NeonViolet = Color(0xFF8B5CF6)
+val NeonVioletLight = Color(0xFFD0BCFF)
+val NeonVioletDark = Color(0xFF6D3BD7)
+val NeonVioletContainer = Color(0xFFA078FF)
+val OnNeonViolet = Color(0xFF3C0091)
+
+// Secondary — Electric Cyan
+val ElectricCyan = Color(0xFF06B6D4)
+val ElectricCyanLight = Color(0xFF4CD7F6)
+val ElectricCyanContainer = Color(0xFF03B5D3)
+val OnElectricCyan = Color(0xFF003640)
+
+// Tertiary — Cyber Rose
+val CyberRose = Color(0xFFF43F5E)
+val CyberRoseLight = Color(0xFFFFB2B7)
+val CyberRoseContainer = Color(0xFFFF516A)
+val OnCyberRose = Color(0xFF67001B)
+
+// Success
+val Emerald = Color(0xFF10B981)
+val EmeraldLight = Color(0xFF6EE7B7)
+
+// Error
+val ErrorRed = Color(0xFFFFB4AB)
+val ErrorRedContainer = Color(0xFF93000A)
+val OnError = Color(0xFF690005)
+
+// Backgrounds
+val ObsidianBlack = Color(0xFF05070F)
+val DarkSlate = Color(0xFF0F111E)
+val SurfaceElevated = Color(0xFF1A1D2E)
+val SurfaceContainerHigh = Color(0xFF2C2832)
+val SurfaceContainerHighest = Color(0xFF37333D)
+
+// Borders & Glass
+val BorderStructural = Color(0xFF1F2937)
+val GlassEdge = Color(0x0FFFFFFF) // rgba(255, 255, 255, 0.06)
+val GlassEdgeStrong = Color(0x14FFFFFF) // rgba(255, 255, 255, 0.08)
+
+// Text
+val TextPrimary = Color(0xFFE7E0ED)
+val TextSecondary = Color(0xFF9CA3AF)
+val TextTertiary = Color(0xFF6B7280)
+val TextOnPrimary = Color.White
+
+// Outline
+val Outline = Color(0xFF958EA0)
+val OutlineVariant = Color(0xFF494454)
+
+// Inverse
+val InverseSurface = Color(0xFFE7E0ED)
+val InverseOnSurface = Color(0xFF322F39)
+val InversePrimary = Color(0xFF6D3BD7)
+
 object RelateAIColors {
-    // Primary brand — Indigo (#6366F1)
-    val Primary         = Color(0xFF6366F1)
-    val PrimaryLight    = Color(0xFF818CF8)
-    val PrimaryDark     = Color(0xFF4F46E5)
+    val Primary = NeonViolet
+    val PrimaryLight = NeonVioletLight
+    val PrimaryDark = NeonVioletDark
 
-    // Secondary — Neon Emerald/Mint (#34D399)
-    val Secondary       = Color(0xFF34D399)
-    val SecondaryLight  = Color(0xFFA7F3D0)
-    val SecondaryDark   = Color(0xFF059669)
-    
-    // Tertiary — Rose Red (#F43F5E)
-    val Tertiary        = Color(0xFFF43F5E)
-    val TertiaryLight   = Color(0xFFFECDD3)
-    val TertiaryDark    = Color(0xFFE11D48)
+    val Secondary = ElectricCyan
+    val SecondaryLight = ElectricCyanLight
+    val SecondaryDark = ElectricCyanContainer
 
-    // Relationship health colors
-    val Thriving        = Color(0xFF10B981)   // Emerald Green
-    val Stable          = Color(0xFF6366F1)   // Indigo Blue
-    val NeedsAttention  = Color(0xFFF59E0B)   // Amber
-    val AtRisk          = Color(0xFFEF4444)   // Red
+    val Tertiary = CyberRose
+    val TertiaryLight = CyberRoseLight
+    val TertiaryDark = CyberRoseContainer
 
-    // Relationship type colors
-    val Family          = Color(0xFF6366F1)
-    val BestFriend      = Color(0xFF818CF8)
-    val CloseFriend     = Color(0xFF3F51B5)
-    val Friend          = Color(0xFF10B981)
-    val Colleague       = Color(0xFF6B7280)
-    val Client          = Color(0xFF8B5CF6)
-    val Mentor          = Color(0xFFF59E0B)
+    val Thriving = Emerald
+    val Stable = ElectricCyan
+    val NeedsAttention = Color(0xFFFBBF24) // Yellow/Amber
+    val AtRisk = CyberRose
 
-    // Neutral surfaces
-    val Surface         = Color(0xFFFFFFFF)
-    val SurfaceVariant  = Color(0xFFF3F4F6)
-    val Background      = Color(0xFFF9FAFB)
+    val Family = NeonViolet
+    val BestFriend = ElectricCyan
+    val CloseFriend = NeonVioletLight
+    val Friend = Emerald
+    val Colleague = TextSecondary
+    val Client = NeonVioletDark
+    val Mentor = Color(0xFFFBBF24)
 
-    // Dark mode surfaces (Sleek Dark Slate & Indigo base)
-    val SurfaceDark     = Color(0xFF0F172A)
-    val SurfaceVariantDark = Color(0xFF1E293B)
-    val BackgroundDark  = Color(0xFF090D16)
+    val Surface = SurfaceElevated
+    val SurfaceVariant = DarkSlate
+    val Background = ObsidianBlack
 
-    val OnSurface       = Color(0xFF111827)
-    val OnSurfaceVariant = Color(0xFF4B5563)
-    val Outline         = Color(0xFFD1D5DB)
+    val SurfaceDark = DarkSlate
+    val SurfaceVariantDark = SurfaceElevated
+    val BackgroundDark = ObsidianBlack
 
-    val OnSurfaceDark       = Color(0xFFF3F4F6)
-    val OnSurfaceVariantDark = Color(0xFF9CA3AF)
-    val OutlineDark         = Color(0xFF374151)
+    val OnSurface = TextPrimary
+    val OnSurfaceVariant = TextSecondary
+    val Outline = com.example.ui.theme.Outline
+
+    val OnSurfaceDark = TextPrimary
+    val OnSurfaceVariantDark = TextSecondary
+    val OutlineDark = com.example.ui.theme.Outline
 }
+

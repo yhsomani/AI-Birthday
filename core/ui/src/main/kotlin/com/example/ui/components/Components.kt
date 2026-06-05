@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.GlassEdge
+import com.example.ui.theme.NeonViolet
+import com.example.ui.theme.ObsidianBlack
 
 @Composable
 fun PrimaryButton(
@@ -30,12 +34,14 @@ fun PrimaryButton(
         onClick = onClick,
         modifier = modifier.height(56.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
+            containerColor = NeonViolet,
+            contentColor = Color.White,
+            disabledContainerColor = NeonViolet.copy(alpha = 0.3f),
+            disabledContentColor = Color.White.copy(alpha = 0.4f)
         ),
-        contentPadding = PaddingValues(horizontal = 24.dp)
+        contentPadding = PaddingValues(horizontal = 28.dp)
     ) {
         if (icon != null) {
             Icon(
@@ -64,14 +70,12 @@ fun SecondaryButton(
         onClick = onClick,
         modifier = modifier.height(56.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = MaterialTheme.colorScheme.onBackground
+            contentColor = Color.White
         ),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp, MaterialTheme.colorScheme.outlineVariant
-        ),
-        contentPadding = PaddingValues(horizontal = 24.dp)
+        border = BorderStroke(1.dp, GlassEdge),
+        contentPadding = PaddingValues(horizontal = 28.dp)
     ) {
         if (icon != null) {
             Icon(
@@ -95,10 +99,11 @@ fun StandardCard(
     padding: Dp = 16.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val shape = RoundedCornerShape(16.dp)
     val baseModifier = modifier
-        .clip(RoundedCornerShape(12.dp))
-        .background(MaterialTheme.colorScheme.surface)
-        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+        .clip(shape)
+        .background(ObsidianBlack.copy(alpha = 0.6f))
+        .border(1.dp, GlassEdge, shape)
         
     val finalModifier = if (onClick != null) {
         baseModifier.clickable(onClick = onClick)
@@ -206,10 +211,11 @@ fun ElevatedCard(
     padding: Dp = 16.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val shape = RoundedCornerShape(16.dp)
     val baseModifier = modifier
-        .clip(RoundedCornerShape(12.dp))
-        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.4f))
-        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+        .clip(shape)
+        .background(ObsidianBlack.copy(alpha = 0.4f))
+        .border(1.dp, GlassEdge, shape)
         
     val finalModifier = if (onClick != null) {
         baseModifier.clickable(onClick = onClick)

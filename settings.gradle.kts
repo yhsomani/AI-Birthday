@@ -1,4 +1,4 @@
-﻿pluginManagement {
+pluginManagement {
     repositories {
         google()
         mavenCentral()
@@ -16,7 +16,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "My Application"
+rootProject.name = "RelateAI"
 
 include(":app")
 include(":core:domain")
@@ -31,4 +31,3 @@ include(":feature:analytics")
 include(":feature:onboarding")
 include(":feature:settings")
 include(":feature:messages")
-

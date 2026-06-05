@@ -1,9 +1,9 @@
-package com.example.automation.workers
+package com.example.core.automation.workers
 
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.automation.sender.MessageDispatcher
+import com.example.core.automation.sender.MessageDispatcher
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao

@@ -1,10 +1,10 @@
-package com.example.automation.workers
+package com.example.core.automation.workers
 
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.automation.scheduler.DailyScheduler
+import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.gemini.GeminiClient
 import com.example.core.gemini.PromptBuilder
@@ -36,8 +36,8 @@ class MessageGenerationWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            if (prefs.getGeminiApiKey().isEmpty()) {
-                Log.i(TAG, "Gemini API key not set yet; skipping generation (Result.success no-op)")
+            if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
+                Log.i(TAG, "User not authenticated; skipping message generation")
                 return Result.success()
             }
 
@@ -95,8 +95,7 @@ class MessageGenerationWorker @AssistedInject constructor(
                 if (approvalMode == "FULLY_AUTO") {
                     DailyScheduler.scheduleExactSend(applicationContext, event.id)
                 } else {
-                    // Send notification ideally
-                    com.example.automation.notifications.NotificationHelper.showApprovalNotification(applicationContext, contact, event, variants)
+                    com.example.core.automation.notifications.NotificationHelper.showApprovalNotification(applicationContext, contact, event, variants)
                 }
             }
 

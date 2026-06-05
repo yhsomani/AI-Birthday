@@ -9,7 +9,7 @@ import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.GetDashboardMetricsUseCase
-import com.example.feature.dashboard.MainViewModel
+import com.example.navigation.MainViewModel
 import com.example.core.db.dao.RelationshipTypeCount
 import androidx.paging.PagingData
 import kotlinx.coroutines.Dispatchers

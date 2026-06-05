@@ -1,4 +1,4 @@
-package com.example.automation.workers
+package com.example.core.automation.workers
 
 import android.content.Context
 import android.util.Log

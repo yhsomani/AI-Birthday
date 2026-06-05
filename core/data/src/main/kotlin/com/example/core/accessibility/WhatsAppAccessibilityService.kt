@@ -1,4 +1,4 @@
-package com.example.accessibility
+package com.example.core.accessibility
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
