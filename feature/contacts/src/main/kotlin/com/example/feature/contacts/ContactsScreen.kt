@@ -177,7 +177,11 @@ fun ContactsScreen(
 
             // Contact list
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(sampleContacts) { contact ->
+                // ⚡ Bolt Optimization: Added stable key to LazyColumn
+                // 💡 What: Used key = { it.name } to provide stable keys for each contact preview
+                // 🎯 Why: Without keys, Compose may recreate all visible items when the list changes or scrolls
+                // 📊 Impact: Reduces unnecessary recompositions
+                items(sampleContacts, key = { it.name }) { contact ->
                     ContactRow(contact = contact, onClick = { onContactClick(contact.name) })
                 }
             }
