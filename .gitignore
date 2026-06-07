@@ -67,3 +67,8 @@ google-services.json
 
 # Gradle wrapper binary
 !/gradle/wrapper/gradle-wrapper.jar
+
+# Root text log files
+app_logs*.txt
+logcat*.txt
+lint_baseline_pre_fixes.txt
