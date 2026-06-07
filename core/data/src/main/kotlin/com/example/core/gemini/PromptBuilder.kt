@@ -44,23 +44,23 @@ class PromptBuilder {
     fun buildClassificationPrompt(contact: ContactEntity): String {
         val firstName = getFirstName(contact.name)
         val sanitizedNotes = sanitizeNotes(contact.notesText)
-        return """
-            You are a contact classification engine. Based on the contact data below, 
-            determine their relationship to the phone owner.
-
-            Contact data:
-            - First Name: $firstName
-            - Notes: ${sanitizedNotes.take(200)}
-            - Interaction frequency: ${contact.interactionFrequencyPerMonth} times/month
-
-            Return ONLY valid JSON, no explanation, no markdown:
-            {
-              "type": "FAMILY|BEST_FRIEND|CLOSE_FRIEND|FRIEND|RELATIVE|COLLEAGUE|CLIENT|MANAGER|MENTOR|ALUMNI|VENDOR|UNKNOWN",
-              "confidence": 0.0,
-              "language": "en|hi|mr|gu|ta|te|bn|pa",
-              "formality": "CASUAL|SEMI_FORMAL|FORMAL"
-            }
-        """.trimIndent()
+        return buildString {
+            appendLine("You are a contact classification engine. Based on the contact data below, ")
+            appendLine("determine their relationship to the phone owner.")
+            appendLine()
+            appendLine("Contact data:")
+            appendLine("- First Name: $firstName")
+            appendLine("- Notes: ${sanitizedNotes.take(200)}")
+            appendLine("- Interaction frequency: ${contact.interactionFrequencyPerMonth} times/month")
+            appendLine()
+            appendLine("Return ONLY valid JSON, no explanation, no markdown:")
+            appendLine("{")
+            appendLine("  \"type\": \"FAMILY|BEST_FRIEND|CLOSE_FRIEND|FRIEND|RELATIVE|COLLEAGUE|CLIENT|MANAGER|MENTOR|ALUMNI|VENDOR|UNKNOWN\",")
+            appendLine("  \"confidence\": 0.0,")
+            appendLine("  \"language\": \"en|hi|mr|gu|ta|te|bn|pa\",")
+            appendLine("  \"formality\": \"CASUAL|SEMI_FORMAL|FORMAL\"")
+            append("}")
+        }
     }
 
     fun buildContactContext(
@@ -118,50 +118,53 @@ class PromptBuilder {
     }
 
     fun buildMessageGenerationPrompt(context: ContactContextObject): String {
-        val basePrompt = """
-            You are a personalised message writer. Write a birthday/event wish that sounds 
-            EXACTLY like the user personally wrote it — NOT like an AI.
-    
-            STRICT RULES:
-            1. Never use generic phrases: "wishing you all the best", "have a great day", "many happy returns"
-            2. Reference at least one specific interest or shared memory from the context
-            3. Match the user's exact writing style (tone, emojis, sentence length)
-            4. Never repeat or paraphrase any previous wish listed below
-            5. Write in language: ${context.preferredLanguage}
-    
-            RECIPIENT:
-            - Name: ${context.firstName} (call them: ${context.nickname ?: context.firstName})
-            - Relationship: ${context.relationshipType}
-            - Age turning: ${context.ageTurning ?: "unknown"}
-            - Interests: ${context.interests.joinToString(", ")}
-            - Shared memories: ${context.sharedHistory.joinToString("; ")}
-            - Last spoke: ${context.daysSinceLastContact} days ago
-    
-            EVENT: ${context.eventType} (${context.eventOccurrenceNumber?.let { "turning $it" } ?: ""})
-    
-            USER'S WRITING STYLE:
-            ${context.userStyleSamples.take(3).joinToString("\n") { "  - \"$it\"" }}
-            Uses emojis: ${context.usesEmoji}
-            Typical length: ~${context.avgMessageLength} characters
-            Common phrases: ${context.commonPhrases.joinToString(", ")}
-    
-            PREVIOUS WISHES SENT TO THIS PERSON (DO NOT REPEAT):
-            ${context.previousWishes.take(5).joinToString("\n") { "  - \"$it\"" }}
-    
-            Return ONLY valid JSON:
-            {
-              "short": "message under 160 chars",
-              "standard": "message 150-250 chars",
-              "long": "message 300-450 chars",
-              "recommended": "short|standard|long",
-              "reasoning": "one sentence"
-            }
-        """.trimIndent()
+        return buildString {
+            appendLine("You are a personalised message writer. Write a birthday/event wish that sounds ")
+            appendLine("EXACTLY like the user personally wrote it — NOT like an AI.")
+            appendLine()
+            appendLine("STRICT RULES:")
+            appendLine("1. Never use generic phrases: \"wishing you all the best\", \"have a great day\", \"many happy returns\"")
+            appendLine("2. Reference at least one specific interest or shared memory from the context")
+            appendLine("3. Match the user's exact writing style (tone, emojis, sentence length)")
+            appendLine("4. Never repeat or paraphrase any previous wish listed below")
+            appendLine("5. Write in language: ${context.preferredLanguage}")
+            appendLine()
+            appendLine("RECIPIENT:")
+            appendLine("- Name: ${context.firstName} (call them: ${context.nickname ?: context.firstName})")
+            appendLine("- Relationship: ${context.relationshipType}")
+            appendLine("- Age turning: ${context.ageTurning ?: "unknown"}")
+            appendLine("- Interests: ${context.interests.joinToString(", ")}")
+            appendLine("- Shared memories: ${context.sharedHistory.joinToString("; ")}")
+            appendLine("- Last spoke: ${context.daysSinceLastContact} days ago")
+            appendLine()
+            appendLine("EVENT: ${context.eventType} (${context.eventOccurrenceNumber?.let { "turning $it" } ?: ""})")
+            appendLine()
+            appendLine("USER'S WRITING STYLE:")
+            appendLine(context.userStyleSamples.take(3).joinToString("\n") { "  - \"$it\"" })
+            appendLine("Uses emojis: ${context.usesEmoji}")
+            appendLine("Typical length: ~${context.avgMessageLength} characters")
+            appendLine("Common phrases: ${context.commonPhrases.joinToString(", ")}")
+            appendLine()
+            appendLine("PREVIOUS WISHES SENT TO THIS PERSON (DO NOT REPEAT):")
+            appendLine(context.previousWishes.take(5).joinToString("\n") { "  - \"$it\"" })
+            appendLine()
+            appendLine("Return ONLY valid JSON:")
+            appendLine("{")
+            appendLine("  \"short\": \"message under 160 chars\",")
+            appendLine("  \"standard\": \"message 150-250 chars\",")
+            appendLine("  \"long\": \"message 300-450 chars\",")
+            appendLine("  \"recommended\": \"short|standard|long\",")
+            appendLine("  \"reasoning\": \"one sentence\"")
+            append("}")
 
-        return if (context.preferredLanguage != "en" && context.preferredLanguage.isNotBlank()) {
-            basePrompt + "\n\nSYSTEM INSTRUCTION:\nGenerate ALL message variants in ${context.preferredLanguage}. Use native script and culturally appropriate expressions.\nFor Hindi: use natural Hinglish (Hindi-English mix) if the contact's style suggests it.\nFor formal contexts in Indian languages: use respectful honorifics appropriate to the relationship."
-        } else {
-            basePrompt
+            if (context.preferredLanguage != "en" && context.preferredLanguage.isNotBlank()) {
+                appendLine()
+                appendLine()
+                appendLine("SYSTEM INSTRUCTION:")
+                appendLine("Generate ALL message variants in ${context.preferredLanguage}. Use native script and culturally appropriate expressions.")
+                appendLine("For Hindi: use natural Hinglish (Hindi-English mix) if the contact's style suggests it.")
+                append("For formal contexts in Indian languages: use respectful honorifics appropriate to the relationship.")
+            }
         }
     }
 
@@ -171,33 +174,33 @@ class PromptBuilder {
             val arr = JSONArray(contact.interestsJson); List(arr.length()) { arr.getString(it) } 
         } catch(e: Exception) { emptyList() }
         
-        return """
-            Write a short, casual reconnect message from the user to ${contact.nickname ?: firstName}.
-    
-            Facts:
-            - Relationship: ${contact.relationshipType}
-            - Last spoke: $daysSince days ago
-            - Interests: ${interestsList.joinToString(", ")}
-            - User style: casual, ${if (contact.formalityLevel == "CASUAL") "uses bro/yaar type language" else "professional"}
-    
-            Requirements:
-            - Sound spontaneous, like they just thought of them
-            - DO NOT mention the gap in contact explicitly
-            - End with a question to start a conversation
-            - Under 100 words
-    
-            Return plain text only. No JSON. No quotes.
-        """.trimIndent()
+        return buildString {
+            appendLine("Write a short, casual reconnect message from the user to ${contact.nickname ?: firstName}.")
+            appendLine()
+            appendLine("Facts:")
+            appendLine("- Relationship: ${contact.relationshipType}")
+            appendLine("- Last spoke: $daysSince days ago")
+            appendLine("- Interests: ${interestsList.joinToString(", ")}")
+            appendLine("- User style: casual, ${if (contact.formalityLevel == "CASUAL") "uses bro/yaar type language" else "professional"}")
+            appendLine()
+            appendLine("Requirements:")
+            appendLine("- Sound spontaneous, like they just thought of them")
+            appendLine("- DO NOT mention the gap in contact explicitly")
+            appendLine("- End with a question to start a conversation")
+            appendLine("- Under 100 words")
+            appendLine()
+            append("Return plain text only. No JSON. No quotes.")
+        }
     }
 
-    fun buildRegenerationPrompt(original: String, context: ContactContextObject): String = """
-        The following message was rejected for being too similar to a previous wish:
-        "$original"
-
-        Generate a COMPLETELY different message. Different tone, different references, 
-        different structure. Same context applies:
-        ${buildMessageGenerationPrompt(context)}
-    """.trimIndent()
+    fun buildRegenerationPrompt(original: String, context: ContactContextObject): String = buildString {
+        appendLine("The following message was rejected for being too similar to a previous wish:")
+        appendLine("\"$original\"")
+        appendLine()
+        appendLine("Generate a COMPLETELY different message. Different tone, different references, ")
+        appendLine("different structure. Same context applies:")
+        append(buildMessageGenerationPrompt(context))
+    }
 
     fun buildGiftSuggestionsPrompt(contact: ContactEntity, history: List<GiftHistoryEntity>): String {
         val firstName = getFirstName(contact.name)
@@ -209,31 +212,31 @@ class PromptBuilder {
             "  - ${it.giftName} (Category: ${it.giftCategory}, Cost: \u20b9${it.approxCostInr}, Liked: ${it.receivedWell ?: "Unknown"})"
         }
         
-        return """
-            You are a personalized gift advisor. Recommend 3 unique gift ideas for ${contact.nickname ?: firstName}.
-            
-            Recipient Facts:
-            - Relationship: ${contact.relationshipType}
-            - Interests: ${interestsList.joinToString(", ")}
-            - Annual Gift Budget: \u20b9${contact.giftBudgetInr}
-            
-            Previous Gift History:
-            ${if (historyStr.isBlank()) "None recorded" else historyStr}
-            
-            Requirements:
-            - Provide exactly 3 diverse recommendations.
-            - Ensure ideas fit within the annual budget (\u20b9${contact.giftBudgetInr}) and align with the interests.
-            - Avoid repeat/similar items to their previous gifts.
-            - Give a specific, compelling reason for each.
-            
-            Return ONLY a valid JSON array, no explanation, no markdown:
-            [
-              {
-                "name": "Gift Name",
-                "reason": "Specific reason why they will love it based on their interests",
-                "estimatedCostInr": 500
-              }
-            ]
-        """.trimIndent()
+        return buildString {
+            appendLine("You are a personalized gift advisor. Recommend 3 unique gift ideas for ${contact.nickname ?: firstName}.")
+            appendLine()
+            appendLine("Recipient Facts:")
+            appendLine("- Relationship: ${contact.relationshipType}")
+            appendLine("- Interests: ${interestsList.joinToString(", ")}")
+            appendLine("- Annual Gift Budget: \u20b9${contact.giftBudgetInr}")
+            appendLine()
+            appendLine("Previous Gift History:")
+            appendLine(if (historyStr.isBlank()) "None recorded" else historyStr)
+            appendLine()
+            appendLine("Requirements:")
+            appendLine("- Provide exactly 3 diverse recommendations.")
+            appendLine("- Ensure ideas fit within the annual budget (\u20b9${contact.giftBudgetInr}) and align with the interests.")
+            appendLine("- Avoid repeat/similar items to their previous gifts.")
+            appendLine("- Give a specific, compelling reason for each.")
+            appendLine()
+            appendLine("Return ONLY a valid JSON array, no explanation, no markdown:")
+            appendLine("[")
+            appendLine("  {")
+            appendLine("    \"name\": \"Gift Name\",")
+            appendLine("    \"reason\": \"Specific reason why they will love it based on their interests\",")
+            appendLine("    \"estimatedCostInr\": 500")
+            appendLine("  }")
+            append("]")
+        }
     }
 }
