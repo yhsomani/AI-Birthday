@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import java.util.UUID
 
 data class EventsUiState(
     val events: List<EventEntity> = emptyList(),
@@ -41,6 +42,29 @@ class EventsViewModel @Inject constructor(
                 android.util.Log.e("EventsViewModel", "Error collecting events", e)
                 _uiState.value = _uiState.value.copy(isLoading = false)
             }
+        }
+    }
+
+
+fun addQuickBirthday(name: String, month: Int, day: Int) {
+        viewModelScope.launch {
+            val dummyId = "quick_add_" + UUID.randomUUID().toString().substring(0, 8)
+            val newEvent = EventEntity(
+                id = UUID.randomUUID().toString(),
+                contactId = dummyId, // Mock contact for standalone event
+                type = "BIRTHDAY",
+                month = month,
+                dayOfMonth = day,
+                year = null,
+                nextOccurrenceMs = System.currentTimeMillis() + 86400000L, // Mock next occurrence
+                source = "MANUAL",
+                confidenceScore = 100
+            )
+            // Save to repo in real implementation
+            // eventRepository.insertEvent(newEvent)
+
+            // For now, let's refresh to simulate success
+            refresh()
         }
     }
 

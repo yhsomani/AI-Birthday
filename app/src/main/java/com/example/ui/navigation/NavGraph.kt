@@ -19,6 +19,7 @@ import com.example.ui.screens.auth.AuthScreen
 import com.example.ui.screens.home.HomeScreen
 import com.example.ui.screens.contacts.ContactListScreen
 import com.example.ui.screens.contacts.ContactDetailScreen
+import com.example.ui.screens.chat.ChatHistoryScreen
 import com.example.ui.screens.events.EventsScreen
 import com.example.ui.screens.messages.MessagesScreen
 import com.example.ui.screens.settings.SettingsScreen

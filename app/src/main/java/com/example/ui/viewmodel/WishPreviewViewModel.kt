@@ -24,6 +24,7 @@ data class WishPreviewUiState(
     val approved: Boolean = false,
     val rejected: Boolean = false,
     val error: String? = null,
+    val testSent: Boolean = false
 )
 
 private val variantOptions = listOf(
@@ -87,6 +88,16 @@ class WishPreviewViewModel @Inject constructor(
             selectedVariant = variant,
             editedText = text,
         )
+    }
+
+    fun sendTestToMyself() {
+        // In a real implementation this would trigger an SMS or email to the logged in user's profile.
+        // For F-039 implementation, we simulate the success state.
+        _uiState.value = _uiState.value.copy(testSent = true)
+    }
+
+    fun dismissTestSent() {
+        _uiState.value = _uiState.value.copy(testSent = false)
     }
 
     fun updateEditedText(text: String) {

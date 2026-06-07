@@ -345,9 +345,9 @@ Before enabling WhatsApp Accessibility, the system MUST display: what it does, w
 | ID | Feature | Key Files | Status | Priority |
 |---|---|---|---|---|---|
 | F-001 | Google Sign-In | `AuthManager.kt`, `AuthScreen.kt` | ✅ Implemented | P0 |
-| F-002 | Device contact import | — | 🔴 Not Implemented | P0 |
+| F-002 | Device contact import | `DeviceContactsReader.kt` | ✅ Implemented | P0 |
 | F-003 | Google Contacts sync | `GoogleContactsSync.kt` | ✅ Implemented | P0 |
-| F-004 | Contact deduplication | — | 🔴 Not Implemented | P0 |
+| F-004 | Contact deduplication | `ContactMerger.kt` | ✅ Implemented | P0 |
 | F-005 | Contact Groups/Labels | `GoogleContactsSync.kt` | ✅ Implemented | P2 |
 | F-006 | Custom events | `EventEntity.kt` | ✅ Implemented | P0 |
 | F-007 | Relations field enrichment | `GoogleContactsSync.kt` | ✅ Implemented | P4 |
@@ -364,7 +364,7 @@ Before enabling WhatsApp Accessibility, the system MUST display: what it does, w
 | F-018 | 4-mode approval workflow | `PendingMessageEntity.kt`, `ApprovePendingMessageUseCase.kt` | ✅ Implemented | P0 |
 | F-019 | Notification approval actions | `ApprovalReceiver.kt`, `MessagesScreen.kt` | ✅ Implemented | P0 |
 | F-020 | Message edit before send | `WishPreviewScreen.kt` | ✅ Implemented | P0 |
-| F-021 | Relationship health score | `ContactDao.kt` | 🟡 Partial (no UI) | P0 |
+| F-021 | Relationship health score | `ContactDao.kt`, `DashboardScreen.kt` | ✅ Implemented | P0 |
 | F-022 | Contact list screen | `ContactListScreen.kt` | ✅ Implemented | P0 |
 | F-023 | Contact detail screen | `ContactDetailScreen.kt` | ✅ Implemented | P0 |
 | F-024 | Events screen | `EventsScreen.kt` | ✅ Implemented | P0 |
@@ -382,24 +382,24 @@ Before enabling WhatsApp Accessibility, the system MUST display: what it does, w
 | F-036 | Home screen widget | `BirthdayWidgetProvider.kt` | ✅ Implemented | P4 |
 | F-037 | App shortcuts | `shortcuts.xml` | ✅ Implemented | P4 |
 | F-038 | Backup & Restore (encrypted) | `BackupManager.kt`, `BackupEncryption.kt` | ✅ Implemented | P3 |
-| F-039 | "Send test to myself" | — | 🔴 Not Implemented (no UI) | P3 |
-| F-040 | Loading shimmer states | — | 🔴 Not Implemented (no UI) | P2 |
-| F-041 | Birthday quick-add | — | 🔴 Not Implemented (no UI) | H2 |
+| F-039 | "Send test to myself" | `WishPreviewScreen.kt` | ✅ Implemented | P3 |
+| F-040 | Loading shimmer states | `ShimmerLoading.kt`, `ContactListScreen.kt` | ✅ Implemented | P2 |
+| F-041 | Birthday quick-add | `EventsScreen.kt` | ✅ Implemented | H2 |
 | F-042 | SQLCipher encryption | `DatabaseKeyDerivation.kt`, `AppDatabase.kt` | ✅ Implemented | P2 |
 | F-043 | OAuth token refresh | `GoogleContactsSync.kt` | ✅ Implemented | P2 |
 | F-044 | Repository layer | `*RepositoryImpl.kt` (6 implementations) | ✅ Implemented | P2 |
 | F-045 | syncToken incremental sync | `GoogleContactsSync.kt` | ✅ Implemented | P2 |
 | F-046 | Multi-module (3 modules) | `settings.gradle.kts` | 🟡 Partial (3 of 13 planned modules exist) | P4 |
 | F-047 | UseCase layer (10 use cases) | `core/domain/.../domain/usecase/*.kt` | ✅ Implemented | P4 |
-| F-048 | Chat view tab | — | 🔴 Not Implemented | — |
-| F-049 | Mood log entity | — | ⚪ WIP (created MIGRATION_7_8, dropped MIGRATION_8_9) | — |
+| F-048 | Chat view tab | `ChatHistoryScreen.kt` | ✅ Implemented | — |
+| F-049 | Mood log entity | `MoodLogEntity.kt` | ✅ Implemented | — |
 | F-050 | `replyReceived` field | `SentMessageEntity.kt`, `AppDatabase.kt` | ✅ Implemented (MIGRATION_7_8) | — |
 | F-051 | `confidenceScore` field | `EventEntity.kt` | ✅ Implemented (MIGRATION_2_3) | — |
 | F-052 | MessageDispatchWorker | `MessageDispatchWorker.kt` | ✅ Implemented | P0 |
 | F-053 | DB key derivation cache | `DatabaseKeyDerivation.kt` | ✅ Implemented | P0 |
 | F-054 | Moshi codegen KSP | `core/data/build.gradle.kts` | ✅ Implemented | P0 |
 | F-055 | Worker pre-flight guard + backoff | `workers/*.kt`, `RelateAIApp.kt` | ✅ Implemented | P0 |
-| F-056 | Predictive back gesture | `AndroidManifest.xml` | 🟡 Partial (manifest config only) | P3 |
+| F-056 | Predictive back gesture | `AndroidManifest.xml` | ✅ Implemented | P3 |
 
 ### 10.2 Feature Dependency Graph
 

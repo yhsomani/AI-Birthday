@@ -26,6 +26,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +68,19 @@ fun WishPreviewScreen(
     viewModel: WishPreviewViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(state.testSent) {
+        if (state.testSent) {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Test message sent to your device!")
+                viewModel.dismissTestSent()
+            }
+        }
+    }
+
 
     LaunchedEffect(eventId) {
         viewModel.loadPending(eventId)
