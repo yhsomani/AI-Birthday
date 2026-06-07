@@ -10,9 +10,7 @@ import com.example.core.db.entities.EventEntity
 import com.example.core.resilience.StructuredLogger
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import java.time.LocalDate
-import java.time.Year
-import java.time.ZoneId
+import java.util.Calendar
 
 @HiltWorker
 class EventDiscoveryWorker @AssistedInject constructor(
@@ -102,21 +100,41 @@ class EventDiscoveryWorker @AssistedInject constructor(
     }
 
     private fun computeNextOccurrence(month: Int, day: Int, year: Int?): Long {
-        val today = LocalDate.now()
-        
-        // Handle Feb 29 in non-leap years
-        val effectiveDay = if (month == 2 && day == 29 && !Year.of(today.year).isLeap) 28 else day
-        
-        var candidate = LocalDate.of(today.year, month, effectiveDay)
-        if (candidate.isBefore(today) || candidate.isEqual(today)) {
-            // Roll forward to next year
-            val nextYear = today.year + 1
-            val nextEffectiveDay = if (month == 2 && day == 29 && !Year.of(nextYear).isLeap) 28 else day
-            candidate = LocalDate.of(nextYear, month, nextEffectiveDay)
+        val now = Calendar.getInstance()
+        val currentYear = now.get(Calendar.YEAR)
+        val currentMonth = now.get(Calendar.MONTH) + 1 // Calendar months are 0-based
+        val currentDay = now.get(Calendar.DAY_OF_MONTH)
+
+        val candidate = Calendar.getInstance()
+        candidate.set(Calendar.HOUR_OF_DAY, 9)
+        candidate.set(Calendar.MINUTE, 0)
+        candidate.set(Calendar.SECOND, 0)
+        candidate.set(Calendar.MILLISECOND, 0)
+
+        // Handle Feb 29 for non-leap years (calculate for current year first)
+        var effectiveDay = day
+        if (month == 2 && day == 29 && !isLeapYear(currentYear)) {
+            effectiveDay = 28
         }
-        
-        return candidate.atTime(9, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+        var targetYear = currentYear
+        if (month < currentMonth || (month == currentMonth && effectiveDay <= currentDay)) {
+            targetYear = currentYear + 1
+            // Recalculate for the new target year
+            effectiveDay = day
+            if (month == 2 && day == 29 && !isLeapYear(targetYear)) {
+                effectiveDay = 28
+            }
+        }
+
+        candidate.set(Calendar.YEAR, targetYear)
+        candidate.set(Calendar.MONTH, month - 1)
+        candidate.set(Calendar.DAY_OF_MONTH, effectiveDay)
+
+        return candidate.timeInMillis
     }
+
+    private fun isLeapYear(year: Int): Boolean = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 
     private companion object {
         const val TAG = "EventDiscoveryWorker"
