@@ -25,6 +25,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -54,6 +60,60 @@ fun EventsScreen(
     viewModel: EventsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    val showQuickAddDialog = remember { mutableStateOf(false) }
+    val quickAddName = remember { mutableStateOf("") }
+    val quickAddMonth = remember { mutableStateOf("") }
+    val quickAddDay = remember { mutableStateOf("") }
+
+    if (showQuickAddDialog.value) {
+        AlertDialog(
+            onDismissRequest = { showQuickAddDialog.value = false },
+            title = { Text("Quick Add Birthday") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = quickAddName.value,
+                        onValueChange = { quickAddName.value = it },
+                        label = { Text("Name") }
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = quickAddMonth.value,
+                            onValueChange = { quickAddMonth.value = it },
+                            label = { Text("Month (1-12)") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = quickAddDay.value,
+                            onValueChange = { quickAddDay.value = it },
+                            label = { Text("Day (1-31)") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val m = quickAddMonth.value.toIntOrNull() ?: 1
+                    val d = quickAddDay.value.toIntOrNull() ?: 1
+                    viewModel.addQuickBirthday(quickAddName.value, m, d)
+                    showQuickAddDialog.value = false
+                    quickAddName.value = ""
+                    quickAddMonth.value = ""
+                    quickAddDay.value = ""
+                }) {
+                    Text("Add")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showQuickAddDialog.value = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
 
     val groupedEvents = state.events.groupBy {
         val cal = java.util.Calendar.getInstance()

@@ -46,6 +46,9 @@ import com.example.core.db.entities.ContactEntity
 import com.example.ui.components.EmptyState
 import com.example.ui.components.FilterChip
 import com.example.ui.components.HealthIndicatorDot
+import com.example.ui.components.ShimmerItem
+import com.example.ui.components.ShimmerItem
+import androidx.compose.foundation.layout.PaddingValues
 import com.example.ui.theme.RelateDarkBackground
 import com.example.ui.theme.RelateOnBackground
 import com.example.ui.theme.RelateOnSurfaceVariant
@@ -185,11 +188,22 @@ fun ContactListScreen(
                 }
 
                 if (state.isLoading && state.contacts.isEmpty()) {
-                    Box(
+                    LazyColumn(
                         modifier = Modifier.weight(1f).fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        CircularProgressIndicator(color = RelatePrimary)
+                        items(10) {
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                ShimmerItem(modifier = Modifier.size(48.dp).clip(CircleShape))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    ShimmerItem(modifier = Modifier.fillMaxWidth(0.5f).height(16.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    ShimmerItem(modifier = Modifier.fillMaxWidth(0.3f).height(12.dp))
+                                }
+                            }
+                        }
                     }
                 } else if (filteredContacts.isEmpty()) {
                     Box(

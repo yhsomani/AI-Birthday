@@ -57,6 +57,7 @@ fun ContactDetailScreen(
     onNavigateToWish: (String) -> Unit = {},
     onNavigateToMemoryVault: (String) -> Unit = {},
     onNavigateToGiftAdvisor: (String) -> Unit = {},
+    onNavigateToChatHistory: (String) -> Unit = {},
     viewModel: ContactDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
