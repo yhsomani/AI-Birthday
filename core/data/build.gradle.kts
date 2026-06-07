@@ -5,6 +5,9 @@ plugins {
 }
 
 android {
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
     namespace = "com.example.core.data"
     compileSdk = 36
 
@@ -99,6 +102,8 @@ dependencies {
     implementation(libs.firebase.vertexai)
     implementation(libs.google.ai.client)
 
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
 
     // Testing
