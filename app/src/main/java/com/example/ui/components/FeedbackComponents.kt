@@ -26,6 +26,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.ui.theme.RelateOnSurfaceVariant
@@ -62,7 +66,8 @@ fun AdaptiveFeedbackBanner(
             modifier = modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp)
-                .background(color.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
+                .background(color.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                .semantics { liveRegion = LiveRegionMode.Polite },
         ) {
             Row(
                 modifier = Modifier.padding(12.dp),
@@ -94,7 +99,11 @@ fun StatusIndicator(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.padding(vertical = 2.dp),
+        modifier = modifier
+            .padding(vertical = 2.dp)
+            .semantics(mergeDescendants = true) {
+                stateDescription = if (isActive) "Active" else "Inactive"
+            },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
