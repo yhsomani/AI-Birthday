@@ -53,5 +53,8 @@ class PreferencesRepositoryImpl @Inject constructor(
     override fun setGuestMode(enabled: Boolean) = securePrefs.setGuestMode(enabled)
     override fun isGuestMode(): Boolean = securePrefs.isGuestMode()
 
+    override fun setLastSyncError(error: String?) = securePrefs.setLastSyncError(error)
+    override fun getLastSyncError(): String? = securePrefs.getLastSyncError()
+
     override fun clearAll() = securePrefs.clearAll()
 }

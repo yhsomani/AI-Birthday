@@ -16,11 +16,13 @@ data class ContactListUiState(
     val contacts: List<ContactEntity> = emptyList(),
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
+    val syncError: String? = null,
 )
 
 @HiltViewModel
 class ContactListViewModel @Inject constructor(
     private val contactRepository: ContactRepository,
+    private val preferencesRepository: com.example.domain.service.PreferencesRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ContactListUiState())
@@ -30,11 +32,19 @@ class ContactListViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            contactRepository.getAll().collect { contacts ->
-                _uiState.value = ContactListUiState(
-                    contacts = contacts,
-                    isLoading = false,
-                )
+            try {
+                contactRepository.getAll().collect { contacts ->
+                    val lastError = try { preferencesRepository.getLastSyncError() } catch(ex: Exception) { null }
+                    _uiState.value = ContactListUiState(
+                        contacts = contacts,
+                        isLoading = false,
+                        syncError = lastError,
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ContactListViewModel", "Error collecting contacts", e)
+                val lastError = try { preferencesRepository.getLastSyncError() } catch(ex: Exception) { null }
+                _uiState.value = _uiState.value.copy(isLoading = false, syncError = lastError)
             }
         }
     }
@@ -45,14 +55,27 @@ class ContactListViewModel @Inject constructor(
         refreshJob = viewModelScope.launch {
             try {
                 contactRepository.getAll().first().let { contacts ->
+                    val lastError = try { preferencesRepository.getLastSyncError() } catch(ex: Exception) { null }
                     _uiState.value = ContactListUiState(
                         contacts = contacts,
                         isLoading = false,
                         isRefreshing = false,
+                        syncError = lastError,
                     )
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isRefreshing = false)
+            }
+        }
+    }
+
+    fun dismissSyncError() {
+        viewModelScope.launch {
+            try {
+                preferencesRepository.setLastSyncError(null)
+                _uiState.value = _uiState.value.copy(syncError = null)
+            } catch (e: Exception) {
+                // Ignore
             }
         }
     }

@@ -9,6 +9,9 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE isActive = 1")
     fun getAll(): Flow<List<EventEntity>>
 
+    @Query("SELECT * FROM events WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): EventEntity?
+
     @Query("SELECT COUNT(*) FROM events WHERE isActive = 1")
     fun countAll(): Flow<Int>
 

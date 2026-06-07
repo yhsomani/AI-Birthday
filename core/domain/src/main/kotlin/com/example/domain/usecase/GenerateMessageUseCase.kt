@@ -79,7 +79,7 @@ class GenerateMessageUseCase @Inject constructor(
         if (approvalMode == "FULLY_AUTO") {
             schedulerService.scheduleExactSend(event.id)
         } else {
-            notificationService.showApprovalNotification(contact, event, variants)
+            notificationService.showApprovalNotification(contact, event, variants, pending.id)
         }
 
         return GenerationOutcome.Generated(pending.id, approvalMode, retries)

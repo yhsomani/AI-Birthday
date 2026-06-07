@@ -1,6 +1,10 @@
 package com.example.core.gemini
 
-import com.example.core.db.entities.ContactEntity
+import android.content.Context
+import com.example.core.db.dao.PendingMessageDao
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 data class ClassificationResult(
@@ -19,7 +23,8 @@ data class MessageVariants(
     val formal: String,
     val funny: String,
     val emotional: String,
-    val recommended: String
+    val recommended: String,
+    val isUsingFallback: Boolean = false
 ) {
     fun get(variant: String): String {
         return when (variant) {
@@ -34,7 +39,7 @@ data class MessageVariants(
     
     companion object {
         fun fromFallback(text: String): MessageVariants {
-            return MessageVariants(text, text, text, text, text, text, "standard")
+            return MessageVariants(text, text, text, text, text, text, "standard", true)
         }
     }
 }
@@ -56,7 +61,13 @@ object ResponseParser {
         }
     }
 
-    fun parseMessageVariants(jsonString: String): MessageVariants {
+    fun parseMessageVariants(
+        jsonString: String,
+        messageId: String? = null,
+        pendingMessageDao: PendingMessageDao? = null,
+        context: Context? = null,
+        eventType: String = "BIRTHDAY"
+    ): MessageVariants {
         return try {
             val json = JSONObject(jsonString)
             MessageVariants(
@@ -66,10 +77,54 @@ object ResponseParser {
                 formal = json.optString("formal", "Wishing you a very happy birthday!"),
                 funny = json.optString("funny", "Wishing you a very happy birthday!"),
                 emotional = json.optString("emotional", "Wishing you a very happy birthday!"),
-                recommended = json.optString("recommended", "standard")
+                recommended = json.optString("recommended", "standard"),
+                isUsingFallback = false
             )
         } catch (e: Exception) {
-            MessageVariants.fromFallback("Wishing you a very happy birthday!")
+            val fallbackText = getFallbackTemplate(context, eventType)
+            if (messageId != null && pendingMessageDao != null) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    pendingMessageDao.setFallbackFlag(messageId, true)
+                }
+            }
+            if (context != null) {
+                try {
+                    com.example.core.automation.notifications.NotificationHelper.showSystemAlert(
+                        context,
+                        "AI Generation Unavailable",
+                        "A template message was used because the AI generator was offline or rate-limited."
+                    )
+                } catch (ex: Exception) {
+                    android.util.Log.e("ResponseParser", "Failed to show system alert", ex)
+                }
+            }
+            MessageVariants.fromFallback(fallbackText)
+        }
+    }
+
+    private fun getFallbackTemplate(context: Context?, eventType: String): String {
+        context ?: return when (eventType) {
+            "ANNIVERSARY" -> "Happy Anniversary! Wishing you both a lifetime of love and happiness."
+            "WORK_ANNIVERSARY" -> "Congratulations on your work anniversary! Thank you for your hard work and dedication."
+            "REVIVAL" -> "Hey! It's been a while since we caught up. Hope you're doing great! Let's connect soon."
+            else -> "Wishing you a very happy birthday! Hope you have a wonderful day!"
+        }
+        return try {
+            val resName = when (eventType) {
+                "ANNIVERSARY" -> "fallback_anniversary_message"
+                "WORK_ANNIVERSARY" -> "fallback_work_anniversary_message"
+                "REVIVAL" -> "fallback_revival_message"
+                else -> "fallback_birthday_message"
+            }
+            val resId = context.resources.getIdentifier(resName, "string", context.packageName)
+            if (resId != 0) context.getString(resId) else when (eventType) {
+                "ANNIVERSARY" -> "Happy Anniversary! Wishing you both a lifetime of love and happiness."
+                "WORK_ANNIVERSARY" -> "Congratulations on your work anniversary! Thank you for your hard work and dedication."
+                "REVIVAL" -> "Hey! It's been a while since we caught up. Hope you're doing great! Let's connect soon."
+                else -> "Wishing you a very happy birthday! Hope you have a wonderful day!"
+            }
+        } catch (ex: Exception) {
+            "Wishing you a very happy birthday!"
         }
     }
 

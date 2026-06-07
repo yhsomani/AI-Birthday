@@ -1,13 +1,8 @@
 package com.example.core.automation.workers
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.core.contacts.ContactMerger
-import com.example.core.contacts.DeviceContactsReader
 import com.example.core.contacts.GoogleContactsSync
 import com.example.core.db.dao.ContactDao
 import com.example.core.prefs.SecurePrefs
@@ -28,22 +23,11 @@ class ContactSyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            val hasContactsPerm = ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
-            val hasCallLogPerm = ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED
-            val deviceContacts = if (hasContactsPerm || hasCallLogPerm) {
-                DeviceContactsReader(applicationContext).readAll()
-            } else {
-                StructuredLogger.i(TAG, "Contacts permissions not granted; skipping device contact sync")
-                emptyList()
-            }
-
-            StructuredLogger.i(TAG, "Syncing contacts", mapOf(
-                "deviceContacts" to deviceContacts.size.toString(),
-            ))
+            StructuredLogger.i(TAG, "Syncing Google contacts")
 
             val gSync = GoogleContactsSync(applicationContext)
             val googleContacts = gSync.fetchAll()
-            val merged = ContactMerger.merge(deviceContacts, googleContacts)
+            val merged = googleContacts
 
             // 1. First, map contactGroup to relationshipType before inserting to DB
             val mappedContacts = merged.map { contact ->

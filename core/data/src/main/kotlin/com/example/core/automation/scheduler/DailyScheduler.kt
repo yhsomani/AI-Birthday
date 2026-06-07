@@ -66,8 +66,55 @@ class BootReceiver : BroadcastReceiver() {
                         DailyScheduler.scheduleExactSend(context, msg.eventId)
                     }
                     
-                    // 2. Reschedule periodic workers
-                    com.example.core.automation.scheduler.WorkerScheduler.scheduleAll(context)
+                    // 2. Reschedule periodic workers conditionally
+                    val workManager = androidx.work.WorkManager.getInstance(context)
+
+                    val hasDailyTrigger = workManager.getWorkInfosByTag("daily_trigger").get().any {
+                        it.state == androidx.work.WorkInfo.State.ENQUEUED || it.state == androidx.work.WorkInfo.State.RUNNING
+                    }
+                    val hasRevival = workManager.getWorkInfosByTag("revival").get().any {
+                        it.state == androidx.work.WorkInfo.State.ENQUEUED || it.state == androidx.work.WorkInfo.State.RUNNING
+                    }
+                    val hasStyle = workManager.getWorkInfosByTag("style_analysis").get().any {
+                        it.state == androidx.work.WorkInfo.State.ENQUEUED || it.state == androidx.work.WorkInfo.State.RUNNING
+                    }
+
+                    val constraints = androidx.work.Constraints.Builder()
+                        .setRequiresBatteryNotLow(true)
+                        .setRequiresStorageNotLow(true)
+                        .build()
+
+                    if (!hasDailyTrigger) {
+                        val request = androidx.work.PeriodicWorkRequestBuilder<com.example.core.automation.workers.DailyTriggerWorker>(24, java.util.concurrent.TimeUnit.HOURS)
+                            .setConstraints(constraints)
+                            .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, java.util.concurrent.TimeUnit.SECONDS)
+                            .addTag("daily_trigger")
+                            .build()
+                        workManager.enqueueUniquePeriodicWork("daily_trigger", androidx.work.ExistingPeriodicWorkPolicy.KEEP, request)
+                    }
+
+                    if (!hasRevival) {
+                        val request = androidx.work.PeriodicWorkRequestBuilder<com.example.core.automation.workers.RevivalWorker>(7, java.util.concurrent.TimeUnit.DAYS)
+                            .setConstraints(constraints)
+                            .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, java.util.concurrent.TimeUnit.SECONDS)
+                            .addTag("revival")
+                            .build()
+                        workManager.enqueueUniquePeriodicWork("revival_check", androidx.work.ExistingPeriodicWorkPolicy.KEEP, request)
+                    }
+
+                    if (!hasStyle) {
+                        val styleConstraints = androidx.work.Constraints.Builder()
+                            .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                            .setRequiresBatteryNotLow(true)
+                            .setRequiresStorageNotLow(true)
+                            .build()
+                        val request = androidx.work.PeriodicWorkRequestBuilder<com.example.core.automation.workers.StyleAnalysisWorker>(14, java.util.concurrent.TimeUnit.DAYS)
+                            .setConstraints(styleConstraints)
+                            .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, java.util.concurrent.TimeUnit.SECONDS)
+                            .addTag("style_analysis")
+                            .build()
+                        workManager.enqueueUniquePeriodicWork("style_analysis", androidx.work.ExistingPeriodicWorkPolicy.KEEP, request)
+                    }
                 } finally {
                     pendingResult.finish()
                 }

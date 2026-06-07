@@ -13,6 +13,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -26,6 +30,18 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
+    sourceSets {
+        getByName("test") {
+            assets.srcDirs(files("$projectDir/schemas"))
+        }
     }
 }
 
@@ -91,4 +107,5 @@ dependencies {
     testImplementation(libs.androidx.junit)
     testImplementation(libs.androidx.core)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation("androidx.room:room-testing:2.7.0")
 }

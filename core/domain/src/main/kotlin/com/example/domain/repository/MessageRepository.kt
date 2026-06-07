@@ -15,6 +15,7 @@ interface MessageRepository {
     fun getAllSent(): Flow<List<SentMessageEntity>>
     suspend fun getSentByContact(contactId: String, limit: Int): List<SentMessageEntity>
     suspend fun getRecentForStyleAnalysis(sinceMs: Long, limit: Int = 100): List<SentMessageEntity>
+    suspend fun getSentSinceYearStart(yearStartMs: Long): List<SentMessageEntity>
     fun countAllSent(): Flow<Int>
     fun countPending(): Flow<Int>
     suspend fun insertSent(message: SentMessageEntity)

@@ -1,0 +1,317 @@
+﻿06-07 22:07:34.295 19309 19309 E Zygote  : process_name_ptr:19309 com.aistudio.relateai.qxtjrk
+06-07 22:07:34.295 19309 19309 E Zygote  : SetMemoryProtected process_name_ptr:19309 com.aistudio.relateai.qxtjrk
+06-07 22:07:34.308 19309 19309 I relateai.qxtjrk: Late-enabling -Xcheck:jni
+06-07 22:07:34.618 19309 19309 I relateai.qxtjrk: Using generational CollectorTypeCMC GC.
+06-07 22:07:34.638 19309 19309 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+06-07 22:07:34.646 19309 19309 I MessageMonitor: Load libmiui_runtime
+06-07 22:07:34.684 19309 19309 D MiuiMonitorThread: Shared singleton Thread for stability monitor start
+06-07 22:07:34.691 19309 21908 D AppScoutStateMachine: 19309-ScoutStateMachinecreated
+06-07 22:07:34.699 19309 19309 D ActivityThread: setEmbeddedParam packageName=com.aistudio.relateai.qxtjrk processName=com.aistudio.relateai.qxtjrk isEmbedded=false isIsolated=false
+06-07 22:07:35.411 19309 19309 D nativeloader: Configuring clns-8 for other apk /data/app/~~ZFZgmY_NGjNno_nwtAY7ig==/com.aistudio.relateai.qxtjrk-UzOMdlvj0s3GFLiPJd8tXQ==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~ZFZgmY_NGjNno_nwtAY7ig==/com.aistudio.relateai.qxtjrk-UzOMdlvj0s3GFLiPJd8tXQ==/lib/arm64:/data/app/~~ZFZgmY_NGjNno_nwtAY7ig==/com.aistudio.relateai.qxtjrk-UzOMdlvj0s3GFLiPJd8tXQ==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.aistudio.relateai.qxtjrk
+06-07 22:07:35.416 19309 19309 I Perf    : Connecting to perf service.
+06-07 22:07:35.420 19309 19309 V GraphicsEnvironment: Currently set values for:
+06-07 22:07:35.420 19309 19309 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+06-07 22:07:35.420 19309 19309 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+06-07 22:07:35.420 19309 19309 V GraphicsEnvironment: Global.Settings values are invalid: number of packages: 0, number of values: 0
+06-07 22:07:35.420 19309 19309 V GraphicsEnvironment: App is not on the allowlist for updatable production driver.
+06-07 22:07:35.422 19309 21912 I ActivityThread: TrafficStats init done
+06-07 22:07:35.433 19309 21912 I ForceDarkHelperStubImpl: initialize for com.aistudio.relateai.qxtjrk , ForceDarkAppConfig: null
+06-07 22:07:35.436 19309 21912 D nativeloader: Load libforcedarkimpl.so using system ns (caller=/system_ext/framework/miui-framework.jar): ok
+06-07 22:07:35.436 19309 21912 D HWUI    : JNI_OnLoad success
+06-07 22:07:35.436 19309 21912 I MiuiForceDarkConfig: setConfig density:2.750000, mainRule:0, secondaryRule:0, tertiaryRule:0
+06-07 22:07:35.442 19309 21912 I PluginScenarioManager: miui.scenariorecognition.plugins.VideoStreamPlugin, (App)create success!
+06-07 22:07:35.442 19309 21912 I ActivityThread: Miui Feature Init done
+06-07 22:07:35.454 19309 19309 I FirebaseApp: Device unlocked: initializing all Firebase APIs for app [DEFAULT]
+06-07 22:07:35.465 19309 19309 I FirebaseInitProvider: FirebaseApp initialization successful
+06-07 22:07:35.469 19309 19309 W libc    : Access denied finding property "vendor.boostfwk.frameprefetcher"
+06-07 22:07:35.487 19309 22020 I DynamiteModule: Considering local module com.google.android.gms.measurement.dynamite:185 and remote module com.google.android.gms.measurement.dynamite:193
+06-07 22:07:35.487 19309 22020 I DynamiteModule: Selected remote version of com.google.android.gms.measurement.dynamite, version >= 193
+06-07 22:07:35.487 19309 22020 V DynamiteModule: Dynamite loader version >= 2, using loadModule2NoCrashUtils
+06-07 22:07:35.498 19309 22020 W System  : ClassLoader referenced unknown path: 
+06-07 22:07:35.498 19309 22020 D nativeloader: Configuring clns-9 for other apk . target_sdk_version=37, uses_libraries=, library_path=/data/app/~~o0HrVbxZvgBwQzbKGIShyw==/com.google.android.gms-tUQJoWodNSn4nwYT5sUYPg==/lib/arm64:/data/app/~~o0HrVbxZvgBwQzbKGIShyw==/com.google.android.gms-tUQJoWodNSn4nwYT5sUYPg==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/com.google.android.gms
+06-07 22:07:35.543 19309 22028 D WM-PackageManagerHelper: Skipping component enablement for androidx.work.impl.background.systemjob.SystemJobService
+06-07 22:07:35.543 19309 22028 D WM-Schedulers: Created SystemJobScheduler and enabled SystemJobService
+06-07 22:07:35.557 19309 22038 I relateai.qxtjrk: hiddenapi: Accessing hidden method Ldalvik/system/VMStack;->getStackClass2()Ljava/lang/Class; (runtime_flags=0, domain=core-platform, api=unsupported) from Lm7/apl; (domain=app, TargetSdkVersion=36) using reflection: allowed
+06-07 22:07:35.572 19309 22036 E relateai.qxtjrk: No package ID 6a found for resource ID 0x6a0b0013.
+06-07 22:07:35.572 19309 22036 I FA      : App measurement initialized, version: 169000
+06-07 22:07:35.572 19309 22036 I FA      : To enable debug logging run: adb shell setprop log.tag.FA VERBOSE
+06-07 22:07:35.573 19309 22036 I FA      : To enable faster debug mode event logging run:
+06-07 22:07:35.573 19309 22036 I FA      :   adb shell setprop debug.firebase.analytics.app com.aistudio.relateai.qxtjrk
+06-07 22:07:36.115 19309 22025 D DatabaseKeyDerivation: DB key derived from scratch and cached in EncryptedSharedPreferences
+06-07 22:07:36.146 19309 19309 D nativeloader: Load /data/app/~~ZFZgmY_NGjNno_nwtAY7ig==/com.aistudio.relateai.qxtjrk-UzOMdlvj0s3GFLiPJd8tXQ==/base.apk!/lib/arm64-v8a/libsqlcipher.so using class loader ns clns-8 (caller=/data/app/~~ZFZgmY_NGjNno_nwtAY7ig==/com.aistudio.relateai.qxtjrk-UzOMdlvj0s3GFLiPJd8tXQ==/base.apk!classes29.dex): ok
+06-07 22:07:36.158 19309 22042 W relateai.qxtjrk: Long monitor contention with owner main (19309) at com.example.core.db.AppDatabase com.example.core.db.AppDatabase$Companion.getInstance(android.content.Context)(AppDatabase.kt:450) waiters=0 in com.example.core.db.AppDatabase com.example.core.db.AppDatabase$Companion.getInstance(android.content.Context) for 505ms
+06-07 22:07:36.160 19309 19309 D FramePredict: FramePredict init: false
+06-07 22:07:36.161 19309 19309 I Choreographer: Skipped 82 frames!  The application may be doing too much work on its main thread.
+06-07 22:07:36.161 19309 19309 D UserSceneDetector: invoke error.
+06-07 22:07:36.167 19309 21912 I ActivityThread: HardwareRenderer preload  done
+06-07 22:07:36.170 19309 22051 W libc    : Access denied finding property "vendor.migl.debug"
+06-07 22:07:36.170 19309 22051 D libMiGL : SuperResolution SR initSR mBaseSRWidthSize: 0, mBaseSRHeightSize: 0, mTargetSRWidthSize: 0, mTargetSRHeightSize: 0
+06-07 22:07:36.170 19309 22051 I libMiGL : EnableDR: 0
+06-07 22:07:36.170 19309 22051 D libMiGL : mDFIInterval: -1
+06-07 22:07:36.170 19309 22051 I AdrenoGLES-0: QUALCOMM build                   : c1fe339905, Id5fe42143e
+06-07 22:07:36.170 19309 22051 I AdrenoGLES-0: Build Date                       : 01/23/25
+06-07 22:07:36.170 19309 22051 I AdrenoGLES-0: OpenGL ES Shader Compiler Version: EV031.36.08.30
+06-07 22:07:36.170 19309 22051 I AdrenoGLES-0: Local Branch                     : 
+06-07 22:07:36.170 19309 22051 I AdrenoGLES-0: Remote Branch                    : refs/tags/AU_LINUX_ANDROID_LA.VENDOR.1.0.R1.11.00.00.816.269
+06-07 22:07:36.170 19309 22051 I AdrenoGLES-0: Remote Branch                    : NONE
+06-07 22:07:36.170 19309 22051 I AdrenoGLES-0: Reconstruct Branch               : NOTHING
+06-07 22:07:36.170 19309 22051 I AdrenoGLES-0: Build Config                     : S P 12.1.1 AArch64
+06-07 22:07:36.170 19309 22051 I AdrenoGLES-0: Driver Path                      : /vendor/lib64/egl/libGLESv2_adreno.so
+06-07 22:07:36.170 19309 22051 I AdrenoGLES-0: Driver Version                   : 0615.95
+06-07 22:07:36.174 19309 22051 I AdrenoGLES-0: PFP: 0x01730158, ME: 0x00000000
+06-07 22:07:36.185 19309 22051 D HWUI    : MiShaderPrecompile handle com.aistudio.relateai.qxtjrk, isSksl: 0, isAppInPreCacheList: 0, isGpuVersionChanged: 0, isSkslChanged: 0
+06-07 22:07:36.219 19309 19309 D Activity: Activity = ActivityInfo{69f5a53 com.example.MainActivity}, Resume onConfigurationChanged = {1.0 404mcc90mnc [en_IN] ldltr sw393dp w393dp h873dp 440dpi nrml long hdr widecg port night finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 1080, 2400) mAppBounds=Rect(0, 0 - 1080, 2400) mMaxBounds=Rect(0, 0 - 1080, 2400) mDisplayRotation=ROTATION_0 mWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0 mInSplitScreen=false letterBoxed=false foScaled=false isSpecificEmbedded=false} s.2 fontWeightAdjustment=0/d themeChanged=0 themeChangedFlags=0 display=0 extraData = Bundle[{}] screenType=0/0}
+06-07 22:07:36.221 19309 19309 W libc    : Access denied finding property "ro.vendor.df.effect.conflict"
+06-07 22:07:36.218 19309 19309 W relateai.qxtjrk: type=1400 audit(0.0:57112): avc:  denied  { read } for  name="u:object_r:vendor_displayfeature_prop:s0" dev="tmpfs" ino=463 scontext=u:r:untrusted_app:s0:c78,c257,c512,c768 tcontext=u:object_r:vendor_displayfeature_prop:s0 tclass=file permissive=0 app=com.myairtelapp
+06-07 22:07:36.222 19309 22036 I FA      : Tag Manager is not found and thus will not be used
+06-07 22:07:36.222 19309 19309 D SecurityManager: checkAccessControl flag0
+06-07 22:07:36.234 19309 19309 D FramePredict: init success
+06-07 22:07:36.236 19309 22053 E FramePredict: registerContentObserver fail
+06-07 22:07:36.244 19309 19309 I ForceDarkHelperStubImpl: setViewRootImplForceDark: false for com.example.MainActivity@d5597df, reason: AppDarkModeEnable
+06-07 22:07:36.255 19309 19309 D DecorViewImmersiveImpl: onAttachedToWindow:com.aistudio.relateai.qxtjrk/com.example.MainActivity
+06-07 22:07:36.413 19309 21903 I relateai.qxtjrk: Compiler allocated 5318KB to compile void android.view.ViewRootImpl.performTraversals()
+06-07 22:07:36.502 19309 19309 W libc    : Access denied finding property "ro.vendor.display.support_round_corner_decoration_composite"
+06-07 22:07:36.498 19309 19309 W relateai.qxtjrk: type=1400 audit(0.0:57113): avc:  denied  { read } for  name="u:object_r:vendor_display_prop:s0" dev="tmpfs" ino=462 scontext=u:r:untrusted_app:s0:c78,c257,c512,c768 tcontext=u:object_r:vendor_display_prop:s0 tclass=file permissive=0 app=com.myairtelapp
+06-07 22:07:36.503 19309 19309 W libc    : Access denied finding property "vendor.display.enable_optimal_refresh_rate"
+06-07 22:07:36.503 19309 19309 I relateai.qxtjrk: πÇÉMiuiBoosterUtilsπÇæcheckUtil disable.
+06-07 22:07:36.503 19309 19309 I relateai.qxtjrk: πÇÉMiuiBoosterUtilsπÇæpackage permission check disable.
+06-07 22:07:36.503 19309 19309 I relateai.qxtjrk: πÇÉMiuiBoosterUtilsπÇæget Service disable.
+06-07 22:07:36.498 19309 19309 W relateai.qxtjrk: type=1400 audit(0.0:57114): avc:  denied  { read } for  name="u:object_r:vendor_display_prop:s0" dev="tmpfs" ino=462 scontext=u:r:untrusted_app:s0:c78,c257,c512,c768 tcontext=u:object_r:vendor_display_prop:s0 tclass=file permissive=0 app=com.myairtelapp
+06-07 22:07:36.506 19309 22057 I relateai.qxtjrk: πÇÉMiuiBoosterUtilsπÇæimprove disable.
+06-07 22:07:36.512 19309 19309 D VRI[MainActivity]: vri.reportNextDraw android.view.ViewRootImpl.performTraversals:5014 android.view.ViewRootImpl.doTraversal:3592 android.view.ViewRootImpl$TraversalRunnable.run:11667 android.view.Choreographer$CallbackRecord.run:1733 android.view.Choreographer$CallbackRecord.run:1742 
+06-07 22:07:36.512 19309 19309 D VRI[MainActivity]: vri.Setup new sync=wmsSync-VRI[MainActivity]#0
+06-07 22:07:36.513 19309 19309 D UserSceneDetector: invoke error.
+06-07 22:07:36.527 19309 22051 D relateai.qxtjrk: MiuiProcessManagerServiceStub setSchedFifo
+06-07 22:07:36.527 19309 22051 I MiuiProcessManagerImpl: setSchedFifo pid:19309, mode:3
+06-07 22:07:36.530 19309 19309 D VRI[MainActivity]: vri.reportDrawFinished
+06-07 22:07:36.544 19309 19309 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+06-07 22:07:36.545 19309 19309 D UserSceneDetector: invoke error.
+06-07 22:07:36.558 19309 22026 I StyleAnalysisWorker: Starting style analysis from sent messages
+06-07 22:07:36.558 19309 22025 W RevivalWorker: Gemini API key not configured ΓÇö skipping worker
+06-07 22:07:36.563 19309 19309 I HandWritingStubImpl: refreshLastKeyboardType: 1
+06-07 22:07:36.563 19309 19309 I HandWritingStubImpl: getCurrentKeyboardType: 1
+06-07 22:07:36.573 19309 22045 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=e66b1ddd-7311-4f11-b109-20ef25179bb5, tags={ com.example.core.automation.workers.DailyTriggerWorker, daily_trigger } ]
+06-07 22:07:36.577 19309 22025 W EpFrameworkFactory: activated: false jar exist: false
+06-07 22:07:36.597 19309 19309 I HandWritingStubImpl: getCurrentKeyboardType: 1
+06-07 22:07:36.602 19309 22026 I ContactSyncWorker: Syncing Google contacts
+06-07 22:07:36.612 19309 22025 D GoogleContactsSync: getValidToken: existing token length = 324
+06-07 22:07:36.615 19309 22046 I WM-WorkerWrapper: Worker result FAILURE for Work [ id=7ae5639a-4696-46b5-9b0d-5f5b9369f234, tags={ com.example.core.automation.workers.RevivalWorker, revival } ]
+06-07 22:07:36.620 19309 22025 D GoogleContactsSync: getValidToken: getLastSignedInAccount email = ysomani07@gmail.com
+06-07 22:07:36.676 19309 22025 D GoogleContactsSync: getValidToken: GoogleAuthUtil token retrieved successfully
+06-07 22:07:36.676 19309 22025 D GoogleContactsSync: fetchAll: Requesting URL: https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses,phoneNumbers,birthdays,events,organizations,memberships,relations
+06-07 22:07:36.727 19309 22026 I StyleAnalysisWorker: Style analysis completed successfully
+06-07 22:07:36.731 19309 22045 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=5783b450-1aa6-4783-8713-96e353c4d4f2, tags={ com.example.core.automation.workers.StyleAnalysisWorker, style_analysis } ]
+06-07 22:07:36.733 19309 22025 E FeatureFlagsImplExport: android.os.flagging.AconfigStorageReadException: ERROR_PACKAGE_NOT_FOUND: package com.android.libcore cannot be found on the device
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync: fetchAll error: HTTP 403: {
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:   "error": {
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:     "code": 403,
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:     "message": "People API has not been used in project 339889410493 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:     "status": "PERMISSION_DENIED",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:     "details": [
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:       {
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:         "reason": "SERVICE_DISABLED",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:         "domain": "googleapis.com",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:         "metadata": {
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:           "activationUrl": "https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:           "consumer": "projects/339889410493",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:           "containerInfo": "339889410493",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:           "service": "people.googleapis.com",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:           "serviceTitle": "People API"
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:         }
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:       },
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:       {
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.LocalizedMessage",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:         "locale": "en-US",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:         "message": "People API has not been used in project 339889410493 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:       },
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:       {
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.Help",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:         "links": [
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:           {
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:             "description": "Google developers console API activation",
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:             "url": "https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493"
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:           }
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:         ]
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:       }
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:     ]
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync:   }
+06-07 22:07:37.120 19309 22025 E GoogleContactsSync: }
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: Failed to fetch Google contacts
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: java.io.IOException: HTTP 403: {
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:   "error": {
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:     "code": 403,
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:     "message": "People API has not been used in project 339889410493 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:     "status": "PERMISSION_DENIED",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:     "details": [
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:       {
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:         "reason": "SERVICE_DISABLED",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:         "domain": "googleapis.com",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:         "metadata": {
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:           "activationUrl": "https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:           "consumer": "projects/339889410493",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:           "containerInfo": "339889410493",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:           "service": "people.googleapis.com",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:           "serviceTitle": "People API"
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:         }
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:       },
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:       {
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.LocalizedMessage",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:         "locale": "en-US",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:         "message": "People API has not been used in project 339889410493 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:       },
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:       {
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.Help",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:         "links": [
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:           {
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:             "description": "Google developers console API activation",
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:             "url": "https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493"
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:           }
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:         ]
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:       }
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:     ]
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync:   }
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: }
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: 
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: 	at com.example.core.contacts.GoogleContactsSync$fetchAll$2.invokeSuspend(GoogleContactsSync.kt:116)
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: 	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: 	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: 	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: 	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: 	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+06-07 22:07:37.121 19309 22025 E GoogleContactsSync: 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+06-07 22:07:37.121 19309 22025 I ContactSyncWorker: Upserted 0 contacts
+06-07 22:07:37.122 19309 22025 I ContactSyncWorker: Classifying 0 unknown contacts
+06-07 22:07:37.123 19309 22045 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=9381e1d3-ca79-43b5-a24a-b9cd80d9790c, tags={ com.example.core.automation.workers.ContactSyncWorker, initial_sync } ]
+06-07 22:07:37.124 19309 22045 I WM-WorkerWrapper: Setting status to enqueued for 8c29f907-c14b-4fc4-9f59-b960aa73c930
+06-07 22:07:37.165 19309 22026 I EventDiscoveryWorker: Discovering events for 0 contacts
+06-07 22:07:37.165 19309 22026 I EventDiscoveryWorker: Discovered 0 events
+06-07 22:07:37.166 19309 22045 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=8c29f907-c14b-4fc4-9f59-b960aa73c930, tags={ com.example.core.automation.workers.EventDiscoveryWorker } ]
+06-07 22:07:37.167 19309 22045 I WM-WorkerWrapper: Setting status to enqueued for a317f7c3-1d12-4d4b-b8d0-4e18d3ba1cce
+06-07 22:07:37.210 19309 22026 W MessageGenerationWorker: Gemini API key not configured ΓÇö skipping worker
+06-07 22:07:37.214 19309 22045 I WM-WorkerWrapper: Worker result FAILURE for Work [ id=a317f7c3-1d12-4d4b-b8d0-4e18d3ba1cce, tags={ com.example.core.automation.workers.MessageGenerationWorker } ]
+06-07 22:07:37.610 19309 19309 W RenderThread: type=1400 audit(0.0:57115): avc:  denied  { getattr } for  path="/sys/module/metis/parameters/minor_window_app" dev="sysfs" ino=69420 scontext=u:r:untrusted_app:s0:c78,c257,c512,c768 tcontext=u:object_r:sysfs_migt:s0 tclass=file permissive=0 app=com.myairtelapp
+06-07 22:07:38.692 19309 19309 D UserSceneDetector: invoke error.
+06-07 22:07:38.801 19309 22026 I SkJpegCodec: [mId: 4] skia-debug SkJpegCodec::+SkJpegCodec
+06-07 22:07:38.801 19309 22026 I SkJpegCodec: [mId: 4] skia-debug SkJpegCodec::ReadHeader: width = 96, height = 96, color = 10
+06-07 22:07:38.801 19309 22026 I SkJpegCodec: [mId: 4] skia-debug SkJpegCodec::ReadHeader: progressive_mode = 0, streamType: SkStreamRewindable
+06-07 22:07:38.806 19309 22026 I SkJpegCodec: [mId: 5] skia-debug SkJpegCodec::+SkJpegCodec
+06-07 22:07:38.806 19309 22026 I SkJpegCodec: [mId: 5] skia-debug SkJpegCodec::ReadHeader: width = 96, height = 96, color = 10
+06-07 22:07:38.806 19309 22026 I SkJpegCodec: [mId: 5] skia-debug SkJpegCodec::ReadHeader: progressive_mode = 0, streamType: SkStreamRewindable
+06-07 22:07:38.806 19309 22026 I SkJpegCodec: [mId: 5] skia-debug SkJpegCodec::onGetPixels: dstRowBytes = 384, 
+06-07 22:07:38.806 19309 22026 I SkJpegCodec: dstInfo: SkImageInfo: {IsRGB = 1, ColorType = 4, AlphaType = 1, Dimensions.width = 96, Dimensions.height = 96};
+06-07 22:07:38.807 19309 22026 I SkJpegCodec: [mId: 5] skia-debug SkJpegCodec::onGetPixels ends with rowsDecodec = 96
+06-07 22:07:38.807 19309 22026 I SkJpegCodec: [mId: 5] skia-debug onGetGainmapInfo returns false
+06-07 22:07:38.807 19309 22026 I AHardwareBuffer: proc name :com.aistudio.relateai.qxtjrk
+06-07 22:07:38.857 19309 19309 D UserSceneDetector: invoke error.
+06-07 22:07:38.935 19309 22026 D GoogleContactsSync: getValidToken: existing token length = 324
+06-07 22:07:38.935 19309 22026 D GoogleContactsSync: getValidToken: getLastSignedInAccount email = ysomani07@gmail.com
+06-07 22:07:38.939 19309 22026 D GoogleContactsSync: getValidToken: GoogleAuthUtil token retrieved successfully
+06-07 22:07:38.940 19309 22026 D GoogleContactsSync: fetchAll: Requesting URL: https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses,phoneNumbers,birthdays,events,organizations,memberships,relations
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync: fetchAll error: HTTP 403: {
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:   "error": {
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:     "code": 403,
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:     "message": "People API has not been used in project 339889410493 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:     "status": "PERMISSION_DENIED",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:     "details": [
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:       {
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:         "reason": "SERVICE_DISABLED",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:         "domain": "googleapis.com",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:         "metadata": {
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:           "consumer": "projects/339889410493",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:           "serviceTitle": "People API",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:           "activationUrl": "https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:           "service": "people.googleapis.com",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:           "containerInfo": "339889410493"
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:         }
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:       },
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:       {
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.LocalizedMessage",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:         "locale": "en-US",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:         "message": "People API has not been used in project 339889410493 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:       },
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:       {
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.Help",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:         "links": [
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:           {
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:             "description": "Google developers console API activation",
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:             "url": "https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493"
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:           }
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:         ]
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:       }
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:     ]
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync:   }
+06-07 22:07:39.297 19309 22026 E GoogleContactsSync: }
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: Failed to fetch Google contacts
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: java.io.IOException: HTTP 403: {
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:   "error": {
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:     "code": 403,
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:     "message": "People API has not been used in project 339889410493 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:     "status": "PERMISSION_DENIED",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:     "details": [
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:       {
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:         "reason": "SERVICE_DISABLED",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:         "domain": "googleapis.com",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:         "metadata": {
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:           "consumer": "projects/339889410493",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:           "serviceTitle": "People API",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:           "activationUrl": "https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:           "service": "people.googleapis.com",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:           "containerInfo": "339889410493"
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:         }
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:       },
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:       {
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.LocalizedMessage",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:         "locale": "en-US",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:         "message": "People API has not been used in project 339889410493 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:       },
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:       {
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:         "@type": "type.googleapis.com/google.rpc.Help",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:         "links": [
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:           {
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:             "description": "Google developers console API activation",
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:             "url": "https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493"
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:           }
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:         ]
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:       }
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:     ]
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync:   }
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: }
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: 
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: 	at com.example.core.contacts.GoogleContactsSync$fetchAll$2.invokeSuspend(GoogleContactsSync.kt:116)
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: 	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: 	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: 	at kotlinx.coroutines.internal.LimitedDispatcher$Worker.run(LimitedDispatcher.kt:124)
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: 	at kotlinx.coroutines.scheduling.TaskImpl.run(Tasks.kt:89)
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: 	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:820)
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+06-07 22:07:39.298 19309 22026 E GoogleContactsSync: 	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+06-07 22:07:41.967 19309 22122 D ProfileInstaller: Installing profile for com.aistudio.relateai.qxtjrk
+06-07 22:07:52.843 19309 19309 I MIUIInput: [MotionEvent] ViewRootImpl windowName 'com.aistudio.relateai.qxtjrk/com.example.MainActivity', { action=ACTION_DOWN, id[0]=0, pointerCount=1, eventTime=105813443, downTime=105813443, phoneEventTime=22:07:52.819 } moveCount:0
+06-07 22:07:52.848 19309 19309 D VRI[MainActivity]: getMiuiFreeformStackInfo mTmpFrames.miuiFreeFormStackInfo: null
+06-07 22:07:52.873 19309 22051 E relateai.qxtjrk: FrameInsert open fail: No such file or directory
+06-07 22:07:52.876 19309 19309 I MIUIInput: [MotionEvent] ViewRootImpl windowName 'com.aistudio.relateai.qxtjrk/com.example.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=105813493, downTime=105813443, phoneEventTime=22:07:52.868 } moveCount:0
+06-07 22:07:52.880 19309 19309 I NavController: Ignoring popBackStack to destination -1229886412 as it was not found on the current back stack
+06-07 22:07:52.926 19309 19309 W FinalizerDaemon: type=1400 audit(0.0:57118): avc:  denied  { getopt } for  path="/dev/socket/usap_pool_primary" scontext=u:r:untrusted_app:s0:c78,c257,c512,c768 tcontext=u:r:zygote:s0 tclass=unix_stream_socket permissive=0 app=com.myairtelapp
+06-07 22:07:53.106 19309 19309 D UserSceneDetector: invoke error.
+06-07 22:07:53.959 19309 19309 I MIUIInput: [MotionEvent] ViewRootImpl windowName 'com.aistudio.relateai.qxtjrk/com.example.MainActivity', { action=ACTION_DOWN, id[0]=0, pointerCount=1, eventTime=105814580, downTime=105814580, phoneEventTime=22:07:53.955 } moveCount:0
+06-07 22:07:53.960 19309 19309 D VRI[MainActivity]: getMiuiFreeformStackInfo mTmpFrames.miuiFreeFormStackInfo: null
+06-07 22:07:54.007 19309 19309 I MIUIInput: [MotionEvent] ViewRootImpl windowName 'com.aistudio.relateai.qxtjrk/com.example.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=105814629, downTime=105814580, phoneEventTime=22:07:54.004 } moveCount:0
+06-07 22:07:54.012 19309 19309 I NavController: Ignoring popBackStack to destination -1229886412 as it was not found on the current back stack
+06-07 22:07:54.476 19309 19309 I MIUIInput: [MotionEvent] ViewRootImpl windowName 'com.aistudio.relateai.qxtjrk/com.example.MainActivity', { action=ACTION_DOWN, id[0]=0, pointerCount=1, eventTime=105815098, downTime=105815098, phoneEventTime=22:07:54.473 } moveCount:0
+06-07 22:07:54.476 19309 19309 D VRI[MainActivity]: getMiuiFreeformStackInfo mTmpFrames.miuiFreeFormStackInfo: null
+06-07 22:07:54.559 19309 19309 I MIUIInput: [MotionEvent] ViewRootImpl windowName 'com.aistudio.relateai.qxtjrk/com.example.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=105815180, downTime=105815098, phoneEventTime=22:07:54.555 } moveCount:0
+06-07 22:07:55.313 19309 19309 I MIUIInput: [MotionEvent] ViewRootImpl windowName 'com.aistudio.relateai.qxtjrk/com.example.MainActivity', { action=ACTION_DOWN, id[0]=0, pointerCount=1, eventTime=105815934, downTime=105815934, phoneEventTime=22:07:55.309 } moveCount:0
+06-07 22:07:55.313 19309 19309 D VRI[MainActivity]: getMiuiFreeformStackInfo mTmpFrames.miuiFreeFormStackInfo: null
+06-07 22:07:55.378 19309 19309 I MIUIInput: [MotionEvent] ViewRootImpl windowName 'com.aistudio.relateai.qxtjrk/com.example.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=105816000, downTime=105815934, phoneEventTime=22:07:55.375 } moveCount:0
+06-07 22:07:55.383 19309 19309 I NavController: Ignoring popBackStack to destination -1229886412 as it was not found on the current back stack
+06-07 22:07:56.030 19309 19309 I MIUIInput: [MotionEvent] ViewRootImpl windowName 'com.aistudio.relateai.qxtjrk/com.example.MainActivity', { action=ACTION_DOWN, id[0]=0, pointerCount=1, eventTime=105816651, downTime=105816651, phoneEventTime=22:07:56.026 } moveCount:0
+06-07 22:07:56.031 19309 19309 D VRI[MainActivity]: getMiuiFreeformStackInfo mTmpFrames.miuiFreeFormStackInfo: null
+06-07 22:07:56.046 19309 19309 I MIUIInput: [MotionEvent] ViewRootImpl windowName 'com.aistudio.relateai.qxtjrk/com.example.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=105816667, downTime=105816651, phoneEventTime=22:07:56.042 } moveCount:0
+06-07 22:07:56.049 19309 19309 I NavController: Ignoring popBackStack to destination -1229886412 as it was not found on the current back stack

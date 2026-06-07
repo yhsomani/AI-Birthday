@@ -18,7 +18,8 @@ class NotificationServiceImpl @Inject constructor(
     override fun showApprovalNotification(
         contact: ContactEntity,
         event: EventEntity,
-        variants: MessageVariantsResult
+        variants: MessageVariantsResult,
+        messageId: String
     ) {
         val mappedVariants = MessageVariants(
             short = variants.short,
@@ -29,6 +30,6 @@ class NotificationServiceImpl @Inject constructor(
             emotional = variants.emotional,
             recommended = variants.recommended
         )
-        NotificationHelper.showApprovalNotification(context, contact, event, mappedVariants)
+        NotificationHelper.showApprovalNotification(context, contact, event, mappedVariants, messageId)
     }
 }

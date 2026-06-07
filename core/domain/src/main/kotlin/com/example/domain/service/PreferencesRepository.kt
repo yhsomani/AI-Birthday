@@ -45,5 +45,8 @@ interface PreferencesRepository {
     fun setGuestMode(enabled: Boolean)
     fun isGuestMode(): Boolean
 
+    fun setLastSyncError(error: String?)
+    fun getLastSyncError(): String?
+
     fun clearAll()
 }

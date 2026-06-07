@@ -41,11 +41,18 @@ class HomeViewModelTest {
     @RelaxedMockK
     private lateinit var mockSyncContactsUseCase: com.example.domain.usecase.SyncContactsUseCase
 
+    @RelaxedMockK
+    private lateinit var mockPreferencesRepository: com.example.domain.service.PreferencesRepository
+
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        io.mockk.mockkStatic(android.util.Log::class)
+        every { android.util.Log.e(any(), any()) } returns 0
+        every { android.util.Log.e(any(), any(), any()) } returns 0
+        every { mockPreferencesRepository.getLastSyncError() } returns null
         every { mockAuthManager.userProfile } returns MutableStateFlow(
             UserProfile(displayName = "TestUser", email = "test@example.com")
         )
@@ -54,6 +61,7 @@ class HomeViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        io.mockk.unmockkStatic(android.util.Log::class)
     }
 
     @Test
@@ -66,7 +74,7 @@ class HomeViewModelTest {
             sentCount = 2,
         )
         coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
-        val viewModel = HomeViewModel(mockUseCase, mockAuthManager, mockEventRepository, mockSyncContactsUseCase)
+        val viewModel = HomeViewModel(mockUseCase, mockAuthManager, mockEventRepository, mockSyncContactsUseCase, mockPreferencesRepository)
         advanceUntilIdle()
 
         assertEquals("TestUser", viewModel.uiState.value.userName)
@@ -84,7 +92,7 @@ class HomeViewModelTest {
     fun `loadMetrics handles exception gracefully`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } throws RuntimeException("Simulated failure")
         coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
-        val viewModel = HomeViewModel(mockUseCase, mockAuthManager, mockEventRepository, mockSyncContactsUseCase)
+        val viewModel = HomeViewModel(mockUseCase, mockAuthManager, mockEventRepository, mockSyncContactsUseCase, mockPreferencesRepository)
         advanceUntilIdle()
 
         assertEquals(false, viewModel.uiState.value.isLoading)

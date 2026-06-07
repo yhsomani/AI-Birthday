@@ -52,6 +52,13 @@ object BackupManager {
         val backupFile = File(context.filesDir, "relateai_backup_$timestamp.enc")
         backupFile.writeText(encryptedJson)
         Log.i(TAG, "Encrypted backup created: ${backupFile.name} (${backupFile.length()} bytes)")
+        
+        try {
+            SecurePrefs(context).setLastBackupMs(System.currentTimeMillis())
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save last backup timestamp to SecurePrefs", e)
+        }
+
         backupFile
     }
 

@@ -35,6 +35,8 @@ class MessageRepositoryImpl @Inject constructor(
 
     override suspend fun getRecentForStyleAnalysis(sinceMs: Long, limit: Int): List<SentMessageEntity> = sentMessageDao.getRecentForStyleAnalysis(sinceMs, limit)
 
+    override suspend fun getSentSinceYearStart(yearStartMs: Long): List<SentMessageEntity> = sentMessageDao.getSentSinceYearStart(yearStartMs)
+
     override fun countAllSent(): Flow<Int> = sentMessageDao.countAll()
 
     override fun countPending(): Flow<Int> = pendingMessageDao.countPending()

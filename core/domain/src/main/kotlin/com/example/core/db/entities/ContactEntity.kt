@@ -65,6 +65,7 @@ data class ContactEntity(
     // Automation
     val automationMode: String = "DEFAULT",    // FULLY_AUTO, SMART_APPROVE, VIP_APPROVE, DEFAULT
     val giftBudgetInr: Int = 500,
+    val annualBudgetInr: Int = 0,
     val skipAutoWish: Boolean = false,
     val customSendTimeHour: Int? = null,
     val customSendTimeMinute: Int? = null,

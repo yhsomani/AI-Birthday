@@ -154,6 +154,12 @@ class SecurePrefs(context: Context) {
     fun setFirebaseUid(uid: String) = authPrefs.edit().putString("firebase_uid", uid).apply()
     fun getFirebaseUid(): String = authPrefs.getString("firebase_uid", "") ?: ""
 
+    fun setLastBackupMs(ms: Long) = configPrefs.edit().putLong("last_backup_ms", ms).apply()
+    fun getLastBackupMs(): Long = configPrefs.getLong("last_backup_ms", 0L)
+
+    fun setLastSyncError(error: String?) = configPrefs.edit().putString("last_sync_error", error).apply()
+    fun getLastSyncError(): String? = configPrefs.getString("last_sync_error", null)
+
     fun clearAll() {
         authPrefs.edit().clear().apply()
         configPrefs.edit().clear().apply()

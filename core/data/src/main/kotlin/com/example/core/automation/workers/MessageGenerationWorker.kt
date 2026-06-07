@@ -40,12 +40,13 @@ class MessageGenerationWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         val apiKey = prefs.getGeminiApiKey()
-        if (apiKey.isNullOrBlank()) {
-            StructuredLogger.w(TAG, "Gemini API key not configured — skipping worker")
+        val firebaseUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+        if (apiKey.isNullOrBlank() && firebaseUser == null) {
+            StructuredLogger.w(TAG, "Gemini API key not configured and user not authenticated — skipping worker")
             com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
                 applicationContext,
                 "RelateAI Setup Needed",
-                "RelateAI needs your Gemini API key to generate messages. Tap to configure."
+                "RelateAI needs your Gemini API key or a signed-in Google account to generate messages."
             )
             return Result.failure()
         }
@@ -88,10 +89,18 @@ class MessageGenerationWorker @AssistedInject constructor(
 
                             val contextObj = prompter.buildContactContext(contact, event, styleProfile, previousMessages)
 
+                            val messageId = existingPending?.id ?: java.util.UUID.randomUUID().toString()
+
                             RateLimiter.waitIfNeeded()
                             var prompt = prompter.buildMessageGenerationPrompt(contextObj)
                             var responseString = gemini.generate(prompt)
-                            var variants = ResponseParser.parseMessageVariants(responseString)
+                            var variants = ResponseParser.parseMessageVariants(
+                                responseString,
+                                messageId = messageId,
+                                pendingMessageDao = pendingMessageDao,
+                                context = applicationContext,
+                                eventType = event.type
+                            )
 
                             // Anti-repetition check
                             var retries = 0
@@ -99,7 +108,13 @@ class MessageGenerationWorker @AssistedInject constructor(
                                 RateLimiter.waitIfNeeded()
                                 prompt = prompter.buildRegenerationPrompt(variants.standard, contextObj)
                                 responseString = gemini.generate(prompt)
-                                variants = ResponseParser.parseMessageVariants(responseString)
+                                variants = ResponseParser.parseMessageVariants(
+                                    responseString,
+                                    messageId = messageId,
+                                    pendingMessageDao = pendingMessageDao,
+                                    context = applicationContext,
+                                    eventType = event.type
+                                )
                                 retries++
                             }
 
@@ -115,7 +130,7 @@ class MessageGenerationWorker @AssistedInject constructor(
                             ))
 
                             pendingMessageDao.insert(PendingMessageEntity(
-                                id = existingPending?.id ?: UUID.randomUUID().toString(),
+                                id = messageId,
                                 contactId = contact.id,
                                 eventId = event.id,
                                 shortVariant = variants.short,
@@ -130,14 +145,15 @@ class MessageGenerationWorker @AssistedInject constructor(
                                 scheduledForMs = event.nextOccurrenceMs,
                                 approvalMode = approvalMode,
                                 status = if (approvalMode == "FULLY_AUTO") "APPROVED" else "PENDING",
-                                scheduledYear = scheduledYear
+                                scheduledYear = scheduledYear,
+                                isUsingFallback = variants.isUsingFallback
                             ))
 
                             if (approvalMode == "FULLY_AUTO") {
                                 StructuredLogger.i(TAG, "Auto-approving message for event ${event.id}")
                                 DailyScheduler.scheduleExactSend(applicationContext, event.id)
                             } else {
-                                com.example.core.automation.notifications.NotificationHelper.showApprovalNotification(applicationContext, contact, event, variants)
+                                com.example.core.automation.notifications.NotificationHelper.showApprovalNotification(applicationContext, contact, event, variants, messageId)
                             }
                         } catch (e: Exception) {
                             StructuredLogger.w(TAG, "Failed to generate message for event ${event.id}", e)

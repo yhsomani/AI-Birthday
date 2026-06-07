@@ -23,7 +23,7 @@ import java.io.File
         GiftHistoryEntity::class,
         StyleProfileHistoryEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -124,9 +124,10 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // contacts table: add lastRevivalAttemptMs and isDeleted
+                // contacts table: add lastRevivalAttemptMs, isDeleted, and annualBudgetInr
                 db.execSQL("ALTER TABLE contacts ADD COLUMN lastRevivalAttemptMs INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE contacts ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE contacts ADD COLUMN annualBudgetInr INTEGER NOT NULL DEFAULT 0")
 
                 // Recreate events table with cascade foreign key and isActive column
                 db.execSQL("""
@@ -154,7 +155,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("DROP TABLE events")
                 db.execSQL("ALTER TABLE events_new RENAME TO events")
 
-                // Recreate pending_messages table with scheduledYear column, unique index, and cascade foreign key
+                // Recreate pending_messages table with scheduledYear and isUsingFallback columns, and cascade foreign key
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS pending_messages_new (
                         id TEXT PRIMARY KEY NOT NULL,
@@ -181,6 +182,7 @@ abstract class AppDatabase : RoomDatabase() {
                         length TEXT NOT NULL DEFAULT 'STANDARD',
                         includeEmoji INTEGER NOT NULL DEFAULT 1,
                         scheduledYear INTEGER NOT NULL DEFAULT 0,
+                        isUsingFallback INTEGER NOT NULL DEFAULT 0,
                         FOREIGN KEY(contactId) REFERENCES contacts(id) ON DELETE CASCADE
                     )
                 """.trimIndent())
@@ -284,6 +286,126 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Helper to check if a column exists in a table
+                fun columnExists(tableName: String, columnName: String): Boolean {
+                    return try {
+                        db.query("SELECT `$columnName` FROM `$tableName` LIMIT 0").use {
+                            true
+                        }
+                    } catch (e: Exception) {
+                        false
+                    }
+                }
+
+                // Helper to check if a table exists
+                fun tableExists(tableName: String): Boolean {
+                    db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='$tableName'").use { cursor ->
+                        return cursor.count > 0
+                    }
+                }
+
+                // 1. Hardening contacts columns
+                if (!columnExists("contacts", "lastRevivalAttemptMs")) {
+                    db.execSQL("ALTER TABLE contacts ADD COLUMN lastRevivalAttemptMs INTEGER NOT NULL DEFAULT 0")
+                }
+                if (!columnExists("contacts", "isDeleted")) {
+                    db.execSQL("ALTER TABLE contacts ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
+                }
+                if (!columnExists("contacts", "annualBudgetInr")) {
+                    db.execSQL("ALTER TABLE contacts ADD COLUMN annualBudgetInr INTEGER NOT NULL DEFAULT 0")
+                }
+
+                // 2. Hardening events columns
+                if (!columnExists("events", "isActive")) {
+                    db.execSQL("ALTER TABLE events ADD COLUMN isActive INTEGER NOT NULL DEFAULT 1")
+                }
+
+                // 3. Hardening pending_messages columns
+                if (!columnExists("pending_messages", "scheduledYear")) {
+                    db.execSQL("ALTER TABLE pending_messages ADD COLUMN scheduledYear INTEGER NOT NULL DEFAULT 0")
+                }
+                if (!columnExists("pending_messages", "isUsingFallback")) {
+                    db.execSQL("ALTER TABLE pending_messages ADD COLUMN isUsingFallback INTEGER NOT NULL DEFAULT 0")
+                }
+
+                // 4. Hardening sent_messages columns
+                if (!columnExists("sent_messages", "isContactDeleted")) {
+                    db.execSQL("ALTER TABLE sent_messages ADD COLUMN isContactDeleted INTEGER NOT NULL DEFAULT 0")
+                }
+
+                // 5. Hardening style_profile_history table
+                if (!tableExists("style_profile_history")) {
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS style_profile_history (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            profileJson TEXT NOT NULL,
+                            savedAtMs INTEGER NOT NULL,
+                            source TEXT NOT NULL DEFAULT 'MANUAL_TRAINING'
+                        )
+                    """.trimIndent())
+                }
+
+                // 6. Recreate pending_messages table with UNIQUE(contactId, eventId, scheduledYear) constraint
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS pending_messages_new (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        contactId TEXT NOT NULL,
+                        eventId TEXT NOT NULL,
+                        shortVariant TEXT NOT NULL,
+                        standardVariant TEXT NOT NULL,
+                        longVariant TEXT NOT NULL,
+                        formalVariant TEXT NOT NULL,
+                        funnyVariant TEXT NOT NULL,
+                        emotionalVariant TEXT NOT NULL,
+                        selectedVariant TEXT NOT NULL DEFAULT 'standard',
+                        selectedVariantText TEXT NOT NULL DEFAULT '',
+                        channel TEXT NOT NULL,
+                        scheduledForMs INTEGER NOT NULL,
+                        approvalMode TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'PENDING',
+                        aiModel TEXT NOT NULL DEFAULT 'flash',
+                        generatedAtMs INTEGER NOT NULL,
+                        editedByUser INTEGER NOT NULL,
+                        userEditedText TEXT,
+                        qualityScore INTEGER NOT NULL DEFAULT 0,
+                        tone TEXT NOT NULL DEFAULT 'WARM',
+                        length TEXT NOT NULL DEFAULT 'STANDARD',
+                        includeEmoji INTEGER NOT NULL DEFAULT 1,
+                        scheduledYear INTEGER NOT NULL DEFAULT 0,
+                        isUsingFallback INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY(contactId) REFERENCES contacts(id) ON DELETE CASCADE,
+                        UNIQUE(contactId, eventId, scheduledYear) ON CONFLICT REPLACE
+                    )
+                """.trimIndent())
+
+                // Insert into new table
+                db.execSQL("""
+                    INSERT INTO pending_messages_new (id, contactId, eventId, shortVariant, standardVariant, longVariant, formalVariant, funnyVariant, emotionalVariant, selectedVariant, selectedVariantText, channel, scheduledForMs, approvalMode, status, aiModel, generatedAtMs, editedByUser, userEditedText, qualityScore, tone, length, includeEmoji, scheduledYear, isUsingFallback)
+                    SELECT id, contactId, eventId, shortVariant, standardVariant, longVariant, formalVariant, funnyVariant, emotionalVariant, selectedVariant, selectedVariantText, channel, scheduledForMs, approvalMode, status, aiModel, generatedAtMs, editedByUser, userEditedText, qualityScore, tone, length, includeEmoji, scheduledYear, isUsingFallback FROM pending_messages
+                """.trimIndent())
+
+                db.execSQL("DROP TABLE pending_messages")
+                db.execSQL("ALTER TABLE pending_messages_new RENAME TO pending_messages")
+
+                // Recreate indices since dropping table drops indices
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_pending_messages_scheduledForMs ON pending_messages(scheduledForMs)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_pending_messages_contactId ON pending_messages(contactId)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_pending_messages_contactId_eventId_scheduledYear ON pending_messages(contactId, eventId, scheduledYear)")
+
+                // Also recreate other indices that might be missing in some v10 databases
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_contacts_revival ON contacts(healthScore ASC, lastRevivalAttemptMs ASC)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_contacts_active ON contacts(isDeleted ASC, healthScore ASC)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_nextOccurrenceMs ON events(nextOccurrenceMs)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_contactId ON events(contactId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_events_active ON events(isActive ASC, nextOccurrenceMs ASC)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_sent_messages_contactId_sentAtMs ON sent_messages(contactId ASC, sentAtMs DESC)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_memory_notes_contactId ON memory_notes(contactId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_gift_history_contactId ON gift_history(contactId)")
+            }
+        }
+
         private fun isDatabaseUnencrypted(context: Context): Boolean {
             val dbFile = context.getDatabasePath("relateai.db")
             if (!dbFile.exists() || dbFile.length() < 16) return false
@@ -311,6 +433,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        fun closeAndResetInstance() {
+            synchronized(this) {
+                INSTANCE?.let { db ->
+                    try {
+                        db.close()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error closing database", e)
+                    }
+                }
+                INSTANCE = null
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 if (isDatabaseUnencrypted(context)) {
@@ -326,7 +461,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "relateai.db"
                 )
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                 .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance

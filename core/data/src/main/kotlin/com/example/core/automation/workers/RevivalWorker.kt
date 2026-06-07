@@ -27,6 +27,18 @@ class RevivalWorker @AssistedInject constructor(
     private val prefs: SecurePrefs
 ) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
+        val apiKey = prefs.getGeminiApiKey()
+        val firebaseUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+        if (apiKey.isNullOrBlank() && firebaseUser == null) {
+            StructuredLogger.w(TAG, "Gemini API key not configured and user not authenticated — skipping worker")
+            com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
+                applicationContext,
+                "RelateAI Setup Needed",
+                "RelateAI needs your Gemini API key or a signed-in Google account to generate revival messages."
+            )
+            return Result.failure()
+        }
+
         return try {
             if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
                 StructuredLogger.i(TAG, "User not authenticated; skipping revival scan")

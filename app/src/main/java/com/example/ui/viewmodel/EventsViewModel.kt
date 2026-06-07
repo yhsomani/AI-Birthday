@@ -30,11 +30,16 @@ class EventsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            eventRepository.getAll().collect { events ->
-                _uiState.value = EventsUiState(
-                    events = events,
-                    isLoading = false,
-                )
+            try {
+                eventRepository.getAll().collect { events ->
+                    _uiState.value = EventsUiState(
+                        events = events,
+                        isLoading = false,
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("EventsViewModel", "Error collecting events", e)
+                _uiState.value = _uiState.value.copy(isLoading = false)
             }
         }
     }

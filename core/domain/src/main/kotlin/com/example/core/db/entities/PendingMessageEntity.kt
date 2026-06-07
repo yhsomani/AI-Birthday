@@ -45,5 +45,6 @@ data class PendingMessageEntity(
     val tone: String = "WARM",           // WARM, FUNNY, NOSTALGIC, MOTIVATIONAL, PROFESSIONAL
     val length: String = "STANDARD",     // ULTRA_SHORT, STANDARD, LONG
     val includeEmoji: Boolean = true,
-    val scheduledYear: Int = 0
+    val scheduledYear: Int = 0,
+    val isUsingFallback: Boolean = false
 )

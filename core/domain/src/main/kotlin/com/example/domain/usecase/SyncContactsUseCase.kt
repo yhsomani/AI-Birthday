@@ -22,9 +22,22 @@ class SyncContactsUseCase @Inject constructor(
     private val preferencesRepository: com.example.domain.service.PreferencesRepository
 ) {
     suspend operator fun invoke(): SyncOutcome {
-        val googleContacts = contactSyncService.fetchGoogleContacts()
-        val deviceContacts = contactSyncService.fetchDeviceContacts()
-        var merged = mergeContacts(deviceContacts, googleContacts)
+        var googleContacts = emptyList<ContactEntity>()
+        var googleError: String? = null
+        try {
+            googleContacts = contactSyncService.fetchGoogleContacts()
+            preferencesRepository.setLastSyncError(null)
+        } catch (e: Exception) {
+            android.util.Log.e("SyncContactsUseCase", "Google contacts sync failed", e)
+            googleError = e.message ?: "Failed to fetch Google contacts"
+            preferencesRepository.setLastSyncError(googleError)
+        }
+
+        if (googleError != null) {
+            throw Exception("Google contacts sync failed: $googleError")
+        }
+
+        var merged = googleContacts
 
         val isGuest = preferencesRepository.isGuestMode()
         if (merged.isEmpty() && isGuest) {
@@ -55,25 +68,7 @@ class SyncContactsUseCase @Inject constructor(
         // Run event discovery immediately so events are available in the database
         discoverEventsUseCase()
 
-        return SyncOutcome(googleCount = googleContacts.size, deviceCount = deviceContacts.size, inserted = inserted, updated = updated)
-    }
-
-    private fun mergeContacts(
-        device: List<ContactEntity>,
-        google: List<ContactEntity>
-    ): List<ContactEntity> {
-        val byName = mutableMapOf<String, ContactEntity>()
-        device.forEach { byName[it.name] = it }
-        google.forEach { g ->
-            val existing = byName[g.name]
-            byName[g.name] = if (existing != null) {
-                existing.copy(
-                    googleContactId = g.googleContactId ?: existing.googleContactId,
-                    primaryEmail = g.primaryEmail ?: existing.primaryEmail
-                )
-            } else g
-        }
-        return byName.values.toList()
+        return SyncOutcome(googleCount = googleContacts.size, deviceCount = 0, inserted = inserted, updated = updated)
     }
 
     private fun getMockContacts(): List<ContactEntity> {

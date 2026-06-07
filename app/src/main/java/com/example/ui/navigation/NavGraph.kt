@@ -6,11 +6,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.core.prefs.SecurePrefs
 import com.example.ui.screens.splash.SplashScreen
 import com.example.ui.screens.onboarding.OnboardingScreen
 import com.example.ui.screens.auth.AuthScreen
@@ -70,16 +72,35 @@ fun RelateNavGraph(
     ) {
         composable(Screen.Splash.route) {
             SplashScreen(
-                onSplashComplete = {
-                    navController.navigate(Screen.Onboarding.route) {
-                        popUpTo(Screen.Splash.route) { inclusive = true }
+                onNavigateToHome = {
+                    if (navController.currentDestination?.route == Screen.Splash.route) {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Splash.route) { inclusive = true }
+                        }
                     }
-                }
+                },
+                onNavigateToOnboarding = {
+                    if (navController.currentDestination?.route == Screen.Splash.route) {
+                        navController.navigate(Screen.Onboarding.route) {
+                            popUpTo(Screen.Splash.route) { inclusive = true }
+                        }
+                    }
+                },
+                onNavigateToAuth = {
+                    if (navController.currentDestination?.route == Screen.Splash.route) {
+                        navController.navigate(Screen.Auth.route) {
+                            popUpTo(Screen.Splash.route) { inclusive = true }
+                        }
+                    }
+                },
             )
         }
         composable(Screen.Onboarding.route) {
+            val context = LocalContext.current
             OnboardingScreen(
                 onOnboardingComplete = {
+                    // Persist onboarding completion so future launches skip this screen
+                    SecurePrefs(context).setOnboardingComplete(true)
                     navController.navigate(Screen.Auth.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
@@ -114,7 +135,12 @@ fun RelateNavGraph(
         }
         composable(
             route = Screen.ContactDetail.route,
-            arguments = listOf(navArgument("contactId") { type = NavType.StringType })
+            arguments = listOf(navArgument("contactId") { type = NavType.StringType }),
+            deepLinks = listOf(
+                androidx.navigation.navDeepLink {
+                    uriPattern = "relateai://contact/{contactId}"
+                }
+            )
         ) { backStackEntry ->
             val contactId = backStackEntry.arguments?.getString("contactId") ?: ""
             ContactDetailScreen(
@@ -136,6 +162,11 @@ fun RelateNavGraph(
             arguments = listOf(
                 navArgument("contactId") { type = NavType.StringType },
                 navArgument("eventId") { type = NavType.StringType },
+            ),
+            deepLinks = listOf(
+                androidx.navigation.navDeepLink {
+                    uriPattern = "relateai://wish/{contactId}/{eventId}"
+                }
             )
         ) { backStackEntry ->
             val contactId = backStackEntry.arguments?.getString("contactId") ?: ""
@@ -153,9 +184,20 @@ fun RelateNavGraph(
             EventsScreen()
         }
         composable(Screen.Messages.route) {
-            MessagesScreen()
+            MessagesScreen(
+                onNavigateToWish = { contactId, eventId ->
+                    navController.navigate(Screen.WishPreview.createRoute(contactId, eventId))
+                }
+            )
         }
-        composable(Screen.Settings.route) {
+        composable(
+            route = Screen.Settings.route,
+            deepLinks = listOf(
+                androidx.navigation.navDeepLink {
+                    uriPattern = "relateai://settings"
+                }
+            )
+        ) {
             SettingsScreen(
                 onSignOut = {
                     navController.navigate(Screen.Auth.route) {

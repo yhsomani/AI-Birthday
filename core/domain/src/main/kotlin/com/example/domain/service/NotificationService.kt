@@ -7,6 +7,7 @@ interface NotificationService {
     fun showApprovalNotification(
         contact: ContactEntity,
         event: EventEntity,
-        variants: MessageVariantsResult
+        variants: MessageVariantsResult,
+        messageId: String
     )
 }

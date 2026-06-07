@@ -129,9 +129,14 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideGenerativeModel(): GenerativeModel {
+    fun provideGenerativeModel(@ApplicationContext context: Context): GenerativeModel {
+        val firebaseApp = try {
+            com.google.firebase.FirebaseApp.getInstance()
+        } catch (e: IllegalStateException) {
+            com.google.firebase.FirebaseApp.initializeApp(context) ?: throw e
+        }
         return com.google.firebase.vertexai.FirebaseVertexAI.getInstance(
-            com.google.firebase.FirebaseApp.getInstance(),
+            firebaseApp,
             "us-central1"
         ).generativeModel("gemini-1.5-flash")
     }

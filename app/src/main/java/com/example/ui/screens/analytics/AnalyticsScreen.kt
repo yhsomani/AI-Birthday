@@ -96,16 +96,15 @@ fun AnalyticsScreen(
         SectionHeader(title = "Monthly Wishes")
         RelateGlassCard {
             Column(modifier = Modifier.padding(16.dp)) {
-                BarChart(
-                    data = listOf(
-                        "Jan" to 8f,
-                        "Feb" to 5f,
-                        "Mar" to 12f,
-                        "Apr" to 7f,
-                        "May" to 10f,
-                        "Jun" to 6f,
-                    ),
-                )
+                if (state.monthlyCounts.isEmpty()) {
+                    Text(
+                        text = "No wishes sent yet this year",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = RelateOnSurfaceVariant,
+                    )
+                } else {
+                    BarChart(data = state.monthlyCounts)
+                }
             }
         }
 

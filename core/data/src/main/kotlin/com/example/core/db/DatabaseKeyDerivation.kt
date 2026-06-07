@@ -33,6 +33,13 @@ object DatabaseKeyDerivation {
     }
 
     private fun deriveKeyInternal(context: Context): ByteArray {
+        // One-time migration: delete legacy plaintext prefs file
+        val legacyPrefs = context.getSharedPreferences("relateai_db_meta", Context.MODE_PRIVATE)
+        if (legacyPrefs.contains("derived_key_hex")) {
+            legacyPrefs.edit().clear().apply()
+            context.deleteSharedPreferences("relateai_db_meta")
+        }
+
         val prefs = createEncryptedPrefs(context.applicationContext)
         val cachedHex = prefs.getString(PREF_DB_KEY, null)
 

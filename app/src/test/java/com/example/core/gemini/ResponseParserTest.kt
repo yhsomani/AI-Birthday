@@ -86,7 +86,7 @@ class ResponseParserTest {
     fun `parseMessageVariants returns fallback on malformed json`() {
         val variants = ResponseParser.parseMessageVariants("garbage")
 
-        assertEquals("Wishing you a very happy birthday!", variants.short)
+        assertEquals("Wishing you a very happy birthday! Hope you have a wonderful day!", variants.short)
         assertEquals("standard", variants.recommended)
     }
 

@@ -17,80 +17,95 @@ object WorkerScheduler {
 
     fun scheduleAll(context: Context) {
         val workManager = WorkManager.getInstance(context)
-        val prefs = SecurePrefs(context)
         
-        val isSetupComplete = try {
-            com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null
-        } catch (e: Exception) {
-            false
-        }
-
-        if (!isSetupComplete) {
-            Log.i(TAG, "Setup not complete; deferring worker schedule by 1h.")
-        }
-
-        val fallbackDelay = TimeUnit.HOURS.toMillis(1)
-        val networkConstraint = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
+        val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .setRequiresStorageNotLow(true)
             .build()
-        val backoff = BackoffPolicy.EXPONENTIAL
-        val minBackoffSeconds = 30L
+
+        // 1. Daily Trigger Worker (every 24 hours)
+        val dailyTrigger = PeriodicWorkRequestBuilder<com.example.core.automation.workers.DailyTriggerWorker>(24, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .addTag("daily_trigger")
+            .build()
 
         workManager.enqueueUniquePeriodicWork(
-            "contact_sync",
+            "daily_trigger",
             ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<ContactSyncWorker>(24, TimeUnit.HOURS)
-                .setConstraints(networkConstraint)
-                .setInitialDelay(
-                    if (isSetupComplete) maxOf(calculateDelayUntilMidnight(), 0) else fallbackDelay,
-                    TimeUnit.MILLISECONDS
-                )
-                .setBackoffCriteria(backoff, minBackoffSeconds, TimeUnit.SECONDS)
-                .build()
+            dailyTrigger
         )
 
-        workManager.enqueueUniquePeriodicWork(
-            "event_discovery",
-            ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<EventDiscoveryWorker>(24, TimeUnit.HOURS)
-                .setInitialDelay(
-                    if (isSetupComplete) maxOf(calculateDelayUntil(0, 5), 0) else fallbackDelay,
-                    TimeUnit.MILLISECONDS
-                )
-                .setBackoffCriteria(backoff, minBackoffSeconds, TimeUnit.SECONDS)
-                .build()
-        )
-
-        workManager.enqueueUniquePeriodicWork(
-            "message_generation",
-            ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<MessageGenerationWorker>(24, TimeUnit.HOURS)
-                .setConstraints(networkConstraint)
-                .setInitialDelay(
-                    if (isSetupComplete) maxOf(calculateDelayUntil(1, 0), 0) else fallbackDelay,
-                    TimeUnit.MILLISECONDS
-                )
-                .setBackoffCriteria(backoff, minBackoffSeconds, TimeUnit.SECONDS)
-                .build()
-        )
+        // 2. Revival Worker (every 7 days)
+        val revival = PeriodicWorkRequestBuilder<com.example.core.automation.workers.RevivalWorker>(7, TimeUnit.DAYS)
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .addTag("revival")
+            .build()
 
         workManager.enqueueUniquePeriodicWork(
             "revival_check",
             ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<RevivalWorker>(7, TimeUnit.DAYS)
-                .setInitialDelay(2, TimeUnit.DAYS)
-                .setBackoffCriteria(backoff, minBackoffSeconds, TimeUnit.SECONDS)
-                .build()
+            revival
         )
+
+        // 3. Style Analysis Worker (every 14 days)
+        val styleConstraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiresBatteryNotLow(true)
+            .setRequiresStorageNotLow(true)
+            .build()
+
+        val styleAnalysis = PeriodicWorkRequestBuilder<com.example.core.automation.workers.StyleAnalysisWorker>(14, TimeUnit.DAYS)
+            .setConstraints(styleConstraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .addTag("style_analysis")
+            .build()
 
         workManager.enqueueUniquePeriodicWork(
             "style_analysis",
             ExistingPeriodicWorkPolicy.KEEP,
-            PeriodicWorkRequestBuilder<StyleAnalysisWorker>(14, TimeUnit.DAYS)
-                .setConstraints(networkConstraint)
-                .setBackoffCriteria(backoff, minBackoffSeconds, TimeUnit.SECONDS)
-                .build()
+            styleAnalysis
         )
+    }
+
+    fun scheduleDailyAutomationChain(context: Context) {
+        val workManager = WorkManager.getInstance(context)
+
+        val networkConstraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiresBatteryNotLow(true)
+            .setRequiresStorageNotLow(true)
+            .build()
+
+        val localConstraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .setRequiresStorageNotLow(true)
+            .build()
+
+        val contactSyncRequest = OneTimeWorkRequestBuilder<com.example.core.automation.workers.ContactSyncWorker>()
+            .setConstraints(networkConstraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .addTag("initial_sync")
+            .build()
+
+        val eventDiscoveryRequest = OneTimeWorkRequestBuilder<com.example.core.automation.workers.EventDiscoveryWorker>()
+            .setConstraints(localConstraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .build()
+
+        val messageGenRequest = OneTimeWorkRequestBuilder<com.example.core.automation.workers.MessageGenerationWorker>()
+            .setConstraints(networkConstraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .build()
+
+        workManager.beginUniqueWork(
+            "daily_automation_chain",
+            ExistingWorkPolicy.KEEP,
+            contactSyncRequest
+        ).then(eventDiscoveryRequest)
+         .then(messageGenRequest)
+         .enqueue()
     }
 
     private fun calculateDelayUntilMidnight(): Long {

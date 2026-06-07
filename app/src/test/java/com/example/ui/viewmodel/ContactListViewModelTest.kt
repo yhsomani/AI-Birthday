@@ -24,11 +24,15 @@ class ContactListViewModelTest {
     @RelaxedMockK
     private lateinit var contactRepository: ContactRepository
 
+    @RelaxedMockK
+    private lateinit var mockPreferencesRepository: com.example.domain.service.PreferencesRepository
+
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        every { mockPreferencesRepository.getLastSyncError() } returns null
     }
 
     @After
@@ -44,7 +48,7 @@ class ContactListViewModelTest {
         )
         every { contactRepository.getAll() } returns flowOf(contacts)
 
-        val viewModel = ContactListViewModel(contactRepository)
+        val viewModel = ContactListViewModel(contactRepository, mockPreferencesRepository)
         advanceUntilIdle()
 
         assertEquals(2, viewModel.uiState.value.contacts.size)
@@ -55,7 +59,7 @@ class ContactListViewModelTest {
     fun `refresh flips isRefreshing and settles back to false`() = runTest(testDispatcher) {
         every { contactRepository.getAll() } returns flowOf(listOf(ContactEntity(id = "c_1", name = "Alice")))
 
-        val viewModel = ContactListViewModel(contactRepository)
+        val viewModel = ContactListViewModel(contactRepository, mockPreferencesRepository)
         advanceUntilIdle()
 
         viewModel.refresh()

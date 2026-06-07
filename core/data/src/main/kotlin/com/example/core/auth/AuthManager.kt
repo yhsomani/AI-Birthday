@@ -32,6 +32,7 @@ open class AuthManager @Inject constructor(
 ) {
     private val auth by lazy { FirebaseAuth.getInstance() }
     private var isMocked = false
+    private companion object { private const val TAG = "AuthManager" }
 
     private val _userProfile = MutableStateFlow(UserProfile())
     val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
@@ -97,65 +98,60 @@ open class AuthManager @Inject constructor(
 
     open fun signOut() {
         Log.i("AuthManager", "Initiating secure sign-out sequence")
+        // TODO: The calling ViewModel must navigate to SplashScreen/OnboardingScreen after
+        // signOut() completes, clearing the back stack.
 
         try {
-            // Step 1: database.clearAllTables()
-            database.clearAllTables()
-        } catch (e: Exception) {
-            Log.e("AuthManager", "Wipe database tables failed", e)
-        }
-
-        try {
-            // Step 2: securePrefs.clearAll()
-            securePrefs.clearAll()
-            DatabaseKeyDerivation.clearCachedKey(context)
-        } catch (e: Exception) {
-            Log.e("AuthManager", "Clear secure preferences failed", e)
-        }
-
-        try {
-            // Step 3: Delete database files from disk
-            val dbFile = context.getDatabasePath("relateai.db")
-            if (dbFile.exists()) {
-                dbFile.delete()
-                File(dbFile.path + "-wal").delete()
-                File(dbFile.path + "-shm").delete()
-            }
-        } catch (e: Exception) {
-            Log.e("AuthManager", "Deleting database files failed", e)
-        }
-
-        try {
-            // Step 4: WorkManager.cancelAllWork()
+            // Step 1: Stop all workers before DB access
             androidx.work.WorkManager.getInstance(context).cancelAllWork()
-        } catch (e: Exception) {
-            Log.e("AuthManager", "Cancel WorkManager tasks failed", e)
-        }
 
-        try {
-            // Step 5: NotificationManager.cancelAll()
+            // Step 2: Clear pending notifications
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
             nm.cancelAll()
+
+            // Step 3: Wipe all 7 Room tables
+            try {
+                database.clearAllTables()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to clear tables before close", e)
+            }
+
+            // Close and reset database instance to release files and prevent reuse of stale connection
+            AppDatabase.closeAndResetInstance()
+
+            // Step 4: Clear all secrets (OAuth token, API key, syncToken)
+            securePrefs.clearAll()
+            DatabaseKeyDerivation.clearCachedKey(context)
+
+            // Step 5: Delete database files from disk
+            val dbFile = context.getDatabasePath("relateai.db")
+            listOf(dbFile, File("${dbFile.path}-wal"), File("${dbFile.path}-shm"))
+                .filter { it.exists() }
+                .forEach { file ->
+                    val deleted = file.delete()
+                    Log.d(TAG, "Delete ${file.name}: success=$deleted")
+                }
         } catch (e: Exception) {
-            Log.e("AuthManager", "Clear notifications failed", e)
+            Log.e(TAG, "Sign-out data wipe failed — continuing with auth sign-out anyway", e)
         }
 
+        // Steps 6–7 always execute regardless of errors in steps 1–5
         try {
-            // Step 6: firebaseAuth.signOut()
+            // Step 6: Firebase sign-out
             auth.signOut()
         } catch (e: Exception) {
-            Log.e("AuthManager", "Firebase Auth sign-out failed", e)
+            Log.e(TAG, "Firebase Auth sign-out failed", e)
         }
 
         try {
-            // Step 7: googleSignInClient.signOut()
+            // Step 7: Revoke Google OAuth token server-side (revokeAccess, not just signOut)
             val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
                 com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
             ).build()
             val googleSignInClient = GoogleSignIn.getClient(context, gso)
-            googleSignInClient.signOut()
+            googleSignInClient.revokeAccess()
         } catch (e: Exception) {
-            Log.e("AuthManager", "Google Sign-In client sign-out failed", e)
+            Log.e(TAG, "Google Sign-In client revoke failed", e)
         }
 
         isMocked = false

@@ -1,0 +1,1092 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 10,
+    "identityHash": "cd4a91530ef871cda788160fb710df5d",
+    "entities": [
+      {
+        "tableName": "contacts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `googleContactId` TEXT, `name` TEXT NOT NULL, `nickname` TEXT, `birthdayDay` INTEGER, `birthdayMonth` INTEGER, `birthdayYear` INTEGER, `anniversaryDay` INTEGER, `anniversaryMonth` INTEGER, `anniversaryYear` INTEGER, `workStartDay` INTEGER, `workStartMonth` INTEGER, `workStartYear` INTEGER, `primaryPhone` TEXT, `secondaryPhone` TEXT, `primaryEmail` TEXT, `company` TEXT, `jobTitle` TEXT, `address` TEXT, `profilePhotoUri` TEXT, `contactGroup` TEXT, `relationshipType` TEXT NOT NULL, `relationshipSubtype` TEXT, `preferredLanguage` TEXT NOT NULL, `preferredChannel` TEXT NOT NULL, `formalityLevel` TEXT NOT NULL, `communicationStyle` TEXT NOT NULL, `classificationConfidence` REAL NOT NULL, `healthScore` INTEGER NOT NULL, `engagementScore` INTEGER NOT NULL, `interactionFrequencyPerMonth` REAL NOT NULL, `lastInteractionDate` INTEGER, `lastWishedDate` INTEGER, `consecutiveYearsWished` INTEGER NOT NULL, `lastRevivalAttemptMs` INTEGER NOT NULL, `automationMode` TEXT NOT NULL, `giftBudgetInr` INTEGER NOT NULL, `annualBudgetInr` INTEGER NOT NULL, `skipAutoWish` INTEGER NOT NULL, `customSendTimeHour` INTEGER, `customSendTimeMinute` INTEGER, `interestsJson` TEXT NOT NULL, `hobbiesJson` TEXT NOT NULL, `sharedHistoryJson` TEXT NOT NULL, `favoritesJson` TEXT NOT NULL, `relationsJson` TEXT NOT NULL, `notesText` TEXT NOT NULL, `typicalMoodWhenContacted` TEXT NOT NULL, `sensitiveTopicsJson` TEXT NOT NULL, `currentLifePhaseJson` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `isArchived` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "googleContactId",
+            "columnName": "googleContactId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nickname",
+            "columnName": "nickname",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "birthdayDay",
+            "columnName": "birthdayDay",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "birthdayMonth",
+            "columnName": "birthdayMonth",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "birthdayYear",
+            "columnName": "birthdayYear",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "anniversaryDay",
+            "columnName": "anniversaryDay",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "anniversaryMonth",
+            "columnName": "anniversaryMonth",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "anniversaryYear",
+            "columnName": "anniversaryYear",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "workStartDay",
+            "columnName": "workStartDay",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "workStartMonth",
+            "columnName": "workStartMonth",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "workStartYear",
+            "columnName": "workStartYear",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "primaryPhone",
+            "columnName": "primaryPhone",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "secondaryPhone",
+            "columnName": "secondaryPhone",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "primaryEmail",
+            "columnName": "primaryEmail",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "company",
+            "columnName": "company",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "jobTitle",
+            "columnName": "jobTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "address",
+            "columnName": "address",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "profilePhotoUri",
+            "columnName": "profilePhotoUri",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "contactGroup",
+            "columnName": "contactGroup",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "relationshipType",
+            "columnName": "relationshipType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relationshipSubtype",
+            "columnName": "relationshipSubtype",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "preferredLanguage",
+            "columnName": "preferredLanguage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "preferredChannel",
+            "columnName": "preferredChannel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "formalityLevel",
+            "columnName": "formalityLevel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "communicationStyle",
+            "columnName": "communicationStyle",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "classificationConfidence",
+            "columnName": "classificationConfidence",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "healthScore",
+            "columnName": "healthScore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "engagementScore",
+            "columnName": "engagementScore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "interactionFrequencyPerMonth",
+            "columnName": "interactionFrequencyPerMonth",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastInteractionDate",
+            "columnName": "lastInteractionDate",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastWishedDate",
+            "columnName": "lastWishedDate",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "consecutiveYearsWished",
+            "columnName": "consecutiveYearsWished",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastRevivalAttemptMs",
+            "columnName": "lastRevivalAttemptMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "automationMode",
+            "columnName": "automationMode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "giftBudgetInr",
+            "columnName": "giftBudgetInr",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "annualBudgetInr",
+            "columnName": "annualBudgetInr",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "skipAutoWish",
+            "columnName": "skipAutoWish",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "customSendTimeHour",
+            "columnName": "customSendTimeHour",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "customSendTimeMinute",
+            "columnName": "customSendTimeMinute",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "interestsJson",
+            "columnName": "interestsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hobbiesJson",
+            "columnName": "hobbiesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sharedHistoryJson",
+            "columnName": "sharedHistoryJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "favoritesJson",
+            "columnName": "favoritesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relationsJson",
+            "columnName": "relationsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notesText",
+            "columnName": "notesText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "typicalMoodWhenContacted",
+            "columnName": "typicalMoodWhenContacted",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sensitiveTopicsJson",
+            "columnName": "sensitiveTopicsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currentLifePhaseJson",
+            "columnName": "currentLifePhaseJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isArchived",
+            "columnName": "isArchived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isDeleted",
+            "columnName": "isDeleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_contacts_revival",
+            "unique": false,
+            "columnNames": [
+              "healthScore",
+              "lastRevivalAttemptMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_contacts_revival` ON `${TABLE_NAME}` (`healthScore`, `lastRevivalAttemptMs`)"
+          },
+          {
+            "name": "idx_contacts_active",
+            "unique": false,
+            "columnNames": [
+              "isDeleted",
+              "healthScore"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_contacts_active` ON `${TABLE_NAME}` (`isDeleted`, `healthScore`)"
+          }
+        ]
+      },
+      {
+        "tableName": "events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `contactId` TEXT NOT NULL, `type` TEXT NOT NULL, `label` TEXT, `dayOfMonth` INTEGER NOT NULL, `month` INTEGER NOT NULL, `year` INTEGER, `nextOccurrenceMs` INTEGER NOT NULL, `isActive` INTEGER NOT NULL, `notifyDaysBefore` INTEGER NOT NULL, `source` TEXT NOT NULL, `confidenceScore` INTEGER NOT NULL, `isVerified` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "dayOfMonth",
+            "columnName": "dayOfMonth",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "month",
+            "columnName": "month",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "year",
+            "columnName": "year",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "nextOccurrenceMs",
+            "columnName": "nextOccurrenceMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isActive",
+            "columnName": "isActive",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notifyDaysBefore",
+            "columnName": "notifyDaysBefore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidenceScore",
+            "columnName": "confidenceScore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isVerified",
+            "columnName": "isVerified",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_events_nextOccurrenceMs",
+            "unique": false,
+            "columnNames": [
+              "nextOccurrenceMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_events_nextOccurrenceMs` ON `${TABLE_NAME}` (`nextOccurrenceMs`)"
+          },
+          {
+            "name": "idx_events_contactId",
+            "unique": false,
+            "columnNames": [
+              "contactId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_events_contactId` ON `${TABLE_NAME}` (`contactId`)"
+          },
+          {
+            "name": "idx_events_active",
+            "unique": false,
+            "columnNames": [
+              "isActive",
+              "nextOccurrenceMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_events_active` ON `${TABLE_NAME}` (`isActive`, `nextOccurrenceMs`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "contacts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "contactId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "pending_messages",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `contactId` TEXT NOT NULL, `eventId` TEXT NOT NULL, `shortVariant` TEXT NOT NULL, `standardVariant` TEXT NOT NULL, `longVariant` TEXT NOT NULL, `formalVariant` TEXT NOT NULL, `funnyVariant` TEXT NOT NULL, `emotionalVariant` TEXT NOT NULL, `selectedVariant` TEXT NOT NULL, `selectedVariantText` TEXT NOT NULL, `channel` TEXT NOT NULL, `scheduledForMs` INTEGER NOT NULL, `approvalMode` TEXT NOT NULL, `status` TEXT NOT NULL, `aiModel` TEXT NOT NULL, `generatedAtMs` INTEGER NOT NULL, `editedByUser` INTEGER NOT NULL, `userEditedText` TEXT, `qualityScore` INTEGER NOT NULL, `tone` TEXT NOT NULL, `length` TEXT NOT NULL, `includeEmoji` INTEGER NOT NULL, `scheduledYear` INTEGER NOT NULL, `isUsingFallback` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventId",
+            "columnName": "eventId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "shortVariant",
+            "columnName": "shortVariant",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "standardVariant",
+            "columnName": "standardVariant",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longVariant",
+            "columnName": "longVariant",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "formalVariant",
+            "columnName": "formalVariant",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "funnyVariant",
+            "columnName": "funnyVariant",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "emotionalVariant",
+            "columnName": "emotionalVariant",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selectedVariant",
+            "columnName": "selectedVariant",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selectedVariantText",
+            "columnName": "selectedVariantText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "channel",
+            "columnName": "channel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scheduledForMs",
+            "columnName": "scheduledForMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "approvalMode",
+            "columnName": "approvalMode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aiModel",
+            "columnName": "aiModel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "generatedAtMs",
+            "columnName": "generatedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "editedByUser",
+            "columnName": "editedByUser",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userEditedText",
+            "columnName": "userEditedText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "qualityScore",
+            "columnName": "qualityScore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tone",
+            "columnName": "tone",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "length",
+            "columnName": "length",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "includeEmoji",
+            "columnName": "includeEmoji",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scheduledYear",
+            "columnName": "scheduledYear",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isUsingFallback",
+            "columnName": "isUsingFallback",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_pending_messages_scheduledForMs",
+            "unique": false,
+            "columnNames": [
+              "scheduledForMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_pending_messages_scheduledForMs` ON `${TABLE_NAME}` (`scheduledForMs`)"
+          },
+          {
+            "name": "idx_pending_messages_contactId",
+            "unique": false,
+            "columnNames": [
+              "contactId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_pending_messages_contactId` ON `${TABLE_NAME}` (`contactId`)"
+          },
+          {
+            "name": "index_pending_messages_contactId_eventId_scheduledYear",
+            "unique": true,
+            "columnNames": [
+              "contactId",
+              "eventId",
+              "scheduledYear"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_pending_messages_contactId_eventId_scheduledYear` ON `${TABLE_NAME}` (`contactId`, `eventId`, `scheduledYear`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "contacts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "contactId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "sent_messages",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `contactId` TEXT, `eventType` TEXT NOT NULL, `eventYear` INTEGER NOT NULL, `messageText` TEXT NOT NULL, `channel` TEXT NOT NULL, `sentAtMs` INTEGER NOT NULL, `deliveryStatus` TEXT NOT NULL, `aiGenerated` INTEGER NOT NULL, `geminiModel` TEXT NOT NULL, `variantUsed` TEXT NOT NULL, `replyReceived` INTEGER NOT NULL, `replyAtMs` INTEGER, `isContactDeleted` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "eventType",
+            "columnName": "eventType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventYear",
+            "columnName": "eventYear",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messageText",
+            "columnName": "messageText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "channel",
+            "columnName": "channel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sentAtMs",
+            "columnName": "sentAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deliveryStatus",
+            "columnName": "deliveryStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aiGenerated",
+            "columnName": "aiGenerated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "geminiModel",
+            "columnName": "geminiModel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "variantUsed",
+            "columnName": "variantUsed",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "replyReceived",
+            "columnName": "replyReceived",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "replyAtMs",
+            "columnName": "replyAtMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isContactDeleted",
+            "columnName": "isContactDeleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_sent_messages_contactId_sentAtMs",
+            "unique": false,
+            "columnNames": [
+              "contactId",
+              "sentAtMs"
+            ],
+            "orders": [
+              "ASC",
+              "DESC"
+            ],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_sent_messages_contactId_sentAtMs` ON `${TABLE_NAME}` (`contactId` ASC, `sentAtMs` DESC)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "contacts",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "contactId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "style_profile",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `sampleMessagesJson` TEXT NOT NULL, `usesEmoji` INTEGER NOT NULL, `avgMessageLength` INTEGER NOT NULL, `commonPhrasesJson` TEXT NOT NULL, `commonGreetingsJson` TEXT NOT NULL, `formalityLevel` TEXT NOT NULL, `preferredLanguage` TEXT NOT NULL, `emojiSetJson` TEXT NOT NULL, `avoidPhrasesJson` TEXT NOT NULL, `toneDescriptors` TEXT NOT NULL, `sampleCount` INTEGER NOT NULL, `updatedAtMs` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sampleMessagesJson",
+            "columnName": "sampleMessagesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "usesEmoji",
+            "columnName": "usesEmoji",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "avgMessageLength",
+            "columnName": "avgMessageLength",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "commonPhrasesJson",
+            "columnName": "commonPhrasesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "commonGreetingsJson",
+            "columnName": "commonGreetingsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "formalityLevel",
+            "columnName": "formalityLevel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "preferredLanguage",
+            "columnName": "preferredLanguage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "emojiSetJson",
+            "columnName": "emojiSetJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "avoidPhrasesJson",
+            "columnName": "avoidPhrasesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toneDescriptors",
+            "columnName": "toneDescriptors",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sampleCount",
+            "columnName": "sampleCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updatedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "memory_notes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `contactId` TEXT NOT NULL, `noteText` TEXT NOT NULL, `category` TEXT NOT NULL, `dateMs` INTEGER NOT NULL, `isPinned` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "noteText",
+            "columnName": "noteText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateMs",
+            "columnName": "dateMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isPinned",
+            "columnName": "isPinned",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_memory_notes_contactId",
+            "unique": false,
+            "columnNames": [
+              "contactId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_memory_notes_contactId` ON `${TABLE_NAME}` (`contactId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "contacts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "contactId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "gift_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `contactId` TEXT NOT NULL, `giftName` TEXT NOT NULL, `giftCategory` TEXT NOT NULL, `occasionType` TEXT NOT NULL, `year` INTEGER NOT NULL, `approxCostInr` INTEGER NOT NULL, `receivedWell` INTEGER, `notes` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "giftName",
+            "columnName": "giftName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "giftCategory",
+            "columnName": "giftCategory",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occasionType",
+            "columnName": "occasionType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "year",
+            "columnName": "year",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "approxCostInr",
+            "columnName": "approxCostInr",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receivedWell",
+            "columnName": "receivedWell",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "idx_gift_history_contactId",
+            "unique": false,
+            "columnNames": [
+              "contactId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `idx_gift_history_contactId` ON `${TABLE_NAME}` (`contactId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "contacts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "contactId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "style_profile_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileJson` TEXT NOT NULL, `savedAtMs` INTEGER NOT NULL, `source` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileJson",
+            "columnName": "profileJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "savedAtMs",
+            "columnName": "savedAtMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cd4a91530ef871cda788160fb710df5e')"
+    ]
+  }
+}

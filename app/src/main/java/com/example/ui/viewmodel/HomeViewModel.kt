@@ -33,6 +33,7 @@ data class HomeUiState(
     val sentCount: Int = 0,
     val upcomingBirthdays: List<UpcomingBirthday> = emptyList(),
     val isLoading: Boolean = true,
+    val syncError: String? = null,
 )
 
 @HiltViewModel
@@ -41,6 +42,7 @@ class HomeViewModel @Inject constructor(
     private val authManager: AuthManager,
     private val eventRepository: EventRepository,
     private val syncContactsUseCase: SyncContactsUseCase,
+    private val preferencesRepository: com.example.domain.service.PreferencesRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -63,6 +65,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
+                val lastError = preferencesRepository.getLastSyncError()
                 var metrics = getDashboardMetricsUseCase()
                 if (metrics.contactCount == 0) {
                     try {
@@ -83,6 +86,7 @@ class HomeViewModel @Inject constructor(
                     )
                 }
                 val profile = authManager.userProfile.value
+                val freshError = preferencesRepository.getLastSyncError()
                 _uiState.value = HomeUiState(
                     userName = profile.displayName,
                     userEmail = profile.email,
@@ -94,9 +98,23 @@ class HomeViewModel @Inject constructor(
                     sentCount = metrics.sentCount,
                     upcomingBirthdays = birthdays,
                     isLoading = false,
+                    syncError = freshError ?: lastError,
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoading = false)
+                android.util.Log.e("HomeViewModel", "Failed to load metrics", e)
+                val lastError = try { preferencesRepository.getLastSyncError() } catch (ex: Exception) { null }
+                _uiState.value = _uiState.value.copy(isLoading = false, syncError = lastError)
+            }
+        }
+    }
+
+    fun dismissSyncError() {
+        viewModelScope.launch {
+            try {
+                preferencesRepository.setLastSyncError(null)
+                _uiState.value = _uiState.value.copy(syncError = null)
+            } catch (e: Exception) {
+                // Ignore
             }
         }
     }

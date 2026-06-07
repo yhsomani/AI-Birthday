@@ -2,6 +2,7 @@ package com.example.ui.viewmodel
 
 import com.example.core.auth.AuthManager
 import com.example.core.auth.UserProfile
+import com.example.core.prefs.SecurePrefs
 import com.example.domain.repository.ContactRepository
 import com.example.domain.usecase.SyncContactsUseCase
 import io.mockk.every
@@ -31,8 +32,12 @@ class SettingsViewModelTest {
     @RelaxedMockK
     private lateinit var authManager: AuthManager
 
+    @RelaxedMockK
+    private lateinit var securePrefs: SecurePrefs
+
     private val testDispatcher = StandardTestDispatcher()
     private val userProfileFlow = MutableStateFlow(UserProfile())
+    private val context = io.mockk.mockk<android.content.Context>(relaxed = true)
 
     @Before
     fun setUp() {
@@ -47,7 +52,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `toggleBirthdayReminders updates state`() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(syncContactsUseCase, contactRepository, authManager)
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
 
         viewModel.toggleBirthdayReminders(false)
         assertFalse(viewModel.uiState.value.birthdayReminders)
@@ -58,7 +63,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `toggleAiWishGeneration updates state`() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(syncContactsUseCase, contactRepository, authManager)
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
 
         viewModel.toggleAiWishGeneration(false)
         assertFalse(viewModel.uiState.value.aiWishGeneration)
@@ -66,7 +71,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `syncContacts success flips isSyncing off and updates lastSyncTimestamp`() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(syncContactsUseCase, contactRepository, authManager)
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
 
         viewModel.syncContacts()
         advanceUntilIdle()
