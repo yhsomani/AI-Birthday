@@ -9,6 +9,9 @@ plugins {
 
 android {
     namespace = "com.example"
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
     compileSdk { version = release(36) { minorApiLevel = 1 } }
 
     defaultConfig {
@@ -117,6 +120,8 @@ dependencies {
     implementation(libs.moshi.kotlin)
     implementation(libs.okhttp)
     implementation(libs.retrofit)
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // Android core dependencies
     implementation("androidx.core:core-ktx:1.13.1")
