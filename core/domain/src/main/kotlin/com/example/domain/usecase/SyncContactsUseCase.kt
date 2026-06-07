@@ -22,6 +22,23 @@ class SyncContactsUseCase @Inject constructor(
     private val preferencesRepository: com.example.domain.service.PreferencesRepository
 ) {
     suspend operator fun invoke(forceRefresh: Boolean = false): SyncOutcome {
+        val isGuest = preferencesRepository.isGuestMode()
+
+        // Proactively clear mock contacts if the user is not in Guest Mode.
+        // This prevents showing dummy data if the Google Contacts sync subsequently fails.
+        if (!isGuest) {
+            try {
+                val allExisting = contactRepository.getAllSync()
+                allExisting.forEach { existing ->
+                    if (existing.id.startsWith("mock_")) {
+                        contactRepository.delete(existing)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SyncContactsUseCase", "Failed to clear mock contacts", e)
+            }
+        }
+
         var googleContacts = emptyList<ContactEntity>()
         var googleError: String? = null
         try {
@@ -39,22 +56,8 @@ class SyncContactsUseCase @Inject constructor(
 
         var merged = googleContacts
 
-        val isGuest = preferencesRepository.isGuestMode()
         if (merged.isEmpty() && isGuest) {
             merged = getMockContacts()
-        }
-
-        if (!isGuest) {
-            val allExisting = contactRepository.getAllSync()
-            allExisting.forEach { existing ->
-                if (existing.id.startsWith("mock_")) {
-                    try {
-                        contactRepository.delete(existing)
-                    } catch (e: Exception) {
-                        android.util.Log.e("SyncContactsUseCase", "Failed to delete mock contact: ${existing.id}", e)
-                    }
-                }
-            }
         }
 
         var inserted = 0

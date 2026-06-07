@@ -33,6 +33,9 @@ interface SentMessageDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(message: SentMessageEntity)
 
+    @Query("UPDATE sent_messages SET deliveryStatus = :status WHERE id = :messageId")
+    suspend fun updateDeliveryStatus(messageId: String, status: String)
+
     @Query("SELECT * FROM sent_messages")
     suspend fun getAllSync(): List<SentMessageEntity>
 

@@ -58,7 +58,9 @@ class MessageGenerationWorker @AssistedInject constructor(
             }
 
             val prompter = PromptBuilder()
-            val tomorrow = System.currentTimeMillis() + 24 * 60 * 60 * 1000L
+            // Use 36 hours lookahead to ensure tomorrow's events (scheduled at 9:00 AM)
+            // are always captured regardless of the time of day the worker runs.
+            val tomorrow = System.currentTimeMillis() + 36 * 60 * 60 * 1000L
 
             val upcomingEvents = eventDao.getEventsBefore(tomorrow)
             StructuredLogger.i(TAG, "Found ${upcomingEvents.size} upcoming events for generation")

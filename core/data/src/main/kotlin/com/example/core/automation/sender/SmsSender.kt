@@ -6,19 +6,25 @@ import android.content.Intent
 import android.telephony.SmsManager
 
 class SmsSender(private val context: Context) {
-    fun send(phoneNumber: String, message: String, eventId: String) {
+    fun send(phoneNumber: String, message: String, sentMessageId: String) {
         val smsManager = context.getSystemService(SmsManager::class.java)
         val parts = smsManager.divideMessage(message)
 
         val sentPIs = ArrayList(parts.map { _ ->
-            val intent = Intent("SMS_SENT_$eventId")
-            PendingIntent.getBroadcast(context, 0, intent,
+            val intent = Intent("com.example.SMS_SENT").apply {
+                putExtra("sent_message_id", sentMessageId)
+                setPackage(context.packageName)
+            }
+            PendingIntent.getBroadcast(context, sentMessageId.hashCode(), intent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         })
 
         val deliveredPIs = ArrayList(parts.map { _ ->
-            val intent = Intent("SMS_DELIVERED_$eventId")
-            PendingIntent.getBroadcast(context, 0, intent,
+            val intent = Intent("com.example.SMS_DELIVERED").apply {
+                putExtra("sent_message_id", sentMessageId)
+                setPackage(context.packageName)
+            }
+            PendingIntent.getBroadcast(context, sentMessageId.hashCode(), intent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         })
 
