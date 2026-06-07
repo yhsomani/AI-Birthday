@@ -43,14 +43,14 @@ class DiscoverEventsUseCase @Inject constructor(
                 val nextMs = nextOccurrenceMs(day, month)
                 events.add(
                     EventEntity(
-                        id = "${contact.id}__BIRTHDAY",
+                        id = "${contact.id}_birthday",
                         contactId = contact.id,
                         type = "BIRTHDAY",
+                        label = contact.name,
                         dayOfMonth = day,
                         month = month,
                         year = contact.birthdayYear,
                         nextOccurrenceMs = nextMs,
-                        daysUntil = daysUntil(nextMs),
                         isActive = true,
                         source = "CONTACTS"
                     )
@@ -63,14 +63,14 @@ class DiscoverEventsUseCase @Inject constructor(
                 val nextMs = nextOccurrenceMs(day, month)
                 events.add(
                     EventEntity(
-                        id = "${contact.id}__ANNIVERSARY",
+                        id = "${contact.id}_anniversary",
                         contactId = contact.id,
                         type = "ANNIVERSARY",
+                        label = contact.name,
                         dayOfMonth = day,
                         month = month,
                         year = contact.anniversaryYear,
                         nextOccurrenceMs = nextMs,
-                        daysUntil = daysUntil(nextMs),
                         isActive = true,
                         source = "CONTACTS"
                     )
@@ -83,14 +83,14 @@ class DiscoverEventsUseCase @Inject constructor(
                 val nextMs = nextOccurrenceMs(day, month)
                 events.add(
                     EventEntity(
-                        id = "${contact.id}__WORK_ANNIVERSARY",
+                        id = "${contact.id}_work_anniversary",
                         contactId = contact.id,
                         type = "WORK_ANNIVERSARY",
+                        label = contact.name,
                         dayOfMonth = day,
                         month = month,
                         year = contact.workStartYear,
                         nextOccurrenceMs = nextMs,
-                        daysUntil = daysUntil(nextMs),
                         isActive = true,
                         source = "CONTACTS"
                     )

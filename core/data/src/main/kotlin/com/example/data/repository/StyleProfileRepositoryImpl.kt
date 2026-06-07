@@ -14,4 +14,6 @@ class StyleProfileRepositoryImpl @Inject constructor(
     override fun getProfile(): Flow<StyleProfileEntity?> = styleProfileDao.getFlow()
     override suspend fun getProfileOnce(): StyleProfileEntity? = styleProfileDao.get()
     override suspend fun upsert(profile: StyleProfileEntity) = styleProfileDao.upsert(profile)
+    override suspend fun upsertWithHistory(profile: StyleProfileEntity, history: com.example.core.db.entities.StyleProfileHistoryEntity) = styleProfileDao.upsertWithHistory(profile, history)
+    override suspend fun getHistory(): List<com.example.core.db.entities.StyleProfileHistoryEntity> = styleProfileDao.getHistory()
 }

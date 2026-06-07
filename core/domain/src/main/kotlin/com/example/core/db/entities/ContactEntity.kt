@@ -1,9 +1,16 @@
 package com.example.core.db.entities
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "contacts")
+@Entity(
+    tableName = "contacts",
+    indices = [
+        Index(value = ["healthScore", "lastRevivalAttemptMs"], name = "idx_contacts_revival"),
+        Index(value = ["isDeleted", "healthScore"], name = "idx_contacts_active")
+    ]
+)
 data class ContactEntity(
     @PrimaryKey val id: String,
     val googleContactId: String? = null,
@@ -53,6 +60,7 @@ data class ContactEntity(
     val lastInteractionDate: Long? = null,
     val lastWishedDate: Long? = null,
     val consecutiveYearsWished: Int = 0,
+    val lastRevivalAttemptMs: Long = 0L,
 
     // Automation
     val automationMode: String = "DEFAULT",    // FULLY_AUTO, SMART_APPROVE, VIP_APPROVE, DEFAULT
@@ -77,5 +85,6 @@ data class ContactEntity(
     // Metadata
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val isArchived: Boolean = false
+    val isArchived: Boolean = false,
+    val isDeleted: Boolean = false
 )

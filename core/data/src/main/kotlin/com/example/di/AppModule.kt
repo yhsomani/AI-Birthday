@@ -73,24 +73,31 @@ object AppModule {
     }
 
     @Provides
+    @Singleton
     fun provideContactDao(database: AppDatabase): ContactDao = database.contactDao()
 
     @Provides
+    @Singleton
     fun provideEventDao(database: AppDatabase): EventDao = database.eventDao()
 
     @Provides
+    @Singleton
     fun providePendingMessageDao(database: AppDatabase): PendingMessageDao = database.pendingMessageDao()
 
     @Provides
+    @Singleton
     fun provideSentMessageDao(database: AppDatabase): com.example.core.db.dao.SentMessageDao = database.sentMessageDao()
 
     @Provides
+    @Singleton
     fun provideStyleProfileDao(database: AppDatabase): com.example.core.db.dao.StyleProfileDao = database.styleProfileDao()
 
     @Provides
+    @Singleton
     fun provideMemoryNoteDao(database: AppDatabase): MemoryNoteDao = database.memoryNoteDao()
 
     @Provides
+    @Singleton
     fun provideGiftHistoryDao(database: AppDatabase): GiftHistoryDao = database.giftHistoryDao()
 
     @Provides
@@ -112,8 +119,12 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideAuthManager(): AuthManager {
-        return AuthManager()
+    fun provideAuthManager(
+        @ApplicationContext context: Context,
+        database: AppDatabase,
+        securePrefs: SecurePrefs
+    ): AuthManager {
+        return AuthManager(context, database, securePrefs)
     }
 
     @Provides

@@ -30,9 +30,6 @@ class DispatchMessageUseCase @Inject constructor(
 
         messageDispatcherService.dispatch(pending, contact)
 
-        contactRepository.updateLastWished(contact.id, System.currentTimeMillis())
-        contactRepository.incrementConsecutiveYearsWished(contact.id)
-
         return DispatchOutcome.Sent(pending.id, pending.channel)
     }
 

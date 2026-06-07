@@ -14,11 +14,12 @@ import javax.inject.Singleton
 class MessageDispatcherServiceImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val pendingMessageDao: PendingMessageDao,
-    private val sentMessageDao: SentMessageDao
+    private val sentMessageDao: SentMessageDao,
+    private val contactDao: com.example.core.db.dao.ContactDao
 ) : MessageDispatcherService {
 
     override suspend fun dispatch(message: PendingMessageEntity, contact: ContactEntity) {
-        val dispatcher = MessageDispatcher(context, pendingMessageDao, sentMessageDao)
+        val dispatcher = MessageDispatcher(context, pendingMessageDao, sentMessageDao, contactDao)
         dispatcher.dispatch(message, contact)
     }
 }

@@ -1,141 +1,161 @@
 package com.example.core.prefs
 
 import android.content.Context
-import kotlinx.coroutines.launch
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class SecurePrefs(context: Context) {
-    private val prefs: SharedPreferences by lazy { getSharedInstance(context) }
+    private val authPrefs: SharedPreferences by lazy { getSharedAuthInstance(context) }
+    private val configPrefs: SharedPreferences by lazy { getSharedConfigInstance(context) }
 
     companion object {
         @Volatile
-        private var instance: SharedPreferences? = null
-        private val lock = Any()
+        private var authInstance: SharedPreferences? = null
+        @Volatile
+        private var configInstance: SharedPreferences? = null
+        private val lockAuth = Any()
+        private val lockConfig = Any()
 
-        private fun getSharedInstance(context: Context): SharedPreferences {
-            return instance ?: synchronized(lock) {
-                instance ?: createEncryptedPrefs(context.applicationContext).also {
-                    instance = it
+        private fun getSharedAuthInstance(context: Context): SharedPreferences {
+            return authInstance ?: synchronized(lockAuth) {
+                authInstance ?: createEncryptedPrefs(context.applicationContext, "relateai_auth_prefs", "relateai_auth_key").also {
+                    authInstance = it
+                }
+            }
+        }
+
+        private fun getSharedConfigInstance(context: Context): SharedPreferences {
+            return configInstance ?: synchronized(lockConfig) {
+                configInstance ?: createEncryptedPrefs(context.applicationContext, "relateai_config_prefs", "relateai_config_key").also {
+                    configInstance = it
                 }
             }
         }
 
         fun warmUpAsync(context: Context) {
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                getSharedInstance(context)
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                getSharedAuthInstance(context)
+                getSharedConfigInstance(context)
             }
         }
 
-        private fun deleteMasterKey() {
+        private fun deleteMasterKey(keyAlias: String) {
             try {
                 val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
                 keyStore.load(null)
-                keyStore.deleteEntry("_androidx_security_master_key_")
-                Log.i("SecurePrefs", "Deleted master key '_androidx_security_master_key_' from AndroidKeyStore")
+                keyStore.deleteEntry(keyAlias)
+                Log.i("SecurePrefs", "Deleted master key '$keyAlias' from AndroidKeyStore")
             } catch (e: Exception) {
-                Log.e("SecurePrefs", "Failed to delete master key from AndroidKeyStore", e)
+                Log.e("SecurePrefs", "Failed to delete master key '$keyAlias' from AndroidKeyStore", e)
             }
         }
 
-        private fun createEncryptedPrefs(context: Context): SharedPreferences {
+        private fun createEncryptedPrefs(context: Context, fileName: String, keyAlias: String): SharedPreferences {
             return try {
-                val masterKey = MasterKey.Builder(context)
+                val masterKey = MasterKey.Builder(context, keyAlias)
                     .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                     .build()
                 EncryptedSharedPreferences.create(
                     context,
-                    "relateai_secure_prefs",
+                    fileName,
                     masterKey,
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
             } catch (e: Exception) {
-                Log.e("SecurePrefs", "Failed to create encrypted prefs, clearing and retrying", e)
+                Log.e("SecurePrefs", "Failed to create encrypted prefs for $fileName, clearing and retrying", e)
                 try {
-                    context.getSharedPreferences("relateai_secure_prefs", Context.MODE_PRIVATE).edit().clear().commit()
+                    context.getSharedPreferences(fileName, Context.MODE_PRIVATE).edit().clear().commit()
                 } catch (ex: Exception) {
                     Log.e("SecurePrefs", "Failed to clear shared preferences", ex)
                 }
-                deleteMasterKey()
-                context.deleteSharedPreferences("relateai_secure_prefs")
+                deleteMasterKey(keyAlias)
+                context.deleteSharedPreferences(fileName)
                 try {
-                    val masterKey = MasterKey.Builder(context)
+                    val masterKey = MasterKey.Builder(context, keyAlias)
                         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                         .build()
                     EncryptedSharedPreferences.create(
                         context,
-                        "relateai_secure_prefs",
+                        fileName,
                         masterKey,
                         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                     )
                 } catch (retryEx: Exception) {
-                    Log.e("SecurePrefs", "Retry also failed, falling back to unencrypted preferences", retryEx)
+                    Log.e("SecurePrefs", "Retry also failed for $fileName, falling back to unencrypted preferences", retryEx)
                     try {
-                        context.getSharedPreferences("relateai_secure_prefs", Context.MODE_PRIVATE).edit().clear().commit()
+                        context.getSharedPreferences(fileName, Context.MODE_PRIVATE).edit().clear().commit()
                     } catch (ex: Exception) {
                         Log.e("SecurePrefs", "Failed to clear shared preferences during fallback", ex)
                     }
-                    deleteMasterKey()
-                    context.deleteSharedPreferences("relateai_secure_prefs")
-                    context.getSharedPreferences("relateai_secure_prefs", Context.MODE_PRIVATE)
+                    deleteMasterKey(keyAlias)
+                    context.deleteSharedPreferences(fileName)
+                    context.getSharedPreferences(fileName, Context.MODE_PRIVATE)
                 }
             }
         }
     }
 
-    fun setGoogleOAuthToken(token: String) = prefs.edit().putString("oauth_token", token).apply()
-    fun getGoogleOAuthToken(): String = prefs.getString("oauth_token", "") ?: ""
+    fun setGoogleOAuthToken(token: String) = authPrefs.edit().putString("oauth_token", token).apply()
+    fun getGoogleOAuthToken(): String = authPrefs.getString("oauth_token", "") ?: ""
 
-    fun setGeminiApiKey(key: String) = prefs.edit().putString("gemini_key", key).apply()
-    fun getGeminiApiKey(): String = prefs.getString("gemini_key", "") ?: ""
+    fun setGeminiApiKey(key: String) = configPrefs.edit().putString("gemini_key", key).apply()
+    fun getGeminiApiKey(): String = configPrefs.getString("gemini_key", "") ?: ""
 
-    fun setSenderEmail(email: String) = prefs.edit().putString("sender_email", email).apply()
-    fun getSenderEmail(): String = prefs.getString("sender_email", "") ?: ""
+    fun setSenderEmail(email: String) = configPrefs.edit().putString("sender_email", email).apply()
+    fun getSenderEmail(): String = configPrefs.getString("sender_email", "") ?: ""
 
-    fun setSenderEmailPassword(pw: String) = prefs.edit().putString("sender_email_pw", pw).apply()
-    fun getSenderEmailPassword(): String = prefs.getString("sender_email_pw", "") ?: ""
+    fun setSenderEmailPassword(pw: String) = configPrefs.edit().putString("sender_email_pw", pw).apply()
+    fun getSenderEmailPassword(): String = configPrefs.getString("sender_email_pw", "") ?: ""
 
-    fun setGlobalAutomationMode(mode: String) = prefs.edit().putString("global_automation_mode", mode).apply()
-    fun getGlobalAutomationMode(): String = prefs.getString("global_automation_mode", "SMART_APPROVE") ?: "SMART_APPROVE"
+    fun setGlobalAutomationMode(mode: String) = configPrefs.edit().putString("global_automation_mode", mode).apply()
+    fun getGlobalAutomationMode(): String = configPrefs.getString("global_automation_mode", "SMART_APPROVE") ?: "SMART_APPROVE"
 
-    fun setThemeMode(mode: String) = prefs.edit().putString("theme_mode", mode).apply()
-    fun getThemeMode(): String = prefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM"
+    fun setThemeMode(mode: String) = configPrefs.edit().putString("theme_mode", mode).apply()
+    fun getThemeMode(): String = configPrefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM"
 
-    fun setBlackoutDates(datesJson: String) = prefs.edit().putString("blackout_dates", datesJson).apply()
-    fun getBlackoutDates(): String = prefs.getString("blackout_dates", "[]") ?: "[]"
+    fun setBlackoutDates(datesJson: String) = configPrefs.edit().putString("blackout_dates", datesJson).apply()
+    fun getBlackoutDates(): String = configPrefs.getString("blackout_dates", "[]") ?: "[]"
 
-    fun setQuietHoursStart(hour: Int) = prefs.edit().putInt("quiet_hours_start", hour).apply()
-    fun getQuietHoursStart(): Int = prefs.getInt("quiet_hours_start", 22)
+    fun setQuietHoursStart(hour: Int) = configPrefs.edit().putInt("quiet_hours_start", hour).apply()
+    fun getQuietHoursStart(): Int = configPrefs.getInt("quiet_hours_start", 22)
 
-    fun setQuietHoursEnd(hour: Int) = prefs.edit().putInt("quiet_hours_end", hour).apply()
-    fun getQuietHoursEnd(): Int = prefs.getInt("quiet_hours_end", 8)
+    fun setQuietHoursEnd(hour: Int) = configPrefs.edit().putInt("quiet_hours_end", hour).apply()
+    fun getQuietHoursEnd(): Int = configPrefs.getInt("quiet_hours_end", 8)
 
-    fun setChannelBlackout(channelsJson: String) = prefs.edit().putString("channel_blackout", channelsJson).apply()
-    fun getChannelBlackout(): String = prefs.getString("channel_blackout", "[]") ?: "[]"
+    fun setChannelBlackout(channelsJson: String) = configPrefs.edit().putString("channel_blackout", channelsJson).apply()
+    fun getChannelBlackout(): String = configPrefs.getString("channel_blackout", "[]") ?: "[]"
 
-    fun setBiometricLockEnabled(enabled: Boolean) = prefs.edit().putBoolean("biometric_lock", enabled).apply()
-    fun isBiometricLockEnabled(): Boolean = prefs.getBoolean("biometric_lock", false)
+    fun setBiometricLockEnabled(enabled: Boolean) = configPrefs.edit().putBoolean("biometric_lock", enabled).apply()
+    fun isBiometricLockEnabled(): Boolean = configPrefs.getBoolean("biometric_lock", false)
 
     fun isSecureStorageAvailable(): Boolean {
         return try {
-            prefs is EncryptedSharedPreferences
+            authPrefs is EncryptedSharedPreferences && configPrefs is EncryptedSharedPreferences
         } catch (e: Exception) {
             false
         }
     }
 
-    fun setSyncToken(token: String) = prefs.edit().putString("sync_token", token).apply()
-    fun getSyncToken(): String = prefs.getString("sync_token", "") ?: ""
+    fun setSyncToken(token: String) = authPrefs.edit().putString("sync_token", token).apply()
+    fun getSyncToken(): String = authPrefs.getString("sync_token", "") ?: ""
 
-    fun setOnboardingComplete(complete: Boolean) = prefs.edit().putBoolean("onboarding_complete", complete).apply()
-    fun isOnboardingComplete(): Boolean = prefs.getBoolean("onboarding_complete", false)
+    fun setOnboardingComplete(complete: Boolean) = configPrefs.edit().putBoolean("onboarding_complete", complete).apply()
+    fun isOnboardingComplete(): Boolean = configPrefs.getBoolean("onboarding_complete", false)
 
-    fun setGuestMode(enabled: Boolean) = prefs.edit().putBoolean("guest_mode", enabled).apply()
-    fun isGuestMode(): Boolean = prefs.getBoolean("guest_mode", false)
+    fun setGuestMode(enabled: Boolean) = configPrefs.edit().putBoolean("guest_mode", enabled).apply()
+    fun isGuestMode(): Boolean = configPrefs.getBoolean("guest_mode", false)
 
-    fun clearAll() = prefs.edit().clear().apply()
+    fun setFirebaseUid(uid: String) = authPrefs.edit().putString("firebase_uid", uid).apply()
+    fun getFirebaseUid(): String = authPrefs.getString("firebase_uid", "") ?: ""
+
+    fun clearAll() {
+        authPrefs.edit().clear().apply()
+        configPrefs.edit().clear().apply()
+    }
 }

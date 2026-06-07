@@ -1,12 +1,10 @@
 plugins {
     alias(libs.plugins.android.application)
-    // alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.devtools.ksp)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.google.services)
     alias(libs.plugins.baselineprofile)
-    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -51,8 +49,8 @@ android {
     }
 
     buildFeatures {
-        compose = true
         buildConfig = true
+        compose = true
     }
 
     ksp {
@@ -88,21 +86,10 @@ android {
 
 dependencies {
     implementation(project(":core:data"))
-    implementation(project(":core:ui"))
-    implementation(project(":feature:splash"))
-    implementation(project(":feature:login"))
-    implementation(project(":feature:onboarding"))
-    implementation(project(":feature:dashboard"))
-    implementation(project(":feature:contacts"))
-    implementation(project(":feature:events"))
-    implementation(project(":feature:messages"))
-    implementation(project(":feature:analytics"))
-    implementation(project(":feature:settings"))
 
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    implementation(libs.hilt.navigation.compose)
     implementation(libs.hilt.work)
     ksp(libs.hilt.ext.compiler)
     
@@ -140,9 +127,25 @@ dependencies {
     // Room
     implementation(libs.androidx.room.runtime)
 
+    // Compose BOM
+    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.navigation:navigation-compose:2.8.5")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // Image loading
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
     // Paging
     implementation(libs.androidx.paging.runtime)
-    implementation(libs.androidx.paging.compose)
     testImplementation(libs.androidx.paging.runtime)
 
     // Testing
@@ -150,8 +153,5 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.androidx.compose.ui.test.junit4)
-    testImplementation(libs.roborazzi)
-    testImplementation(libs.roborazzi.compose)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    testImplementation(libs.mockk)
 }

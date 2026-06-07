@@ -3,7 +3,6 @@ package com.example.core.automation.workers
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -12,6 +11,7 @@ import com.example.core.contacts.DeviceContactsReader
 import com.example.core.contacts.GoogleContactsSync
 import com.example.core.db.dao.ContactDao
 import com.example.core.prefs.SecurePrefs
+import com.example.core.resilience.StructuredLogger
 import com.example.domain.usecase.ClassifyContactUseCase
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -33,9 +33,13 @@ class ContactSyncWorker @AssistedInject constructor(
             val deviceContacts = if (hasContactsPerm || hasCallLogPerm) {
                 DeviceContactsReader(applicationContext).readAll()
             } else {
-                Log.i(TAG, "Contacts permissions not granted; skipping device contact sync")
+                StructuredLogger.i(TAG, "Contacts permissions not granted; skipping device contact sync")
                 emptyList()
             }
+
+            StructuredLogger.i(TAG, "Syncing contacts", mapOf(
+                "deviceContacts" to deviceContacts.size.toString(),
+            ))
 
             val gSync = GoogleContactsSync(applicationContext)
             val googleContacts = gSync.fetchAll()
@@ -59,21 +63,22 @@ class ContactSyncWorker @AssistedInject constructor(
 
             // 2. Upsert all mapped contacts to ensure they exist in DB with IDs
             mappedContacts.forEach { contactDao.upsert(it) }
+            StructuredLogger.i(TAG, "Upserted ${mappedContacts.size} contacts")
 
             // 3. Then, classify contacts that are still UNKNOWN using Gemini
             if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
-                Log.i(TAG, "User not authenticated; skipping AI classification")
+                StructuredLogger.i(TAG, "User not authenticated; skipping AI classification")
             } else {
-                mappedContacts
-                    .filter { it.relationshipType == "UNKNOWN" }
-                    .forEach { contact ->
-                        classifyContactUseCase(contact.id)
-                    }
+                val unknownContacts = mappedContacts.filter { it.relationshipType == "UNKNOWN" }
+                StructuredLogger.i(TAG, "Classifying ${unknownContacts.size} unknown contacts")
+                unknownContacts.forEach { contact ->
+                    classifyContactUseCase(contact.id)
+                }
             }
 
             Result.success()
         } catch (e: Exception) {
-            Log.w(TAG, "doWork failed; will retry with backoff", e)
+            StructuredLogger.w(TAG, "doWork failed; will retry with backoff", e)
             Result.retry()
         }
     }

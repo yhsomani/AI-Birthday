@@ -13,7 +13,7 @@ interface SentMessageDao {
     suspend fun getByContact(contactId: String, limit: Int = 100): List<SentMessageEntity>
 
     @Query("SELECT EXISTS(SELECT 1 FROM sent_messages WHERE contactId = :contactId AND eventType = :eventType AND (sentAtMs > :oneYearAgo))")
-    suspend fun wasWishedThisYear(contactId: String, eventType: String, oneYearAgo: Long = System.currentTimeMillis() - 300L * 24 * 60 * 60 * 1000): Boolean
+    suspend fun wasWishedThisYear(contactId: String, eventType: String, oneYearAgo: Long = System.currentTimeMillis() - 365L * 24 * 60 * 60 * 1000): Boolean
 
     @Query("SELECT m.* FROM sent_messages m INNER JOIN contacts c ON c.id = m.contactId WHERE c.primaryPhone = :phone OR c.secondaryPhone = :phone ORDER BY m.sentAtMs DESC LIMIT 1")
     suspend fun getLastSentToPhone(phone: String): SentMessageEntity?
@@ -27,6 +27,12 @@ interface SentMessageDao {
     @Query("SELECT COUNT(*) FROM sent_messages WHERE sentAtMs > :sinceMs")
     suspend fun countRecent(sinceMs: Long): Int
 
+    @Query("SELECT * FROM sent_messages WHERE sentAtMs > :sinceMs ORDER BY sentAtMs DESC LIMIT :limit")
+    suspend fun getRecentForStyleAnalysis(sinceMs: Long, limit: Int = 100): List<SentMessageEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(message: SentMessageEntity)
+
+    @Query("SELECT * FROM sent_messages")
+    suspend fun getAllSync(): List<SentMessageEntity>
 }

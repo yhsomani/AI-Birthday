@@ -6,6 +6,12 @@ import android.content.pm.PackageManager
 import android.provider.Settings
 import android.util.Base64
 import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import java.security.MessageDigest
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
@@ -14,49 +20,43 @@ object DatabaseKeyDerivation {
     private const val ITERATIONS = 65536
     private const val KEY_LENGTH = 256
     private const val TAG = "DatabaseKeyDerivation"
-    private const val PREFS_NAME = "relateai_db_meta"
-    private const val PREF_DB_KEY = "db_key_v2_b64"
-    private const val PREF_SCHEMA_VERSION = "db_key_schema_version"
-    private const val CURRENT_SCHEMA_VERSION = 2
+    private const val PREFS_NAME = "relateai_db_meta_secure"
+    private const val PREF_DB_KEY = "db_key_hex"
 
     @Volatile
-    private var cachedKey: ByteArray? = null
+    private var warmUpDeferred: Deferred<ByteArray>? = null
 
-    @Synchronized
     fun deriveKey(context: Context): ByteArray {
-        cachedKey?.let { return it }
+        return runBlocking {
+            warmUpAsync(context).await()
+        }
+    }
 
-        val prefs: SharedPreferences =
-            context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private fun deriveKeyInternal(context: Context): ByteArray {
+        val prefs = createEncryptedPrefs(context.applicationContext)
+        val cachedHex = prefs.getString(PREF_DB_KEY, null)
 
-        val schemaVersion = prefs.getInt(PREF_SCHEMA_VERSION, 0)
-        val cachedB64 = if (schemaVersion == CURRENT_SCHEMA_VERSION) prefs.getString(PREF_DB_KEY, null) else null
-
-        if (cachedB64 != null) {
-            val bytes = Base64.decode(cachedB64, Base64.NO_WRAP)
+        if (cachedHex != null) {
+            val bytes = hexToByteArray(cachedHex)
             if (bytes.size == KEY_LENGTH / 8) {
-                cachedKey = bytes
-                Log.d(TAG, "DB key loaded from cache (fast path)")
+                Log.d(TAG, "DB key loaded from EncryptedSharedPreferences")
                 return bytes
             }
         }
 
-        val bytes = computeKeyFromScratch(context)
-        cachedKey = bytes
-
+        val derived = computeKeyFromScratch(context)
         prefs.edit()
-            .putString(PREF_DB_KEY, Base64.encodeToString(bytes, Base64.NO_WRAP))
-            .putInt(PREF_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION)
+            .putString(PREF_DB_KEY, byteArrayToHex(derived))
             .apply()
-        Log.d(TAG, "DB key derived from scratch and cached")
-        return bytes
+        Log.d(TAG, "DB key derived from scratch and cached in EncryptedSharedPreferences")
+        return derived
     }
 
     private fun computeKeyFromScratch(context: Context): ByteArray {
         val androidId = Settings.Secure.getString(
             context.contentResolver,
             Settings.Secure.ANDROID_ID
-        ) ?: java.util.UUID.randomUUID().toString() // Fallback if unavailable, will trigger destructive migration on next run but won't crash
+        ) ?: java.util.UUID.randomUUID().toString()
 
         val appSignatureHash = getAppCertificateHash(context)
         val keyMaterial = "$androidId:$appSignatureHash:relateai_v2"
@@ -108,25 +108,95 @@ object DatabaseKeyDerivation {
         return Base64.encodeToString(keyBytes, Base64.NO_WRAP)
     }
 
-    fun warmUpAsync(context: Context) {
-        Thread({
-            try {
-                deriveKey(context.applicationContext)
-            } catch (e: Exception) {
-                Log.w(TAG, "Background DB-key warmup failed (will retry on first DB access)", e)
-            }
-        }, "db-key-warmup").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1 }.start()
+    @Synchronized
+    fun warmUpAsync(context: Context): Deferred<ByteArray> {
+        return warmUpDeferred ?: kotlinx.coroutines.CoroutineScope(Dispatchers.IO).async {
+            deriveKeyInternal(context.applicationContext)
+        }.also { warmUpDeferred = it }
     }
+
     @Synchronized
     fun clearCachedKey(context: Context? = null) {
-        cachedKey = null
+        warmUpDeferred = null
         context?.let {
             try {
-                val prefs = it.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val prefs = createEncryptedPrefs(it.applicationContext)
                 prefs.edit().clear().apply()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to clear DB key preferences on sign-out", e)
             }
         }
+    }
+
+    private fun createEncryptedPrefs(context: Context): SharedPreferences {
+        return try {
+            val masterKey = MasterKey.Builder(context, "relateai_db_key_v1")
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create encrypted prefs for DB key, clearing and retrying", e)
+            try {
+                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
+            } catch (ex: Exception) {
+                Log.e(TAG, "Failed to clear shared preferences", ex)
+            }
+            deleteMasterKey()
+            context.deleteSharedPreferences(PREFS_NAME)
+            try {
+                val masterKey = MasterKey.Builder(context, "relateai_db_key_v1")
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                EncryptedSharedPreferences.create(
+                    context,
+                    PREFS_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                )
+            } catch (retryEx: Exception) {
+                Log.e(TAG, "Retry also failed, falling back to unencrypted preferences", retryEx)
+                try {
+                    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
+                } catch (ex: Exception) {
+                    Log.e(TAG, "Failed to clear shared preferences during fallback", ex)
+                }
+                deleteMasterKey()
+                context.deleteSharedPreferences(PREFS_NAME)
+                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            }
+        }
+    }
+
+    private fun deleteMasterKey() {
+        try {
+            val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
+            keyStore.load(null)
+            keyStore.deleteEntry("relateai_db_key_v1")
+            Log.i(TAG, "Deleted master key 'relateai_db_key_v1' from AndroidKeyStore")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete master key from AndroidKeyStore", e)
+        }
+    }
+
+    private fun byteArrayToHex(bytes: ByteArray): String {
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun hexToByteArray(hex: String): ByteArray {
+        val len = hex.length
+        val data = ByteArray(len / 2)
+        var i = 0
+        while (i < len) {
+            data[i / 2] = ((Character.digit(hex[i], 16) shl 4) + Character.digit(hex[i + 1], 16)).toByte()
+            i += 2
+        }
+        return data
     }
 }

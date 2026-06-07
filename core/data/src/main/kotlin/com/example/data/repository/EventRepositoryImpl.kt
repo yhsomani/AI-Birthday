@@ -16,7 +16,7 @@ class EventRepositoryImpl @Inject constructor(
 
     override suspend fun getEventsBefore(timeMs: Long): List<EventEntity> = eventDao.getEventsBefore(timeMs)
 
-    override suspend fun getUpcoming(days: Int): List<EventEntity> = eventDao.getUpcoming(days)
+    override suspend fun getUpcoming(days: Int): List<EventEntity> = eventDao.getUpcoming(days, System.currentTimeMillis())
 
     override suspend fun upsert(event: EventEntity) = eventDao.upsert(event)
 

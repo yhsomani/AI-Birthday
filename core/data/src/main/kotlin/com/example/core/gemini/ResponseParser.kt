@@ -72,4 +72,21 @@ object ResponseParser {
             MessageVariants.fromFallback("Wishing you a very happy birthday!")
         }
     }
+
+    fun parseGiftSuggestions(jsonString: String): List<com.example.domain.service.GiftSuggestion> {
+        return try {
+            val cleanJson = jsonString.trim().removeSurrounding("```json", "```").trim()
+            val arr = org.json.JSONArray(cleanJson)
+            List(arr.length()) { i ->
+                val obj = arr.getJSONObject(i)
+                com.example.domain.service.GiftSuggestion(
+                    name = obj.optString("name", "Gift"),
+                    reason = obj.optString("reason", ""),
+                    estimatedCostInr = obj.optInt("estimatedCostInr", 0)
+                )
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
 }

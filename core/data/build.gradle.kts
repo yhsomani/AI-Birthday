@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.library)
-    // alias(libs.plugins.kotlin.android)
     alias(libs.plugins.google.devtools.ksp)
     alias(libs.plugins.hilt.android)
 }
@@ -82,9 +81,9 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.vertexai)
+    implementation(libs.google.ai.client)
 
-    // Image loading
-    implementation(libs.coil.compose)
+
 
     // Testing
     testImplementation(libs.junit)

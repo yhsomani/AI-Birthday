@@ -14,6 +14,9 @@ interface PendingMessageDao {
     
     @Query("SELECT * FROM pending_messages WHERE eventId = :eventId LIMIT 1")
     suspend fun getByEventId(eventId: String): PendingMessageEntity?
+
+    @Query("SELECT * FROM pending_messages WHERE contactId = :contactId AND eventId = :eventId AND scheduledYear = :scheduledYear LIMIT 1")
+    suspend fun getPendingMessage(contactId: String, eventId: String, scheduledYear: Int): PendingMessageEntity?
     
     @Query("SELECT EXISTS(SELECT 1 FROM pending_messages WHERE eventId = :eventId)")
     suspend fun existsForEvent(eventId: String): Boolean
@@ -26,6 +29,9 @@ interface PendingMessageDao {
 
     @Query("UPDATE pending_messages SET status = :status WHERE eventId = :eventId")
     suspend fun updateStatusByEventId(eventId: String, status: String)
+
+    @Query("SELECT * FROM pending_messages")
+    suspend fun getAllSync(): List<PendingMessageEntity>
 
     @Query("SELECT COUNT(*) FROM pending_messages WHERE status = 'PENDING'")
     fun countPending(): Flow<Int>

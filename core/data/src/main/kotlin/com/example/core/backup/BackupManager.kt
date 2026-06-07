@@ -37,10 +37,12 @@ object BackupManager {
 
         val backup = BackupData(
             contacts = db.contactDao().getAllSync(),
-            events = db.eventDao().getAllSync(), // Fixed: was emptyList()
-            styleProfile = db.styleProfileDao().get(), // Fixed: was null
-            memoryNotes = db.memoryNoteDao().getAllSync(), // Fixed: was emptyList()
-            giftHistory = db.giftHistoryDao().getAllSync() // Fixed: was emptyList()
+            events = db.eventDao().getAllSync(),
+            pendingMessages = db.pendingMessageDao().getAllSync(),
+            sentMessages = db.sentMessageDao().getAllSync(),
+            styleProfile = db.styleProfileDao().get(),
+            memoryNotes = db.memoryNoteDao().getAllSync(),
+            giftHistory = db.giftHistoryDao().getAllSync()
         )
 
         val json = adapter.toJson(backup)
@@ -63,12 +65,18 @@ object BackupManager {
             val moshi = Moshi.Builder().build()
             val adapter = moshi.adapter(BackupData::class.java)
             val backup = adapter.fromJson(json) ?: return@withContext Result.failure(Exception("Invalid backup format"))
+            
+            if (backup.version > 1) {
+                return@withContext Result.failure(Exception("This backup was created with a newer version of RelateAI. Please update the app to restore it."))
+            }
 
             val db = AppDatabase.getInstance(context)
             var count = 0
 
             backup.contacts.forEach { db.contactDao().upsert(it); count++ }
             backup.events.forEach { db.eventDao().upsert(it); count++ }
+            backup.pendingMessages.forEach { db.pendingMessageDao().insert(it); count++ }
+            backup.sentMessages.forEach { db.sentMessageDao().insert(it); count++ }
             backup.styleProfile?.let { db.styleProfileDao().upsert(it); count++ }
             backup.memoryNotes.forEach { db.memoryNoteDao().upsert(it); count++ }
             backup.giftHistory.forEach { db.giftHistoryDao().upsert(it); count++ }

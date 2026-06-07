@@ -1,12 +1,25 @@
 package com.example.core.db.entities
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "pending_messages",
-    indices = [Index(value = ["scheduledForMs"], name = "idx_pending_messages_scheduledForMs"), Index(value = ["contactId"], name = "idx_pending_messages_contactId")]
+    foreignKeys = [
+        ForeignKey(
+            entity = ContactEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["contactId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["scheduledForMs"], name = "idx_pending_messages_scheduledForMs"),
+        Index(value = ["contactId"], name = "idx_pending_messages_contactId"),
+        Index(value = ["contactId", "eventId", "scheduledYear"], unique = true)
+    ]
 )
 data class PendingMessageEntity(
     @PrimaryKey val id: String,
@@ -31,5 +44,6 @@ data class PendingMessageEntity(
     val qualityScore: Int = 0,           // 0-100
     val tone: String = "WARM",           // WARM, FUNNY, NOSTALGIC, MOTIVATIONAL, PROFESSIONAL
     val length: String = "STANDARD",     // ULTRA_SHORT, STANDARD, LONG
-    val includeEmoji: Boolean = true
+    val includeEmoji: Boolean = true,
+    val scheduledYear: Int = 0
 )

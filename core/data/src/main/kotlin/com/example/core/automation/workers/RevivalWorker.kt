@@ -1,7 +1,6 @@
 package com.example.core.automation.workers
 
 import android.content.Context
-import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -13,6 +12,7 @@ import com.example.core.gemini.GeminiClient
 import com.example.core.gemini.PromptBuilder
 import com.example.core.gemini.RateLimiter
 import com.example.core.prefs.SecurePrefs
+import com.example.core.resilience.StructuredLogger
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.UUID
@@ -29,66 +29,70 @@ class RevivalWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         return try {
             if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
-                Log.i(TAG, "User not authenticated; skipping revival scan")
+                StructuredLogger.i(TAG, "User not authenticated; skipping revival scan")
                 return Result.success()
             }
 
-            val contacts = contactDao.getAllSync()
             val prompter = PromptBuilder()
-
             val now = System.currentTimeMillis()
-            var revivedCount = 0
+            val thirtyDaysAgoMs = now - 30L * 24 * 60 * 60 * 1000L
+
+            val contacts = contactDao.getContactsForRevival(thirtyDaysAgoMs)
+            StructuredLogger.i(TAG, "Revival scan: ${contacts.size} candidates (healthScore<40, lastRevivalAttemptMs<30d)")
 
             contacts.forEach { contact ->
                 val lastInteraction = contact.lastInteractionDate
-                if (lastInteraction != null) {
-                    val days = ((now - lastInteraction) / (1000 * 60 * 60 * 24)).toInt()
-                    if (days > 90 && (contact.relationshipType == "FRIEND" || contact.relationshipType == "FAMILY")) {
-                        RateLimiter.waitIfNeeded()
-                        val prompt = prompter.buildReconnectPrompt(contact, days)
-                        val suggestionResponse = gemini.generate(prompt)
-
-                        val scheduledMs = now + 1000 * 60 * 60 + (revivedCount * 60000L)
-
-                        val pendingMsg = PendingMessageEntity(
-                            id = UUID.randomUUID().toString(),
-                            contactId = contact.id,
-                            eventId = "REVIVAL_${contact.id}",
-                            shortVariant = suggestionResponse,
-                            standardVariant = suggestionResponse,
-                            longVariant = suggestionResponse,
-                            formalVariant = suggestionResponse,
-                            funnyVariant = suggestionResponse,
-                            emotionalVariant = suggestionResponse,
-                            selectedVariant = "standard",
-                            selectedVariantText = suggestionResponse,
-                            channel = contact.preferredChannel,
-                            scheduledForMs = scheduledMs,
-                            approvalMode = "VIP_APPROVE",
-                            status = "PENDING"
-                        )
-                        pendingMessageDao.insert(pendingMsg)
-                        NotificationHelper.showRevivalNotification(
-                            context = applicationContext,
-                            contactName = contact.name,
-                            daysSinceContact = days,
-                            suggestionText = suggestionResponse,
-                            contactId = contact.id
-                        )
-                        revivedCount++
-                    }
+                val days = if (lastInteraction != null) {
+                    ((now - lastInteraction) / (1000 * 60 * 60 * 24)).toInt()
+                } else {
+                    180
                 }
+
+                RateLimiter.waitIfNeeded()
+                val prompt = prompter.buildReconnectPrompt(contact, days)
+                val suggestionResponse = gemini.generate(prompt)
+
+                val scheduledMs = now + 1000 * 60 * 60
+
+                val pendingMsg = PendingMessageEntity(
+                    id = UUID.randomUUID().toString(),
+                    contactId = contact.id,
+                    eventId = "REVIVAL_${contact.id}",
+                    shortVariant = suggestionResponse,
+                    standardVariant = suggestionResponse,
+                    longVariant = suggestionResponse,
+                    formalVariant = suggestionResponse,
+                    funnyVariant = suggestionResponse,
+                    emotionalVariant = suggestionResponse,
+                    selectedVariant = "standard",
+                    selectedVariantText = suggestionResponse,
+                    channel = contact.preferredChannel,
+                    scheduledForMs = scheduledMs,
+                    approvalMode = "VIP_APPROVE",
+                    status = "PENDING"
+                )
+                pendingMessageDao.insert(pendingMsg)
+
+                contactDao.updateLastRevivalAttempt(contact.id, now)
+
+                NotificationHelper.showRevivalNotification(
+                    context = applicationContext,
+                    contactName = contact.name,
+                    daysSinceContact = days,
+                    suggestionText = suggestionResponse,
+                    contactId = contact.id
+                )
             }
 
-            Log.i(TAG, "Created $revivedCount revival suggestions")
+            StructuredLogger.i(TAG, "Created ${contacts.size} revival suggestions")
             Result.success()
         } catch (e: Exception) {
-            Log.w(TAG, "doWork failed; will retry with backoff", e)
+            StructuredLogger.e(TAG, "doWork failed; will retry with backoff", e)
             Result.retry()
         }
     }
 
-    private companion object {
+    companion object {
         const val TAG = "RevivalWorker"
     }
 }

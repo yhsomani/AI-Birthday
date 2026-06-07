@@ -1,17 +1,18 @@
 package com.example.core.automation.workers
 
 import android.content.Context
-import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.entities.EventEntity
+import com.example.core.resilience.StructuredLogger
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import java.util.Calendar
-import java.util.concurrent.TimeUnit
+import java.time.LocalDate
+import java.time.Year
+import java.time.ZoneId
 
 @HiltWorker
 class EventDiscoveryWorker @AssistedInject constructor(
@@ -24,76 +25,97 @@ class EventDiscoveryWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         return try {
             val contacts = contactDao.getAllSync()
-            val now = System.currentTimeMillis()
+            StructuredLogger.i(TAG, "Discovering events for ${contacts.size} contacts")
+            var eventCount = 0
 
             contacts.forEach { contact ->
+                // Birthday
                 val bDay = contact.birthdayDay
                 val bMonth = contact.birthdayMonth
                 if (bDay != null && bMonth != null) {
-                    val nextBirthday = computeNextOccurrence(bDay, bMonth)
-                    val daysUntil = TimeUnit.MILLISECONDS.toDays(nextBirthday - now).toInt()
+                    val nextBirthday = computeNextOccurrence(bMonth, bDay, contact.birthdayYear)
                     eventDao.upsert(EventEntity(
                         id = "${contact.id}_birthday",
                         contactId = contact.id,
                         type = "BIRTHDAY",
+                        label = contact.name,
                         dayOfMonth = bDay,
                         month = bMonth,
+                        year = contact.birthdayYear,
                         nextOccurrenceMs = nextBirthday,
-                        daysUntil = daysUntil.coerceAtLeast(0)
+                        isActive = true
                     ))
+                    eventCount++
+                } else {
+                    eventDao.deactivateEventsForContact(contact.id, "BIRTHDAY")
                 }
 
+                // Anniversary
                 val aDay = contact.anniversaryDay
                 val aMonth = contact.anniversaryMonth
                 if (aDay != null && aMonth != null) {
-                    val nextAnniv = computeNextOccurrence(aDay, aMonth)
-                    val daysUntil = TimeUnit.MILLISECONDS.toDays(nextAnniv - now).toInt()
+                    val nextAnniv = computeNextOccurrence(aMonth, aDay, contact.anniversaryYear)
                     eventDao.upsert(EventEntity(
                         id = "${contact.id}_anniversary",
                         contactId = contact.id,
                         type = "ANNIVERSARY",
+                        label = contact.name,
                         dayOfMonth = aDay,
                         month = aMonth,
+                        year = contact.anniversaryYear,
                         nextOccurrenceMs = nextAnniv,
-                        daysUntil = daysUntil.coerceAtLeast(0)
+                        isActive = true
                     ))
+                    eventCount++
+                } else {
+                    eventDao.deactivateEventsForContact(contact.id, "ANNIVERSARY")
                 }
 
+                // Work Anniversary
                 val wDay = contact.workStartDay
                 val wMonth = contact.workStartMonth
                 if (wDay != null && wMonth != null) {
-                    val nextWorkAnniv = computeNextOccurrence(wDay, wMonth)
-                    val daysUntil = TimeUnit.MILLISECONDS.toDays(nextWorkAnniv - now).toInt()
+                    val nextWorkAnniv = computeNextOccurrence(wMonth, wDay, contact.workStartYear)
                     eventDao.upsert(EventEntity(
                         id = "${contact.id}_work_anniversary",
                         contactId = contact.id,
                         type = "WORK_ANNIVERSARY",
+                        label = contact.name,
                         dayOfMonth = wDay,
                         month = wMonth,
+                        year = contact.workStartYear,
                         nextOccurrenceMs = nextWorkAnniv,
-                        daysUntil = daysUntil.coerceAtLeast(0)
+                        isActive = true
                     ))
+                    eventCount++
+                } else {
+                    eventDao.deactivateEventsForContact(contact.id, "WORK_ANNIVERSARY")
                 }
             }
 
+            StructuredLogger.i(TAG, "Discovered $eventCount events")
             Result.success()
         } catch (e: Exception) {
-            Log.w(TAG, "doWork failed; will retry with backoff", e)
+            StructuredLogger.w(TAG, "doWork failed; will retry with backoff", e)
             Result.retry()
         }
     }
 
-    private fun computeNextOccurrence(day: Int, month: Int): Long {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.DAY_OF_MONTH, day)
-        cal.set(Calendar.MONTH, month - 1)
-        cal.set(Calendar.HOUR_OF_DAY, 9)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        if (cal.timeInMillis < System.currentTimeMillis()) {
-            cal.add(Calendar.YEAR, 1)
+    private fun computeNextOccurrence(month: Int, day: Int, year: Int?): Long {
+        val today = LocalDate.now()
+        
+        // Handle Feb 29 in non-leap years
+        val effectiveDay = if (month == 2 && day == 29 && !Year.of(today.year).isLeap) 28 else day
+        
+        var candidate = LocalDate.of(today.year, month, effectiveDay)
+        if (candidate.isBefore(today) || candidate.isEqual(today)) {
+            // Roll forward to next year
+            val nextYear = today.year + 1
+            val nextEffectiveDay = if (month == 2 && day == 29 && !Year.of(nextYear).isLeap) 28 else day
+            candidate = LocalDate.of(nextYear, month, nextEffectiveDay)
         }
-        return cal.timeInMillis
+        
+        return candidate.atTime(9, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
 
     private companion object {

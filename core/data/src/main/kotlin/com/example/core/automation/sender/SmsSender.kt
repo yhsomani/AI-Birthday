@@ -10,21 +10,20 @@ class SmsSender(private val context: Context) {
         val smsManager = context.getSystemService(SmsManager::class.java)
         val parts = smsManager.divideMessage(message)
 
-        val sentPIs = parts.map { _ ->
+        val sentPIs = ArrayList(parts.map { _ ->
             val intent = Intent("SMS_SENT_$eventId")
             PendingIntent.getBroadcast(context, 0, intent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        }
+        })
 
-        val deliveredPIs = parts.map { _ ->
+        val deliveredPIs = ArrayList(parts.map { _ ->
             val intent = Intent("SMS_DELIVERED_$eventId")
             PendingIntent.getBroadcast(context, 0, intent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        }
+        })
 
         smsManager.sendMultipartTextMessage(
-            phoneNumber, null, parts as ArrayList<String>,
-            sentPIs as ArrayList<PendingIntent>, deliveredPIs as ArrayList<PendingIntent>
+            phoneNumber, null, ArrayList(parts), sentPIs, deliveredPIs
         )
     }
 }

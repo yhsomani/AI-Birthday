@@ -13,10 +13,16 @@ class StyleAnalysisUseCase @Inject constructor(
     private val styleProfileRepository: StyleProfileRepository
 ) {
     suspend operator fun invoke() {
-        val sentMessages = messageRepository.getAllSent().first()
+        val sinceMs = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000L
+        val sentMessages = messageRepository.getRecentForStyleAnalysis(sinceMs, 100)
         if (sentMessages.isEmpty()) return
 
         val texts = sentMessages.map { it.messageText }
+        analyzeAndSave(texts, "AUTO_ANALYSIS")
+    }
+
+    suspend fun analyzeAndSave(texts: List<String>, source: String) {
+        if (texts.isEmpty()) return
 
         // 1. Average Length
         val avgLength = texts.map { it.length }.average()
@@ -35,24 +41,63 @@ class StyleAnalysisUseCase @Inject constructor(
         }
         val emojiDensity = if (totalChars > 0) totalEmojis.toDouble() / totalChars.toDouble() else 0.0
 
-        // 3. Identify common phrases
-        val commonPhrases = findCommonPhrases(texts)
-        val commonPhrasesJson = org.json.JSONArray(commonPhrases).toString()
+        // 3. Devanagari Unicode Range Detection (U+0900–U+097F) for Hindi/Hinglish
+        val hasDevanagari = texts.any { text -> text.any { it in '\u0900'..'\u097F' } }
+        val preferredLanguage = if (hasDevanagari) "hi" else "en"
 
-        // 4. Identify top emojis
+        // 4. Identify common bi-grams (phrases)
+        val bigrams = mutableListOf<String>()
+        texts.forEach { text ->
+            val words = text.lowercase().replace(Regex("[^a-zA-Z0-9\\s\u0900-\u097F]"), "").split(Regex("\\s+")).filter { it.length > 2 }
+            for (i in 0 until words.size - 1) {
+                bigrams.add("${words[i]} ${words[i+1]}")
+            }
+        }
+        val topPhrases = bigrams.groupBy { it }
+            .mapValues { it.value.size }
+            .entries.sortedByDescending { it.value }
+            .take(5)
+            .map { it.key }
+
+        // 5. Common greetings and closings
+        val greetings = texts.mapNotNull { text ->
+            val words = text.trim().split(Regex("\\s+"))
+            if (words.isNotEmpty()) words.take(2).joinToString(" ") else null
+        }
+        val topGreetings = greetings.groupBy { it.lowercase() }
+            .mapValues { it.value.size }
+            .entries.sortedByDescending { it.value }
+            .take(3)
+            .map { entry -> greetings.first { it.lowercase() == entry.key } }
+
+        val closings = texts.mapNotNull { text ->
+            val words = text.trim().split(Regex("\\s+"))
+            if (words.isNotEmpty()) words.takeLast(2).joinToString(" ") else null
+        }
+        val topClosings = closings.groupBy { it.lowercase() }
+            .mapValues { it.value.size }
+            .entries.sortedByDescending { it.value }
+            .take(3)
+            .map { entry -> closings.first { it.lowercase() == entry.key } }
+
+        // 6. Identify top emojis
         val topEmojis = findTopEmojis(texts)
         val emojiSetJson = org.json.JSONArray(topEmojis).toString()
 
-        // 5. Tone & Formality analysis
+        // 7. Tone & Formality analysis
         val toneList = mutableListOf<String>()
         val allTextJoined = texts.joinToString(" ").lowercase()
 
-        val informalWords = listOf("hey", "hi", "dude", "yaar", "bro", "wassup", "bday", "congrats", "party", "haha", "lol")
-        val formalWords = listOf("dear", "hello", "regards", "warm", "wishing", "sincere", "success", "career", "health", "prosperous")
+        val informalOpeners = listOf("hey", "hi", "dude", "bro", "wassup", "hello there", "what's up", "yaar")
+        val formalOpeners = listOf("dear", "hello", "respected", "good morning", "good afternoon", "greetings")
 
-        val informalCount = informalWords.sumOf { word -> allTextJoined.split(word).size - 1 }
-        val formalCount = formalWords.sumOf { word -> allTextJoined.split(word).size - 1 }
-
+        var informalCount = 0
+        var formalCount = 0
+        texts.forEach { text ->
+            val lower = text.lowercase().trim()
+            if (informalOpeners.any { lower.startsWith(it) }) informalCount++
+            if (formalOpeners.any { lower.startsWith(it) }) formalCount++
+        }
         val formality = if (formalCount > informalCount) "FORMAL" else "CASUAL"
 
         if (formality == "FORMAL") {
@@ -63,6 +108,12 @@ class StyleAnalysisUseCase @Inject constructor(
             toneList.add("friendly")
         }
 
+        if (hasDevanagari) {
+            toneList.add("uses_hindi")
+        }
+        if (allTextJoined.contains("yaar") || allTextJoined.contains("bhai")) {
+            toneList.add("hinglish_mix")
+        }
         if (allTextJoined.contains("haha") || allTextJoined.contains("lol") || allTextJoined.contains("joke") || allTextJoined.contains("fun")) {
             toneList.add("funny")
         }
@@ -81,18 +132,37 @@ class StyleAnalysisUseCase @Inject constructor(
         val toneDescriptorsJson = org.json.JSONArray(toneList.distinct()).toString()
         val currentProfile = styleProfileRepository.getProfileOnce() ?: StyleProfileEntity()
 
-        // Update profile with fully analyzed data
-        styleProfileRepository.upsert(currentProfile.copy(
+        val newProfile = currentProfile.copy(
             sampleMessagesJson = augmentSamplesWithAnalysis(currentProfile.sampleMessagesJson, texts),
             usesEmoji = emojiDensity > 0.01,
             avgMessageLength = avgLength.toInt(),
-            commonPhrasesJson = commonPhrasesJson,
+            commonPhrasesJson = org.json.JSONArray(topPhrases).toString(),
+            commonGreetingsJson = org.json.JSONArray(topGreetings).toString(),
             formalityLevel = formality,
+            preferredLanguage = preferredLanguage,
             emojiSetJson = emojiSetJson,
             toneDescriptors = toneDescriptorsJson,
             sampleCount = texts.size,
             updatedAtMs = System.currentTimeMillis()
-        ))
+        )
+
+        // Save style profile snapshot to history
+        val profileJson = org.json.JSONObject().apply {
+            put("formalityLevel", formality)
+            put("preferredLanguage", preferredLanguage)
+            put("avgMessageLength", avgLength.toInt())
+            put("usesEmoji", emojiDensity > 0.01)
+            put("toneDescriptors", org.json.JSONArray(toneList.distinct()))
+            put("commonPhrases", org.json.JSONArray(topPhrases))
+        }.toString()
+
+        val historyEntity = com.example.core.db.entities.StyleProfileHistoryEntity(
+            profileJson = profileJson,
+            savedAtMs = System.currentTimeMillis(),
+            source = source
+        )
+
+        styleProfileRepository.upsertWithHistory(newProfile, historyEntity)
     }
 
     private fun findCommonPhrases(texts: List<String>): List<String> {

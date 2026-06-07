@@ -41,6 +41,12 @@ class ContactRepositoryImpl @Inject constructor(
 
     override suspend fun incrementConsecutiveYearsWished(id: String) = contactDao.incrementConsecutiveYearsWished(id)
 
+    override suspend fun getContactsForRevival(lastInteractionBeforeMs: Long): List<ContactEntity> =
+        contactDao.getContactsForRevival(lastInteractionBeforeMs)
+
+    override suspend fun updateLastRevivalAttempt(id: String, timestampMs: Long) =
+        contactDao.updateLastRevivalAttempt(id, timestampMs)
+
     override fun countAll(): Flow<Int> = contactDao.countAll()
 
     override fun countByRelationshipType(): Flow<List<com.example.core.db.dao.RelationshipTypeCount>> = contactDao.countByRelationshipType()

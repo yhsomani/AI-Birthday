@@ -1,9 +1,9 @@
 package com.example.core.automation.workers
 
 import android.content.Context
-import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.example.core.resilience.StructuredLogger
 import com.example.domain.usecase.StyleAnalysisUseCase
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -18,17 +18,17 @@ class StyleAnalysisWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            Log.i(TAG, "Starting style analysis from sent messages...")
+            StructuredLogger.i(TAG, "Starting style analysis from sent messages")
             styleAnalysisUseCase()
-            Log.i(TAG, "Style analysis completed successfully.")
+            StructuredLogger.i(TAG, "Style analysis completed successfully")
             Result.success()
         } catch (e: Exception) {
-            Log.e(TAG, "Style analysis failed", e)
+            StructuredLogger.e(TAG, "Style analysis failed", e)
             Result.retry()
         }
     }
 
-    private companion object {
+    companion object {
         const val TAG = "StyleAnalysisWorker"
     }
 }

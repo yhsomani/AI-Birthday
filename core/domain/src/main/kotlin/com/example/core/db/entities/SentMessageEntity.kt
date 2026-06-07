@@ -1,11 +1,20 @@
 package com.example.core.db.entities
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "sent_messages",
+    foreignKeys = [
+        ForeignKey(
+            entity = ContactEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["contactId"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
     indices = [
         Index(
             value = ["contactId", "sentAtMs"],
@@ -16,7 +25,7 @@ import androidx.room.PrimaryKey
 )
 data class SentMessageEntity(
     @PrimaryKey val id: String,
-    val contactId: String,
+    val contactId: String?,
     val eventType: String,
     val eventYear: Int,
     val messageText: String,
@@ -27,5 +36,6 @@ data class SentMessageEntity(
     val geminiModel: String = "flash",
     val variantUsed: String = "standard",
     val replyReceived: Boolean = false,
-    val replyAtMs: Long? = null
+    val replyAtMs: Long? = null,
+    val isContactDeleted: Boolean = false
 )

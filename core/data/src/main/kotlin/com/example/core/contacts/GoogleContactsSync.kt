@@ -17,13 +17,33 @@ class GoogleContactsSync(private val context: Context) {
 
     private suspend fun getValidToken(prefs: SecurePrefs): String? = withContext(Dispatchers.IO) {
         val existing = prefs.getGoogleOAuthToken()
-        if (existing.isNotEmpty()) {
-            try {
-                val account = GoogleSignIn.getLastSignedInAccount(context)
-                if (account != null) {
+        try {
+            val account = GoogleSignIn.getLastSignedInAccount(context)
+            if (account != null) {
+                val email = account.email
+                val googleAccount = account.account ?: email?.let { android.accounts.Account(it, "com.google") }
+                if (googleAccount != null) {
+                    // Try GoogleAuthUtil first
+                    try {
+                        val token = com.google.android.gms.auth.GoogleAuthUtil.getToken(
+                            context,
+                            googleAccount,
+                            "oauth2:https://www.googleapis.com/auth/contacts.readonly"
+                        )
+                        if (!token.isNullOrEmpty()) {
+                            if (token != existing) {
+                                prefs.setGoogleOAuthToken(token)
+                            }
+                            return@withContext token
+                        }
+                    } catch (e: Exception) {
+                        Log.w("GoogleContactsSync", "GoogleAuthUtil.getToken failed, trying AccountManager", e)
+                    }
+
+                    // Fallback to AccountManager
                     val am = AccountManager.get(context)
                     val future = am.getAuthToken(
-                        account.account ?: return@withContext existing,
+                        googleAccount,
                         "oauth2:https://www.googleapis.com/auth/contacts.readonly",
                         null,
                         false,
@@ -35,11 +55,11 @@ class GoogleContactsSync(private val context: Context) {
                     if (freshToken != null && freshToken != existing) {
                         prefs.setGoogleOAuthToken(freshToken)
                     }
-                    return@withContext freshToken ?: existing
+                    return@withContext freshToken ?: existing.ifEmpty { null }
                 }
-            } catch (e: Exception) {
-                Log.w("GoogleContactsSync", "Token refresh failed, using existing", e)
             }
+        } catch (e: Exception) {
+            Log.w("GoogleContactsSync", "Token fetch/refresh failed, using existing", e)
         }
         return@withContext existing.ifEmpty { null }
     }

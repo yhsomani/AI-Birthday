@@ -12,6 +12,7 @@ import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.*
@@ -28,7 +29,7 @@ class DaoTest {
     private lateinit var sentMessageDao: SentMessageDao
 
     @Before
-    fun createDb() {
+    fun createDb() = runBlocking {
         db = Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),
             AppDatabase::class.java
@@ -37,6 +38,24 @@ class DaoTest {
         eventDao = db.eventDao()
         pendingMessageDao = db.pendingMessageDao()
         sentMessageDao = db.sentMessageDao()
+
+        contactDao.upsert(ContactEntity(id = "c1", name = "Alice"))
+        eventDao.upsert(EventEntity(
+            id = "e1",
+            contactId = "c1",
+            type = "BIRTHDAY",
+            dayOfMonth = 1,
+            month = 1,
+            nextOccurrenceMs = System.currentTimeMillis()
+        ))
+        eventDao.upsert(EventEntity(
+            id = "e2",
+            contactId = "c1",
+            type = "ANNIVERSARY",
+            dayOfMonth = 2,
+            month = 1,
+            nextOccurrenceMs = System.currentTimeMillis()
+        ))
     }
 
     @After
@@ -131,13 +150,13 @@ class DaoTest {
         eventDao.upsert(testEvent("e1"))
         eventDao.delete(testEvent("e1"))
         val events = eventDao.getAll().first()
-        assertTrue(events.isEmpty())
+        assertTrue(events.none { it.id == "e1" })
     }
 
     @Test
     fun pendingMessageDao_insertAndCount() = runTest {
-        pendingMessageDao.insert(testPending("p1"))
-        pendingMessageDao.insert(testPending("p2"))
+        pendingMessageDao.insert(testPending("p1", "e1"))
+        pendingMessageDao.insert(testPending("p2", "e2"))
         val count = pendingMessageDao.countPending().first()
         assertEquals(2, count)
     }

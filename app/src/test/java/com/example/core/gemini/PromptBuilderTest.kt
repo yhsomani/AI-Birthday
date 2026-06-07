@@ -46,7 +46,7 @@ class PromptBuilderTest {
         )
         val ctx = builder.buildContactContext(contact, event, null, emptyList())
 
-        assertEquals("Bob", ctx.name)
+        assertEquals("Bob", ctx.firstName)
         assertEquals(listOf("music", "hiking"), ctx.interests)
         assertEquals(listOf("college trip"), ctx.sharedHistory)
         assertEquals(10, ctx.daysSinceLastContact)
@@ -162,7 +162,7 @@ class PromptBuilderTest {
     @Test
     fun `buildMessageGenerationPrompt includes context`() {
         val ctx = ContactContextObject(
-            name = "Grace", nickname = "Gra",
+            firstName = "Grace", nickname = "Gra",
             relationshipType = "SISTER",
             knownSince = null, ageTurning = 25,
             interests = listOf("photography"),
@@ -204,7 +204,7 @@ class PromptBuilderTest {
     @Test
     fun `buildRegenerationPrompt includes original message`() {
         val ctx = ContactContextObject(
-            name = "Ivy", nickname = null,
+            firstName = "Ivy", nickname = null,
             relationshipType = "FRIEND",
             knownSince = null, ageTurning = null,
             interests = emptyList(),

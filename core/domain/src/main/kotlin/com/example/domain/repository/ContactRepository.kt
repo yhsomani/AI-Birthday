@@ -17,6 +17,8 @@ interface ContactRepository {
     suspend fun updateLastWished(id: String, timestamp: Long)
     suspend fun incrementEngagementScore(id: String, delta: Int)
     suspend fun incrementConsecutiveYearsWished(id: String)
+    suspend fun getContactsForRevival(lastInteractionBeforeMs: Long): List<ContactEntity>
+    suspend fun updateLastRevivalAttempt(id: String, timestampMs: Long)
     fun countAll(): Flow<Int>
     fun countByRelationshipType(): Flow<List<com.example.core.db.dao.RelationshipTypeCount>>
     suspend fun getTopByHealthScore(limit: Int): List<ContactEntity>

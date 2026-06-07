@@ -4,6 +4,7 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.db.entities.StyleProfileEntity
+import com.example.core.resilience.StructuredLogger
 import com.example.domain.service.AiService
 import com.example.domain.service.ContactClassificationResult
 import com.example.domain.service.MessageVariantsResult
@@ -21,6 +22,11 @@ class AiServiceImpl @Inject constructor(
         styleProfile: StyleProfileEntity?,
         previousMessages: List<SentMessageEntity>
     ): MessageVariantsResult {
+        StructuredLogger.i(TAG, "Generating message", mapOf(
+            "contactId" to contact.id,
+            "eventId" to event.id,
+            "previousMessages" to previousMessages.size.toString(),
+        ))
         val prompter = PromptBuilder()
         val contextObj = prompter.buildContactContext(contact, event, styleProfile, previousMessages)
 
@@ -29,6 +35,9 @@ class AiServiceImpl @Inject constructor(
         val response = geminiClient.generate(prompt)
         val variants = ResponseParser.parseMessageVariants(response)
 
+        StructuredLogger.d(TAG, "Message generated", mapOf(
+            "recommended" to variants.recommended.take(50),
+        ))
         return MessageVariantsResult(
             short = variants.short,
             standard = variants.standard,
@@ -47,6 +56,10 @@ class AiServiceImpl @Inject constructor(
         styleProfile: StyleProfileEntity?,
         previousMessages: List<SentMessageEntity>
     ): MessageVariantsResult {
+        StructuredLogger.i(TAG, "Regenerating message", mapOf(
+            "contactId" to contact.id,
+            "eventId" to event.id,
+        ))
         val prompter = PromptBuilder()
         val contextObj = prompter.buildContactContext(contact, event, styleProfile, previousMessages)
 
@@ -67,6 +80,10 @@ class AiServiceImpl @Inject constructor(
     }
 
     override suspend fun classifyContact(contact: ContactEntity): ContactClassificationResult {
+        StructuredLogger.i(TAG, "Classifying contact", mapOf(
+            "contactId" to contact.id,
+            "name" to contact.name,
+        ))
         val prompter = PromptBuilder()
         val prompt = prompter.buildClassificationPrompt(contact)
 
@@ -82,5 +99,23 @@ class AiServiceImpl @Inject constructor(
             communicationStyle = result.communicationStyle,
             confidence = result.confidence
         )
+    }
+
+    override suspend fun generateGiftSuggestions(
+        contact: ContactEntity,
+        history: List<com.example.core.db.entities.GiftHistoryEntity>
+    ): List<com.example.domain.service.GiftSuggestion> {
+        val prompter = PromptBuilder()
+        val prompt = prompter.buildGiftSuggestionsPrompt(contact, history)
+        RateLimiter.waitIfNeeded()
+        val response = geminiClient.generate(prompt)
+        val raw = ResponseParser.parseGiftSuggestions(response)
+        val budget = (contact.giftBudgetInr.takeIf { it > 0 } ?: 500)
+        val filtered = raw.filter { it.estimatedCostInr in 1..budget }
+        return if (filtered.isNotEmpty()) filtered else raw
+    }
+
+    companion object {
+        private const val TAG = "AiServiceImpl"
     }
 }

@@ -123,4 +123,26 @@ object NotificationHelper {
             // Permission missing
         }
     }
+
+    @SuppressLint("MissingPermission")
+    fun showSetupNotification(context: Context, title: String, message: String) {
+        val appIntent = PendingIntent.getActivity(
+            context, 999,
+            Intent().setClassName(context, "com.example.MainActivity"),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, APPROVAL)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setContentIntent(appIntent)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(999, notification)
+        } catch (e: SecurityException) {
+            // Permission missing
+        }
+    }
 }

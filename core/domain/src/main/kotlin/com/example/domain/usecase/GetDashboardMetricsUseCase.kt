@@ -22,11 +22,13 @@ class GetDashboardMetricsUseCase @Inject constructor(
         val pending = messageRepository.getAllPending().first()
         val events = eventRepository.getUpcoming(30)
         val healthScore = if (contacts.isEmpty()) 0 else contacts.map { it.healthScore }.average().toInt()
+        val sentCount = messageRepository.countAllSent().first()
         return DashboardMetrics(
             healthScore = healthScore,
             pendingCount = pending.size,
             upcomingEventsCount = events.size,
-            contactCount = contacts.size
+            contactCount = contacts.size,
+            sentCount = sentCount
         )
     }
 
@@ -34,6 +36,7 @@ class GetDashboardMetricsUseCase @Inject constructor(
         val healthScore: Int,
         val pendingCount: Int,
         val upcomingEventsCount: Int,
-        val contactCount: Int
+        val contactCount: Int,
+        val sentCount: Int
     )
 }

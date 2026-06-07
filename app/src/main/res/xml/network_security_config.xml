@@ -13,4 +13,24 @@
             <pin digest="SHA-256">K87oWBWMP0Zfydd/DfoxL+8lpNyIUB2ptGtn0fv6O2Q=</pin>
         </pin-set>
     </domain-config>
+    <!-- Google OAuth / Identity endpoints (CRIT-02) -->
+    <domain-config>
+        <domain includeSubdomains="true">oauth2.googleapis.com</domain>
+        <domain includeSubdomains="true">accounts.google.com</domain>
+        <pin-set expiration="2027-06-01">
+            <pin digest="SHA-256">hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=</pin>
+            <pin digest="SHA-256">Vfd95BwDeSQo+NUYxVEEIlvkOlWY2SalKK1lPhzOx78=</pin>
+            <pin digest="SHA-256">K87oWBWMP0Zfydd/DfoxL+8lpNyIUB2ptGtn0fv6O2Q=</pin>
+        </pin-set>
+    </domain-config>
+    <!-- Firebase / Gmail SMTP (CRIT-02) -->
+    <domain-config>
+        <domain includeSubdomains="true">firebase.googleapis.com</domain>
+        <domain includeSubdomains="true">smtp.gmail.com</domain>
+        <pin-set expiration="2027-06-01">
+            <pin digest="SHA-256">hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=</pin>
+            <pin digest="SHA-256">Vfd95BwDeSQo+NUYxVEEIlvkOlWY2SalKK1lPhzOx78=</pin>
+            <pin digest="SHA-256">K87oWBWMP0Zfydd/DfoxL+8lpNyIUB2ptGtn0fv6O2Q=</pin>
+        </pin-set>
+    </domain-config>
 </network-security-config>

@@ -1,7 +1,6 @@
 package com.example.core.automation.workers
 
 import android.content.Context
-import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.core.automation.scheduler.DailyScheduler
@@ -16,10 +15,15 @@ import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.dao.StyleProfileDao
+import com.example.core.resilience.StructuredLogger
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import androidx.hilt.work.HiltWorker
 import java.util.UUID
+import java.util.Calendar
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 @HiltWorker
 class MessageGenerationWorker @AssistedInject constructor(
@@ -35,9 +39,20 @@ class MessageGenerationWorker @AssistedInject constructor(
 ) : CoroutineWorker(ctx, params) {
 
     override suspend fun doWork(): Result {
+        val apiKey = prefs.getGeminiApiKey()
+        if (apiKey.isNullOrBlank()) {
+            StructuredLogger.w(TAG, "Gemini API key not configured — skipping worker")
+            com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
+                applicationContext,
+                "RelateAI Setup Needed",
+                "RelateAI needs your Gemini API key to generate messages. Tap to configure."
+            )
+            return Result.failure()
+        }
+
         return try {
             if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
-                Log.i(TAG, "User not authenticated; skipping message generation")
+                StructuredLogger.i(TAG, "User not authenticated; skipping message generation")
                 return Result.success()
             }
 
@@ -45,63 +60,96 @@ class MessageGenerationWorker @AssistedInject constructor(
             val tomorrow = System.currentTimeMillis() + 24 * 60 * 60 * 1000L
 
             val upcomingEvents = eventDao.getEventsBefore(tomorrow)
+            StructuredLogger.i(TAG, "Found ${upcomingEvents.size} upcoming events for generation")
 
-            upcomingEvents.forEach { event ->
-                if (pendingMessageDao.existsForEvent(event.id)) return@forEach
+            coroutineScope {
+                val deferredList = upcomingEvents.map { event ->
+                    async {
+                        try {
+                            val cal = Calendar.getInstance().apply { timeInMillis = event.nextOccurrenceMs }
+                            val scheduledYear = cal.get(Calendar.YEAR)
 
-                val contact = contactDao.getById(event.contactId) ?: return@forEach
-                val styleProfile = styleProfileDao.get()
-                val previousMessages = sentMessageDao.getByContact(contact.id)
+                            val existingPending = pendingMessageDao.getPendingMessage(event.contactId, event.id, scheduledYear)
+                            if (existingPending != null) {
+                                if (existingPending.status == "PENDING") {
+                                    StructuredLogger.i(TAG, "Pending message already queued for contact ${event.contactId} event ${event.id} year $scheduledYear; skipping")
+                                    return@async
+                                } else if (existingPending.status == "FAILED") {
+                                    StructuredLogger.i(TAG, "Regenerating previously failed message for contact ${event.contactId} event ${event.id} year $scheduledYear")
+                                } else {
+                                    StructuredLogger.i(TAG, "Message already processed with status ${existingPending.status} for contact ${event.contactId} event ${event.id} year $scheduledYear; skipping")
+                                    return@async
+                                }
+                            }
 
-                val contextObj = prompter.buildContactContext(contact, event, styleProfile, previousMessages)
+                            val contact = contactDao.getById(event.contactId) ?: return@async
+                            val styleProfile = styleProfileDao.get()
+                            val previousMessages = sentMessageDao.getByContact(contact.id)
 
-                RateLimiter.waitIfNeeded()
-                var prompt = prompter.buildMessageGenerationPrompt(contextObj)
-                var responseString = gemini.generate(prompt)
-                var variants = ResponseParser.parseMessageVariants(responseString)
+                            val contextObj = prompter.buildContactContext(contact, event, styleProfile, previousMessages)
 
-                // Anti-repetition check
-                var retries = 0
-                while (retries < 2 && isPreviouslyUsed(contact.id, variants.standard)) {
-                    RateLimiter.waitIfNeeded()
-                    prompt = prompter.buildRegenerationPrompt(variants.standard, contextObj)
-                    responseString = gemini.generate(prompt)
-                    variants = ResponseParser.parseMessageVariants(responseString)
-                    retries++
+                            RateLimiter.waitIfNeeded()
+                            var prompt = prompter.buildMessageGenerationPrompt(contextObj)
+                            var responseString = gemini.generate(prompt)
+                            var variants = ResponseParser.parseMessageVariants(responseString)
+
+                            // Anti-repetition check
+                            var retries = 0
+                            while (retries < 2 && isPreviouslyUsed(contact.id, variants.standard)) {
+                                RateLimiter.waitIfNeeded()
+                                prompt = prompter.buildRegenerationPrompt(variants.standard, contextObj)
+                                responseString = gemini.generate(prompt)
+                                variants = ResponseParser.parseMessageVariants(responseString)
+                                retries++
+                            }
+
+                            val globalMode = prefs.getGlobalAutomationMode()
+                            val approvalMode = determineApprovalMode(contact.relationshipType, contact.automationMode, globalMode)
+
+                            val selectedVariantText = variants.get(variants.recommended)
+
+                            StructuredLogger.i(TAG, "Generated message for event ${event.id}", mapOf(
+                                "contactId" to contact.id,
+                                "approvalMode" to approvalMode,
+                                "retries" to retries.toString(),
+                            ))
+
+                            pendingMessageDao.insert(PendingMessageEntity(
+                                id = existingPending?.id ?: UUID.randomUUID().toString(),
+                                contactId = contact.id,
+                                eventId = event.id,
+                                shortVariant = variants.short,
+                                standardVariant = variants.standard,
+                                longVariant = variants.long,
+                                formalVariant = variants.formal,
+                                funnyVariant = variants.funny,
+                                emotionalVariant = variants.emotional,
+                                selectedVariant = variants.recommended,
+                                selectedVariantText = selectedVariantText,
+                                channel = contact.preferredChannel,
+                                scheduledForMs = event.nextOccurrenceMs,
+                                approvalMode = approvalMode,
+                                status = if (approvalMode == "FULLY_AUTO") "APPROVED" else "PENDING",
+                                scheduledYear = scheduledYear
+                            ))
+
+                            if (approvalMode == "FULLY_AUTO") {
+                                StructuredLogger.i(TAG, "Auto-approving message for event ${event.id}")
+                                DailyScheduler.scheduleExactSend(applicationContext, event.id)
+                            } else {
+                                com.example.core.automation.notifications.NotificationHelper.showApprovalNotification(applicationContext, contact, event, variants)
+                            }
+                        } catch (e: Exception) {
+                            StructuredLogger.w(TAG, "Failed to generate message for event ${event.id}", e)
+                        }
+                    }
                 }
-
-                val globalMode = prefs.getGlobalAutomationMode()
-                val approvalMode = determineApprovalMode(contact.relationshipType, contact.automationMode, globalMode)
-
-                val selectedVariantText = variants.get(variants.recommended)
-                pendingMessageDao.insert(PendingMessageEntity(
-                    id = UUID.randomUUID().toString(),
-                    contactId = contact.id,
-                    eventId = event.id,
-                    shortVariant = variants.short,
-                    standardVariant = variants.standard,
-                    longVariant = variants.long,
-                    formalVariant = variants.formal,
-                    funnyVariant = variants.funny,
-                    emotionalVariant = variants.emotional,
-                    selectedVariant = variants.recommended,
-                    selectedVariantText = selectedVariantText,
-                    channel = contact.preferredChannel,
-                    scheduledForMs = event.nextOccurrenceMs,
-                    approvalMode = approvalMode,
-                    status = if (approvalMode == "FULLY_AUTO") "APPROVED" else "PENDING"
-                ))
-
-                if (approvalMode == "FULLY_AUTO") {
-                    DailyScheduler.scheduleExactSend(applicationContext, event.id)
-                } else {
-                    com.example.core.automation.notifications.NotificationHelper.showApprovalNotification(applicationContext, contact, event, variants)
-                }
+                deferredList.awaitAll()
             }
 
             Result.success()
         } catch (e: Exception) {
-            Log.w(TAG, "doWork failed; will retry with backoff", e)
+            StructuredLogger.w(TAG, "doWork failed; will retry with backoff", e)
             Result.retry()
         }
     }
