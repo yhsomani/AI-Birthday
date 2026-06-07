@@ -142,7 +142,8 @@ fun RelateNavGraph(
                 }
             )
         ) { backStackEntry ->
-            val contactId = backStackEntry.arguments?.getString("contactId") ?: ""
+            val rawContactId = backStackEntry.arguments?.getString("contactId") ?: ""
+            val contactId = try { java.net.URLDecoder.decode(rawContactId, "UTF-8") } catch (e: Exception) { rawContactId }
             ContactDetailScreen(
                 contactId = contactId,
                 onBack = { navController.popBackStack() },
@@ -169,8 +170,10 @@ fun RelateNavGraph(
                 }
             )
         ) { backStackEntry ->
-            val contactId = backStackEntry.arguments?.getString("contactId") ?: ""
-            val eventId = backStackEntry.arguments?.getString("eventId") ?: ""
+            val rawContactId = backStackEntry.arguments?.getString("contactId") ?: ""
+            val contactId = try { java.net.URLDecoder.decode(rawContactId, "UTF-8") } catch (e: Exception) { rawContactId }
+            val rawEventId = backStackEntry.arguments?.getString("eventId") ?: ""
+            val eventId = try { java.net.URLDecoder.decode(rawEventId, "UTF-8") } catch (e: Exception) { rawEventId }
             WishPreviewScreen(
                 contactId = contactId,
                 eventId = eventId,
@@ -229,7 +232,8 @@ fun RelateNavGraph(
             route = Screen.MemoryVault.route,
             arguments = listOf(navArgument("contactId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val contactId = backStackEntry.arguments?.getString("contactId") ?: ""
+            val rawContactId = backStackEntry.arguments?.getString("contactId") ?: ""
+            val contactId = try { java.net.URLDecoder.decode(rawContactId, "UTF-8") } catch (e: Exception) { rawContactId }
             MemoryVaultScreen(
                 contactId = contactId,
                 onBack = { navController.popBackStack() }
@@ -239,7 +243,8 @@ fun RelateNavGraph(
             route = Screen.GiftAdvisor.route,
             arguments = listOf(navArgument("contactId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val contactId = backStackEntry.arguments?.getString("contactId") ?: ""
+            val rawContactId = backStackEntry.arguments?.getString("contactId") ?: ""
+            val contactId = try { java.net.URLDecoder.decode(rawContactId, "UTF-8") } catch (e: Exception) { rawContactId }
             GiftAdvisorScreen(
                 contactId = contactId,
                 onBack = { navController.popBackStack() }

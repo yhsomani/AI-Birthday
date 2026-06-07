@@ -88,7 +88,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSyncing = true, syncError = null)
             try {
-                syncContactsUseCase()
+                syncContactsUseCase(forceRefresh = true)
                 _uiState.value = _uiState.value.copy(
                     isSyncing = false,
                     lastSyncTimestamp = "Just now",

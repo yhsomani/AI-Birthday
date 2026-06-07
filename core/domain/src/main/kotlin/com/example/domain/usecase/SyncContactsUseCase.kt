@@ -21,11 +21,11 @@ class SyncContactsUseCase @Inject constructor(
     private val discoverEventsUseCase: DiscoverEventsUseCase,
     private val preferencesRepository: com.example.domain.service.PreferencesRepository
 ) {
-    suspend operator fun invoke(): SyncOutcome {
+    suspend operator fun invoke(forceRefresh: Boolean = false): SyncOutcome {
         var googleContacts = emptyList<ContactEntity>()
         var googleError: String? = null
         try {
-            googleContacts = contactSyncService.fetchGoogleContacts()
+            googleContacts = contactSyncService.fetchGoogleContacts(forceRefresh)
             preferencesRepository.setLastSyncError(null)
         } catch (e: Exception) {
             android.util.Log.e("SyncContactsUseCase", "Google contacts sync failed", e)

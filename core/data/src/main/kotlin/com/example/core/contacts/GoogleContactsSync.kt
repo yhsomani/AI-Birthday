@@ -83,7 +83,7 @@ class GoogleContactsSync(private val context: Context) {
         return@withContext existing.ifEmpty { null }
     }
 
-    suspend fun fetchAll(): List<ContactEntity> = withContext(Dispatchers.IO) {
+    suspend fun fetchAll(forceRefresh: Boolean = false): List<ContactEntity> = withContext(Dispatchers.IO) {
         val prefs = SecurePrefs(context)
         val token = getValidToken(prefs)
         if (token == null) {
@@ -92,7 +92,7 @@ class GoogleContactsSync(private val context: Context) {
         }
 
         val baseFields = "names,nicknames,emailAddresses,phoneNumbers,birthdays,events,organizations,memberships,relations,addresses,photos,biographies"
-        val syncToken = prefs.getSyncToken()
+        val syncToken = if (forceRefresh) "" else prefs.getSyncToken()
         val contacts = mutableListOf<ContactEntity>()
         val client = OkHttpClient()
         
@@ -107,6 +107,8 @@ class GoogleContactsSync(private val context: Context) {
                 
                 if (syncToken.isNotEmpty()) {
                     urlBuilder.append("&syncToken=").append(syncToken)
+                } else {
+                    urlBuilder.append("&requestSyncToken=true")
                 }
                 if (!pageToken.isNullOrEmpty()) {
                     urlBuilder.append("&pageToken=").append(pageToken)
@@ -122,9 +124,14 @@ class GoogleContactsSync(private val context: Context) {
                     
                 val response = client.newCall(request).execute()
                 if (!response.isSuccessful) {
-                    val errBody = response.body?.string()
+                    val errBody = response.body?.string() ?: ""
+                    Log.e("GoogleContactsSync", "fetchAll error: HTTP ${response.code}: $errBody")
+                    if (response.code == 400 && syncToken.isNotEmpty()) {
+                        Log.w("GoogleContactsSync", "Sync token expired or parameter mismatch (400). Clearing sync token and performing full sync.")
+                        prefs.setSyncToken("")
+                        return@withContext fetchAll(forceRefresh = true)
+                    }
                     val errMsg = "HTTP ${response.code}: $errBody"
-                    Log.e("GoogleContactsSync", "fetchAll error: $errMsg")
                     throw IOException(errMsg)
                 }
                 
@@ -328,7 +335,8 @@ class GoogleContactsSync(private val context: Context) {
                     }
                 }
                 
-                pageToken = jsonObj.optString("nextPageToken", null)
+                val nextToken = jsonObj.optString("nextPageToken", "")
+                pageToken = if (nextToken.isNotEmpty()) nextToken else null
                 val nextSyncToken = jsonObj.optString("nextSyncToken", "")
                 if (nextSyncToken.isNotEmpty()) {
                     lastNextSyncToken = nextSyncToken

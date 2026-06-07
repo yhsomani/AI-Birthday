@@ -15,22 +15,22 @@ sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object ContactList : Screen("contacts")
     data object ContactDetail : Screen("contacts/{contactId}") {
-        fun createRoute(contactId: String) = "contacts/$contactId"
+        fun createRoute(contactId: String) = "contacts/${java.net.URLEncoder.encode(contactId, "UTF-8")}"
     }
     data object Events : Screen("events")
     data object Messages : Screen("messages")
     data object Settings : Screen("settings")
     data object Analytics : Screen("analytics")
     data object WishPreview : Screen("wish/{contactId}/{eventId}") {
-        fun createRoute(contactId: String, eventId: String) = "wish/$contactId/$eventId"
+        fun createRoute(contactId: String, eventId: String) = "wish/${java.net.URLEncoder.encode(contactId, "UTF-8")}/${java.net.URLEncoder.encode(eventId, "UTF-8")}"
     }
     data object StyleCoach : Screen("style-coach")
     data object BackupRestore : Screen("backup-restore")
     data object MemoryVault : Screen("memory-vault/{contactId}") {
-        fun createRoute(contactId: String) = "memory-vault/$contactId"
+        fun createRoute(contactId: String) = "memory-vault/${java.net.URLEncoder.encode(contactId, "UTF-8")}"
     }
     data object GiftAdvisor : Screen("gift-advisor/{contactId}") {
-        fun createRoute(contactId: String) = "gift-advisor/$contactId"
+        fun createRoute(contactId: String) = "gift-advisor/${java.net.URLEncoder.encode(contactId, "UTF-8")}"
     }
 }
 

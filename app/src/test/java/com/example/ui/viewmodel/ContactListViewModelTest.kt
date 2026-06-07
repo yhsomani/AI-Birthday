@@ -2,6 +2,7 @@ package com.example.ui.viewmodel
 
 import com.example.core.db.entities.ContactEntity
 import com.example.domain.repository.ContactRepository
+import com.example.domain.usecase.SyncContactsUseCase
 import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
@@ -27,6 +28,9 @@ class ContactListViewModelTest {
     @RelaxedMockK
     private lateinit var mockPreferencesRepository: com.example.domain.service.PreferencesRepository
 
+    @RelaxedMockK
+    private lateinit var syncContactsUseCase: SyncContactsUseCase
+
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -48,7 +52,7 @@ class ContactListViewModelTest {
         )
         every { contactRepository.getAll() } returns flowOf(contacts)
 
-        val viewModel = ContactListViewModel(contactRepository, mockPreferencesRepository)
+        val viewModel = ContactListViewModel(contactRepository, mockPreferencesRepository, syncContactsUseCase)
         advanceUntilIdle()
 
         assertEquals(2, viewModel.uiState.value.contacts.size)
@@ -59,7 +63,7 @@ class ContactListViewModelTest {
     fun `refresh flips isRefreshing and settles back to false`() = runTest(testDispatcher) {
         every { contactRepository.getAll() } returns flowOf(listOf(ContactEntity(id = "c_1", name = "Alice")))
 
-        val viewModel = ContactListViewModel(contactRepository, mockPreferencesRepository)
+        val viewModel = ContactListViewModel(contactRepository, mockPreferencesRepository, syncContactsUseCase)
         advanceUntilIdle()
 
         viewModel.refresh()
