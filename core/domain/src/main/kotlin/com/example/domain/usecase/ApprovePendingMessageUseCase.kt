@@ -33,9 +33,8 @@ class ApprovePendingMessageUseCase @Inject constructor(
 
         messageRepository.insertPending(updatedPending)
 
-        if (updatedPending.approvalMode == "FULLY_AUTO") {
-            schedulerService.scheduleExactSend(updatedPending.eventId)
-        }
+        // Always schedule exactly when approved from the UI
+        schedulerService.scheduleExactSend(updatedPending.eventId)
 
         return ApprovalOutcome.Approved(updatedPending.id, updatedPending.approvalMode)
     }

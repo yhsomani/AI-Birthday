@@ -39,10 +39,11 @@ class ApprovePendingMessageUseCaseTest {
         assertEquals("msg_1", approved.id)
         assertEquals("MANUAL", approved.approvalMode)
         coVerify { messageRepository.insertPending(any()) }
+        coVerify { schedulerService.scheduleExactSend("event_1") }
     }
 
     @Test
-    fun `invoke with fully auto approval mode schedules exact send`() = runTest {
+    fun `invoke with any approval mode schedules exact send`() = runTest {
         val pendingMsg = PendingMessageEntity(
             id = "msg_1",
             contactId = "contact_1",

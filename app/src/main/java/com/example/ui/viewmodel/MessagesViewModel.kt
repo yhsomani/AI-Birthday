@@ -82,6 +82,14 @@ class MessagesViewModel @Inject constructor(
                     calendar.set(Calendar.MILLISECOND, 999)
                     val endOfTodayMs = calendar.timeInMillis
     
+                    val thirtyDaysCalendar = Calendar.getInstance()
+                    thirtyDaysCalendar.add(Calendar.DAY_OF_YEAR, 30)
+                    thirtyDaysCalendar.set(Calendar.HOUR_OF_DAY, 23)
+                    thirtyDaysCalendar.set(Calendar.MINUTE, 59)
+                    thirtyDaysCalendar.set(Calendar.SECOND, 59)
+                    thirtyDaysCalendar.set(Calendar.MILLISECOND, 999)
+                    val endOfThirtyDaysMs = thirtyDaysCalendar.timeInMillis
+
                     val todayItems = mutableListOf<PendingMessageItem>()
                     val pendingItems = mutableListOf<PendingMessageItem>()
                     val failedItems = mutableListOf<PendingMessageItem>()
@@ -104,7 +112,7 @@ class MessagesViewModel @Inject constructor(
                             else -> {
                                 if (msg.scheduledForMs <= endOfTodayMs) {
                                     todayItems.add(item)
-                                } else {
+                                } else if (msg.scheduledForMs <= endOfThirtyDaysMs) {
                                     pendingItems.add(item)
                                 }
                             }
