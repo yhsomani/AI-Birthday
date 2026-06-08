@@ -1,4 +1,4 @@
-package com.example.ui.components
+package com.example.core.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,11 +33,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
-import com.example.ui.theme.RelateCard
-import com.example.ui.theme.RelateCardBorder
-import com.example.ui.theme.RelateOnSurfaceVariant
-import com.example.ui.theme.RelatePrimary
-import com.example.ui.theme.RelateSurfaceVariant
+import com.example.core.ui.theme.RelateCard
+import com.example.core.ui.theme.RelateCardBorder
+import com.example.core.ui.theme.RelateOnSurfaceVariant
+import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSurfaceVariant
 
 @Composable
 fun RelateGlassCard(

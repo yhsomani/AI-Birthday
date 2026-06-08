@@ -23,11 +23,11 @@ import androidx.navigation.compose.rememberNavController
 import com.example.ui.navigation.RelateNavGraph
 import com.example.ui.navigation.bottomNavItems
 import com.example.ui.navigation.Screen
-import com.example.ui.theme.RelateAITheme
-import com.example.ui.theme.RelateDarkBackground
-import com.example.ui.theme.RelateOnSurfaceVariant
-import com.example.ui.theme.RelatePrimary
-import com.example.ui.theme.RelateSurfaceVariant
+import com.example.core.ui.theme.RelateAITheme
+import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateOnSurfaceVariant
+import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSurfaceVariant
 import dagger.hilt.android.AndroidEntryPoint
 
 import android.Manifest

@@ -1,4 +1,4 @@
-package com.example.ui.components
+package com.example.core.ui.components
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode

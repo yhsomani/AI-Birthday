@@ -12,7 +12,7 @@ android {
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
     }
-    compileSdk { version = release(36) { minorApiLevel = 1 } }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.aistudio.relateai.qxtjrk"
@@ -98,6 +98,7 @@ android {
 
 dependencies {
     implementation(project(":core:data"))
+    implementation(project(":core:ui"))
 
     // Hilt
     implementation(libs.hilt.android)

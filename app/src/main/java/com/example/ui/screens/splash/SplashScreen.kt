@@ -26,9 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.ui.theme.RelateDarkBackground
-import com.example.ui.theme.RelateOnBackground
-import com.example.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateOnBackground
+import com.example.core.ui.theme.RelatePrimary
 import com.example.ui.viewmodel.SplashDestination
 import com.example.ui.viewmodel.SplashViewModel
 import kotlinx.coroutines.delay

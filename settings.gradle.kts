@@ -21,4 +21,5 @@ rootProject.name = "RelateAI"
 include(":app")
 include(":core:domain")
 include(":core:data")
+include(":core:ui")
 

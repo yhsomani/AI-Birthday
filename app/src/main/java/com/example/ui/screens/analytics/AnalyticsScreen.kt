@@ -33,14 +33,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.ui.components.RelateGlassCard
-import com.example.ui.components.SectionHeader
-import com.example.ui.components.StatCard
-import com.example.ui.theme.RelateDarkBackground
-import com.example.ui.theme.RelateOnBackground
-import com.example.ui.theme.RelateOnSurfaceVariant
-import com.example.ui.theme.RelatePrimary
-import com.example.ui.theme.RelateSurfaceVariant
+import com.example.core.ui.components.RelateGlassCard
+import com.example.core.ui.components.SectionHeader
+import com.example.core.ui.components.StatCard
+import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateOnBackground
+import com.example.core.ui.theme.RelateOnSurfaceVariant
+import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.viewmodel.AnalyticsViewModel
 
 @Composable

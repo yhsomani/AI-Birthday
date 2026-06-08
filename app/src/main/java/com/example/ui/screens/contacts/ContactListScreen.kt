@@ -21,7 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.graphics.Color
-import com.example.ui.components.RelateGlassCard
+import com.example.core.ui.components.RelateGlassCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -43,17 +43,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.core.db.entities.ContactEntity
-import com.example.ui.components.EmptyState
-import com.example.ui.components.FilterChip
-import com.example.ui.components.HealthIndicatorDot
-import com.example.ui.components.ShimmerItem
-import com.example.ui.components.ShimmerItem
+import com.example.core.ui.components.EmptyState
+import com.example.core.ui.components.FilterChip
+import com.example.core.ui.components.HealthIndicatorDot
+import com.example.core.ui.components.ShimmerItem
+import com.example.core.ui.components.ShimmerItem
 import androidx.compose.foundation.layout.PaddingValues
-import com.example.ui.theme.RelateDarkBackground
-import com.example.ui.theme.RelateOnBackground
-import com.example.ui.theme.RelateOnSurfaceVariant
-import com.example.ui.theme.RelatePrimary
-import com.example.ui.theme.RelateSurfaceVariant
+import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateOnBackground
+import com.example.core.ui.theme.RelateOnSurfaceVariant
+import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.viewmodel.ContactListViewModel
 
 private val filterOptions = listOf("All", "Family", "Friends", "Work", "Close Friends")

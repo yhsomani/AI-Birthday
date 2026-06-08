@@ -65,12 +65,12 @@ import coil.compose.AsyncImage
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
-import com.example.ui.components.RelateGlassCard
-import com.example.ui.theme.RelateDarkBackground
-import com.example.ui.theme.RelateOnBackground
-import com.example.ui.theme.RelateOnSurfaceVariant
-import com.example.ui.theme.RelatePrimary
-import com.example.ui.theme.RelateSurfaceVariant
+import com.example.core.ui.components.RelateGlassCard
+import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateOnBackground
+import com.example.core.ui.theme.RelateOnSurfaceVariant
+import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.viewmodel.SettingsViewModel
 
 @Composable

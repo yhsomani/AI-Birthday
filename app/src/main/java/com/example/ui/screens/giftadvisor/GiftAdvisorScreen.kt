@@ -25,11 +25,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.ui.components.EmptyState
-import com.example.ui.components.RelateGlassCard
-import com.example.ui.components.SectionHeader
-import com.example.ui.components.StatCard
-import com.example.ui.theme.*
+import com.example.core.ui.components.EmptyState
+import com.example.core.ui.components.RelateGlassCard
+import com.example.core.ui.components.SectionHeader
+import com.example.core.ui.components.StatCard
+import com.example.core.ui.theme.*
 import com.example.ui.viewmodel.GiftAdvisorViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -1,4 +1,4 @@
-package com.example.ui.components
+package com.example.core.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -32,11 +32,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.ui.theme.RelateOnSurfaceVariant
-import com.example.ui.theme.RelatePrimary
-import com.example.ui.theme.RelateSuccess
-import com.example.ui.theme.RelateSurfaceVariant
-import com.example.ui.theme.RelateWarning
+import com.example.core.ui.theme.RelateOnSurfaceVariant
+import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSuccess
+import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.core.ui.theme.RelateWarning
 
 enum class FeedbackType { SUCCESS, ERROR, WARNING, INFO }
 

@@ -37,13 +37,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.ui.components.RelatePrimaryButton
-import com.example.ui.theme.RelateCard
-import com.example.ui.theme.RelateDarkBackground
-import com.example.ui.theme.RelateOnBackground
-import com.example.ui.theme.RelateOnSurfaceVariant
-import com.example.ui.theme.RelatePrimary
-import com.example.ui.theme.RelateSurfaceVariant
+import com.example.core.ui.components.RelatePrimaryButton
+import com.example.core.ui.theme.RelateCard
+import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateOnBackground
+import com.example.core.ui.theme.RelateOnSurfaceVariant
+import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSurfaceVariant
 
 data class OnboardingStep(
     val icon: ImageVector,
