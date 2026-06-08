@@ -28,9 +28,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
-import com.example.ui.components.EmptyState
-import com.example.ui.components.RelateGlassCard
-import com.example.ui.theme.*
+import com.example.core.ui.components.EmptyState
+import com.example.core.ui.components.RelateGlassCard
+import com.example.core.ui.theme.*
 import com.example.ui.viewmodel.MessagesViewModel
 import com.example.ui.viewmodel.PendingMessageItem
 import com.example.ui.viewmodel.SentMessageItem

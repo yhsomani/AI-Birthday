@@ -27,10 +27,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.ui.components.RelateGlassCard
-import com.example.ui.components.RelatePrimaryButton
-import com.example.ui.components.SectionHeader
-import com.example.ui.theme.*
+import com.example.core.ui.components.RelateGlassCard
+import com.example.core.ui.components.RelatePrimaryButton
+import com.example.core.ui.components.SectionHeader
+import com.example.core.ui.theme.*
 import com.example.ui.viewmodel.BackupRestoreViewModel
 import com.example.ui.viewmodel.PasswordStrength
 
