@@ -39,7 +39,7 @@ class ChatHistoryViewModel @Inject constructor(
             try {
                 val history = messageRepository.getSentByContact(contactId, 100)
 
-                    _uiState.update {
+                _uiState.update {
                     it.copy(isLoading = false, messages = history)
                 }
             } catch (e: Exception) {

@@ -1,8 +1,0 @@
-feat: Architecture refinement and Core stabilization
-
-- Fix Core Data Lint Errors: enable desugaring, fix commit(), apply KTX
-- Fix Security Vulnerabilities: stop using ANDROID_ID, use secure random UUID
-- Improve WhatsApp Accessibility Service: Add timeouts, remove hardcoded strings
-- Refine GeminiClient: fix mutable state
-- Refine GlobalExceptionHandler: add foundation
-- Extract :core:ui module, migrating shared Jetpack Compose Theme and Components
