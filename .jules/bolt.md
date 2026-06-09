@@ -18,3 +18,7 @@
 ## 2024-06-07 - Lint compatibility for java.time on older API levels
 **Learning:** In projects with `minSdk < 26` where `coreLibraryDesugaring` is not explicitly enabled, usage of modern Java Time APIs like `java.time.LocalDate` will result in `NewApi` lint errors and potentially fail the CI build.
 **Action:** Use traditional `java.util.Calendar` or check for desugaring before using `java.time` APIs in worker or scheduled logic.
+
+## 2026-06-09 - Compose List Performance without Keys
+**Learning:** For dynamic lists such as chat histories or generated items, omitting the `key` parameter in `LazyColumn.items` can cause unnecessary UI recompositions. This is specifically relevant when updates occur frequently or lists grow long.
+**Action:** Always provide stable `key` closures in `LazyColumn` and `LazyRow` items blocks using unique Entity IDs.
