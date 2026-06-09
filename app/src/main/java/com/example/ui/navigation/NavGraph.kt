@@ -29,7 +29,6 @@ import com.example.ui.screens.stylecoach.StyleCoachScreen
 import com.example.ui.screens.backup.BackupRestoreScreen
 import com.example.ui.screens.memoryvault.MemoryVaultScreen
 import com.example.ui.screens.giftadvisor.GiftAdvisorScreen
-import com.example.ui.screens.chat.ChatHistoryScreen
 import com.example.ui.screens.setup.AutomationSetupScreen
 
 private const val ANIM_DURATION = 300
@@ -148,8 +147,7 @@ fun RelateNavGraph(
                 }
             )
         ) { backStackEntry ->
-            val rawContactId = backStackEntry.arguments?.getString("contactId") ?: ""
-            val contactId = try { java.net.URLDecoder.decode(rawContactId, "UTF-8") } catch (e: Exception) { rawContactId }
+            val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
             ContactDetailScreen(
                 contactId = contactId,
                 onBack = { navController.popBackStack() },
@@ -179,10 +177,8 @@ fun RelateNavGraph(
                 }
             )
         ) { backStackEntry ->
-            val rawContactId = backStackEntry.arguments?.getString("contactId") ?: ""
-            val contactId = try { java.net.URLDecoder.decode(rawContactId, "UTF-8") } catch (e: Exception) { rawContactId }
-            val rawEventId = backStackEntry.arguments?.getString("eventId") ?: ""
-            val eventId = try { java.net.URLDecoder.decode(rawEventId, "UTF-8") } catch (e: Exception) { rawEventId }
+            val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
+            val eventId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("eventId"))
             WishPreviewScreen(
                 contactId = contactId,
                 eventId = eventId,
@@ -248,9 +244,7 @@ fun RelateNavGraph(
         composable(
             route = Screen.ChatHistory.route,
             arguments = listOf(navArgument("contactId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val rawContactId = backStackEntry.arguments?.getString("contactId") ?: ""
-            val contactId = try { java.net.URLDecoder.decode(rawContactId, "UTF-8") } catch (e: Exception) { rawContactId }
+        ) {
             ChatHistoryScreen(
                 onBack = { navController.popBackStack() }
             )
@@ -259,8 +253,7 @@ fun RelateNavGraph(
             route = Screen.MemoryVault.route,
             arguments = listOf(navArgument("contactId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val rawContactId = backStackEntry.arguments?.getString("contactId") ?: ""
-            val contactId = try { java.net.URLDecoder.decode(rawContactId, "UTF-8") } catch (e: Exception) { rawContactId }
+            val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
             MemoryVaultScreen(
                 contactId = contactId,
                 onBack = { navController.popBackStack() }
@@ -270,8 +263,7 @@ fun RelateNavGraph(
             route = Screen.GiftAdvisor.route,
             arguments = listOf(navArgument("contactId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val rawContactId = backStackEntry.arguments?.getString("contactId") ?: ""
-            val contactId = try { java.net.URLDecoder.decode(rawContactId, "UTF-8") } catch (e: Exception) { rawContactId }
+            val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
             GiftAdvisorScreen(
                 contactId = contactId,
                 onBack = { navController.popBackStack() }

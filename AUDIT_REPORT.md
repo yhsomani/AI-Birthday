@@ -99,3 +99,35 @@
 
 **Commit message**
 * `fix: redact contact sync logging`
+
+### Feature 3: Navigation Route Argument Hardening
+
+**Problem identified**
+* Contact/event route arguments were encoded in each `Screen.createRoute()` method and decoded with repeated ad hoc `URLDecoder` blocks in `NavGraph`.
+* The chat-history destination decoded a `contactId` local that was never used by the screen, increasing the chance of route drift during future edits.
+
+**Root cause**
+* Route argument handling was implemented inline instead of behind a single path-segment codec, and Navigation argument decoding behavior was not covered by unit tests.
+
+**Fix implemented**
+* Added `RouteArgumentCodec` for consistent route path-segment encode/decode behavior.
+* Updated all contact/event route builders to use the codec.
+* Replaced duplicated `NavGraph` decode blocks with the codec and removed the unused chat-history local decode.
+* Added unit tests for spaces, slashes, plus signs, percent values, and invalid percent input.
+
+**Impact**
+* Reduces navigation bugs for Google contact IDs and user/event identifiers containing path-sensitive characters.
+* Makes route argument behavior easier to test and maintain.
+
+**Files modified**
+* `app/src/main/java/com/example/ui/navigation/RouteArgumentCodec.kt`
+* `app/src/main/java/com/example/ui/navigation/Screen.kt`
+* `app/src/main/java/com/example/ui/navigation/NavGraph.kt`
+* `app/src/test/java/com/example/ui/navigation/RouteArgumentCodecTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+
+**Commit message**
+* `fix: harden navigation route arguments`

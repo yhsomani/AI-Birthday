@@ -16,26 +16,27 @@ sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object ContactList : Screen("contacts")
     data object ContactDetail : Screen("contacts/{contactId}") {
-        fun createRoute(contactId: String) = "contacts/${java.net.URLEncoder.encode(contactId, "UTF-8")}"
+        fun createRoute(contactId: String) = "contacts/${RouteArgumentCodec.encode(contactId)}"
     }
     data object Events : Screen("events")
     data object Messages : Screen("messages")
     data object Settings : Screen("settings")
     data object Analytics : Screen("analytics")
     data object WishPreview : Screen("wish/{contactId}/{eventId}") {
-        fun createRoute(contactId: String, eventId: String) = "wish/${java.net.URLEncoder.encode(contactId, "UTF-8")}/${java.net.URLEncoder.encode(eventId, "UTF-8")}"
+        fun createRoute(contactId: String, eventId: String) =
+            "wish/${RouteArgumentCodec.encode(contactId)}/${RouteArgumentCodec.encode(eventId)}"
     }
     data object ChatHistory : Screen("chat-history/{contactId}") {
-        fun createRoute(contactId: String) = "chat-history/${java.net.URLEncoder.encode(contactId, "UTF-8")}"
+        fun createRoute(contactId: String) = "chat-history/${RouteArgumentCodec.encode(contactId)}"
     }
     data object StyleCoach : Screen("style-coach")
     data object BackupRestore : Screen("backup-restore")
     data object AutomationSetup : Screen("automation-setup")
     data object MemoryVault : Screen("memory-vault/{contactId}") {
-        fun createRoute(contactId: String) = "memory-vault/${java.net.URLEncoder.encode(contactId, "UTF-8")}"
+        fun createRoute(contactId: String) = "memory-vault/${RouteArgumentCodec.encode(contactId)}"
     }
     data object GiftAdvisor : Screen("gift-advisor/{contactId}") {
-        fun createRoute(contactId: String) = "gift-advisor/${java.net.URLEncoder.encode(contactId, "UTF-8")}"
+        fun createRoute(contactId: String) = "gift-advisor/${RouteArgumentCodec.encode(contactId)}"
     }
 }
 
