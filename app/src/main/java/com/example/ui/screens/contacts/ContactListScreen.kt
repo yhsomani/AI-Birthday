@@ -214,7 +214,7 @@ fun ContactListScreen(
                     }
                 } else {
                     LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(filteredContacts) { contact ->
+                        items(filteredContacts, key = { it.id }) { contact ->
                             ContactRow(
                                 contact = contact,
                                 onClick = { onContactClick(contact.id) },
