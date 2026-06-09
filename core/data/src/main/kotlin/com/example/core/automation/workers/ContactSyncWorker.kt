@@ -50,8 +50,10 @@ class ContactSyncWorker @AssistedInject constructor(
             StructuredLogger.i(TAG, "Upserted ${mappedContacts.size} contacts")
 
             // 3. Then, classify contacts that are still UNKNOWN using Gemini
-            if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
-                StructuredLogger.i(TAG, "User not authenticated; skipping AI classification")
+            val canClassify = prefs.getGeminiApiKey().isNotBlank() ||
+                com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null
+            if (!canClassify) {
+                StructuredLogger.i(TAG, "No Gemini API key or authenticated user; skipping AI classification")
             } else {
                 val unknownContacts = mappedContacts.filter { it.relationshipType == "UNKNOWN" }
                 StructuredLogger.i(TAG, "Classifying ${unknownContacts.size} unknown contacts")

@@ -10,6 +10,7 @@ import com.example.domain.repository.MessageRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
 import com.example.domain.usecase.RevokeApprovalUseCase
+import com.example.domain.service.SchedulerService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +45,7 @@ data class MessagesUiState(
     val rejectingMessageId: String? = null,
     val revokingMessageId: String? = null,
     val retryingMessageId: String? = null,
+    val selectedMessageIds: Set<String> = emptySet(),
     val error: String? = null,
 )
 
@@ -55,6 +57,7 @@ class MessagesViewModel @Inject constructor(
     private val approvePendingMessageUseCase: ApprovePendingMessageUseCase,
     private val rejectPendingMessageUseCase: RejectPendingMessageUseCase,
     private val revokeApprovalUseCase: RevokeApprovalUseCase,
+    private val schedulerService: SchedulerService,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MessagesUiState())
@@ -192,13 +195,80 @@ class MessagesViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(retryingMessageId = messageId)
             try {
-                messageRepository.updatePendingStatus(messageId, "PENDING")
+                val pending = messageRepository.getPendingById(messageId)
+                if (pending != null) {
+                    messageRepository.insertPending(
+                        pending.copy(
+                            status = "APPROVED",
+                            scheduledForMs = System.currentTimeMillis(),
+                        )
+                    )
+                    schedulerService.scheduleExactSend(messageId)
+                }
                 _uiState.value = _uiState.value.copy(retryingMessageId = null)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     retryingMessageId = null,
                     error = "Failed to retry: ${e.localizedMessage}"
                 )
+            }
+        }
+    }
+
+    fun toggleSelection(messageId: String) {
+        val current = _uiState.value.selectedMessageIds
+        _uiState.value = _uiState.value.copy(
+            selectedMessageIds = if (messageId in current) current - messageId else current + messageId
+        )
+    }
+
+    fun clearSelection() {
+        _uiState.value = _uiState.value.copy(selectedMessageIds = emptySet())
+    }
+
+    fun bulkApproveSelected() {
+        val ids = _uiState.value.selectedMessageIds.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                ids.forEach { approvePendingMessageUseCase(it) }
+                _uiState.value = _uiState.value.copy(selectedMessageIds = emptySet())
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = "Failed to approve selected messages: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun bulkRejectSelected() {
+        val ids = _uiState.value.selectedMessageIds.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                ids.forEach { rejectPendingMessageUseCase(it) }
+                _uiState.value = _uiState.value.copy(selectedMessageIds = emptySet())
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = "Failed to reject selected messages: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun bulkRetrySelected() {
+        val ids = _uiState.value.selectedMessageIds.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                ids.forEach { id ->
+                    val pending = messageRepository.getPendingById(id)
+                    if (pending != null) {
+                        messageRepository.insertPending(
+                            pending.copy(status = "APPROVED", scheduledForMs = System.currentTimeMillis())
+                        )
+                        schedulerService.scheduleExactSend(id)
+                    }
+                }
+                _uiState.value = _uiState.value.copy(selectedMessageIds = emptySet())
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = "Failed to retry selected messages: ${e.localizedMessage}")
             }
         }
     }

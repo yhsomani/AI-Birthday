@@ -573,9 +573,9 @@ All workers: `@HiltWorker`, `@AssistedInject`, pre-flight API key guard, try/cat
 ## 15. Frontend Architecture
 
 ### 15.1 Current State
-**UI layer is not implemented.** `MainActivity` (`@AndroidEntryPoint`) immediately calls `finish()`, so the app exits on launch. No Compose screens, ViewModels, navigation, or user-facing components exist.
+**UI layer is implemented.** `MainActivity` hosts the Jetpack Compose app shell with navigation, onboarding/auth surfaces, contact/event/message screens, automation setup, analytics, settings, and Hilt-backed ViewModels.
 
-### 15.2 Planned Architecture (for UI implementation)
+### 15.2 Architecture
 - **Single-Activity**: `MainActivity` as entry point → Compose `NavHost`
 - **5-tab bottom nav**: HOME, CONTACTS, EVENTS, MESSAGES, MORE
 - **ViewModels**: `@HiltViewModel`, `StateFlow<UiState>`, `collectAsStateWithLifecycle()`
@@ -739,8 +739,8 @@ erDiagram
 
 ### 21.2 Current State
 - Auth logic is fully implemented in `AuthManager.kt` (service layer)
-- **UI is not implemented**: No login screen, sign-in button, or auth flow UI exists
-- Planned flow: App Launch → Google Sign-In → Biometric (if enabled) → Dashboard
+- Auth UI is implemented with Google Sign-In entry points and onboarding/settings integration
+- Flow: App Launch → Google Sign-In → Biometric (if enabled) → Dashboard
 
 ### 21.3 Token Lifecycle
 - `AuthManager.getCurrentUser()` checks Firebase auth state
@@ -958,11 +958,11 @@ Material Icons Extended. Key icons: Cake (birthday), Event (anniversary), Star (
 
 | Module | Target | Current |
 |---|---|---|
-| `:core:domain` (UseCases, Entities) | 80% | ~0% (no use case tests) |
+| `:core:domain` (UseCases, Entities) | 80% | Partial use-case coverage |
 | `:core:data` (DAOs) | 90% | ~30% (DaoTest only) |
 | `:core:data` (Gemini, Contacts) | 80% | ~70% (PromptBuilder, ResponseParser, ContactMerger tested) |
-| `:core:data` (Workers) | 70% | 0% (no worker tests) |
-| `:app` (UI) | 30% | 0% (no UI exists) |
+| `:core:data` (Workers) | 70% | Partial worker coverage |
+| `:app` (UI) | 30% | Partial ViewModel/navigation coverage |
 | **Overall** | **60-80%** | **~15%** |
 
 ### 27.3 Testing Tools
@@ -972,7 +972,7 @@ JUnit 4, Robolectric 4.16.1, Room `inMemoryDatabaseBuilder`. Roborazzi (declared
 
 ## 28. Analytics, Logging & Monitoring
 
-### 28.1 Local Analytics (AnalyticsScreen — planned, not yet implemented)
+### 28.1 Local Analytics (AnalyticsScreen)
 Total wishes, monthly wishes, pending approvals, contact counts by type, top/bottom 5 by health, engagement trend chart. All from Room DAOs — zero data leaves device.
 
 ### 28.2 Logging
@@ -1035,7 +1035,7 @@ Baseline Profile AOT, DB indices (MIGRATION_6_7), StateFlow `WhileSubscribed(500
 |---|---|---|---|
 | TD-02 | Direct DAO access in some workers | 1 day | Medium |
 | TD-05 | No integration tests | 1 week | High |
-| TD-06 | MainActivity is a 14-line stub (needs full UI) | Large | High |
+| TD-06 | Compose UI exists; continue expanding UI test coverage | Medium | Medium |
 | TD-08 | Magic strings for approval modes | 0.25 day | Low |
 
 ### 30.3 Risks
@@ -1063,7 +1063,7 @@ Baseline Profile AOT, DB indices (MIGRATION_6_7), StateFlow `WhileSubscribed(500
 ## 31. Product Roadmap & Future Enhancements
 
 ### 31.1 Q3 2026 (Current)
-- Build Compose UI layer (splash, login, dashboard, contacts, events, messages screens)
+- Harden the implemented Compose UI layer and expand UI regression coverage
 - Onboarding screen flow
 - Hindi language support
 - Schema migration tests
@@ -1099,7 +1099,7 @@ Baseline Profile AOT, DB indices (MIGRATION_6_7), StateFlow `WhileSubscribed(500
 | ADR-010 | EncryptedSharedPreferences | AES-256 via Keystore; MasterKey latency |
 | ADR-011 | Optional biometric lock | Security layer; extra cold-start friction |
 | ADR-012 | R8/ProGuard in release | 40% APK reduction; requires keep rules |
-| ADR-013 | Single-Activity (Compose Nav) — planned, not yet implemented | Simpler lifecycle; deep linking harder |
+| ADR-013 | Single-Activity Compose Nav | Simpler lifecycle; deep linking harder |
 | ADR-014 | StateFlow + collectAsStateWithLifecycle | Lifecycle-aware; boilerplate for one-off events |
 | ADR-015 | No feature flags v1 | Simpler; no remote control |
 | ADR-016 | Adaptive rate limiter | Maximizes throughput; slightly more complex |
@@ -1118,7 +1118,7 @@ Baseline Profile AOT, DB indices (MIGRATION_6_7), StateFlow `WhileSubscribed(500
 
 ### 33.1 Critical Do's and Don'ts
 
-> **Note**: Several items below reference Compose/ViewModel patterns that are planned but not yet implemented. They serve as forward-looking standards for the upcoming UI layer.
+> **Note**: Several items below reference Compose/ViewModel patterns used by the implemented UI layer. Treat them as standards for future UI changes and regression coverage.
 
 #### ✅ DO
 - Use Hilt for DI (`@HiltViewModel`, `@Inject` constructors)
@@ -1309,7 +1309,7 @@ For critical production issues:
 
 ### 34.4 Key Files Checklist (~80+ source files)
 - Root: `settings.gradle.kts`, `build.gradle.kts`, `gradle.properties`, `libs.versions.toml`
-- `:app`: `build.gradle.kts`, `proguard-rules.pro`, `AndroidManifest.xml`, 5 XML configs, `strings.xml`, `themes.xml`, `baseline-prof.txt`, `MainActivity.kt` (stub), `RelateAIApp.kt`, `SecurityChecks.kt`, `BirthdayWidgetProvider.kt`
+- `:app`: `build.gradle.kts`, `proguard-rules.pro`, `AndroidManifest.xml`, XML configs, `strings.xml`, `themes.xml`, `baseline-prof.txt`, Compose `MainActivity.kt`, `RelateAIApp.kt`, `SecurityChecks.kt`, `BirthdayWidgetProvider.kt`
 - `:core:domain`: 7 entities, 6 repository interfaces, 6 service interfaces, `AutomationMode.kt`, `RelationshipTypeCount.kt`, 10 use cases
 - `:core:data`: `AppDatabase.kt` (v9, 7 migrations), `DatabaseKeyDerivation.kt`, 7 DAOs, 2 DI modules, 6 workers, 4 senders, 2 auth files, `GeminiClient.kt`, `PromptBuilder.kt`, `ResponseParser.kt`, `RateLimiter.kt`, `AiServiceImpl.kt`, 3 contacts files, 2 backup files, `SecurePrefs.kt`, 3 scheduler files, 3 notification files, 6 repository implementations
 
@@ -1440,13 +1440,13 @@ All core engineering tasks are completed. Future minor items are:
 | §27.1 | Code audit | Test counts corrected: ~38 tests across 7 files. MainViewModelTest and GreetingScreenshotTest removed (don't exist). |
 | §33.3 | Code audit | Key files reference corrected with actual file paths (no `feature/` or `core/ui/` modules) |
 | §11.2 | Code audit | F-011 endpoint description corrected: Firebase Vertex AI SDK, not REST with x-goog-api-key |
-| §12.1–12.2 | Code audit | Added notes confirming all user-flow screens are aspirational (no UI exists) |
+| §12.1–12.2 | Code audit | User-flow screens now exist in the active Compose app and should be kept aligned with implemented routes |
 | §13.4 | Code audit | Added implementation status note for gift budget logic (data layer only) |
-| §15, §16, §17 | Code audit | §15: clarified stub state. §16: corrected Gemini entry to Firebase Vertex AI. §17: marked State Management as planned |
+| §15, §16, §17 | Code audit | §15: corrected Compose UI implementation state. §16: corrected Gemini entry to Firebase Vertex AI. §17: marked State Management as planned |
 | §22.4 | Code audit | Certificate pinning domains: `generativelanguage.googleapis.com`, `people.googleapis.com` (not `googleapis.com`, `gstatic.com`) |
 | §28.1, §29.1–29.2 | Code audit | AnalyticsScreen and performance metrics marked N/A/Planned; removed Coil reference |
-| §30 | Code audit | ARC-001 → ✅ Resolved (use cases already in `:core:domain`). TD-06 corrected: 14-line stub, needs full UI. |
-| §31 | Code audit | Roadmap updated: build Compose UI layer (not fix dead handlers) |
+| §30 | Code audit | ARC-001 → ✅ Resolved (use cases already in `:core:domain`). TD-06 corrected to UI test coverage debt. |
+| §31 | Code audit | Roadmap updated: harden implemented Compose UI layer and expand coverage |
 | §32 | Code audit | ADR-004 updated for 3-module reality. ADR-013 marked planned. ADR-024 marked resolved. |
 | §33.1–33.2, §33.7 | Code audit | Added Compose/feature-module notes; fixed onboarding refs to non-existent files |
 | §34.4 | Code audit | File counts rewritten to reflect actual ~80+ source files organized by module |

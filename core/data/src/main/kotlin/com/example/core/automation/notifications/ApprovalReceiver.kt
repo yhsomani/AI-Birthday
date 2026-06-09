@@ -1,23 +1,19 @@
 package com.example.core.automation.notifications
 
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.WorkManager
-import com.example.core.automation.scheduler.MessageDispatchReceiver
+import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.automation.workers.MessageDispatchWorkRequests
 import com.example.core.db.dao.PendingMessageDao
-import com.example.domain.repository.MessageRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class ApprovalReceiver : BroadcastReceiver() {
@@ -26,7 +22,6 @@ class ApprovalReceiver : BroadcastReceiver() {
     @InstallIn(SingletonComponent::class)
     interface ApprovalReceiverEntryPoint {
         fun pendingMessageDao(): PendingMessageDao
-        fun messageRepository(): MessageRepository
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -42,64 +37,67 @@ class ApprovalReceiver : BroadcastReceiver() {
             ApprovalReceiverEntryPoint::class.java
         )
         val pendingMessageDao = entryPoint.pendingMessageDao()
-        val messageRepository = entryPoint.messageRepository()
 
         CoroutineScope(Dispatchers.IO).launch {
             val pending = if (messageId.isNotEmpty()) {
-                messageRepository.getAllPending().first().find { it.id == messageId }
-            } else null
+                pendingMessageDao.getById(messageId)
+            } else if (eventId.isNotEmpty()) {
+                pendingMessageDao.getByEventId(eventId)
+            } else {
+                null
+            }
             val resolvedEventId = pending?.eventId ?: eventId
 
             when (action) {
-                "ACTION_APPROVE", "APPROVE" -> {
-                    if (messageId.isNotEmpty()) {
-                        pendingMessageDao.updateStatus(messageId, "DISPATCHING")
-                    } else if (resolvedEventId.isNotEmpty()) {
-                        pendingMessageDao.updateStatusByEventId(resolvedEventId, "DISPATCHING")
-                    }
-                    
-                    val workManager = WorkManager.getInstance(context)
-                    workManager.enqueue(MessageDispatchWorkRequests.create(resolvedEventId))
-                }
+                "ACTION_APPROVE", "APPROVE", "ACTION_APPROVE_REVIVAL" ->
+                    approveAndScheduleOrDispatch(context, pendingMessageDao, pending?.id, resolvedEventId)
                 "ACTION_REJECT", "REJECT", "SKIP" -> {
-                    if (messageId.isNotEmpty()) {
-                        pendingMessageDao.updateStatus(messageId, "REJECTED")
+                    if (pending != null) {
+                        pendingMessageDao.updateStatus(pending.id, "REJECTED")
+                        DailyScheduler.cancelExactSend(context, pending.id)
                     } else if (resolvedEventId.isNotEmpty()) {
                         pendingMessageDao.updateStatusByEventId(resolvedEventId, "REJECTED")
-                    }
-                    
-                    if (resolvedEventId.isNotEmpty()) {
-                        val alarmManager = context.getSystemService(AlarmManager::class.java)
-                        val dispatchIntent = Intent(context, MessageDispatchReceiver::class.java).apply {
-                            putExtra("event_id", resolvedEventId)
-                        }
-                        val pendingIntent = PendingIntent.getBroadcast(
-                            context,
-                            resolvedEventId.hashCode(),
-                            dispatchIntent,
-                            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-                        )
-                        if (pendingIntent != null) {
-                            alarmManager.cancel(pendingIntent)
-                            pendingIntent.cancel()
-                        }
-                    }
-                }
-                "ACTION_APPROVE_REVIVAL" -> {
-                    if (messageId.isNotEmpty()) {
-                        pendingMessageDao.updateStatus(messageId, "APPROVED")
-                        val workManager = WorkManager.getInstance(context)
-                        workManager.enqueue(MessageDispatchWorkRequests.create(resolvedEventId))
+                        DailyScheduler.cancelLegacyExactSend(context, resolvedEventId)
                     }
                 }
                 "ACTION_RETRY" -> {
-                    if (messageId.isNotEmpty()) {
-                        pendingMessageDao.updateStatus(messageId, "PENDING")
-                        val workManager = WorkManager.getInstance(context)
-                        workManager.enqueue(MessageDispatchWorkRequests.create(resolvedEventId))
-                    }
+                    retryNow(context, pendingMessageDao, pending?.id, resolvedEventId)
                 }
             }
         }
+    }
+
+    private suspend fun approveAndScheduleOrDispatch(
+        context: Context,
+        pendingMessageDao: PendingMessageDao,
+        pendingMessageId: String?,
+        eventId: String,
+    ) {
+        val pending = pendingMessageId?.let { pendingMessageDao.getById(it) }
+            ?: eventId.takeIf { it.isNotBlank() }?.let { pendingMessageDao.getByEventId(it) }
+            ?: return
+
+        pendingMessageDao.updateStatus(pending.id, "APPROVED")
+        if (pending.scheduledForMs <= System.currentTimeMillis()) {
+            WorkManager.getInstance(context)
+                .enqueue(MessageDispatchWorkRequests.create(pending.id, pending.eventId))
+        } else {
+            DailyScheduler.scheduleExactSend(context, pending.id)
+        }
+    }
+
+    private suspend fun retryNow(
+        context: Context,
+        pendingMessageDao: PendingMessageDao,
+        pendingMessageId: String?,
+        eventId: String,
+    ) {
+        val pending = pendingMessageId?.let { pendingMessageDao.getById(it) }
+            ?: eventId.takeIf { it.isNotBlank() }?.let { pendingMessageDao.getByEventId(it) }
+            ?: return
+
+        pendingMessageDao.updateStatus(pending.id, "APPROVED")
+        WorkManager.getInstance(context)
+            .enqueue(MessageDispatchWorkRequests.create(pending.id, pending.eventId))
     }
 }

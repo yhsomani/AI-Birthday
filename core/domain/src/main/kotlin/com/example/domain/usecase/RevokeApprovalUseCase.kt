@@ -4,7 +4,6 @@ import com.example.domain.repository.MessageRepository
 import com.example.domain.service.SchedulerService
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.first
 
 /**
  * Revokes approval for a pending message. Sets its status back to PENDING and
@@ -16,8 +15,7 @@ class RevokeApprovalUseCase @Inject constructor(
     private val schedulerService: SchedulerService
 ) {
     suspend operator fun invoke(pendingMessageId: String): RevokeOutcome {
-        val allPending = messageRepository.getAllPending().first()
-        val pending = allPending.find { it.id == pendingMessageId }
+        val pending = messageRepository.getPendingById(pendingMessageId)
             ?: return RevokeOutcome.PendingNotFound
 
         if (pending.status != "APPROVED") {
@@ -27,7 +25,7 @@ class RevokeApprovalUseCase @Inject constructor(
         val updatedPending = pending.copy(status = "PENDING")
         messageRepository.insertPending(updatedPending)
 
-        schedulerService.cancelExactSend(updatedPending.eventId)
+        schedulerService.cancelExactSend(updatedPending.id)
 
         return RevokeOutcome.Revoked(updatedPending.id)
     }

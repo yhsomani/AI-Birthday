@@ -61,7 +61,7 @@ class GenerateMessageUseCaseTest {
     fun `invoke with existing pending message returns AlreadyExists`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEvent("e1") } returns true
+        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns true
 
         val result = useCase("e1")
 
@@ -72,7 +72,7 @@ class GenerateMessageUseCaseTest {
     fun `invoke with missing contact returns ContactNotFound`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEvent("e1") } returns false
+        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
         coEvery { contactRepository.getById("c1") } returns null
 
         val result = useCase("e1")
@@ -85,7 +85,7 @@ class GenerateMessageUseCaseTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         val contact = ContactEntity(id = "c1", name = "John")
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEvent("e1") } returns false
+        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
         coEvery { contactRepository.getById("c1") } returns contact
         every { preferencesRepository.isAiWishGenerationEnabled() } returns false
 
@@ -103,7 +103,7 @@ class GenerateMessageUseCaseTest {
         val variants = MessageVariantsResult("sh", "std", "lg", "fr", "fn", "em", "standard")
 
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEvent("e1") } returns false
+        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
         coEvery { contactRepository.getById("c1") } returns contact
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
@@ -129,7 +129,7 @@ class GenerateMessageUseCaseTest {
         val variants = MessageVariantsResult("sh", "std", "lg", "fr", "fn", "em", "standard")
 
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEvent("e1") } returns false
+        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
         coEvery { contactRepository.getById("c1") } returns contact
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
@@ -142,7 +142,30 @@ class GenerateMessageUseCaseTest {
         assertEquals("FULLY_AUTO", generated.approvalMode)
 
         coVerify { messageRepository.insertPending(any()) }
-        coVerify { schedulerService.scheduleExactSend("e1") }
+        coVerify { schedulerService.scheduleExactSend(any()) }
         coVerify(exactly = 0) { notificationService.showApprovalNotification(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `invoke checks duplicate messages by scheduled occurrence year`() = runTest {
+        val event = EventEntity(
+            id = "e1",
+            contactId = "c1",
+            type = "BIRTHDAY",
+            label = "Test",
+            dayOfMonth = 1,
+            month = 1,
+            nextOccurrenceMs = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.YEAR, 2027)
+                set(java.util.Calendar.MONTH, java.util.Calendar.JANUARY)
+                set(java.util.Calendar.DAY_OF_MONTH, 1)
+            }.timeInMillis
+        )
+        coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
+        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", 2027) } returns true
+
+        val result = useCase("e1")
+
+        assertEquals(GenerateMessageUseCase.GenerationOutcome.AlreadyExists, result)
     }
 }

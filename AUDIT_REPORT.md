@@ -8,6 +8,7 @@
 * Added real manual event creation through `SaveManualEventUseCase`, including local manual contacts, validation, next occurrence calculation, and Feb 29 handling.
 * Persisted birthday reminder and AI wish-generation settings; disabled AI generation now returns a user-visible `AiDisabled` outcome instead of calling Gemini.
 * Made chat history reachable from Contact Detail and added visible feedback for message/event action failures.
+* Completed the AI and automation reliability pass: dispatch now keys exact alarms and WorkManager requests by pending-message id, approval/retry flows schedule the correct message, yearly recurring duplicates use `scheduledYear`, wish preview resolves pending ids with legacy event-id fallback, API-key-only Gemini generation works in background workers, AI-disabled settings are respected, six AI variants are parsed defensively, revival suggestions reject AI error JSON, exact-alarm fallback is safer, Analytics handles zero states, Automation Setup has a readiness dashboard, Messages supports bulk approve/reject/retry, and Wish Preview supports AI regeneration.
 
 ## 1. Summary of Completed Changes
 

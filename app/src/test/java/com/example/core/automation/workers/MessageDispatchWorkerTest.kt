@@ -45,7 +45,7 @@ class MessageDispatchWorkerTest {
     }
 
     @Test
-    fun `doWork double-send guard fails worker on dispatching status`() = runTest {
+    fun `doWork double-send guard exits successfully on dispatching status`() = runTest {
         val pendingMsg = PendingMessageEntity(
             id = "msg_1", contactId = "c1", eventId = "e1",
             shortVariant = "", standardVariant = "", longVariant = "",
@@ -56,11 +56,11 @@ class MessageDispatchWorkerTest {
         )
         val contact = ContactEntity(id = "c1", name = "Alice")
 
-        coEvery { pendingMessageDao.getByEventId("e1") } returns pendingMsg
+        coEvery { pendingMessageDao.getById("msg_1") } returns pendingMsg
         coEvery { contactDao.getById("c1") } returns contact
 
         val worker = TestListenableWorkerBuilder<MessageDispatchWorker>(context)
-            .setInputData(workDataOf("event_id" to "e1"))
+            .setInputData(workDataOf(MessageDispatchWorkRequests.KEY_PENDING_MESSAGE_ID to "msg_1"))
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(
                     appContext: Context,
@@ -74,7 +74,7 @@ class MessageDispatchWorkerTest {
 
         val result = worker.doWork()
 
-        assertEquals(ListenableWorker.Result.failure(), result)
+        assertEquals(ListenableWorker.Result.success(), result)
     }
 
     @Test
@@ -89,11 +89,11 @@ class MessageDispatchWorkerTest {
         )
         val contact = ContactEntity(id = "c1", name = "Alice")
 
-        coEvery { pendingMessageDao.getByEventId("e1") } returns pendingMsg
+        coEvery { pendingMessageDao.getById("msg_1") } returns pendingMsg
         coEvery { contactDao.getById("c1") } returns contact
 
         val worker = TestListenableWorkerBuilder<MessageDispatchWorker>(context)
-            .setInputData(workDataOf("event_id" to "e1"))
+            .setInputData(workDataOf(MessageDispatchWorkRequests.KEY_PENDING_MESSAGE_ID to "msg_1"))
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(
                     appContext: Context,

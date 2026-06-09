@@ -27,6 +27,11 @@ class RevivalWorker @AssistedInject constructor(
     private val prefs: SecurePrefs
 ) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
+        if (!prefs.isAiWishGenerationEnabled()) {
+            StructuredLogger.i(TAG, "AI generation disabled; skipping revival worker")
+            return Result.success()
+        }
+
         val apiKey = prefs.getGeminiApiKey()
         val firebaseUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
         if (apiKey.isNullOrBlank() && firebaseUser == null) {
@@ -40,11 +45,6 @@ class RevivalWorker @AssistedInject constructor(
         }
 
         return try {
-            if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
-                StructuredLogger.i(TAG, "User not authenticated; skipping revival scan")
-                return Result.success()
-            }
-
             val prompter = PromptBuilder()
             val now = System.currentTimeMillis()
             val thirtyDaysAgoMs = now - 30L * 24 * 60 * 60 * 1000L
@@ -62,7 +62,7 @@ class RevivalWorker @AssistedInject constructor(
 
                 RateLimiter.waitIfNeeded()
                 val prompt = prompter.buildReconnectPrompt(contact, days)
-                val suggestionResponse = gemini.generate(prompt)
+                val suggestionResponse = sanitizeSuggestion(gemini.generate(prompt), contact.name)
 
                 val scheduledMs = now + 1000 * 60 * 60
 
@@ -106,5 +106,24 @@ class RevivalWorker @AssistedInject constructor(
 
     companion object {
         const val TAG = "RevivalWorker"
+    }
+
+    private fun sanitizeSuggestion(raw: String, contactName: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) {
+            return fallbackSuggestion(contactName)
+        }
+        if (trimmed.startsWith("{") && trimmed.contains("\"error\"", ignoreCase = true)) {
+            return fallbackSuggestion(contactName)
+        }
+        return trimmed
+            .removeSurrounding("\"")
+            .take(500)
+            .ifBlank { fallbackSuggestion(contactName) }
+    }
+
+    private fun fallbackSuggestion(contactName: String): String {
+        val firstName = contactName.trim().substringBefore(' ').ifBlank { "there" }
+        return "Hey $firstName, it has been a while. Hope you are doing well. Want to catch up soon?"
     }
 }

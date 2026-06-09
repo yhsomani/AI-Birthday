@@ -22,6 +22,7 @@ class DispatchMessageUseCaseTest {
 
     @Test
     fun `invoke with missing pending message returns PendingNotFound`() = runTest {
+        coEvery { messageRepository.getPendingById("e1") } returns null
         coEvery { messageRepository.getPendingByEventId("e1") } returns null
 
         val result = useCase("e1")
@@ -41,6 +42,7 @@ class DispatchMessageUseCaseTest {
             channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL",
             status = "PENDING"
         )
+        coEvery { messageRepository.getPendingById("e1") } returns null
         coEvery { messageRepository.getPendingByEventId("e1") } returns pendingMsg
 
         val result = useCase("e1")
@@ -61,6 +63,7 @@ class DispatchMessageUseCaseTest {
             channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL",
             status = "APPROVED"
         )
+        coEvery { messageRepository.getPendingById("e1") } returns null
         coEvery { messageRepository.getPendingByEventId("e1") } returns pendingMsg
         coEvery { contactRepository.getById("c1") } returns null
 
@@ -83,6 +86,7 @@ class DispatchMessageUseCaseTest {
         )
         val contact = ContactEntity(id = "c1", name = "John Doe")
 
+        coEvery { messageRepository.getPendingById("e1") } returns null
         coEvery { messageRepository.getPendingByEventId("e1") } returns pendingMsg
         coEvery { contactRepository.getById("c1") } returns contact
 

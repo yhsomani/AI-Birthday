@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -21,14 +22,20 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +43,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
 import com.example.core.ui.components.RelateStatusBanner
@@ -44,14 +52,19 @@ import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSuccess
 import com.example.core.ui.theme.RelateWarning
+import com.example.ui.viewmodel.AutomationSetupViewModel
+import com.example.ui.viewmodel.ReadinessCheck
+import com.example.ui.viewmodel.ReadinessStatus
 
 @Composable
 fun AutomationSetupScreen(
     onBack: () -> Unit,
+    viewModel: AutomationSetupViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val isAccessibilityEnabled = remember { context.isWhatsAppAutomationServiceEnabled() }
     val isIgnoringBattery = remember { context.isIgnoringBatteryOptimizations() }
+    val state by viewModel.uiState.collectAsState()
 
     RelateScreen(
         title = "Automation Setup",
@@ -78,6 +91,18 @@ fun AutomationSetupScreen(
                 contentColor = if (isAccessibilityEnabled) RelateSuccess else RelateWarning,
             )
 
+            ReadinessDashboard(
+                checks = state.checks,
+                isRefreshing = state.isRefreshing,
+                isSyncingContacts = state.isSyncingContacts,
+                isTestingAi = state.isTestingAi,
+                operationMessage = state.operationMessage,
+                onRefresh = viewModel::refreshChecks,
+                onSyncContacts = viewModel::syncContacts,
+                onDryRun = viewModel::runSafeGenerationCheck,
+                onTestAi = viewModel::testAiGeneration,
+            )
+
             SetupCard(
                 icon = Icons.AutoMirrored.Filled.Chat,
                 title = "Enable WhatsApp automation",
@@ -92,9 +117,9 @@ fun AutomationSetupScreen(
                 body = if (isIgnoringBattery) {
                     "Battery optimization is already ignored for RelateAI."
                 } else {
-                    "Allow RelateAI to keep scheduled workers reliable around birthdays and reminders."
+                    "Review OS battery settings if scheduled workers are delayed on this device."
                 },
-                actionText = "Battery Settings",
+                actionText = "Open Battery Settings",
                 onClick = { context.openBatteryOptimizationSettings() },
             )
 
@@ -116,6 +141,138 @@ fun AutomationSetupScreen(
             )
 
             Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun ReadinessDashboard(
+    checks: List<ReadinessCheck>,
+    isRefreshing: Boolean,
+    isSyncingContacts: Boolean,
+    isTestingAi: Boolean,
+    operationMessage: String?,
+    onRefresh: () -> Unit,
+    onSyncContacts: () -> Unit,
+    onDryRun: () -> Unit,
+    onTestAi: () -> Unit,
+) {
+    RelateGlassCard {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Automation Readiness",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                if (isRefreshing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = RelatePrimary,
+                    )
+                }
+            }
+
+            checks.forEach { check ->
+                ReadinessRow(check)
+            }
+
+            operationMessage?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RelateOnSurfaceVariant,
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onRefresh,
+                    modifier = Modifier.weight(1f),
+                    enabled = !isRefreshing,
+                ) {
+                    Text("Refresh")
+                }
+                OutlinedButton(
+                    onClick = onDryRun,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Dry Run")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onSyncContacts,
+                    modifier = Modifier.weight(1f),
+                    enabled = !isSyncingContacts,
+                    colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+                ) {
+                    if (isSyncingContacts) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = RelateDarkBackground,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text("Sync Contacts", color = RelateDarkBackground)
+                    }
+                }
+                Button(
+                    onClick = onTestAi,
+                    modifier = Modifier.weight(1f),
+                    enabled = !isTestingAi,
+                    colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+                ) {
+                    if (isTestingAi) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = RelateDarkBackground,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text("Test AI", color = RelateDarkBackground)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReadinessRow(check: ReadinessCheck) {
+    val (icon, color) = when (check.status) {
+        ReadinessStatus.OK -> Icons.Filled.CheckCircle to RelateSuccess
+        ReadinessStatus.WARNING -> Icons.Filled.Warning to RelateWarning
+        ReadinessStatus.ACTION_REQUIRED -> Icons.Filled.Error to MaterialTheme.colorScheme.error
+    }
+    Row(
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(20.dp),
+        )
+        Column {
+            Text(
+                text = check.title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = check.detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = RelateOnSurfaceVariant,
+            )
         }
     }
 }
@@ -191,10 +348,9 @@ private fun Context.isIgnoringBatteryOptimizations(): Boolean {
 }
 
 private fun Context.openBatteryOptimizationSettings() {
-    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+    safeStartActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS), fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
         data = Uri.parse("package:$packageName")
-    }
-    safeStartActivity(intent, fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+    })
 }
 
 private fun Context.openAppSettings() {

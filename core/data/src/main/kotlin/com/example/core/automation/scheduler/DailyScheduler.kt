@@ -1,10 +1,12 @@
 package com.example.core.automation.scheduler
 
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import com.example.core.automation.workers.MessageDispatchWorkRequests
 import com.example.core.db.AppDatabase
 import kotlinx.coroutines.CoroutineScope
@@ -12,54 +14,110 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 object DailyScheduler {
-    fun scheduleExactSend(context: Context, eventId: String) {
+    @SuppressLint("ScheduleExactAlarm")
+    fun scheduleExactSend(context: Context, pendingMessageId: String) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val intent = Intent(context, MessageDispatchReceiver::class.java).apply {
-            putExtra("event_id", eventId)
-        }
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            eventId.hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         val db = AppDatabase.getInstance(context)
-        // Fire and forget, but ideally this should be managed by a WorkManager or injected scope.
-        // We'll use GlobalScope for fire and forget broadcast scheduling (as context might die).
-        @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
-            val pending = db.pendingMessageDao().getByEventId(eventId)
+        CoroutineScope(Dispatchers.IO).launch {
+            val pending = db.pendingMessageDao().getById(pendingMessageId)
             if (pending != null) {
-                alarmManager.setAlarmClock(
-                    AlarmManager.AlarmClockInfo(pending.scheduledForMs, pendingIntent),
-                    pendingIntent
+                val pendingIntent = buildDispatchPendingIntent(
+                    context = context,
+                    requestCode = pending.id.hashCode(),
+                    pendingMessageId = pending.id,
+                    eventId = pending.eventId,
+                    flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
+
+                if (pending.scheduledForMs <= System.currentTimeMillis()) {
+                    androidx.work.WorkManager.getInstance(context)
+                        .enqueue(MessageDispatchWorkRequests.create(pending.id, pending.eventId))
+                    return@launch
+                }
+
+                if (canScheduleExactAlarms(alarmManager)) {
+                    alarmManager.setAlarmClock(
+                        AlarmManager.AlarmClockInfo(pending.scheduledForMs, pendingIntent),
+                        pendingIntent
+                    )
+                } else {
+                    com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
+                        context,
+                        "Exact Alarm Permission Needed",
+                        "RelateAI could not schedule an exact send. Open Automation Setup to allow scheduled sends."
+                    )
+                    androidx.work.WorkManager.getInstance(context)
+                        .enqueue(MessageDispatchWorkRequests.create(pending.id, pending.eventId))
+                }
             }
         }
     }
 
-    fun cancelExactSend(context: Context, eventId: String) {
+    fun cancelExactSend(context: Context, pendingMessageId: String) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
+        cancelPendingIntent(context, alarmManager, pendingMessageId.hashCode(), pendingMessageId, null)
+    }
+
+    fun cancelLegacyExactSend(context: Context, eventId: String) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        cancelPendingIntent(context, alarmManager, eventId.hashCode(), null, eventId)
+    }
+
+    private fun canScheduleExactAlarms(alarmManager: AlarmManager): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+    }
+
+    private fun buildDispatchPendingIntent(
+        context: Context,
+        requestCode: Int,
+        pendingMessageId: String?,
+        eventId: String?,
+        flags: Int,
+    ): PendingIntent {
         val intent = Intent(context, MessageDispatchReceiver::class.java).apply {
-            putExtra("event_id", eventId)
+            pendingMessageId?.let { putExtra(MessageDispatchWorkRequests.KEY_PENDING_MESSAGE_ID, it) }
+            eventId?.let { putExtra(MessageDispatchWorkRequests.KEY_EVENT_ID, it) }
         }
-        val pendingIntent = PendingIntent.getBroadcast(
+        return PendingIntent.getBroadcast(
             context,
-            eventId.hashCode(),
+            requestCode,
             intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            flags,
         )
+    }
+
+    private fun cancelPendingIntent(
+        context: Context,
+        alarmManager: AlarmManager,
+        requestCode: Int,
+        pendingMessageId: String?,
+        eventId: String?,
+    ) {
+        val pendingIntent = buildDispatchPendingIntent(
+            context = context,
+            requestCode = requestCode,
+            pendingMessageId = pendingMessageId,
+            eventId = eventId,
+            flags = PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        )
+        pendingIntent ?: return
         alarmManager.cancel(pendingIntent)
+        pendingIntent.cancel()
     }
 }
 
 class MessageDispatchReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val eventId = intent.getStringExtra("event_id") ?: return
+        val pendingMessageId = intent.getStringExtra(MessageDispatchWorkRequests.KEY_PENDING_MESSAGE_ID)
+        val eventId = intent.getStringExtra(MessageDispatchWorkRequests.KEY_EVENT_ID)
+        if (pendingMessageId.isNullOrBlank() && eventId.isNullOrBlank()) return
         
         val workManager = androidx.work.WorkManager.getInstance(context)
-        workManager.enqueue(MessageDispatchWorkRequests.create(eventId))
+        if (!pendingMessageId.isNullOrBlank()) {
+            workManager.enqueue(MessageDispatchWorkRequests.create(pendingMessageId, eventId))
+        } else if (!eventId.isNullOrBlank()) {
+            workManager.enqueue(MessageDispatchWorkRequests.createForEvent(eventId))
+        }
     }
 }
 
@@ -73,7 +131,7 @@ class BootReceiver : BroadcastReceiver() {
                     // 1. Reschedule approved alarms
                     val pending = db.pendingMessageDao().getAllApproved()
                     pending.forEach { msg ->
-                        DailyScheduler.scheduleExactSend(context, msg.eventId)
+                        DailyScheduler.scheduleExactSend(context, msg.id)
                     }
                     
                     // 2. Reschedule periodic workers conditionally

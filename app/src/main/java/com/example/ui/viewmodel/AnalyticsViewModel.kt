@@ -71,9 +71,12 @@ class AnalyticsViewModel @Inject constructor(
                 }
                 // Only include months up to current month for readability
                 val currentMonth = Calendar.getInstance().get(Calendar.MONTH)
-                val monthlyCounts = (0..currentMonth).map { i ->
+                val monthlyCountsRaw = (0..currentMonth).map { i ->
                     monthAbbrevs[i] to countsByMonth[i].toFloat()
                 }
+                val monthlyCounts = monthlyCountsRaw.takeIf { data ->
+                    data.any { it.second > 0f }
+                } ?: emptyList()
 
                 _uiState.value = AnalyticsUiState(
                     totalWishesSent = snapshot.totalWishesSent,

@@ -39,6 +39,11 @@ class MessageGenerationWorker @AssistedInject constructor(
 ) : CoroutineWorker(ctx, params) {
 
     override suspend fun doWork(): Result {
+        if (!prefs.isAiWishGenerationEnabled()) {
+            StructuredLogger.i(TAG, "AI wish generation disabled; skipping worker")
+            return Result.success()
+        }
+
         val apiKey = prefs.getGeminiApiKey()
         val firebaseUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
         if (apiKey.isNullOrBlank() && firebaseUser == null) {
@@ -52,11 +57,6 @@ class MessageGenerationWorker @AssistedInject constructor(
         }
 
         return try {
-            if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) {
-                StructuredLogger.i(TAG, "User not authenticated; skipping message generation")
-                return Result.success()
-            }
-
             val prompter = PromptBuilder()
             // Use 36 hours lookahead to ensure tomorrow's events (scheduled at 9:00 AM)
             // are always captured regardless of the time of day the worker runs.
@@ -153,7 +153,7 @@ class MessageGenerationWorker @AssistedInject constructor(
 
                             if (approvalMode == "FULLY_AUTO") {
                                 StructuredLogger.i(TAG, "Auto-approving message for event ${event.id}")
-                                DailyScheduler.scheduleExactSend(applicationContext, event.id)
+                                DailyScheduler.scheduleExactSend(applicationContext, messageId)
                             } else {
                                 com.example.core.automation.notifications.NotificationHelper.showApprovalNotification(applicationContext, contact, event, variants, messageId)
                             }

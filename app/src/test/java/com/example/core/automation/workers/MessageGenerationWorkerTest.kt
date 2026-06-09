@@ -63,6 +63,7 @@ class MessageGenerationWorkerTest {
         every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
         every { NotificationHelper.showApprovalNotification(any(), any(), any(), any(), any()) } just Runs
         every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
+        every { prefs.isAiWishGenerationEnabled() } returns true
     }
 
     @After
@@ -106,6 +107,6 @@ class MessageGenerationWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(any()) }
-        verify { DailyScheduler.scheduleExactSend(any(), "e1") }
+        verify { DailyScheduler.scheduleExactSend(any(), any()) }
     }
 }

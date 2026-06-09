@@ -4,7 +4,6 @@ import com.example.domain.repository.MessageRepository
 import com.example.domain.service.SchedulerService
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.first
 
 /**
  * Approves a pending message. Sets its status to APPROVED and, if the approval mode
@@ -16,8 +15,7 @@ class ApprovePendingMessageUseCase @Inject constructor(
     private val schedulerService: SchedulerService
 ) {
     suspend operator fun invoke(pendingMessageId: String, finalEditedText: String? = null): ApprovalOutcome {
-        val allPending = messageRepository.getAllPending().first()
-        val pending = allPending.find { it.id == pendingMessageId }
+        val pending = messageRepository.getPendingById(pendingMessageId)
             ?: return ApprovalOutcome.PendingNotFound
 
         val updatedPending = if (finalEditedText != null && finalEditedText != pending.selectedVariantText) {
@@ -34,7 +32,7 @@ class ApprovePendingMessageUseCase @Inject constructor(
         messageRepository.insertPending(updatedPending)
 
         // Always schedule exactly when approved from the UI
-        schedulerService.scheduleExactSend(updatedPending.eventId)
+        schedulerService.scheduleExactSend(updatedPending.id)
 
         return ApprovalOutcome.Approved(updatedPending.id, updatedPending.approvalMode)
     }

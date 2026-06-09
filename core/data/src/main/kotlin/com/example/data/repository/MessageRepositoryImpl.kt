@@ -19,9 +19,23 @@ class MessageRepositoryImpl @Inject constructor(
 
     override suspend fun getAllApproved(): List<PendingMessageEntity> = pendingMessageDao.getAllApproved()
 
+    override suspend fun getPendingById(id: String): PendingMessageEntity? = pendingMessageDao.getById(id)
+
     override suspend fun getPendingByEventId(eventId: String): PendingMessageEntity? = pendingMessageDao.getByEventId(eventId)
 
+    override suspend fun getPendingForEventOccurrence(
+        contactId: String,
+        eventId: String,
+        scheduledYear: Int
+    ): PendingMessageEntity? = pendingMessageDao.getPendingMessage(contactId, eventId, scheduledYear)
+
     override suspend fun pendingExistsForEvent(eventId: String): Boolean = pendingMessageDao.existsForEvent(eventId)
+
+    override suspend fun pendingExistsForEventOccurrence(
+        contactId: String,
+        eventId: String,
+        scheduledYear: Int
+    ): Boolean = pendingMessageDao.existsForEventOccurrence(contactId, eventId, scheduledYear)
 
     override suspend fun insertPending(message: PendingMessageEntity) = pendingMessageDao.insert(message)
 

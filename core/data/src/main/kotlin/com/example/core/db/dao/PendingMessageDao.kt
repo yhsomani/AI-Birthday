@@ -11,6 +11,9 @@ interface PendingMessageDao {
 
     @Query("SELECT * FROM pending_messages WHERE status = 'APPROVED'")
     suspend fun getAllApproved(): List<PendingMessageEntity>
+
+    @Query("SELECT * FROM pending_messages WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): PendingMessageEntity?
     
     @Query("SELECT * FROM pending_messages WHERE eventId = :eventId LIMIT 1")
     suspend fun getByEventId(eventId: String): PendingMessageEntity?
@@ -20,6 +23,9 @@ interface PendingMessageDao {
     
     @Query("SELECT EXISTS(SELECT 1 FROM pending_messages WHERE eventId = :eventId)")
     suspend fun existsForEvent(eventId: String): Boolean
+
+    @Query("SELECT EXISTS(SELECT 1 FROM pending_messages WHERE contactId = :contactId AND eventId = :eventId AND scheduledYear = :scheduledYear)")
+    suspend fun existsForEventOccurrence(contactId: String, eventId: String, scheduledYear: Int): Boolean
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(message: PendingMessageEntity)

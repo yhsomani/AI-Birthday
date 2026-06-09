@@ -153,7 +153,10 @@ class PromptBuilder {
             appendLine("  \"short\": \"message under 160 chars\",")
             appendLine("  \"standard\": \"message 150-250 chars\",")
             appendLine("  \"long\": \"message 300-450 chars\",")
-            appendLine("  \"recommended\": \"short|standard|long\",")
+            appendLine("  \"formal\": \"polished respectful version, 150-250 chars\",")
+            appendLine("  \"funny\": \"light funny version that still feels personal, 150-250 chars\",")
+            appendLine("  \"emotional\": \"warm heartfelt version, 150-250 chars\",")
+            appendLine("  \"recommended\": \"short|standard|long|formal|funny|emotional\",")
             appendLine("  \"reasoning\": \"one sentence\"")
             append("}")
 

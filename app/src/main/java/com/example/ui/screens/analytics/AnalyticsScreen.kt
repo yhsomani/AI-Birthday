@@ -149,6 +149,14 @@ fun AnalyticsScreen(
 @Composable
 private fun BarChart(data: List<Pair<String, Float>>) {
     val maxValue = data.maxOf { it.second }
+    if (maxValue <= 0f) {
+        Text(
+            text = "No wishes sent yet this year",
+            style = MaterialTheme.typography.bodyMedium,
+            color = RelateOnSurfaceVariant,
+        )
+        return
+    }
     Column {
         data.forEach { (label, value) ->
             Row(

@@ -25,15 +25,15 @@ class RouteArgumentCodecTest {
     }
 
     @Test
-    fun createRoute_encodesContactAndEventIdsAsPathSegments() {
+    fun createRoute_encodesContactAndMessageRefsAsPathSegments() {
         val route = Screen.WishPreview.createRoute(
             contactId = "people/c123 + 100%",
-            eventId = "event/birthday #1",
+            messageRef = "pending/message #1",
         )
 
-        assertEquals("wish/people%2Fc123%20%2B%20100%25/event%2Fbirthday%20%231", route)
+        assertEquals("wish/people%2Fc123%20%2B%20100%25/pending%2Fmessage%20%231", route)
         assertEquals("people/c123 + 100%", RouteArgumentCodec.decode(route.split("/")[1]))
-        assertEquals("event/birthday #1", RouteArgumentCodec.decode(route.split("/")[2]))
+        assertEquals("pending/message #1", RouteArgumentCodec.decode(route.split("/")[2]))
     }
 
     @Test

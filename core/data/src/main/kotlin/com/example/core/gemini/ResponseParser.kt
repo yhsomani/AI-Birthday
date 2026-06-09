@@ -69,15 +69,26 @@ object ResponseParser {
         eventType: String = "BIRTHDAY"
     ): MessageVariants {
         return try {
-            val json = JSONObject(jsonString)
+            val json = JSONObject(cleanJson(jsonString))
+            if (json.has("error")) {
+                throw IllegalArgumentException("AI response contained an error payload")
+            }
+            val standard = json.optString("standard")
+                .ifBlank { fallbackTextFor(eventType) }
+            val short = json.optString("short").ifBlank { standard }
+            val long = json.optString("long").ifBlank { standard }
+            val recommended = json.optString("recommended", "standard")
+                .lowercase()
+                .takeIf { it in setOf("short", "standard", "long", "formal", "funny", "emotional") }
+                ?: "standard"
             MessageVariants(
-                short = json.optString("short", "Happy Birthday!"),
-                standard = json.optString("standard", "Wishing you a very happy birthday!"),
-                long = json.optString("long", "Wishing you a very happy birthday! Hope you have a wonderful day!"),
-                formal = json.optString("formal", "Wishing you a very happy birthday!"),
-                funny = json.optString("funny", "Wishing you a very happy birthday!"),
-                emotional = json.optString("emotional", "Wishing you a very happy birthday!"),
-                recommended = json.optString("recommended", "standard"),
+                short = short,
+                standard = standard,
+                long = long,
+                formal = json.optString("formal").ifBlank { standard },
+                funny = json.optString("funny").ifBlank { standard },
+                emotional = json.optString("emotional").ifBlank { standard },
+                recommended = recommended,
                 isUsingFallback = false
             )
         } catch (e: Exception) {
@@ -102,13 +113,26 @@ object ResponseParser {
         }
     }
 
-    private fun getFallbackTemplate(context: Context?, eventType: String): String {
-        context ?: return when (eventType) {
+    private fun cleanJson(raw: String): String {
+        return raw.trim()
+            .removePrefix("```json")
+            .removePrefix("```JSON")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+    }
+
+    private fun fallbackTextFor(eventType: String): String {
+        return when (eventType) {
             "ANNIVERSARY" -> "Happy Anniversary! Wishing you both a lifetime of love and happiness."
             "WORK_ANNIVERSARY" -> "Congratulations on your work anniversary! Thank you for your hard work and dedication."
             "REVIVAL" -> "Hey! It's been a while since we caught up. Hope you're doing great! Let's connect soon."
             else -> "Wishing you a very happy birthday! Hope you have a wonderful day!"
         }
+    }
+
+    private fun getFallbackTemplate(context: Context?, eventType: String): String {
+        context ?: return fallbackTextFor(eventType)
         return try {
             val resName = when (eventType) {
                 "ANNIVERSARY" -> "fallback_anniversary_message"
@@ -117,12 +141,7 @@ object ResponseParser {
                 else -> "fallback_birthday_message"
             }
             val resId = context.resources.getIdentifier(resName, "string", context.packageName)
-            if (resId != 0) context.getString(resId) else when (eventType) {
-                "ANNIVERSARY" -> "Happy Anniversary! Wishing you both a lifetime of love and happiness."
-                "WORK_ANNIVERSARY" -> "Congratulations on your work anniversary! Thank you for your hard work and dedication."
-                "REVIVAL" -> "Hey! It's been a while since we caught up. Hope you're doing great! Let's connect soon."
-                else -> "Wishing you a very happy birthday! Hope you have a wonderful day!"
-            }
+            if (resId != 0) context.getString(resId) else fallbackTextFor(eventType)
         } catch (ex: Exception) {
             "Wishing you a very happy birthday!"
         }

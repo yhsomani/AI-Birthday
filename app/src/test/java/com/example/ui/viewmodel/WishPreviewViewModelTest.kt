@@ -3,14 +3,13 @@ package com.example.ui.viewmodel
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.repository.MessageRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
+import com.example.domain.usecase.RegeneratePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
 import io.mockk.coEvery
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
-import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.*
 import org.junit.Assert.assertEquals
@@ -30,6 +29,9 @@ class WishPreviewViewModelTest {
 
     @RelaxedMockK
     private lateinit var rejectPendingMessageUseCase: RejectPendingMessageUseCase
+
+    @RelaxedMockK
+    private lateinit var regeneratePendingMessageUseCase: RegeneratePendingMessageUseCase
 
     private val testDispatcher = StandardTestDispatcher()
 
@@ -63,9 +65,9 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `loadPending populates state with selected variant text`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getAllPending() } returns flowOf(listOf(samplePending()))
+        coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
 
-        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase)
+        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -79,9 +81,10 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `loadPending surfaces error when message is missing`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getAllPending() } returns flowOf(emptyList())
+        coEvery { messageRepository.getPendingById("missing") } returns null
+        coEvery { messageRepository.getPendingByEventId("missing") } returns null
 
-        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase)
+        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
         viewModel.loadPending("missing")
         advanceUntilIdle()
 
@@ -90,10 +93,23 @@ class WishPreviewViewModelTest {
     }
 
     @Test
-    fun `selectVariant swaps edited text to that variant`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getAllPending() } returns flowOf(listOf(samplePending()))
+    fun `loadPending falls back to event id for legacy preview routes`() = runTest(testDispatcher) {
+        coEvery { messageRepository.getPendingById("e_1") } returns null
+        coEvery { messageRepository.getPendingByEventId("e_1") } returns samplePending()
 
-        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase)
+        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        viewModel.loadPending("e_1")
+        advanceUntilIdle()
+
+        assertEquals("pm_1", viewModel.uiState.value.pendingMessage?.id)
+        assertEquals(false, viewModel.uiState.value.isLoading)
+    }
+
+    @Test
+    fun `selectVariant swaps edited text to that variant`() = runTest(testDispatcher) {
+        coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
+
+        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -106,9 +122,9 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `updateEditedText sets the local draft text`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getAllPending() } returns flowOf(listOf(samplePending()))
+        coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
 
-        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase)
+        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -117,11 +133,35 @@ class WishPreviewViewModelTest {
     }
 
     @Test
+    fun `regenerate refreshes pending draft and quality message`() = runTest(testDispatcher) {
+        val regenerated = samplePending().copy(
+            standardVariant = "Fresh AI draft",
+            selectedVariantText = "Fresh AI draft",
+        )
+        coEvery { messageRepository.getPendingById("pm_1") } returns samplePending() andThen regenerated
+        coEvery {
+            regeneratePendingMessageUseCase("pm_1", "Wishing you a happy birthday!")
+        } returns RegeneratePendingMessageUseCase.Outcome.Regenerated("pm_1", usedFallback = false)
+
+        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        viewModel.regenerate()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("Fresh AI draft", state.editedText)
+        assertEquals("AI regenerated a fresh draft.", state.qualityMessage)
+        assertEquals(false, state.isRegenerating)
+    }
+
+    @Test
     fun `approve invokes use case and flips approved flag on success`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getAllPending() } returns flowOf(listOf(samplePending()))
+        coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
         coEvery { approvePendingMessageUseCase("pm_1", any()) } returns ApprovePendingMessageUseCase.ApprovalOutcome.Approved("pm_1", "VIP_APPROVE")
 
-        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase)
+        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -134,10 +174,10 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `approve surfaces error when pending missing`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getAllPending() } returns flowOf(listOf(samplePending()))
+        coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
         coEvery { approvePendingMessageUseCase("pm_1", any()) } returns ApprovePendingMessageUseCase.ApprovalOutcome.PendingNotFound
 
-        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase)
+        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -151,10 +191,10 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `reject invokes use case and flips rejected flag on success`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getAllPending() } returns flowOf(listOf(samplePending()))
+        coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
         coEvery { rejectPendingMessageUseCase("pm_1") } returns RejectPendingMessageUseCase.RejectionOutcome.Rejected("pm_1")
 
-        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase)
+        val viewModel = WishPreviewViewModel(messageRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 

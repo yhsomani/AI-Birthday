@@ -5,12 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.repository.MessageRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
+import com.example.domain.usecase.RegeneratePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -21,10 +21,13 @@ data class WishPreviewUiState(
     val isLoading: Boolean = true,
     val isApproving: Boolean = false,
     val isRejecting: Boolean = false,
+    val isRegenerating: Boolean = false,
     val approved: Boolean = false,
     val rejected: Boolean = false,
     val error: String? = null,
-    val testSent: Boolean = false
+    val testSent: Boolean = false,
+    val usedFallback: Boolean = false,
+    val qualityMessage: String? = null,
 )
 
 private val variantOptions = listOf(
@@ -41,22 +44,29 @@ class WishPreviewViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val approvePendingMessageUseCase: ApprovePendingMessageUseCase,
     private val rejectPendingMessageUseCase: RejectPendingMessageUseCase,
+    private val regeneratePendingMessageUseCase: RegeneratePendingMessageUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WishPreviewUiState())
     val uiState: StateFlow<WishPreviewUiState> = _uiState.asStateFlow()
 
-    fun loadPending(pendingId: String) {
+    fun loadPending(messageRef: String) {
         viewModelScope.launch {
             try {
-                val allPending = messageRepository.getAllPending().first()
-                val pending = allPending.find { it.id == pendingId }
+                val pending = messageRepository.getPendingById(messageRef)
+                    ?: messageRepository.getPendingByEventId(messageRef)
                 if (pending != null) {
                     _uiState.value = WishPreviewUiState(
                         pendingMessage = pending,
                         selectedVariant = pending.selectedVariant,
                         editedText = pending.selectedVariantText,
                         isLoading = false,
+                        usedFallback = pending.isUsingFallback,
+                        qualityMessage = if (pending.isUsingFallback) {
+                            "Template used because AI generation was unavailable."
+                        } else {
+                            null
+                        },
                     )
                 } else {
                     _uiState.value = WishPreviewUiState(
@@ -98,6 +108,56 @@ class WishPreviewViewModel @Inject constructor(
 
     fun dismissTestSent() {
         _uiState.value = _uiState.value.copy(testSent = false)
+    }
+
+    fun regenerate() {
+        val pendingId = _uiState.value.pendingMessage?.id ?: return
+        val draft = _uiState.value.editedText
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isRegenerating = true, error = null, qualityMessage = null)
+            when (val result = regeneratePendingMessageUseCase(pendingId, draft)) {
+                RegeneratePendingMessageUseCase.Outcome.AiDisabled -> {
+                    _uiState.value = _uiState.value.copy(
+                        isRegenerating = false,
+                        error = "AI wish generation is disabled in Settings.",
+                    )
+                }
+                RegeneratePendingMessageUseCase.Outcome.ContextNotFound -> {
+                    _uiState.value = _uiState.value.copy(
+                        isRegenerating = false,
+                        error = "Could not find the contact or event for this message.",
+                    )
+                }
+                RegeneratePendingMessageUseCase.Outcome.PendingNotFound -> {
+                    _uiState.value = _uiState.value.copy(
+                        isRegenerating = false,
+                        error = "Message not found.",
+                    )
+                }
+                is RegeneratePendingMessageUseCase.Outcome.Regenerated -> {
+                    val updated = messageRepository.getPendingById(result.pendingId)
+                    if (updated != null) {
+                        _uiState.value = _uiState.value.copy(
+                            pendingMessage = updated,
+                            selectedVariant = updated.selectedVariant,
+                            editedText = updated.selectedVariantText,
+                            isRegenerating = false,
+                            usedFallback = result.usedFallback,
+                            qualityMessage = if (result.usedFallback) {
+                                "Template used because AI generation was unavailable."
+                            } else {
+                                "AI regenerated a fresh draft."
+                            },
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isRegenerating = false,
+                            error = "Message not found.",
+                        )
+                    }
+                }
+            }
+        }
     }
 
     fun updateEditedText(text: String) {

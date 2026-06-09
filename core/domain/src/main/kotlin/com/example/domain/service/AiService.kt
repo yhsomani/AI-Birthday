@@ -43,7 +43,8 @@ data class MessageVariantsResult(
     val formal: String,
     val funny: String,
     val emotional: String,
-    val recommended: String
+    val recommended: String,
+    val isUsingFallback: Boolean = false
 ) {
     fun get(variantName: String): String {
         return when (variantName.lowercase()) {

@@ -151,8 +151,8 @@ fun RelateNavGraph(
             ContactDetailScreen(
                 contactId = contactId,
                 onBack = { navController.popBackStack() },
-                onNavigateToWish = { eventId ->
-                    navController.navigate(Screen.WishPreview.createRoute(contactId, eventId))
+                onNavigateToWish = { pendingMessageId ->
+                    navController.navigate(Screen.WishPreview.createRoute(contactId, pendingMessageId))
                 },
                 onNavigateToMemoryVault = { cid ->
                     navController.navigate(Screen.MemoryVault.createRoute(cid))
@@ -169,19 +169,19 @@ fun RelateNavGraph(
             route = Screen.WishPreview.route,
             arguments = listOf(
                 navArgument("contactId") { type = NavType.StringType },
-                navArgument("eventId") { type = NavType.StringType },
+                navArgument("messageRef") { type = NavType.StringType },
             ),
             deepLinks = listOf(
                 androidx.navigation.navDeepLink {
-                    uriPattern = "relateai://wish/{contactId}/{eventId}"
+                    uriPattern = "relateai://wish/{contactId}/{messageRef}"
                 }
             )
         ) { backStackEntry ->
             val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
-            val eventId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("eventId"))
+            val messageRef = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("messageRef"))
             WishPreviewScreen(
                 contactId = contactId,
-                eventId = eventId,
+                messageRef = messageRef,
                 onBack = { navController.popBackStack() },
                 onSent = {
                     navController.popBackStack()
@@ -193,8 +193,8 @@ fun RelateNavGraph(
         }
         composable(Screen.Messages.route) {
             MessagesScreen(
-                onNavigateToWish = { contactId, eventId ->
-                    navController.navigate(Screen.WishPreview.createRoute(contactId, eventId))
+                onNavigateToWish = { contactId, messageRef ->
+                    navController.navigate(Screen.WishPreview.createRoute(contactId, messageRef))
                 }
             )
         }

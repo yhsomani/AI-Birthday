@@ -24,6 +24,7 @@ class GeminiClient @Inject constructor(
     ))
 
     private var googleAiModel: com.google.ai.client.generativeai.GenerativeModel? = null
+    private var googleAiModelApiKey: String? = null
 
     init {
         HealthMonitor.register("gemini", circuitBreaker)
@@ -65,10 +66,17 @@ class GeminiClient @Inject constructor(
     }
 
     private suspend fun generateWithGoogleKey(prompt: String, apiKey: String): String? {
-        val model = googleAiModel ?: com.google.ai.client.generativeai.GenerativeModel(
-            modelName = "gemini-1.5-flash",
-            apiKey = apiKey
-        ).also { googleAiModel = it }
+        val model = if (googleAiModel == null || googleAiModelApiKey != apiKey) {
+            com.google.ai.client.generativeai.GenerativeModel(
+                modelName = "gemini-1.5-flash",
+                apiKey = apiKey
+            ).also {
+                googleAiModel = it
+                googleAiModelApiKey = apiKey
+            }
+        } else {
+            googleAiModel!!
+        }
         return model.generateContent(prompt).text
     }
 

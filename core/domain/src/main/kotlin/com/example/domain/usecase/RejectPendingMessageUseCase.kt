@@ -1,7 +1,7 @@
 package com.example.domain.usecase
 
 import com.example.domain.repository.MessageRepository
-import kotlinx.coroutines.flow.first
+import com.example.domain.service.SchedulerService
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -11,13 +11,17 @@ import javax.inject.Singleton
  */
 @Singleton
 class RejectPendingMessageUseCase @Inject constructor(
-    private val messageRepository: MessageRepository
+    private val messageRepository: MessageRepository,
+    private val schedulerService: SchedulerService,
 ) {
     suspend operator fun invoke(pendingMessageId: String): RejectionOutcome {
-        val exists = messageRepository.getAllPending().first().any { it.id == pendingMessageId }
-        if (!exists) return RejectionOutcome.PendingNotFound
+        val pending = messageRepository.getPendingById(pendingMessageId)
+            ?: return RejectionOutcome.PendingNotFound
 
         messageRepository.updatePendingStatus(pendingMessageId, "REJECTED")
+        if (pending.status == "APPROVED") {
+            schedulerService.cancelExactSend(pending.id)
+        }
         return RejectionOutcome.Rejected(pendingMessageId)
     }
 

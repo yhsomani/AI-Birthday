@@ -48,6 +48,7 @@ class RevivalWorkerTest {
         every { mockAuth.currentUser } returns mockUser
 
         every { prefs.getGeminiApiKey() } returns "test_api_key"
+        every { prefs.isAiWishGenerationEnabled() } returns true
 
         coEvery { RateLimiter.waitIfNeeded() } returns Unit
         every { NotificationHelper.showRevivalNotification(any(), any(), any(), any(), any()) } just Runs

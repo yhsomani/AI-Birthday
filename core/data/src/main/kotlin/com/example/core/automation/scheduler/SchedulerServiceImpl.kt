@@ -11,11 +11,11 @@ class SchedulerServiceImpl @Inject constructor(
     @ApplicationContext private val context: Context
 ) : SchedulerService {
 
-    override fun scheduleExactSend(eventId: String) {
-        DailyScheduler.scheduleExactSend(context, eventId)
+    override fun scheduleExactSend(pendingMessageId: String) {
+        DailyScheduler.scheduleExactSend(context, pendingMessageId)
     }
 
-    override fun cancelExactSend(eventId: String) {
-        DailyScheduler.cancelExactSend(context, eventId)
+    override fun cancelExactSend(pendingMessageId: String) {
+        DailyScheduler.cancelExactSend(context, pendingMessageId)
     }
 }

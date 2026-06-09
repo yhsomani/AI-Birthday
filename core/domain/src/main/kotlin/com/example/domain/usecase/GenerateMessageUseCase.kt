@@ -12,6 +12,7 @@ import com.example.domain.service.PreferencesRepository
 import com.example.domain.service.SchedulerService
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.Calendar
 import java.util.UUID
 
 /**
@@ -37,7 +38,8 @@ class GenerateMessageUseCase @Inject constructor(
         val event = eventRepository.getEventsBefore(Long.MAX_VALUE).firstOrNull { it.id == eventId }
             ?: return GenerationOutcome.EventNotFound
 
-        if (messageRepository.pendingExistsForEvent(eventId)) {
+        val scheduledYear = scheduledYearFor(event.nextOccurrenceMs)
+        if (messageRepository.pendingExistsForEventOccurrence(event.contactId, event.id, scheduledYear)) {
             return GenerationOutcome.AlreadyExists
         }
 
@@ -75,12 +77,14 @@ class GenerateMessageUseCase @Inject constructor(
             channel = contact.preferredChannel,
             scheduledForMs = event.nextOccurrenceMs,
             approvalMode = approvalMode,
-            status = if (approvalMode == "FULLY_AUTO") "APPROVED" else "PENDING"
+            status = if (approvalMode == "FULLY_AUTO") "APPROVED" else "PENDING",
+            scheduledYear = scheduledYear,
+            isUsingFallback = variants.isUsingFallback
         )
         messageRepository.insertPending(pending)
 
         if (approvalMode == "FULLY_AUTO") {
-            schedulerService.scheduleExactSend(event.id)
+            schedulerService.scheduleExactSend(pending.id)
         } else {
             notificationService.showApprovalNotification(contact, event, variants, pending.id)
         }
@@ -105,6 +109,10 @@ class GenerateMessageUseCase @Inject constructor(
             val union = newWords.union(oldWords).size
             if (union == 0) false else (intersection.toFloat() / union) > 0.65f
         }
+    }
+
+    private fun scheduledYearFor(timestampMs: Long): Int {
+        return Calendar.getInstance().apply { timeInMillis = timestampMs }.get(Calendar.YEAR)
     }
 
     sealed class GenerationOutcome {

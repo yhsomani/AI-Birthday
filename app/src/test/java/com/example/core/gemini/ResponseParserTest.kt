@@ -1,7 +1,9 @@
 package com.example.core.gemini
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -88,6 +90,7 @@ class ResponseParserTest {
 
         assertEquals("Wishing you a very happy birthday! Hope you have a wonderful day!", variants.short)
         assertEquals("standard", variants.recommended)
+        assertTrue(variants.isUsingFallback)
     }
 
     @Test
@@ -97,8 +100,62 @@ class ResponseParserTest {
         val variants = ResponseParser.parseMessageVariants(json)
 
         assertEquals("Hey!", variants.short)
-        assertEquals("Wishing you a very happy birthday!", variants.standard)
+        assertEquals("Wishing you a very happy birthday! Hope you have a wonderful day!", variants.standard)
         assertEquals("standard", variants.recommended)
+        assertFalse(variants.isUsingFallback)
+    }
+
+    @Test
+    fun `parseMessageVariants accepts fenced json and all six variants`() {
+        val json = """
+            ```json
+            {
+                "short": "Short wish",
+                "standard": "Standard wish",
+                "long": "Long wish",
+                "formal": "Formal wish",
+                "funny": "Funny wish",
+                "emotional": "Emotional wish",
+                "recommended": "emotional"
+            }
+            ```
+        """.trimIndent()
+
+        val variants = ResponseParser.parseMessageVariants(json)
+
+        assertEquals("Short wish", variants.short)
+        assertEquals("Standard wish", variants.standard)
+        assertEquals("Long wish", variants.long)
+        assertEquals("Formal wish", variants.formal)
+        assertEquals("Funny wish", variants.funny)
+        assertEquals("Emotional wish", variants.emotional)
+        assertEquals("emotional", variants.recommended)
+        assertFalse(variants.isUsingFallback)
+    }
+
+    @Test
+    fun `parseMessageVariants resets invalid recommended to standard`() {
+        val json = """
+            {
+                "short": "Short",
+                "standard": "Standard",
+                "recommended": "wild"
+            }
+        """.trimIndent()
+
+        val variants = ResponseParser.parseMessageVariants(json)
+
+        assertEquals("standard", variants.recommended)
+        assertEquals("Standard", variants.get(variants.recommended))
+    }
+
+    @Test
+    fun `parseMessageVariants treats error json as fallback`() {
+        val variants = ResponseParser.parseMessageVariants("""{"error":"quota exceeded"}""")
+
+        assertEquals("standard", variants.recommended)
+        assertTrue(variants.isUsingFallback)
+        assertEquals("Wishing you a very happy birthday! Hope you have a wonderful day!", variants.standard)
     }
 
     @Test

@@ -22,15 +22,27 @@ class MessageDispatchWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val eventId = inputData.getString(MessageDispatchWorkRequests.KEY_EVENT_ID) ?: run {
-            StructuredLogger.e(TAG, "Missing event_id in input data")
+        val pendingMessageId = inputData.getString(MessageDispatchWorkRequests.KEY_PENDING_MESSAGE_ID)
+        val eventId = inputData.getString(MessageDispatchWorkRequests.KEY_EVENT_ID)
+        if (pendingMessageId.isNullOrBlank() && eventId.isNullOrBlank()) {
+            StructuredLogger.e(TAG, "Missing pending_message_id and event_id in input data")
             return Result.failure()
         }
 
-        StructuredLogger.i(TAG, "Dispatching message for event $eventId")
+        StructuredLogger.i(TAG, "Dispatching message", mapOf(
+            "pendingMessageId" to (pendingMessageId ?: ""),
+            "eventId" to (eventId ?: ""),
+        ))
 
-        val pendingMsg = pendingMessageDao.getByEventId(eventId) ?: run {
-            StructuredLogger.w(TAG, "No pending message found for event $eventId")
+        val pendingMsg = if (!pendingMessageId.isNullOrBlank()) {
+            pendingMessageDao.getById(pendingMessageId)
+        } else {
+            pendingMessageDao.getByEventId(eventId.orEmpty())
+        } ?: run {
+            StructuredLogger.w(TAG, "No pending message found", extras = mapOf(
+                "pendingMessageId" to (pendingMessageId ?: ""),
+                "eventId" to (eventId ?: ""),
+            ))
             return Result.failure()
         }
 
@@ -57,7 +69,7 @@ class MessageDispatchWorker @AssistedInject constructor(
                     "Double-Send Prevented",
                     "A potential duplicate send for ${contact.name} was blocked."
                 )
-                return Result.failure()
+                return Result.success()
             }
             pendingMsg.status == "REJECTED" -> {
                 StructuredLogger.i(TAG, "Message ${pendingMsg.id} was rejected; skipping")

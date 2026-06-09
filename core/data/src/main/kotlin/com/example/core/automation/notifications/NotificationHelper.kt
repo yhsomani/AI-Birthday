@@ -122,7 +122,7 @@ object NotificationHelper {
 
         val editIntent = PendingIntent.getActivity(
             context, event.id.hashCode() + 3,
-            Intent(Intent.ACTION_VIEW, android.net.Uri.parse("relateai://wish/${contact.id}/${event.id}")).apply {
+            Intent(Intent.ACTION_VIEW, android.net.Uri.parse("relateai://wish/${contact.id}/$messageId")).apply {
                 setClassName(context, "com.example.MainActivity")
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT

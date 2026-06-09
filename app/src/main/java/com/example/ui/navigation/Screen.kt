@@ -22,9 +22,9 @@ sealed class Screen(val route: String) {
     data object Messages : Screen("messages")
     data object Settings : Screen("settings")
     data object Analytics : Screen("analytics")
-    data object WishPreview : Screen("wish/{contactId}/{eventId}") {
-        fun createRoute(contactId: String, eventId: String) =
-            "wish/${RouteArgumentCodec.encode(contactId)}/${RouteArgumentCodec.encode(eventId)}"
+    data object WishPreview : Screen("wish/{contactId}/{messageRef}") {
+        fun createRoute(contactId: String, messageRef: String) =
+            "wish/${RouteArgumentCodec.encode(contactId)}/${RouteArgumentCodec.encode(messageRef)}"
     }
     data object ChatHistory : Screen("chat-history/{contactId}") {
         fun createRoute(contactId: String) = "chat-history/${RouteArgumentCodec.encode(contactId)}"

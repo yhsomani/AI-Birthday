@@ -45,7 +45,8 @@ class AiServiceImpl @Inject constructor(
             formal = variants.formal,
             funny = variants.funny,
             emotional = variants.emotional,
-            recommended = variants.recommended
+            recommended = variants.recommended,
+            isUsingFallback = variants.isUsingFallback
         )
     }
 
@@ -75,7 +76,8 @@ class AiServiceImpl @Inject constructor(
             formal = variants.formal,
             funny = variants.funny,
             emotional = variants.emotional,
-            recommended = variants.recommended
+            recommended = variants.recommended,
+            isUsingFallback = variants.isUsingFallback
         )
     }
 

@@ -142,6 +142,19 @@ fun MessagesScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        if (state.selectedMessageIds.isNotEmpty()) {
+            BulkActionBar(
+                selectedCount = state.selectedMessageIds.size,
+                showApprove = pagerState.currentPage in listOf(0, 1),
+                showRetry = pagerState.currentPage == 4,
+                onApprove = viewModel::bulkApproveSelected,
+                onRetry = viewModel::bulkRetrySelected,
+                onReject = viewModel::bulkRejectSelected,
+                onClear = viewModel::clearSelection,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = { viewModel.refresh() },
@@ -167,6 +180,8 @@ fun MessagesScreen(
                             onReject = { showRejectDialogForId = it },
                             onEdit = onNavigateToWish,
                             approvingMessageId = state.approvingMessageId,
+                            selectedMessageIds = state.selectedMessageIds,
+                            onToggleSelection = viewModel::toggleSelection,
                         )
                         1 -> PendingMessagesList(
                             messages = state.pendingMessages,
@@ -175,6 +190,8 @@ fun MessagesScreen(
                             onReject = { showRejectDialogForId = it },
                             onEdit = onNavigateToWish,
                             approvingMessageId = state.approvingMessageId,
+                            selectedMessageIds = state.selectedMessageIds,
+                            onToggleSelection = viewModel::toggleSelection,
                         )
                         2 -> ApprovedMessagesList(
                             messages = state.approvedMessages,
@@ -182,18 +199,74 @@ fun MessagesScreen(
                             onReject = { showRejectDialogForId = it },
                             onEdit = onNavigateToWish,
                             revokingMessageId = state.revokingMessageId,
+                            selectedMessageIds = state.selectedMessageIds,
+                            onToggleSelection = viewModel::toggleSelection,
                         )
                         3 -> SentMessagesList(messages = state.sentMessages)
                         4 -> FailedMessagesList(
                             messages = state.failedMessages,
                             onRetry = { viewModel.retryMessage(it) },
                             retryingMessageId = state.retryingMessageId,
+                            selectedMessageIds = state.selectedMessageIds,
+                            onToggleSelection = viewModel::toggleSelection,
                         )
                     }
                 }
             }
         }
         SnackbarHost(hostState = snackbarHostState)
+    }
+}
+
+@Composable
+private fun BulkActionBar(
+    selectedCount: Int,
+    showApprove: Boolean,
+    showRetry: Boolean,
+    onApprove: () -> Unit,
+    onRetry: () -> Unit,
+    onReject: () -> Unit,
+    onClear: () -> Unit,
+) {
+    RelateGlassCard {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "$selectedCount selected",
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            if (showApprove) {
+                Button(
+                    onClick = onApprove,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary, contentColor = Color.Black),
+                ) {
+                    Text("Approve", fontSize = 12.sp)
+                }
+            }
+            if (showRetry) {
+                Button(
+                    onClick = onRetry,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary, contentColor = Color.Black),
+                ) {
+                    Text("Retry", fontSize = 12.sp)
+                }
+            }
+            TextButton(onClick = onReject) {
+                Text("Reject", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+            }
+            IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Filled.Close, contentDescription = "Clear selection", tint = RelateOnSurfaceVariant)
+            }
+        }
     }
 }
 
@@ -205,6 +278,8 @@ private fun PendingMessagesList(
     onReject: (String) -> Unit,
     onEdit: (String, String) -> Unit,
     approvingMessageId: String?,
+    selectedMessageIds: Set<String>,
+    onToggleSelection: (String) -> Unit,
 ) {
     if (messages.isEmpty()) {
         EmptyState(message = emptyText)
@@ -220,6 +295,8 @@ private fun PendingMessagesList(
                     onReject = onReject,
                     onEdit = onEdit,
                     isApproving = approvingMessageId == item.entity.id,
+                    selected = item.entity.id in selectedMessageIds,
+                    onToggleSelection = onToggleSelection,
                 )
             }
         }
@@ -247,6 +324,8 @@ private fun FailedMessagesList(
     messages: List<PendingMessageItem>,
     onRetry: (String) -> Unit,
     retryingMessageId: String?,
+    selectedMessageIds: Set<String>,
+    onToggleSelection: (String) -> Unit,
 ) {
     if (messages.isEmpty()) {
         EmptyState(message = "No failed messages")
@@ -260,6 +339,8 @@ private fun FailedMessagesList(
                     item = item,
                     onRetry = onRetry,
                     isRetrying = retryingMessageId == item.entity.id,
+                    selected = item.entity.id in selectedMessageIds,
+                    onToggleSelection = onToggleSelection,
                 )
             }
         }
@@ -273,6 +354,8 @@ private fun PendingMessageCard(
     onReject: (String) -> Unit,
     onEdit: (String, String) -> Unit,
     isApproving: Boolean,
+    selected: Boolean,
+    onToggleSelection: (String) -> Unit,
 ) {
     val message = item.entity
     val eventTypeColor = when (item.eventType) {
@@ -305,6 +388,11 @@ private fun PendingMessageCard(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { onToggleSelection(message.id) },
+                    colors = CheckboxDefaults.colors(checkedColor = RelatePrimary),
+                )
                 if (item.contactAvatarUrl != null) {
                     AsyncImage(
                         model = item.contactAvatarUrl,
@@ -477,7 +565,7 @@ private fun PendingMessageCard(
                     }
 
                     OutlinedButton(
-                        onClick = { onEdit(message.contactId, message.eventId) },
+                        onClick = { onEdit(message.contactId, message.id) },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         modifier = Modifier.height(32.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
@@ -602,6 +690,8 @@ private fun FailedMessageCard(
     item: PendingMessageItem,
     onRetry: (String) -> Unit,
     isRetrying: Boolean,
+    selected: Boolean,
+    onToggleSelection: (String) -> Unit,
 ) {
     val message = item.entity
     val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
@@ -610,6 +700,11 @@ private fun FailedMessageCard(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { onToggleSelection(message.id) },
+                    colors = CheckboxDefaults.colors(checkedColor = RelatePrimary),
+                )
                 if (item.contactAvatarUrl != null) {
                     AsyncImage(
                         model = item.contactAvatarUrl,
@@ -704,6 +799,8 @@ private fun ApprovedMessagesList(
     onReject: (String) -> Unit,
     onEdit: (String, String) -> Unit,
     revokingMessageId: String?,
+    selectedMessageIds: Set<String>,
+    onToggleSelection: (String) -> Unit,
 ) {
     if (messages.isEmpty()) {
         EmptyState(message = "No approved messages")
@@ -719,6 +816,8 @@ private fun ApprovedMessagesList(
                     onReject = onReject,
                     onEdit = onEdit,
                     isRevoking = revokingMessageId == item.entity.id,
+                    selected = item.entity.id in selectedMessageIds,
+                    onToggleSelection = onToggleSelection,
                 )
             }
         }
@@ -732,6 +831,8 @@ private fun ApprovedMessageCard(
     onReject: (String) -> Unit,
     onEdit: (String, String) -> Unit,
     isRevoking: Boolean,
+    selected: Boolean,
+    onToggleSelection: (String) -> Unit,
 ) {
     val message = item.entity
     val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
@@ -740,6 +841,11 @@ private fun ApprovedMessageCard(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { onToggleSelection(message.id) },
+                    colors = CheckboxDefaults.colors(checkedColor = RelatePrimary),
+                )
                 if (item.contactAvatarUrl != null) {
                     AsyncImage(
                         model = item.contactAvatarUrl,
@@ -818,7 +924,7 @@ private fun ApprovedMessageCard(
                     }
 
                     OutlinedButton(
-                        onClick = { onEdit(message.contactId, message.eventId) },
+                        onClick = { onEdit(message.contactId, message.id) },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         modifier = Modifier.height(32.dp),
                         colors = ButtonDefaults.outlinedButtonColors(

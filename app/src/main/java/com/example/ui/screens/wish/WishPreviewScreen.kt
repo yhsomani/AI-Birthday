@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,7 +63,7 @@ private val variantOptions = listOf(
 @Composable
 fun WishPreviewScreen(
     contactId: String,
-    eventId: String,
+    messageRef: String,
     onBack: () -> Unit = {},
     onSent: () -> Unit = {},
     viewModel: WishPreviewViewModel = hiltViewModel(),
@@ -82,8 +83,8 @@ fun WishPreviewScreen(
     }
 
 
-    LaunchedEffect(eventId) {
-        viewModel.loadPending(eventId)
+    LaunchedEffect(messageRef) {
+        viewModel.loadPending(messageRef)
     }
 
     LaunchedEffect(state.approved) {
@@ -210,6 +211,46 @@ fun WishPreviewScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = RelateOnSurfaceVariant,
                     )
+                }
+
+                state.qualityMessage?.let { message ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = RelateOnSurfaceVariant,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = { viewModel.regenerate() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.isRegenerating && !state.isApproving && !state.isRejecting,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RelateSurfaceVariant,
+                    ),
+                ) {
+                    if (state.isRegenerating) {
+                        CircularProgressIndicator(
+                            color = RelateOnBackground,
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = null,
+                            tint = RelateOnBackground,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Regenerate AI Draft",
+                            color = RelateOnBackground,
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))

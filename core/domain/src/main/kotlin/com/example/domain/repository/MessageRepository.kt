@@ -7,8 +7,11 @@ import kotlinx.coroutines.flow.Flow
 interface MessageRepository {
     fun getAllPending(): Flow<List<PendingMessageEntity>>
     suspend fun getAllApproved(): List<PendingMessageEntity>
+    suspend fun getPendingById(id: String): PendingMessageEntity?
     suspend fun getPendingByEventId(eventId: String): PendingMessageEntity?
+    suspend fun getPendingForEventOccurrence(contactId: String, eventId: String, scheduledYear: Int): PendingMessageEntity?
     suspend fun pendingExistsForEvent(eventId: String): Boolean
+    suspend fun pendingExistsForEventOccurrence(contactId: String, eventId: String, scheduledYear: Int): Boolean
     suspend fun insertPending(message: PendingMessageEntity)
     suspend fun updatePendingStatus(id: String, status: String)
     suspend fun updatePendingStatusByEventId(eventId: String, status: String)

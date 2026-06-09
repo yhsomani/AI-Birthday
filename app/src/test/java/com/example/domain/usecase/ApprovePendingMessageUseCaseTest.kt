@@ -6,7 +6,6 @@ import com.example.domain.service.SchedulerService
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -30,7 +29,7 @@ class ApprovePendingMessageUseCaseTest {
             channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL",
             status = "PENDING"
         )
-        coEvery { messageRepository.getAllPending() } returns flowOf(listOf(pendingMsg))
+        coEvery { messageRepository.getPendingById("msg_1") } returns pendingMsg
 
         val result = useCase("msg_1")
 
@@ -39,7 +38,7 @@ class ApprovePendingMessageUseCaseTest {
         assertEquals("msg_1", approved.id)
         assertEquals("MANUAL", approved.approvalMode)
         coVerify { messageRepository.insertPending(any()) }
-        coVerify { schedulerService.scheduleExactSend("event_1") }
+        coVerify { schedulerService.scheduleExactSend("msg_1") }
     }
 
     @Test
@@ -54,16 +53,16 @@ class ApprovePendingMessageUseCaseTest {
             channel = "SMS", scheduledForMs = 0, approvalMode = "FULLY_AUTO",
             status = "PENDING"
         )
-        coEvery { messageRepository.getAllPending() } returns flowOf(listOf(pendingMsg))
+        coEvery { messageRepository.getPendingById("msg_1") } returns pendingMsg
 
         useCase("msg_1")
 
-        coVerify { schedulerService.scheduleExactSend("event_1") }
+        coVerify { schedulerService.scheduleExactSend("msg_1") }
     }
 
     @Test
     fun `invoke with invalid id returns PendingNotFound`() = runTest {
-        coEvery { messageRepository.getAllPending() } returns flowOf(emptyList())
+        coEvery { messageRepository.getPendingById("invalid_id") } returns null
 
         val result = useCase("invalid_id")
 
