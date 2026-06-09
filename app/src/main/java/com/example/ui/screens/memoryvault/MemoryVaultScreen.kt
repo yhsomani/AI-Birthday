@@ -160,7 +160,7 @@ fun MemoryVaultScreen(
                         )
                     }
                 } else {
-                    items(uiState.notes) { note ->
+                    items(uiState.notes, key = { it.id }) { note ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(

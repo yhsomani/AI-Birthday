@@ -197,7 +197,7 @@ fun GiftAdvisorScreen(
                         )
                     }
                 } else {
-                    items(uiState.giftHistory) { gift ->
+                    items(uiState.giftHistory, key = { it.id }) { gift ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = RelateCard)
