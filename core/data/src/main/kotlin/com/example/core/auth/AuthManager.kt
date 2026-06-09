@@ -98,8 +98,8 @@ open class AuthManager @Inject constructor(
 
     open fun signOut() {
         Log.i("AuthManager", "Initiating secure sign-out sequence")
-        // TODO: The calling ViewModel must navigate to SplashScreen/OnboardingScreen after
-        // signOut() completes, clearing the back stack.
+        // The calling ViewModel handles navigation to AuthScreen after
+        // signOut() completes, clearing the back stack (handled in SettingsScreen.kt).
 
         try {
             // Step 1: Stop all workers before DB access
