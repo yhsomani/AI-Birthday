@@ -131,3 +131,38 @@
 
 **Commit message**
 * `fix: harden navigation route arguments`
+
+### Feature 4: Sync Error UI Consolidation
+
+**Problem identified**
+* Home and Contacts duplicated the same sync-error card UI, including hardcoded English strings and a Google Cloud Console URL with a fixed project id.
+* The error card offered dismissal but no consistent retry action across screens.
+
+**Root cause**
+* Sync failure feedback was implemented inline per screen instead of as a shared app-level component with localized text and explicit screen-provided actions.
+
+**Fix implemented**
+* Added a reusable `SyncErrorCard` with warning icon, safe message display, dismiss action, and retry action.
+* Replaced the duplicated Home and Contacts sync-error blocks with the shared component.
+* Wired Home retry to `HomeViewModel.loadMetrics()` and Contacts retry to `ContactListViewModel.refresh()`.
+* Removed the hardcoded Google Cloud project URL from user-facing UI.
+* Added English and Hindi string resources for the shared sync-error UI.
+
+**Impact**
+* Provides consistent recovery affordances for contact sync failures.
+* Avoids exposing developer-only Google Cloud project details to end users.
+* Reduces duplicated Compose UI and future maintenance risk.
+
+**Files modified**
+* `app/src/main/java/com/example/ui/components/SyncErrorCard.kt`
+* `app/src/main/java/com/example/ui/screens/home/HomeScreen.kt`
+* `app/src/main/java/com/example/ui/screens/contacts/ContactListScreen.kt`
+* `app/src/main/res/values/strings.xml`
+* `app/src/main/res/values-hi/strings.xml`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+
+**Commit message**
+* `ui: consolidate sync error feedback`

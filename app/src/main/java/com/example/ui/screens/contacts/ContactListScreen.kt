@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,8 +23,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.ui.graphics.Color
-import com.example.core.ui.components.RelateGlassCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -50,12 +49,12 @@ import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.HealthIndicatorDot
 import com.example.core.ui.components.ShimmerItem
-import androidx.compose.foundation.layout.PaddingValues
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.ui.components.SyncErrorCard
 import com.example.ui.viewmodel.ContactListViewModel
 
 private val filterOptions = listOf("All", "Family", "Friends", "Work", "Close Friends")
@@ -143,59 +142,12 @@ fun ContactListScreen(
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 state.syncError?.let { errorMsg ->
-                    RelateGlassCard(
+                    SyncErrorCard(
+                        message = errorMsg,
+                        onRetry = { viewModel.refresh() },
+                        onDismiss = { viewModel.dismissSyncError() },
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = "Sync Error",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = Color(0xFFFBBF24), // Amber color
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Dismiss",
-                                    tint = RelateOnSurfaceVariant,
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .clickable { viewModel.dismissSyncError() }
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = errorMsg,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = RelateOnBackground
-                            )
-                            if (errorMsg.contains("People API") || errorMsg.contains("disabled") || errorMsg.contains("403")) {
-                                Spacer(modifier = Modifier.height(12.dp))
-                                val context = androidx.compose.ui.platform.LocalContext.current
-                                androidx.compose.material3.Button(
-                                    onClick = {
-                                        val intent = android.content.Intent(
-                                            android.content.Intent.ACTION_VIEW,
-                                            android.net.Uri.parse("https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493")
-                                        )
-                                        context.startActivity(intent)
-                                    },
-                                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFFFBBF24),
-                                        contentColor = RelateDarkBackground
-                                    ),
-                                    shape = RoundedCornerShape(8.dp),
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                                ) {
-                                    Text("Enable People API in GCP Console", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
+                    )
                 }
 
                 if (state.isLoading && state.contacts.isEmpty()) {

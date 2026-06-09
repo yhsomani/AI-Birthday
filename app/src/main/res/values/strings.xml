@@ -118,6 +118,9 @@
     <string name="permission_rationale_message">RelateAI needs SMS permission to send approved wishes and notification permission to alert you before important moments.</string>
     <string name="permission_rationale_grant">Grant permissions</string>
     <string name="permission_rationale_not_now">Not now</string>
+    <string name="sync_error_title">Sync error</string>
+    <string name="sync_error_retry">Retry</string>
+    <string name="sync_error_dismiss">Dismiss</string>
     
     <!-- Common -->
     <string name="add">Add</string>

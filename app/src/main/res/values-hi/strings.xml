@@ -119,6 +119,9 @@
     <string name="permission_rationale_message">RelateAI को स्वीकृत शुभकामनाएं भेजने के लिए SMS अनुमति और महत्वपूर्ण मौकों से पहले बताने के लिए नोटिफिकेशन अनुमति चाहिए।</string>
     <string name="permission_rationale_grant">अनुमति दें</string>
     <string name="permission_rationale_not_now">अभी नहीं</string>
+    <string name="sync_error_title">सिंक त्रुटि</string>
+    <string name="sync_error_retry">फिर कोशिश करें</string>
+    <string name="sync_error_dismiss">हटाएं</string>
     
     <!-- Common -->
     <string name="add">जोड़ें</string>

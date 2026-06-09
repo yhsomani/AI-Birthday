@@ -1,7 +1,6 @@
 package com.example.ui.screens.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +18,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.People
@@ -28,7 +26,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,19 +35,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.example.core.ui.components.HealthBar
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
 import com.example.core.ui.components.StatCard
 import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
-import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.ui.components.SyncErrorCard
 import com.example.ui.viewmodel.HomeViewModel
 
 @Composable
@@ -105,59 +99,12 @@ fun HomeScreen(
         state.syncError?.let { errorMsg ->
             item {
                 Spacer(modifier = Modifier.height(16.dp))
-                RelateGlassCard(
+                SyncErrorCard(
+                    message = errorMsg,
+                    onRetry = { viewModel.loadMetrics() },
+                    onDismiss = { viewModel.dismissSyncError() },
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "Sync Error",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color(0xFFFBBF24), // Amber color
-                                fontWeight = FontWeight.Bold
-                            )
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Dismiss",
-                                tint = RelateOnSurfaceVariant,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clickable { viewModel.dismissSyncError() }
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = errorMsg,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = RelateOnBackground
-                        )
-                        if (errorMsg.contains("People API") || errorMsg.contains("disabled") || errorMsg.contains("403")) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            val context = androidx.compose.ui.platform.LocalContext.current
-                            androidx.compose.material3.Button(
-                                onClick = {
-                                    val intent = android.content.Intent(
-                                        android.content.Intent.ACTION_VIEW,
-                                        android.net.Uri.parse("https://console.developers.google.com/apis/api/people.googleapis.com/overview?project=339889410493")
-                                    )
-                                    context.startActivity(intent)
-                                },
-                                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFFBBF24),
-                                    contentColor = RelateDarkBackground
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                            ) {
-                                Text("Enable People API in GCP Console", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
+                )
             }
         }
 
