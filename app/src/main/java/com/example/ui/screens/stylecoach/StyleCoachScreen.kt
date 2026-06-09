@@ -266,7 +266,7 @@ fun StyleCoachScreen(
                     }
                 }
             } else {
-                items(uiState.history) { snapshot ->
+                items(uiState.history, key = { it.id }) { snapshot ->
                     val snapshotObj = remember(snapshot.profileJson) {
                         try {
                             org.json.JSONObject(snapshot.profileJson)

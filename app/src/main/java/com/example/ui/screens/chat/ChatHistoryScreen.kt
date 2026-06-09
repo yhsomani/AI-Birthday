@@ -52,7 +52,7 @@ fun ChatHistoryScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(uiState.messages) { message ->
+                items(uiState.messages, key = { it.id }) { message ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
