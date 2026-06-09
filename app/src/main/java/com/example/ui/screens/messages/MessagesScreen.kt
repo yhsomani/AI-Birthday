@@ -51,11 +51,12 @@ fun MessagesScreen(
     val tabs = listOf(
         "Today (${state.todayMessages.size})",
         "Pending (${state.pendingMessages.size})",
+        "Approved (${state.approvedMessages.size})",
         "Sent (${state.sentMessages.size})",
         "Failed (${state.failedMessages.size})"
     )
 
-    val pagerState = rememberPagerState(pageCount = { 4 })
+    val pagerState = rememberPagerState(pageCount = { 5 })
     var showRejectDialogForId by remember { mutableStateOf<String?>(null) }
 
     if (showRejectDialogForId != null) {
@@ -150,7 +151,7 @@ fun MessagesScreen(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
                 ) { page ->
-                    when (page) {
+                                        when (page) {
                         0 -> PendingMessagesList(
                             messages = state.todayMessages,
                             emptyText = "No messages scheduled for today",
@@ -167,8 +168,15 @@ fun MessagesScreen(
                             onEdit = onNavigateToWish,
                             approvingMessageId = state.approvingMessageId,
                         )
-                        2 -> SentMessagesList(messages = state.sentMessages)
-                        3 -> FailedMessagesList(
+                        2 -> ApprovedMessagesList(
+                            messages = state.approvedMessages,
+                            onRevoke = { viewModel.revokeApproval(it) },
+                            onReject = { showRejectDialogForId = it },
+                            onEdit = onNavigateToWish,
+                            revokingMessageId = state.revokingMessageId,
+                        )
+                        3 -> SentMessagesList(messages = state.sentMessages)
+                        4 -> FailedMessagesList(
                             messages = state.failedMessages,
                             onRetry = { viewModel.retryMessage(it) },
                             retryingMessageId = state.retryingMessageId,
@@ -671,6 +679,170 @@ private fun FailedMessageCard(
                         )
                     } else {
                         Text("Retry Send", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+@Composable
+private fun ApprovedMessagesList(
+    messages: List<PendingMessageItem>,
+    onRevoke: (String) -> Unit,
+    onReject: (String) -> Unit,
+    onEdit: (String, String) -> Unit,
+    revokingMessageId: String?,
+) {
+    if (messages.isEmpty()) {
+        EmptyState(message = "No approved messages")
+    } else {
+        LazyColumn(
+            contentPadding = PaddingValues(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(messages, key = { it.entity.id }) { item ->
+                ApprovedMessageCard(
+                    item = item,
+                    onRevoke = onRevoke,
+                    onReject = onReject,
+                    onEdit = onEdit,
+                    isRevoking = revokingMessageId == item.entity.id,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApprovedMessageCard(
+    item: PendingMessageItem,
+    onRevoke: (String) -> Unit,
+    onReject: (String) -> Unit,
+    onEdit: (String, String) -> Unit,
+    isRevoking: Boolean,
+) {
+    val message = item.entity
+    val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
+    RelateGlassCard {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (item.contactAvatarUrl != null) {
+                    AsyncImage(
+                        model = item.contactAvatarUrl,
+                        contentDescription = "Avatar",
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(RelateSurfaceVariant),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = item.contactName.take(1).uppercase(),
+                            color = RelateOnBackground,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.contactName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Scheduled: " + dateFormat.format(Date(message.scheduledForMs)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = RelateOnSurfaceVariant,
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = "Approved",
+                    tint = RelatePrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = message.selectedVariantText.ifBlank { message.standardVariant },
+                style = MaterialTheme.typography.bodyMedium,
+                color = RelateOnSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = { onReject(message.id) },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error,
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                        )
+                    ) {
+                        Text("Reject", fontSize = 11.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = { onEdit(message.contactId, message.eventId) },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = RelatePrimary,
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = androidx.compose.ui.graphics.SolidColor(RelatePrimary.copy(alpha = 0.5f))
+                        )
+                    ) {
+                        Text("Edit", fontSize = 11.sp)
+                    }
+
+                    Button(
+                        onClick = { onRevoke(message.id) },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = RelateOnSurfaceVariant,
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = !isRevoking,
+                    ) {
+                        if (isRevoking) {
+                            CircularProgressIndicator(
+                                color = RelateOnSurfaceVariant,
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text("Revoke", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
