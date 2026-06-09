@@ -112,7 +112,7 @@ dependencies {
     implementation(libs.firebase.vertexai)
     implementation(libs.firebase.analytics)
     
-    // RelateAI deps (these are now in the feature modules, but we keep them here for the Application class if needed)
+    // RelateAI app/data dependencies used by the active app UI and application shell.
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.sqlite.ktx)
     implementation(libs.androidx.security.crypto)

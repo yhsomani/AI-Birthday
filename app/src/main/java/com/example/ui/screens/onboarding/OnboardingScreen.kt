@@ -92,6 +92,7 @@ private val onboardingSteps = listOf(
 @Composable
 fun OnboardingScreen(
     onOnboardingComplete: () -> Unit,
+    onOpenAutomationSetup: () -> Unit = {},
 ) {
     var currentStep by remember { mutableIntStateOf(0) }
     val step = onboardingSteps[currentStep]
@@ -174,7 +175,17 @@ fun OnboardingScreen(
                 text = "Get Started",
                 onClick = onOnboardingComplete,
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(
+                onClick = onOpenAutomationSetup,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = "Set up WhatsApp automation",
+                    color = RelateOnSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

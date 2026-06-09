@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.People
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.example.R
 
 sealed class Screen(val route: String) {
     data object Splash : Screen("splash")
@@ -24,8 +25,12 @@ sealed class Screen(val route: String) {
     data object WishPreview : Screen("wish/{contactId}/{eventId}") {
         fun createRoute(contactId: String, eventId: String) = "wish/${java.net.URLEncoder.encode(contactId, "UTF-8")}/${java.net.URLEncoder.encode(eventId, "UTF-8")}"
     }
+    data object ChatHistory : Screen("chat-history/{contactId}") {
+        fun createRoute(contactId: String) = "chat-history/${java.net.URLEncoder.encode(contactId, "UTF-8")}"
+    }
     data object StyleCoach : Screen("style-coach")
     data object BackupRestore : Screen("backup-restore")
+    data object AutomationSetup : Screen("automation-setup")
     data object MemoryVault : Screen("memory-vault/{contactId}") {
         fun createRoute(contactId: String) = "memory-vault/${java.net.URLEncoder.encode(contactId, "UTF-8")}"
     }
@@ -35,15 +40,15 @@ sealed class Screen(val route: String) {
 }
 
 data class BottomNavItem(
-    val label: String,
+    val labelRes: Int,
     val icon: ImageVector,
     val screen: Screen,
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem("Home", Icons.Filled.Home, Screen.Home),
-    BottomNavItem("Contacts", Icons.Filled.People, Screen.ContactList),
-    BottomNavItem("Events", Icons.Filled.CalendarMonth, Screen.Events),
-    BottomNavItem("Messages", Icons.Filled.MailOutline, Screen.Messages),
-    BottomNavItem("Analytics", Icons.Filled.Analytics, Screen.Analytics),
+    BottomNavItem(R.string.nav_home, Icons.Filled.Home, Screen.Home),
+    BottomNavItem(R.string.nav_contacts, Icons.Filled.People, Screen.ContactList),
+    BottomNavItem(R.string.nav_events, Icons.Filled.CalendarMonth, Screen.Events),
+    BottomNavItem(R.string.nav_messages, Icons.Filled.MailOutline, Screen.Messages),
+    BottomNavItem(R.string.analytics, Icons.Filled.Analytics, Screen.Analytics),
 )

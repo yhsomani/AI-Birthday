@@ -8,6 +8,7 @@ import com.example.domain.usecase.SyncContactsUseCase
 import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +44,10 @@ class SettingsViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         every { authManager.userProfile } returns userProfileFlow
+        every { securePrefs.isBirthdayRemindersEnabled() } returns true
+        every { securePrefs.isAiWishGenerationEnabled() } returns true
+        every { securePrefs.getGeminiApiKey() } returns ""
+        every { securePrefs.getGlobalAutomationMode() } returns "SMART_APPROVE"
     }
 
     @After
@@ -56,9 +61,11 @@ class SettingsViewModelTest {
 
         viewModel.toggleBirthdayReminders(false)
         assertFalse(viewModel.uiState.value.birthdayReminders)
+        verify { securePrefs.setBirthdayRemindersEnabled(false) }
 
         viewModel.toggleBirthdayReminders(true)
         assertTrue(viewModel.uiState.value.birthdayReminders)
+        verify { securePrefs.setBirthdayRemindersEnabled(true) }
     }
 
     @Test
@@ -67,6 +74,7 @@ class SettingsViewModelTest {
 
         viewModel.toggleAiWishGeneration(false)
         assertFalse(viewModel.uiState.value.aiWishGeneration)
+        verify { securePrefs.setAiWishGenerationEnabled(false) }
     }
 
     @Test

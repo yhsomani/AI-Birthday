@@ -12,14 +12,14 @@ val RelateTypography = Typography(
         fontWeight = FontWeight.Bold,
         fontSize = 42.sp,
         lineHeight = 48.sp,
-        letterSpacing = (-0.02).sp,
+        letterSpacing = 0.sp,
     ),
     displayMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
         fontSize = 32.sp,
         lineHeight = 38.sp,
-        letterSpacing = (-0.01).sp,
+        letterSpacing = 0.sp,
     ),
     headlineLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -86,13 +86,13 @@ val RelateTypography = Typography(
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
-        letterSpacing = 0.05.sp,
+        letterSpacing = 0.sp,
     ),
     labelSmall = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
         fontSize = 10.sp,
         lineHeight = 14.sp,
-        letterSpacing = 0.05.sp,
+        letterSpacing = 0.sp,
     ),
 )

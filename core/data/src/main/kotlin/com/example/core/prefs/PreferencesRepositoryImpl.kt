@@ -42,6 +42,16 @@ class PreferencesRepositoryImpl @Inject constructor(
     override fun setBiometricLockEnabled(enabled: Boolean) = securePrefs.setBiometricLockEnabled(enabled)
     override fun isBiometricLockEnabled(): Boolean = securePrefs.isBiometricLockEnabled()
 
+    override fun setBirthdayRemindersEnabled(enabled: Boolean) =
+        securePrefs.setBirthdayRemindersEnabled(enabled)
+    override fun isBirthdayRemindersEnabled(): Boolean =
+        securePrefs.isBirthdayRemindersEnabled()
+
+    override fun setAiWishGenerationEnabled(enabled: Boolean) =
+        securePrefs.setAiWishGenerationEnabled(enabled)
+    override fun isAiWishGenerationEnabled(): Boolean =
+        securePrefs.isAiWishGenerationEnabled()
+
     override fun isSecureStorageAvailable(): Boolean = securePrefs.isSecureStorageAvailable()
 
     override fun setSyncToken(token: String) = securePrefs.setSyncToken(token)

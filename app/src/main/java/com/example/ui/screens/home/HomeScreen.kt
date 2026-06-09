@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MailOutline
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
@@ -188,6 +189,24 @@ fun HomeScreen(
                         label = "Upcoming",
                         value = "${state.upcomingEventsCount}",
                         icon = Icons.Filled.CalendarMonth,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    StatCard(
+                        label = "Contacts",
+                        value = "${state.contactCount}",
+                        icon = Icons.Filled.People,
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatCard(
+                        label = "Pending",
+                        value = "${state.pendingCount}",
+                        icon = Icons.Filled.MailOutline,
                         modifier = Modifier.weight(1f),
                     )
                     StatCard(

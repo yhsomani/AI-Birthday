@@ -2,6 +2,7 @@ package com.example.ui.screens.contacts
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -47,7 +49,6 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.HealthIndicatorDot
-import com.example.core.ui.components.ShimmerItem
 import com.example.core.ui.components.ShimmerItem
 import androidx.compose.foundation.layout.PaddingValues
 import com.example.core.ui.theme.RelateDarkBackground
@@ -120,7 +121,9 @@ fun ContactListScreen(
         )
         Spacer(modifier = Modifier.height(12.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             filterOptions.forEach { filter ->

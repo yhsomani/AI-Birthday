@@ -158,4 +158,39 @@ class ContactDetailViewModelTest {
         assertNotNull(viewModel.uiState.value.generationError)
         assertEquals(false, viewModel.uiState.value.isGenerating)
     }
+
+    @Test
+    fun `generateWish shows settings error when AI generation is disabled`() = runTest(testDispatcher) {
+        val contact = ContactEntity(id = "contact1", name = "Alice", healthScore = 80)
+        val cal = java.util.Calendar.getInstance()
+        cal.add(java.util.Calendar.DAY_OF_MONTH, 7)
+        val event = EventEntity(
+            id = "event1",
+            contactId = "contact1",
+            type = "BIRTHDAY",
+            dayOfMonth = cal.get(java.util.Calendar.DAY_OF_MONTH),
+            month = cal.get(java.util.Calendar.MONTH) + 1,
+            nextOccurrenceMs = cal.timeInMillis,
+        )
+
+        coEvery { mockContactRepo.getById("contact1") } returns contact
+        coEvery { mockEventRepo.getUpcoming(365) } returns listOf(event)
+        coEvery { mockGenerateUseCase("event1") } returns
+            GenerateMessageUseCase.GenerationOutcome.AiDisabled
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact1"))
+        val viewModel = ContactDetailViewModel(
+            savedStateHandle = savedStateHandle,
+            contactRepository = mockContactRepo,
+            eventRepository = mockEventRepo,
+            generateMessageUseCase = mockGenerateUseCase,
+        )
+        advanceUntilIdle()
+
+        viewModel.generateWish()
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.generationResult)
+        assertEquals("AI wish generation is disabled in Settings.", viewModel.uiState.value.generationError)
+    }
 }

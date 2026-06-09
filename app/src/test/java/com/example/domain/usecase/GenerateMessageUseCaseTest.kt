@@ -15,6 +15,7 @@ import com.example.domain.service.PreferencesRepository
 import com.example.domain.service.SchedulerService
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -42,6 +43,10 @@ class GenerateMessageUseCaseTest {
         schedulerService,
         notificationService
     )
+
+    init {
+        every { preferencesRepository.isAiWishGenerationEnabled() } returns true
+    }
 
     @Test
     fun `invoke with missing event returns EventNotFound`() = runTest {
@@ -73,6 +78,22 @@ class GenerateMessageUseCaseTest {
         val result = useCase("e1")
 
         assertEquals(GenerateMessageUseCase.GenerationOutcome.ContactNotFound, result)
+    }
+
+    @Test
+    fun `invoke returns AiDisabled before calling Gemini when disabled in preferences`() = runTest {
+        val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
+        val contact = ContactEntity(id = "c1", name = "John")
+        coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
+        coEvery { messageRepository.pendingExistsForEvent("e1") } returns false
+        coEvery { contactRepository.getById("c1") } returns contact
+        every { preferencesRepository.isAiWishGenerationEnabled() } returns false
+
+        val result = useCase("e1")
+
+        assertEquals(GenerateMessageUseCase.GenerationOutcome.AiDisabled, result)
+        coVerify(exactly = 0) { aiService.generateMessage(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { messageRepository.insertPending(any()) }
     }
 
     @Test

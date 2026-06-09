@@ -14,7 +14,7 @@
 │   ├── domain/         # Business logic, use cases, repositories (interfaces)
 │   ├── data/           # Data layer (repositories, Room, API clients)
 │   └── ui/             # Shared UI components, theme, design system
-└── feature/            # Feature modules (splash, login, dashboard, etc.)
+└── feature/            # Not active; keep feature UI under app/src/main/java/com/example/ui
 ```
 
 ## Key Dependencies

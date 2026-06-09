@@ -108,7 +108,7 @@ RelateAI is an **on-device "Relationship Operating System"** that automatically 
 | P2-09 | syncToken incremental contact sync | ✅ Implemented | `GoogleContactsSync` — `syncToken` parameter |
 | P2-10 | Google Contact Groups/Labels enrichment | ✅ Implemented | `contactGroup` column (MIGRATION_4_5) + sync logic |
 | P3-05 | Coil for contact photo caching | ✅ Implemented | Coil declared in build.gradle.kts and integrated in UI |
-| P4-01 | Multi-module architecture (3 modules) | 🟡 Partial | 3 modules exist (app, core:domain, core:data); no feature modules |
+| P4-01 | Multi-module architecture (4 active modules) | ✅ Implemented | Active modules are `:app`, `:core:domain`, `:core:data`, and `:core:ui`; no feature modules |
 | P4-02 | UseCase layer (10 use cases) | ✅ Implemented | 10 use cases in `:core:domain` |
 | CRIT-01 | DB key derivation off main thread (cache + `warmUpAsync()`) | ✅ Implemented | `DatabaseKeyDerivation.warmUpAsync()` on app start |
 | CRIT-03 | Backup encryption: AES-256-GCM | ✅ Implemented | `BackupEncryption.kt` uses `AES/GCM/NoPadding` |
@@ -544,15 +544,16 @@ graph TD
 :app (UI) → :core:domain (Entities, Repositories, UseCases) → :core:data (DAOs, Implementations) → External (Room, Firebase, Network)
 ```
 
-### 14.2 Module Structure (3 Modules)
+### 14.2 Module Structure (4 Active Modules)
 
 | Module | Type | Purpose |
 |---|---|---|
-| `:app` | Application | Entry point, DI, manifest, widget, signing, UI stub, tests |
+| `:app` | Application | Entry point, DI, manifest, widget, signing, active Compose UI, tests |
 | `:core:domain` | Android Library | 7 Room entities, 6 repository interfaces, 6 service interfaces, 10 use cases |
 | `:core:data` | Android Library | 7 DAOs, 6 repository implementations, 6 workers, 4 senders, Gemini client, contacts sync, auth, backup, DI modules |
+| `:core:ui` | Android Library | Shared Compose components, theme, typography, and design-system primitives |
 
-> **Note**: The documented `:core:ui` and 9 `:feature:*` modules do not currently exist. All UI code resides in `:app`. Separate feature modules may be created during UI implementation.
+> **Note**: The repo intentionally has no active `:feature:*` modules. Feature UI currently lives in `:app`; shared UI primitives live in `:core:ui`.
 
 ### 14.3 Workers (6)
 
@@ -1089,7 +1090,7 @@ Baseline Profile AOT, DB indices (MIGRATION_6_7), StateFlow `WhileSubscribed(500
 | ADR-001 | WorkManager for background tasks | Survives process death; min 15-min periodic |
 | ADR-002 | Accessibility Service for WhatsApp | Works all versions; fragile to UI changes |
 | ADR-003 | Hilt over Koin | Compile-time safety; slower builds |
-| ADR-004 | Multi-module planned — currently 3 modules (`:app`, `:core:domain`, `:core:data`) | Parallel compilation; more complex structure; feature modules not yet created |
+| ADR-004 | Multi-module app with 4 active modules (`:app`, `:core:domain`, `:core:data`, `:core:ui`) | Parallel compilation; clear layer boundaries; no active feature modules |
 | ADR-005 | SQLCipher for DB encryption | AES-256; device-specific DB |
 | ADR-006 | Repository pattern | Abstracted data sources; one more layer |
 | ADR-007 | Gemini 1.5-Flash | Low cost; no offline capability |

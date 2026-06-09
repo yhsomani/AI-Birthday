@@ -10,10 +10,12 @@ plugins {
   alias(libs.plugins.google.services) apply false
 }
 
+val buildJvmVersion = 21
+
 subprojects {
     plugins.withId("org.jetbrains.kotlin.android") {
         extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension> {
-            jvmToolchain(17)
+            jvmToolchain(buildJvmVersion)
         }
     }
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
@@ -25,9 +27,15 @@ subprojects {
         val toolchainService = project.extensions.findByType<org.gradle.jvm.toolchain.JavaToolchainService>()
             ?: project.rootProject.extensions.getByType<org.gradle.jvm.toolchain.JavaToolchainService>()
         javaLauncher.set(toolchainService.launcherFor {
-            languageVersion.set(org.gradle.jvm.toolchain.JavaLanguageVersion.of(17))
+            languageVersion.set(org.gradle.jvm.toolchain.JavaLanguageVersion.of(buildJvmVersion))
         })
+
+        val localTrustStore = rootProject.layout.projectDirectory
+            .file(".gradle/trust/cacerts-zscaler")
+            .asFile
+        if (localTrustStore.exists()) {
+            systemProperty("javax.net.ssl.trustStore", localTrustStore.absolutePath)
+            systemProperty("javax.net.ssl.trustStorePassword", "changeit")
+        }
     }
 }
-
-

@@ -114,6 +114,10 @@
     <string name="nav_events">Events</string>
     <string name="nav_messages">Messages</string>
     <string name="nav_more">More</string>
+    <string name="permission_rationale_title">Enable sending and reminders</string>
+    <string name="permission_rationale_message">RelateAI needs SMS permission to send approved wishes and notification permission to alert you before important moments.</string>
+    <string name="permission_rationale_grant">Grant permissions</string>
+    <string name="permission_rationale_not_now">Not now</string>
     
     <!-- Common -->
     <string name="add">Add</string>

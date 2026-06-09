@@ -96,6 +96,12 @@ class ContactDetailViewModel @Inject constructor(
                         generationError = "Contact not found.",
                     )
                 }
+                is GenerateMessageUseCase.GenerationOutcome.AiDisabled -> {
+                    _uiState.value = _uiState.value.copy(
+                        isGenerating = false,
+                        generationError = "AI wish generation is disabled in Settings.",
+                    )
+                }
             }
         }
     }

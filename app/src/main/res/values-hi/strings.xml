@@ -115,6 +115,10 @@
     <string name="nav_events">कार्यक्रम</string>
     <string name="nav_messages">संदेश</string>
     <string name="nav_more">और अधिक</string>
+    <string name="permission_rationale_title">भेजना और रिमाइंडर चालू करें</string>
+    <string name="permission_rationale_message">RelateAI को स्वीकृत शुभकामनाएं भेजने के लिए SMS अनुमति और महत्वपूर्ण मौकों से पहले बताने के लिए नोटिफिकेशन अनुमति चाहिए।</string>
+    <string name="permission_rationale_grant">अनुमति दें</string>
+    <string name="permission_rationale_not_now">अभी नहीं</string>
     
     <!-- Common -->
     <string name="add">जोड़ें</string>

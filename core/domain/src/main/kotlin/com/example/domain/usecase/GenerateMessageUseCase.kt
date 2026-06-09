@@ -42,6 +42,9 @@ class GenerateMessageUseCase @Inject constructor(
         }
 
         val contact = contactRepository.getById(event.contactId) ?: return GenerationOutcome.ContactNotFound
+        if (!preferencesRepository.isAiWishGenerationEnabled()) {
+            return GenerationOutcome.AiDisabled
+        }
         val styleProfile = styleProfileRepository.getProfileOnce()
         val previousMessages = messageRepository.getSentByContact(contact.id, 10)
 
@@ -108,6 +111,7 @@ class GenerateMessageUseCase @Inject constructor(
         data object EventNotFound : GenerationOutcome()
         data object ContactNotFound : GenerationOutcome()
         data object AlreadyExists : GenerationOutcome()
+        data object AiDisabled : GenerationOutcome()
         data class Generated(val pendingId: String, val approvalMode: String, val retries: Int) : GenerationOutcome()
     }
 }

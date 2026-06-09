@@ -78,6 +78,7 @@ fun SettingsScreen(
     onSignOut: () -> Unit = {},
     onNavigateToStyleCoach: () -> Unit = {},
     onNavigateToBackupRestore: () -> Unit = {},
+    onNavigateToAutomationSetup: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -175,6 +176,13 @@ fun SettingsScreen(
                         title = "AI Style Coach",
                         subtitle = "Train AI to match your personal writing style",
                         onClick = onNavigateToStyleCoach
+                    )
+                    SettingsDivider()
+                    SettingsRow(
+                        icon = Icons.Filled.Security,
+                        title = "Automation Setup",
+                        subtitle = "Enable WhatsApp accessibility, reminders, and background reliability",
+                        onClick = onNavigateToAutomationSetup
                     )
                 }
             }

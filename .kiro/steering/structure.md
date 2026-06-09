@@ -9,9 +9,7 @@ app/
 │   │   ├── MainActivity.kt           # Main entry point, navigation setup
 │   │   ├── RelateAIApp.kt            # Application class, HiltAndroidApp
 │   │   ├── SecurityChecks.kt         # Certificate pin expiry check
-│   │   ├── feature/                  # Feature modules (splash, login, dashboard, etc.)
-│   │   ├── data/                     # Data sources (not used, moved to core/data)
-│   │   ├── di/                       # Dependency injection modules
+│   │   ├── ui/                       # Active Compose screens, navigation, and ViewModels
 │   │   └── automation/
 │   │       └── notifications/
 │   │           └── MessageEditActivity.kt
@@ -41,28 +39,21 @@ core/
 │   │   │   ├── auth/                 # AuthManager
 │   │   │   ├── prefs/                # SecurePrefs, encrypted storage
 │   │   │   ├── gemini/               # Gemini AI client
-│   │   │   └── ui/                   # Shared UI components
+│   │   │   └── automation/           # Workers, scheduling, senders, notifications
 │   │   ├── data/                     # Repository implementations
 │   │   └── di/                       # Hilt modules (AppModule, AppModuleBinds)
 │   └── build.gradle.kts
 │
 └── ui/                               # Shared UI components and theme
-    ├── src/main/kotlin/com/example/ui/
+    ├── src/main/kotlin/com/example/core/ui/
+    │   ├── components/               # Reusable Compose primitives
     │   └── theme/                    # Color, Typography, Theme composition
     └── build.gradle.kts
 ```
 
 ```
-feature/                              # Feature modules
-├── splash/
-├── login/
-├── dashboard/
-├── contacts/
-├── events/
-├── analytics/
-├── onboarding/
-├── settings/
-└── messages/
+feature/                              # Not active
+└── Do not add new code here. Feature UI currently lives under app/src/main/java/com/example/ui/.
 ```
 
 ## Architecture Patterns
@@ -70,7 +61,7 @@ feature/                              # Feature modules
 ### Clean Architecture Layers
 
 ```
-UI Layer (feature modules)
+UI Layer (app/src/main/java/com/example/ui)
     ↓ uses
 Domain Layer (core/domain)
     ↓ uses

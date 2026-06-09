@@ -29,6 +29,8 @@ import com.example.ui.screens.stylecoach.StyleCoachScreen
 import com.example.ui.screens.backup.BackupRestoreScreen
 import com.example.ui.screens.memoryvault.MemoryVaultScreen
 import com.example.ui.screens.giftadvisor.GiftAdvisorScreen
+import com.example.ui.screens.chat.ChatHistoryScreen
+import com.example.ui.screens.setup.AutomationSetupScreen
 
 private const val ANIM_DURATION = 300
 
@@ -99,6 +101,9 @@ fun RelateNavGraph(
         composable(Screen.Onboarding.route) {
             val context = LocalContext.current
             OnboardingScreen(
+                onOpenAutomationSetup = {
+                    navController.navigate(Screen.AutomationSetup.route)
+                },
                 onOnboardingComplete = {
                     // Persist onboarding completion so future launches skip this screen
                     SecurePrefs(context).setOnboardingComplete(true)
@@ -156,6 +161,9 @@ fun RelateNavGraph(
                 },
                 onNavigateToGiftAdvisor = { cid ->
                     navController.navigate(Screen.GiftAdvisor.createRoute(cid))
+                },
+                onNavigateToChatHistory = { cid ->
+                    navController.navigate(Screen.ChatHistory.createRoute(cid))
                 }
             )
         }
@@ -213,6 +221,9 @@ fun RelateNavGraph(
                 },
                 onNavigateToBackupRestore = {
                     navController.navigate(Screen.BackupRestore.route)
+                },
+                onNavigateToAutomationSetup = {
+                    navController.navigate(Screen.AutomationSetup.route)
                 }
             )
         }
@@ -226,6 +237,21 @@ fun RelateNavGraph(
         }
         composable(Screen.BackupRestore.route) {
             BackupRestoreScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.AutomationSetup.route) {
+            AutomationSetupScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = Screen.ChatHistory.route,
+            arguments = listOf(navArgument("contactId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val rawContactId = backStackEntry.arguments?.getString("contactId") ?: ""
+            val contactId = try { java.net.URLDecoder.decode(rawContactId, "UTF-8") } catch (e: Exception) { rawContactId }
+            ChatHistoryScreen(
                 onBack = { navController.popBackStack() }
             )
         }

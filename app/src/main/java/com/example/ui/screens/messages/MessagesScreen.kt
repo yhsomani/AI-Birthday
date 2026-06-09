@@ -47,6 +47,7 @@ fun MessagesScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val tabs = listOf(
         "Today (${state.todayMessages.size})",
@@ -58,6 +59,13 @@ fun MessagesScreen(
 
     val pagerState = rememberPagerState(pageCount = { 5 })
     var showRejectDialogForId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(state.error) {
+        state.error?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.clearError()
+        }
+    }
 
     if (showRejectDialogForId != null) {
         AlertDialog(
@@ -185,6 +193,7 @@ fun MessagesScreen(
                 }
             }
         }
+        SnackbarHost(hostState = snackbarHostState)
     }
 }
 

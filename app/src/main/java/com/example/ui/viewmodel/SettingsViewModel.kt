@@ -34,7 +34,7 @@ data class SettingsUiState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    @ApplicationContext private val appContext: Context,
+    @param:ApplicationContext private val appContext: Context,
     private val syncContactsUseCase: SyncContactsUseCase,
     private val contactRepository: ContactRepository,
     private val authManager: AuthManager,
@@ -49,6 +49,8 @@ class SettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             geminiApiKey = securePrefs.getGeminiApiKey(),
             automationMode = securePrefs.getGlobalAutomationMode(),
+            birthdayReminders = securePrefs.isBirthdayRemindersEnabled(),
+            aiWishGeneration = securePrefs.isAiWishGenerationEnabled(),
         )
         viewModelScope.launch {
             authManager.userProfile.collect { profile ->
@@ -62,10 +64,12 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun toggleBirthdayReminders(enabled: Boolean) {
+        securePrefs.setBirthdayRemindersEnabled(enabled)
         _uiState.value = _uiState.value.copy(birthdayReminders = enabled)
     }
 
     fun toggleAiWishGeneration(enabled: Boolean) {
+        securePrefs.setAiWishGenerationEnabled(enabled)
         _uiState.value = _uiState.value.copy(aiWishGeneration = enabled)
     }
 

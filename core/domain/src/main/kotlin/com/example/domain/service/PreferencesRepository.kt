@@ -34,6 +34,12 @@ interface PreferencesRepository {
     fun setBiometricLockEnabled(enabled: Boolean)
     fun isBiometricLockEnabled(): Boolean
 
+    fun setBirthdayRemindersEnabled(enabled: Boolean)
+    fun isBirthdayRemindersEnabled(): Boolean
+
+    fun setAiWishGenerationEnabled(enabled: Boolean)
+    fun isAiWishGenerationEnabled(): Boolean
+
     fun isSecureStorageAvailable(): Boolean
 
     fun setSyncToken(token: String)

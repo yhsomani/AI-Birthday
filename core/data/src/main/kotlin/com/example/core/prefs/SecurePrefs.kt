@@ -127,6 +127,16 @@ class SecurePrefs(context: Context) {
     fun setBiometricLockEnabled(enabled: Boolean) = configPrefs.edit().putBoolean("biometric_lock", enabled).apply()
     fun isBiometricLockEnabled(): Boolean = configPrefs.getBoolean("biometric_lock", false)
 
+    fun setBirthdayRemindersEnabled(enabled: Boolean) =
+        configPrefs.edit().putBoolean("birthday_reminders_enabled", enabled).apply()
+    fun isBirthdayRemindersEnabled(): Boolean =
+        configPrefs.getBoolean("birthday_reminders_enabled", true)
+
+    fun setAiWishGenerationEnabled(enabled: Boolean) =
+        configPrefs.edit().putBoolean("ai_wish_generation_enabled", enabled).apply()
+    fun isAiWishGenerationEnabled(): Boolean =
+        configPrefs.getBoolean("ai_wish_generation_enabled", true)
+
     fun isSecureStorageAvailable(): Boolean {
         return try {
             authPrefs is EncryptedSharedPreferences && configPrefs is EncryptedSharedPreferences

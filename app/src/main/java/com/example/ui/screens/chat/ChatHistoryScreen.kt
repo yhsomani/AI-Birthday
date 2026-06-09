@@ -9,14 +9,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.core.ui.components.EmptyState
+import com.example.core.ui.components.RelateGlassCard
+import com.example.core.ui.components.RelateScreen
+import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateOnSurfaceVariant
+import com.example.core.ui.theme.RelatePrimary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatHistoryScreen(
     onBack: () -> Unit,
@@ -24,47 +30,43 @@ fun ChatHistoryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Chat History") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    RelateScreen(
+        title = "Chat History",
+        subtitle = "Messages already sent for this contact.",
+        navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
+        navigationContentDescription = "Back",
+        onNavigationClick = onBack,
+    ) {
         if (uiState.isLoading) {
-            Box(Modifier.fillMaxSize()) {
-                CircularProgressIndicator(Modifier.align(androidx.compose.ui.Alignment.Center))
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = RelatePrimary)
             }
         } else if (uiState.messages.isEmpty()) {
-             Box(Modifier.fillMaxSize()) {
-                Text("No messages sent yet.", Modifier.align(androidx.compose.ui.Alignment.Center))
-            }
+            EmptyState(
+                message = "No messages sent yet.",
+                modifier = Modifier.fillMaxSize(),
+            )
         } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(uiState.messages, key = { it.id }) { message ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    RelateGlassCard {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = message.messageText,
-                                style = MaterialTheme.typography.bodyLarge
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             val date = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(Date(message.sentAtMs))
                             Text(
                                 text = "Sent via ${message.channel} • $date",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = RelateOnSurfaceVariant,
                             )
                         }
                     }
