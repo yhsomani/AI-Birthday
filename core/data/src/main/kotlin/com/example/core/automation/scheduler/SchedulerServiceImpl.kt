@@ -14,4 +14,8 @@ class SchedulerServiceImpl @Inject constructor(
     override fun scheduleExactSend(eventId: String) {
         DailyScheduler.scheduleExactSend(context, eventId)
     }
+
+    override fun cancelExactSend(eventId: String) {
+        DailyScheduler.cancelExactSend(context, eventId)
+    }
 }

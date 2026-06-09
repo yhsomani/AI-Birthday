@@ -37,6 +37,20 @@ object DailyScheduler {
             }
         }
     }
+
+    fun cancelExactSend(context: Context, eventId: String) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        val intent = Intent(context, MessageDispatchReceiver::class.java).apply {
+            putExtra("event_id", eventId)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            eventId.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent)
+    }
 }
 
 class MessageDispatchReceiver : BroadcastReceiver() {

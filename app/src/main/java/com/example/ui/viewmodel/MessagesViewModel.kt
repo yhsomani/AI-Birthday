@@ -9,6 +9,7 @@ import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
+import com.example.domain.usecase.RevokeApprovalUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,12 +35,14 @@ data class SentMessageItem(
 data class MessagesUiState(
     val todayMessages: List<PendingMessageItem> = emptyList(),
     val pendingMessages: List<PendingMessageItem> = emptyList(),
+    val approvedMessages: List<PendingMessageItem> = emptyList(),
     val sentMessages: List<SentMessageItem> = emptyList(),
     val failedMessages: List<PendingMessageItem> = emptyList(),
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val approvingMessageId: String? = null,
     val rejectingMessageId: String? = null,
+    val revokingMessageId: String? = null,
     val retryingMessageId: String? = null,
     val error: String? = null,
 )
@@ -51,6 +54,7 @@ class MessagesViewModel @Inject constructor(
     private val eventRepository: EventRepository,
     private val approvePendingMessageUseCase: ApprovePendingMessageUseCase,
     private val rejectPendingMessageUseCase: RejectPendingMessageUseCase,
+    private val revokeApprovalUseCase: RevokeApprovalUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MessagesUiState())
@@ -93,6 +97,7 @@ class MessagesViewModel @Inject constructor(
                     val todayItems = mutableListOf<PendingMessageItem>()
                     val pendingItems = mutableListOf<PendingMessageItem>()
                     val failedItems = mutableListOf<PendingMessageItem>()
+                    val approvedItems = mutableListOf<PendingMessageItem>()
     
                     pending.forEach { msg ->
                         val contact = contactMap[msg.contactId]
@@ -106,6 +111,7 @@ class MessagesViewModel @Inject constructor(
     
                         when (msg.status) {
                             "FAILED" -> failedItems.add(item)
+                            "APPROVED" -> approvedItems.add(item)
                             "SENT", "REJECTED", "EXPIRED" -> {
                                 // Do not show these in pending/today/failed lists
                             }
@@ -131,6 +137,7 @@ class MessagesViewModel @Inject constructor(
                     _uiState.value.copy(
                         todayMessages = todayItems,
                         pendingMessages = pendingItems,
+                        approvedMessages = approvedItems,
                         sentMessages = sentItems,
                         failedMessages = failedItems,
                         isLoading = false,
@@ -191,6 +198,22 @@ class MessagesViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     retryingMessageId = null,
                     error = "Failed to retry: ${e.localizedMessage}"
+                )
+            }
+        }
+    }
+
+
+    fun revokeApproval(messageId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(revokingMessageId = messageId)
+            try {
+                revokeApprovalUseCase(messageId)
+                _uiState.value = _uiState.value.copy(revokingMessageId = null)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    revokingMessageId = null,
+                    error = "Failed to revoke: ${e.localizedMessage}"
                 )
             }
         }
