@@ -9,8 +9,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.core.db.dao.*
 import com.example.core.db.entities.*
+import com.example.core.prefs.SecurePrefs
 import net.sqlcipher.database.SupportFactory
-import java.io.File
 
 @Database(
     entities = [
@@ -406,33 +406,6 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        private fun isDatabaseUnencrypted(context: Context): Boolean {
-            val dbFile = context.getDatabasePath("relateai.db")
-            if (!dbFile.exists() || dbFile.length() < 16) return false
-            return try {
-                dbFile.inputStream().use { stream ->
-                    val header = ByteArray(16)
-                    val read = stream.read(header)
-                    if (read != 16) return false
-                    val expected = "SQLite format 3\u0000".toByteArray(Charsets.US_ASCII)
-                    header.contentEquals(expected)
-                }
-            } catch (e: Exception) {
-                false
-            }
-        }
-
-        private fun deleteUnencryptedDb(context: Context) {
-            val dbFile = context.getDatabasePath("relateai.db")
-            if (dbFile.exists()) {
-                Log.w(TAG, "Deleting existing unencrypted DB for SQLCipher migration")
-                dbFile.delete()
-                // Also delete WAL and SHM files if they exist
-                File(dbFile.path + "-wal").delete()
-                File(dbFile.path + "-shm").delete()
-            }
-        }
-
         fun closeAndResetInstance() {
             synchronized(this) {
                 INSTANCE?.let { db ->
@@ -448,8 +421,14 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                if (isDatabaseUnencrypted(context)) {
-                    deleteUnencryptedDb(context)
+                val quarantineResult = LegacyDatabaseQuarantine.quarantineIfPlaintext(context.applicationContext)
+                if (quarantineResult.quarantined) {
+                    Log.w(TAG, "Quarantined legacy unencrypted DB at ${quarantineResult.directory?.absolutePath}")
+                    try {
+                        SecurePrefs(context.applicationContext).setLegacyUnencryptedDbQuarantined(true)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to persist legacy DB quarantine notice", e)
+                    }
                 }
 
                 val passphrase = DatabaseKeyDerivation.deriveKey(context)
@@ -462,7 +441,6 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 .openHelperFactory(factory)
                 .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
-                .fallbackToDestructiveMigration()
                 .build()
                 INSTANCE = instance
                 instance

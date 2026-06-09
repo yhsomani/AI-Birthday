@@ -207,3 +207,54 @@
 
 **Commit message**
 * `fix: harden google sign-in configuration`
+
+### Feature 6: Data-Safety Production Hardening
+
+**Problem identified**
+* Room still used `fallbackToDestructiveMigration()`, so a missing migration could silently wipe relationship data.
+* Legacy plaintext `relateai.db` files were deleted before SQLCipher open, preventing support or manual recovery.
+* Message-dispatch work requests were built in multiple places with inconsistent constraints.
+
+**Root cause**
+* Database open logic optimized for recovery from old plaintext data but treated destructive migration/deletion as acceptable fallback behavior.
+* Dispatch retries, notification approvals, and alarm dispatch each constructed `MessageDispatchWorker` requests independently.
+
+**Fix implemented**
+* Removed destructive Room migration fallback so unsupported schema paths fail closed.
+* Added `LegacyDatabaseQuarantine` to move plaintext `relateai.db`, `relateai.db-wal`, and `relateai.db-shm` into `noBackupFilesDir/legacy-unencrypted-db/<timestamp>/` without modifying file bytes.
+* Added a one-time `SecurePrefs` notice flag and surfaced a localized Settings notice under Data & Sync with a dismiss action.
+* Centralized `MessageDispatchWorker` request creation with low-storage protection and exponential backoff while preserving immediate approval/alarm timing semantics.
+* Expanded migration tests for exported schema paths `4 -> 11`, `5 -> 11`, `6 -> 11`, `9 -> 11`, and `10 -> 11`, including representative contacts, events, pending messages, sent messages, memory notes, and gift history data where supported.
+
+**Impact**
+* Prevents silent loss of user relationship data during database open and migration failures.
+* Preserves old plaintext database files for support recovery while still starting a fresh encrypted database.
+* Reduces message-state write risk when device storage is low and makes dispatch scheduling behavior easier to maintain without adding low-battery delays to user-approved sends.
+
+**Files modified**
+* `core/data/src/main/kotlin/com/example/core/db/AppDatabase.kt`
+* `core/data/src/main/kotlin/com/example/core/db/LegacyDatabaseQuarantine.kt`
+* `core/data/src/main/kotlin/com/example/core/prefs/SecurePrefs.kt`
+* `app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt`
+* `app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt`
+* `app/src/main/res/values/strings.xml`
+* `app/src/main/res/values-hi/strings.xml`
+* `core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorkRequests.kt`
+* `core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt`
+* `core/data/src/main/kotlin/com/example/core/automation/notifications/ApprovalReceiver.kt`
+* `core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt`
+* `core/data/src/test/kotlin/com/example/core/db/MigrationTest.kt`
+* `core/data/src/test/kotlin/com/example/core/db/LegacyDatabaseQuarantineTest.kt`
+* `core/data/src/test/kotlin/com/example/core/automation/workers/MessageDispatchWorkRequestsTest.kt`
+* `app/src/test/java/com/example/ui/viewmodel/SettingsViewModelTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `./gradlew :core:data:testDebugUnitTest --no-configuration-cache` passed.
+* `./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed with Homebrew JDK 21 and the existing TLS truststore.
+* `./gradlew assembleRelease --no-configuration-cache` passed with Homebrew JDK 21 and the existing TLS truststore.
+* Launched `com.aistudio.relateai.qxtjrk/com.example.MainActivity` on device `1b87b5db`; filtered logcat showed startup and SQLCipher load, with no app-owned `FATAL EXCEPTION`, `AndroidRuntime`, Room, or SQLCipher open failure.
+* Fresh debug reinstall on the same device was not forced because `adb install -r` reported `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; no uninstall was performed in order to preserve app data. Relaunching the installed package still showed no app-owned crash/runtime/database errors in filtered logcat.
+
+**Commit message**
+* `fix: harden database data safety`

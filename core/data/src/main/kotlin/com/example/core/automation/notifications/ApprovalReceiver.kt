@@ -6,11 +6,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
-import androidx.work.Data
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.core.automation.scheduler.MessageDispatchReceiver
-import com.example.core.automation.workers.MessageDispatchWorker
+import com.example.core.automation.workers.MessageDispatchWorkRequests
 import com.example.core.db.dao.PendingMessageDao
 import com.example.domain.repository.MessageRepository
 import dagger.hilt.EntryPoint
@@ -61,13 +59,7 @@ class ApprovalReceiver : BroadcastReceiver() {
                     }
                     
                     val workManager = WorkManager.getInstance(context)
-                    val data = Data.Builder()
-                        .putString("event_id", resolvedEventId)
-                        .build()
-                    val request = OneTimeWorkRequestBuilder<MessageDispatchWorker>()
-                        .setInputData(data)
-                        .build()
-                    workManager.enqueue(request)
+                    workManager.enqueue(MessageDispatchWorkRequests.create(resolvedEventId))
                 }
                 "ACTION_REJECT", "REJECT", "SKIP" -> {
                     if (messageId.isNotEmpty()) {
@@ -97,26 +89,14 @@ class ApprovalReceiver : BroadcastReceiver() {
                     if (messageId.isNotEmpty()) {
                         pendingMessageDao.updateStatus(messageId, "APPROVED")
                         val workManager = WorkManager.getInstance(context)
-                        val data = Data.Builder()
-                            .putString("event_id", resolvedEventId)
-                            .build()
-                        val request = OneTimeWorkRequestBuilder<MessageDispatchWorker>()
-                            .setInputData(data)
-                            .build()
-                        workManager.enqueue(request)
+                        workManager.enqueue(MessageDispatchWorkRequests.create(resolvedEventId))
                     }
                 }
                 "ACTION_RETRY" -> {
                     if (messageId.isNotEmpty()) {
                         pendingMessageDao.updateStatus(messageId, "PENDING")
                         val workManager = WorkManager.getInstance(context)
-                        val data = Data.Builder()
-                            .putString("event_id", resolvedEventId)
-                            .build()
-                        val request = OneTimeWorkRequestBuilder<MessageDispatchWorker>()
-                            .setInputData(data)
-                            .build()
-                        workManager.enqueue(request)
+                        workManager.enqueue(MessageDispatchWorkRequests.create(resolvedEventId))
                     }
                 }
             }

@@ -48,6 +48,7 @@ class SettingsViewModelTest {
         every { securePrefs.isAiWishGenerationEnabled() } returns true
         every { securePrefs.getGeminiApiKey() } returns ""
         every { securePrefs.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        every { securePrefs.wasLegacyUnencryptedDbQuarantined() } returns false
     }
 
     @After
@@ -86,5 +87,18 @@ class SettingsViewModelTest {
 
         assertFalse(viewModel.uiState.value.isSyncing)
         assertEquals("Just now", viewModel.uiState.value.lastSyncTimestamp)
+    }
+
+    @Test
+    fun `dismissLegacyDbNotice clears persisted notice flag`() = runTest(testDispatcher) {
+        every { securePrefs.wasLegacyUnencryptedDbQuarantined() } returns true
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+
+        assertTrue(viewModel.uiState.value.showLegacyDbNotice)
+
+        viewModel.dismissLegacyDbNotice()
+
+        assertFalse(viewModel.uiState.value.showLegacyDbNotice)
+        verify { securePrefs.setLegacyUnencryptedDbQuarantined(false) }
     }
 }

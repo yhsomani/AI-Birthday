@@ -22,7 +22,7 @@ class MessageDispatchWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val eventId = inputData.getString("event_id") ?: run {
+        val eventId = inputData.getString(MessageDispatchWorkRequests.KEY_EVENT_ID) ?: run {
             StructuredLogger.e(TAG, "Missing event_id in input data")
             return Result.failure()
         }

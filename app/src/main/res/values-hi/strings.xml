@@ -188,6 +188,9 @@
     <string name="settings_notifications">Notifications</string>
     <string name="settings_privacy_security">Privacy &amp; Security</string>
     <string name="settings_about">About</string>
+    <string name="settings_legacy_db_notice_title">पुराना डेटा सुरक्षित रखा गया</string>
+    <string name="settings_legacy_db_notice_body">एक पुराना अनएन्क्रिप्टेड डेटाबेस मिला और सपोर्ट रिकवरी के लिए सुरक्षित ऐप स्टोरेज में ले जाया गया। RelateAI ने नया एन्क्रिप्टेड डेटाबेस शुरू किया।</string>
+    <string name="settings_legacy_db_notice_dismiss">हटाएं</string>
     <string name="settings_default_send_time">Default Send Time</string>
     <string name="settings_default_time_value">9:00 AM</string>
     <string name="settings_style_coach_subtitle">Train your writing style</string>

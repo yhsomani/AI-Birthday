@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.example.core.automation.workers.MessageDispatchWorkRequests
 import com.example.core.db.AppDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,12 +59,7 @@ class MessageDispatchReceiver : BroadcastReceiver() {
         val eventId = intent.getStringExtra("event_id") ?: return
         
         val workManager = androidx.work.WorkManager.getInstance(context)
-        val data = androidx.work.Data.Builder().putString("event_id", eventId).build()
-        val request = androidx.work.OneTimeWorkRequestBuilder<com.example.core.automation.workers.MessageDispatchWorker>()
-            .setInputData(data)
-            .build()
-            
-        workManager.enqueue(request)
+        workManager.enqueue(MessageDispatchWorkRequests.create(eventId))
     }
 }
 

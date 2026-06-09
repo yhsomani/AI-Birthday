@@ -30,6 +30,7 @@ data class SettingsUiState(
     val geminiApiKeySaved: Boolean = false,
     val automationMode: String = "SMART_APPROVE",
     val syncError: String? = null,
+    val showLegacyDbNotice: Boolean = false,
 )
 
 @HiltViewModel
@@ -51,6 +52,7 @@ class SettingsViewModel @Inject constructor(
             automationMode = securePrefs.getGlobalAutomationMode(),
             birthdayReminders = securePrefs.isBirthdayRemindersEnabled(),
             aiWishGeneration = securePrefs.isAiWishGenerationEnabled(),
+            showLegacyDbNotice = securePrefs.wasLegacyUnencryptedDbQuarantined(),
         )
         viewModelScope.launch {
             authManager.userProfile.collect { profile ->
@@ -109,6 +111,11 @@ class SettingsViewModel @Inject constructor(
 
     fun clearSyncError() {
         _uiState.value = _uiState.value.copy(syncError = null)
+    }
+
+    fun dismissLegacyDbNotice() {
+        securePrefs.setLegacyUnencryptedDbQuarantined(false)
+        _uiState.value = _uiState.value.copy(showLegacyDbNotice = false)
     }
 
     fun signOut(context: Context) {

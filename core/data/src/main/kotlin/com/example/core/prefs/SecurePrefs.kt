@@ -163,6 +163,11 @@ class SecurePrefs(context: Context) {
     fun setLastSyncError(error: String?) = configPrefs.edit().putString("last_sync_error", error).apply()
     fun getLastSyncError(): String? = configPrefs.getString("last_sync_error", null)
 
+    fun setLegacyUnencryptedDbQuarantined(quarantined: Boolean) =
+        configPrefs.edit().putBoolean("legacy_unencrypted_db_quarantined", quarantined).apply()
+    fun wasLegacyUnencryptedDbQuarantined(): Boolean =
+        configPrefs.getBoolean("legacy_unencrypted_db_quarantined", false)
+
     fun clearAll() {
         authPrefs.edit().clear().apply()
         configPrefs.edit().clear().apply()
