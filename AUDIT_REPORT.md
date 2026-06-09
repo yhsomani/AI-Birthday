@@ -166,3 +166,44 @@
 
 **Commit message**
 * `ui: consolidate sync error feedback`
+
+### Feature 5: Google Sign-In Configuration Hardening
+
+**Problem identified**
+* Google Sign-In could fail or cancel because app resources still defined `default_web_client_id` as `YOUR_DEFAULT_WEB_CLIENT_ID`, including the Hindi resource set.
+* The installed debug APK is signed with SHA-1 `88055BAEE201EB76971DC0CA5B3C70A239A9DA18`, while the current Firebase Android OAuth client in `google-services.json` is registered for a different certificate hash.
+* Auth failures were surfaced as generic text, making configuration failures hard to diagnose.
+
+**Root cause**
+* Source string resources shadowed the Google Services generated web client ID for localized builds.
+* The local debug signing certificate has not been registered in Firebase/Google Cloud for this app package.
+* `AuthManager` returned only a boolean sign-in result.
+
+**Fix implemented**
+* Removed source `default_web_client_id` placeholders so all locales fall back to the generated Google Services client ID.
+* Added a web-client-id guard before launching Google Sign-In.
+* Added structured sign-in failure results for developer configuration, network, Firebase auth, and unknown failures.
+* Added user-visible, localized auth error strings and tests for placeholder detection and actionable configuration errors.
+* Kept the developer bypass visible only for debug builds.
+
+**Impact**
+* Prevents placeholder OAuth client IDs from reaching Google Sign-In.
+* Makes the remaining Firebase SHA-1 mismatch visible to the user instead of failing generically.
+* Gives maintainers the exact next configuration step: add the debug SHA-1 in Firebase and refresh `google-services.json`.
+
+**Files modified**
+* `core/data/src/main/kotlin/com/example/core/auth/AuthManager.kt`
+* `app/src/main/java/com/example/ui/viewmodel/AuthViewModel.kt`
+* `app/src/main/java/com/example/ui/screens/auth/AuthScreen.kt`
+* `app/src/main/res/values/strings.xml`
+* `app/src/main/res/values-hi/strings.xml`
+* `app/src/test/java/com/example/ui/viewmodel/AuthViewModelTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Verified merged debug resources contain the generated web client ID and no `values-hi` placeholder override.
+* Installed rebuilt debug APK on device `1b87b5db`; app launched and stayed alive.
+
+**Commit message**
+* `fix: harden google sign-in configuration`

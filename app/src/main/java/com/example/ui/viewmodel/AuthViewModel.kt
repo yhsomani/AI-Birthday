@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.example.core.auth.AuthManager
+import com.example.core.auth.SignInFailure
 import com.example.core.auth.UserProfile
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -41,9 +43,17 @@ class AuthViewModel @Inject constructor(
         )
     }
 
+    companion object {
+        fun isValidWebClientId(clientId: String): Boolean {
+            return clientId.endsWith(".apps.googleusercontent.com") &&
+                !clientId.contains("YOUR_DEFAULT_WEB_CLIENT_ID") &&
+                !clientId.contains("YOUR_WEB_CLIENT_ID")
+        }
+    }
+
     fun getSignInIntent(): Intent {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(context.getString(com.example.R.string.default_web_client_id))
+            .requestIdToken(context.getString(R.string.default_web_client_id))
             .requestEmail()
             .requestScopes(Scope("https://www.googleapis.com/auth/contacts.readonly"))
             .build()
@@ -51,18 +61,28 @@ class AuthViewModel @Inject constructor(
         return googleSignInClient.signInIntent
     }
 
+    fun startGoogleSignIn(launch: (Intent) -> Unit) {
+        val clientId = context.getString(R.string.default_web_client_id)
+        if (!isValidWebClientId(clientId)) {
+            _uiState.value = _uiState.value.copy(error = context.getString(R.string.auth_error_google_config))
+            return
+        }
+        launch(getSignInIntent())
+    }
+
     fun handleResult(resultCode: Int, data: Intent?) {
         if (resultCode != Activity.RESULT_OK) {
-            _uiState.value = _uiState.value.copy(error = "Sign in cancelled")
+            _uiState.value = _uiState.value.copy(error = context.getString(R.string.auth_error_cancelled))
             return
         }
         _uiState.value = _uiState.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
-            authManager.signInWithGoogle(data) { success ->
+            authManager.signInWithGoogle(data) { result ->
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    isSignedIn = success,
-                    error = if (success) null else "Sign in failed. Please try again.",
+                    isSignedIn = result.success,
+                    error = result.failure?.toErrorMessage()
+                        ?: if (result.success) null else context.getString(R.string.auth_error_failed),
                     userProfile = authManager.userProfile.value,
                 )
             }
@@ -80,6 +100,16 @@ class AuthViewModel @Inject constructor(
                     userProfile = authManager.userProfile.value,
                 )
             }
+        }
+    }
+
+    private fun SignInFailure.toErrorMessage(): String {
+        return when (this) {
+            SignInFailure.DEVELOPER_CONFIGURATION ->
+                context.getString(R.string.auth_error_developer_config)
+            SignInFailure.NETWORK -> context.getString(R.string.auth_error_network)
+            SignInFailure.FIREBASE_AUTH -> context.getString(R.string.auth_error_firebase)
+            SignInFailure.UNKNOWN -> context.getString(R.string.auth_error_failed)
         }
     }
 }

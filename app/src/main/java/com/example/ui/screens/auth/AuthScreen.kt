@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.BuildConfig
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
@@ -82,7 +83,7 @@ fun AuthScreen(
             CircularProgressIndicator(color = RelatePrimary)
         } else {
             Button(
-                onClick = { launcher.launch(viewModel.getSignInIntent()) },
+                onClick = { viewModel.startGoogleSignIn { launcher.launch(it) } },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -97,22 +98,24 @@ fun AuthScreen(
                     color = RelateOnBackground,
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = { viewModel.bypassSignIn() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = RelatePrimary,
-                ),
-            ) {
-                Text(
-                    text = "Bypass Sign-In (Dev)",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = RelateDarkBackground,
-                )
+            if (BuildConfig.DEBUG) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = { viewModel.bypassSignIn() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RelatePrimary,
+                    ),
+                ) {
+                    Text(
+                        text = "Bypass Sign-In (Dev)",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = RelateDarkBackground,
+                    )
+                }
             }
         }
         state.error?.let { error ->

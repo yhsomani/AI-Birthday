@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">RelateAI</string>
-    <string name="default_web_client_id">YOUR_DEFAULT_WEB_CLIENT_ID</string>
     <string name="widget_birthday_description">Shows today\'s birthdays from your contacts</string>
     <string name="shortcut_compose">Compose</string>
     <string name="shortcut_compose_long">Compose a message</string>
@@ -122,6 +121,12 @@
     <string name="sync_error_title">सिंक त्रुटि</string>
     <string name="sync_error_retry">फिर कोशिश करें</string>
     <string name="sync_error_dismiss">हटाएं</string>
+    <string name="auth_error_cancelled">साइन इन रद्द हो गया</string>
+    <string name="auth_error_failed">साइन इन विफल रहा। कृपया फिर कोशिश करें।</string>
+    <string name="auth_error_google_config">इस बिल्ड के लिए Google Sign-In सही तरीके से कॉन्फ़िगर नहीं है।</string>
+    <string name="auth_error_developer_config">इस ऐप साइनिंग सर्टिफिकेट के लिए Google Sign-In कॉन्फ़िगर नहीं है। Firebase में इस बिल्ड का SHA-1 जोड़ें, नया google-services.json डाउनलोड करें, और फिर से बिल्ड करें।</string>
+    <string name="auth_error_network">Google Sign-In से कनेक्ट नहीं हो सका। अपना कनेक्शन जांचें और फिर कोशिश करें।</string>
+    <string name="auth_error_firebase">Firebase authentication विफल रहा। OAuth configuration जांचें और फिर कोशिश करें।</string>
     
     <!-- Common -->
     <string name="add">जोड़ें</string>

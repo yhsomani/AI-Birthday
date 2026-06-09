@@ -2,12 +2,14 @@ package com.example.ui.viewmodel
 
 import android.app.Activity
 import android.content.Intent
+import com.example.R
 import com.example.core.auth.AuthManager
+import com.example.core.auth.SignInFailure
+import com.example.core.auth.SignInResult
 import com.example.core.auth.UserProfile
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit4.MockKRule
-import io.mockk.verify
 import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,7 +22,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -76,8 +77,37 @@ class AuthViewModelTest {
         viewModel.handleResult(Activity.RESULT_CANCELED, null)
         advanceUntilIdle()
 
-        assertEquals("Sign in cancelled", viewModel.uiState.value.error)
+        assertEquals(
+            mockApplicationContext().getString(R.string.auth_error_cancelled),
+            viewModel.uiState.value.error,
+        )
         assertFalse(viewModel.uiState.value.isSignedIn)
+    }
+
+    @Test
+    fun `handleResult with developer configuration failure sets actionable error`() = runTest(testDispatcher) {
+        every { mockAuthManager.isSignedIn() } returns false
+        val callbackSlot = slot<(SignInResult) -> Unit>()
+        every { mockAuthManager.signInWithGoogle(any(), capture(callbackSlot)) } answers {
+            callbackSlot.captured(SignInResult(success = false, failure = SignInFailure.DEVELOPER_CONFIGURATION))
+        }
+        val viewModel = AuthViewModel(mockApplicationContext(), mockAuthManager)
+
+        viewModel.handleResult(Activity.RESULT_OK, Intent())
+        advanceUntilIdle()
+
+        assertEquals(
+            mockApplicationContext().getString(R.string.auth_error_developer_config),
+            viewModel.uiState.value.error,
+        )
+        assertFalse(viewModel.uiState.value.isSignedIn)
+    }
+
+    @Test
+    fun `isValidWebClientId rejects placeholder values`() {
+        assertFalse(AuthViewModel.isValidWebClientId("YOUR_DEFAULT_WEB_CLIENT_ID"))
+        assertFalse(AuthViewModel.isValidWebClientId("not-a-client-id"))
+        assertTrue(AuthViewModel.isValidWebClientId("1234567890-example.apps.googleusercontent.com"))
     }
 }
 

@@ -7,7 +7,7 @@ import com.example.core.db.AppDatabase
 import com.example.core.db.DatabaseKeyDerivation
 import com.example.core.prefs.SecurePrefs
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,6 +22,18 @@ data class UserProfile(
     val displayName: String = "User",
     val email: String = "",
     val photoUrl: String? = null,
+)
+
+enum class SignInFailure {
+    DEVELOPER_CONFIGURATION,
+    NETWORK,
+    FIREBASE_AUTH,
+    UNKNOWN,
+}
+
+data class SignInResult(
+    val success: Boolean,
+    val failure: SignInFailure? = null,
 )
 
 @Singleton
@@ -58,10 +70,16 @@ open class AuthManager @Inject constructor(
         )
     }
 
-    open fun signInWithGoogle(data: Intent?, onComplete: (Boolean) -> Unit) {
+    open fun signInWithGoogle(data: Intent?, onComplete: (SignInResult) -> Unit) {
         val task = GoogleSignIn.getSignedInAccountFromIntent(data)
         try {
-            val account = task.result
+            val account = try {
+                task.getResult(ApiException::class.java)
+            } catch (e: ApiException) {
+                Log.e(TAG, "Google Sign-In failed: statusCode=${e.statusCode}", e)
+                onComplete(SignInResult(success = false, failure = e.toSignInFailure()))
+                return
+            }
             _userProfile.value = UserProfile(
                 displayName = account.displayName ?: "User",
                 email = account.email ?: "",
@@ -71,17 +89,26 @@ open class AuthManager @Inject constructor(
             auth.signInWithCredential(credential)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
-                        Log.d("AuthManager", "Firebase Sign-In successful")
+                        Log.d(TAG, "Firebase Sign-In successful")
                         securePrefs.setGuestMode(false)
                         updateProfileFromFirebaseUser()
+                        onComplete(SignInResult(success = true))
                     } else {
-                        Log.e("AuthManager", "Firebase Sign-In failed: ${task.exception?.message}")
+                        Log.e(TAG, "Firebase Sign-In failed", task.exception)
+                        onComplete(SignInResult(success = false, failure = SignInFailure.FIREBASE_AUTH))
                     }
-                    onComplete(task.isSuccessful)
                 }
         } catch (e: Exception) {
-            Log.e("AuthManager", "Google Sign-In failed: ${e.message}")
-            onComplete(false)
+            Log.e(TAG, "Google Sign-In failed", e)
+            onComplete(SignInResult(success = false, failure = SignInFailure.UNKNOWN))
+        }
+    }
+
+    private fun ApiException.toSignInFailure(): SignInFailure {
+        return when (statusCode) {
+            7 -> SignInFailure.NETWORK
+            10 -> SignInFailure.DEVELOPER_CONFIGURATION
+            else -> SignInFailure.UNKNOWN
         }
     }
 
