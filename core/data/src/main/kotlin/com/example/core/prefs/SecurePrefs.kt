@@ -87,15 +87,8 @@ class SecurePrefs(context: Context) {
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                     )
                 } catch (retryEx: Exception) {
-                    Log.e("SecurePrefs", "Retry also failed for $fileName, falling back to unencrypted preferences", retryEx)
-                    try {
-                        context.getSharedPreferences(fileName, Context.MODE_PRIVATE).edit().clear().commit()
-                    } catch (ex: Exception) {
-                        Log.e("SecurePrefs", "Failed to clear shared preferences during fallback", ex)
-                    }
-                    deleteMasterKey(keyAlias)
-                    context.deleteSharedPreferences(fileName)
-                    context.getSharedPreferences(fileName, Context.MODE_PRIVATE)
+                    Log.e("SecurePrefs", "Retry also failed for $fileName, failing securely", retryEx)
+                    throw SecurityException("Failed to initialize EncryptedSharedPreferences securely", retryEx)
                 }
             }
         }

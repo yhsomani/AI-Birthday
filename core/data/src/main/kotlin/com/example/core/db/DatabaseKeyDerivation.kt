@@ -168,15 +168,8 @@ object DatabaseKeyDerivation {
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
             } catch (retryEx: Exception) {
-                Log.e(TAG, "Retry also failed, falling back to unencrypted preferences", retryEx)
-                try {
-                    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
-                } catch (ex: Exception) {
-                    Log.e(TAG, "Failed to clear shared preferences during fallback", ex)
-                }
-                deleteMasterKey()
-                context.deleteSharedPreferences(PREFS_NAME)
-                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                Log.e(TAG, "Retry also failed, failing securely", retryEx)
+                throw SecurityException("Failed to initialize EncryptedSharedPreferences for DB key securely", retryEx)
             }
         }
     }
