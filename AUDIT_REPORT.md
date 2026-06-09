@@ -69,3 +69,33 @@
 **Remaining improvements**
 * Live-device validation is blocked because `adb devices` currently shows no attached devices.
 * Feature-specific permission education can be expanded in the onboarding/settings feature passes, but the app shell no longer shows a system permission dialog without user action.
+
+### Feature 2: Contact Sync Sensitive Logging Hardening
+
+**Problem identified**
+* Google Contacts sync logs exposed sensitive operational details including signed-in email addresses, full People API request URLs, sync/page tokens in query strings, and raw HTTP response bodies.
+
+**Root cause**
+* `GoogleContactsSync` logged debug/error data directly from OAuth, People API request construction, and network responses without a reusable redaction boundary.
+
+**Fix implemented**
+* Added `SensitiveLogRedactor` with reusable email, bearer-token, People API URL, and sensitive query-parameter redaction.
+* Replaced Google Contacts token and request logs with safe presence/status summaries.
+* Converted raw Google HTTP response-body logging and thrown errors into generic HTTP status summaries.
+* Added unit tests covering redaction and safe Google Contacts HTTP error summaries.
+
+**Impact**
+* Reduces PII and OAuth-adjacent data exposure in Logcat and user-facing sync errors.
+* Keeps enough diagnostic signal to distinguish auth, request, permission, and service-availability failures.
+
+**Files modified**
+* `core/data/src/main/kotlin/com/example/core/contacts/GoogleContactsSync.kt`
+* `core/data/src/main/kotlin/com/example/core/resilience/SensitiveLogRedactor.kt`
+* `core/data/src/test/kotlin/com/example/core/resilience/SensitiveLogRedactorTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+
+**Commit message**
+* `fix: redact contact sync logging`

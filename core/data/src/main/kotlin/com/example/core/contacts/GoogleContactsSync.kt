@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import com.example.core.db.entities.ContactEntity
 import com.example.core.prefs.SecurePrefs
+import com.example.core.resilience.SensitiveLogRedactor
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,19 +15,22 @@ import org.json.JSONObject
 import java.io.IOException
 
 class GoogleContactsSync(private val context: Context) {
+    private companion object {
+        const val TAG = "GoogleContactsSync"
+    }
 
     private suspend fun getValidToken(prefs: SecurePrefs): String? = withContext(Dispatchers.IO) {
         val existing = prefs.getGoogleOAuthToken()
-        Log.d("GoogleContactsSync", "getValidToken: existing token length = ${existing.length}")
+        Log.d(TAG, "getValidToken: cached token present=${existing.isNotEmpty()}")
         try {
             val account = GoogleSignIn.getLastSignedInAccount(context)
             if (account != null) {
                 val email = account.email
-                Log.d("GoogleContactsSync", "getValidToken: getLastSignedInAccount email = $email")
+                Log.d(TAG, "getValidToken: signed-in Google account present=${email != null}")
                 
                 val contactsScope = com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/contacts.readonly")
                 if (!GoogleSignIn.hasPermissions(account, contactsScope)) {
-                    Log.w("GoogleContactsSync", "getValidToken: Required contacts scope is not granted")
+                    Log.w(TAG, "getValidToken: Required contacts scope is not granted")
                     throw SecurityException("Required Google Contacts access permission is not granted. Please sign out and sign in again, ensuring you check the box to grant contact access.")
                 }
                 
@@ -40,18 +44,18 @@ class GoogleContactsSync(private val context: Context) {
                             "oauth2:https://www.googleapis.com/auth/contacts.readonly"
                         )
                         if (!token.isNullOrEmpty()) {
-                            Log.d("GoogleContactsSync", "getValidToken: GoogleAuthUtil token retrieved successfully")
+                            Log.d(TAG, "getValidToken: GoogleAuthUtil token retrieved successfully")
                             if (token != existing) {
                                 prefs.setGoogleOAuthToken(token)
                             }
                             return@withContext token
                         }
                     } catch (e: Exception) {
-                        Log.w("GoogleContactsSync", "GoogleAuthUtil.getToken failed, trying AccountManager", e)
+                        Log.w(TAG, "GoogleAuthUtil.getToken failed, trying AccountManager (${e.javaClass.simpleName})")
                     }
 
                     // Fallback to AccountManager
-                    Log.d("GoogleContactsSync", "getValidToken: Attempting fallback to AccountManager")
+                    Log.d(TAG, "getValidToken: Attempting fallback to AccountManager")
                     val am = AccountManager.get(context)
                     val future = am.getAuthToken(
                         googleAccount,
@@ -64,22 +68,22 @@ class GoogleContactsSync(private val context: Context) {
                     val bundle = future.result
                     val freshToken = bundle?.getString(AccountManager.KEY_AUTHTOKEN)
                     if (freshToken != null) {
-                        Log.d("GoogleContactsSync", "getValidToken: AccountManager token retrieved successfully")
+                        Log.d(TAG, "getValidToken: AccountManager token retrieved successfully")
                         if (freshToken != existing) {
                             prefs.setGoogleOAuthToken(freshToken)
                         }
                         return@withContext freshToken
                     }
                 } else {
-                    Log.w("GoogleContactsSync", "getValidToken: googleAccount is null")
+                    Log.w(TAG, "getValidToken: googleAccount is null")
                 }
             } else {
-                Log.w("GoogleContactsSync", "getValidToken: GoogleSignIn.getLastSignedInAccount returned null")
+                Log.w(TAG, "getValidToken: GoogleSignIn.getLastSignedInAccount returned null")
             }
         } catch (e: Exception) {
-            Log.w("GoogleContactsSync", "Token fetch/refresh failed, using existing", e)
+            Log.w(TAG, "Token fetch/refresh failed, using cached token if available (${e.javaClass.simpleName})")
         }
-        Log.d("GoogleContactsSync", "getValidToken: Returning existing token: ${existing.isNotEmpty()}")
+        Log.d(TAG, "getValidToken: Returning cached token: ${existing.isNotEmpty()}")
         return@withContext existing.ifEmpty { null }
     }
 
@@ -87,7 +91,7 @@ class GoogleContactsSync(private val context: Context) {
         val prefs = SecurePrefs(context)
         val token = getValidToken(prefs)
         if (token == null) {
-            Log.w("GoogleContactsSync", "fetchAll: Token is null, aborting Google Contacts fetch")
+            Log.w(TAG, "fetchAll: Token is null, aborting Google Contacts fetch")
             throw IllegalStateException("Google account token is missing or expired. Please sign in again.")
         }
 
@@ -115,7 +119,11 @@ class GoogleContactsSync(private val context: Context) {
                 }
                 
                 val url = urlBuilder.toString()
-                Log.d("GoogleContactsSync", "fetchAll: Requesting URL: $url")
+                Log.d(
+                    TAG,
+                    "fetchAll: Requesting People API connections page " +
+                        "(incrementalSync=${syncToken.isNotEmpty()}, continuation=${!pageToken.isNullOrEmpty()})",
+                )
                 
                 val request = Request.Builder()
                     .url(url)
@@ -124,19 +132,19 @@ class GoogleContactsSync(private val context: Context) {
                     
                 val response = client.newCall(request).execute()
                 if (!response.isSuccessful) {
-                    val errBody = response.body?.string() ?: ""
-                    Log.e("GoogleContactsSync", "fetchAll error: HTTP ${response.code}: $errBody")
+                    response.body?.close()
+                    val safeError = SensitiveLogRedactor.googleContactsHttpErrorSummary(response.code)
+                    Log.e(TAG, "fetchAll error: $safeError")
                     if (response.code == 400 && syncToken.isNotEmpty()) {
-                        Log.w("GoogleContactsSync", "Sync token expired or parameter mismatch (400). Clearing sync token and performing full sync.")
+                        Log.w(TAG, "Sync token expired or parameter mismatch (400). Clearing sync token and performing full sync.")
                         prefs.setSyncToken("")
                         return@withContext fetchAll(forceRefresh = true)
                     }
-                    val errMsg = "HTTP ${response.code}: $errBody"
-                    throw IOException(errMsg)
+                    throw IOException(safeError)
                 }
                 
                 val jsonStr = response.body?.string() ?: break
-                Log.d("GoogleContactsSync", "fetchAll: Retrieved page JSON response, length = ${jsonStr.length}")
+                Log.d(TAG, "fetchAll: Retrieved page JSON response, length = ${jsonStr.length}")
                 val jsonObj = JSONObject(jsonStr)
                 
                 val connections = jsonObj.optJSONArray("connections")
@@ -347,7 +355,10 @@ class GoogleContactsSync(private val context: Context) {
                 prefs.setSyncToken(lastNextSyncToken)
             }
         } catch (e: Exception) {
-            Log.e("GoogleContactsSync", "Failed to fetch Google contacts", e)
+            Log.e(
+                TAG,
+                "Failed to fetch Google contacts (${SensitiveLogRedactor.redact(e.javaClass.simpleName)})",
+            )
             throw e
         }
 
