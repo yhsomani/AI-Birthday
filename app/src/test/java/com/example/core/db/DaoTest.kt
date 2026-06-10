@@ -7,6 +7,7 @@ import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
+import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.PendingMessageEntity
@@ -27,6 +28,7 @@ class DaoTest {
     private lateinit var eventDao: EventDao
     private lateinit var pendingMessageDao: PendingMessageDao
     private lateinit var sentMessageDao: SentMessageDao
+    private lateinit var activityLogDao: com.example.core.db.dao.ActivityLogDao
 
     @Before
     fun createDb() = runBlocking {
@@ -38,6 +40,7 @@ class DaoTest {
         eventDao = db.eventDao()
         pendingMessageDao = db.pendingMessageDao()
         sentMessageDao = db.sentMessageDao()
+        activityLogDao = db.activityLogDao()
 
         contactDao.upsert(ContactEntity(id = "c1", name = "Alice"))
         eventDao.upsert(EventEntity(
@@ -175,5 +178,35 @@ class DaoTest {
         sentMessageDao.insert(testSent("s2"))
         val count = sentMessageDao.countAll().first()
         assertEquals(2, count)
+    }
+
+    @Test
+    fun activityLogDao_filtersByTypeAndDeletesOldEntries() = runTest {
+        activityLogDao.insert(
+            ActivityLogEntity(
+                id = "a1",
+                type = "MESSAGE",
+                title = "Message approved",
+                detail = "A message was approved.",
+                messageId = "p1",
+                createdAtMs = 100L,
+            )
+        )
+        activityLogDao.insert(
+            ActivityLogEntity(
+                id = "a2",
+                type = "SYNC",
+                title = "Contacts synced",
+                detail = "Contacts were refreshed.",
+                createdAtMs = 200L,
+            )
+        )
+
+        assertEquals(listOf("a2", "a1"), activityLogDao.getRecent(10).first().map { it.id })
+        assertEquals(listOf("a1"), activityLogDao.getByType("MESSAGE", 10).first().map { it.id })
+
+        activityLogDao.deleteOlderThan(150L)
+
+        assertEquals(listOf("a2"), activityLogDao.getRecent(10).first().map { it.id })
     }
 }

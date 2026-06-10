@@ -21,9 +21,10 @@ import net.sqlcipher.database.SupportFactory
         StyleProfileEntity::class,
         MemoryNoteEntity::class,
         GiftHistoryEntity::class,
-        StyleProfileHistoryEntity::class
+        StyleProfileHistoryEntity::class,
+        ActivityLogEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,6 +35,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun styleProfileDao(): StyleProfileDao
     abstract fun memoryNoteDao(): MemoryNoteDao
     abstract fun giftHistoryDao(): GiftHistoryDao
+    abstract fun activityLogDao(): ActivityLogDao
     // abstract fun moodLogDao(): MoodLogDao
 
     companion object {
@@ -406,6 +408,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS activity_logs (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        type TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        detail TEXT NOT NULL,
+                        contactId TEXT,
+                        eventId TEXT,
+                        messageId TEXT,
+                        createdAtMs INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_activity_logs_createdAtMs ON activity_logs(createdAtMs)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_activity_logs_type ON activity_logs(type)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_activity_logs_contactId ON activity_logs(contactId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_activity_logs_eventId ON activity_logs(eventId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_activity_logs_messageId ON activity_logs(messageId)")
+            }
+        }
+
         fun closeAndResetInstance() {
             synchronized(this) {
                 INSTANCE?.let { db ->
@@ -440,7 +464,18 @@ abstract class AppDatabase : RoomDatabase() {
                     "relateai.db"
                 )
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                .addMigrations(
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                    MIGRATION_7_8,
+                    MIGRATION_8_9,
+                    MIGRATION_9_10,
+                    MIGRATION_10_11,
+                    MIGRATION_11_12,
+                )
                 .build()
                 INSTANCE = instance
                 instance

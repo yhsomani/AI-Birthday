@@ -50,8 +50,14 @@ class MigrationTest {
 
     @Test
     @Throws(IOException::class)
-    fun migrate10To11_preservesRepresentativeData() {
+    fun migrate10To12_preservesRepresentativeData() {
         migrateAndAssertPreservesRepresentativeData(10)
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrate11To12_preservesRepresentativeData() {
+        migrateAndAssertPreservesRepresentativeData(11)
     }
 
     @Test
@@ -124,14 +130,14 @@ class MigrationTest {
     }
 
     private fun migrateAndAssertPreservesRepresentativeData(startVersion: Int) {
-        val dbName = "migration-$startVersion-to-11"
+        val dbName = "migration-$startVersion-to-12"
         var db = helper.createDatabase(dbName, startVersion)
         insertRepresentativeRows(db, startVersion)
         db.close()
 
         db = helper.runMigrationsAndValidate(
             dbName,
-            11,
+            12,
             true,
             *migrationsFrom(startVersion),
         )
@@ -150,6 +156,7 @@ class MigrationTest {
                 AppDatabase.MIGRATION_8_9,
                 AppDatabase.MIGRATION_9_10,
                 AppDatabase.MIGRATION_10_11,
+                AppDatabase.MIGRATION_11_12,
             )
             5 -> arrayOf(
                 AppDatabase.MIGRATION_5_6,
@@ -158,6 +165,7 @@ class MigrationTest {
                 AppDatabase.MIGRATION_8_9,
                 AppDatabase.MIGRATION_9_10,
                 AppDatabase.MIGRATION_10_11,
+                AppDatabase.MIGRATION_11_12,
             )
             6 -> arrayOf(
                 AppDatabase.MIGRATION_6_7,
@@ -165,9 +173,11 @@ class MigrationTest {
                 AppDatabase.MIGRATION_8_9,
                 AppDatabase.MIGRATION_9_10,
                 AppDatabase.MIGRATION_10_11,
+                AppDatabase.MIGRATION_11_12,
             )
-            9 -> arrayOf(AppDatabase.MIGRATION_9_10, AppDatabase.MIGRATION_10_11)
-            10 -> arrayOf(AppDatabase.MIGRATION_10_11)
+            9 -> arrayOf(AppDatabase.MIGRATION_9_10, AppDatabase.MIGRATION_10_11, AppDatabase.MIGRATION_11_12)
+            10 -> arrayOf(AppDatabase.MIGRATION_10_11, AppDatabase.MIGRATION_11_12)
+            11 -> arrayOf(AppDatabase.MIGRATION_11_12)
             else -> error("Unsupported migration start version: $startVersion")
         }
     }
@@ -276,7 +286,7 @@ class MigrationTest {
                     'Important note', 'NEUTRAL', '[]', '{}', 1500000000000, 1700000000000, 0
                 )
             """.trimIndent())
-            10 -> db.execSQL("""
+            10, 11 -> db.execSQL("""
                 INSERT INTO contacts (
                     id, googleContactId, name, nickname, birthdayDay, birthdayMonth, birthdayYear,
                     anniversaryDay, anniversaryMonth, anniversaryYear, workStartDay, workStartMonth,
@@ -323,7 +333,7 @@ class MigrationTest {
                     1800000000000, 1, 'CONTACTS', 100, 1
                 )
             """.trimIndent()
-            10 -> """
+            10, 11 -> """
                 INSERT INTO events (
                     id, contactId, type, label, dayOfMonth, month, year, nextOccurrenceMs,
                     isActive, notifyDaysBefore, source, confidenceScore, isVerified
@@ -338,7 +348,7 @@ class MigrationTest {
     }
 
     private fun insertPendingMessage(db: SupportSQLiteDatabase, version: Int) {
-        val sql = if (version == 10) {
+        val sql = if (version in setOf(10, 11)) {
             """
                 INSERT INTO pending_messages (
                     id, contactId, eventId, shortVariant, standardVariant, longVariant,
@@ -450,6 +460,11 @@ class MigrationTest {
             assertEquals("Happy birthday", cursor.getString(0))
             assertEquals(0, cursor.getInt(1))
             assertEquals(0, cursor.getInt(2))
+        }
+
+        db.query("SELECT COUNT(*) FROM activity_logs").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
         }
     }
 
