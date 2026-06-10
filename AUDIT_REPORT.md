@@ -738,7 +738,7 @@
 
 **Impact**
 * Produces reproducible XML and HTML coverage evidence at `build/reports/jacoco/jacocoDebugUnitTestReport/`.
-* Current aggregate line coverage is 30.37% (`3714` covered lines, `8517` missed lines), satisfying the documented minimum release evidence threshold while still showing remaining UI/device coverage risk.
+* Establishes measurable coverage evidence for release decisions; the follow-up resilience coverage in Feature 20 brings the current aggregate above the documented minimum threshold.
 
 **Files modified**
 * `build.gradle.kts`
@@ -753,3 +753,34 @@
 
 **Commit message**
 * `test: add measured coverage reporting`
+
+### Feature 20: Resilience Primitive Coverage
+
+**Problem identified**
+* The first measured aggregate coverage report exposed that the project was still below the documented 30% minimum evidence threshold after real app and UI classes were included.
+* `Retry` and `CircuitBreaker` were production reliability primitives with limited direct behavioral coverage.
+
+**Root cause**
+* Coverage evidence previously depended on broad test count rather than measured line counters.
+* Retry exhaustion, non-retryable open-circuit handling, and circuit-breaker recovery/reopen transitions were not directly covered by focused unit tests.
+
+**Fix implemented**
+* Added `ResiliencePrimitivesTest` for successful retry, retry exhaustion metadata, open-circuit no-retry behavior, null fallback after exhaustion, half-open recovery, and half-open failure reopening.
+* Regenerated aggregate JaCoCo coverage after the new tests.
+
+**Impact**
+* Improves confidence in shared retry and circuit-breaker behavior used by integration and worker paths.
+* Raises current aggregate line coverage to 30.54% (`3823` covered lines, `8696` missed lines), clearing the documented minimum coverage evidence threshold while leaving UI/device coverage as a remaining risk.
+
+**Files modified**
+* `core/data/src/test/kotlin/com/example/core/resilience/ResiliencePrimitivesTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest --tests com.example.core.resilience.ResiliencePrimitivesTest --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew jacocoDebugUnitTestReport --no-configuration-cache -Djavax.net.ssl.trustStore=/Users/yashsomani/Desktop/Android\ Project/AI-Birthday/.gradle/trust/cacerts-zscaler -Djavax.net.ssl.trustStorePassword=changeit` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `test: cover resilience primitives`
