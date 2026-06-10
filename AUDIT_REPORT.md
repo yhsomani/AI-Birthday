@@ -592,3 +592,35 @@
 
 **Commit message**
 * `ui: improve feature discoverability`
+
+### Feature 15: Fallback Logging Redaction
+
+**Problem identified**
+* `FallbackOrchestrator` logged raw provider exception messages through `android.util.Log`.
+* Provider exception text can include email addresses, API keys, tokens, passphrases, phone numbers, or sensitive Google Contacts query parameters.
+* The fallback name was also embedded in the log tag without redaction.
+
+**Root cause**
+* Earlier redaction work covered `StructuredLogger`, retry logging, health snapshots, and Gemini fallbacks, but this lower-level fallback primitive still wrote directly to Logcat.
+
+**Fix implemented**
+* Redacted the fallback log tag name with `SensitiveLogRedactor`.
+* Redacted provider failure messages before writing fallback warning logs.
+* Added a Robolectric regression test that captures fallback logs and verifies email, API key, and token values are removed.
+
+**Impact**
+* Reduces the chance of secrets or PII appearing in Logcat during fallback failures.
+* Extends the existing redaction boundary to a shared resilience primitive used by future providers.
+
+**Files modified**
+* `core/data/src/main/kotlin/com/example/core/resilience/Fallback.kt`
+* `core/data/src/test/kotlin/com/example/core/resilience/SensitiveLogRedactorTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest --tests com.example.core.resilience.SensitiveLogRedactorTest --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `fix: redact fallback provider logs`

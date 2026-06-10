@@ -11,7 +11,7 @@ class FallbackOrchestrator<T>(
     private val providers: List<FallbackProvider<T>>,
     private val name: String = "fallback",
 ) {
-    private val tag = "Fallback[$name]"
+    private val tag = "Fallback[${SensitiveLogRedactor.redact(name)}]"
 
     suspend fun execute(): T {
         for ((index, provider) in providers.withIndex()) {
@@ -22,7 +22,8 @@ class FallbackOrchestrator<T>(
                 }
                 return result
             } catch (e: Exception) {
-                Log.w(tag, "Provider $index failed: ${e.message}")
+                val safeMessage = SensitiveLogRedactor.redact(e.message ?: e.javaClass.simpleName)
+                Log.w(tag, "Provider $index failed: $safeMessage")
             }
         }
         throw FallbackExhaustedException(name, providers.size)
