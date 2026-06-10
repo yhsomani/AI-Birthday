@@ -14,11 +14,13 @@ import com.example.data.repository.ContactRepositoryImpl
 import com.example.data.repository.ActivityLogRepositoryImpl
 import com.example.data.repository.EventRepositoryImpl
 import com.example.data.repository.MessageRepositoryImpl
+import com.example.data.repository.MessageFeedbackRepositoryImpl
 import com.example.data.repository.StyleProfileRepositoryImpl
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
+import com.example.domain.repository.MessageFeedbackRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.repository.GiftHistoryRepository
@@ -66,6 +68,10 @@ abstract class AppModuleBinds {
     @Binds
     @Singleton
     abstract fun bindActivityLogRepository(impl: ActivityLogRepositoryImpl): ActivityLogRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMessageFeedbackRepository(impl: MessageFeedbackRepositoryImpl): MessageFeedbackRepository
 }
 
 @Module
@@ -110,6 +116,11 @@ object AppModule {
     @Singleton
     fun provideActivityLogDao(database: AppDatabase): com.example.core.db.dao.ActivityLogDao =
         database.activityLogDao()
+
+    @Provides
+    @Singleton
+    fun provideMessageFeedbackDao(database: AppDatabase): com.example.core.db.dao.MessageFeedbackDao =
+        database.messageFeedbackDao()
 
     @Provides
     @Singleton

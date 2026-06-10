@@ -4,8 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.core.db.entities.ActivityLogEntity
+import com.example.core.db.entities.MessageFeedbackEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.repository.ActivityLogRepository
+import com.example.domain.repository.ContactRepository
+import com.example.domain.repository.GiftHistoryRepository
+import com.example.domain.repository.MemoryNoteRepository
+import com.example.domain.repository.MessageFeedbackRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RegeneratePendingMessageUseCase
@@ -22,6 +27,11 @@ data class AiFeedbackOption(
     val key: String,
     val labelRes: Int,
     val instruction: String,
+)
+
+data class WhySignal(
+    val labelRes: Int,
+    val value: String,
 )
 
 private val aiFeedbackOptions = listOf(
@@ -75,12 +85,17 @@ data class WishPreviewUiState(
     val feedbackOptions: List<AiFeedbackOption> = aiFeedbackOptions,
     val selectedFeedbackKey: String? = null,
     val feedbackMessageRes: Int? = null,
+    val whySignals: List<WhySignal> = emptyList(),
 )
 
 @HiltViewModel
 class WishPreviewViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val activityLogRepository: ActivityLogRepository,
+    private val messageFeedbackRepository: MessageFeedbackRepository,
+    private val contactRepository: ContactRepository,
+    private val memoryNoteRepository: MemoryNoteRepository,
+    private val giftHistoryRepository: GiftHistoryRepository,
     private val approvePendingMessageUseCase: ApprovePendingMessageUseCase,
     private val rejectPendingMessageUseCase: RejectPendingMessageUseCase,
     private val regeneratePendingMessageUseCase: RegeneratePendingMessageUseCase,
@@ -95,12 +110,14 @@ class WishPreviewViewModel @Inject constructor(
                 val pending = messageRepository.getPendingById(messageRef)
                     ?: messageRepository.getPendingByEventId(messageRef)
                 if (pending != null) {
+                    val whySignals = buildWhySignals(pending)
                     _uiState.value = WishPreviewUiState(
                         pendingMessage = pending,
                         selectedVariant = pending.selectedVariant,
                         editedText = pending.selectedVariantText,
                         isLoading = false,
                         usedFallback = pending.isUsingFallback,
+                        whySignals = whySignals,
                         qualityMessageRes = if (pending.isUsingFallback) {
                             R.string.wish_preview_quality_template_used
                         } else {
@@ -182,12 +199,20 @@ class WishPreviewViewModel @Inject constructor(
                 is RegeneratePendingMessageUseCase.Outcome.Regenerated -> {
                     val updated = messageRepository.getPendingById(result.pendingId)
                     if (updated != null) {
+                        val feedbackId = messageFeedbackRepository
+                            .getLatestForPendingMessage(pendingId)
+                            ?.takeIf { it.reasonKey == feedback?.key }
+                            ?.id
+                        if (feedbackId != null) {
+                            messageFeedbackRepository.markApplied(feedbackId)
+                        }
                         _uiState.value = _uiState.value.copy(
                             pendingMessage = updated,
                             selectedVariant = updated.selectedVariant,
                             editedText = updated.selectedVariantText,
                             isRegenerating = false,
                             usedFallback = result.usedFallback,
+                            whySignals = buildWhySignals(updated),
                             qualityMessageRes = if (result.usedFallback) {
                                 R.string.wish_preview_quality_template_used
                             } else if (feedback != null) {
@@ -219,15 +244,30 @@ class WishPreviewViewModel @Inject constructor(
         )
         if (pending != null) {
             viewModelScope.launch {
+                messageFeedbackRepository.record(
+                    MessageFeedbackEntity(
+                        id = UUID.randomUUID().toString(),
+                        pendingMessageId = pending.id,
+                        contactId = pending.contactId,
+                        eventId = pending.eventId,
+                        reasonKey = option.key,
+                        instruction = option.instruction,
+                        draftText = _uiState.value.editedText,
+                    )
+                )
                 activityLogRepository.record(
                     ActivityLogEntity(
                         id = UUID.randomUUID().toString(),
                         type = "AI",
-                        title = "AI feedback: ${option.key}",
+                        title = "AI feedback saved",
                         detail = option.instruction,
                         contactId = pending.contactId,
                         eventId = pending.eventId,
                         messageId = pending.id,
+                        severity = "INFO",
+                        status = "OPEN",
+                        actionRoute = "wish/${pending.contactId}/${pending.id}",
+                        metadataJson = "{\"feedback\":\"${option.key}\"}",
                     )
                 )
             }
@@ -284,5 +324,21 @@ class WishPreviewViewModel @Inject constructor(
     private fun selectedFeedback(): AiFeedbackOption? {
         val key = _uiState.value.selectedFeedbackKey ?: return null
         return aiFeedbackOptions.firstOrNull { it.key == key }
+    }
+
+    private suspend fun buildWhySignals(pending: PendingMessageEntity): List<WhySignal> {
+        val contact = contactRepository.getById(pending.contactId)
+        val memoryCount = memoryNoteRepository.getByContact(pending.contactId).size
+        val giftCount = giftHistoryRepository.getByContact(pending.contactId).size
+        val previousWishes = messageRepository.getSentByContact(pending.contactId, 10).size
+        return listOf(
+            WhySignal(R.string.wish_why_relationship, contact?.relationshipType ?: "UNKNOWN"),
+            WhySignal(R.string.wish_why_language, contact?.preferredLanguage ?: "en"),
+            WhySignal(R.string.wish_why_channel, pending.channel),
+            WhySignal(R.string.wish_why_tone, pending.selectedVariant),
+            WhySignal(R.string.wish_why_memories, memoryCount.toString()),
+            WhySignal(R.string.wish_why_gifts, giftCount.toString()),
+            WhySignal(R.string.wish_why_previous, previousWishes.toString()),
+        )
     }
 }

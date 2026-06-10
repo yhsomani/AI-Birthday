@@ -9,6 +9,7 @@ import com.example.core.db.entities.EventEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.usecase.GenerateMessageUseCase
+import com.example.domain.usecase.UpdateContactPreferencesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,8 +23,11 @@ data class ContactDetailUiState(
     val upcomingEvent: EventEntity? = null,
     val isLoading: Boolean = true,
     val isGenerating: Boolean = false,
+    val isSavingPreferences: Boolean = false,
     val generationResult: String? = null,
     val generationErrorRes: Int? = null,
+    val preferenceMessageRes: Int? = null,
+    val preferenceError: String? = null,
 )
 
 @HiltViewModel
@@ -32,6 +36,7 @@ class ContactDetailViewModel @Inject constructor(
     private val contactRepository: ContactRepository,
     private val eventRepository: EventRepository,
     private val generateMessageUseCase: GenerateMessageUseCase,
+    private val updateContactPreferencesUseCase: UpdateContactPreferencesUseCase,
 ) : ViewModel() {
 
     private val contactId: String = savedStateHandle.get<String>("contactId") ?: ""
@@ -64,6 +69,39 @@ class ContactDetailViewModel @Inject constructor(
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false)
+            }
+        }
+    }
+
+    fun savePreferences(request: UpdateContactPreferencesUseCase.Request) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isSavingPreferences = true,
+                preferenceMessageRes = null,
+                preferenceError = null,
+            )
+            when (val outcome = updateContactPreferencesUseCase(request.copy(contactId = contactId))) {
+                UpdateContactPreferencesUseCase.Outcome.ContactNotFound -> {
+                    _uiState.value = _uiState.value.copy(
+                        isSavingPreferences = false,
+                        preferenceError = "Contact not found.",
+                    )
+                }
+                is UpdateContactPreferencesUseCase.Outcome.InvalidInput -> {
+                    _uiState.value = _uiState.value.copy(
+                        isSavingPreferences = false,
+                        preferenceError = outcome.message,
+                    )
+                }
+                is UpdateContactPreferencesUseCase.Outcome.Updated -> {
+                    _uiState.value = _uiState.value.copy(
+                        contact = outcome.contact,
+                        isSavingPreferences = false,
+                        preferenceMessageRes = R.string.contact_detail_preferences_saved,
+                        preferenceError = null,
+                    )
+                    loadContact()
+                }
             }
         }
     }
@@ -112,6 +150,11 @@ class ContactDetailViewModel @Inject constructor(
     }
 
     fun clearGenerationResult() {
-        _uiState.value = _uiState.value.copy(generationResult = null, generationErrorRes = null)
+        _uiState.value = _uiState.value.copy(
+            generationResult = null,
+            generationErrorRes = null,
+            preferenceMessageRes = null,
+            preferenceError = null,
+        )
     }
 }

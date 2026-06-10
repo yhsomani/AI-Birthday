@@ -3,6 +3,7 @@ package com.example.domain.service
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.GiftHistoryEntity
+import com.example.core.db.entities.MemoryNoteEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.db.entities.StyleProfileEntity
 
@@ -11,7 +12,9 @@ interface AiService {
         contact: ContactEntity,
         event: EventEntity,
         styleProfile: StyleProfileEntity?,
-        previousMessages: List<SentMessageEntity>
+        previousMessages: List<SentMessageEntity>,
+        memoryNotes: List<MemoryNoteEntity> = emptyList(),
+        giftHistory: List<GiftHistoryEntity> = emptyList(),
     ): MessageVariantsResult
 
     suspend fun regenerateMessage(
@@ -20,7 +23,9 @@ interface AiService {
         event: EventEntity,
         styleProfile: StyleProfileEntity?,
         previousMessages: List<SentMessageEntity>,
-        feedbackInstruction: String? = null
+        feedbackInstruction: String? = null,
+        memoryNotes: List<MemoryNoteEntity> = emptyList(),
+        giftHistory: List<GiftHistoryEntity> = emptyList(),
     ): MessageVariantsResult
 
     suspend fun classifyContact(contact: ContactEntity): ContactClassificationResult

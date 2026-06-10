@@ -2,6 +2,8 @@ package com.example.domain.usecase
 
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.repository.GiftHistoryRepository
+import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.service.AiService
@@ -15,6 +17,8 @@ class RegeneratePendingMessageUseCase @Inject constructor(
     private val contactRepository: ContactRepository,
     private val eventRepository: EventRepository,
     private val styleProfileRepository: StyleProfileRepository,
+    private val memoryNoteRepository: MemoryNoteRepository,
+    private val giftHistoryRepository: GiftHistoryRepository,
     private val aiService: AiService,
     private val preferencesRepository: PreferencesRepository,
 ) {
@@ -36,6 +40,8 @@ class RegeneratePendingMessageUseCase @Inject constructor(
             ?: return Outcome.ContextNotFound
         val styleProfile = styleProfileRepository.getProfileOnce()
         val previousMessages = messageRepository.getSentByContact(contact.id, 10)
+        val memoryNotes = memoryNoteRepository.getByContact(contact.id)
+        val giftHistory = giftHistoryRepository.getByContact(contact.id)
 
         val variants = aiService.regenerateMessage(
             previousMessage = currentDraft.ifBlank { pending.selectedVariantText },
@@ -44,6 +50,8 @@ class RegeneratePendingMessageUseCase @Inject constructor(
             styleProfile = styleProfile,
             previousMessages = previousMessages,
             feedbackInstruction = feedbackInstruction,
+            memoryNotes = memoryNotes,
+            giftHistory = giftHistory,
         )
         val selectedText = variants.get(variants.recommended)
         val updated = pending.copy(

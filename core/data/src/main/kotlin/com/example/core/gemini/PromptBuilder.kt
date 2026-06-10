@@ -3,6 +3,7 @@ package com.example.core.gemini
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.GiftHistoryEntity
+import com.example.core.db.entities.MemoryNoteEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.db.entities.StyleProfileEntity
 import org.json.JSONArray
@@ -24,7 +25,12 @@ data class ContactContextObject(
     val avgMessageLength: Int,
     val commonPhrases: List<String>,
     val previousWishes: List<String>,
-    val formalityLevel: String
+    val formalityLevel: String,
+    val memoryNotes: List<String>,
+    val giftHistory: List<String>,
+    val sensitiveTopics: List<String>,
+    val currentLifePhase: String?,
+    val preferredChannel: String,
 )
 
 class PromptBuilder {
@@ -67,7 +73,9 @@ class PromptBuilder {
         contact: ContactEntity,
         event: EventEntity,
         styleProfile: StyleProfileEntity?,
-        previousMessages: List<SentMessageEntity>
+        previousMessages: List<SentMessageEntity>,
+        memoryNotes: List<MemoryNoteEntity> = emptyList(),
+        giftHistory: List<GiftHistoryEntity> = emptyList(),
     ): ContactContextObject {
         val lastInteraction = contact.lastInteractionDate
         val daysSince = if (lastInteraction != null)
@@ -89,6 +97,26 @@ class PromptBuilder {
         val parsedPhrases = try { 
             val arr = JSONArray(styleProfile?.commonPhrasesJson ?: "[]"); List(arr.length()) { arr.getString(it) } 
         } catch(e: Exception) { emptyList() }
+
+        val parsedSensitiveTopics = try {
+            val arr = JSONArray(contact.sensitiveTopicsJson)
+            List(arr.length()) { arr.getString(it) }
+        } catch(e: Exception) { emptyList() }
+
+        val lifePhase = try {
+            val phase = org.json.JSONObject(contact.currentLifePhaseJson).optString("phase")
+            phase.takeIf { it.isNotBlank() }
+        } catch(e: Exception) { null }
+
+        val memorySummaries = memoryNotes
+            .sortedWith(compareByDescending<MemoryNoteEntity> { it.isPinned }.thenByDescending { it.dateMs })
+            .take(6)
+            .map { "${it.category}: ${sanitizeNotes(it.noteText).take(180)}" }
+
+        val giftSummaries = giftHistory
+            .sortedByDescending { it.year }
+            .take(5)
+            .map { "${it.year}: ${it.giftName} (${it.giftCategory}, liked: ${it.receivedWell ?: "unknown"})" }
 
         val birthdayYear = contact.birthdayYear
         val eventYear = event.year
@@ -113,7 +141,12 @@ class PromptBuilder {
             avgMessageLength = styleProfile?.avgMessageLength ?: 120,
             commonPhrases = parsedPhrases,
             previousWishes = previousMessages.map { it.messageText },
-            formalityLevel = contact.formalityLevel
+            formalityLevel = contact.formalityLevel,
+            memoryNotes = memorySummaries,
+            giftHistory = giftSummaries,
+            sensitiveTopics = parsedSensitiveTopics,
+            currentLifePhase = lifePhase,
+            preferredChannel = contact.preferredChannel,
         )
     }
 
@@ -136,6 +169,19 @@ class PromptBuilder {
             appendLine("- Interests: ${context.interests.joinToString(", ")}")
             appendLine("- Shared memories: ${context.sharedHistory.joinToString("; ")}")
             appendLine("- Last spoke: ${context.daysSinceLastContact} days ago")
+            appendLine("- Preferred send channel: ${context.preferredChannel}")
+            if (!context.currentLifePhase.isNullOrBlank()) {
+                appendLine("- Current life phase: ${context.currentLifePhase}")
+            }
+            if (context.memoryNotes.isNotEmpty()) {
+                appendLine("- Memory Vault notes: ${context.memoryNotes.joinToString("; ")}")
+            }
+            if (context.giftHistory.isNotEmpty()) {
+                appendLine("- Gift history: ${context.giftHistory.joinToString("; ")}")
+            }
+            if (context.sensitiveTopics.isNotEmpty()) {
+                appendLine("- Avoid these topics: ${context.sensitiveTopics.joinToString(", ")}")
+            }
             appendLine()
             appendLine("EVENT: ${context.eventType} (${context.eventOccurrenceNumber?.let { "turning $it" } ?: ""})")
             appendLine()

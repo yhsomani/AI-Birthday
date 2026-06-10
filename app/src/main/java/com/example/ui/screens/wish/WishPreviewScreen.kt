@@ -53,6 +53,7 @@ import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.viewmodel.WishPreviewViewModel
+import com.example.ui.viewmodel.WhySignal
 
 private val variantOptions = listOf(
     "short" to R.string.wish_variant_short,
@@ -251,6 +252,11 @@ private fun WishPreviewContent(
                     )
                 }
 
+                if (state.whySignals.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    WhyThisMessagePanel(signals = state.whySignals)
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.wish_preview_feedback_title),
@@ -408,6 +414,45 @@ private fun FeedbackChip(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+@Composable
+private fun WhyThisMessagePanel(signals: List<WhySignal>) {
+    RelateGlassCard {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.wish_why_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = RelatePrimary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            signals.forEach { signal ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Text(
+                        text = stringResource(signal.labelRes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = RelateOnSurfaceVariant,
+                        modifier = Modifier.weight(0.42f),
+                    )
+                    Text(
+                        text = signal.value,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(0.58f),
+                    )
+                }
+            }
+        }
     }
 }
 

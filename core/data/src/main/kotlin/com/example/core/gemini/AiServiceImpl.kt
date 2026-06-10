@@ -2,6 +2,8 @@ package com.example.core.gemini
 
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
+import com.example.core.db.entities.GiftHistoryEntity
+import com.example.core.db.entities.MemoryNoteEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.resilience.StructuredLogger
@@ -20,7 +22,9 @@ class AiServiceImpl @Inject constructor(
         contact: ContactEntity,
         event: EventEntity,
         styleProfile: StyleProfileEntity?,
-        previousMessages: List<SentMessageEntity>
+        previousMessages: List<SentMessageEntity>,
+        memoryNotes: List<MemoryNoteEntity>,
+        giftHistory: List<GiftHistoryEntity>,
     ): MessageVariantsResult {
         StructuredLogger.i(TAG, "Generating message", mapOf(
             "contactId" to contact.id,
@@ -28,7 +32,14 @@ class AiServiceImpl @Inject constructor(
             "previousMessages" to previousMessages.size.toString(),
         ))
         val prompter = PromptBuilder()
-        val contextObj = prompter.buildContactContext(contact, event, styleProfile, previousMessages)
+        val contextObj = prompter.buildContactContext(
+            contact = contact,
+            event = event,
+            styleProfile = styleProfile,
+            previousMessages = previousMessages,
+            memoryNotes = memoryNotes,
+            giftHistory = giftHistory,
+        )
 
         RateLimiter.waitIfNeeded()
         val prompt = prompter.buildMessageGenerationPrompt(contextObj)
@@ -56,14 +67,23 @@ class AiServiceImpl @Inject constructor(
         event: EventEntity,
         styleProfile: StyleProfileEntity?,
         previousMessages: List<SentMessageEntity>,
-        feedbackInstruction: String?
+        feedbackInstruction: String?,
+        memoryNotes: List<MemoryNoteEntity>,
+        giftHistory: List<GiftHistoryEntity>,
     ): MessageVariantsResult {
         StructuredLogger.i(TAG, "Regenerating message", mapOf(
             "contactId" to contact.id,
             "eventId" to event.id,
         ))
         val prompter = PromptBuilder()
-        val contextObj = prompter.buildContactContext(contact, event, styleProfile, previousMessages)
+        val contextObj = prompter.buildContactContext(
+            contact = contact,
+            event = event,
+            styleProfile = styleProfile,
+            previousMessages = previousMessages,
+            memoryNotes = memoryNotes,
+            giftHistory = giftHistory,
+        )
 
         RateLimiter.waitIfNeeded()
         val prompt = prompter.buildRegenerationPrompt(previousMessage, contextObj, feedbackInstruction)
@@ -106,7 +126,7 @@ class AiServiceImpl @Inject constructor(
 
     override suspend fun generateGiftSuggestions(
         contact: ContactEntity,
-        history: List<com.example.core.db.entities.GiftHistoryEntity>
+        history: List<GiftHistoryEntity>
     ): List<com.example.domain.service.GiftSuggestion> {
         val prompter = PromptBuilder()
         val prompt = prompter.buildGiftSuggestionsPrompt(contact, history)

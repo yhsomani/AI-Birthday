@@ -4,6 +4,8 @@ import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.repository.GiftHistoryRepository
+import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.service.AiService
@@ -29,6 +31,8 @@ class GenerateMessageUseCase @Inject constructor(
     private val eventRepository: EventRepository,
     private val messageRepository: MessageRepository,
     private val styleProfileRepository: StyleProfileRepository,
+    private val memoryNoteRepository: MemoryNoteRepository,
+    private val giftHistoryRepository: GiftHistoryRepository,
     private val aiService: AiService,
     private val preferencesRepository: PreferencesRepository,
     private val schedulerService: SchedulerService,
@@ -49,12 +53,29 @@ class GenerateMessageUseCase @Inject constructor(
         }
         val styleProfile = styleProfileRepository.getProfileOnce()
         val previousMessages = messageRepository.getSentByContact(contact.id, 10)
+        val memoryNotes = memoryNoteRepository.getByContact(contact.id)
+        val giftHistory = giftHistoryRepository.getByContact(contact.id)
 
-        var variants = aiService.generateMessage(contact, event, styleProfile, previousMessages)
+        var variants = aiService.generateMessage(
+            contact = contact,
+            event = event,
+            styleProfile = styleProfile,
+            previousMessages = previousMessages,
+            memoryNotes = memoryNotes,
+            giftHistory = giftHistory,
+        )
 
         var retries = 0
         while (retries < 2 && isPreviouslyUsed(variants.standard, previousMessages)) {
-            variants = aiService.regenerateMessage(variants.standard, contact, event, styleProfile, previousMessages)
+            variants = aiService.regenerateMessage(
+                previousMessage = variants.standard,
+                contact = contact,
+                event = event,
+                styleProfile = styleProfile,
+                previousMessages = previousMessages,
+                memoryNotes = memoryNotes,
+                giftHistory = giftHistory,
+            )
             retries++
         }
 

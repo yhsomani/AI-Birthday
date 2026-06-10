@@ -12,6 +12,7 @@ import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.GiftHistoryDao
 import com.example.core.db.dao.MemoryNoteDao
+import com.example.core.db.dao.MessageFeedbackDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.dao.StyleProfileDao
@@ -20,6 +21,7 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.GiftHistoryEntity
 import com.example.core.db.entities.MemoryNoteEntity
+import com.example.core.db.entities.MessageFeedbackEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.db.entities.StyleProfileEntity
@@ -38,8 +40,9 @@ import net.sqlcipher.database.SupportFactory
         GiftHistoryEntity::class,
         StyleProfileHistoryEntity::class,
         ActivityLogEntity::class,
+        MessageFeedbackEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -51,6 +54,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun memoryNoteDao(): MemoryNoteDao
     abstract fun giftHistoryDao(): GiftHistoryDao
     abstract fun activityLogDao(): ActivityLogDao
+    abstract fun messageFeedbackDao(): MessageFeedbackDao
     // abstract fun moodLogDao(): MoodLogDao
 
     companion object {
@@ -445,6 +449,36 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE activity_logs ADD COLUMN severity TEXT NOT NULL DEFAULT 'INFO'")
+                db.execSQL("ALTER TABLE activity_logs ADD COLUMN status TEXT NOT NULL DEFAULT 'OPEN'")
+                db.execSQL("ALTER TABLE activity_logs ADD COLUMN actionRoute TEXT")
+                db.execSQL("ALTER TABLE activity_logs ADD COLUMN metadataJson TEXT NOT NULL DEFAULT '{}'")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_activity_logs_status ON activity_logs(status)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_activity_logs_severity ON activity_logs(severity)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS message_feedback (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        pendingMessageId TEXT NOT NULL,
+                        contactId TEXT NOT NULL,
+                        eventId TEXT NOT NULL,
+                        reasonKey TEXT NOT NULL,
+                        instruction TEXT NOT NULL,
+                        draftText TEXT NOT NULL,
+                        appliedToRegeneration INTEGER NOT NULL DEFAULT 0,
+                        createdAtMs INTEGER NOT NULL,
+                        FOREIGN KEY(pendingMessageId) REFERENCES pending_messages(id) ON DELETE CASCADE,
+                        FOREIGN KEY(contactId) REFERENCES contacts(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_message_feedback_pendingMessageId ON message_feedback(pendingMessageId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_message_feedback_contactId ON message_feedback(contactId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_message_feedback_createdAtMs ON message_feedback(createdAtMs)")
+            }
+        }
+
         fun closeAndResetInstance() {
             synchronized(this) {
                 INSTANCE?.let { db ->
@@ -490,6 +524,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_9_10,
                     MIGRATION_10_11,
                     MIGRATION_11_12,
+                    MIGRATION_12_13,
                 )
                 .build()
                 INSTANCE = instance

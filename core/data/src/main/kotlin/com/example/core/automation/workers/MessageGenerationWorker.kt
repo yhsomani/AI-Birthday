@@ -15,6 +15,8 @@ import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.dao.StyleProfileDao
+import com.example.core.db.dao.MemoryNoteDao
+import com.example.core.db.dao.GiftHistoryDao
 import com.example.core.resilience.StructuredLogger
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -34,6 +36,8 @@ class MessageGenerationWorker @AssistedInject constructor(
     private val pendingMessageDao: PendingMessageDao,
     private val sentMessageDao: SentMessageDao,
     private val styleProfileDao: StyleProfileDao,
+    private val memoryNoteDao: MemoryNoteDao,
+    private val giftHistoryDao: GiftHistoryDao,
     private val gemini: GeminiClient,
     private val prefs: SecurePrefs
 ) : CoroutineWorker(ctx, params) {
@@ -88,8 +92,17 @@ class MessageGenerationWorker @AssistedInject constructor(
                             val contact = contactDao.getById(event.contactId) ?: return@async
                             val styleProfile = styleProfileDao.get()
                             val previousMessages = sentMessageDao.getByContact(contact.id)
+                            val memoryNotes = memoryNoteDao.getByContact(contact.id)
+                            val giftHistory = giftHistoryDao.getByContact(contact.id)
 
-                            val contextObj = prompter.buildContactContext(contact, event, styleProfile, previousMessages)
+                            val contextObj = prompter.buildContactContext(
+                                contact = contact,
+                                event = event,
+                                styleProfile = styleProfile,
+                                previousMessages = previousMessages,
+                                memoryNotes = memoryNotes,
+                                giftHistory = giftHistory,
+                            )
 
                             val messageId = existingPending?.id ?: java.util.UUID.randomUUID().toString()
 

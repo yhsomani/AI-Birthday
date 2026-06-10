@@ -22,5 +22,9 @@ data class ActivityLogEntity(
     val contactId: String? = null,
     val eventId: String? = null,
     val messageId: String? = null,
+    val severity: String = "INFO",
+    val status: String = "OPEN",
+    val actionRoute: String? = null,
+    val metadataJson: String = "{}",
     val createdAtMs: Long = System.currentTimeMillis(),
 )
