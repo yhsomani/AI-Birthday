@@ -22,3 +22,7 @@
 ## 2026-06-09 - Compose List Performance without Keys
 **Learning:** For dynamic lists such as chat histories or generated items, omitting the `key` parameter in `LazyColumn.items` can cause unnecessary UI recompositions. This is specifically relevant when updates occur frequently or lists grow long.
 **Action:** Always provide stable `key` closures in `LazyColumn` and `LazyRow` items blocks using unique Entity IDs.
+
+## 2026-06-10 - Unnecessary Regex Recompilation in Loops
+**Learning:** Instantiating `Regex` objects inside loops (e.g., in `.forEach` or `.map`) or inside frequently called functions (e.g., `send` or prompt building) forces the underlying `java.util.regex.Pattern` to be recompiled repeatedly. This is an expensive operation that leads to significant CPU overhead and unnecessary Garbage Collection (GC) pressure in hot paths.
+**Action:** Always extract static `Regex` patterns to class properties or a `companion object` so they are compiled only once and reused across invocations.

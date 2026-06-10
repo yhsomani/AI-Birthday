@@ -11,7 +11,7 @@ class WhatsAppSender(private val context: Context) {
     suspend fun send(phoneNumber: String, message: String, eventId: String): Boolean = withContext(Dispatchers.Main) {
         val deferred = CompletableDeferred<Boolean>()
         val job = WhatsAppAccessibilityService.WhatsAppSendJob(
-            phoneNumber = phoneNumber.replace(Regex("[^0-9]"), ""),
+            phoneNumber = phoneNumber.replace(NON_DIGIT_REGEX, ""),
             message = message,
             eventId = eventId,
             onComplete = { result ->
@@ -25,5 +25,9 @@ class WhatsAppSender(private val context: Context) {
         } else {
             return@withContext false
         }
+    }
+
+    companion object {
+        private val NON_DIGIT_REGEX = Regex("[^0-9]")
     }
 }
