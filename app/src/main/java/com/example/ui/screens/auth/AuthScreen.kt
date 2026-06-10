@@ -23,12 +23,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.BuildConfig
+import com.example.R
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
@@ -64,7 +66,7 @@ fun AuthScreen(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "RelateAI",
+            text = stringResource(R.string.app_name),
             style = MaterialTheme.typography.displayLarge.copy(
                 fontWeight = FontWeight.Bold,
                 fontSize = 42.sp,
@@ -73,7 +75,7 @@ fun AuthScreen(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Nurture your connections\nwith AI-powered wishes",
+            text = stringResource(R.string.auth_subtitle),
             style = MaterialTheme.typography.bodyLarge,
             color = RelateOnBackground.copy(alpha = 0.7f),
             textAlign = TextAlign.Center,
@@ -93,7 +95,7 @@ fun AuthScreen(
                 ),
             ) {
                 Text(
-                    text = "Sign in with Google",
+                    text = stringResource(R.string.auth_sign_in_google),
                     style = MaterialTheme.typography.labelLarge,
                     color = RelateOnBackground,
                 )
@@ -111,7 +113,7 @@ fun AuthScreen(
                     ),
                 ) {
                     Text(
-                        text = "Bypass Sign-In (Dev)",
+                        text = stringResource(R.string.auth_dev_bypass),
                         style = MaterialTheme.typography.labelLarge,
                         color = RelateDarkBackground,
                     )
@@ -129,7 +131,7 @@ fun AuthScreen(
         }
         Spacer(modifier = Modifier.height(48.dp))
         Text(
-            text = "By signing in, you agree to our Terms and Privacy Policy",
+            text = stringResource(R.string.auth_legal_agreement),
             style = MaterialTheme.typography.bodySmall,
             color = RelateOnSurfaceVariant,
             textAlign = TextAlign.Center,

@@ -38,6 +38,7 @@ class NoHardcodedStringsRegressionTest {
         val CLEANED_SCREEN_SOURCES = listOf(
             "app/src/main/java/com/example/ui/screens/activity/ActivityHistoryScreen.kt",
             "app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt",
+            "app/src/main/java/com/example/ui/screens/auth/AuthScreen.kt",
             "app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt",
             "app/src/main/java/com/example/ui/screens/contacts/ContactListScreen.kt",
             "app/src/main/java/com/example/ui/screens/events/EventsScreen.kt",

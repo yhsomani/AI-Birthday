@@ -68,6 +68,21 @@ class ProductionReadinessConfigTest {
         assertTrue(workflow.contains("debug-apk"))
     }
 
+    @Test
+    fun authScreen_releaseCopyUsesStringResources() {
+        val source = rootFile("app/src/main/java/com/example/ui/screens/auth/AuthScreen.kt").readText()
+
+        assertTrue(source.contains("stringResource(R.string.app_name)"))
+        assertTrue(source.contains("stringResource(R.string.auth_subtitle)"))
+        assertTrue(source.contains("stringResource(R.string.auth_sign_in_google)"))
+        assertTrue(source.contains("stringResource(R.string.auth_dev_bypass)"))
+        assertTrue(source.contains("stringResource(R.string.auth_legal_agreement)"))
+        assertFalse(source.contains("Nurture your connections"))
+        assertFalse(source.contains("Sign in with Google"))
+        assertFalse(source.contains("Bypass Sign-In (Dev)"))
+        assertFalse(source.contains("By signing in, you agree"))
+    }
+
     private fun parseXml(file: File) = DocumentBuilderFactory.newInstance()
         .apply { isNamespaceAware = true }
         .newDocumentBuilder()

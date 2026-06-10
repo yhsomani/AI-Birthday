@@ -143,6 +143,10 @@
     <string name="auth_error_developer_config">इस ऐप साइनिंग सर्टिफिकेट के लिए Google Sign-In कॉन्फ़िगर नहीं है। Firebase में इस बिल्ड का SHA-1 जोड़ें, नया google-services.json डाउनलोड करें, और फिर से बिल्ड करें।</string>
     <string name="auth_error_network">Google Sign-In से कनेक्ट नहीं हो सका। अपना कनेक्शन जांचें और फिर कोशिश करें।</string>
     <string name="auth_error_firebase">Firebase authentication विफल रहा। OAuth configuration जांचें और फिर कोशिश करें।</string>
+    <string name="auth_subtitle">AI-powered wishes के साथ\nअपने रिश्ते मजबूत रखें</string>
+    <string name="auth_sign_in_google">Google से साइन इन करें</string>
+    <string name="auth_dev_bypass">Sign-In बायपास करें (Dev)</string>
+    <string name="auth_legal_agreement">साइन इन करके आप हमारी Terms और Privacy Policy से सहमत होते हैं</string>
     
     <!-- Common -->
     <string name="add">जोड़ें</string>

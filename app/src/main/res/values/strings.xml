@@ -142,6 +142,10 @@
     <string name="auth_error_developer_config">Google Sign-In is not configured for this app signing certificate. Add this build\'s SHA-1 in Firebase, download the updated google-services.json, and rebuild.</string>
     <string name="auth_error_network">Could not reach Google Sign-In. Check your connection and try again.</string>
     <string name="auth_error_firebase">Firebase authentication failed. Check OAuth configuration and try again.</string>
+    <string name="auth_subtitle">Nurture your connections\nwith AI-powered wishes</string>
+    <string name="auth_sign_in_google">Sign in with Google</string>
+    <string name="auth_dev_bypass">Bypass Sign-In (Dev)</string>
+    <string name="auth_legal_agreement">By signing in, you agree to our Terms and Privacy Policy</string>
     
     <!-- Common -->
     <string name="add">Add</string>
