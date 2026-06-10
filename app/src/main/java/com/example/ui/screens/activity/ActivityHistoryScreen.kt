@@ -19,15 +19,18 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MailOutline
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.ui.components.EmptyState
@@ -46,6 +50,7 @@ import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.ui.viewmodel.ActivityHistoryViewModel
 import com.example.ui.viewmodel.ActivityLogDateFilter
+import com.example.ui.viewmodel.ActivityLogStatusFilter
 import com.example.ui.viewmodel.ActivityLogTypeFilter
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -54,9 +59,10 @@ import java.util.Locale
 @Composable
 fun ActivityHistoryScreen(
     onBack: () -> Unit,
+    onOpenRoute: (String) -> Unit = {},
     viewModel: ActivityHistoryViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     RelateScreen(
         title = stringResource(R.string.activity_history_title),
@@ -65,6 +71,17 @@ fun ActivityHistoryScreen(
         navigationContentDescription = stringResource(R.string.back),
         onNavigationClick = onBack,
     ) {
+        OutlinedTextField(
+            value = state.searchQuery,
+            onValueChange = viewModel::updateSearchQuery,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            leadingIcon = {
+                Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.search))
+            },
+            placeholder = { Text(stringResource(R.string.activity_history_search_placeholder)) },
+        )
+        Spacer(modifier = Modifier.height(8.dp))
         FilterRow(
             filters = ActivityLogTypeFilter.entries,
             selected = state.selectedTypeFilter,
@@ -77,6 +94,13 @@ fun ActivityHistoryScreen(
             selected = state.selectedDateFilter,
             label = { it.label() },
             onSelected = viewModel::selectDateFilter,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        FilterRow(
+            filters = ActivityLogStatusFilter.entries,
+            selected = state.selectedStatusFilter,
+            label = { it.label() },
+            onSelected = viewModel::selectStatusFilter,
         )
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -100,7 +124,7 @@ fun ActivityHistoryScreen(
                 contentPadding = PaddingValues(bottom = 24.dp),
             ) {
                 items(state.entries, key = { it.id }) { entry ->
-                    ActivityLogCard(entry = entry)
+                    ActivityLogCard(entry = entry, onOpenRoute = onOpenRoute)
                 }
             }
         }
@@ -131,7 +155,10 @@ private fun <T> FilterRow(
 }
 
 @Composable
-private fun ActivityLogCard(entry: ActivityLogEntity) {
+private fun ActivityLogCard(
+    entry: ActivityLogEntity,
+    onOpenRoute: (String) -> Unit,
+) {
     val dateFormat = rememberActivityDateFormat()
     RelateGlassCard {
         Row(
@@ -157,11 +184,33 @@ private fun ActivityLogCard(entry: ActivityLogEntity) {
                     color = RelateOnSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = entry.severity,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = entry.severity.severityColor(),
+                    )
+                    Text(
+                        text = entry.status,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = RelateOnSurfaceVariant,
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = dateFormat.format(Date(entry.createdAtMs)),
                     style = MaterialTheme.typography.labelSmall,
                     color = RelateOnSurfaceVariant,
                 )
+                entry.actionRoute?.let { route ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { onOpenRoute(route) },
+                        colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+                    ) {
+                        Text(stringResource(R.string.activity_history_open_action))
+                    }
+                }
             }
         }
     }
@@ -187,6 +236,13 @@ private fun ActivityLogDateFilter.label(): String = when (this) {
 }
 
 @Composable
+private fun ActivityLogStatusFilter.label(): String = when (this) {
+    ActivityLogStatusFilter.ALL -> stringResource(R.string.filter_all)
+    ActivityLogStatusFilter.OPEN -> stringResource(R.string.activity_filter_open)
+    ActivityLogStatusFilter.RESOLVED -> stringResource(R.string.activity_filter_resolved)
+}
+
+@Composable
 private fun rememberActivityDateFormat(): SimpleDateFormat =
     SimpleDateFormat(stringResource(R.string.activity_history_date_pattern), Locale.getDefault())
 
@@ -198,4 +254,11 @@ private fun String.icon(): ImageVector = when (uppercase(Locale.US)) {
     "SETTINGS" -> Icons.Filled.Settings
     "AI" -> Icons.Filled.SmartToy
     else -> Icons.Filled.History
+}
+
+@Composable
+private fun String.severityColor() = when (uppercase(Locale.US)) {
+    "ERROR" -> MaterialTheme.colorScheme.error
+    "WARNING" -> androidx.compose.ui.graphics.Color(0xFFF59E0B)
+    else -> RelatePrimary
 }

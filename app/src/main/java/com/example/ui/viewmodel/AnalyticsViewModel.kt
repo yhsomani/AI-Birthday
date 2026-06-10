@@ -25,6 +25,10 @@ data class AnalyticsUiState(
     val healthCounts: Map<String, Int> = emptyMap(),
     /** Real monthly sent counts for the current year, index 0 = January */
     val monthlyCounts: List<Pair<String, Float>> = emptyList(),
+    val deliveryReliabilityPercent: Int = 0,
+    val responseRatePercent: Int = 0,
+    val personalizationCoveragePercent: Int = 0,
+    val topNeglectedContacts: List<String> = emptyList(),
     val exportReport: AnalyticsReport? = null,
     val isLoading: Boolean = true,
     val isExporting: Boolean = false,
@@ -69,6 +73,17 @@ class AnalyticsViewModel @Inject constructor(
                 }.timeInMillis
 
                 val sentThisYear = messageRepository.getSentSinceYearStart(yearStartMs)
+                val deliveredOrSent = sentThisYear.count {
+                    !it.deliveryStatus.equals("FAILED", ignoreCase = true)
+                }
+                val replies = sentThisYear.count { it.replyReceived }
+                val personalizedContacts = allContacts.count {
+                    !it.nickname.isNullOrBlank() ||
+                        it.notesText.isNotBlank() ||
+                        it.interestsJson.trim().let { raw -> raw.isNotBlank() && raw != "[]" } ||
+                        it.sharedHistoryJson.trim().let { raw -> raw.isNotBlank() && raw != "[]" }
+                }
+                val neglectedContacts = contactRepository.getBottomByHealthScore(5)
                 val countsByMonth = IntArray(12)
                 sentThisYear.forEach { msg ->
                     val cal = Calendar.getInstance().apply { timeInMillis = msg.sentAtMs }
@@ -98,6 +113,10 @@ class AnalyticsViewModel @Inject constructor(
                         "At Risk" to atRiskCount,
                     ),
                     monthlyCounts = monthlyCounts,
+                    deliveryReliabilityPercent = percent(deliveredOrSent, sentThisYear.size),
+                    responseRatePercent = percent(replies, sentThisYear.size),
+                    personalizationCoveragePercent = percent(personalizedContacts, allContacts.size),
+                    topNeglectedContacts = neglectedContacts.map { "${it.name} (${it.healthScore})" },
                     isLoading = false,
                 )
             }
@@ -128,5 +147,10 @@ class AnalyticsViewModel @Inject constructor(
 
     fun clearExportError() {
         _uiState.value = _uiState.value.copy(exportError = false)
+    }
+
+    private fun percent(numerator: Int, denominator: Int): Int {
+        if (denominator <= 0) return 0
+        return ((numerator.toDouble() / denominator.toDouble()) * 100).toInt()
     }
 }

@@ -246,7 +246,8 @@ fun RelateNavGraph(
         }
         composable(Screen.ActivityHistory.route) {
             ActivityHistoryScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onOpenRoute = { route -> navController.navigate(route) },
             )
         }
         composable(Screen.StyleCoach.route) {

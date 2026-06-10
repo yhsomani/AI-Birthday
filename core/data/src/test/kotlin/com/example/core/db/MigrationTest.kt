@@ -50,14 +50,47 @@ class MigrationTest {
 
     @Test
     @Throws(IOException::class)
-    fun migrate10To12_preservesRepresentativeData() {
+    fun migrate10To13_preservesRepresentativeData() {
         migrateAndAssertPreservesRepresentativeData(10)
     }
 
     @Test
     @Throws(IOException::class)
-    fun migrate11To12_preservesRepresentativeData() {
+    fun migrate11To13_preservesRepresentativeData() {
         migrateAndAssertPreservesRepresentativeData(11)
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrate12To13_addsFeedbackAndActivityWorkflowColumns() {
+        val dbName = "migration-12-to-13-feedback"
+        var db = helper.createDatabase(dbName, 12)
+        db.execSQL("""
+            INSERT INTO activity_logs (
+                id, type, title, detail, contactId, eventId, messageId, createdAtMs
+            ) VALUES (
+                'log_1', 'AI', 'Feedback', 'Needs warmth', 'contact_1', 'event_1', 'pending_1', 1700000000000
+            )
+        """.trimIndent())
+        db.close()
+
+        db = helper.runMigrationsAndValidate(
+            dbName,
+            13,
+            true,
+            AppDatabase.MIGRATION_12_13,
+        )
+
+        db.query("SELECT severity, status, metadataJson FROM activity_logs WHERE id = 'log_1'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("INFO", cursor.getString(0))
+            assertEquals("OPEN", cursor.getString(1))
+            assertEquals("{}", cursor.getString(2))
+        }
+        db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'message_feedback'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+        }
+        db.close()
     }
 
     @Test
@@ -130,14 +163,14 @@ class MigrationTest {
     }
 
     private fun migrateAndAssertPreservesRepresentativeData(startVersion: Int) {
-        val dbName = "migration-$startVersion-to-12"
+        val dbName = "migration-$startVersion-to-13"
         var db = helper.createDatabase(dbName, startVersion)
         insertRepresentativeRows(db, startVersion)
         db.close()
 
         db = helper.runMigrationsAndValidate(
             dbName,
-            12,
+            13,
             true,
             *migrationsFrom(startVersion),
         )
@@ -157,6 +190,7 @@ class MigrationTest {
                 AppDatabase.MIGRATION_9_10,
                 AppDatabase.MIGRATION_10_11,
                 AppDatabase.MIGRATION_11_12,
+                AppDatabase.MIGRATION_12_13,
             )
             5 -> arrayOf(
                 AppDatabase.MIGRATION_5_6,
@@ -166,6 +200,7 @@ class MigrationTest {
                 AppDatabase.MIGRATION_9_10,
                 AppDatabase.MIGRATION_10_11,
                 AppDatabase.MIGRATION_11_12,
+                AppDatabase.MIGRATION_12_13,
             )
             6 -> arrayOf(
                 AppDatabase.MIGRATION_6_7,
@@ -174,10 +209,11 @@ class MigrationTest {
                 AppDatabase.MIGRATION_9_10,
                 AppDatabase.MIGRATION_10_11,
                 AppDatabase.MIGRATION_11_12,
+                AppDatabase.MIGRATION_12_13,
             )
-            9 -> arrayOf(AppDatabase.MIGRATION_9_10, AppDatabase.MIGRATION_10_11, AppDatabase.MIGRATION_11_12)
-            10 -> arrayOf(AppDatabase.MIGRATION_10_11, AppDatabase.MIGRATION_11_12)
-            11 -> arrayOf(AppDatabase.MIGRATION_11_12)
+            9 -> arrayOf(AppDatabase.MIGRATION_9_10, AppDatabase.MIGRATION_10_11, AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13)
+            10 -> arrayOf(AppDatabase.MIGRATION_10_11, AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13)
+            11 -> arrayOf(AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13)
             else -> error("Unsupported migration start version: $startVersion")
         }
     }

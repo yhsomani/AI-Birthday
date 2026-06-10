@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,6 +55,7 @@ import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.ui.components.SyncErrorCard
 import com.example.ui.viewmodel.HomeViewModel
+import com.example.ui.viewmodel.RelationshipPlannerItem
 
 @Composable
 fun HomeScreen(
@@ -117,6 +119,19 @@ fun HomeScreen(
                     onRetry = { viewModel.loadMetrics() },
                     onDismiss = { viewModel.dismissSyncError() },
                     modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        val readinessTitle = state.readinessTitle
+        val readinessDetail = state.readinessDetail
+        if (readinessTitle != null && readinessDetail != null) {
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                ReadinessBanner(
+                    title = readinessTitle,
+                    detail = readinessDetail,
+                    onClick = onNavigateToAutomationSetup,
                 )
             }
         }
@@ -226,6 +241,25 @@ fun HomeScreen(
             }
         }
 
+        if (state.plannerItems.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                SectionHeader(title = stringResource(R.string.relationship_planner_title))
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    state.plannerItems.forEach { item ->
+                        PlannerItemCard(
+                            item = item,
+                            onClick = {
+                                item.contactId?.let(onNavigateToContact)
+                                    ?: onNavigateToAutomationSetup()
+                            },
+                        )
+                    }
+                }
+            }
+        }
+
         item {
             Spacer(modifier = Modifier.height(24.dp))
             SectionHeader(title = stringResource(R.string.home_upcoming_birthdays))
@@ -251,6 +285,82 @@ fun HomeScreen(
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun PlannerItemCard(
+    item: RelationshipPlannerItem,
+    onClick: () -> Unit,
+) {
+    RelateGlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Favorite,
+                contentDescription = null,
+                tint = RelatePrimary,
+                modifier = Modifier.size(20.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = item.detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RelateOnSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReadinessBanner(
+    title: String,
+    detail: String,
+    onClick: () -> Unit,
+) {
+    RelateGlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(22.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                )
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RelateOnSurfaceVariant,
+                )
+            }
         }
     }
 }

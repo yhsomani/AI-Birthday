@@ -31,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
@@ -58,7 +58,7 @@ fun AnalyticsScreen(
     onNavigateToActivityHistory: () -> Unit = {},
     viewModel: AnalyticsViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val chooserTitle = stringResource(R.string.analytics_share_chooser)
     val exportError = stringResource(R.string.analytics_export_failed)
@@ -202,6 +202,54 @@ fun AnalyticsScreen(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+        SectionHeader(title = stringResource(R.string.analytics_growth_metrics))
+        RelateGlassCard {
+            Column(modifier = Modifier.padding(16.dp)) {
+                DistributionRow(
+                    stringResource(R.string.analytics_delivery_reliability),
+                    state.deliveryReliabilityPercent,
+                    Color(0xFF22C55E),
+                    suffix = "%",
+                )
+                DistributionRow(
+                    stringResource(R.string.analytics_response_rate),
+                    state.responseRatePercent,
+                    Color(0xFF22D3EE),
+                    suffix = "%",
+                )
+                DistributionRow(
+                    stringResource(R.string.analytics_personalization_coverage),
+                    state.personalizationCoveragePercent,
+                    RelatePrimary,
+                    suffix = "%",
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        SectionHeader(title = stringResource(R.string.analytics_top_neglected))
+        RelateGlassCard {
+            Column(modifier = Modifier.padding(16.dp)) {
+                if (state.topNeglectedContacts.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.analytics_no_neglected_contacts),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = RelateOnSurfaceVariant,
+                    )
+                } else {
+                    state.topNeglectedContacts.forEach { contact ->
+                        Text(
+                            text = contact,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
@@ -259,7 +307,7 @@ private fun BarChart(data: List<Pair<String, Float>>) {
 }
 
 @Composable
-private fun DistributionRow(label: String, count: Int, color: Color) {
+private fun DistributionRow(label: String, count: Int, color: Color, suffix: String = "") {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -280,7 +328,7 @@ private fun DistributionRow(label: String, count: Int, color: Color) {
             modifier = Modifier.weight(1f),
         )
         Text(
-            text = count.toString(),
+            text = "$count$suffix",
             style = MaterialTheme.typography.bodyMedium,
             color = RelateOnSurfaceVariant,
         )

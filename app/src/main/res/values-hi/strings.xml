@@ -538,6 +538,7 @@
     <string name="contact_filter_friends">दोस्त</string>
     <string name="contact_filter_work">काम</string>
     <string name="contact_filter_close_friends">करीबी दोस्त</string>
+    <string name="contact_filter_needs_personalization">डिटेल चाहिए</string>
     <string name="contact_sort_name">नाम</string>
     <string name="contact_sort_health_high">Health high</string>
     <string name="contact_sort_health_low">Health low</string>
@@ -606,11 +607,19 @@
     <string name="analytics_health_healthy">स्वस्थ (70%+)</string>
     <string name="analytics_health_attention">ध्यान चाहिए</string>
     <string name="analytics_health_at_risk">जोखिम में</string>
+    <string name="analytics_growth_metrics">Growth Metrics</string>
+    <string name="analytics_delivery_reliability">Delivery reliability</string>
+    <string name="analytics_response_rate">Response rate</string>
+    <string name="analytics_personalization_coverage">Personalization coverage</string>
+    <string name="analytics_top_neglected">सबसे उपेक्षित संपर्क</string>
+    <string name="analytics_no_neglected_contacts">अभी कोई neglected contact नहीं</string>
 
     <!-- Activity history -->
     <string name="activity_history_title">गतिविधि इतिहास</string>
     <string name="activity_history_subtitle">हाल की ऐप गतिविधियां और एक्सपोर्ट</string>
     <string name="activity_history_empty">अभी कोई गतिविधि नहीं</string>
+    <string name="activity_history_search_placeholder">Activity, errors, या actions खोजें</string>
+    <string name="activity_history_open_action">Open</string>
     <string name="activity_history_date_pattern">MMM dd, yyyy HH:mm</string>
     <string name="activity_filter_message">संदेश</string>
     <string name="activity_filter_event">इवेंट</string>
@@ -621,5 +630,48 @@
     <string name="activity_filter_today">आज</string>
     <string name="activity_filter_last_7_days">7 दिन</string>
     <string name="activity_filter_last_30_days">30 दिन</string>
+    <string name="activity_filter_open">Open</string>
+    <string name="activity_filter_resolved">Resolved</string>
     <string name="settings_activity_history_subtitle">हाल की ऐप गतिविधि देखें</string>
+
+    <!-- Roadmap implementation -->
+    <string name="relationship_planner_title">Relationship Planner</string>
+    <string name="contact_detail_edit_preferences">Personalization edit करें</string>
+    <string name="contact_detail_quick_enrichment">Quick personalization</string>
+    <string name="contact_detail_add_memory">Memory जोड़ें</string>
+    <string name="contact_detail_add_gift">Gift जोड़ें</string>
+    <string name="contact_detail_mark_vip">VIP mark करें</string>
+    <string name="contact_detail_set_whatsapp">WhatsApp</string>
+    <string name="contact_detail_set_sms">SMS</string>
+    <string name="contact_detail_preferences_saved">Personalization saved.</string>
+    <string name="contact_preferences_title">Personalization Control</string>
+    <string name="contact_preferences_nickname">Nickname</string>
+    <string name="contact_preferences_relationship_type">Relationship type</string>
+    <string name="contact_preferences_language">Preferred language</string>
+    <string name="contact_preferences_channel">Preferred channel: SMS, WHATSAPP, EMAIL</string>
+    <string name="contact_preferences_formality">Formality: CASUAL, SEMI_FORMAL, FORMAL</string>
+    <string name="contact_preferences_style">Style: WARM, FUNNY, PROFESSIONAL, EMOTIONAL</string>
+    <string name="contact_preferences_automation_mode">Automation: DEFAULT, SMART_APPROVE, VIP_APPROVE, FULLY_AUTO, ALWAYS_ASK</string>
+    <string name="contact_preferences_send_time">Custom send time, HH:mm</string>
+    <string name="contact_preferences_gift_budget">Gift budget INR</string>
+    <string name="contact_preferences_annual_budget">Annual budget INR</string>
+    <string name="contact_preferences_interests">Interests, comma separated</string>
+    <string name="contact_preferences_sensitive_topics">Avoid topics, comma separated</string>
+    <string name="contact_preferences_life_phase">Current life phase</string>
+    <string name="contact_preferences_notes">Personal notes</string>
+    <string name="contact_preferences_skip_auto_wish">Automatic wishes skip करें</string>
+    <string name="wish_why_title">यह draft क्यों</string>
+    <string name="wish_why_relationship">Relationship</string>
+    <string name="wish_why_language">Language</string>
+    <string name="wish_why_channel">Channel</string>
+    <string name="wish_why_tone">Tone</string>
+    <string name="wish_why_memories">Memory notes</string>
+    <string name="wish_why_gifts">Gift records</string>
+    <string name="wish_why_previous">Previous wishes</string>
+    <string name="widget_no_birthdays_today">आज कोई जन्मदिन नहीं</string>
+    <string name="widget_birthdays_today">आज %1$d birthday(s)</string>
+    <string name="widget_unknown_contact">Unknown Contact</string>
+    <string name="widget_next_events">Next: %1$s</string>
+    <string name="widget_pending_approvals">%1$d approval(s) pending</string>
+    <string name="widget_enjoy_day">Enjoy your day!</string>
 </resources>

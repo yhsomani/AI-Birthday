@@ -15,6 +15,19 @@ interface ActivityLogDao {
     @Query("SELECT * FROM activity_logs WHERE type = :type ORDER BY createdAtMs DESC LIMIT :limit")
     fun getByType(type: String, limit: Int): Flow<List<ActivityLogEntity>>
 
+    @Query("SELECT * FROM activity_logs WHERE status = :status ORDER BY createdAtMs DESC LIMIT :limit")
+    fun getByStatus(status: String, limit: Int): Flow<List<ActivityLogEntity>>
+
+    @Query("""
+        SELECT * FROM activity_logs
+        WHERE title LIKE '%' || :query || '%'
+            OR detail LIKE '%' || :query || '%'
+            OR type LIKE '%' || :query || '%'
+        ORDER BY createdAtMs DESC
+        LIMIT :limit
+    """)
+    fun search(query: String, limit: Int): Flow<List<ActivityLogEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entry: ActivityLogEntity)
 

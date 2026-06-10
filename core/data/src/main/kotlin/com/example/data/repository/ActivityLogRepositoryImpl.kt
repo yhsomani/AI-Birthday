@@ -16,6 +16,12 @@ class ActivityLogRepositoryImpl @Inject constructor(
     override fun getByType(type: String, limit: Int): Flow<List<ActivityLogEntity>> =
         activityLogDao.getByType(type, limit)
 
+    override fun getByStatus(status: String, limit: Int): Flow<List<ActivityLogEntity>> =
+        activityLogDao.getByStatus(status, limit)
+
+    override fun search(query: String, limit: Int): Flow<List<ActivityLogEntity>> =
+        activityLogDao.search(query, limit)
+
     override suspend fun record(entry: ActivityLogEntity) = activityLogDao.insert(entry)
 
     override suspend fun deleteOlderThan(cutoffMs: Long) = activityLogDao.deleteOlderThan(cutoffMs)

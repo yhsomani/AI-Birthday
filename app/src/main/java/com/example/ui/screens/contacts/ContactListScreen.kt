@@ -33,7 +33,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.ui.components.EmptyState
@@ -64,6 +64,7 @@ private val filterOptions = listOf(
     ContactFilter.FRIENDS,
     ContactFilter.WORK,
     ContactFilter.CLOSE_FRIENDS,
+    ContactFilter.NEEDS_PERSONALIZATION,
 )
 
 private val sortOptions = listOf(
@@ -78,7 +79,7 @@ fun ContactListScreen(
     onContactClick: (String) -> Unit = {},
     viewModel: ContactListViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -215,6 +216,7 @@ private fun ContactFilter.label(): String = when (this) {
     ContactFilter.FRIENDS -> stringResource(R.string.contact_filter_friends)
     ContactFilter.WORK -> stringResource(R.string.contact_filter_work)
     ContactFilter.CLOSE_FRIENDS -> stringResource(R.string.contact_filter_close_friends)
+    ContactFilter.NEEDS_PERSONALIZATION -> stringResource(R.string.contact_filter_needs_personalization)
 }
 
 @Composable

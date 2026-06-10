@@ -28,11 +28,19 @@ enum class ActivityLogDateFilter {
     LAST_30_DAYS,
 }
 
+enum class ActivityLogStatusFilter {
+    ALL,
+    OPEN,
+    RESOLVED,
+}
+
 data class ActivityHistoryUiState(
     val allEntries: List<ActivityLogEntity> = emptyList(),
     val entries: List<ActivityLogEntity> = emptyList(),
     val selectedTypeFilter: ActivityLogTypeFilter = ActivityLogTypeFilter.ALL,
     val selectedDateFilter: ActivityLogDateFilter = ActivityLogDateFilter.ALL,
+    val selectedStatusFilter: ActivityLogStatusFilter = ActivityLogStatusFilter.ALL,
+    val searchQuery: String = "",
     val isLoading: Boolean = true,
 )
 
@@ -62,15 +70,34 @@ class ActivityHistoryViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(selectedDateFilter = filter).withFilteredEntries()
     }
 
+    fun selectStatusFilter(filter: ActivityLogStatusFilter) {
+        _uiState.value = _uiState.value.copy(selectedStatusFilter = filter).withFilteredEntries()
+    }
+
+    fun updateSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query).withFilteredEntries()
+    }
+
     private fun ActivityHistoryUiState.withFilteredEntries(): ActivityHistoryUiState {
         val cutoffMs = selectedDateFilter.cutoffMs()
+        val query = searchQuery.trim()
         val filtered = allEntries
             .asSequence()
             .filter { entry ->
                 selectedTypeFilter == ActivityLogTypeFilter.ALL ||
                     entry.type.equals(selectedTypeFilter.name, ignoreCase = true)
             }
+            .filter { entry ->
+                selectedStatusFilter == ActivityLogStatusFilter.ALL ||
+                    entry.status.equals(selectedStatusFilter.name, ignoreCase = true)
+            }
             .filter { entry -> cutoffMs == null || entry.createdAtMs >= cutoffMs }
+            .filter { entry ->
+                query.isBlank() ||
+                    entry.title.contains(query, ignoreCase = true) ||
+                    entry.detail.contains(query, ignoreCase = true) ||
+                    entry.type.contains(query, ignoreCase = true)
+            }
             .sortedByDescending { it.createdAtMs }
             .toList()
         return copy(entries = filtered)

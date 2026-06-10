@@ -20,6 +20,7 @@ enum class ContactFilter {
     FRIENDS,
     WORK,
     CLOSE_FRIENDS,
+    NEEDS_PERSONALIZATION,
 }
 
 enum class ContactSort {
@@ -177,6 +178,20 @@ class ContactListViewModel @Inject constructor(
                 relationshipType.equals("WORK", ignoreCase = true)
             ContactFilter.CLOSE_FRIENDS -> contactGroup.equals("Close Friends", ignoreCase = true) ||
                 relationshipType.equals("CLOSE_FRIEND", ignoreCase = true)
+            ContactFilter.NEEDS_PERSONALIZATION -> needsPersonalization()
         }
+    }
+
+    private fun ContactEntity.needsPersonalization(): Boolean {
+        return nickname.isNullOrBlank() &&
+            notesText.isBlank() &&
+            !hasJsonArrayContent(interestsJson) &&
+            !hasJsonArrayContent(sharedHistoryJson) &&
+            classificationConfidence < 0.6
+    }
+
+    private fun hasJsonArrayContent(raw: String): Boolean {
+        val trimmed = raw.trim()
+        return trimmed.isNotBlank() && trimmed != "[]"
     }
 }
