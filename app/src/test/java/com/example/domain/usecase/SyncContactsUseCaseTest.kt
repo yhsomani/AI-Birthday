@@ -151,4 +151,54 @@ class SyncContactsUseCaseTest {
             })
         }
     }
+
+    @Test
+    fun `invoke maps relationship from semantic contact group`() = runTest {
+        val googleContact = ContactEntity(
+            id = "google_2",
+            name = "Maya Nair",
+            relationshipType = "UNKNOWN",
+            contactGroup = "College Friends",
+        )
+
+        coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
+        coEvery { contactSyncService.fetchDeviceContacts() } returns emptyList()
+        coEvery { preferencesRepository.isGuestMode() } returns false
+        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getById(any()) } returns null
+
+        useCase()
+
+        coVerify {
+            contactRepository.upsert(match {
+                it.id == "google_2" &&
+                    it.relationshipType == "FRIEND"
+            })
+        }
+    }
+
+    @Test
+    fun `invoke leaves generic device group unknown for AI classification`() = runTest {
+        val deviceContact = ContactEntity(
+            id = "device_3",
+            name = "Ishaan Roy",
+            relationshipType = "UNKNOWN",
+            contactGroup = "Device",
+        )
+
+        coEvery { contactSyncService.fetchGoogleContacts(any()) } returns emptyList()
+        coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
+        coEvery { preferencesRepository.isGuestMode() } returns false
+        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getById(any()) } returns null
+
+        useCase()
+
+        coVerify {
+            contactRepository.upsert(match {
+                it.id == "device_3" &&
+                    it.relationshipType == "UNKNOWN"
+            })
+        }
+    }
 }

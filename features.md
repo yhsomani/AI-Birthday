@@ -30,7 +30,7 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-003 | Authentication, guest mode, session state | Fully Implemented | Validate live OAuth/guest paths on device. |
 | F-004 | Settings and secure configuration | Partially Implemented | Confirm biometric enforcement, quiet-hour enforcement, and settings actions. |
 | F-005 | Home dashboard and relationship planner | Fully Implemented | Add UI smoke evidence for cards, links, and sync-error recovery. |
-| F-006 | Contact sync, import, and deduplication | Partially Implemented | Align background sync with foreground Google + device contact merge and event discovery. |
+| F-006 | Contact sync, import, and deduplication | Fully Implemented | Foreground and background sync share Google + device contact merge, relationship normalization, and event discovery. |
 | F-007 | Contact list search, filter, sort | Fully Implemented | Add UI smoke evidence for search, chips, sort, clear, and details navigation. |
 | F-008 | Contact detail personalization | Fully Implemented | Custom send time and skip-auto-wish now affect generation/scheduling; live UI validation remains tracked in `docs/UI_VALIDATION.md`. |
 | F-009 | Event discovery | Fully Implemented | Preserve leap-day and deactivation behavior. |
@@ -50,7 +50,7 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-023 | AI message generation and fallback | Fully Implemented | Respects skip-auto-wish, custom send time, quiet hours, and blackout dates. |
 | F-024 | Approval lifecycle | Fully Implemented | Validate notification actions and scheduling after approval. |
 | F-025 | Exact scheduling and boot recovery | Fully Implemented | Exact send scheduling applies automation policy and boot recovery reschedules reminders. |
-| F-026 | WorkManager automation chain | Partially Implemented | Use foreground sync parity and schedule reminders during daily automation. |
+| F-026 | WorkManager automation chain | Fully Implemented | Daily automation uses shared contact sync, event discovery, message generation, reminders, revival, and style analysis workers. |
 | F-027 | Dispatch orchestration | Fully Implemented | Dispatch defers during quiet hours or blackout dates before final send. |
 | F-028 | SMS delivery and status callbacks | Fully Implemented | Validate live SMS with test recipient when safe. |
 | F-029 | WhatsApp Accessibility delivery | Fully Implemented | Validate live WhatsApp test flow when WhatsApp/accessibility are configured. |

@@ -71,6 +71,7 @@ class SyncContactsUseCase @Inject constructor(
         }
 
         var merged = mergeContacts(googleContacts, deviceContacts)
+            .map { it.withRelationshipFromContactGroup() }
 
         if (merged.isEmpty() && isGuest) {
             merged = getMockContacts()
@@ -157,6 +158,23 @@ class SyncContactsUseCase @Inject constructor(
             workStartYear = workStartYear ?: fallback.workStartYear,
             contactGroup = contactGroup ?: fallback.contactGroup,
         )
+    }
+
+    private fun ContactEntity.withRelationshipFromContactGroup(): ContactEntity {
+        val group = contactGroup?.trim()?.takeIf { it.isNotBlank() } ?: return this
+        if (relationshipType != "UNKNOWN" || group.equals("device", ignoreCase = true)) {
+            return this
+        }
+
+        val relationship = when {
+            group.contains("family", ignoreCase = true) -> "FAMILY"
+            group.contains("coworker", ignoreCase = true) ||
+                group.contains("work", ignoreCase = true) ||
+                group.contains("colleague", ignoreCase = true) -> "WORK"
+            group.contains("friend", ignoreCase = true) -> "FRIEND"
+            else -> "ACQUAINTANCE"
+        }
+        return copy(relationshipType = relationship)
     }
 
     private fun getMockContacts(): List<ContactEntity> {

@@ -8,6 +8,7 @@
 - Added AlarmManager-backed event reminder scheduling from `notifyDaysBefore`, with boot/daily rescheduling and reminder-toggle guards.
 
 ### Changed
+- Background contact sync now runs through the same Google + device merge, relationship normalization, mock cleanup, and event-discovery path as foreground sync.
 - Automatic message generation now skips contacts with `skipAutoWish`, while manual generation forces review instead of auto-send for those contacts.
 - Dispatch workers now defer approved sends that become due during quiet hours or blackout dates.
 

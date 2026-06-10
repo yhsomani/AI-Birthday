@@ -269,7 +269,7 @@ RelateAI
 
 - Category: Core Feature.
 - Description: Imports contacts from Google People API and Android ContactsProvider, then merges and persists them locally.
-- Functionality: Foreground sync fetches Google and device contacts, deduplicates by phone/email/name, prefers Google identity, fills gaps from device contacts, clears mock contacts when not guest, seeds mock contacts in guest mode when needed, and runs event discovery.
+- Functionality: Foreground and background sync use the same `SyncContactsUseCase` path to fetch Google and device contacts, deduplicate by phone/email/name, prefer Google identity, fill gaps from device contacts, normalize semantic contact groups to relationship types, clear mock contacts when not guest, seed mock contacts in guest mode when needed, and run event discovery.
 - Components involved: SyncContactsUseCase, GoogleContactsSync, DeviceContactsReader, ContactRepository, EventRepository, ContactSyncWorker.
 - Related files: `SyncContactsUseCase.kt`, `GoogleContactsSync.kt`, `DeviceContactsReader.kt`, `ContactSyncServiceImpl.kt`, `ContactSyncWorker.kt`, `ContactEntity.kt`, `ContactDao.kt`.
 - Dependencies: Google People API, ContactsProvider, READ_CONTACTS permission, Firebase/Google auth, Room, SecurePrefs sync token.
@@ -549,7 +549,7 @@ RelateAI
 
 - Category: Backend Feature.
 - Description: Runs background automation for sync, event discovery, message generation, revival, and style analysis.
-- Functionality: Schedules daily trigger, chains ContactSyncWorker to EventDiscoveryWorker to MessageGenerationWorker, schedules weekly revival and biweekly style analysis, applies constraints/backoff, and avoids scheduling in Robolectric app startup.
+- Functionality: Schedules daily trigger, chains ContactSyncWorker through the shared foreground sync path to EventDiscoveryWorker and MessageGenerationWorker, reschedules event reminders, schedules weekly revival and biweekly style analysis, applies constraints/backoff, and avoids scheduling in Robolectric app startup.
 - Components involved: WorkerScheduler, DailyTriggerWorker, ContactSyncWorker, EventDiscoveryWorker, MessageGenerationWorker, RevivalWorker, StyleAnalysisWorker.
 - Related files: `WorkerScheduler.kt`, `DailyTriggerWorker.kt`, `ContactSyncWorker.kt`, `EventDiscoveryWorker.kt`, `MessageGenerationWorker.kt`, `RevivalWorker.kt`, `StyleAnalysisWorker.kt`, `RelateAIApp.kt`.
 - Dependencies: WorkManager, Hilt Worker injection, auth/prefs, DAOs, AI service.
@@ -949,7 +949,6 @@ Receivers:
 
 - Biometric app lock: manager, toggle, app-wide cold-start/resume gate, and policy test exist; live device prompt validation remains required.
 - Live device validation is still required for quiet-hour deferral, blackout-date deferral, and event-reminder notifications.
-- Background device-contact sync parity: foreground sync merges Google plus device contacts; background `ContactSyncWorker` appears Google-focused.
 - Dynamic shortcuts: implemented as entry points, but not deeply route-specific beyond their configured intents.
 - Gmail event-specific subject: email subject appears birthday-oriented even when dispatching other event types.
 - UI/device smoke coverage: many viewmodels and use cases are tested, but Compose rendering, notifications, widgets, exact alarms, SMS, WhatsApp, OAuth, SMTP, and ContactsProvider require device validation.
