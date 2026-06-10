@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import androidx.lifecycle.SavedStateHandle
+import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.GiftHistoryEntity
 import com.example.domain.repository.ContactRepository
@@ -8,6 +9,7 @@ import com.example.domain.repository.GiftHistoryRepository
 import com.example.domain.service.AiService
 import com.example.domain.service.GiftSuggestion
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.Dispatchers
@@ -105,5 +107,105 @@ class GiftAdvisorViewModelTest {
         assertEquals(2, viewModel.uiState.value.suggestions.size)
         assertEquals("AI Suggestion 1", viewModel.uiState.value.suggestions[0].name)
         assertEquals(false, viewModel.uiState.value.isGeneratingSuggestions)
+    }
+
+    @Test
+    fun `addGiftRecord trims input and parses formatted cost`() = runTest(testDispatcher) {
+        val contact = ContactEntity(id = "contact_1", name = "John Doe", giftBudgetInr = 5000)
+
+        coEvery { contactRepository.getById("contact_1") } returns contact
+        coEvery { giftHistoryRepository.getByContact("contact_1") } returns emptyList()
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
+        advanceUntilIdle()
+
+        val accepted = viewModel.addGiftRecord(
+            name = "  Travel journal  ",
+            category = "  Books  ",
+            occasion = "  Birthday  ",
+            costInput = "1,250",
+            liked = true,
+            notes = "  Loved the paper quality  "
+        )
+        advanceUntilIdle()
+
+        assertEquals(true, accepted)
+        coVerify {
+            giftHistoryRepository.upsert(
+                match {
+                    it.giftName == "Travel journal" &&
+                        it.giftCategory == "Books" &&
+                        it.occasionType == "Birthday" &&
+                        it.approxCostInr == 1250 &&
+                        it.notes == "Loved the paper quality" &&
+                        it.receivedWell == true
+                }
+            )
+        }
+    }
+
+    @Test
+    fun `addGiftRecord rejects invalid cost without persisting`() = runTest(testDispatcher) {
+        coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
+        coEvery { giftHistoryRepository.getByContact("contact_1") } returns emptyList()
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
+        advanceUntilIdle()
+
+        val accepted = viewModel.addGiftRecord(
+            name = "Headphones",
+            category = "Tech",
+            occasion = "Birthday",
+            costInput = "12abc",
+            liked = null,
+            notes = ""
+        )
+        advanceUntilIdle()
+
+        assertEquals(false, accepted)
+        assertEquals(R.string.gift_advisor_error_invalid_cost, viewModel.uiState.value.errorMessageRes)
+        coVerify(exactly = 0) { giftHistoryRepository.upsert(any()) }
+    }
+
+    @Test
+    fun `addGiftRecord rejects overlong notes without persisting`() = runTest(testDispatcher) {
+        coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
+        coEvery { giftHistoryRepository.getByContact("contact_1") } returns emptyList()
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
+        advanceUntilIdle()
+
+        val accepted = viewModel.addGiftRecord(
+            name = "Headphones",
+            category = "Tech",
+            occasion = "Birthday",
+            costInput = "1200",
+            liked = null,
+            notes = "x".repeat(GiftAdvisorViewModel.MAX_NOTES_LENGTH + 1)
+        )
+        advanceUntilIdle()
+
+        assertEquals(false, accepted)
+        assertEquals(R.string.gift_advisor_error_notes_too_long, viewModel.uiState.value.errorMessageRes)
+        coVerify(exactly = 0) { giftHistoryRepository.upsert(any()) }
+    }
+
+    @Test
+    fun `generateGiftSuggestions without contact exposes stable error`() = runTest(testDispatcher) {
+        coEvery { contactRepository.getById("contact_1") } returns null
+        coEvery { giftHistoryRepository.getByContact("contact_1") } returns emptyList()
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
+        advanceUntilIdle()
+
+        viewModel.generateGiftSuggestions()
+        advanceUntilIdle()
+
+        assertEquals(R.string.gift_advisor_error_missing_contact, viewModel.uiState.value.errorMessageRes)
+        coVerify(exactly = 0) { aiService.generateGiftSuggestions(any(), any()) }
     }
 }

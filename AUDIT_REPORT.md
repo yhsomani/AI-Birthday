@@ -461,3 +461,47 @@
 
 **Commit message**
 * `ui: harden memory vault workflow`
+
+### Feature 12: Gift Advisor Workflow Release Readiness
+
+**Problem identified**
+* Gift Advisor still used hardcoded visible English strings, hardcoded content descriptions, and lifecycle-unaware Compose state collection.
+* The screen silently ignored ViewModel errors and closed the add-record dialog even when cost parsing fell back to `0`.
+* The ViewModel accepted untrimmed text, invalid categories/occasions, invalid costs, and raw exception messages.
+* Gift Advisor was not covered by the hardcoded-string regression guard.
+
+**Root cause**
+* Gift Advisor had not been included in the earlier localization and lifecycle cleanup tranche.
+* Numeric parsing and validation were handled ad hoc in Compose instead of at the ViewModel boundary.
+
+**Fix implemented**
+* Localized Gift Advisor screen copy, dialog labels, feedback labels, content descriptions, empty states, loading state, and error messages in English and Hindi resources.
+* Switched Gift Advisor to `collectAsStateWithLifecycle()`.
+* Added stable resource-backed ViewModel error messages for load, add, delete, AI suggestions, missing contact, required fields, invalid cost, and length validation.
+* Hardened gift record creation by trimming input, parsing formatted numeric costs safely, rejecting invalid costs, limiting core fields to 80 characters, and limiting notes to 500 characters.
+* Kept invalid dialog submissions open and visible with localized validation feedback instead of saving `0` or dismissing the form.
+* Added a visible error card, localized loading text, AI empty hint, note counter, accessible feedback/delete labels, and category display in gift history rows.
+* Added `GiftAdvisorViewModelTest` coverage for budget stats, AI suggestions, trimmed save behavior, invalid cost rejection, overlong note rejection, and missing-contact AI errors.
+* Added `GiftAdvisorScreen.kt` to `NoHardcodedStringsRegressionTest`.
+
+**Impact**
+* Improves localization, accessibility, lifecycle safety, and user feedback for the gift workflow.
+* Prevents malformed gift history records from being persisted through UI or programmatic ViewModel calls.
+* Reduces privacy and support risk by avoiding raw exception text in user-facing state.
+
+**Files modified**
+* `app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt`
+* `app/src/main/java/com/example/ui/viewmodel/GiftAdvisorViewModel.kt`
+* `app/src/main/res/values/strings.xml`
+* `app/src/main/res/values-hi/strings.xml`
+* `app/src/test/java/com/example/ui/viewmodel/GiftAdvisorViewModelTest.kt`
+* `app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.GiftAdvisorViewModelTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `ui: harden gift advisor workflow`
