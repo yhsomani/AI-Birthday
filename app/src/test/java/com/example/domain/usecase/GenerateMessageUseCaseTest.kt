@@ -6,6 +6,8 @@ import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.repository.GiftHistoryRepository
+import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.service.AiService
@@ -28,6 +30,8 @@ class GenerateMessageUseCaseTest {
     private val eventRepository: EventRepository = mockk(relaxed = true)
     private val messageRepository: MessageRepository = mockk(relaxed = true)
     private val styleProfileRepository: StyleProfileRepository = mockk(relaxed = true)
+    private val memoryNoteRepository: MemoryNoteRepository = mockk(relaxed = true)
+    private val giftHistoryRepository: GiftHistoryRepository = mockk(relaxed = true)
     private val aiService: AiService = mockk(relaxed = true)
     private val preferencesRepository: PreferencesRepository = mockk(relaxed = true)
     private val schedulerService: SchedulerService = mockk(relaxed = true)
@@ -38,6 +42,8 @@ class GenerateMessageUseCaseTest {
         eventRepository,
         messageRepository,
         styleProfileRepository,
+        memoryNoteRepository,
+        giftHistoryRepository,
         aiService,
         preferencesRepository,
         schedulerService,
@@ -107,6 +113,8 @@ class GenerateMessageUseCaseTest {
         coEvery { contactRepository.getById("c1") } returns contact
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
+        coEvery { memoryNoteRepository.getByContact("c1") } returns emptyList()
+        coEvery { giftHistoryRepository.getByContact("c1") } returns emptyList()
         coEvery { aiService.generateMessage(any(), any(), any(), any()) } returns variants
         coEvery { preferencesRepository.getGlobalAutomationMode() } returns "MANUAL"
 
@@ -133,6 +141,8 @@ class GenerateMessageUseCaseTest {
         coEvery { contactRepository.getById("c1") } returns contact
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
+        coEvery { memoryNoteRepository.getByContact("c1") } returns emptyList()
+        coEvery { giftHistoryRepository.getByContact("c1") } returns emptyList()
         coEvery { aiService.generateMessage(any(), any(), any(), any()) } returns variants
 
         val result = useCase("e1")

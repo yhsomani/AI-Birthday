@@ -10,6 +10,8 @@ import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.EventDao
+import com.example.core.db.dao.GiftHistoryDao
+import com.example.core.db.dao.MemoryNoteDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.dao.StyleProfileDao
@@ -42,6 +44,8 @@ class MessageGenerationWorkerTest {
     private val pendingMessageDao: PendingMessageDao = mockk(relaxed = true)
     private val sentMessageDao: SentMessageDao = mockk(relaxed = true)
     private val styleProfileDao: StyleProfileDao = mockk(relaxed = true)
+    private val memoryNoteDao: MemoryNoteDao = mockk(relaxed = true)
+    private val giftHistoryDao: GiftHistoryDao = mockk(relaxed = true)
     private val geminiClient: GeminiClient = mockk(relaxed = true)
     private val prefs: SecurePrefs = mockk(relaxed = true)
 
@@ -83,6 +87,8 @@ class MessageGenerationWorkerTest {
         coEvery { contactDao.getById("c1") } returns contact
         coEvery { styleProfileDao.get() } returns null
         coEvery { sentMessageDao.getByContact("c1") } returns emptyList()
+        coEvery { memoryNoteDao.getByContact("c1") } returns emptyList()
+        coEvery { giftHistoryDao.getByContact("c1") } returns emptyList()
         coEvery { geminiClient.generate(any()) } returns "mock_response"
         every { ResponseParser.parseMessageVariants(any(), any()) } returns variants
         every { prefs.getGlobalAutomationMode() } returns "MANUAL"
@@ -97,7 +103,7 @@ class MessageGenerationWorkerTest {
                     return MessageGenerationWorker(
                         appContext, workerParameters,
                         contactDao, eventDao, pendingMessageDao, sentMessageDao, styleProfileDao,
-                        geminiClient, prefs
+                        memoryNoteDao, giftHistoryDao, geminiClient, prefs
                     )
                 }
             })

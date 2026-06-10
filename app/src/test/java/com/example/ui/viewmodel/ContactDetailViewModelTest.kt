@@ -7,6 +7,7 @@ import com.example.core.db.entities.EventEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.usecase.GenerateMessageUseCase
+import com.example.domain.usecase.UpdateContactPreferencesUseCase
 import io.mockk.coEvery
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
@@ -39,6 +40,9 @@ class ContactDetailViewModelTest {
 
     @RelaxedMockK
     private lateinit var mockGenerateUseCase: GenerateMessageUseCase
+
+    @RelaxedMockK
+    private lateinit var mockUpdateContactPreferencesUseCase: UpdateContactPreferencesUseCase
 
     private val testDispatcher = StandardTestDispatcher()
 
@@ -80,6 +84,7 @@ class ContactDetailViewModelTest {
             contactRepository = mockContactRepo,
             eventRepository = mockEventRepo,
             generateMessageUseCase = mockGenerateUseCase,
+            updateContactPreferencesUseCase = mockUpdateContactPreferencesUseCase,
         )
         advanceUntilIdle()
 
@@ -114,6 +119,7 @@ class ContactDetailViewModelTest {
             contactRepository = mockContactRepo,
             eventRepository = mockEventRepo,
             generateMessageUseCase = mockGenerateUseCase,
+            updateContactPreferencesUseCase = mockUpdateContactPreferencesUseCase,
         )
         advanceUntilIdle()
 
@@ -149,6 +155,7 @@ class ContactDetailViewModelTest {
             contactRepository = mockContactRepo,
             eventRepository = mockEventRepo,
             generateMessageUseCase = mockGenerateUseCase,
+            updateContactPreferencesUseCase = mockUpdateContactPreferencesUseCase,
         )
         advanceUntilIdle()
 
@@ -185,6 +192,7 @@ class ContactDetailViewModelTest {
             contactRepository = mockContactRepo,
             eventRepository = mockEventRepo,
             generateMessageUseCase = mockGenerateUseCase,
+            updateContactPreferencesUseCase = mockUpdateContactPreferencesUseCase,
         )
         advanceUntilIdle()
 

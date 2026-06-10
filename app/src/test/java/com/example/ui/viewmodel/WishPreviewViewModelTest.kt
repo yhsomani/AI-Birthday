@@ -3,6 +3,10 @@ package com.example.ui.viewmodel
 import com.example.R
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.repository.ActivityLogRepository
+import com.example.domain.repository.ContactRepository
+import com.example.domain.repository.GiftHistoryRepository
+import com.example.domain.repository.MemoryNoteRepository
+import com.example.domain.repository.MessageFeedbackRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RegeneratePendingMessageUseCase
@@ -31,6 +35,18 @@ class WishPreviewViewModelTest {
     private lateinit var activityLogRepository: ActivityLogRepository
 
     @RelaxedMockK
+    private lateinit var messageFeedbackRepository: MessageFeedbackRepository
+
+    @RelaxedMockK
+    private lateinit var contactRepository: ContactRepository
+
+    @RelaxedMockK
+    private lateinit var memoryNoteRepository: MemoryNoteRepository
+
+    @RelaxedMockK
+    private lateinit var giftHistoryRepository: GiftHistoryRepository
+
+    @RelaxedMockK
     private lateinit var approvePendingMessageUseCase: ApprovePendingMessageUseCase
 
     @RelaxedMockK
@@ -44,6 +60,11 @@ class WishPreviewViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        coEvery { contactRepository.getById(any()) } returns null
+        coEvery { memoryNoteRepository.getByContact(any()) } returns emptyList()
+        coEvery { giftHistoryRepository.getByContact(any()) } returns emptyList()
+        coEvery { messageRepository.getSentByContact(any(), any()) } returns emptyList()
+        coEvery { messageFeedbackRepository.getLatestForPendingMessage(any()) } returns null
     }
 
     @After
@@ -69,11 +90,23 @@ class WishPreviewViewModelTest {
         status = "PENDING"
     )
 
+    private fun createViewModel() = WishPreviewViewModel(
+        messageRepository = messageRepository,
+        activityLogRepository = activityLogRepository,
+        messageFeedbackRepository = messageFeedbackRepository,
+        contactRepository = contactRepository,
+        memoryNoteRepository = memoryNoteRepository,
+        giftHistoryRepository = giftHistoryRepository,
+        approvePendingMessageUseCase = approvePendingMessageUseCase,
+        rejectPendingMessageUseCase = rejectPendingMessageUseCase,
+        regeneratePendingMessageUseCase = regeneratePendingMessageUseCase,
+    )
+
     @Test
     fun `loadPending populates state with selected variant text`() = runTest(testDispatcher) {
         coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
 
-        val viewModel = WishPreviewViewModel(messageRepository, activityLogRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -90,7 +123,7 @@ class WishPreviewViewModelTest {
         coEvery { messageRepository.getPendingById("missing") } returns null
         coEvery { messageRepository.getPendingByEventId("missing") } returns null
 
-        val viewModel = WishPreviewViewModel(messageRepository, activityLogRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        val viewModel = createViewModel()
         viewModel.loadPending("missing")
         advanceUntilIdle()
 
@@ -103,7 +136,7 @@ class WishPreviewViewModelTest {
         coEvery { messageRepository.getPendingById("e_1") } returns null
         coEvery { messageRepository.getPendingByEventId("e_1") } returns samplePending()
 
-        val viewModel = WishPreviewViewModel(messageRepository, activityLogRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        val viewModel = createViewModel()
         viewModel.loadPending("e_1")
         advanceUntilIdle()
 
@@ -115,7 +148,7 @@ class WishPreviewViewModelTest {
     fun `selectVariant swaps edited text to that variant`() = runTest(testDispatcher) {
         coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
 
-        val viewModel = WishPreviewViewModel(messageRepository, activityLogRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -130,7 +163,7 @@ class WishPreviewViewModelTest {
     fun `updateEditedText sets the local draft text`() = runTest(testDispatcher) {
         coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
 
-        val viewModel = WishPreviewViewModel(messageRepository, activityLogRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -149,7 +182,7 @@ class WishPreviewViewModelTest {
             regeneratePendingMessageUseCase("pm_1", "Wishing you a happy birthday!", null)
         } returns RegeneratePendingMessageUseCase.Outcome.Regenerated("pm_1", usedFallback = false)
 
-        val viewModel = WishPreviewViewModel(messageRepository, activityLogRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -174,7 +207,7 @@ class WishPreviewViewModelTest {
             regeneratePendingMessageUseCase("pm_1", "Wishing you a happy birthday!", match { it?.contains("more personal") == true })
         } returns RegeneratePendingMessageUseCase.Outcome.Regenerated("pm_1", usedFallback = false)
 
-        val viewModel = WishPreviewViewModel(messageRepository, activityLogRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -194,7 +227,7 @@ class WishPreviewViewModelTest {
         coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
         coEvery { approvePendingMessageUseCase("pm_1", any()) } returns ApprovePendingMessageUseCase.ApprovalOutcome.Approved("pm_1", "VIP_APPROVE")
 
-        val viewModel = WishPreviewViewModel(messageRepository, activityLogRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -210,7 +243,7 @@ class WishPreviewViewModelTest {
         coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
         coEvery { approvePendingMessageUseCase("pm_1", any()) } returns ApprovePendingMessageUseCase.ApprovalOutcome.PendingNotFound
 
-        val viewModel = WishPreviewViewModel(messageRepository, activityLogRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 
@@ -227,7 +260,7 @@ class WishPreviewViewModelTest {
         coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
         coEvery { rejectPendingMessageUseCase("pm_1") } returns RejectPendingMessageUseCase.RejectionOutcome.Rejected("pm_1")
 
-        val viewModel = WishPreviewViewModel(messageRepository, activityLogRepository, approvePendingMessageUseCase, rejectPendingMessageUseCase, regeneratePendingMessageUseCase)
+        val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
         advanceUntilIdle()
 

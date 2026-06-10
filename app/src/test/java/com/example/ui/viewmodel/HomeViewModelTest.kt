@@ -3,6 +3,7 @@ package com.example.ui.viewmodel
 import com.example.core.auth.AuthManager
 import com.example.core.auth.UserProfile
 import com.example.core.db.entities.EventEntity
+import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.usecase.GetDashboardMetricsUseCase
 import io.mockk.coEvery
@@ -39,6 +40,9 @@ class HomeViewModelTest {
     private lateinit var mockEventRepository: EventRepository
 
     @RelaxedMockK
+    private lateinit var mockContactRepository: ContactRepository
+
+    @RelaxedMockK
     private lateinit var mockSyncContactsUseCase: com.example.domain.usecase.SyncContactsUseCase
 
     @RelaxedMockK
@@ -53,6 +57,7 @@ class HomeViewModelTest {
         every { android.util.Log.e(any(), any()) } returns 0
         every { android.util.Log.e(any(), any(), any()) } returns 0
         every { mockPreferencesRepository.getLastSyncError() } returns null
+        coEvery { mockContactRepository.getBottomByHealthScore(3) } returns emptyList()
         every { mockAuthManager.userProfile } returns MutableStateFlow(
             UserProfile(displayName = "TestUser", email = "test@example.com")
         )
@@ -74,7 +79,7 @@ class HomeViewModelTest {
             sentCount = 2,
         )
         coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
-        val viewModel = HomeViewModel(mockUseCase, mockAuthManager, mockEventRepository, mockSyncContactsUseCase, mockPreferencesRepository)
+        val viewModel = HomeViewModel(mockUseCase, mockAuthManager, mockContactRepository, mockEventRepository, mockSyncContactsUseCase, mockPreferencesRepository)
         advanceUntilIdle()
 
         assertEquals("TestUser", viewModel.uiState.value.userName)
@@ -92,7 +97,7 @@ class HomeViewModelTest {
     fun `loadMetrics handles exception gracefully`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } throws RuntimeException("Simulated failure")
         coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
-        val viewModel = HomeViewModel(mockUseCase, mockAuthManager, mockEventRepository, mockSyncContactsUseCase, mockPreferencesRepository)
+        val viewModel = HomeViewModel(mockUseCase, mockAuthManager, mockContactRepository, mockEventRepository, mockSyncContactsUseCase, mockPreferencesRepository)
         advanceUntilIdle()
 
         assertEquals(false, viewModel.uiState.value.isLoading)

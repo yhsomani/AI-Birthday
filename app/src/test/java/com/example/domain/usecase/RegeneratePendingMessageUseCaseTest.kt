@@ -5,6 +5,8 @@ import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.repository.GiftHistoryRepository
+import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.service.AiService
@@ -25,6 +27,8 @@ class RegeneratePendingMessageUseCaseTest {
     private val contactRepository: ContactRepository = mockk(relaxed = true)
     private val eventRepository: EventRepository = mockk(relaxed = true)
     private val styleProfileRepository: StyleProfileRepository = mockk(relaxed = true)
+    private val memoryNoteRepository: MemoryNoteRepository = mockk(relaxed = true)
+    private val giftHistoryRepository: GiftHistoryRepository = mockk(relaxed = true)
     private val aiService: AiService = mockk(relaxed = true)
     private val preferencesRepository: PreferencesRepository = mockk(relaxed = true)
 
@@ -33,6 +37,8 @@ class RegeneratePendingMessageUseCaseTest {
         contactRepository,
         eventRepository,
         styleProfileRepository,
+        memoryNoteRepository,
+        giftHistoryRepository,
         aiService,
         preferencesRepository,
     )
@@ -96,6 +102,8 @@ class RegeneratePendingMessageUseCaseTest {
         coEvery { eventRepository.getEventsBefore(Long.MAX_VALUE) } returns listOf(event)
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c_1", 10) } returns emptyList()
+        coEvery { memoryNoteRepository.getByContact("c_1") } returns emptyList()
+        coEvery { giftHistoryRepository.getByContact("c_1") } returns emptyList()
         coEvery { aiService.regenerateMessage("current draft", contact, event, null, emptyList(), null) } returns variants
 
         val result = useCase("pm_1", "current draft")
@@ -140,6 +148,8 @@ class RegeneratePendingMessageUseCaseTest {
         coEvery { eventRepository.getEventsBefore(Long.MAX_VALUE) } returns listOf(event)
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c_1", 10) } returns emptyList()
+        coEvery { memoryNoteRepository.getByContact("c_1") } returns emptyList()
+        coEvery { giftHistoryRepository.getByContact("c_1") } returns emptyList()
         coEvery {
             aiService.regenerateMessage("current draft", contact, event, null, emptyList(), "Make it warmer")
         } returns variants

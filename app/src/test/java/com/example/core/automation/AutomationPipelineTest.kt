@@ -118,7 +118,7 @@ class AutomationPipelineTest {
                     return MessageGenerationWorker(
                         appContext, workerParameters,
                         db.contactDao(), db.eventDao(), db.pendingMessageDao(), db.sentMessageDao(), db.styleProfileDao(),
-                        geminiClient, prefs
+                        db.memoryNoteDao(), db.giftHistoryDao(), geminiClient, prefs
                     )
                 }
             })
