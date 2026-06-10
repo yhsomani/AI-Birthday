@@ -3,6 +3,7 @@ package com.example.domain.usecase
 import com.example.core.db.entities.ContactEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.service.EventReminderSchedulerService
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -15,7 +16,12 @@ class DiscoverEventsUseCaseTest {
 
     private val contactRepository: ContactRepository = mockk(relaxed = true)
     private val eventRepository: EventRepository = mockk(relaxed = true)
-    private val useCase = DiscoverEventsUseCase(contactRepository, eventRepository)
+    private val eventReminderSchedulerService: EventReminderSchedulerService = mockk(relaxed = true)
+    private val useCase = DiscoverEventsUseCase(
+        contactRepository,
+        eventRepository,
+        eventReminderSchedulerService,
+    )
 
     @Test
     fun `invoke with no contacts returns zero discovered events`() = runTest {
@@ -26,6 +32,7 @@ class DiscoverEventsUseCaseTest {
         assertEquals(0, outcome.contacts)
         assertEquals(0, outcome.events)
         coVerify(exactly = 0) { eventRepository.upsert(any()) }
+        coVerify(exactly = 0) { eventReminderSchedulerService.scheduleReminder(any()) }
     }
 
     @Test
@@ -56,5 +63,6 @@ class DiscoverEventsUseCaseTest {
         assertEquals(3, outcome.events) // Birthday, Anniversary, Work Anniversary
 
         coVerify(exactly = 3) { eventRepository.upsert(any()) }
+        coVerify(exactly = 3) { eventReminderSchedulerService.scheduleReminder(any()) }
     }
 }

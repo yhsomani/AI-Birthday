@@ -4,6 +4,7 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.service.EventReminderSchedulerService
 import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
@@ -14,6 +15,7 @@ import javax.inject.Singleton
 class SaveManualEventUseCase @Inject constructor(
     private val contactRepository: ContactRepository,
     private val eventRepository: EventRepository,
+    private val eventReminderSchedulerService: EventReminderSchedulerService,
 ) {
     suspend operator fun invoke(request: Request): Outcome {
         val normalizedType = request.eventType.trim().uppercase(Locale.US).ifBlank { "BIRTHDAY" }
@@ -61,6 +63,7 @@ class SaveManualEventUseCase @Inject constructor(
             isVerified = true,
         )
         eventRepository.upsert(event)
+        eventReminderSchedulerService.scheduleReminder(event)
 
         return Outcome.Saved(contact = updatedContact, event = event)
     }

@@ -17,6 +17,7 @@ This document records manual and automated UI validation for the feature complia
 |---|---|---|
 | Unit tests and lint | Pass | `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug --no-configuration-cache`, 212 tests, 0 failures, 0 errors, 0 skipped. |
 | Biometric lock compile/test | Pass | `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:compileDebugKotlin :app:testDebugUnitTest --tests com.example.BiometricLockPolicyTest --no-configuration-cache`. |
+| Automation scheduling/reminder targeted tests | Pass | `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :core:data:testDebugUnitTest --tests com.example.core.automation.scheduler.EventReminderSchedulerTest :app:testDebugUnitTest --tests com.example.domain.usecase.GenerateMessageUseCaseTest --tests com.example.core.automation.workers.MessageGenerationWorkerTest --tests com.example.core.automation.workers.MessageDispatchWorkerTest --tests com.example.core.automation.workers.DailyTriggerWorkerTest --tests com.example.domain.usecase.SaveManualEventUseCaseTest --tests com.example.domain.usecase.DiscoverEventsUseCaseTest --no-configuration-cache`. |
 | Full release-readiness validation | Not Run | Planned command: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug jacocoDebugUnitTestReport --no-configuration-cache`. |
 | Compose/instrumented UI coverage | Not Run | Existing `app/src/androidTest` only contains package-context smoke test before this pass. |
 

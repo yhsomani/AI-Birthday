@@ -16,8 +16,8 @@
     <string name="notification_revival_title">Reconnect with %1$s</string>
     <string name="notification_revival_text">You have not spoken in %1$d days</string>
     <string name="notification_revival_big_text">Suggested message:\n\n%1$s\n\nYou can edit and approve this in the Messages screen.</string>
-    <string name="notification_event_today_title">Event Today: %1$s</string>
-    <string name="notification_event_today_text">It is %1$s %2$s today. Reconnect with them.</string>
+    <string name="notification_event_reminder_title">Upcoming event: %1$s</string>
+    <string name="notification_event_reminder_text">%1$s\'s %2$s is coming up. Tap to prepare.</string>
     <string name="notification_setup_double_send_title">Double-Send Prevented</string>
     <string name="notification_setup_double_send_message">A potential duplicate send for %1$s was blocked.</string>
     <string name="notification_setup_message_expired_title">Message Expired</string>

@@ -23,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import io.mockk.slot
 
 class GenerateMessageUseCaseTest {
 
@@ -154,6 +155,77 @@ class GenerateMessageUseCaseTest {
         coVerify { messageRepository.insertPending(any()) }
         coVerify { schedulerService.scheduleExactSend(any()) }
         coVerify(exactly = 0) { notificationService.showApprovalNotification(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `invoke uses contact custom send time for pending schedule`() = runTest {
+        val eventMs = java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.DAY_OF_YEAR, 3)
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = eventMs)
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            preferredChannel = "SMS",
+            automationMode = "ALWAYS_ASK",
+            customSendTimeHour = 14,
+            customSendTimeMinute = 45,
+        )
+        val variants = MessageVariantsResult("sh", "std", "lg", "fr", "fn", "em", "standard")
+        val pendingSlot = slot<PendingMessageEntity>()
+
+        coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
+        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { contactRepository.getById("c1") } returns contact
+        coEvery { styleProfileRepository.getProfileOnce() } returns null
+        coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
+        coEvery { memoryNoteRepository.getByContact("c1") } returns emptyList()
+        coEvery { giftHistoryRepository.getByContact("c1") } returns emptyList()
+        coEvery { aiService.generateMessage(any(), any(), any(), any()) } returns variants
+        every { preferencesRepository.getQuietHoursStart() } returns 0
+        every { preferencesRepository.getQuietHoursEnd() } returns 0
+        every { preferencesRepository.getBlackoutDates() } returns "[]"
+
+        useCase("e1")
+
+        coVerify { messageRepository.insertPending(capture(pendingSlot)) }
+        val scheduled = java.util.Calendar.getInstance().apply { timeInMillis = pendingSlot.captured.scheduledForMs }
+        assertEquals(14, scheduled.get(java.util.Calendar.HOUR_OF_DAY))
+        assertEquals(45, scheduled.get(java.util.Calendar.MINUTE))
+    }
+
+    @Test
+    fun `invoke forces approval when skip auto wish is enabled`() = runTest {
+        val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            relationshipType = "FRIEND",
+            preferredChannel = "SMS",
+            automationMode = "FULLY_AUTO",
+            skipAutoWish = true,
+        )
+        val variants = MessageVariantsResult("sh", "std", "lg", "fr", "fn", "em", "standard")
+
+        coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
+        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { contactRepository.getById("c1") } returns contact
+        coEvery { styleProfileRepository.getProfileOnce() } returns null
+        coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
+        coEvery { memoryNoteRepository.getByContact("c1") } returns emptyList()
+        coEvery { giftHistoryRepository.getByContact("c1") } returns emptyList()
+        coEvery { aiService.generateMessage(any(), any(), any(), any()) } returns variants
+
+        val result = useCase("e1")
+
+        assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
+        assertEquals("ALWAYS_ASK", (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
+        coVerify { notificationService.showApprovalNotification(contact, event, variants, any()) }
+        coVerify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
     }
 
     @Test

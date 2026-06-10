@@ -10,6 +10,8 @@ import android.os.Build
 import com.example.core.automation.workers.MessageDispatchWorkRequests
 import com.example.core.data.R
 import com.example.core.db.AppDatabase
+import com.example.core.prefs.SecurePrefs
+import com.example.domain.automation.AutomationSchedulePolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -22,6 +24,16 @@ object DailyScheduler {
         CoroutineScope(Dispatchers.IO).launch {
             val pending = db.pendingMessageDao().getById(pendingMessageId)
             if (pending != null) {
+                val prefs = SecurePrefs(context)
+                val scheduledForMs = AutomationSchedulePolicy.nextAllowedSendMs(
+                    candidateMs = pending.scheduledForMs,
+                    quietHoursStart = prefs.getQuietHoursStart(),
+                    quietHoursEnd = prefs.getQuietHoursEnd(),
+                    blackoutDatesJson = prefs.getBlackoutDates(),
+                )
+                if (scheduledForMs != pending.scheduledForMs) {
+                    db.pendingMessageDao().insert(pending.copy(scheduledForMs = scheduledForMs))
+                }
                 val pendingIntent = buildDispatchPendingIntent(
                     context = context,
                     requestCode = pending.id.hashCode(),
@@ -30,7 +42,7 @@ object DailyScheduler {
                     flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
 
-                if (pending.scheduledForMs <= System.currentTimeMillis()) {
+                if (scheduledForMs <= System.currentTimeMillis()) {
                     androidx.work.WorkManager.getInstance(context)
                         .enqueue(MessageDispatchWorkRequests.create(pending.id, pending.eventId))
                     return@launch
@@ -38,7 +50,7 @@ object DailyScheduler {
 
                 if (canScheduleExactAlarms(alarmManager)) {
                     alarmManager.setAlarmClock(
-                        AlarmManager.AlarmClockInfo(pending.scheduledForMs, pendingIntent),
+                        AlarmManager.AlarmClockInfo(scheduledForMs, pendingIntent),
                         pendingIntent
                     )
                 } else {
@@ -134,6 +146,7 @@ class BootReceiver : BroadcastReceiver() {
                     pending.forEach { msg ->
                         DailyScheduler.scheduleExactSend(context, msg.id)
                     }
+                    EventReminderScheduler.scheduleAll(context)
                     
                     // 2. Reschedule periodic workers conditionally
                     val workManager = androidx.work.WorkManager.getInstance(context)

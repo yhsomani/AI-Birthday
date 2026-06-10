@@ -32,7 +32,7 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-005 | Home dashboard and relationship planner | Fully Implemented | Add UI smoke evidence for cards, links, and sync-error recovery. |
 | F-006 | Contact sync, import, and deduplication | Partially Implemented | Align background sync with foreground Google + device contact merge and event discovery. |
 | F-007 | Contact list search, filter, sort | Fully Implemented | Add UI smoke evidence for search, chips, sort, clear, and details navigation. |
-| F-008 | Contact detail personalization | Partially Implemented | Ensure custom send time and skip-auto-wish affect generation/scheduling. |
+| F-008 | Contact detail personalization | Fully Implemented | Custom send time and skip-auto-wish now affect generation/scheduling; live UI validation remains tracked in `docs/UI_VALIDATION.md`. |
 | F-009 | Event discovery | Fully Implemented | Preserve leap-day and deactivation behavior. |
 | F-010 | Manual and custom event creation | Fully Implemented | Add reminder scheduling after manual event save. |
 | F-011 | Messages inbox and bulk actions | Fully Implemented | Add UI smoke evidence for tabs, search, selection, and bulk actions. |
@@ -47,11 +47,11 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-020 | Automation setup / AI Doctor | Fully Implemented | Validate diagnostics and system-setting handoffs on device. |
 | F-021 | Room database, schema, migrations | Fully Implemented | Keep migrations non-destructive and schema tests passing. |
 | F-022 | AI contact classification | Fully Implemented | Validate AI-disabled and live-AI paths. |
-| F-023 | AI message generation and fallback | Partially Implemented | Respect skip-auto-wish, custom send time, quiet hours, and blackout dates. |
+| F-023 | AI message generation and fallback | Fully Implemented | Respects skip-auto-wish, custom send time, quiet hours, and blackout dates. |
 | F-024 | Approval lifecycle | Fully Implemented | Validate notification actions and scheduling after approval. |
-| F-025 | Exact scheduling and boot recovery | Partially Implemented | Apply automation schedule policy and event-reminder rescheduling. |
+| F-025 | Exact scheduling and boot recovery | Fully Implemented | Exact send scheduling applies automation policy and boot recovery reschedules reminders. |
 | F-026 | WorkManager automation chain | Partially Implemented | Use foreground sync parity and schedule reminders during daily automation. |
-| F-027 | Dispatch orchestration | Partially Implemented | Enforce blackout dates and quiet-hour deferral before final dispatch. |
+| F-027 | Dispatch orchestration | Fully Implemented | Dispatch defers during quiet hours or blackout dates before final send. |
 | F-028 | SMS delivery and status callbacks | Fully Implemented | Validate live SMS with test recipient when safe. |
 | F-029 | WhatsApp Accessibility delivery | Fully Implemented | Validate live WhatsApp test flow when WhatsApp/accessibility are configured. |
 | F-030 | Gmail SMTP delivery and test send | Partially Implemented | Make subjects event-aware and validate SMTP test send. |
@@ -67,8 +67,8 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-040 | Design system and localization | Partially Implemented | Add localization parity checks and resource raw notification strings touched by this pass. |
 | F-041 | Developer helper scripts and docs | Partially Implemented | Remove `/workspace` helper-script assumption and update stale docs. |
 | F-042 | Biometric app lock enforcement | Fully Implemented | App access is gated at cold start/resume when enabled; live device unlock validation remains tracked in `docs/UI_VALIDATION.md`. |
-| F-043 | Quiet hours, blackout dates, reminder toggles | Partially Implemented | Add reusable automation schedule policy and runtime enforcement. |
-| F-044 | Event reminder scheduling | Partially Implemented | Schedule/cancel/reschedule alarms from `notifyDaysBefore` and user toggle. |
+| F-043 | Quiet hours, blackout dates, reminder toggles | Fully Implemented | Reusable automation schedule policy enforces quiet hours, blackout dates, and reminder toggles. |
+| F-044 | Event reminder scheduling | Fully Implemented | Schedules, cancels, and reschedules alarms from `notifyDaysBefore` and the reminder toggle. |
 | F-045 | Mood logs | Deprecated | Keep deprecated unless explicitly re-scoped. |
 | F-046 | Dedicated birthday quick-add FAB/modal | Deprecated | Keep superseded by manual event creation unless explicitly re-scoped. |
 | F-047 | Legacy Retrofit Gemini model layer | Experimental | Keep experimental unless active Gemini client is migrated to it. |

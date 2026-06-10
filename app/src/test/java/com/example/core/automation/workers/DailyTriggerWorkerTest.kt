@@ -9,6 +9,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.automation.scheduler.WorkerScheduler
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.service.EventReminderSchedulerService
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -25,6 +26,7 @@ class DailyTriggerWorkerTest {
 
     private lateinit var context: Context
     private val prefs: SecurePrefs = mockk(relaxed = true)
+    private val eventReminderSchedulerService: EventReminderSchedulerService = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -49,7 +51,12 @@ class DailyTriggerWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return DailyTriggerWorker(appContext, workerParameters, prefs)
+                    return DailyTriggerWorker(
+                        appContext,
+                        workerParameters,
+                        prefs,
+                        eventReminderSchedulerService,
+                    )
                 }
             })
             .build()
@@ -58,5 +65,6 @@ class DailyTriggerWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         verify { WorkerScheduler.scheduleDailyAutomationChain(any()) }
+        verify { eventReminderSchedulerService.rescheduleAll() }
     }
 }

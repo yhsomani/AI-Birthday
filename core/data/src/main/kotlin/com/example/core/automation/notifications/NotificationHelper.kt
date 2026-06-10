@@ -218,10 +218,10 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, EVENT_REMINDERS)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(context.getString(R.string.notification_event_today_title, contact.name))
+            .setContentTitle(context.getString(R.string.notification_event_reminder_title, contact.name))
             .setContentText(
                 context.getString(
-                    R.string.notification_event_today_text,
+                    R.string.notification_event_reminder_text,
                     contact.name,
                     event.type.lowercase().replace('_', ' '),
                 )

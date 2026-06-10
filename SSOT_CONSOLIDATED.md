@@ -187,8 +187,8 @@ RelateAI
 | F-040 | Design system and localization | UI/Developer Feature | Partially Implemented | 75% | Partially Tested | 85% |
 | F-041 | Developer helper scripts and docs | Developer Feature | Partially Implemented | 60% | Not Tested | 75% |
 | F-042 | Biometric app lock enforcement | Security Feature | Fully Implemented | 85% | Partially Tested | 90% |
-| F-043 | Quiet hours, blackout dates, reminder toggles | System Feature | Partially Implemented | 50% | Partially Tested | 85% |
-| F-044 | Event reminder scheduling | System Feature | Partially Implemented | 55% | Not Tested | 75% |
+| F-043 | Quiet hours, blackout dates, reminder toggles | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
+| F-044 | Event reminder scheduling | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-045 | Mood logs | Deprecated | Deprecated | 0% | Partially Tested via migration | 98% |
 | F-046 | Dedicated birthday quick-add FAB/modal | UI Feature | Deprecated | 0% | Not Tested | 90% |
 | F-047 | Legacy Retrofit Gemini model layer | Internal Feature | Experimental | 30% | Not Tested | 75% |
@@ -787,29 +787,29 @@ RelateAI
 
 - Category: System Feature.
 - Description: Stores user preferences meant to suppress or control automation timing and channel usage.
-- Functionality: SecurePrefs stores quiet hours, blackout dates, channel blackout JSON, biometric setting, birthday reminders, and AI enabled. Settings validates/saves quiet hours and channel blackout. MessageDispatcher uses channel blackout. Broad quiet-hour, blackout-date, and birthday-reminder enforcement was not confirmed across scheduler/dispatcher.
-- Components involved: Settings, SecurePrefs, MessageDispatcher, AutomationSetup diagnostics.
-- Related files: `SettingsScreen.kt`, `SettingsViewModel.kt`, `SecurePrefs.kt`, `MessageDispatcher.kt`, `AutomationSetupViewModel.kt`.
+- Functionality: SecurePrefs stores quiet hours, blackout dates, channel blackout JSON, biometric setting, birthday reminders, and AI enabled. Settings validates/saves quiet hours and channel blackout. `AutomationSchedulePolicy` applies default/custom send time, quiet-hour deferral, blackout-date deferral, reminder timing, and channel-block parsing. Generation, exact scheduling, dispatch workers, and event reminders use the policy.
+- Components involved: Settings, SecurePrefs, AutomationSchedulePolicy, GenerateMessageUseCase, MessageGenerationWorker, DailyScheduler, MessageDispatchWorker, EventReminderScheduler, AutomationSetup diagnostics.
+- Related files: `SettingsScreen.kt`, `SettingsViewModel.kt`, `SecurePrefs.kt`, `AutomationSchedulePolicy.kt`, `GenerateMessageUseCase.kt`, `MessageGenerationWorker.kt`, `DailyScheduler.kt`, `MessageDispatchWorker.kt`, `EventReminderScheduler.kt`, `AutomationSetupViewModel.kt`.
 - Dependencies: Preferences, scheduler/dispatcher enforcement, notification settings.
-- User workflow: User configures quiet hours/channel blackout/reminders. Edge cases include invalid hours, channel fallback, and mismatched expectation if scheduling ignores quiet hours.
-- Current status: Partially Implemented.
-- Completion percentage: 50%.
-- Test coverage: Partially Tested for Settings save behavior; runtime enforcement needs tests.
-- Confidence score: 85%.
+- User workflow: User configures quiet hours/channel blackout/reminders. Automatic sends are scheduled outside quiet hours and blackout dates, dispatch workers defer if settings changed after scheduling, and reminders are disabled when the reminder toggle is off.
+- Current status: Fully Implemented.
+- Completion percentage: 85%.
+- Test coverage: Partially Tested by settings tests, `AutomationSchedulePolicyTest`, generation tests, dispatch worker deferral tests, and event reminder scheduler tests.
+- Confidence score: 90%.
 
 ### F-044 Event Reminder Scheduling
 
 - Category: System Feature.
 - Description: Intended to notify users before important events.
-- Functionality: EventReminderReceiver and NotificationHelper can show reminder notifications for contact/event ids. The current inspection found receiver infrastructure, but did not confirm a complete scheduler that programs reminder alarms from event `notifyDaysBefore`.
-- Components involved: EventReminderReceiver, NotificationHelper, EventEntity, DailyScheduler/WorkerScheduler candidates.
-- Related files: `EventReminderReceiver.kt`, `NotificationHelper.kt`, `EventEntity.kt`, `DailyScheduler.kt`, `WorkerScheduler.kt`.
+- Functionality: EventReminderScheduler schedules AlarmManager reminders from active event `notifyDaysBefore`, cancels reminders when the global reminder toggle is disabled, reschedules all active reminders during daily startup and boot recovery, and EventReminderReceiver guards against stale alarms after reminders are disabled.
+- Components involved: EventReminderScheduler, EventReminderSchedulerService, EventReminderReceiver, NotificationHelper, EventEntity, DailyScheduler, WorkerScheduler, DailyTriggerWorker.
+- Related files: `EventReminderScheduler.kt`, `EventReminderSchedulerService.kt`, `EventReminderReceiver.kt`, `NotificationHelper.kt`, `EventEntity.kt`, `DailyScheduler.kt`, `WorkerScheduler.kt`, `DailyTriggerWorker.kt`.
 - Dependencies: AlarmManager or WorkManager scheduling, event repository, notification permission.
-- User workflow: Expected flow is user sets reminder days and receives event reminder before date. Edge cases include missing scheduler, permission denial, and stale event id.
-- Current status: Partially Implemented.
-- Completion percentage: 55%.
-- Test coverage: Not Tested in observed reports.
-- Confidence score: 75%.
+- User workflow: User saves or syncs events and receives reminder notifications before the event date. Edge cases include disabled reminders, stale event ids, notification permission denial, and exact-alarm availability.
+- Current status: Fully Implemented.
+- Completion percentage: 85%.
+- Test coverage: Partially Tested by `AutomationSchedulePolicyTest`, `EventReminderSchedulerTest`, manual-event/discovery tests, and daily worker tests; live notification/alarm validation remains required.
+- Confidence score: 90%.
 
 ### F-045 Mood Logs
 
@@ -948,9 +948,7 @@ Receivers:
 ## 11. Partially Implemented Features
 
 - Biometric app lock: manager, toggle, app-wide cold-start/resume gate, and policy test exist; live device prompt validation remains required.
-- Quiet hours and blackout dates: preferences exist; channel blackout is used by dispatch; broader quiet-hour/blackout-date scheduling enforcement was not confirmed.
-- Birthday reminder toggle: persisted in settings, but complete reminder behavior was not confirmed.
-- Event reminder scheduling: receiver and notification helper exist; scheduler integration for `notifyDaysBefore` was not confirmed.
+- Live device validation is still required for quiet-hour deferral, blackout-date deferral, and event-reminder notifications.
 - Background device-contact sync parity: foreground sync merges Google plus device contacts; background `ContactSyncWorker` appears Google-focused.
 - Dynamic shortcuts: implemented as entry points, but not deeply route-specific beyond their configured intents.
 - Gmail event-specific subject: email subject appears birthday-oriented even when dispatching other event types.

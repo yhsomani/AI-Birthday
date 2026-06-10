@@ -8,12 +8,15 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.workDataOf
 import com.example.core.automation.sender.MessageDispatcher
+import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.PendingMessageEntity
+import com.example.core.prefs.SecurePrefs
 import io.mockk.*
+import java.util.Calendar
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -36,7 +39,13 @@ class MessageDispatchWorkerTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         mockkConstructor(MessageDispatcher::class)
+        mockkConstructor(SecurePrefs::class)
+        mockkObject(DailyScheduler)
         coEvery { anyConstructed<MessageDispatcher>().dispatch(any(), any()) } returns Unit
+        every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
+        every { anyConstructed<SecurePrefs>().getQuietHoursStart() } returns 0
+        every { anyConstructed<SecurePrefs>().getQuietHoursEnd() } returns 0
+        every { anyConstructed<SecurePrefs>().getBlackoutDates() } returns "[]"
     }
 
     @After
@@ -147,5 +156,45 @@ class MessageDispatchWorkerTest {
         assertEquals(ListenableWorker.Result.failure(), result)
         coVerify { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
         coVerify { pendingMessageDao.updateStatus("msg_1", "FAILED") }
+    }
+
+    @Test
+    fun `doWork defers approved message during quiet hours`() = runTest {
+        val nowHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        every { anyConstructed<SecurePrefs>().getQuietHoursStart() } returns nowHour
+        every { anyConstructed<SecurePrefs>().getQuietHoursEnd() } returns ((nowHour + 1) % 24)
+        val pendingMsg = PendingMessageEntity(
+            id = "msg_1", contactId = "c1", eventId = "e1",
+            shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
+            formalVariant = "", funnyVariant = "", emotionalVariant = "",
+            selectedVariant = "standard", selectedVariantText = "Happy Birthday",
+            channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL",
+            status = "APPROVED"
+        )
+        val contact = ContactEntity(id = "c1", name = "Alice")
+
+        coEvery { pendingMessageDao.getById("msg_1") } returns pendingMsg
+        coEvery { contactDao.getById("c1") } returns contact
+
+        val worker = TestListenableWorkerBuilder<MessageDispatchWorker>(context)
+            .setInputData(workDataOf(MessageDispatchWorkRequests.KEY_PENDING_MESSAGE_ID to "msg_1"))
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: Context,
+                    workerClassName: String,
+                    workerParameters: WorkerParameters
+                ): ListenableWorker {
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao)
+                }
+            })
+            .build()
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify { pendingMessageDao.insert(match { it.id == "msg_1" && it.scheduledForMs > System.currentTimeMillis() }) }
+        verify { DailyScheduler.scheduleExactSend(any(), "msg_1") }
+        coVerify(exactly = 0) { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
+        coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any(), any()) }
     }
 }

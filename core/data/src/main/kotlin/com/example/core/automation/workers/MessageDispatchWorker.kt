@@ -4,11 +4,14 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.core.automation.sender.MessageDispatcher
+import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.data.R
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
+import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.automation.AutomationSchedulePolicy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import androidx.hilt.work.HiltWorker
@@ -114,6 +117,24 @@ class MessageDispatchWorker @AssistedInject constructor(
         }
 
         if (shouldSend) {
+            val prefs = SecurePrefs(context)
+            val nextAllowedSendMs = AutomationSchedulePolicy.nextAllowedSendMs(
+                candidateMs = now,
+                quietHoursStart = prefs.getQuietHoursStart(),
+                quietHoursEnd = prefs.getQuietHoursEnd(),
+                blackoutDatesJson = prefs.getBlackoutDates(),
+                nowMs = now,
+            )
+            if (nextAllowedSendMs > now) {
+                StructuredLogger.i(TAG, "Deferring dispatch due to quiet hours or blackout date", mapOf(
+                    "pendingMessageId" to pendingMsg.id,
+                    "nextAllowedSendMs" to nextAllowedSendMs.toString(),
+                ))
+                pendingMessageDao.insert(pendingMsg.copy(scheduledForMs = nextAllowedSendMs))
+                DailyScheduler.scheduleExactSend(context, pendingMsg.id)
+                return Result.success()
+            }
+
             // Idempotency: mark status as DISPATCHING immediately
             pendingMessageDao.updateStatus(pendingMsg.id, "DISPATCHING")
 

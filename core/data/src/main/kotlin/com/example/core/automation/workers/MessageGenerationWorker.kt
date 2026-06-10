@@ -6,6 +6,7 @@ import androidx.work.WorkerParameters
 import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.data.R
 import com.example.core.db.entities.PendingMessageEntity
+import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.core.gemini.GeminiClient
 import com.example.core.gemini.PromptBuilder
 import com.example.core.gemini.RateLimiter
@@ -91,6 +92,11 @@ class MessageGenerationWorker @AssistedInject constructor(
                             }
 
                             val contact = contactDao.getById(event.contactId) ?: return@async
+                            if (contact.skipAutoWish) {
+                                StructuredLogger.i(TAG, "Skipping automatic message generation for contact ${contact.id}; skip-auto-wish is enabled")
+                                return@async
+                            }
+
                             val styleProfile = styleProfileDao.get()
                             val previousMessages = sentMessageDao.getByContact(contact.id)
                             val memoryNotes = memoryNoteDao.getByContact(contact.id)
@@ -141,6 +147,14 @@ class MessageGenerationWorker @AssistedInject constructor(
 
                             val globalMode = prefs.getGlobalAutomationMode()
                             val approvalMode = determineApprovalMode(contact.relationshipType, contact.automationMode, globalMode)
+                            val scheduledForMs = AutomationSchedulePolicy.messageSendTimeMs(
+                                eventOccurrenceMs = event.nextOccurrenceMs,
+                                customHour = contact.customSendTimeHour,
+                                customMinute = contact.customSendTimeMinute,
+                                quietHoursStart = prefs.getQuietHoursStart(),
+                                quietHoursEnd = prefs.getQuietHoursEnd(),
+                                blackoutDatesJson = prefs.getBlackoutDates(),
+                            )
 
                             val selectedVariantText = variants.get(variants.recommended)
 
@@ -163,7 +177,7 @@ class MessageGenerationWorker @AssistedInject constructor(
                                 selectedVariant = variants.recommended,
                                 selectedVariantText = selectedVariantText,
                                 channel = contact.preferredChannel,
-                                scheduledForMs = event.nextOccurrenceMs,
+                                scheduledForMs = scheduledForMs,
                                 approvalMode = approvalMode,
                                 status = if (approvalMode == "FULLY_AUTO") "APPROVED" else "PENDING",
                                 scheduledYear = scheduledYear,

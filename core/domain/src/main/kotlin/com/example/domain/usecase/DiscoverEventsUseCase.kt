@@ -4,6 +4,7 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.service.EventReminderSchedulerService
 import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,7 +19,8 @@ import javax.inject.Singleton
 @Singleton
 class DiscoverEventsUseCase @Inject constructor(
     private val contactRepository: ContactRepository,
-    private val eventRepository: EventRepository
+    private val eventRepository: EventRepository,
+    private val eventReminderSchedulerService: EventReminderSchedulerService,
 ) {
     suspend operator fun invoke(): DiscoveryOutcome {
         val contacts = contactRepository.getAllSync()
@@ -28,6 +30,7 @@ class DiscoverEventsUseCase @Inject constructor(
             val events = buildEventsFor(contact)
             events.forEach { event ->
                 eventRepository.upsert(event)
+                eventReminderSchedulerService.scheduleReminder(event)
                 discovered++
             }
         }

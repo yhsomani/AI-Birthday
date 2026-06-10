@@ -115,4 +115,44 @@ class MessageGenerationWorkerTest {
         coVerify { pendingMessageDao.insert(any()) }
         verify { DailyScheduler.scheduleExactSend(any(), any()) }
     }
+
+    @Test
+    fun `doWork skips automatic generation when contact opted out`() = runTest {
+        val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            relationshipType = "FRIEND",
+            preferredChannel = "SMS",
+            automationMode = "FULLY_AUTO",
+            skipAutoWish = true,
+        )
+
+        every { prefs.getGeminiApiKey() } returns "mock_key"
+        coEvery { eventDao.getEventsBefore(any()) } returns listOf(event)
+        coEvery { pendingMessageDao.getPendingMessage("c1", "e1", any()) } returns null
+        coEvery { contactDao.getById("c1") } returns contact
+
+        val worker = TestListenableWorkerBuilder<MessageGenerationWorker>(context)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: Context,
+                    workerClassName: String,
+                    workerParameters: WorkerParameters
+                ): ListenableWorker {
+                    return MessageGenerationWorker(
+                        appContext, workerParameters,
+                        contactDao, eventDao, pendingMessageDao, sentMessageDao, styleProfileDao,
+                        memoryNoteDao, giftHistoryDao, geminiClient, prefs
+                    )
+                }
+            })
+            .build()
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify(exactly = 0) { geminiClient.generate(any()) }
+        coVerify(exactly = 0) { pendingMessageDao.insert(any()) }
+    }
 }

@@ -67,6 +67,8 @@ object WorkerScheduler {
             ExistingPeriodicWorkPolicy.KEEP,
             styleAnalysis
         )
+
+        EventReminderScheduler.scheduleAll(context)
     }
 
     fun scheduleDailyAutomationChain(context: Context) {

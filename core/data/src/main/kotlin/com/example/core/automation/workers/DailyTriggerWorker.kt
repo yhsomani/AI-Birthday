@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.automation.scheduler.WorkerScheduler
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.service.EventReminderSchedulerService
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
@@ -14,7 +15,8 @@ import dagger.assisted.AssistedInject
 class DailyTriggerWorker @AssistedInject constructor(
     @Assisted ctx: Context,
     @Assisted params: WorkerParameters,
-    private val prefs: SecurePrefs
+    private val prefs: SecurePrefs,
+    private val eventReminderSchedulerService: EventReminderSchedulerService,
 ) : CoroutineWorker(ctx, params) {
 
     override suspend fun doWork(): Result {
@@ -33,6 +35,7 @@ class DailyTriggerWorker @AssistedInject constructor(
         }
 
         WorkerScheduler.scheduleDailyAutomationChain(applicationContext)
+        eventReminderSchedulerService.rescheduleAll()
 
         return Result.success()
     }

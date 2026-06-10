@@ -4,6 +4,7 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.service.EventReminderSchedulerService
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -17,7 +18,12 @@ import java.util.Calendar
 class SaveManualEventUseCaseTest {
     private val contactRepository: ContactRepository = mockk(relaxed = true)
     private val eventRepository: EventRepository = mockk(relaxed = true)
-    private val useCase = SaveManualEventUseCase(contactRepository, eventRepository)
+    private val eventReminderSchedulerService: EventReminderSchedulerService = mockk(relaxed = true)
+    private val useCase = SaveManualEventUseCase(
+        contactRepository,
+        eventRepository,
+        eventReminderSchedulerService,
+    )
 
     @Test
     fun `existing contact saves birthday event and updates contact birthday fields`() = runTest {
@@ -47,6 +53,7 @@ class SaveManualEventUseCaseTest {
             )
         }
         coVerify { eventRepository.upsert(capture(eventSlot)) }
+        coVerify { eventReminderSchedulerService.scheduleReminder(any()) }
         assertEquals("c1", eventSlot.captured.contactId)
         assertEquals("BIRTHDAY", eventSlot.captured.type)
         assertEquals("MANUAL", eventSlot.captured.source)
@@ -70,6 +77,7 @@ class SaveManualEventUseCaseTest {
         assertTrue(outcome is SaveManualEventUseCase.Outcome.Saved)
         coVerify { contactRepository.upsert(capture(contactSlot)) }
         coVerify { eventRepository.upsert(capture(eventSlot)) }
+        coVerify { eventReminderSchedulerService.scheduleReminder(any()) }
         assertTrue(contactSlot.captured.id.startsWith("manual_"))
         assertEquals("Priya", contactSlot.captured.name)
         assertEquals(contactSlot.captured.id, eventSlot.captured.contactId)
@@ -89,6 +97,7 @@ class SaveManualEventUseCaseTest {
         assertTrue(outcome is SaveManualEventUseCase.Outcome.InvalidInput)
         coVerify(exactly = 0) { contactRepository.upsert(any()) }
         coVerify(exactly = 0) { eventRepository.upsert(any()) }
+        coVerify(exactly = 0) { eventReminderSchedulerService.scheduleReminder(any()) }
     }
 
     @Test

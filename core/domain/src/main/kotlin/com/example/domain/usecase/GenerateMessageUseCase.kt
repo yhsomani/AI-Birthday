@@ -2,6 +2,7 @@ package com.example.domain.usecase
 
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
+import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
 import com.example.domain.repository.ContactRepository
@@ -82,8 +83,21 @@ class GenerateMessageUseCase @Inject constructor(
         }
 
         val globalMode = preferencesRepository.getGlobalAutomationMode()
-        val approvalMode = determineApprovalMode(contact.relationshipType, contact.automationMode, globalMode)
+        val approvalMode = determineApprovalMode(
+            relationship = contact.relationshipType,
+            contactOverride = contact.automationMode,
+            globalMode = globalMode,
+            skipAutoWish = contact.skipAutoWish,
+        )
         val selectedVariantText = variants.get(variants.recommended)
+        val scheduledForMs = AutomationSchedulePolicy.messageSendTimeMs(
+            eventOccurrenceMs = event.nextOccurrenceMs,
+            customHour = contact.customSendTimeHour,
+            customMinute = contact.customSendTimeMinute,
+            quietHoursStart = preferencesRepository.getQuietHoursStart(),
+            quietHoursEnd = preferencesRepository.getQuietHoursEnd(),
+            blackoutDatesJson = preferencesRepository.getBlackoutDates(),
+        )
 
         val pending = PendingMessageEntity(
             id = UUID.randomUUID().toString(),
@@ -98,7 +112,7 @@ class GenerateMessageUseCase @Inject constructor(
             selectedVariant = variants.recommended,
             selectedVariantText = selectedVariantText,
             channel = contact.preferredChannel,
-            scheduledForMs = event.nextOccurrenceMs,
+            scheduledForMs = scheduledForMs,
             approvalMode = approvalMode.raw,
             status = if (approvalMode == ApprovalMode.FULLY_AUTO) MessageStatus.APPROVED.raw else MessageStatus.PENDING.raw,
             scheduledYear = scheduledYear,
@@ -119,7 +133,9 @@ class GenerateMessageUseCase @Inject constructor(
         relationship: String,
         contactOverride: String,
         globalMode: String,
+        skipAutoWish: Boolean,
     ): ApprovalMode {
+        if (skipAutoWish) return ApprovalMode.ALWAYS_ASK
         val contactMode = ApprovalMode.fromRaw(contactOverride)
         if (contactMode != ApprovalMode.DEFAULT && contactMode != ApprovalMode.UNKNOWN) return contactMode
         val global = ApprovalMode.fromRaw(globalMode).takeIf { it != ApprovalMode.UNKNOWN } ?: ApprovalMode.SMART_APPROVE
