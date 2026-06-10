@@ -50,23 +50,40 @@ class ProductionReadinessConfigTest {
         assertTrue(buildScript.contains("Release signing is not configured"))
     }
 
+    @Test
+    fun ciWorkflow_keepsReleaseReadinessGuardrails() {
+        val workflow = rootFile(".github/workflows/android.yml").readText()
+
+        assertTrue(workflow.contains("java-version: \"21\""))
+        assertTrue(workflow.contains("./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache"))
+        assertTrue(workflow.contains("./gradlew assembleRelease --no-configuration-cache"))
+        assertTrue(workflow.contains("Release signing is not configured"))
+        assertTrue(workflow.contains("KEYSTORE_PATH"))
+        assertTrue(workflow.contains("STORE_PASSWORD"))
+        assertTrue(workflow.contains("KEY_ALIAS"))
+        assertTrue(workflow.contains("KEY_PASSWORD"))
+        assertTrue(workflow.contains("actions/upload-artifact@v4"))
+        assertTrue(workflow.contains("lint-reports"))
+        assertTrue(workflow.contains("unit-test-reports"))
+        assertTrue(workflow.contains("debug-apk"))
+    }
+
     private fun parseXml(file: File) = DocumentBuilderFactory.newInstance()
         .apply { isNamespaceAware = true }
         .newDocumentBuilder()
         .parse(file)
 
     private fun appFile(relativePath: String): File {
+        return rootFile("app/$relativePath")
+    }
+
+    private fun rootFile(relativePath: String): File {
         val start = File(requireNotNull(System.getProperty("user.dir"))).absoluteFile
         val candidates = generateSequence(start) { it.parentFile }
-            .flatMap { dir ->
-                sequenceOf(
-                    File(dir, "app/$relativePath"),
-                    File(dir, relativePath),
-                )
-            }
+            .map { dir -> File(dir, relativePath) }
 
         return candidates.firstOrNull { it.isFile }
-            ?: error("Could not find app source file: $relativePath from $start")
+            ?: error("Could not find source file: $relativePath from $start")
     }
 
     private companion object {
