@@ -2,6 +2,7 @@
 
 - [ ] F-001-F-003: verify app shell, onboarding, auth, guest mode, and navigation on device.
 - [x] F-001-F-003: add Compose UI smoke coverage for onboarding/auth and app-shell bottom navigation.
+- [x] F-001-F-003: make debug UI validation install side-by-side as `com.aistudio.relateai.qxtjrk.debug` without uninstalling the production-signed app.
 - [x] F-004/F-042: implement biometric lock enforcement.
 - [ ] F-004/F-042: validate biometric lock prompt and resume behavior on device.
 - [x] F-006/F-026: route background contact sync through foreground sync use case.

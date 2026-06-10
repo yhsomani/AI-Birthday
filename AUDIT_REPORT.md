@@ -8,7 +8,7 @@
 * Completed the background contact-sync parity pass: `ContactSyncWorker` now routes through foreground `SyncContactsUseCase` behavior for Google + device merge, relationship normalization, mock cleanup, and event discovery before optional AI classification.
 * Completed the Gmail event-aware subject pass: SMTP delivery resolves event metadata during dispatch and builds birthday, anniversary, work-anniversary, custom-event, fallback, and explicit test-send subjects.
 * Completed the localization/script portability pass: app and core-data English/Hindi resource keys have parity tests, touched notification/system-alert copy is resource-backed, critical Hindi notification labels were refreshed, and the string-audit helper no longer assumes `/workspace`.
-* Added Compose instrumented smoke coverage for first-run onboarding-to-auth and guest-mode bottom navigation. The test APK builds, but connected execution on device `1b87b5db` is blocked by `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because an existing install uses a different signing certificate.
+* Added Compose instrumented smoke coverage for first-run onboarding-to-auth and guest-mode bottom navigation. Debug builds now use the side-by-side package `com.aistudio.relateai.qxtjrk.debug`, with a matching debug `google-services.json`, so validation no longer requires removing the existing production-signed install. Connected execution on device `1b87b5db` installed and started the debug package, then stalled at 0/2 tests while another app was foregrounded; live UI validation needs an idle, unlocked device.
 * Completed full non-device validation with unit tests, lint, debug assemble, and JaCoCo report using JDK 21.
 * Kept the existing single Gradle root project and active modules (`:app`, `:core:domain`, `:core:data`, `:core:ui`) instead of collapsing them into one module.
 * Migrated the inactive WhatsApp setup idea into the active app as an Automation Setup screen reachable from onboarding and settings.
@@ -263,7 +263,7 @@
 * `./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed with Homebrew JDK 21 and the existing TLS truststore.
 * `./gradlew assembleRelease --no-configuration-cache` passed with Homebrew JDK 21 and the existing TLS truststore.
 * Launched `com.aistudio.relateai.qxtjrk/com.example.MainActivity` on device `1b87b5db`; filtered logcat showed startup and SQLCipher load, with no app-owned `FATAL EXCEPTION`, `AndroidRuntime`, Room, or SQLCipher open failure.
-* Fresh debug reinstall on the same device was not forced because `adb install -r` reported `INSTALL_FAILED_UPDATE_INCOMPATIBLE`; no uninstall was performed in order to preserve app data. Relaunching the installed package still showed no app-owned crash/runtime/database errors in filtered logcat.
+* Debug validation now uses `com.aistudio.relateai.qxtjrk.debug` for side-by-side installation instead of forcing a reinstall over the existing production package, preserving app data. The latest connected test run installed and started the debug package, then stalled at 0/2 tests because another app was foregrounded on the device.
 
 **Commit message**
 * `fix: harden database data safety`

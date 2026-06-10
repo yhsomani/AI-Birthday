@@ -95,7 +95,8 @@ android {
             }
         }
         debug {
-            // Default to built-in debug signing configuration
+            // Install validation builds beside production-signed installs without deleting app data.
+            applicationIdSuffix = ".debug"
         }
     }
 

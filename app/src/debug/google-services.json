@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "339889410493",
+    "project_id": "relateai-birthday-ysomani",
+    "storage_bucket": "relateai-birthday-ysomani.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:339889410493:android:e6c8650b60dfdc6b8bc2d4",
+        "android_client_info": {
+          "package_name": "com.aistudio.relateai.qxtjrk.debug"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "339889410493-6t9vfj0ns1f6ikmgsi10njs4afbkkd2m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aistudio.relateai.qxtjrk.debug",
+            "certificate_hash": "413ecbc6a3bef23bdadd9632763e08156aa8c392"
+          }
+        },
+        {
+          "client_id": "339889410493-g5klr4838kfibddoqvk1rbbt39dblffp.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUgbmii4EH0PCHVOxO9TXvGeXyFpyxWNQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "339889410493-g5klr4838kfibddoqvk1rbbt39dblffp.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,6 +1,6 @@
 # RelateAI Feature Source of Truth
 
-Last updated: 2026-06-10
+Last updated: 2026-06-11
 
 This file is the primary feature source of truth for the Android app in this repository. `SSOT_CONSOLIDATED.md` remains the expanded architecture and evidence companion, but feature status changes must be reflected here first and mirrored into the companion docs during each feature pass.
 
@@ -25,9 +25,9 @@ The target implementation is the Android app in this repository, not an IDE exte
 
 | ID | Feature | Status | Required Completion Work |
 |---|---|---|---|
-| F-001 | App shell, navigation, routes, permissions | Fully Implemented | Compose smoke coverage added for permission rationale and bottom navigation; connected device run is blocked by signature mismatch. |
-| F-002 | Splash and onboarding | Fully Implemented | Compose smoke coverage added for first-run onboarding-to-auth routing; connected device run is blocked by signature mismatch. |
-| F-003 | Authentication, guest mode, session state | Fully Implemented | Compose smoke coverage added for auth actions and guest app shell; live OAuth remains blocked by device install/signature and credential prerequisites. |
+| F-001 | App shell, navigation, routes, permissions | Fully Implemented | Compose smoke coverage added for permission rationale and bottom navigation; debug builds install as `com.aistudio.relateai.qxtjrk.debug`; connected device run installed/started but stalled while another app was foregrounded. |
+| F-002 | Splash and onboarding | Fully Implemented | Compose smoke coverage added for first-run onboarding-to-auth routing; debug builds install side-by-side; connected device run installed/started but stalled while another app was foregrounded. |
+| F-003 | Authentication, guest mode, session state | Fully Implemented | Compose smoke coverage added for auth actions and guest app shell; live OAuth remains blocked by idle-device and credential prerequisites. |
 | F-004 | Settings and secure configuration | Fully Implemented | Biometric, quiet-hour, reminder, channel blackout, sync, Gmail, AI, and sign-out settings are implemented; live device handoffs remain tracked in `docs/UI_VALIDATION.md`. |
 | F-005 | Home dashboard and relationship planner | Fully Implemented | Add UI smoke evidence for cards, links, and sync-error recovery. |
 | F-006 | Contact sync, import, and deduplication | Fully Implemented | Foreground and background sync share Google + device contact merge, relationship normalization, and event discovery. |

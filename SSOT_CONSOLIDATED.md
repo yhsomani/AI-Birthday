@@ -206,7 +206,7 @@ RelateAI
 - User workflow: User opens app, splash decides the first route, bottom navigation controls primary sections, detail screens are opened from lists or deep links. Edge cases include encoded contact/message ids and denied runtime permissions.
 - Current status: Fully Implemented.
 - Completion percentage: 95%.
-- Test coverage: Partially Tested. `RouteArgumentCodecTest` covers argument encoding, and `MainActivityNavigationSmokeTest` covers permission-rationale dismissal plus Home/Contacts/Events/Messages/Analytics bottom-nav clicks at the Compose smoke level. Connected execution is blocked by an installed package signature mismatch on device `1b87b5db`.
+- Test coverage: Partially Tested. `RouteArgumentCodecTest` covers argument encoding, and `MainActivityNavigationSmokeTest` covers permission-rationale dismissal plus Home/Contacts/Events/Messages/Analytics bottom-nav clicks at the Compose smoke level. Debug builds use `com.aistudio.relateai.qxtjrk.debug` for side-by-side validation. Connected execution on device `1b87b5db` installed and started the debug package, but the smoke stalled at 0/2 tests while another app was foregrounded; live validation requires an idle, unlocked device.
 - Confidence score: 95%.
 
 ### F-002 Splash and Onboarding
@@ -220,7 +220,7 @@ RelateAI
 - User workflow: New users see onboarding, then authentication. Returning onboarded users go to auth or home depending on session. Edge cases include missing/corrupt secure prefs and guest mode.
 - Current status: Fully Implemented.
 - Completion percentage: 95%.
-- Test coverage: Partially Tested through viewmodel tests, preference behavior, and `MainActivityNavigationSmokeTest` first-run onboarding-to-auth coverage. Connected execution is blocked by an installed package signature mismatch on device `1b87b5db`.
+- Test coverage: Partially Tested through viewmodel tests, preference behavior, and `MainActivityNavigationSmokeTest` first-run onboarding-to-auth coverage. Debug builds use `com.aistudio.relateai.qxtjrk.debug` for side-by-side validation. Connected execution on device `1b87b5db` installed and started the debug package, but the smoke stalled at 0/2 tests while another app was foregrounded; live validation requires an idle, unlocked device.
 - Confidence score: 95%.
 
 ### F-003 Authentication, Guest Mode, Session State
@@ -987,10 +987,11 @@ Validation commands executed for this update:
 
 ```bash
 JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug jacocoDebugUnitTestReport --no-configuration-cache -Djavax.net.ssl.trustStore=.gradle/trust/cacerts-zscaler -Djavax.net.ssl.trustStorePassword=changeit
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:assembleDebugAndroidTest --no-configuration-cache -Djavax.net.ssl.trustStore=.gradle/trust/cacerts-zscaler -Djavax.net.ssl.trustStorePassword=changeit
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-configuration-cache -Djavax.net.ssl.trustStore=.gradle/trust/cacerts-zscaler -Djavax.net.ssl.trustStorePassword=changeit
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.ui.MainActivityNavigationSmokeTest --no-configuration-cache -Djavax.net.ssl.trustStore=.gradle/trust/cacerts-zscaler -Djavax.net.ssl.trustStorePassword=changeit
 ```
 
-Connected instrumentation was attempted on `1b87b5db` with `MainActivityNavigationSmokeTest`, but the debug APK could not be installed over the existing `com.aistudio.relateai.qxtjrk` package because its signature differs from the local debug build. The installed app was not uninstalled to avoid deleting existing device data.
+Connected instrumentation was attempted on `1b87b5db` with `MainActivityNavigationSmokeTest`. Debug builds now use `com.aistudio.relateai.qxtjrk.debug` and a matching debug `google-services.json` so the test target installs side-by-side with the existing production-signed app. The latest connected run installed the debug package and reported `Starting 2 tests`, but progress remained at 0/2 for several minutes while `dumpsys activity top` showed another app foregrounded and the RelateAI debug process backgrounded. The stuck wrapper was stopped; live UI validation requires an idle, unlocked device that is not being actively used.
 
 CI validation:
 

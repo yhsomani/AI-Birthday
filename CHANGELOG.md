@@ -9,6 +9,7 @@
 - Added event-aware Gmail SMTP subject generation for birthdays, anniversaries, work anniversaries, custom events, and SMTP test emails.
 - Added localization parity and helper-script portability regression tests.
 - Added Compose instrumented smoke coverage for onboarding/auth routing and app-shell bottom navigation.
+- Added a side-by-side debug package (`com.aistudio.relateai.qxtjrk.debug`) and matching debug Firebase config so UI validation can run without uninstalling an existing production-signed app.
 
 ### Changed
 - Notification backup reminder and AI fallback alert copy now uses localized string resources, and critical Hindi notification labels were refreshed.
@@ -19,7 +20,7 @@
 
 ### Validation
 - Full local validation passes with unit tests, lint, debug assemble, and JaCoCo report.
-- Connected UI smoke execution is blocked on device `1b87b5db` by `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because an existing app install uses a different signing certificate.
+- Connected UI smoke execution now targets the side-by-side debug package. Device `1b87b5db` installed and started the test run, but it stalled at 0/2 tests while another app was foregrounded; live UI validation needs an idle, unlocked device.
 
 ## [1.0.0] - 2026-06-08
 ### Added
