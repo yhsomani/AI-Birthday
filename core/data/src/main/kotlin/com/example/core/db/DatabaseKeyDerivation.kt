@@ -44,11 +44,12 @@ object DatabaseKeyDerivation {
         val cachedHex = prefs.getString(PREF_DB_KEY, null)
 
         if (cachedHex != null) {
-            val bytes = hexToByteArray(cachedHex)
-            if (bytes.size == KEY_LENGTH / 8) {
+            val bytes = decodeStoredKeyHex(cachedHex)
+            if (bytes != null) {
                 Log.d(TAG, "DB key loaded from EncryptedSharedPreferences")
                 return bytes
             }
+            prefs.edit().remove(PREF_DB_KEY).apply()
         }
 
         val derived = computeKeyFromScratch(context)
@@ -187,6 +188,12 @@ object DatabaseKeyDerivation {
 
     private fun byteArrayToHex(bytes: ByteArray): String {
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    internal fun decodeStoredKeyHex(hex: String): ByteArray? {
+        if (hex.length != KEY_LENGTH / 4 || hex.length % 2 != 0) return null
+        if (!hex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) return null
+        return hexToByteArray(hex)
     }
 
     private fun hexToByteArray(hex: String): ByteArray {

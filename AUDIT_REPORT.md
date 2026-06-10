@@ -656,3 +656,34 @@
 
 **Commit message**
 * `fix: recover failed dispatch worker status`
+
+### Feature 17: Database Key Cache Validation
+
+**Problem identified**
+* `DatabaseKeyDerivation` trusted the cached DB-key hex string from encrypted preferences.
+* A corrupted odd-length, wrong-length, or non-hex cache value could throw during decode or produce invalid key bytes, causing database startup failure instead of safe recovery.
+
+**Root cause**
+* Cached key decoding assumed the encrypted preference value was always well-formed and only checked byte-array size after decoding.
+
+**Fix implemented**
+* Added strict cached-key validation for expected SHA-256 key length, even-length hex, and valid hex characters before decoding.
+* Removed invalid cached key values before recomputing and re-caching the deterministic DB key.
+* Added unit tests for valid cached-key decoding and malformed cached-key rejection.
+
+**Impact**
+* Improves startup resilience when encrypted preference contents are corrupted or partially written.
+* Avoids unnecessary database-open failure caused by malformed cache metadata while preserving the existing deterministic key derivation path.
+
+**Files modified**
+* `core/data/src/main/kotlin/com/example/core/db/DatabaseKeyDerivation.kt`
+* `core/data/src/test/kotlin/com/example/core/db/DatabaseKeyDerivationTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest --tests com.example.core.db.DatabaseKeyDerivationTest --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `fix: validate cached database key metadata`
