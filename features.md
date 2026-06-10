@@ -25,9 +25,9 @@ The target implementation is the Android app in this repository, not an IDE exte
 
 | ID | Feature | Status | Required Completion Work |
 |---|---|---|---|
-| F-001 | App shell, navigation, routes, permissions | Fully Implemented | Maintain permission-rationale flow and add UI smoke evidence. |
-| F-002 | Splash and onboarding | Fully Implemented | Add UI smoke evidence for first-run and returning-user routing. |
-| F-003 | Authentication, guest mode, session state | Fully Implemented | Validate live OAuth/guest paths on device. |
+| F-001 | App shell, navigation, routes, permissions | Fully Implemented | Compose smoke coverage added for permission rationale and bottom navigation; connected device run is blocked by signature mismatch. |
+| F-002 | Splash and onboarding | Fully Implemented | Compose smoke coverage added for first-run onboarding-to-auth routing; connected device run is blocked by signature mismatch. |
+| F-003 | Authentication, guest mode, session state | Fully Implemented | Compose smoke coverage added for auth actions and guest app shell; live OAuth remains blocked by device install/signature and credential prerequisites. |
 | F-004 | Settings and secure configuration | Partially Implemented | Confirm biometric enforcement, quiet-hour enforcement, and settings actions. |
 | F-005 | Home dashboard and relationship planner | Fully Implemented | Add UI smoke evidence for cards, links, and sync-error recovery. |
 | F-006 | Contact sync, import, and deduplication | Fully Implemented | Foreground and background sync share Google + device contact merge, relationship normalization, and event discovery. |
@@ -63,7 +63,7 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-036 | Sign-out data purge | Fully Implemented | Validate destructive cleanup on test data only. |
 | F-037 | Resilience, logging, health, dead-letter queue | Fully Implemented | Keep resilience tests passing and validate AI Doctor surfacing. |
 | F-038 | External API and service interfaces | Fully Implemented | Keep domain/data boundaries stable while adding reminder scheduler service. |
-| F-039 | Build, CI, release guard, coverage | Fully Implemented | Keep JDK 21 Gradle validation and release guard documented. |
+| F-039 | Build, CI, release guard, coverage | Fully Implemented | Full JDK 21 Gradle validation passes with unit tests, lint, debug assemble, and JaCoCo report. |
 | F-040 | Design system and localization | Fully Implemented | Resource-key parity tests cover English/Hindi app and core-data strings; touched notification/system-alert strings are resource-backed. |
 | F-041 | Developer helper scripts and docs | Fully Implemented | Helper string-audit script resolves the repository root dynamically; steering build docs reflect the active Gradle/JDK/SDK setup. |
 | F-042 | Biometric app lock enforcement | Fully Implemented | App access is gated at cold start/resume when enabled; live device unlock validation remains tracked in `docs/UI_VALIDATION.md`. |

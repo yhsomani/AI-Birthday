@@ -8,6 +8,8 @@
 * Completed the background contact-sync parity pass: `ContactSyncWorker` now routes through foreground `SyncContactsUseCase` behavior for Google + device merge, relationship normalization, mock cleanup, and event discovery before optional AI classification.
 * Completed the Gmail event-aware subject pass: SMTP delivery resolves event metadata during dispatch and builds birthday, anniversary, work-anniversary, custom-event, fallback, and explicit test-send subjects.
 * Completed the localization/script portability pass: app and core-data English/Hindi resource keys have parity tests, touched notification/system-alert copy is resource-backed, critical Hindi notification labels were refreshed, and the string-audit helper no longer assumes `/workspace`.
+* Added Compose instrumented smoke coverage for first-run onboarding-to-auth and guest-mode bottom navigation. The test APK builds, but connected execution on device `1b87b5db` is blocked by `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because an existing install uses a different signing certificate.
+* Completed full non-device validation with unit tests, lint, debug assemble, and JaCoCo report using JDK 21.
 * Kept the existing single Gradle root project and active modules (`:app`, `:core:domain`, `:core:data`, `:core:ui`) instead of collapsing them into one module.
 * Migrated the inactive WhatsApp setup idea into the active app as an Automation Setup screen reachable from onboarding and settings.
 * Removed the inactive `feature/onboarding` source tree and updated steering docs so future work uses the active `app/src/main/java/com/example/ui` UI structure.
@@ -34,7 +36,7 @@
 * **Backups Policy:** I assumed that because the database uses `SQLCipher` and contains highly sensitive personal relationship data (API keys, memory vaults), it should explicitly *not* be backed up automatically by Android's cloud backup mechanism, to prevent secure data from leaving the device unintentionally. I adjusted `data_extraction_rules.xml` based on this security best practice.
 
 ## 3. Remaining Issues & Recommended Future Improvements
-* **Test Coverage:** The documentation notes that test coverage targets are not yet met (~38 tests total). A future effort should focus on expanding unit and UI tests, particularly for the Jetpack Compose screens and complex `ViewModel` logic.
+* **Test Coverage:** The current local unit-test baseline is 241 tests with no failures, and Compose smoke coverage now exists for onboarding/auth and the primary app shell. Further work should focus on live device validation for Android system integrations and deeper Compose screen workflows.
 * **CI/CD Integration:** Establish GitHub Actions for automated linting, testing, and potential Google Play deployment as outlined in the SSOT's "Pending Work" section.
 * **On-Device LLM Migration:** Plan for the eventual migration from Firebase Vertex AI to Gemini Nano on-device once API models are standardized, as per the long-term vision in the documentation.
 

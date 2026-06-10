@@ -8,6 +8,7 @@
 - Added AlarmManager-backed event reminder scheduling from `notifyDaysBefore`, with boot/daily rescheduling and reminder-toggle guards.
 - Added event-aware Gmail SMTP subject generation for birthdays, anniversaries, work anniversaries, custom events, and SMTP test emails.
 - Added localization parity and helper-script portability regression tests.
+- Added Compose instrumented smoke coverage for onboarding/auth routing and app-shell bottom navigation.
 
 ### Changed
 - Notification backup reminder and AI fallback alert copy now uses localized string resources, and critical Hindi notification labels were refreshed.
@@ -15,6 +16,10 @@
 - Background contact sync now runs through the same Google + device merge, relationship normalization, mock cleanup, and event-discovery path as foreground sync.
 - Automatic message generation now skips contacts with `skipAutoWish`, while manual generation forces review instead of auto-send for those contacts.
 - Dispatch workers now defer approved sends that become due during quiet hours or blackout dates.
+
+### Validation
+- Full local validation passes with unit tests, lint, debug assemble, and JaCoCo report.
+- Connected UI smoke execution is blocked on device `1b87b5db` by `INSTALL_FAILED_UPDATE_INCOMPATIBLE` because an existing app install uses a different signing certificate.
 
 ## [1.0.0] - 2026-06-08
 ### Added

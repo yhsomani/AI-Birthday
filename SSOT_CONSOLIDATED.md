@@ -57,7 +57,7 @@ Validation snapshot:
 
 - `./gradlew testDebugUnitTest lintDebug` passed during this documentation update.
 - `./gradlew jacocoDebugUnitTestReport` passed during this documentation update.
-- Local XML reports under `app/build/test-results/testDebugUnitTest` and `core/data/build/test-results/testDebugUnitTest`: 212 tests, 0 failures, 0 errors, 0 skipped.
+- Local XML reports under `app/build/test-results/testDebugUnitTest`, `core:data`, and `core:domain`: 241 tests, 0 failures, 0 errors, 0 skipped.
 - Latest aggregate JaCoCo report: 30,148 covered and 96,178 missed instructions; 4,083 covered and 10,075 missed lines; 878 covered and 7,589 missed branches. Approximate coverage: 23.9 percent instruction, 28.8 percent line, 10.4 percent branch.
 
 ## 3. Feature Hierarchy
@@ -206,7 +206,7 @@ RelateAI
 - User workflow: User opens app, splash decides the first route, bottom navigation controls primary sections, detail screens are opened from lists or deep links. Edge cases include encoded contact/message ids and denied runtime permissions.
 - Current status: Fully Implemented.
 - Completion percentage: 95%.
-- Test coverage: Partially Tested. `RouteArgumentCodecTest` covers argument encoding; app-shell rendering and permission behavior need device/UI smoke testing.
+- Test coverage: Partially Tested. `RouteArgumentCodecTest` covers argument encoding, and `MainActivityNavigationSmokeTest` covers permission-rationale dismissal plus Home/Contacts/Events/Messages/Analytics bottom-nav clicks at the Compose smoke level. Connected execution is blocked by an installed package signature mismatch on device `1b87b5db`.
 - Confidence score: 95%.
 
 ### F-002 Splash and Onboarding
@@ -220,7 +220,7 @@ RelateAI
 - User workflow: New users see onboarding, then authentication. Returning onboarded users go to auth or home depending on session. Edge cases include missing/corrupt secure prefs and guest mode.
 - Current status: Fully Implemented.
 - Completion percentage: 95%.
-- Test coverage: Partially Tested through viewmodel tests and preference behavior; full first-launch UI flow needs device validation.
+- Test coverage: Partially Tested through viewmodel tests, preference behavior, and `MainActivityNavigationSmokeTest` first-run onboarding-to-auth coverage. Connected execution is blocked by an installed package signature mismatch on device `1b87b5db`.
 - Confidence score: 95%.
 
 ### F-003 Authentication, Guest Mode, Session State
@@ -234,7 +234,7 @@ RelateAI
 - User workflow: User signs in with Google or uses guest mode where available. Auth errors surface as structured failure categories. Edge cases include developer console misconfiguration, network errors, Firebase errors, and missing web client id.
 - Current status: Fully Implemented.
 - Completion percentage: 90%.
-- Test coverage: Partially Tested by `AuthViewModelTest` and config tests; live OAuth needs device/integration validation.
+- Test coverage: Partially Tested by `AuthViewModelTest`, config tests, and `MainActivityNavigationSmokeTest` auth-action coverage. Live OAuth still needs device/integration validation and credentials.
 - Confidence score: 95%.
 
 ### F-004 Settings and Secure Configuration
@@ -966,7 +966,7 @@ Observed test artifacts:
 
 - `app/build/test-results/testDebugUnitTest`: app, viewmodel, domain-usecase, worker, parser, route, SMS receiver, and config test XML.
 - `core/data/build/test-results/testDebugUnitTest`: data-layer migration, backup, analytics, repository, key derivation, quarantine, and resilience test XML.
-- Aggregate observed result: 212 tests, 0 failures, 0 errors, 0 skipped.
+- Aggregate observed result: 241 tests, 0 failures, 0 errors, 0 skipped.
 - No separate local XML result directories were observed for `core/domain/build/test-results/testDebugUnitTest` or `core/ui/build/test-results/testDebugUnitTest` in this snapshot.
 
 Observed coverage:
@@ -986,9 +986,11 @@ Coverage interpretation:
 Validation commands executed for this update:
 
 ```bash
-./gradlew testDebugUnitTest lintDebug
-./gradlew jacocoDebugUnitTestReport
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug jacocoDebugUnitTestReport --no-configuration-cache -Djavax.net.ssl.trustStore=.gradle/trust/cacerts-zscaler -Djavax.net.ssl.trustStorePassword=changeit
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:assembleDebugAndroidTest --no-configuration-cache -Djavax.net.ssl.trustStore=.gradle/trust/cacerts-zscaler -Djavax.net.ssl.trustStorePassword=changeit
 ```
+
+Connected instrumentation was attempted on `1b87b5db` with `MainActivityNavigationSmokeTest`, but the debug APK could not be installed over the existing `com.aistudio.relateai.qxtjrk` package because its signature differs from the local debug build. The installed app was not uninstalled to avoid deleting existing device data.
 
 CI validation:
 
