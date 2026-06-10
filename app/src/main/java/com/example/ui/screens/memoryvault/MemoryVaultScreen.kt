@@ -21,6 +21,7 @@ import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
+import com.example.core.db.entities.MemoryNoteEntity
 import com.example.core.ui.theme.*
 import com.example.ui.viewmodel.MemoryVaultViewModel
 import java.text.SimpleDateFormat
@@ -40,6 +41,7 @@ fun MemoryVaultScreen(
     var newNoteText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("GENERAL") }
     val categories = listOf("GENERAL", "PREFERENCE", "EVENT", "GIFT", "MILESTONE")
+    var noteToDelete by remember { mutableStateOf<MemoryNoteEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -185,7 +187,7 @@ fun MemoryVaultScreen(
                                                 tint = if (note.isPinned) RelatePrimary else RelateOnSurfaceVariant.copy(alpha = 0.4f)
                                             )
                                         }
-                                        IconButton(onClick = { viewModel.deleteNote(note) }) {
+                                        IconButton(onClick = { noteToDelete = note }) {
                                             Icon(
                                                 Icons.Filled.Delete,
                                                 contentDescription = "Delete note",
@@ -212,5 +214,26 @@ fun MemoryVaultScreen(
                 }
             }
         }
+    }
+
+    if (noteToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { noteToDelete = null },
+            title = { Text("Delete Memory") },
+            text = { Text("Are you sure you want to delete this memory? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    noteToDelete?.let { viewModel.deleteNote(it) }
+                    noteToDelete = null
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { noteToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
