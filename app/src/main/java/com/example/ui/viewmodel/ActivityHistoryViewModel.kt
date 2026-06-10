@@ -18,6 +18,7 @@ enum class ActivityLogTypeFilter {
     SYNC,
     ANALYTICS,
     SETTINGS,
+    AI,
 }
 
 enum class ActivityLogDateFilter {

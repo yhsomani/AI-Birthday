@@ -9,15 +9,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Analytics
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -58,7 +61,7 @@ fun ActivityHistoryScreen(
     RelateScreen(
         title = stringResource(R.string.activity_history_title),
         subtitle = stringResource(R.string.activity_history_subtitle),
-        navigationIcon = Icons.Filled.ArrowBack,
+        navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
         navigationContentDescription = stringResource(R.string.back),
         onNavigationClick = onBack,
     ) {
@@ -112,7 +115,9 @@ private fun <T> FilterRow(
     onSelected: (T) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         filters.forEach { filter ->
@@ -170,6 +175,7 @@ private fun ActivityLogTypeFilter.label(): String = when (this) {
     ActivityLogTypeFilter.SYNC -> stringResource(R.string.activity_filter_sync)
     ActivityLogTypeFilter.ANALYTICS -> stringResource(R.string.activity_filter_analytics)
     ActivityLogTypeFilter.SETTINGS -> stringResource(R.string.activity_filter_settings)
+    ActivityLogTypeFilter.AI -> stringResource(R.string.activity_filter_ai)
 }
 
 @Composable
@@ -190,5 +196,6 @@ private fun String.icon(): ImageVector = when (uppercase(Locale.US)) {
     "SYNC" -> Icons.Filled.Sync
     "ANALYTICS" -> Icons.Filled.Analytics
     "SETTINGS" -> Icons.Filled.Settings
+    "AI" -> Icons.Filled.SmartToy
     else -> Icons.Filled.History
 }

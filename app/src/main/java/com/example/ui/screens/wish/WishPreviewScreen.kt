@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.core.ui.components.RelateGlassCard
@@ -223,6 +224,40 @@ fun WishPreviewScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Tell AI what went wrong",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = RelatePrimary,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                state.feedbackOptions.chunked(2).forEach { rowOptions ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        rowOptions.forEach { option ->
+                            FeedbackChip(
+                                label = option.label,
+                                isSelected = state.selectedFeedbackKey == option.key,
+                                onClick = { viewModel.submitFeedback(option.key) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (rowOptions.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                state.feedbackMessage?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = RelateOnSurfaceVariant,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { viewModel.regenerate() },
                     modifier = Modifier.fillMaxWidth(),
@@ -309,6 +344,35 @@ fun WishPreviewScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun FeedbackChip(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .height(40.dp)
+            .clickable(onClick = onClick)
+            .background(
+                color = if (isSelected) RelatePrimary else RelateSurfaceVariant,
+                shape = RoundedCornerShape(20.dp),
+            )
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

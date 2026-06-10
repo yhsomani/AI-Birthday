@@ -55,7 +55,8 @@ class AiServiceImpl @Inject constructor(
         contact: ContactEntity,
         event: EventEntity,
         styleProfile: StyleProfileEntity?,
-        previousMessages: List<SentMessageEntity>
+        previousMessages: List<SentMessageEntity>,
+        feedbackInstruction: String?
     ): MessageVariantsResult {
         StructuredLogger.i(TAG, "Regenerating message", mapOf(
             "contactId" to contact.id,
@@ -65,7 +66,7 @@ class AiServiceImpl @Inject constructor(
         val contextObj = prompter.buildContactContext(contact, event, styleProfile, previousMessages)
 
         RateLimiter.waitIfNeeded()
-        val prompt = prompter.buildRegenerationPrompt(previousMessage, contextObj)
+        val prompt = prompter.buildRegenerationPrompt(previousMessage, contextObj, feedbackInstruction)
         val response = geminiClient.generate(prompt)
         val variants = ResponseParser.parseMessageVariants(response)
 

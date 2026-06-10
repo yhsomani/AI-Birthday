@@ -196,11 +196,23 @@ class PromptBuilder {
         }
     }
 
-    fun buildRegenerationPrompt(original: String, context: ContactContextObject): String = buildString {
-        appendLine("The following message was rejected for being too similar to a previous wish:")
+    fun buildRegenerationPrompt(
+        original: String,
+        context: ContactContextObject,
+        feedbackInstruction: String? = null
+    ): String = buildString {
+        if (feedbackInstruction.isNullOrBlank()) {
+            appendLine("The following message was rejected for being too similar to a previous wish:")
+        } else {
+            appendLine("The following message was rejected by the user:")
+        }
         appendLine("\"$original\"")
         appendLine()
-        appendLine("Generate a COMPLETELY different message. Different tone, different references, ")
+        if (!feedbackInstruction.isNullOrBlank()) {
+            appendLine("Fix this specific issue: $feedbackInstruction")
+            appendLine()
+        }
+        appendLine("Generate a COMPLETELY different message. Different tone, different references,")
         appendLine("different structure. Same context applies:")
         append(buildMessageGenerationPrompt(context))
     }

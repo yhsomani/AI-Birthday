@@ -2,7 +2,9 @@ package com.example.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.db.entities.PendingMessageEntity
+import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RegeneratePendingMessageUseCase
@@ -12,7 +14,47 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
+
+data class AiFeedbackOption(
+    val key: String,
+    val label: String,
+    val instruction: String,
+)
+
+private val aiFeedbackOptions = listOf(
+    AiFeedbackOption(
+        key = "too_generic",
+        label = "Too generic",
+        instruction = "Make it more personal. Use a specific memory, interest, nickname, or relationship detail from the contact context.",
+    ),
+    AiFeedbackOption(
+        key = "too_formal",
+        label = "Too formal",
+        instruction = "Make it more casual and natural, like a real personal message instead of a polished greeting.",
+    ),
+    AiFeedbackOption(
+        key = "wrong_language",
+        label = "Wrong language",
+        instruction = "Regenerate in the contact's preferred language and keep the wording culturally natural.",
+    ),
+    AiFeedbackOption(
+        key = "too_long",
+        label = "Too long",
+        instruction = "Make the message shorter, tighter, and easier to send without losing warmth.",
+    ),
+    AiFeedbackOption(
+        key = "not_warm",
+        label = "Not warm enough",
+        instruction = "Make it warmer and more emotionally specific without sounding dramatic or artificial.",
+    ),
+    AiFeedbackOption(
+        key = "repetitive",
+        label = "Repeated idea",
+        instruction = "Avoid the current wording and any previous wishes. Use a different structure, reference, and opening line.",
+    ),
+)
 
 data class WishPreviewUiState(
     val pendingMessage: PendingMessageEntity? = null,
@@ -28,6 +70,9 @@ data class WishPreviewUiState(
     val testSent: Boolean = false,
     val usedFallback: Boolean = false,
     val qualityMessage: String? = null,
+    val feedbackOptions: List<AiFeedbackOption> = aiFeedbackOptions,
+    val selectedFeedbackKey: String? = null,
+    val feedbackMessage: String? = null,
 )
 
 private val variantOptions = listOf(
@@ -42,6 +87,7 @@ private val variantOptions = listOf(
 @HiltViewModel
 class WishPreviewViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
+    private val activityLogRepository: ActivityLogRepository,
     private val approvePendingMessageUseCase: ApprovePendingMessageUseCase,
     private val rejectPendingMessageUseCase: RejectPendingMessageUseCase,
     private val regeneratePendingMessageUseCase: RegeneratePendingMessageUseCase,
@@ -113,9 +159,10 @@ class WishPreviewViewModel @Inject constructor(
     fun regenerate() {
         val pendingId = _uiState.value.pendingMessage?.id ?: return
         val draft = _uiState.value.editedText
+        val feedback = selectedFeedback()
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isRegenerating = true, error = null, qualityMessage = null)
-            when (val result = regeneratePendingMessageUseCase(pendingId, draft)) {
+            when (val result = regeneratePendingMessageUseCase(pendingId, draft, feedback?.instruction)) {
                 RegeneratePendingMessageUseCase.Outcome.AiDisabled -> {
                     _uiState.value = _uiState.value.copy(
                         isRegenerating = false,
@@ -145,6 +192,8 @@ class WishPreviewViewModel @Inject constructor(
                             usedFallback = result.usedFallback,
                             qualityMessage = if (result.usedFallback) {
                                 "Template used because AI generation was unavailable."
+                            } else if (feedback != null) {
+                                "AI regenerated using your feedback: ${feedback.label}."
                             } else {
                                 "AI regenerated a fresh draft."
                             },
@@ -156,6 +205,31 @@ class WishPreviewViewModel @Inject constructor(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    fun submitFeedback(key: String) {
+        val option = aiFeedbackOptions.firstOrNull { it.key == key } ?: return
+        val pending = _uiState.value.pendingMessage
+        _uiState.value = _uiState.value.copy(
+            selectedFeedbackKey = key,
+            feedbackMessage = "Feedback saved. Regenerate to apply it.",
+            qualityMessage = "Next regeneration will fix: ${option.label}.",
+        )
+        if (pending != null) {
+            viewModelScope.launch {
+                activityLogRepository.record(
+                    ActivityLogEntity(
+                        id = UUID.randomUUID().toString(),
+                        type = "AI",
+                        title = "AI feedback: ${option.label}",
+                        detail = option.instruction,
+                        contactId = pending.contactId,
+                        eventId = pending.eventId,
+                        messageId = pending.id,
+                    )
+                )
             }
         }
     }
@@ -205,5 +279,10 @@ class WishPreviewViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun selectedFeedback(): AiFeedbackOption? {
+        val key = _uiState.value.selectedFeedbackKey ?: return null
+        return aiFeedbackOptions.firstOrNull { it.key == key }
     }
 }

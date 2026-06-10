@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -52,6 +53,8 @@ import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSuccess
 import com.example.core.ui.theme.RelateWarning
+import com.example.ui.viewmodel.AiDoctorAction
+import com.example.ui.viewmodel.AiDoctorSummary
 import com.example.ui.viewmodel.AutomationSetupViewModel
 import com.example.ui.viewmodel.ReadinessCheck
 import com.example.ui.viewmodel.ReadinessStatus
@@ -59,16 +62,19 @@ import com.example.ui.viewmodel.ReadinessStatus
 @Composable
 fun AutomationSetupScreen(
     onBack: () -> Unit,
+    onOpenSettings: () -> Unit = {},
+    onOpenStyleCoach: () -> Unit = {},
+    onOpenContacts: () -> Unit = {},
+    onOpenActivityHistory: () -> Unit = {},
     viewModel: AutomationSetupViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    val isAccessibilityEnabled = remember { context.isWhatsAppAutomationServiceEnabled() }
     val isIgnoringBattery = remember { context.isIgnoringBatteryOptimizations() }
     val state by viewModel.uiState.collectAsState()
 
     RelateScreen(
-        title = "Automation Setup",
-        subtitle = "Prepare WhatsApp automation, reminders, and reliable background sends.",
+        title = "AI Doctor",
+        subtitle = "Find why AI wishes feel wrong or fail, then fix the exact blocker.",
         navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
         navigationContentDescription = "Back",
         onNavigationClick = onBack,
@@ -79,19 +85,17 @@ fun AutomationSetupScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            val summaryColors = state.summary.status.statusColors()
             RelateStatusBanner(
-                title = if (isAccessibilityEnabled) "WhatsApp automation is enabled" else "WhatsApp automation needs setup",
-                message = if (isAccessibilityEnabled) {
-                    "RelateAI can open WhatsApp and send already-approved messages."
-                } else {
-                    "Enable the RelateAI accessibility service only if you want automatic WhatsApp sends."
-                },
-                icon = if (isAccessibilityEnabled) Icons.Filled.CheckCircle else Icons.AutoMirrored.Filled.Chat,
-                containerColor = if (isAccessibilityEnabled) RelateSuccess.copy(alpha = 0.16f) else RelateWarning.copy(alpha = 0.16f),
-                contentColor = if (isAccessibilityEnabled) RelateSuccess else RelateWarning,
+                title = state.summary.title,
+                message = state.summary.detail,
+                icon = state.summary.status.statusIcon(),
+                containerColor = summaryColors.container,
+                contentColor = summaryColors.content,
             )
 
             ReadinessDashboard(
+                summary = state.summary,
                 checks = state.checks,
                 isRefreshing = state.isRefreshing,
                 isSyncingContacts = state.isSyncingContacts,
@@ -101,6 +105,17 @@ fun AutomationSetupScreen(
                 onSyncContacts = viewModel::syncContacts,
                 onDryRun = viewModel::runSafeGenerationCheck,
                 onTestAi = viewModel::testAiGeneration,
+                onAction = { action ->
+                    handleAiDoctorAction(
+                        action = action,
+                        context = context,
+                        viewModel = viewModel,
+                        onOpenSettings = onOpenSettings,
+                        onOpenStyleCoach = onOpenStyleCoach,
+                        onOpenContacts = onOpenContacts,
+                        onOpenActivityHistory = onOpenActivityHistory,
+                    )
+                },
             )
 
             SetupCard(
@@ -147,6 +162,7 @@ fun AutomationSetupScreen(
 
 @Composable
 private fun ReadinessDashboard(
+    summary: AiDoctorSummary,
     checks: List<ReadinessCheck>,
     isRefreshing: Boolean,
     isSyncingContacts: Boolean,
@@ -156,6 +172,7 @@ private fun ReadinessDashboard(
     onSyncContacts: () -> Unit,
     onDryRun: () -> Unit,
     onTestAi: () -> Unit,
+    onAction: (AiDoctorAction) -> Unit,
 ) {
     RelateGlassCard {
         Column(
@@ -164,7 +181,7 @@ private fun ReadinessDashboard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Automation Readiness",
+                    text = "Diagnostic Checks",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
@@ -178,9 +195,14 @@ private fun ReadinessDashboard(
                     )
                 }
             }
+            Text(
+                text = summary.detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = RelateOnSurfaceVariant,
+            )
 
             checks.forEach { check ->
-                ReadinessRow(check)
+                ReadinessRow(check = check, onAction = onAction)
             }
 
             operationMessage?.let {
@@ -245,13 +267,14 @@ private fun ReadinessDashboard(
 }
 
 @Composable
-private fun ReadinessRow(check: ReadinessCheck) {
-    val (icon, color) = when (check.status) {
-        ReadinessStatus.OK -> Icons.Filled.CheckCircle to RelateSuccess
-        ReadinessStatus.WARNING -> Icons.Filled.Warning to RelateWarning
-        ReadinessStatus.ACTION_REQUIRED -> Icons.Filled.Error to MaterialTheme.colorScheme.error
-    }
+private fun ReadinessRow(
+    check: ReadinessCheck,
+    onAction: (AiDoctorAction) -> Unit,
+) {
+    val icon = check.status.statusIcon()
+    val color = check.status.statusColors().content
     Row(
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -261,7 +284,7 @@ private fun ReadinessRow(check: ReadinessCheck) {
             tint = color,
             modifier = Modifier.size(20.dp),
         )
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = check.title,
                 style = MaterialTheme.typography.bodyMedium,
@@ -274,6 +297,65 @@ private fun ReadinessRow(check: ReadinessCheck) {
                 color = RelateOnSurfaceVariant,
             )
         }
+        if (check.actionLabel != null && check.action != AiDoctorAction.NONE) {
+            TextButton(
+                onClick = { onAction(check.action) },
+                modifier = Modifier.padding(top = 0.dp),
+            ) {
+                Text(check.actionLabel)
+            }
+        }
+    }
+}
+
+private data class StatusColors(
+    val container: androidx.compose.ui.graphics.Color,
+    val content: androidx.compose.ui.graphics.Color,
+)
+
+@Composable
+private fun ReadinessStatus.statusColors(): StatusColors = when (this) {
+    ReadinessStatus.OK -> StatusColors(
+        container = RelateSuccess.copy(alpha = 0.16f),
+        content = RelateSuccess,
+    )
+    ReadinessStatus.WARNING -> StatusColors(
+        container = RelateWarning.copy(alpha = 0.16f),
+        content = RelateWarning,
+    )
+    ReadinessStatus.ACTION_REQUIRED -> StatusColors(
+        container = MaterialTheme.colorScheme.error.copy(alpha = 0.16f),
+        content = MaterialTheme.colorScheme.error,
+    )
+}
+
+private fun ReadinessStatus.statusIcon(): ImageVector = when (this) {
+    ReadinessStatus.OK -> Icons.Filled.CheckCircle
+    ReadinessStatus.WARNING -> Icons.Filled.Warning
+    ReadinessStatus.ACTION_REQUIRED -> Icons.Filled.Error
+}
+
+private fun handleAiDoctorAction(
+    action: AiDoctorAction,
+    context: Context,
+    viewModel: AutomationSetupViewModel,
+    onOpenSettings: () -> Unit,
+    onOpenStyleCoach: () -> Unit,
+    onOpenContacts: () -> Unit,
+    onOpenActivityHistory: () -> Unit,
+) {
+    when (action) {
+        AiDoctorAction.NONE -> Unit
+        AiDoctorAction.REFRESH -> viewModel.refreshChecks()
+        AiDoctorAction.TEST_AI -> viewModel.testAiGeneration()
+        AiDoctorAction.SYNC_CONTACTS -> viewModel.syncContacts()
+        AiDoctorAction.OPEN_SETTINGS -> onOpenSettings()
+        AiDoctorAction.OPEN_STYLE_COACH -> onOpenStyleCoach()
+        AiDoctorAction.OPEN_CONTACTS -> onOpenContacts()
+        AiDoctorAction.OPEN_ACTIVITY_HISTORY -> onOpenActivityHistory()
+        AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS -> context.safeStartActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        AiDoctorAction.OPEN_BATTERY_SETTINGS -> context.openBatteryOptimizationSettings()
+        AiDoctorAction.OPEN_APP_SETTINGS -> context.openAppSettings()
     }
 }
 
@@ -328,17 +410,6 @@ private fun SetupCard(
                 }
             }
         }
-    }
-}
-
-private fun Context.isWhatsAppAutomationServiceEnabled(): Boolean {
-    val expectedService = "$packageName/com.example.core.accessibility.WhatsAppAccessibilityService"
-    val enabledServices = Settings.Secure.getString(
-        contentResolver,
-        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-    ) ?: return false
-    return enabledServices.split(':').any {
-        it.equals(expectedService, ignoreCase = true)
     }
 }
 

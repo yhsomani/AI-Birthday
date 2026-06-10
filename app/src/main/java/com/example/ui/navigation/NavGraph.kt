@@ -246,7 +246,21 @@ fun RelateNavGraph(
         }
         composable(Screen.AutomationSetup.route) {
             AutomationSetupScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onOpenSettings = {
+                    if (!navController.popBackStack(Screen.Settings.route, inclusive = false)) {
+                        navController.navigate(Screen.Settings.route)
+                    }
+                },
+                onOpenStyleCoach = {
+                    navController.navigate(Screen.StyleCoach.route)
+                },
+                onOpenContacts = {
+                    navController.navigate(Screen.ContactList.route)
+                },
+                onOpenActivityHistory = {
+                    navController.navigate(Screen.ActivityHistory.route)
+                },
             )
         }
         composable(

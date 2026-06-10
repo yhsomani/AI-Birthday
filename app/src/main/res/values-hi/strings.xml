@@ -221,8 +221,8 @@
     <string name="settings_ai_wish_generation">AI शुभकामना जनरेशन</string>
     <string name="settings_ai_style_coach">AI Style Coach</string>
     <string name="settings_ai_style_coach_subtitle">AI को आपकी निजी लिखने की शैली सिखाएं</string>
-    <string name="settings_automation_setup">ऑटोमेशन सेटअप</string>
-    <string name="settings_automation_setup_subtitle">WhatsApp accessibility, reminders, और background reliability चालू करें</string>
+    <string name="settings_automation_setup">AI Doctor</string>
+    <string name="settings_automation_setup_subtitle">AI failures, generic wishes, और automation setup diagnose करें</string>
     <string name="settings_gemini_api_key_help">AI शुभकामनाओं के लिए जरूरी। अपनी key makersuite.google.com से लें</string>
     <string name="settings_gemini_api_key_placeholder">AIza...</string>
     <string name="settings_save_api_key">API key सेव करें</string>
@@ -378,6 +378,7 @@
     <string name="activity_filter_sync">सिंक</string>
     <string name="activity_filter_analytics">विश्लेषण</string>
     <string name="activity_filter_settings">सेटिंग्स</string>
+    <string name="activity_filter_ai">AI</string>
     <string name="activity_filter_today">आज</string>
     <string name="activity_filter_last_7_days">7 दिन</string>
     <string name="activity_filter_last_30_days">30 दिन</string>

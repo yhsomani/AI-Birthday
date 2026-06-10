@@ -19,7 +19,8 @@ interface AiService {
         contact: ContactEntity,
         event: EventEntity,
         styleProfile: StyleProfileEntity?,
-        previousMessages: List<SentMessageEntity>
+        previousMessages: List<SentMessageEntity>,
+        feedbackInstruction: String? = null
     ): MessageVariantsResult
 
     suspend fun classifyContact(contact: ContactEntity): ContactClassificationResult

@@ -18,7 +18,11 @@ class RegeneratePendingMessageUseCase @Inject constructor(
     private val aiService: AiService,
     private val preferencesRepository: PreferencesRepository,
 ) {
-    suspend operator fun invoke(pendingMessageId: String, currentDraft: String): Outcome {
+    suspend operator fun invoke(
+        pendingMessageId: String,
+        currentDraft: String,
+        feedbackInstruction: String? = null,
+    ): Outcome {
         if (!preferencesRepository.isAiWishGenerationEnabled()) {
             return Outcome.AiDisabled
         }
@@ -39,6 +43,7 @@ class RegeneratePendingMessageUseCase @Inject constructor(
             event = event,
             styleProfile = styleProfile,
             previousMessages = previousMessages,
+            feedbackInstruction = feedbackInstruction,
         )
         val selectedText = variants.get(variants.recommended)
         val updated = pending.copy(

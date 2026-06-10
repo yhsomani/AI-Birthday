@@ -220,8 +220,8 @@
     <string name="settings_ai_wish_generation">AI Wish Generation</string>
     <string name="settings_ai_style_coach">AI Style Coach</string>
     <string name="settings_ai_style_coach_subtitle">Train AI to match your personal writing style</string>
-    <string name="settings_automation_setup">Automation Setup</string>
-    <string name="settings_automation_setup_subtitle">Enable WhatsApp accessibility, reminders, and background reliability</string>
+    <string name="settings_automation_setup">AI Doctor</string>
+    <string name="settings_automation_setup_subtitle">Diagnose AI failures, generic wishes, and automation setup</string>
     <string name="settings_gemini_api_key_help">Required for AI wish generation. Get yours at makersuite.google.com</string>
     <string name="settings_gemini_api_key_placeholder">AIza...</string>
     <string name="settings_save_api_key">Save API Key</string>
@@ -377,6 +377,7 @@
     <string name="activity_filter_sync">Sync</string>
     <string name="activity_filter_analytics">Analytics</string>
     <string name="activity_filter_settings">Settings</string>
+    <string name="activity_filter_ai">AI</string>
     <string name="activity_filter_today">Today</string>
     <string name="activity_filter_last_7_days">7 days</string>
     <string name="activity_filter_last_30_days">30 days</string>
