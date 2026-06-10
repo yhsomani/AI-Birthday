@@ -1,5 +1,10 @@
 # RelateAI Changelog
 
+## [Unreleased]
+### Added
+- Added root `features.md`, feature compliance Kiro specs, and a UI validation ledger.
+- Enforced the biometric app lock at app cold start/resume when the Settings toggle is enabled, with localized lock and prompt text.
+
 ## [1.0.0] - 2026-06-08
 ### Added
 - **SMS Delivery Tracking & Confirmation**: Created `SmsStatusReceiver` for dynamic sent and delivered broadcast confirmations. Integrated unique request code hashing based on message ID in `SmsSender` to prevent intent collisions.

@@ -2,6 +2,8 @@
 
 ## 0. Current Implementation Update
 
+* Added root `features.md` as the primary feature source of truth, plus Kiro compliance specs and `docs/UI_VALIDATION.md` for manual UI/integration evidence.
+* Completed the biometric app-lock enforcement pass: `MainActivity` now blocks app composition on protected cold start/resume when biometric lock is enabled, uses localized prompt/lock text, and has a focused policy unit test.
 * Kept the existing single Gradle root project and active modules (`:app`, `:core:domain`, `:core:data`, `:core:ui`) instead of collapsing them into one module.
 * Migrated the inactive WhatsApp setup idea into the active app as an Automation Setup screen reachable from onboarding and settings.
 * Removed the inactive `feature/onboarding` source tree and updated steering docs so future work uses the active `app/src/main/java/com/example/ui` UI structure.

@@ -1,7 +1,8 @@
 # RelateAI Feature Compliance Tasks
 
 - [ ] F-001-F-003: verify app shell, onboarding, auth, guest mode, and navigation on device.
-- [ ] F-004/F-042: implement and validate biometric lock enforcement.
+- [x] F-004/F-042: implement biometric lock enforcement.
+- [ ] F-004/F-042: validate biometric lock prompt and resume behavior on device.
 - [ ] F-006/F-026: route background contact sync through foreground sync use case.
 - [ ] F-008/F-023/F-025/F-027/F-043: implement automation schedule policy for custom send time, skip-auto-wish, quiet hours, blackout dates, and dispatch deferral.
 - [ ] F-010/F-031/F-044: implement event reminder scheduling from `notifyDaysBefore` and user reminder toggle.

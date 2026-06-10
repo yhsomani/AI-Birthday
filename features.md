@@ -66,7 +66,7 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-039 | Build, CI, release guard, coverage | Fully Implemented | Keep JDK 21 Gradle validation and release guard documented. |
 | F-040 | Design system and localization | Partially Implemented | Add localization parity checks and resource raw notification strings touched by this pass. |
 | F-041 | Developer helper scripts and docs | Partially Implemented | Remove `/workspace` helper-script assumption and update stale docs. |
-| F-042 | Biometric app lock enforcement | Partially Implemented | Enforce cold-start/resume lock when enabled. |
+| F-042 | Biometric app lock enforcement | Fully Implemented | App access is gated at cold start/resume when enabled; live device unlock validation remains tracked in `docs/UI_VALIDATION.md`. |
 | F-043 | Quiet hours, blackout dates, reminder toggles | Partially Implemented | Add reusable automation schedule policy and runtime enforcement. |
 | F-044 | Event reminder scheduling | Partially Implemented | Schedule/cancel/reschedule alarms from `notifyDaysBefore` and user toggle. |
 | F-045 | Mood logs | Deprecated | Keep deprecated unless explicitly re-scoped. |

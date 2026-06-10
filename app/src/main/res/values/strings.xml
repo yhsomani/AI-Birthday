@@ -703,6 +703,15 @@
     <string name="settings_biometric_lock">Biometric lock</string>
     <string name="settings_biometric_enabled">Biometric lock enabled.</string>
     <string name="settings_biometric_disabled">Biometric lock disabled.</string>
+    <string name="biometric_prompt_title">Unlock RelateAI</string>
+    <string name="biometric_prompt_subtitle">Authenticate to access your relationship data.</string>
+    <string name="biometric_lock_title">RelateAI is locked</string>
+    <string name="biometric_lock_message">Authenticate with biometrics or your device credential to continue.</string>
+    <string name="biometric_lock_authenticating">Waiting for authentication.</string>
+    <string name="biometric_lock_unavailable">Biometric or device credential authentication is not available. Set up a screen lock on this device, then retry.</string>
+    <string name="biometric_lock_error">Authentication failed: %1$s</string>
+    <string name="biometric_lock_unlock">Unlock</string>
+    <string name="biometric_lock_retry">Retry</string>
     <string name="settings_channel_blackout_title">Disabled channels</string>
     <string name="settings_channel_blackout_help">Temporarily block channels you do not want RelateAI to use for automatic sends.</string>
     <string name="settings_channel_blackout_saved">Channel preferences saved.</string>

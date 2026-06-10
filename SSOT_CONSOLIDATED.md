@@ -186,7 +186,7 @@ RelateAI
 | F-039 | Build, CI, release guard, coverage | Developer Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-040 | Design system and localization | UI/Developer Feature | Partially Implemented | 75% | Partially Tested | 85% |
 | F-041 | Developer helper scripts and docs | Developer Feature | Partially Implemented | 60% | Not Tested | 75% |
-| F-042 | Biometric app lock enforcement | Security Feature | Partially Implemented | 45% | Not Tested | 80% |
+| F-042 | Biometric app lock enforcement | Security Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-043 | Quiet hours, blackout dates, reminder toggles | System Feature | Partially Implemented | 50% | Partially Tested | 85% |
 | F-044 | Event reminder scheduling | System Feature | Partially Implemented | 55% | Not Tested | 75% |
 | F-045 | Mood logs | Deprecated | Deprecated | 0% | Partially Tested via migration | 98% |
@@ -773,15 +773,15 @@ RelateAI
 
 - Category: Security Feature.
 - Description: Intended to protect app access with biometric/device credential authentication.
-- Functionality: A biometric manager exists and Settings persists a biometric-lock toggle, but source inspection did not confirm app-wide cold-start/resume enforcement in the main shell.
-- Components involved: BiometricAuthManager, Settings, SecurePrefs.
-- Related files: `BiometricAuthManager.kt`, `SettingsScreen.kt`, `SettingsViewModel.kt`, `SecurePrefs.kt`.
+- Functionality: A biometric manager exists, Settings persists a biometric-lock toggle, and `MainActivity` gates app composition on cold start/resume when the toggle is enabled. The lock screen blocks access until biometric or device credential authentication succeeds, with an unavailable state when the device has no supported authenticator.
+- Components involved: MainActivity, BiometricLockPolicy, BiometricAuthManager, Settings, SecurePrefs.
+- Related files: `MainActivity.kt`, `BiometricLockPolicy.kt`, `BiometricAuthManager.kt`, `SettingsScreen.kt`, `SettingsViewModel.kt`, `SecurePrefs.kt`.
 - Dependencies: AndroidX Biometric, device biometric/device credential support, app lifecycle integration.
-- User workflow: User toggles biometric lock in Settings. Expected workflow is biometric re-auth on protected entry, but enforcement is not confirmed.
-- Current status: Partially Implemented.
-- Completion percentage: 45%.
-- Test coverage: Not Tested in observed reports.
-- Confidence score: 80%.
+- User workflow: User toggles biometric lock in Settings. On the next protected cold start/resume, RelateAI shows the biometric/device credential prompt before rendering relationship data. Edge cases include prompt cancellation and unsupported device authentication.
+- Current status: Fully Implemented.
+- Completion percentage: 85%.
+- Test coverage: Partially Tested by `BiometricLockPolicyTest`; live device prompt validation remains required.
+- Confidence score: 90%.
 
 ### F-043 Quiet Hours, Blackout Dates, Reminder Toggles
 
@@ -947,7 +947,7 @@ Receivers:
 
 ## 11. Partially Implemented Features
 
-- Biometric app lock: manager and toggle exist, but app-wide enforcement was not confirmed.
+- Biometric app lock: manager, toggle, app-wide cold-start/resume gate, and policy test exist; live device prompt validation remains required.
 - Quiet hours and blackout dates: preferences exist; channel blackout is used by dispatch; broader quiet-hour/blackout-date scheduling enforcement was not confirmed.
 - Birthday reminder toggle: persisted in settings, but complete reminder behavior was not confirmed.
 - Event reminder scheduling: receiver and notification helper exist; scheduler integration for `notifyDaysBefore` was not confirmed.

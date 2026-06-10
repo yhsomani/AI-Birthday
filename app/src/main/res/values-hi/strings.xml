@@ -704,6 +704,15 @@
     <string name="settings_biometric_lock">Biometric lock</string>
     <string name="settings_biometric_enabled">Biometric lock enabled.</string>
     <string name="settings_biometric_disabled">Biometric lock disabled.</string>
+    <string name="biometric_prompt_title">RelateAI unlock करें</string>
+    <string name="biometric_prompt_subtitle">अपने relationship data तक पहुंचने के लिए authenticate करें।</string>
+    <string name="biometric_lock_title">RelateAI locked है</string>
+    <string name="biometric_lock_message">जारी रखने के लिए biometric या device credential से authenticate करें।</string>
+    <string name="biometric_lock_authenticating">Authentication का इंतज़ार है।</string>
+    <string name="biometric_lock_unavailable">Biometric या device credential authentication उपलब्ध नहीं है। इस device पर screen lock set करें, फिर retry करें।</string>
+    <string name="biometric_lock_error">Authentication failed: %1$s</string>
+    <string name="biometric_lock_unlock">Unlock</string>
+    <string name="biometric_lock_retry">Retry</string>
     <string name="settings_channel_blackout_title">Disabled channels</string>
     <string name="settings_channel_blackout_help">जिन channels से automatic sends नहीं चाहिए उन्हें temporarily block करें।</string>
     <string name="settings_channel_blackout_saved">Channel preferences saved.</string>

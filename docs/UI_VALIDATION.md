@@ -16,6 +16,7 @@ This document records manual and automated UI validation for the feature complia
 | Check | Status | Evidence |
 |---|---|---|
 | Unit tests and lint | Pass | `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug --no-configuration-cache`, 212 tests, 0 failures, 0 errors, 0 skipped. |
+| Biometric lock compile/test | Pass | `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:compileDebugKotlin :app:testDebugUnitTest --tests com.example.BiometricLockPolicyTest --no-configuration-cache`. |
 | Full release-readiness validation | Not Run | Planned command: `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug jacocoDebugUnitTestReport --no-configuration-cache`. |
 | Compose/instrumented UI coverage | Not Run | Existing `app/src/androidTest` only contains package-context smoke test before this pass. |
 
@@ -40,6 +41,7 @@ This document records manual and automated UI validation for the feature complia
 | Gift Advisor | FAB, add gift dialog, cost validation, feedback buttons, delete, AI suggestions | Not Run | Pending contact and AI config. |
 | Backup/Restore | passphrase visibility, export, restore, back, invalid passphrase states | Not Run | Pending document picker/device validation. |
 | Settings | AI key, email settings, automation mode, quiet hours, biometric, reminders, channel blackout, sync, sign out | Not Run | Pending debug install. |
+| Biometric lock | enable toggle, background app, resume, authenticate, cancel/retry, unsupported-device messaging | Not Run | Policy and compile tests pass; live prompt still pending. |
 | Automation Setup | diagnostics, settings/style/contacts/activity links, system-setting handoffs, dry run, email test | Not Run | Pending permissions and credentials. |
 | Chat History | empty/populated states and back | Not Run | Pending sent-message data. |
 
