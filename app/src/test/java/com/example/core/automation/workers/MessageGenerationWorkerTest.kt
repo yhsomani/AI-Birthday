@@ -84,7 +84,7 @@ class MessageGenerationWorkerTest {
         coEvery { styleProfileDao.get() } returns null
         coEvery { sentMessageDao.getByContact("c1") } returns emptyList()
         coEvery { geminiClient.generate(any()) } returns "mock_response"
-        every { ResponseParser.parseMessageVariants(any(), any(), any(), any(), any()) } returns variants
+        every { ResponseParser.parseMessageVariants(any(), any()) } returns variants
         every { prefs.getGlobalAutomationMode() } returns "MANUAL"
 
         val worker = TestListenableWorkerBuilder<MessageGenerationWorker>(context)

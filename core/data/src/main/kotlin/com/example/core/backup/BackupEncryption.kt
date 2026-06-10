@@ -16,6 +16,8 @@ object BackupEncryption {
     private const val SALT_LENGTH = 16
     private const val IV_LENGTH = 12
     private const val TAG_LENGTH = 128
+    private const val MIN_CIPHER_TEXT_LENGTH = TAG_LENGTH / 8
+    private const val MIN_PAYLOAD_LENGTH = SALT_LENGTH + IV_LENGTH + MIN_CIPHER_TEXT_LENGTH
 
     fun encrypt(plainText: String, passphrase: String): String {
         val salt = ByteArray(SALT_LENGTH).apply { SecureRandom().nextBytes(this) }
@@ -33,7 +35,14 @@ object BackupEncryption {
     }
 
     fun decrypt(encryptedData: String, passphrase: String): String {
-        val combined = Base64.decode(encryptedData, Base64.NO_WRAP)
+        val combined = try {
+            Base64.decode(encryptedData, Base64.NO_WRAP)
+        } catch (e: IllegalArgumentException) {
+            throw BackupEncryptionException("Backup is not valid Base64", e)
+        }
+        if (combined.size < MIN_PAYLOAD_LENGTH) {
+            throw BackupEncryptionException("Backup payload is too short")
+        }
         
         val salt = combined.sliceArray(0 until SALT_LENGTH)
         val iv = combined.sliceArray(SALT_LENGTH until SALT_LENGTH + IV_LENGTH)
@@ -54,3 +63,8 @@ object BackupEncryption {
         return SecretKeySpec(tmp.encoded, "AES")
     }
 }
+
+class BackupEncryptionException(
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause)

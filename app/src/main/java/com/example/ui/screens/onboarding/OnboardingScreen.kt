@@ -35,8 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.R
 import com.example.core.ui.components.RelatePrimaryButton
 import com.example.core.ui.theme.RelateCard
 import com.example.core.ui.theme.RelateDarkBackground
@@ -44,48 +47,49 @@ import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.ui.viewmodel.OnboardingViewModel
 
 data class OnboardingStep(
     val icon: ImageVector,
-    val title: String,
-    val description: String,
+    val titleRes: Int,
+    val descriptionRes: Int,
 )
 
 private val onboardingSteps = listOf(
     OnboardingStep(
         icon = Icons.Filled.Favorite,
-        title = "Welcome to RelateAI",
-        description = "Never miss a special moment. Let AI help you nurture your relationships with personalized wishes.",
+        titleRes = R.string.onboarding_step_welcome_title,
+        descriptionRes = R.string.onboarding_step_welcome_description,
     ),
     OnboardingStep(
         icon = Icons.Filled.Groups,
-        title = "Sync Your Contacts",
-        description = "Import your contacts to discover important dates and stay connected with the people who matter.",
+        titleRes = R.string.onboarding_step_contacts_title,
+        descriptionRes = R.string.onboarding_step_contacts_description,
     ),
     OnboardingStep(
         icon = Icons.Filled.SmartToy,
-        title = "AI Birthday Wishes",
-        description = "Generate unique, heartfelt birthday wishes with AI. Each message is personalized for every relationship.",
+        titleRes = R.string.onboarding_step_ai_title,
+        descriptionRes = R.string.onboarding_step_ai_description,
     ),
     OnboardingStep(
         icon = Icons.Filled.Notifications,
-        title = "Smart Reminders",
-        description = "Get notified before important events so you always have time to prepare the perfect message.",
+        titleRes = R.string.onboarding_step_reminders_title,
+        descriptionRes = R.string.onboarding_step_reminders_description,
     ),
     OnboardingStep(
         icon = Icons.Filled.CalendarMonth,
-        title = "Track Events",
-        description = "Keep track of birthdays, anniversaries, and custom events all in one place.",
+        titleRes = R.string.onboarding_step_events_title,
+        descriptionRes = R.string.onboarding_step_events_description,
     ),
     OnboardingStep(
         icon = Icons.Filled.Favorite,
-        title = "Relationship Health",
-        description = "Monitor your relationship health with insights and suggestions to stay connected.",
+        titleRes = R.string.onboarding_step_health_title,
+        descriptionRes = R.string.onboarding_step_health_description,
     ),
     OnboardingStep(
         icon = Icons.Filled.SmartToy,
-        title = "You're All Set!",
-        description = "Start nurturing your connections with AI-powered wishes and smart reminders.",
+        titleRes = R.string.onboarding_step_done_title,
+        descriptionRes = R.string.onboarding_step_done_description,
     ),
 )
 
@@ -93,9 +97,14 @@ private val onboardingSteps = listOf(
 fun OnboardingScreen(
     onOnboardingComplete: () -> Unit,
     onOpenAutomationSetup: () -> Unit = {},
+    viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
     var currentStep by remember { mutableIntStateOf(0) }
     val step = onboardingSteps[currentStep]
+    val completeOnboarding = {
+        viewModel.completeOnboarding()
+        onOnboardingComplete()
+    }
 
     Column(
         modifier = Modifier
@@ -140,14 +149,14 @@ fun OnboardingScreen(
                 )
                 Spacer(modifier = Modifier.height(32.dp))
                 Text(
-                    text = step.title,
+                    text = stringResource(step.titleRes),
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = step.description,
+                    text = stringResource(step.descriptionRes),
                     style = MaterialTheme.typography.bodyLarge,
                     color = RelateOnSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -157,23 +166,23 @@ fun OnboardingScreen(
 
         if (currentStep < onboardingSteps.lastIndex) {
             RelatePrimaryButton(
-                text = "Continue",
+                text = stringResource(R.string.continue_action),
                 onClick = { currentStep++ },
             )
             Spacer(modifier = Modifier.height(8.dp))
             TextButton(
-                onClick = onOnboardingComplete,
+                onClick = completeOnboarding,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    text = "Skip",
+                    text = stringResource(R.string.onboarding_skip),
                     color = RelateOnSurfaceVariant,
                 )
             }
         } else {
             RelatePrimaryButton(
-                text = "Get Started",
-                onClick = onOnboardingComplete,
+                text = stringResource(R.string.onboarding_get_started),
+                onClick = completeOnboarding,
             )
             Spacer(modifier = Modifier.height(8.dp))
             TextButton(
@@ -181,7 +190,7 @@ fun OnboardingScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    text = "Set up WhatsApp automation",
+                    text = stringResource(R.string.onboarding_setup_whatsapp_automation),
                     color = RelateOnSurfaceVariant,
                 )
             }

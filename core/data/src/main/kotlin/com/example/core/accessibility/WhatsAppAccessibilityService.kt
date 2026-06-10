@@ -56,7 +56,8 @@ class WhatsAppAccessibilityService : AccessibilityService() {
     private fun processNextIfIdle() {
         if (sendState != SendState.IDLE) return
         currentJob = pendingQueue.poll() ?: return
-        openWhatsAppChat(currentJob!!.phoneNumber)
+        val job = currentJob ?: return
+        openWhatsAppChat(job.phoneNumber)
     }
 
     private fun openWhatsAppChat(phone: String) {
@@ -70,7 +71,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         
-        jobTimeoutRunnable = Runnable {
+        val timeoutRunnable = Runnable {
             if (sendState != SendState.DONE) {
                 currentJob?.onComplete?.invoke(false)
                 currentJob = null
@@ -79,7 +80,8 @@ class WhatsAppAccessibilityService : AccessibilityService() {
                 mainHandler.postDelayed({ processNextIfIdle() }, 1000L)
             }
         }
-        mainHandler.postDelayed(jobTimeoutRunnable!!, 15000L) // 15s timeout
+        jobTimeoutRunnable = timeoutRunnable
+        mainHandler.postDelayed(timeoutRunnable, 15000L) // 15s timeout
         
         applicationContext.startActivity(intent)
     }

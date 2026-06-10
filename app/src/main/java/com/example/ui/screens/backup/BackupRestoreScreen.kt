@@ -20,13 +20,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelatePrimaryButton
 import com.example.core.ui.components.SectionHeader
@@ -40,7 +41,6 @@ fun BackupRestoreScreen(
     onBack: () -> Unit,
     viewModel: BackupRestoreViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var passwordVisible by remember { mutableStateOf(false) }
 
@@ -48,7 +48,7 @@ fun BackupRestoreScreen(
         contract = ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
         if (uri != null) {
-            viewModel.exportBackup(context, uri)
+            viewModel.exportBackup(uri)
         }
     }
 
@@ -56,17 +56,20 @@ fun BackupRestoreScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            viewModel.importBackup(context, uri)
+            viewModel.importBackup(uri)
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Backup & Restore", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.backup_restore_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -98,22 +101,21 @@ fun BackupRestoreScreen(
                 ) {
                     Icon(
                         Icons.Filled.Info,
-                        contentDescription = "Warning",
+                        contentDescription = stringResource(R.string.backup_security_warning_cd),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            "Important Security Note",
+                            stringResource(R.string.backup_security_note_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.error
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "Your data is derived using your device ID. If you perform a factory reset, you will lose access to your local database. " +
-                                    "We strongly recommend keeping an encrypted backup in a secure external location.",
+                            stringResource(R.string.backup_security_note_body),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -121,7 +123,7 @@ fun BackupRestoreScreen(
                 }
             }
 
-            SectionHeader(title = "Encryption Key")
+            SectionHeader(title = stringResource(R.string.backup_encryption_key_section))
 
             RelateGlassCard {
                 Column(
@@ -129,7 +131,7 @@ fun BackupRestoreScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        "This password will encrypt your backup file. You MUST remember this password to restore your data later.",
+                        stringResource(R.string.backup_passphrase_help),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -137,8 +139,8 @@ fun BackupRestoreScreen(
                     OutlinedTextField(
                         value = uiState.passphrase,
                         onValueChange = { viewModel.updatePassphrase(it) },
-                        label = { Text("Passphrase") },
-                        placeholder = { Text("Enter a secure password") },
+                        label = { Text(stringResource(R.string.backup_passphrase_label)) },
+                        placeholder = { Text(stringResource(R.string.backup_passphrase_placeholder)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -146,7 +148,10 @@ fun BackupRestoreScreen(
                         trailingIcon = {
                             val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(image, contentDescription = "Toggle password visibility")
+                                Icon(
+                                    image,
+                                    contentDescription = stringResource(R.string.backup_toggle_password_visibility)
+                                )
                             }
                         }
                     )
@@ -172,19 +177,19 @@ fun BackupRestoreScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    "Password Strength:",
+                                    stringResource(R.string.backup_password_strength_label),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    uiState.passwordStrength.name.replace("_", " "),
+                                    stringResource(uiState.passwordStrength.labelRes),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Bold,
                                     color = color
                                 )
                             }
                             LinearProgressIndicator(
-                                progress = progress,
+                                progress = { progress },
                                 modifier = Modifier.fillMaxWidth(),
                                 color = color,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -194,7 +199,7 @@ fun BackupRestoreScreen(
                 }
             }
 
-            SectionHeader(title = "Backup & Restore Actions")
+            SectionHeader(title = stringResource(R.string.backup_actions_section))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -219,17 +224,17 @@ fun BackupRestoreScreen(
                     ) {
                         Icon(
                             Icons.Filled.Backup,
-                            contentDescription = "Export",
+                            contentDescription = stringResource(R.string.backup_export_cd),
                             tint = if (uiState.passphrase.isNotEmpty() && uiState.passwordStrength != PasswordStrength.WEAK) RelatePrimary else RelateOnSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.size(36.dp)
                         )
                         Text(
-                            "Export Backup",
+                            stringResource(R.string.backup_export_title),
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            "Save encrypted copy of your data",
+                            stringResource(R.string.backup_export_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -255,17 +260,17 @@ fun BackupRestoreScreen(
                     ) {
                         Icon(
                             Icons.Filled.Restore,
-                            contentDescription = "Restore",
+                            contentDescription = stringResource(R.string.backup_restore_cd),
                             tint = if (uiState.passphrase.isNotEmpty()) RelatePrimary else RelateOnSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.size(36.dp)
                         )
                         Text(
-                            "Restore Backup",
+                            stringResource(R.string.backup_import_title),
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            "Restore your data from backup file",
+                            stringResource(R.string.backup_import_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -275,42 +280,49 @@ fun BackupRestoreScreen(
             }
 
             // Status Card
-            if (uiState.exportSuccessFile != null || uiState.importSuccessCount != null || uiState.errorMessage != null) {
+            if (uiState.exportSuccessFileName != null || uiState.importSuccessCount != null || uiState.errorMessage != null) {
                 RelateGlassCard {
                     Column(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         when {
-                            uiState.exportSuccessFile != null -> {
+                            uiState.exportSuccessFileName != null -> {
                                 Text(
-                                    "Backup Created Successfully!",
+                                    stringResource(R.string.backup_export_success_title),
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF10B981),
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
-                                    "File: ${uiState.exportSuccessFile?.name}\nSize: ${uiState.exportSuccessFile?.length() ?: 0} bytes",
+                                    stringResource(
+                                        R.string.backup_export_success_details,
+                                        uiState.exportSuccessFileName.orEmpty(),
+                                        uiState.exportSuccessSizeBytes,
+                                    ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             uiState.importSuccessCount != null -> {
                                 Text(
-                                    "Restore Completed Successfully!",
+                                    stringResource(R.string.backup_import_success_title),
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF10B981),
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
-                                    "Restored ${uiState.importSuccessCount} records to the database.",
+                                    stringResource(
+                                        R.string.backup_import_success_details,
+                                        uiState.importSuccessCount ?: 0,
+                                    ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             uiState.errorMessage != null -> {
                                 Text(
-                                    "Action Failed",
+                                    stringResource(R.string.backup_action_failed_title),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.error,
                                     style = MaterialTheme.typography.titleMedium
@@ -328,7 +340,7 @@ fun BackupRestoreScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
                             modifier = Modifier.align(Alignment.End)
                         ) {
-                            Text("Dismiss", color = MaterialTheme.colorScheme.onSurface)
+                            Text(stringResource(R.string.sync_error_dismiss), color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }
@@ -338,3 +350,11 @@ fun BackupRestoreScreen(
         }
     }
 }
+
+private val PasswordStrength.labelRes: Int
+    get() = when (this) {
+        PasswordStrength.WEAK -> R.string.backup_password_strength_weak
+        PasswordStrength.FAIR -> R.string.backup_password_strength_fair
+        PasswordStrength.STRONG -> R.string.backup_password_strength_strong
+        PasswordStrength.VERY_STRONG -> R.string.backup_password_strength_very_strong
+    }

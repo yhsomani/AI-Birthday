@@ -6,13 +6,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.core.prefs.SecurePrefs
 import com.example.ui.screens.splash.SplashScreen
 import com.example.ui.screens.onboarding.OnboardingScreen
 import com.example.ui.screens.auth.AuthScreen
@@ -98,14 +96,11 @@ fun RelateNavGraph(
             )
         }
         composable(Screen.Onboarding.route) {
-            val context = LocalContext.current
             OnboardingScreen(
                 onOpenAutomationSetup = {
                     navController.navigate(Screen.AutomationSetup.route)
                 },
                 onOnboardingComplete = {
-                    // Persist onboarding completion so future launches skip this screen
-                    SecurePrefs(context).setOnboardingComplete(true)
                     navController.navigate(Screen.Auth.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }

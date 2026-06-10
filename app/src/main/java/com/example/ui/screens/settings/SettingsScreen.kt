@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import androidx.compose.runtime.LaunchedEffect
+import com.example.BuildConfig
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.theme.RelateDarkBackground
@@ -103,7 +104,7 @@ fun SettingsScreen(
     ) {
         Spacer(modifier = Modifier.height(48.dp))
         Text(
-            text = "Settings",
+            text = stringResource(R.string.settings),
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -115,7 +116,7 @@ fun SettingsScreen(
         ) {
             Spacer(modifier = Modifier.height(24.dp))
 
-            SettingsSection("Account") {
+            SettingsSection(stringResource(R.string.settings_account_section)) {
                 SettingsCard {
                     Row(
                         modifier = Modifier.padding(16.dp),
@@ -124,7 +125,7 @@ fun SettingsScreen(
                         if (state.userPhotoUrl != null) {
                             AsyncImage(
                                 model = state.userPhotoUrl,
-                                contentDescription = "Profile photo",
+                                contentDescription = stringResource(R.string.profile_photo),
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(CircleShape),
@@ -157,31 +158,31 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            SettingsSection("Preferences") {
+            SettingsSection(stringResource(R.string.settings_preferences_section)) {
                 SettingsCard {
                     SettingsToggle(
-                        title = "Birthday Reminders",
+                        title = stringResource(R.string.settings_birthday_reminders),
                         icon = Icons.Filled.Notifications,
                         checked = state.birthdayReminders,
                     ) { viewModel.toggleBirthdayReminders(it) }
                     SettingsDivider()
                     SettingsToggle(
-                        title = "AI Wish Generation",
+                        title = stringResource(R.string.settings_ai_wish_generation),
                         icon = Icons.Filled.SmartToy,
                         checked = state.aiWishGeneration,
                     ) { viewModel.toggleAiWishGeneration(it) }
                     SettingsDivider()
                     SettingsRow(
                         icon = Icons.Filled.Person,
-                        title = "AI Style Coach",
-                        subtitle = "Train AI to match your personal writing style",
+                        title = stringResource(R.string.settings_ai_style_coach),
+                        subtitle = stringResource(R.string.settings_ai_style_coach_subtitle),
                         onClick = onNavigateToStyleCoach
                     )
                     SettingsDivider()
                     SettingsRow(
                         icon = Icons.Filled.Security,
-                        title = "Automation Setup",
-                        subtitle = "Enable WhatsApp accessibility, reminders, and background reliability",
+                        title = stringResource(R.string.settings_automation_setup),
+                        subtitle = stringResource(R.string.settings_automation_setup_subtitle),
                         onClick = onNavigateToAutomationSetup
                     )
                 }
@@ -189,16 +190,16 @@ fun SettingsScreen(
 
             // ── AI Configuration (Gemini API Key) ──────────────────────────────
             Spacer(modifier = Modifier.height(24.dp))
-            SettingsSection("AI Configuration") {
+            SettingsSection(stringResource(R.string.settings_ai_configuration_section)) {
                 SettingsCard {
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text(
-                            text = "Gemini API Key",
+                            text = stringResource(R.string.settings_gemini_api_key),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            text = "Required for AI wish generation. Get yours at makersuite.google.com",
+                            text = stringResource(R.string.settings_gemini_api_key_help),
                             style = MaterialTheme.typography.bodySmall,
                             color = RelateOnSurfaceVariant,
                         )
@@ -207,7 +208,7 @@ fun SettingsScreen(
                             value = state.geminiApiKey,
                             onValueChange = viewModel::onGeminiApiKeyChange,
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("AIza...", color = RelateOnSurfaceVariant) },
+                            placeholder = { Text(stringResource(R.string.settings_gemini_api_key_placeholder), color = RelateOnSurfaceVariant) },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -242,7 +243,7 @@ fun SettingsScreen(
                                     tint = RelateDarkBackground,
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Saved", color = RelateDarkBackground)
+                                Text(stringResource(R.string.saved), color = RelateDarkBackground)
                             } else {
                                 Icon(
                                     Icons.Filled.Key,
@@ -251,7 +252,7 @@ fun SettingsScreen(
                                     tint = RelateDarkBackground,
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Save API Key", color = RelateDarkBackground)
+                                Text(stringResource(R.string.settings_save_api_key), color = RelateDarkBackground)
                             }
                         }
                     }
@@ -260,8 +261,8 @@ fun SettingsScreen(
                     Box {
                         SettingsRow(
                             icon = Icons.Filled.SmartToy,
-                            title = "Automation Mode",
-                            subtitle = state.automationMode.replace("_", " "),
+                            title = stringResource(R.string.settings_automation_mode),
+                            subtitle = state.automationMode.automationModeLabel(),
                             onClick = { showModeMenu = true }
                         )
                         DropdownMenu(
@@ -269,10 +270,10 @@ fun SettingsScreen(
                             onDismissRequest = { showModeMenu = false },
                         ) {
                             listOf(
-                                "FULLY_AUTO" to "Fully Auto",
-                                "SMART_APPROVE" to "Smart Approve (default)",
-                                "VIP_APPROVE" to "VIP Approve",
-                                "ALWAYS_ASK" to "Always Ask",
+                                "FULLY_AUTO" to stringResource(R.string.automation_mode_fully_auto),
+                                "SMART_APPROVE" to stringResource(R.string.automation_mode_smart_approve_default),
+                                "VIP_APPROVE" to stringResource(R.string.automation_mode_vip_approve),
+                                "ALWAYS_ASK" to stringResource(R.string.automation_mode_always_ask),
                             ).forEach { (mode, label) ->
                                 DropdownMenuItem(
                                     text = { Text(label) },
@@ -288,39 +289,43 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            SettingsSection("Data & Sync") {
+            SettingsSection(stringResource(R.string.settings_data_sync_section)) {
                 SettingsCard {
                     if (state.showLegacyDbNotice) {
                         LegacyDbNotice(onDismiss = viewModel::dismissLegacyDbNotice)
                         SettingsDivider()
                     }
-                    val subtitle = if (state.isSyncing) "Syncing..." else "Last synced: ${state.lastSyncTimestamp}"
+                    val subtitle = if (state.isSyncing) {
+                        stringResource(R.string.settings_syncing)
+                    } else {
+                        stringResource(R.string.settings_last_synced_format, state.lastSyncTimestamp)
+                    }
                     SettingsRow(
                         icon = Icons.Filled.CloudSync,
-                        title = "Sync Contacts",
+                        title = stringResource(R.string.settings_sync_contacts),
                         subtitle = subtitle,
                         onClick = { if (!state.isSyncing) viewModel.syncContacts() }
                     )
                     SettingsDivider()
                     SettingsRow(
                         icon = Icons.Filled.Storage,
-                        title = "Backup & Restore",
-                        subtitle = "Encrypted database import and export",
+                        title = stringResource(R.string.backup_restore_title),
+                        subtitle = stringResource(R.string.settings_backup_restore_subtitle),
                         onClick = onNavigateToBackupRestore
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            SettingsSection("About") {
+            SettingsSection(stringResource(R.string.settings_about)) {
                 SettingsCard {
-                    SettingsRow(Icons.Filled.Info, "App Version", subtitle = "1.0.0")
+                    SettingsRow(Icons.Filled.Info, stringResource(R.string.app_version), subtitle = BuildConfig.VERSION_NAME)
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Sign Out",
+                text = stringResource(R.string.sign_out),
                 color = Color(0xFFEF4444),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
@@ -335,6 +340,17 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun String.automationModeLabel(): String {
+    return when (this) {
+        "FULLY_AUTO" -> stringResource(R.string.automation_mode_fully_auto)
+        "SMART_APPROVE" -> stringResource(R.string.automation_mode_smart_approve_default)
+        "VIP_APPROVE" -> stringResource(R.string.automation_mode_vip_approve)
+        "ALWAYS_ASK" -> stringResource(R.string.automation_mode_always_ask)
+        else -> replace("_", " ")
     }
 }
 

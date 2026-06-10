@@ -18,25 +18,36 @@ object StructuredLogger {
     private val history = mutableListOf<LogEntry>()
 
     fun d(tag: String, message: String, extras: Map<String, String> = emptyMap()) {
-        log(LogEntry(tag, message, LogLevel.DEBUG, extras = extras))
-        Log.d(tag, formatMessage(message, extras))
+        val entry = redactedEntry(LogEntry(tag, message, LogLevel.DEBUG, extras = extras))
+        log(entry)
+        Log.d(tag, formatMessage(entry.message, entry.extras))
     }
 
     fun i(tag: String, message: String, extras: Map<String, String> = emptyMap()) {
-        log(LogEntry(tag, message, LogLevel.INFO, extras = extras))
-        Log.i(tag, formatMessage(message, extras))
+        val entry = redactedEntry(LogEntry(tag, message, LogLevel.INFO, extras = extras))
+        log(entry)
+        Log.i(tag, formatMessage(entry.message, entry.extras))
     }
 
     fun w(tag: String, message: String, throwable: Throwable? = null, extras: Map<String, String> = emptyMap()) {
-        log(LogEntry(tag, message, LogLevel.WARN, throwable, extras = extras))
-        if (throwable != null) Log.w(tag, formatMessage(message, extras), throwable)
-        else Log.w(tag, formatMessage(message, extras))
+        val entry = redactedEntry(LogEntry(tag, message, LogLevel.WARN, throwable, extras = extras))
+        log(entry)
+        if (throwable != null) Log.w(tag, formatMessage(entry.message, entry.extras), throwable)
+        else Log.w(tag, formatMessage(entry.message, entry.extras))
     }
 
     fun e(tag: String, message: String, throwable: Throwable? = null, extras: Map<String, String> = emptyMap()) {
-        log(LogEntry(tag, message, LogLevel.ERROR, throwable, extras = extras))
-        if (throwable != null) Log.e(tag, formatMessage(message, extras), throwable)
-        else Log.e(tag, formatMessage(message, extras))
+        val entry = redactedEntry(LogEntry(tag, message, LogLevel.ERROR, throwable, extras = extras))
+        log(entry)
+        if (throwable != null) Log.e(tag, formatMessage(entry.message, entry.extras), throwable)
+        else Log.e(tag, formatMessage(entry.message, entry.extras))
+    }
+
+    private fun redactedEntry(entry: LogEntry): LogEntry {
+        return entry.copy(
+            message = SensitiveLogRedactor.redact(entry.message),
+            extras = entry.extras.mapValues { (_, value) -> SensitiveLogRedactor.redact(value) },
+        )
     }
 
     private fun log(entry: LogEntry) {

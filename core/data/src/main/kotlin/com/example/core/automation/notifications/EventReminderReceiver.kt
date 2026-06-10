@@ -14,11 +14,16 @@ class EventReminderReceiver : BroadcastReceiver() {
         val contactId = intent.getStringExtra("contact_id") ?: return
 
         val db = AppDatabase.getInstance(context)
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            val contact = db.contactDao().getById(contactId)
-            val event = db.eventDao().getById(eventId)
-            if (contact != null && event != null) {
-                NotificationHelper.showEventReminderNotification(context, contact, event)
+            try {
+                val contact = db.contactDao().getById(contactId)
+                val event = db.eventDao().getById(eventId)
+                if (contact != null && event != null) {
+                    NotificationHelper.showEventReminderNotification(context, contact, event)
+                }
+            } finally {
+                pendingResult.finish()
             }
         }
     }

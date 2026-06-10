@@ -3,10 +3,12 @@ package com.example.di
 import com.example.core.automation.notifications.NotificationServiceImpl
 import com.example.core.automation.scheduler.SchedulerServiceImpl
 import com.example.core.automation.sender.MessageDispatcherServiceImpl
+import com.example.core.backup.BackupServiceImpl
 import com.example.core.contacts.ContactSyncServiceImpl
 import com.example.core.gemini.AiServiceImpl
 import com.example.core.prefs.PreferencesRepositoryImpl
 import com.example.domain.service.AiService
+import com.example.domain.service.BackupService
 import com.example.domain.service.ContactSyncService
 import com.example.domain.service.MessageDispatcherService
 import com.example.domain.service.NotificationService
@@ -45,4 +47,8 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindNotificationService(impl: NotificationServiceImpl): NotificationService
+
+    @Binds
+    @Singleton
+    abstract fun bindBackupService(impl: BackupServiceImpl): BackupService
 }

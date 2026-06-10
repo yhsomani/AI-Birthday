@@ -31,8 +31,9 @@ class ContactSyncWorker @AssistedInject constructor(
 
             // 1. First, map contactGroup to relationshipType before inserting to DB
             val mappedContacts = merged.map { contact ->
-                if (contact.relationshipType == "UNKNOWN" && contact.contactGroup != null) {
-                    val groupLower = contact.contactGroup!!.lowercase()
+                val contactGroup = contact.contactGroup
+                if (contact.relationshipType == "UNKNOWN" && contactGroup != null) {
+                    val groupLower = contactGroup.lowercase()
                     val newRelation = when {
                         groupLower.contains("family") -> "FAMILY"
                         groupLower.contains("coworker") || groupLower.contains("work") || groupLower.contains("colleague") -> "WORK"

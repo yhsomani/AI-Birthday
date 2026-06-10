@@ -66,7 +66,8 @@ class GeminiClient @Inject constructor(
     }
 
     private suspend fun generateWithGoogleKey(prompt: String, apiKey: String): String? {
-        val model = if (googleAiModel == null || googleAiModelApiKey != apiKey) {
+        val cachedModel = googleAiModel
+        val model = if (cachedModel == null || googleAiModelApiKey != apiKey) {
             com.google.ai.client.generativeai.GenerativeModel(
                 modelName = "gemini-1.5-flash",
                 apiKey = apiKey
@@ -75,7 +76,7 @@ class GeminiClient @Inject constructor(
                 googleAiModelApiKey = apiKey
             }
         } else {
-            googleAiModel!!
+            cachedModel
         }
         return model.generateContent(prompt).text
     }

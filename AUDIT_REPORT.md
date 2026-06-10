@@ -259,3 +259,56 @@
 
 **Commit message**
 * `fix: harden database data safety`
+
+### Feature 7: Backup, Build Boundary, and Runtime Cleanup
+
+**Problem identified**
+* Backup/restore was driven by a static data-layer object, accepted malformed encrypted payloads late, surfaced raw failures, and restored records without an explicit transaction boundary.
+* `core:ui` declared unused dependencies on domain/data modules, module `compileSdk` values drifted, and several dependencies still used inline versions.
+* Navigation directly created `SecurePrefs` for onboarding completion, and high-risk runtime paths still had avoidable `!!`, unredacted structured log storage, fire-and-forget parser persistence, and async receivers without `goAsync()`.
+
+**Fix implemented**
+* Added injectable `BackupService` / `BackupServiceImpl` with stable export/import result types, transactional restore, malformed/too-short payload validation, and stable failure reasons.
+* Reworked Backup UI/ViewModel to use the service contract, localized user-facing messages, and deterministic export/import state.
+* Added backup encryption/service/ViewModel tests, including wrong passphrase, malformed Base64, too-short payload, unsupported backup versions, and transaction rollback on restore failure.
+* Removed unused `core:ui` domain/data dependencies, aligned module `compileSdk` to 37, consolidated dependency versions into `libs.versions.toml`, and removed duplicate app compile-options configuration.
+* Moved onboarding completion persistence into an injected `OnboardingViewModel` and converted Onboarding, Settings, and Backup visible strings to resources; Settings now shows `BuildConfig.VERSION_NAME`.
+* Extended sensitive log redaction for API keys, password/passphrase/token assignments, phone-like values, and redacted `StructuredLogger` history/output.
+* Removed avoidable null assertions in WhatsApp automation, Gemini client, and contact sync; made approval/reminder receivers use `goAsync()` with `finish()` in `finally`.
+* Removed `ResponseParser` DAO/context side effects; message generation now persists fallback state via the inserted entity and treats fallback alerts as non-fatal.
+* Added a scoped regression test preventing new visible string literals in the cleaned Backup, Settings, and Onboarding screens.
+
+**Impact**
+* Prevents partial backup restores and gives users stable, localized failure feedback.
+* Tightens module boundaries and reduces Gradle version drift.
+* Reduces PII/secret leakage risk in structured logs and makes background receiver work more lifecycle-safe.
+* Keeps the cleanup reviewable while preventing regressions in the screens cleaned during this pass.
+
+**Files modified**
+* `core/domain/src/main/kotlin/com/example/domain/service/BackupService.kt`
+* `core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt`
+* `core/data/src/main/kotlin/com/example/core/backup/BackupEncryption.kt`
+* `core/data/src/main/kotlin/com/example/core/resilience/SensitiveLogRedactor.kt`
+* `core/data/src/main/kotlin/com/example/core/resilience/StructuredLogger.kt`
+* `app/src/main/java/com/example/ui/viewmodel/BackupRestoreViewModel.kt`
+* `app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt`
+* `app/src/main/java/com/example/ui/viewmodel/OnboardingViewModel.kt`
+* `app/src/main/java/com/example/ui/screens/onboarding/OnboardingScreen.kt`
+* `app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt`
+* `gradle/libs.versions.toml`
+* `app/build.gradle.kts`
+* `core/data/build.gradle.kts`
+* `core/domain/build.gradle.kts`
+* `core/ui/build.gradle.kts`
+
+**Validation performed**
+* `./gradlew :core:data:testDebugUnitTest --tests com.example.core.backup.BackupEncryptionTest --tests com.example.core.backup.BackupServiceImplTest :app:testDebugUnitTest --tests com.example.ui.viewmodel.BackupRestoreViewModelTest --no-configuration-cache` passed after fixing the app test runner.
+* `./gradlew testDebugUnitTest lintDebug --no-configuration-cache -Djavax.net.ssl.trustStore=/private/tmp/relateai-cacerts-zscaler -Djavax.net.ssl.trustStorePassword=changeit` passed.
+* `./gradlew assembleDebug assembleRelease --no-configuration-cache -Djavax.net.ssl.trustStore=/private/tmp/relateai-cacerts-zscaler -Djavax.net.ssl.trustStorePassword=changeit` passed.
+
+**Remaining non-goals**
+* Existing hardcoded visible strings in screens outside Backup, Settings, and Onboarding remain as pre-existing i18n debt; the new regression test covers the cleaned screens only.
+* Direct `Log.*` calls inside low-level logging/resilience primitives and domain code remain where replacing them would require a larger logging abstraction migration.
+
+**Commit message**
+* `refactor: harden backup and cleanup app boundaries`

@@ -38,31 +38,36 @@ class ApprovalReceiver : BroadcastReceiver() {
         )
         val pendingMessageDao = entryPoint.pendingMessageDao()
 
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            val pending = if (messageId.isNotEmpty()) {
-                pendingMessageDao.getById(messageId)
-            } else if (eventId.isNotEmpty()) {
-                pendingMessageDao.getByEventId(eventId)
-            } else {
-                null
-            }
-            val resolvedEventId = pending?.eventId ?: eventId
+            try {
+                val pending = if (messageId.isNotEmpty()) {
+                    pendingMessageDao.getById(messageId)
+                } else if (eventId.isNotEmpty()) {
+                    pendingMessageDao.getByEventId(eventId)
+                } else {
+                    null
+                }
+                val resolvedEventId = pending?.eventId ?: eventId
 
-            when (action) {
-                "ACTION_APPROVE", "APPROVE", "ACTION_APPROVE_REVIVAL" ->
-                    approveAndScheduleOrDispatch(context, pendingMessageDao, pending?.id, resolvedEventId)
-                "ACTION_REJECT", "REJECT", "SKIP" -> {
-                    if (pending != null) {
-                        pendingMessageDao.updateStatus(pending.id, "REJECTED")
-                        DailyScheduler.cancelExactSend(context, pending.id)
-                    } else if (resolvedEventId.isNotEmpty()) {
-                        pendingMessageDao.updateStatusByEventId(resolvedEventId, "REJECTED")
-                        DailyScheduler.cancelLegacyExactSend(context, resolvedEventId)
+                when (action) {
+                    "ACTION_APPROVE", "APPROVE", "ACTION_APPROVE_REVIVAL" ->
+                        approveAndScheduleOrDispatch(context, pendingMessageDao, pending?.id, resolvedEventId)
+                    "ACTION_REJECT", "REJECT", "SKIP" -> {
+                        if (pending != null) {
+                            pendingMessageDao.updateStatus(pending.id, "REJECTED")
+                            DailyScheduler.cancelExactSend(context, pending.id)
+                        } else if (resolvedEventId.isNotEmpty()) {
+                            pendingMessageDao.updateStatusByEventId(resolvedEventId, "REJECTED")
+                            DailyScheduler.cancelLegacyExactSend(context, resolvedEventId)
+                        }
+                    }
+                    "ACTION_RETRY" -> {
+                        retryNow(context, pendingMessageDao, pending?.id, resolvedEventId)
                     }
                 }
-                "ACTION_RETRY" -> {
-                    retryNow(context, pendingMessageDao, pending?.id, resolvedEventId)
-                }
+            } finally {
+                pendingResult.finish()
             }
         }
     }

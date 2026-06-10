@@ -98,9 +98,6 @@ class MessageGenerationWorker @AssistedInject constructor(
                             var responseString = gemini.generate(prompt)
                             var variants = ResponseParser.parseMessageVariants(
                                 responseString,
-                                messageId = messageId,
-                                pendingMessageDao = pendingMessageDao,
-                                context = applicationContext,
                                 eventType = event.type
                             )
 
@@ -112,12 +109,20 @@ class MessageGenerationWorker @AssistedInject constructor(
                                 responseString = gemini.generate(prompt)
                                 variants = ResponseParser.parseMessageVariants(
                                     responseString,
-                                    messageId = messageId,
-                                    pendingMessageDao = pendingMessageDao,
-                                    context = applicationContext,
                                     eventType = event.type
                                 )
                                 retries++
+                            }
+                            if (variants.isUsingFallback) {
+                                try {
+                                    com.example.core.automation.notifications.NotificationHelper.showSystemAlert(
+                                        applicationContext,
+                                        "AI Generation Unavailable",
+                                        "A template message was used because the AI generator was offline or rate-limited."
+                                    )
+                                } catch (e: Exception) {
+                                    StructuredLogger.e(TAG, "Failed to show AI fallback alert", e)
+                                }
                             }
 
                             val globalMode = prefs.getGlobalAutomationMode()

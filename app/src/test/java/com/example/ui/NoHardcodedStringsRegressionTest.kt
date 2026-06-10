@@ -1,0 +1,48 @@
+package com.example.ui
+
+import java.io.File
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class NoHardcodedStringsRegressionTest {
+
+    @Test
+    fun cleanedScreens_doNotIntroduceVisibleStringLiterals() {
+        val offenders = CLEANED_SCREEN_SOURCES.flatMap { path ->
+            val file = sourceFile(path)
+            visibleStringPattern.findAll(file.readText()).map { match ->
+                "${file.path}:${lineNumber(file.readText(), match.range.first)}"
+            }
+        }
+
+        assertTrue(
+            "Visible strings in cleaned screens should use string resources:\n${offenders.joinToString("\n")}",
+            offenders.isEmpty(),
+        )
+    }
+
+    private fun sourceFile(rootRelativePath: String): File {
+        return listOf(
+            File(rootRelativePath),
+            File("../$rootRelativePath"),
+            File(rootRelativePath.removePrefix("app/")),
+        ).firstOrNull { it.exists() }
+            ?: error("Could not locate source file $rootRelativePath from ${File(".").absolutePath}")
+    }
+
+    private fun lineNumber(text: String, offset: Int): Int {
+        return text.substring(0, offset).count { it == '\n' } + 1
+    }
+
+    private companion object {
+        val CLEANED_SCREEN_SOURCES = listOf(
+            "app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt",
+            "app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt",
+            "app/src/main/java/com/example/ui/screens/onboarding/OnboardingScreen.kt",
+        )
+
+        val visibleStringPattern = Regex(
+            pattern = "(Text|SectionHeader)\\(\\s*\"|contentDescription\\s*=\\s*\"",
+        )
+    }
+}

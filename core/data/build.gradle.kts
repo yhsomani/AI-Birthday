@@ -9,7 +9,7 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
     namespace = "com.example.core.data"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 24
@@ -43,7 +43,7 @@ android {
 
     sourceSets {
         getByName("test") {
-            assets.srcDirs(files("$projectDir/schemas"))
+            assets.srcDir("$projectDir/schemas")
         }
     }
 }
@@ -103,7 +103,7 @@ dependencies {
     implementation(libs.google.ai.client)
 
 
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
 
     // Testing
@@ -112,5 +112,5 @@ dependencies {
     testImplementation(libs.androidx.junit)
     testImplementation(libs.androidx.core)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation("androidx.room:room-testing:2.7.0")
+    testImplementation(libs.androidx.room.testing)
 }

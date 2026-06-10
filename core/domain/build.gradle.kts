@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace = "com.example.core.domain"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 24
@@ -30,7 +30,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.paging.runtime)
-    implementation("javax.inject:javax.inject:1")
+    implementation(libs.javax.inject)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

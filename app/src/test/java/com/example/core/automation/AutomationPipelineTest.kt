@@ -109,7 +109,7 @@ class AutomationPipelineTest {
         // 3. Generate message
         val variants = MessageVariants("sh", "std", "lg", "fr", "fn", "em", "standard")
         every { prefs.getGeminiApiKey() } returns "mock_key"
-        every { ResponseParser.parseMessageVariants(any(), any(), any(), any(), any()) } returns variants
+        every { ResponseParser.parseMessageVariants(any(), any()) } returns variants
         every { prefs.getGlobalAutomationMode() } returns "MANUAL"
 
         val genWorker = TestListenableWorkerBuilder<MessageGenerationWorker>(context)
