@@ -6,6 +6,8 @@ import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
@@ -149,13 +151,17 @@ class MessagesViewModel @Inject constructor(
                             eventType = event?.type ?: "BIRTHDAY"
                         )
     
-                        when (msg.status) {
-                            "FAILED" -> failedItems.add(item)
-                            "APPROVED" -> approvedItems.add(item)
-                            "SENT", "REJECTED", "EXPIRED" -> {
+                        when (MessageStatus.fromRaw(msg.status)) {
+                            MessageStatus.FAILED -> failedItems.add(item)
+                            MessageStatus.APPROVED -> approvedItems.add(item)
+                            MessageStatus.SENT,
+                            MessageStatus.REJECTED,
+                            MessageStatus.EXPIRED -> {
                                 // Do not show these in pending/today/failed lists
                             }
-                            else -> {
+                            MessageStatus.PENDING,
+                            MessageStatus.DISPATCHING,
+                            MessageStatus.UNKNOWN -> {
                                 if (msg.scheduledForMs <= endOfTodayMs) {
                                     todayItems.add(item)
                                 } else if (msg.scheduledForMs <= endOfThirtyDaysMs) {
@@ -466,9 +472,9 @@ class MessagesViewModel @Inject constructor(
     private fun MessageChannelFilter.matches(channel: String): Boolean {
         return when (this) {
             MessageChannelFilter.ALL -> true
-            MessageChannelFilter.SMS -> channel.equals("SMS", ignoreCase = true)
-            MessageChannelFilter.WHATSAPP -> channel.equals("WHATSAPP", ignoreCase = true)
-            MessageChannelFilter.EMAIL -> channel.equals("EMAIL", ignoreCase = true)
+            MessageChannelFilter.SMS -> MessageChannel.fromRaw(channel) == MessageChannel.SMS
+            MessageChannelFilter.WHATSAPP -> MessageChannel.fromRaw(channel) == MessageChannel.WHATSAPP
+            MessageChannelFilter.EMAIL -> MessageChannel.fromRaw(channel) == MessageChannel.EMAIL
         }
     }
 

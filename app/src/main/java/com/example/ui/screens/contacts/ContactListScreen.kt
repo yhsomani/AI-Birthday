@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.db.entities.ContactEntity
@@ -80,6 +82,22 @@ fun ContactListScreen(
     viewModel: ContactListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        viewModel.refresh()
+    }
+    val syncContacts = {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.refresh()
+        } else {
+            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -156,14 +174,14 @@ fun ContactListScreen(
 
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
-            onRefresh = { viewModel.refresh() },
+            onRefresh = syncContacts,
             modifier = Modifier.weight(1f),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 state.syncError?.let { errorMsg ->
                     SyncErrorCard(
                         message = errorMsg,
-                        onRetry = { viewModel.refresh() },
+                        onRetry = syncContacts,
                         onDismiss = { viewModel.dismissSyncError() },
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     )
@@ -272,3 +290,7 @@ private fun ContactRow(
         }
     }
 }
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts

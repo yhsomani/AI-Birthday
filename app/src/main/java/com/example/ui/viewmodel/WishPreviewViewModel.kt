@@ -15,6 +15,10 @@ import com.example.domain.repository.MessageRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RegeneratePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
+import com.example.domain.usecase.TestSendUseCase
+import com.example.ui.feedback.FeedbackEvent
+import com.example.ui.feedback.FeedbackType
+import com.example.ui.feedback.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -75,6 +79,7 @@ data class WishPreviewUiState(
     val isApproving: Boolean = false,
     val isRejecting: Boolean = false,
     val isRegenerating: Boolean = false,
+    val isTestingSend: Boolean = false,
     val approved: Boolean = false,
     val rejected: Boolean = false,
     val errorMessageRes: Int? = null,
@@ -85,6 +90,7 @@ data class WishPreviewUiState(
     val feedbackOptions: List<AiFeedbackOption> = aiFeedbackOptions,
     val selectedFeedbackKey: String? = null,
     val feedbackMessageRes: Int? = null,
+    val feedbackEvent: FeedbackEvent? = null,
     val whySignals: List<WhySignal> = emptyList(),
 )
 
@@ -99,6 +105,7 @@ class WishPreviewViewModel @Inject constructor(
     private val approvePendingMessageUseCase: ApprovePendingMessageUseCase,
     private val rejectPendingMessageUseCase: RejectPendingMessageUseCase,
     private val regeneratePendingMessageUseCase: RegeneratePendingMessageUseCase,
+    private val testSendUseCase: TestSendUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WishPreviewUiState())
@@ -157,13 +164,40 @@ class WishPreviewViewModel @Inject constructor(
     }
 
     fun sendTestToMyself() {
-        // In a real implementation this would trigger an SMS or email to the logged in user's profile.
-        // For F-039 implementation, we simulate the success state.
-        _uiState.value = _uiState.value.copy(testSent = true)
+        val draft = _uiState.value.editedText
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isTestingSend = true, errorMessageRes = null)
+            val feedback = when (testSendUseCase(draft)) {
+                TestSendUseCase.Outcome.Sent -> FeedbackEvent(
+                    message = UiText.Resource(R.string.wish_preview_test_sent),
+                    type = FeedbackType.SUCCESS,
+                )
+                TestSendUseCase.Outcome.MissingEmailSetup -> FeedbackEvent(
+                    message = UiText.Resource(R.string.wish_preview_test_missing_email),
+                    type = FeedbackType.ERROR,
+                )
+                TestSendUseCase.Outcome.BlankMessage -> FeedbackEvent(
+                    message = UiText.Resource(R.string.wish_preview_test_blank),
+                    type = FeedbackType.ERROR,
+                )
+                TestSendUseCase.Outcome.SendFailed -> FeedbackEvent(
+                    message = UiText.Resource(R.string.wish_preview_test_failed),
+                    type = FeedbackType.ERROR,
+                )
+            }
+            _uiState.value = _uiState.value.copy(
+                isTestingSend = false,
+                feedbackEvent = feedback,
+            )
+        }
     }
 
     fun dismissTestSent() {
         _uiState.value = _uiState.value.copy(testSent = false)
+    }
+
+    fun clearFeedbackEvent() {
+        _uiState.value = _uiState.value.copy(feedbackEvent = null)
     }
 
     fun regenerate() {

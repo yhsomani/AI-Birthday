@@ -102,11 +102,13 @@ fun AutomationSetupScreen(
                 isRefreshing = state.isRefreshing,
                 isSyncingContacts = state.isSyncingContacts,
                 isTestingAi = state.isTestingAi,
+                isTestingEmail = state.isTestingEmail,
                 operationMessage = state.operationMessage,
                 onRefresh = viewModel::refreshChecks,
                 onSyncContacts = viewModel::syncContacts,
                 onDryRun = viewModel::runSafeGenerationCheck,
                 onTestAi = viewModel::testAiGeneration,
+                onTestEmail = viewModel::testEmailSend,
                 onAction = { action ->
                     handleAiDoctorAction(
                         action = action,
@@ -169,11 +171,13 @@ private fun ReadinessDashboard(
     isRefreshing: Boolean,
     isSyncingContacts: Boolean,
     isTestingAi: Boolean,
+    isTestingEmail: Boolean,
     operationMessage: String?,
     onRefresh: () -> Unit,
     onSyncContacts: () -> Unit,
     onDryRun: () -> Unit,
     onTestAi: () -> Unit,
+    onTestEmail: () -> Unit,
     onAction: (AiDoctorAction) -> Unit,
 ) {
     RelateGlassCard {
@@ -270,6 +274,25 @@ private fun ReadinessDashboard(
                     }
                 }
             }
+            Button(
+                onClick = onTestEmail,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isTestingEmail,
+                colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+            ) {
+                if (isTestingEmail) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = RelateDarkBackground,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text(
+                        text = stringResource(R.string.automation_setup_action_test_email),
+                        color = RelateDarkBackground,
+                    )
+                }
+            }
         }
     }
 }
@@ -356,6 +379,7 @@ private fun handleAiDoctorAction(
         AiDoctorAction.NONE -> Unit
         AiDoctorAction.REFRESH -> viewModel.refreshChecks()
         AiDoctorAction.TEST_AI -> viewModel.testAiGeneration()
+        AiDoctorAction.TEST_EMAIL -> viewModel.testEmailSend()
         AiDoctorAction.SYNC_CONTACTS -> viewModel.syncContacts()
         AiDoctorAction.OPEN_SETTINGS -> onOpenSettings()
         AiDoctorAction.OPEN_STYLE_COACH -> onOpenStyleCoach()

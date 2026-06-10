@@ -2,6 +2,8 @@ package com.example.domain.usecase
 
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageStatus
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.GiftHistoryRepository
@@ -97,28 +99,34 @@ class GenerateMessageUseCase @Inject constructor(
             selectedVariantText = selectedVariantText,
             channel = contact.preferredChannel,
             scheduledForMs = event.nextOccurrenceMs,
-            approvalMode = approvalMode,
-            status = if (approvalMode == "FULLY_AUTO") "APPROVED" else "PENDING",
+            approvalMode = approvalMode.raw,
+            status = if (approvalMode == ApprovalMode.FULLY_AUTO) MessageStatus.APPROVED.raw else MessageStatus.PENDING.raw,
             scheduledYear = scheduledYear,
             isUsingFallback = variants.isUsingFallback
         )
         messageRepository.insertPending(pending)
 
-        if (approvalMode == "FULLY_AUTO") {
+        if (approvalMode == ApprovalMode.FULLY_AUTO) {
             schedulerService.scheduleExactSend(pending.id)
         } else {
             notificationService.showApprovalNotification(contact, event, variants, pending.id)
         }
 
-        return GenerationOutcome.Generated(pending.id, approvalMode, retries)
+        return GenerationOutcome.Generated(pending.id, approvalMode.raw, retries)
     }
 
-    private fun determineApprovalMode(relationship: String, contactOverride: String, globalMode: String): String {
-        if (contactOverride != "DEFAULT" && contactOverride.isNotEmpty()) return contactOverride
+    private fun determineApprovalMode(
+        relationship: String,
+        contactOverride: String,
+        globalMode: String,
+    ): ApprovalMode {
+        val contactMode = ApprovalMode.fromRaw(contactOverride)
+        if (contactMode != ApprovalMode.DEFAULT && contactMode != ApprovalMode.UNKNOWN) return contactMode
+        val global = ApprovalMode.fromRaw(globalMode).takeIf { it != ApprovalMode.UNKNOWN } ?: ApprovalMode.SMART_APPROVE
         return when (relationship) {
-            "FAMILY", "BEST_FRIEND" -> "VIP_APPROVE"
-            "CLOSE_FRIEND", "RELATIVE" -> if (globalMode == "ALWAYS_ASK") "ALWAYS_ASK" else "SMART_APPROVE"
-            else -> globalMode
+            "FAMILY", "BEST_FRIEND" -> ApprovalMode.VIP_APPROVE
+            "CLOSE_FRIEND", "RELATIVE" -> if (global == ApprovalMode.ALWAYS_ASK) ApprovalMode.ALWAYS_ASK else ApprovalMode.SMART_APPROVE
+            else -> global
         }
     }
 

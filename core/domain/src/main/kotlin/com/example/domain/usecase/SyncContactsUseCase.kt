@@ -50,11 +50,27 @@ class SyncContactsUseCase @Inject constructor(
             preferencesRepository.setLastSyncError(googleError)
         }
 
-        if (googleError != null) {
-            throw Exception("Google contacts sync failed: $googleError")
+        var deviceContacts = emptyList<ContactEntity>()
+        var deviceError: String? = null
+        try {
+            deviceContacts = contactSyncService.fetchDeviceContacts()
+        } catch (e: Exception) {
+            android.util.Log.e("SyncContactsUseCase", "Device contacts sync failed", e)
+            deviceError = e.message ?: "Failed to fetch device contacts"
         }
 
-        var merged = googleContacts
+        if (googleError != null && deviceContacts.isEmpty() && !isGuest) {
+            throw Exception("Google contacts sync failed: $googleError")
+        }
+        if (googleError == null && deviceError == null) {
+            preferencesRepository.setLastSyncError(null)
+        } else if (googleError != null) {
+            preferencesRepository.setLastSyncError("Google sync failed; imported ${deviceContacts.size} device contacts.")
+        } else if (deviceError != null) {
+            preferencesRepository.setLastSyncError(deviceError)
+        }
+
+        var merged = mergeContacts(googleContacts, deviceContacts)
 
         if (merged.isEmpty() && isGuest) {
             merged = getMockContacts()
@@ -71,7 +87,61 @@ class SyncContactsUseCase @Inject constructor(
         // Run event discovery immediately so events are available in the database
         discoverEventsUseCase()
 
-        return SyncOutcome(googleCount = googleContacts.size, deviceCount = 0, inserted = inserted, updated = updated)
+        return SyncOutcome(
+            googleCount = googleContacts.size,
+            deviceCount = deviceContacts.size,
+            inserted = inserted,
+            updated = updated,
+        )
+    }
+
+    private fun mergeContacts(
+        googleContacts: List<ContactEntity>,
+        deviceContacts: List<ContactEntity>,
+    ): List<ContactEntity> {
+        val mergedByKey = linkedMapOf<String, ContactEntity>()
+        googleContacts.forEach { contact ->
+            mergedByKey[contact.mergeKey()] = contact
+        }
+        deviceContacts.forEach { deviceContact ->
+            val key = deviceContact.mergeKey()
+            val existing = mergedByKey[key]
+            mergedByKey[key] = if (existing == null) {
+                deviceContact
+            } else {
+                existing.mergeMissingFrom(deviceContact)
+            }
+        }
+        return mergedByKey.values.toList()
+    }
+
+    private fun ContactEntity.mergeKey(): String {
+        val phone = primaryPhone?.filter(Char::isDigit)?.takeIf { it.isNotBlank() }
+        if (phone != null) return "phone:$phone"
+        val email = primaryEmail?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+        if (email != null) return "email:$email"
+        return "name:${name.trim().lowercase()}"
+    }
+
+    private fun ContactEntity.mergeMissingFrom(fallback: ContactEntity): ContactEntity {
+        return copy(
+            primaryPhone = primaryPhone ?: fallback.primaryPhone,
+            secondaryPhone = secondaryPhone ?: fallback.secondaryPhone,
+            primaryEmail = primaryEmail ?: fallback.primaryEmail,
+            company = company ?: fallback.company,
+            jobTitle = jobTitle ?: fallback.jobTitle,
+            profilePhotoUri = profilePhotoUri ?: fallback.profilePhotoUri,
+            birthdayDay = birthdayDay ?: fallback.birthdayDay,
+            birthdayMonth = birthdayMonth ?: fallback.birthdayMonth,
+            birthdayYear = birthdayYear ?: fallback.birthdayYear,
+            anniversaryDay = anniversaryDay ?: fallback.anniversaryDay,
+            anniversaryMonth = anniversaryMonth ?: fallback.anniversaryMonth,
+            anniversaryYear = anniversaryYear ?: fallback.anniversaryYear,
+            workStartDay = workStartDay ?: fallback.workStartDay,
+            workStartMonth = workStartMonth ?: fallback.workStartMonth,
+            workStartYear = workStartYear ?: fallback.workStartYear,
+            contactGroup = contactGroup ?: fallback.contactGroup,
+        )
     }
 
     private fun getMockContacts(): List<ContactEntity> {

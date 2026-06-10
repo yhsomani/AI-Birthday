@@ -47,6 +47,11 @@ class MessageDispatcher(
         val primaryPhone = contact.primaryPhone
         val primaryEmail = contact.primaryEmail
         var finalChannel = message.channel
+        val blockedChannels = prefs.getChannelBlackout().toChannelSet()
+
+        if (message.channel.uppercase() in blockedChannels) {
+            StructuredLogger.w(TAG, "Dispatch channel is disabled", extras = mapOf("channel" to message.channel))
+        } else {
 
         when (message.channel) {
             "WHATSAPP" -> {
@@ -56,38 +61,42 @@ class MessageDispatcher(
                     if (!success) {
                         StructuredLogger.w(TAG, "WhatsApp failed, falling back to SMS for ${message.id}")
                         finalChannel = "SMS"
-                        try {
-                            sentMessageDao.insert(SentMessageEntity(
-                                id = sentMessageId,
-                                contactId = message.contactId,
-                                eventType = message.eventId,
-                                eventYear = Calendar.getInstance().get(Calendar.YEAR),
-                                messageText = messageText,
-                                channel = "SMS",
-                                sentAtMs = System.currentTimeMillis(),
-                                deliveryStatus = "PENDING_DELIVERY",
-                                aiGenerated = true
-                            ))
-                            isSentMessageInserted = true
+                        if ("SMS" in blockedChannels) {
+                            StructuredLogger.w(TAG, "SMS fallback skipped because channel is disabled")
+                        } else {
+                            try {
+                                sentMessageDao.insert(SentMessageEntity(
+                                    id = sentMessageId,
+                                    contactId = message.contactId,
+                                    eventType = message.eventId,
+                                    eventYear = Calendar.getInstance().get(Calendar.YEAR),
+                                    messageText = messageText,
+                                    channel = "SMS",
+                                    sentAtMs = System.currentTimeMillis(),
+                                    deliveryStatus = "PENDING_DELIVERY",
+                                    aiGenerated = true
+                                ))
+                                isSentMessageInserted = true
 
-                            val smsSender = SmsSender(context)
-                            smsSender.send(primaryPhone, messageText, sentMessageId)
-                            success = true
-                        } catch (e: SecurityException) {
-                            if (isSentMessageInserted) {
-                                sentMessageDao.updateDeliveryStatus(sentMessageId, "FAILED")
+                                val smsSender = SmsSender(context)
+                                smsSender.send(primaryPhone, messageText, sentMessageId)
+                                success = true
+                            } catch (e: SecurityException) {
+                                if (isSentMessageInserted) {
+                                    sentMessageDao.updateDeliveryStatus(sentMessageId, "FAILED")
+                                }
+                                StructuredLogger.e(TAG, "SMS permission not granted during WhatsApp fallback for message ${message.id}", e)
+                                com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
+                                    context,
+                                    "SMS Permission Needed",
+                                    "RelateAI could not send message to ${contact.name} because SMS permission is missing. Tap to grant permission."
+                                )
+                            } catch (e: Exception) {
+                                if (isSentMessageInserted) {
+                                    sentMessageDao.updateDeliveryStatus(sentMessageId, "FAILED")
+                                }
+                                StructuredLogger.e(TAG, "SMS send failed during WhatsApp fallback for message ${message.id}", e)
                             }
-                            StructuredLogger.e(TAG, "SMS permission not granted during WhatsApp fallback for message ${message.id}", e)
-                            com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
-                                context,
-                                "SMS Permission Needed",
-                                "RelateAI could not send message to ${contact.name} because SMS permission is missing. Tap to grant permission."
-                            )
-                        } catch (e: Exception) {
-                            if (isSentMessageInserted) {
-                                sentMessageDao.updateDeliveryStatus(sentMessageId, "FAILED")
-                            }
-                            StructuredLogger.e(TAG, "SMS send failed during WhatsApp fallback for message ${message.id}", e)
                         }
                     }
                 }
@@ -131,6 +140,14 @@ class MessageDispatcher(
             }
             "EMAIL" -> {
                 if (primaryEmail != null) {
+                    if (prefs.getSenderEmail().isBlank() || prefs.getSenderEmailPassword().isBlank()) {
+                        com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
+                            context,
+                            "Email Setup Needed",
+                            "Add your Gmail sender address and app password in Settings before sending email wishes."
+                        )
+                        success = false
+                    } else {
                     try {
                         val emailSender = EmailSender(prefs)
                         emailSender.send(primaryEmail, contact.name, messageText)
@@ -138,8 +155,10 @@ class MessageDispatcher(
                     } catch (e: Exception) {
                         StructuredLogger.e(TAG, "Email send failed for ${message.id}", e)
                     }
+                    }
                 }
             }
+        }
         }
 
         if (success) {
@@ -185,5 +204,16 @@ class MessageDispatcher(
 
     companion object {
         private const val TAG = "MessageDispatcher"
+    }
+
+    private fun String.toChannelSet(): Set<String> {
+        return try {
+            val array = org.json.JSONArray(this)
+            List(array.length()) { index -> array.optString(index).uppercase() }
+                .filter { it in setOf("SMS", "WHATSAPP", "EMAIL") }
+                .toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
     }
 }

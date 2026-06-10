@@ -1,5 +1,9 @@
 package com.example.ui.screens.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -39,6 +43,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -59,10 +65,12 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import androidx.compose.runtime.LaunchedEffect
 import com.example.BuildConfig
@@ -73,6 +81,7 @@ import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.ui.feedback.asString
 import com.example.ui.viewmodel.SettingsViewModel
 
 @Composable
@@ -87,110 +96,133 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
     var showModeMenu by remember { mutableStateOf(false) }
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        viewModel.syncContacts()
+    }
+    val syncContacts = {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.syncContacts()
+        } else {
+            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        }
+    }
 
-    LaunchedEffect(state.syncError) {
-        state.syncError?.let {
-            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+    val feedbackText = state.feedbackEvent?.message?.asString()
+    LaunchedEffect(state.feedbackEvent?.id, feedbackText) {
+        if (feedbackText != null) {
+            snackbarHostState.showSnackbar(feedbackText)
+            viewModel.clearFeedback()
             viewModel.clearSyncError()
         }
     }
 
-
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(RelateDarkBackground)
-            .padding(horizontal = 16.dp),
-    ) {
-        Spacer(modifier = Modifier.height(48.dp))
-        Text(
-            text = stringResource(R.string.settings),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .background(RelateDarkBackground)
+                .padding(horizontal = 16.dp),
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(48.dp))
+            Text(
+                text = stringResource(R.string.settings),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
 
-            SettingsSection(stringResource(R.string.settings_account_section)) {
-                SettingsCard {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (state.userPhotoUrl != null) {
-                            AsyncImage(
-                                model = state.userPhotoUrl,
-                                contentDescription = stringResource(R.string.profile_photo),
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop,
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(RelateSurfaceVariant),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    state.userName.take(1).uppercase(),
-                                    color = RelateOnBackground,
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.titleMedium,
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Spacer(modifier = Modifier.height(24.dp))
+
+                SettingsSection(stringResource(R.string.settings_account_section)) {
+                    SettingsCard {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (state.userPhotoUrl != null) {
+                                AsyncImage(
+                                    model = state.userPhotoUrl,
+                                    contentDescription = stringResource(R.string.profile_photo),
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop,
                                 )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(RelateSurfaceVariant),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        state.userName.take(1).uppercase(),
+                                        color = RelateOnBackground,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium,
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(state.userName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                                Text(state.userEmail, style = MaterialTheme.typography.bodySmall, color = RelateOnSurfaceVariant)
                             }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(state.userName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                            Text(state.userEmail, style = MaterialTheme.typography.bodySmall, color = RelateOnSurfaceVariant)
-                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                SettingsSection(stringResource(R.string.settings_preferences_section)) {
+                    SettingsCard {
+                        SettingsToggle(
+                            title = stringResource(R.string.settings_birthday_reminders),
+                            icon = Icons.Filled.Notifications,
+                            checked = state.birthdayReminders,
+                        ) { viewModel.toggleBirthdayReminders(it) }
+                        SettingsDivider()
+                        SettingsToggle(
+                            title = stringResource(R.string.settings_ai_wish_generation),
+                            icon = Icons.Filled.SmartToy,
+                            checked = state.aiWishGeneration,
+                        ) { viewModel.toggleAiWishGeneration(it) }
+                        SettingsDivider()
+                        SettingsToggle(
+                            title = stringResource(R.string.settings_biometric_lock),
+                            icon = Icons.Filled.Security,
+                            checked = state.biometricLockEnabled,
+                        ) { viewModel.toggleBiometricLock(it) }
+                        SettingsDivider()
+                        SettingsRow(
+                            icon = Icons.Filled.Person,
+                            title = stringResource(R.string.settings_ai_style_coach),
+                            subtitle = stringResource(R.string.settings_ai_style_coach_subtitle),
+                            onClick = onNavigateToStyleCoach
+                        )
+                        SettingsDivider()
+                        SettingsRow(
+                            icon = Icons.Filled.Security,
+                            title = stringResource(R.string.settings_automation_setup),
+                            subtitle = stringResource(R.string.settings_automation_setup_subtitle),
+                            onClick = onNavigateToAutomationSetup
+                        )
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_preferences_section)) {
-                SettingsCard {
-                    SettingsToggle(
-                        title = stringResource(R.string.settings_birthday_reminders),
-                        icon = Icons.Filled.Notifications,
-                        checked = state.birthdayReminders,
-                    ) { viewModel.toggleBirthdayReminders(it) }
-                    SettingsDivider()
-                    SettingsToggle(
-                        title = stringResource(R.string.settings_ai_wish_generation),
-                        icon = Icons.Filled.SmartToy,
-                        checked = state.aiWishGeneration,
-                    ) { viewModel.toggleAiWishGeneration(it) }
-                    SettingsDivider()
-                    SettingsRow(
-                        icon = Icons.Filled.Person,
-                        title = stringResource(R.string.settings_ai_style_coach),
-                        subtitle = stringResource(R.string.settings_ai_style_coach_subtitle),
-                        onClick = onNavigateToStyleCoach
-                    )
-                    SettingsDivider()
-                    SettingsRow(
-                        icon = Icons.Filled.Security,
-                        title = stringResource(R.string.settings_automation_setup),
-                        subtitle = stringResource(R.string.settings_automation_setup_subtitle),
-                        onClick = onNavigateToAutomationSetup
-                    )
-                }
-            }
-
-            // ── AI Configuration (Gemini API Key) ──────────────────────────────
+                // AI configuration and send readiness
             Spacer(modifier = Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.settings_ai_configuration_section)) {
                 SettingsCard {
@@ -259,6 +291,72 @@ fun SettingsScreen(
                         }
                     }
                     SettingsDivider()
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(
+                            text = stringResource(R.string.settings_email_sending_title),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_email_sending_help),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = RelateOnSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = state.senderEmail,
+                            onValueChange = viewModel::onSenderEmailChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.settings_sender_email)) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = RelatePrimary,
+                                unfocusedBorderColor = RelateSurfaceVariant,
+                                focusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
+                                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
+                                focusedTextColor = RelateOnBackground,
+                                unfocusedTextColor = RelateOnBackground,
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = state.senderEmailPassword,
+                            onValueChange = viewModel::onSenderEmailPasswordChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.settings_app_password)) },
+                            visualTransformation = PasswordVisualTransformation(),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = RelatePrimary,
+                                unfocusedBorderColor = RelateSurfaceVariant,
+                                focusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
+                                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
+                                focusedTextColor = RelateOnBackground,
+                                unfocusedTextColor = RelateOnBackground,
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = {
+                                focusManager.clearFocus()
+                                viewModel.saveSenderEmailSettings()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Text(
+                                text = if (state.senderEmailSaved) {
+                                    stringResource(R.string.saved)
+                                } else {
+                                    stringResource(R.string.settings_save_email_settings)
+                                },
+                                color = RelateDarkBackground,
+                            )
+                        }
+                    }
+                    SettingsDivider()
                     // Automation Mode selector
                     Box {
                         SettingsRow(
@@ -287,6 +385,23 @@ fun SettingsScreen(
                             }
                         }
                     }
+                    SettingsDivider()
+                    QuietHoursEditor(
+                        start = state.quietHoursStart,
+                        end = state.quietHoursEnd,
+                        onStartChange = viewModel::onQuietHoursStartChange,
+                        onEndChange = viewModel::onQuietHoursEndChange,
+                        onSave = viewModel::saveQuietHours,
+                    )
+                    SettingsDivider()
+                    ChannelBlackoutEditor(
+                        smsDisabled = state.channelBlackoutSms,
+                        whatsAppDisabled = state.channelBlackoutWhatsApp,
+                        emailDisabled = state.channelBlackoutEmail,
+                        onSmsChange = { viewModel.toggleChannelBlackout("SMS", it) },
+                        onWhatsAppChange = { viewModel.toggleChannelBlackout("WHATSAPP", it) },
+                        onEmailChange = { viewModel.toggleChannelBlackout("EMAIL", it) },
+                    )
                 }
             }
 
@@ -306,7 +421,7 @@ fun SettingsScreen(
                         icon = Icons.Filled.CloudSync,
                         title = stringResource(R.string.settings_sync_contacts),
                         subtitle = subtitle,
-                        onClick = { if (!state.isSyncing) viewModel.syncContacts() }
+                        onClick = { if (!state.isSyncing) syncContacts() }
                     )
                     SettingsDivider()
                     SettingsRow(
@@ -349,6 +464,115 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp),
+        )
+    }
+}
+
+@Composable
+private fun QuietHoursEditor(
+    start: String,
+    end: String,
+    onStartChange: (String) -> Unit,
+    onEndChange: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(
+            text = stringResource(R.string.settings_quiet_hours_title),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = stringResource(R.string.settings_quiet_hours_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = RelateOnSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row {
+            OutlinedTextField(
+                value = start,
+                onValueChange = onStartChange,
+                label = { Text(stringResource(R.string.settings_quiet_hrs_start)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedTextField(
+                value = end,
+                onValueChange = onEndChange,
+                label = { Text(stringResource(R.string.settings_quiet_hrs_end)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        TextButton(onClick = onSave, modifier = Modifier.align(Alignment.End)) {
+            Text(stringResource(R.string.settings_save_quiet_hours))
+        }
+    }
+}
+
+@Composable
+private fun ChannelBlackoutEditor(
+    smsDisabled: Boolean,
+    whatsAppDisabled: Boolean,
+    emailDisabled: Boolean,
+    onSmsChange: (Boolean) -> Unit,
+    onWhatsAppChange: (Boolean) -> Unit,
+    onEmailChange: (Boolean) -> Unit,
+) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(
+            text = stringResource(R.string.settings_channel_blackout_title),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = stringResource(R.string.settings_channel_blackout_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = RelateOnSurfaceVariant,
+        )
+        ChannelBlackoutRow(stringResource(R.string.channel_sms), smsDisabled, onSmsChange)
+        ChannelBlackoutRow(stringResource(R.string.channel_whatsapp), whatsAppDisabled, onWhatsAppChange)
+        ChannelBlackoutRow(stringResource(R.string.channel_email), emailDisabled, onEmailChange)
+    }
+}
+
+@Composable
+private fun ChannelBlackoutRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = RelateOnBackground,
+                checkedTrackColor = RelatePrimary,
+                uncheckedThumbColor = RelateOnSurfaceVariant,
+                uncheckedTrackColor = RelateSurfaceVariant,
+            ),
+        )
     }
 }
 

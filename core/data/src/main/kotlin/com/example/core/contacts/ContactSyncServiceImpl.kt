@@ -16,4 +16,8 @@ class ContactSyncServiceImpl @Inject constructor(
         val googleSync = GoogleContactsSync(context)
         return googleSync.fetchAll(forceRefresh)
     }
+
+    override suspend fun fetchDeviceContacts(): List<ContactEntity> {
+        return DeviceContactsReader(context).readContacts()
+    }
 }

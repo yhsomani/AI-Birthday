@@ -52,6 +52,7 @@ import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.ui.feedback.asString
 import com.example.ui.viewmodel.WishPreviewViewModel
 import com.example.ui.viewmodel.WhySignal
 
@@ -74,6 +75,7 @@ fun WishPreviewScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val testSentMessage = stringResource(R.string.wish_preview_test_sent)
+    val feedbackText = state.feedbackEvent?.message?.asString()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -84,6 +86,13 @@ fun WishPreviewScreen(
                 snackbarHostState.showSnackbar(testSentMessage)
                 viewModel.dismissTestSent()
             }
+        }
+    }
+
+    LaunchedEffect(state.feedbackEvent?.id, feedbackText) {
+        if (feedbackText != null) {
+            snackbarHostState.showSnackbar(feedbackText)
+            viewModel.clearFeedbackEvent()
         }
     }
 
@@ -295,7 +304,7 @@ private fun WishPreviewContent(
                 Button(
                     onClick = { viewModel.regenerate() },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !state.isRegenerating && !state.isApproving && !state.isRejecting,
+                    enabled = !state.isRegenerating && !state.isApproving && !state.isRejecting && !state.isTestingSend,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RelateSurfaceVariant,
@@ -317,6 +326,30 @@ private fun WishPreviewContent(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.wish_preview_regenerate),
+                            color = RelateOnBackground,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { viewModel.sendTestToMyself() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.isTestingSend && !state.isRegenerating && !state.isApproving && !state.isRejecting,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RelateSurfaceVariant,
+                    ),
+                ) {
+                    if (state.isTestingSend) {
+                        CircularProgressIndicator(
+                            color = RelateOnBackground,
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.wish_preview_send_test),
                             color = RelateOnBackground,
                         )
                     }

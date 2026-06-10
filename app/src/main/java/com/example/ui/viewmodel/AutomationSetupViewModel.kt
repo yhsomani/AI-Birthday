@@ -24,6 +24,7 @@ import com.example.core.resilience.StructuredLogger
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.SyncContactsUseCase
+import com.example.domain.usecase.TestSendUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -41,6 +42,7 @@ enum class AiDoctorAction {
     NONE,
     REFRESH,
     TEST_AI,
+    TEST_EMAIL,
     SYNC_CONTACTS,
     OPEN_SETTINGS,
     OPEN_STYLE_COACH,
@@ -71,6 +73,7 @@ data class AutomationSetupUiState(
     val isRefreshing: Boolean = false,
     val isSyncingContacts: Boolean = false,
     val isTestingAi: Boolean = false,
+    val isTestingEmail: Boolean = false,
     val operationMessage: String? = null,
 )
 
@@ -87,6 +90,7 @@ class AutomationSetupViewModel @Inject constructor(
     private val geminiClient: GeminiClient,
     private val contactRepository: ContactRepository,
     private val styleProfileRepository: StyleProfileRepository,
+    private val testSendUseCase: TestSendUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AutomationSetupUiState())
@@ -172,6 +176,23 @@ class AutomationSetupViewModel @Inject constructor(
         }
     }
 
+    fun testEmailSend() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isTestingEmail = true, operationMessage = null)
+            val message = when (testSendUseCase(text(R.string.automation_setup_email_test_message))) {
+                TestSendUseCase.Outcome.Sent -> text(R.string.automation_setup_email_test_success)
+                TestSendUseCase.Outcome.MissingEmailSetup -> text(R.string.automation_setup_email_missing)
+                TestSendUseCase.Outcome.BlankMessage -> text(R.string.automation_setup_email_test_failed)
+                TestSendUseCase.Outcome.SendFailed -> text(R.string.automation_setup_email_test_failed)
+            }
+            _uiState.value = _uiState.value.copy(
+                isTestingEmail = false,
+                operationMessage = message,
+            )
+            refreshChecks()
+        }
+    }
+
     private suspend fun buildReport(): AiDoctorReport {
         val workInfos = try {
             WorkManager.getInstance(appContext).getWorkInfosByTag("daily_trigger").get()
@@ -199,6 +220,11 @@ class AutomationSetupViewModel @Inject constructor(
         val whatsAppAutomationEnabled = isWhatsAppAutomationServiceEnabled()
         val exactSendsAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
         val deadLetterCount = DeadLetterQueue.count()
+        val senderEmailReady = securePrefs.getSenderEmail().isNotBlank() &&
+            securePrefs.getSenderEmailPassword().isNotBlank()
+        val emailPreferredContacts = contacts.count {
+            it.preferredChannel.equals("EMAIL", ignoreCase = true)
+        }
 
         val checks = listOf(
             ReadinessCheck(
@@ -276,6 +302,24 @@ class AutomationSetupViewModel @Inject constructor(
                 if (smsAllowed) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
                 actionLabel = if (smsAllowed) null else text(R.string.automation_setup_action_app_settings),
                 action = if (smsAllowed) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
+            ),
+            ReadinessCheck(
+                text(R.string.automation_setup_check_email),
+                when {
+                    senderEmailReady -> text(R.string.automation_setup_email_ok)
+                    emailPreferredContacts > 0 -> text(
+                        R.string.automation_setup_email_missing_for_contacts,
+                        emailPreferredContacts,
+                    )
+                    else -> text(R.string.automation_setup_email_optional)
+                },
+                when {
+                    senderEmailReady -> ReadinessStatus.OK
+                    emailPreferredContacts > 0 -> ReadinessStatus.ACTION_REQUIRED
+                    else -> ReadinessStatus.WARNING
+                },
+                actionLabel = if (senderEmailReady) text(R.string.automation_setup_action_test_email) else text(R.string.automation_setup_action_open_settings),
+                action = if (senderEmailReady) AiDoctorAction.TEST_EMAIL else AiDoctorAction.OPEN_SETTINGS,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_whatsapp),

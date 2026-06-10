@@ -117,13 +117,18 @@ fun EventsScreen(
         }
     }
 
+    LaunchedEffect(state.saveMessage) {
+        if (state.saveMessage != null) {
+            showManualDialog = false
+        }
+    }
+
     if (showManualDialog) {
         ManualEventDialog(
             contacts = state.contacts,
             isSaving = state.isSavingManualEvent,
             onDismiss = { showManualDialog = false },
             onSave = { existingContactId, newContactName, eventType, label, month, day, year ->
-                showManualDialog = false
                 viewModel.saveManualEvent(
                     existingContactId = existingContactId,
                     newContactName = newContactName,

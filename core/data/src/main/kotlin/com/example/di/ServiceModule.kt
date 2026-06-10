@@ -3,6 +3,7 @@ package com.example.di
 import com.example.core.automation.notifications.NotificationServiceImpl
 import com.example.core.automation.scheduler.SchedulerServiceImpl
 import com.example.core.automation.sender.MessageDispatcherServiceImpl
+import com.example.core.automation.sender.TestSendServiceImpl
 import com.example.core.analytics.AnalyticsReportServiceImpl
 import com.example.core.backup.BackupServiceImpl
 import com.example.core.contacts.ContactSyncServiceImpl
@@ -16,6 +17,7 @@ import com.example.domain.service.MessageDispatcherService
 import com.example.domain.service.NotificationService
 import com.example.domain.service.PreferencesRepository
 import com.example.domain.service.SchedulerService
+import com.example.domain.service.TestSendService
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -41,6 +43,10 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindMessageDispatcherService(impl: MessageDispatcherServiceImpl): MessageDispatcherService
+
+    @Binds
+    @Singleton
+    abstract fun bindTestSendService(impl: TestSendServiceImpl): TestSendService
 
     @Binds
     @Singleton
