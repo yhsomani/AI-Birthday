@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-06-10T08:56:04.411Z",
+  "repoRoot": "/Users/yashsomani/Desktop/Android Project/AI-Birthday",
+  "proxy": {
+    "httpProxy": null,
+    "httpsProxy": null,
+    "noProxy": null,
+    "isProxyConfigured": false
+  },
+  "tls": {
+    "nodeTlsRejectUnauthorized": "1",
+    "risk": "normal"
+  },
+  "endpoints": [
+    "https://chatgpt.com",
+    "https://api.openai.com"
+  ],
+  "endpointResults": [
+    {
+      "url": "https://chatgpt.com",
+      "status": "request-failed",
+      "classification": "network-error",
+      "latencyMs": 174,
+      "dns": {
+        "address": "104.18.32.47",
+        "family": 4
+      },
+      "error": "fetch failed"
+    },
+    {
+      "url": "https://api.openai.com",
+      "status": "request-failed",
+      "classification": "network-error",
+      "latencyMs": 395,
+      "dns": {
+        "address": "162.159.140.245",
+        "family": 4
+      },
+      "error": "fetch failed"
+    }
+  ],
+  "codexRoutes": [
+    "/backend-api/codex/*"
+  ],
+  "recommendations": {
+    "whitelist": [
+      "/backend-api/codex/*",
+      "api.openai.com",
+      "chatgpt.com"
+    ],
+    "troubleshooting": [
+      "Ensure enterprise proxy variables are configured for both shell and VS Code extension host.",
+      "If 403 persists, request allowlisting for chatgpt.com, api.openai.com, and backend-api/codex routes.",
+      "Avoid NODE_TLS_REJECT_UNAUTHORIZED=0 in production; use trusted corporate CA bundles instead.",
+      "Validate active session/auth tokens when backend-api/codex endpoints return auth failures."
+    ]
+  }
+}

@@ -76,7 +76,7 @@ RelateAI is an **on-device "Relationship Operating System"** that automatically 
 - **Pipeline Status**: Data layer, Domain layer, and UI layer are functionally complete. A fully functional user-facing app exists.
 - **Codebase**: Includes fully implemented Jetpack Compose UI screens, navigation, and features within the `:app` module, alongside `:core:domain` and `:core:data`.
 - **UseCase layer**: ✅ Done — 10 use cases in `core/domain/.../domain/usecase/` (in correct module).
-- **Test Coverage**: ~38 tests total (~38 test methods across 7 files). Coverage targets not yet met.
+- **Test Coverage**: Generated debug unit-test reports showed 165 passing tests across `:app` and `:core:data` at the start of the release-readiness tranche. Coverage targets are still not a release substitute for device smoke testing.
 - **Security**: SQLCipher, biometric lock, R8/ProGuard, OAuth token refresh, DB key derivation cache, AES-256-GCM encrypted backups, certificate pinning. All implemented.
 - **Architecture**: 3-module Clean Architecture with domain/data/app layers.
 
@@ -834,7 +834,7 @@ erDiagram
 ## 23. Infrastructure & Deployment
 
 ### 23.1 Build System
-Gradle Kotlin DSL, version catalog `gradle/libs.versions.toml`, AGP 9.2.1, Kotlin 2.2.10, KSP 2.3.5, JDK 17 (`jvmToolchain(17)`).
+Gradle Kotlin DSL, version catalog `gradle/libs.versions.toml`, AGP 9.2.1, Kotlin 2.2.10, KSP 2.3.5, JDK 21 build toolchain, and Kotlin JVM target 17.
 
 ### 23.2 Build Types
 - **Debug**: Default signing, no minification, debug logging.
@@ -848,7 +848,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - Checkout → Setup JDK 17 → Cache Gradle → Lint → Test → assembleDebug → Upload APK
+      - Checkout → Setup JDK 21 → Cache Gradle → testDebugUnitTest/lintDebug/assembleDebug
+      - Verify assembleRelease fails fast without release signing env vars
+      - Upload lint reports, unit-test reports, and debug APK artifacts
 ```
 
 ### 23.4 Release
@@ -884,11 +886,11 @@ Semantic versioning. Play Store: Internal → Closed Beta → Production (10% �
 ## 25. Design System & UI Standards
 
 ### 25.1 Current State
-**No Compose UI code exists.** The design system below documents the planned visual language. Current codebase has only basic XML resources:
-- `themes.xml` — AppCompat theme (not Material 3 Compose)
-- `colors.xml` — Minimal color definitions
-- `strings.xml` — String resources (66 extracted, ~70 remaining hardcoded)
-- `widget_birthday.xml` — Home screen widget layout
+The active app uses Jetpack Compose screens in `app/src/main/java/com/example/ui`, shared Compose components in `core/ui`, and XML resources for strings, launcher/widget assets, backup rules, shortcuts, and service configuration.
+- `Theme.kt`, `Color.kt`, `Type.kt` — Material 3 Compose theme tokens.
+- `RelateComponents.kt`, `FeedbackComponents.kt`, `ShimmerLoading.kt` — shared UI primitives.
+- `strings.xml` / `values-hi/strings.xml` — localized copy, with remaining hardcoded-string debt tracked by regression tests for cleaned screens.
+- `widget_birthday.xml` — home-screen widget layout.
 
 ### 25.2 Planned Theme
 - **Mode**: Dark-only with neon violet/cyan/rose accent palette
@@ -940,19 +942,11 @@ Material Icons Extended. Key icons: Cake (birthday), Event (anniversary), Star (
 
 ## 27. Testing Strategy
 
-### 27.1 Current Tests (~38 tests across 7 files)
+### 27.1 Current Tests
 
-| Test File | Tests | Coverage |
-|---|---|---|
-| ResponseParserTest.kt | 9 | JSON parsing validation with fallback defaults |
-| PromptBuilderTest.kt | 9 | Prompt construction from contact/event entities |
-| ContactMergerTest.kt | 8 | Google + device contact deduplication scenarios |
-| DaoTest.kt | 9 | Room CRUD operations using in-memory database |
-| ExampleRobolectricTest.kt | 1 | Robolectric smoke test (app name check) |
-| ExampleUnitTest.kt | 1 | Basic arithmetic assertion |
-| ExampleInstrumentedTest.kt | 1 | Instrumented smoke test (context check) |
+The debug unit-test baseline before the release-readiness tranche was 165 passing tests with 0 failures, 0 errors, and 0 skipped tests across generated `:app` and `:core:data` reports. Coverage now spans ViewModels, route argument encoding, domain use cases, WorkManager workers, SMS status broadcasts, Room DAO/migration paths, backup encryption/restore, analytics export, redaction, and production configuration guardrails.
 
-> **Note**: `MainViewModelTest`, `GreetingScreenshotTest`, and `ScreenshotTest` are documented but do not exist in the codebase.
+Instrumented/device coverage remains limited to a smoke test and should be expanded after a stable emulator or device lane is available in CI.
 
 ### 27.2 Coverage Targets
 
@@ -963,7 +957,7 @@ Material Icons Extended. Key icons: Cake (birthday), Event (anniversary), Star (
 | `:core:data` (Gemini, Contacts) | 80% | ~70% (PromptBuilder, ResponseParser, ContactMerger tested) |
 | `:core:data` (Workers) | 70% | Partial worker coverage |
 | `:app` (UI) | 30% | Partial ViewModel/navigation coverage |
-| **Overall** | **60-80%** | **~15%** |
+| **Overall** | **60-80%** | Needs measured coverage reporting; unit-test count alone is not coverage |
 
 ### 27.3 Testing Tools
 JUnit 4, Robolectric 4.16.1, Room `inMemoryDatabaseBuilder`. Roborazzi (declared in version catalog but not applied). MockK and Compose Test Rule (planned).
@@ -1045,16 +1039,18 @@ Baseline Profile AOT, DB indices (MIGRATION_6_7), StateFlow `WhileSubscribed(500
 | WhatsApp UI change (breaks Accessibility) | High | High | Monitor updates, SMS fallback |
 | OEM restrictions (MIUI, ColorOS) | High | Medium | Documented, SMS fallback |
 | Gemini API quota exceeded | Medium | High | Adaptive rate limiter |
-| SQLCipher migration failure | Low | Critical | Tested, destructive fallback |
+| SQLCipher migration failure | Low | Critical | Tested migrations, no destructive fallback |
 
 ### 30.4 Production Release Blockers
 
 | Blocker | Status |
 |---|---|
 | Privacy policy not published | ❌ Not started |
-| Sign-out does not wipe Room DB | ⚠️ Verify |
-| Sign-out does not wipe EncryptedSharedPreferences | ⚠️ Verify |
-| Test coverage ≥ 30% | ❌ Not started (~15%) |
+| Play Console accessibility-service disclosure not reviewed | ❌ Not started |
+| Release signing env vars unavailable locally/CI secrets not configured | ⚠️ Required for release artifacts |
+| Sign-out wipes Room DB and database files | ✅ Implemented in `AuthManager.signOut()` and Settings sign-out path |
+| Sign-out clears EncryptedSharedPreferences and cached DB key | ✅ Implemented via `SecurePrefs.clearAll()` and `DatabaseKeyDerivation.clearCachedKey()` |
+| Test coverage ≥ 30% | ⚠️ Needs measured coverage reporting beyond the 165-test debug unit baseline |
 | Crashlytics opt-in | ❌ Not started |
 | Style Coach auto-analysis from sent_messages (FR-92) | ❌ Not started |
 
@@ -1178,8 +1174,8 @@ Baseline Profile AOT, DB indices (MIGRATION_6_7), StateFlow `WhileSubscribed(500
 
 ```bash
 ./gradlew assembleDebug          # Build debug APK
-./gradlew test                   # Run unit tests (~38 tests)
-./gradlew lint                   # Run lint
+./gradlew testDebugUnitTest      # Run debug unit tests
+./gradlew lintDebug              # Run debug lint
 ./gradlew assembleRelease        # Release (requires signing env vars)
 ./gradlew :core:data:kspDebugKotlin  # Generate Room schema
 ./gradlew installDebug           # Install on device
@@ -1218,24 +1214,23 @@ Baseline Profile AOT, DB indices (MIGRATION_6_7), StateFlow `WhileSubscribed(500
 
 #### Prerequisites
 - Android Studio Ladybug | 2024.2+ (or IntelliJ IDEA)
-- JDK 17 (via `jvmToolchain(17)`)
-- Android SDK (compileSdk 36, targetSdk 36, minSdk 24)
+- JDK 21 (Homebrew OpenJDK 21 locally or Temurin 21 in CI)
+- Android SDK (compileSdk 37, targetSdk 36, minSdk 24)
 - A Gemini API key (get one at https://aistudio.google.com)
 
 #### Run Locally
 1. Open Android Studio, select **Open** and choose this project directory
 2. Allow Android Studio to fix any incompatibilities during import
 3. Create `.env` in the project root with `GEMINI_API_KEY=<your_key>` (see `.env.example`)
-4. Remove this line from `app/build.gradle.kts`: `signingConfig = signingConfigs.getByName("debugConfig")`
-5. Build: `./gradlew assembleDebug` (verifies 427 tasks, 0 errors expected)
-6. Run on emulator or device: `./gradlew installDebug`
+4. Build and verify: `./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`
+5. Run on emulator or device: `./gradlew installDebug`
 
 #### Day 1: Setup
 1. Clone the repo and open in Android Studio
 2. Create `local.properties` with `sdk.dir=/path/to/Android/Sdk`
 3. Create `.env` with Gemini API key
-4. Run `./gradlew assembleDebug` to verify build
-5. Run `./gradlew test` to verify tests pass (~38 tests)
+4. Run `./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` to verify tests, lint, and debug build
+5. Confirm `./gradlew assembleRelease --no-configuration-cache` fails fast unless release signing env vars are configured
 
 #### Day 2: Understand the Architecture
 1. Read this document (especially §14, §17, §18)
@@ -1437,7 +1432,7 @@ All core engineering tasks are completed. Future minor items are:
 | §19.2 | Code audit | Gemini API corrected: uses Firebase Vertex AI SDK, not direct REST with API key header |
 | §20.1 | Code audit | Fixed dependency versions (Moshi 1.15.2, OkHttp 4.10.0, Sun Mail 1.6.7). Removed Coil/Glide (not in codebase). Added Firebase Vertex AI, Paging, google-api-client. |
 | §21 | Code audit | Auth implementation corrected: uses Firebase Auth with Google credential, not direct Google Sign-In intent |
-| §27.1 | Code audit | Test counts corrected: ~38 tests across 7 files. MainViewModelTest and GreetingScreenshotTest removed (don't exist). |
+| §27.1 | Release-readiness audit | Test baseline refreshed to 165 passing debug unit tests across `:app` and `:core:data`; stale historical test inventory removed. |
 | §33.3 | Code audit | Key files reference corrected with actual file paths (no `feature/` or `core/ui/` modules) |
 | §11.2 | Code audit | F-011 endpoint description corrected: Firebase Vertex AI SDK, not REST with x-goog-api-key |
 | §12.1–12.2 | Code audit | User-flow screens now exist in the active Compose app and should be kept aligned with implemented routes |
@@ -1450,7 +1445,7 @@ All core engineering tasks are completed. Future minor items are:
 | §32 | Code audit | ADR-004 updated for 3-module reality. ADR-013 marked planned. ADR-024 marked resolved. |
 | §33.1–33.2, §33.7 | Code audit | Added Compose/feature-module notes; fixed onboarding refs to non-existent files |
 | §34.4 | Code audit | File counts rewritten to reflect actual ~80+ source files organized by module |
-| §35 | Code audit | Updated scorecard with real metrics (~15% coverage, 30/100 readiness); added UI Implementation phase |
+| §35 | Release-readiness audit | Scorecard needs measured coverage reporting; release blockers now distinguish code-complete wipe behavior from external Play/privacy/signing tasks. |
 | F-033 | Code audit | Status corrected: ✅ Implemented (`BootReceiver` exists in `DailyScheduler.kt`) |
 | F-056 | Code audit | Evidence updated with actual manifest attribute |
 
