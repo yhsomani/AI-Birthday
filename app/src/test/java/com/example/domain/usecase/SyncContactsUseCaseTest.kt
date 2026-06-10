@@ -32,7 +32,8 @@ class SyncContactsUseCaseTest {
 
     @Test
     fun `invoke in guest mode with empty merged contacts inserts mock contacts`() = runTest {
-        coEvery { contactSyncService.fetchGoogleContacts() } returns emptyList()
+        coEvery { contactSyncService.fetchGoogleContacts(any()) } returns emptyList()
+        coEvery { contactSyncService.fetchDeviceContacts() } returns emptyList()
         coEvery { preferencesRepository.isGuestMode() } returns true
         coEvery { contactRepository.getById(any()) } returns null
 
@@ -50,7 +51,8 @@ class SyncContactsUseCaseTest {
         val googleContact = ContactEntity(id = "g1", name = "Alice", googleContactId = "google_1", primaryEmail = "alice@gmail.com")
         val existingMock = ContactEntity(id = "mock_amit", name = "Amit")
 
-        coEvery { contactSyncService.fetchGoogleContacts() } returns listOf(googleContact)
+        coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
+        coEvery { contactSyncService.fetchDeviceContacts() } returns emptyList()
         coEvery { preferencesRepository.isGuestMode() } returns false
         coEvery { contactRepository.getAllSync() } returns listOf(existingMock)
         coEvery { contactRepository.getById(any()) } returns null
@@ -63,5 +65,90 @@ class SyncContactsUseCaseTest {
         coVerify { contactRepository.delete(existingMock) }
         coVerify { contactRepository.upsert(match { it.name == "Alice" && it.googleContactId == "google_1" && it.primaryEmail == "alice@gmail.com" }) }
         coVerify { discoverEventsUseCase() }
+    }
+
+    @Test
+    fun `invoke imports device contacts when Google has no contacts`() = runTest {
+        val deviceContact = ContactEntity(
+            id = "device_1",
+            name = "Devika Rao",
+            primaryPhone = "+91 99999 00000",
+            contactGroup = "Device",
+        )
+
+        coEvery { contactSyncService.fetchGoogleContacts(any()) } returns emptyList()
+        coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
+        coEvery { preferencesRepository.isGuestMode() } returns false
+        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getById(any()) } returns null
+
+        val outcome = useCase()
+
+        assertEquals(0, outcome.googleCount)
+        assertEquals(1, outcome.deviceCount)
+        assertEquals(1, outcome.inserted)
+        coVerify { contactRepository.upsert(match { it.id == "device_1" && it.contactGroup == "Device" }) }
+    }
+
+    @Test
+    fun `invoke keeps device contacts when Google sync fails`() = runTest {
+        val deviceContact = ContactEntity(
+            id = "device_2",
+            name = "Rohan Mehta",
+            primaryEmail = "rohan@example.com",
+        )
+
+        coEvery { contactSyncService.fetchGoogleContacts(any()) } throws RuntimeException("auth expired")
+        coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
+        coEvery { preferencesRepository.isGuestMode() } returns false
+        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getById(any()) } returns null
+
+        val outcome = useCase()
+
+        assertEquals(0, outcome.googleCount)
+        assertEquals(1, outcome.deviceCount)
+        assertEquals(1, outcome.inserted)
+        coVerify { preferencesRepository.setLastSyncError("Google sync failed; imported 1 device contacts.") }
+        coVerify { contactRepository.upsert(match { it.id == "device_2" }) }
+    }
+
+    @Test
+    fun `invoke merges duplicate Google and device contacts while keeping Google identity`() = runTest {
+        val googleContact = ContactEntity(
+            id = "google_1",
+            name = "Anaya Shah",
+            googleContactId = "people/c1",
+            primaryEmail = "anaya@example.com",
+        )
+        val deviceContact = ContactEntity(
+            id = "device_1",
+            name = "Anaya Shah",
+            primaryEmail = "ANAYA@example.com",
+            primaryPhone = "+91 88888 77777",
+            birthdayDay = 9,
+            birthdayMonth = 4,
+        )
+
+        coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
+        coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
+        coEvery { preferencesRepository.isGuestMode() } returns false
+        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getById(any()) } returns null
+
+        val outcome = useCase()
+
+        assertEquals(1, outcome.googleCount)
+        assertEquals(1, outcome.deviceCount)
+        assertEquals(1, outcome.inserted)
+        coVerify {
+            contactRepository.upsert(match {
+                it.id == "google_1" &&
+                    it.googleContactId == "people/c1" &&
+                    it.primaryPhone == "+91 88888 77777" &&
+                    it.birthdayDay == 9 &&
+                    it.birthdayMonth == 4
+            })
+        }
     }
 }

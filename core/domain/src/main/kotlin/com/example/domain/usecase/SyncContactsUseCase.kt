@@ -99,28 +99,43 @@ class SyncContactsUseCase @Inject constructor(
         googleContacts: List<ContactEntity>,
         deviceContacts: List<ContactEntity>,
     ): List<ContactEntity> {
-        val mergedByKey = linkedMapOf<String, ContactEntity>()
-        googleContacts.forEach { contact ->
-            mergedByKey[contact.mergeKey()] = contact
-        }
-        deviceContacts.forEach { deviceContact ->
-            val key = deviceContact.mergeKey()
-            val existing = mergedByKey[key]
-            mergedByKey[key] = if (existing == null) {
-                deviceContact
-            } else {
-                existing.mergeMissingFrom(deviceContact)
+        val mergedContacts = mutableListOf<ContactEntity>()
+        val keyToIndex = linkedMapOf<String, Int>()
+
+        fun registerKeys(index: Int, contact: ContactEntity) {
+            contact.mergeKeys().forEach { key ->
+                keyToIndex.putIfAbsent(key, index)
             }
         }
-        return mergedByKey.values.toList()
+
+        googleContacts.forEach { contact ->
+            val index = mergedContacts.size
+            mergedContacts += contact
+            registerKeys(index, contact)
+        }
+        deviceContacts.forEach { deviceContact ->
+            val existingIndex = deviceContact.mergeKeys().firstNotNullOfOrNull { keyToIndex[it] }
+            if (existingIndex == null) {
+                val index = mergedContacts.size
+                mergedContacts += deviceContact
+                registerKeys(index, deviceContact)
+            } else {
+                val merged = mergedContacts[existingIndex].mergeMissingFrom(deviceContact)
+                mergedContacts[existingIndex] = merged
+                registerKeys(existingIndex, merged)
+            }
+        }
+        return mergedContacts
     }
 
-    private fun ContactEntity.mergeKey(): String {
+    private fun ContactEntity.mergeKeys(): List<String> {
+        val keys = mutableListOf<String>()
         val phone = primaryPhone?.filter(Char::isDigit)?.takeIf { it.isNotBlank() }
-        if (phone != null) return "phone:$phone"
+        if (phone != null) keys += "phone:$phone"
         val email = primaryEmail?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
-        if (email != null) return "email:$email"
-        return "name:${name.trim().lowercase()}"
+        if (email != null) keys += "email:$email"
+        keys += "name:${name.trim().lowercase()}"
+        return keys
     }
 
     private fun ContactEntity.mergeMissingFrom(fallback: ContactEntity): ContactEntity {

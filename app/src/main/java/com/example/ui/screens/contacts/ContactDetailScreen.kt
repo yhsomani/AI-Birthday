@@ -360,11 +360,11 @@ fun ContactDetailScreen(
 
 @Composable
 private fun PersonalizationQualityCard(contact: ContactEntity) {
-    val checklist = listOf(
+    val checklist: List<Pair<Int, Boolean>> = listOf(
         R.string.personalization_quality_nickname to !contact.nickname.isNullOrBlank(),
         R.string.personalization_quality_interests to contact.interestsJson.hasJsonArrayContent(),
         R.string.personalization_quality_memory_notes to contact.notesText.isNotBlank(),
-        R.string.personalization_quality_channel to contact.preferredChannel in setOf("SMS", "WHATSAPP", "EMAIL"),
+        R.string.personalization_quality_channel to (contact.preferredChannel in setOf("SMS", "WHATSAPP", "EMAIL")),
     )
     val complete = checklist.count { it.second }
     val score = (complete * 100) / checklist.size

@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.core.automation.notifications.NotificationHelper
+import com.example.core.data.R
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.entities.PendingMessageEntity
@@ -38,8 +39,8 @@ class RevivalWorker @AssistedInject constructor(
             StructuredLogger.w(TAG, "Gemini API key not configured and user not authenticated — skipping worker")
             com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
                 applicationContext,
-                "RelateAI Setup Needed",
-                "RelateAI needs your Gemini API key or a signed-in Google account to generate revival messages."
+                applicationContext.getString(R.string.notification_setup_ai_title),
+                applicationContext.getString(R.string.notification_setup_revival_ai_message),
             )
             return Result.failure()
         }

@@ -22,10 +22,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.R
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelatePrimary
@@ -68,7 +70,7 @@ fun SplashScreen(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = "RelateAI",
+                text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 42.sp,
@@ -77,7 +79,7 @@ fun SplashScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Nurture your connections\nwith AI-powered wishes",
+                text = stringResource(R.string.auth_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = RelateOnBackground.copy(alpha = 0.7f),
             )

@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.example.core.automation.workers.MessageDispatchWorkRequests
+import com.example.core.data.R
 import com.example.core.db.AppDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,8 +44,8 @@ object DailyScheduler {
                 } else {
                     com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
                         context,
-                        "Exact Alarm Permission Needed",
-                        "RelateAI could not schedule an exact send. Open Automation Setup to allow scheduled sends."
+                        context.getString(R.string.notification_setup_exact_alarm_title),
+                        context.getString(R.string.notification_setup_exact_alarm_message),
                     )
                     androidx.work.WorkManager.getInstance(context)
                         .enqueue(MessageDispatchWorkRequests.create(pending.id, pending.eventId))

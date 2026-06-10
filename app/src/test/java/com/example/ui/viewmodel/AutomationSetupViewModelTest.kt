@@ -8,6 +8,7 @@ import com.example.core.prefs.SecurePrefs
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.SyncContactsUseCase
+import com.example.domain.usecase.TestSendUseCase
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
@@ -53,6 +54,9 @@ class AutomationSetupViewModelTest {
     @RelaxedMockK
     private lateinit var styleProfileRepository: StyleProfileRepository
 
+    @RelaxedMockK
+    private lateinit var testSendUseCase: TestSendUseCase
+
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var context: Context
 
@@ -62,9 +66,12 @@ class AutomationSetupViewModelTest {
         context = ApplicationProvider.getApplicationContext()
         every { securePrefs.getGoogleOAuthToken() } returns ""
         every { securePrefs.getGeminiApiKey() } returns ""
+        every { securePrefs.getSenderEmail() } returns ""
+        every { securePrefs.getSenderEmailPassword() } returns ""
         every { securePrefs.isAiWishGenerationEnabled() } returns true
         coEvery { contactRepository.getAllSync() } returns emptyList()
         coEvery { styleProfileRepository.getProfileOnce() } returns null
+        coEvery { testSendUseCase(any()) } returns TestSendUseCase.Outcome.MissingEmailSetup
     }
 
     @After
@@ -126,6 +133,18 @@ class AutomationSetupViewModelTest {
         assertTrue(message.contains("[REDACTED_EMAIL]"))
     }
 
+    @Test
+    fun `testEmailSend reports missing setup`() = runTest(testDispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.testEmailSend()
+        advanceUntilIdle()
+
+        assertEquals(context.getString(R.string.automation_setup_email_missing), viewModel.uiState.value.operationMessage)
+        assertFalse(viewModel.uiState.value.isTestingEmail)
+    }
+
     private fun newViewModel(): AutomationSetupViewModel {
         return AutomationSetupViewModel(
             appContext = context,
@@ -134,6 +153,7 @@ class AutomationSetupViewModelTest {
             geminiClient = geminiClient,
             contactRepository = contactRepository,
             styleProfileRepository = styleProfileRepository,
+            testSendUseCase = testSendUseCase,
         )
     }
 }

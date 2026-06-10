@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.core.automation.sender.MessageDispatcher
+import com.example.core.data.R
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
@@ -66,8 +67,8 @@ class MessageDispatchWorker @AssistedInject constructor(
                 StructuredLogger.w(TAG, "Message ${pendingMsg.id} is already in state ${pendingMsg.status}; aborting to prevent double-send")
                 com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
                     context,
-                    "Double-Send Prevented",
-                    "A potential duplicate send for ${contact.name} was blocked."
+                    context.getString(R.string.notification_setup_double_send_title),
+                    context.getString(R.string.notification_setup_double_send_message, contact.name),
                 )
                 return Result.success()
             }
@@ -95,8 +96,8 @@ class MessageDispatchWorker @AssistedInject constructor(
                             pendingMessageDao.updateStatus(pendingMsg.id, "EXPIRED")
                             com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
                                 context,
-                                "Message Expired",
-                                "Birthday message for ${contact.name} expired without approval."
+                                context.getString(R.string.notification_setup_message_expired_title),
+                                context.getString(R.string.notification_setup_message_expired_message, contact.name),
                             )
                             return Result.success()
                         } else {

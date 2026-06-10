@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.core.automation.scheduler.DailyScheduler
+import com.example.core.data.R
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.gemini.GeminiClient
 import com.example.core.gemini.PromptBuilder
@@ -54,8 +55,8 @@ class MessageGenerationWorker @AssistedInject constructor(
             StructuredLogger.w(TAG, "Gemini API key not configured and user not authenticated — skipping worker")
             com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
                 applicationContext,
-                "RelateAI Setup Needed",
-                "RelateAI needs your Gemini API key or a signed-in Google account to generate messages."
+                applicationContext.getString(R.string.notification_setup_ai_title),
+                applicationContext.getString(R.string.notification_setup_ai_message),
             )
             return Result.failure()
         }

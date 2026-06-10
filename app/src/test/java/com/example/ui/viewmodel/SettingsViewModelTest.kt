@@ -1,5 +1,6 @@
 package com.example.ui.viewmodel
 
+import com.example.R
 import com.example.core.auth.AuthManager
 import com.example.core.auth.UserProfile
 import com.example.core.prefs.SecurePrefs
@@ -47,8 +48,17 @@ class SettingsViewModelTest {
         every { securePrefs.isBirthdayRemindersEnabled() } returns true
         every { securePrefs.isAiWishGenerationEnabled() } returns true
         every { securePrefs.getGeminiApiKey() } returns ""
+        every { securePrefs.getSenderEmail() } returns ""
+        every { securePrefs.getSenderEmailPassword() } returns ""
         every { securePrefs.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        every { securePrefs.getQuietHoursStart() } returns 22
+        every { securePrefs.getQuietHoursEnd() } returns 8
+        every { securePrefs.getChannelBlackout() } returns "[]"
+        every { securePrefs.isBiometricLockEnabled() } returns false
         every { securePrefs.wasLegacyUnencryptedDbQuarantined() } returns false
+        every { context.getString(R.string.settings_last_sync_never) } returns "Never"
+        every { context.getString(R.string.settings_last_sync_just_now) } returns "Just now"
+        every { context.getString(R.string.settings_sync_contacts_failed) } returns "Contact sync failed."
     }
 
     @After

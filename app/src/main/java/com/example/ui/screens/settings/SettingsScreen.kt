@@ -464,6 +464,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+        }
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier

@@ -21,6 +21,26 @@ class NoHardcodedStringsRegressionTest {
         )
     }
 
+    @Test
+    fun notificationAndSetupSurfaces_doNotIntroduceRawUserVisibleStrings() {
+        val offenders = NOTIFICATION_AND_SETUP_SOURCES.flatMap { path ->
+            val file = sourceFile(path)
+            val text = file.readText()
+            val directNotificationOffenders = notificationStringPattern.findAll(text).map { match ->
+                "${file.path}:${lineNumber(text, match.range.first)}"
+            }
+            val setupCallOffenders = setupNotificationCallPattern.findAll(text)
+                .filter { call -> rawLiteralArgumentPattern.containsMatchIn(call.value) }
+                .map { match -> "${file.path}:${lineNumber(text, match.range.first)}" }
+            directNotificationOffenders + setupCallOffenders
+        }
+
+        assertTrue(
+            "Notification/setup user-visible strings should use resources:\n${offenders.joinToString("\n")}",
+            offenders.isEmpty(),
+        )
+    }
+
     private fun sourceFile(rootRelativePath: String): File {
         return listOf(
             File(rootRelativePath),
@@ -36,6 +56,7 @@ class NoHardcodedStringsRegressionTest {
 
     private companion object {
         val CLEANED_SCREEN_SOURCES = listOf(
+            "app/src/main/java/com/example/ui/screens/splash/SplashScreen.kt",
             "app/src/main/java/com/example/ui/screens/activity/ActivityHistoryScreen.kt",
             "app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt",
             "app/src/main/java/com/example/ui/screens/auth/AuthScreen.kt",
@@ -57,6 +78,25 @@ class NoHardcodedStringsRegressionTest {
 
         val visibleStringPattern = Regex(
             pattern = "(Text|SectionHeader)\\(\\s*\"|contentDescription\\s*=\\s*\"|EmptyState\\(message\\s*=\\s*\"",
+        )
+
+        val NOTIFICATION_AND_SETUP_SOURCES = listOf(
+            "core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt",
+            "core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt",
+            "core/data/src/main/kotlin/com/example/core/automation/workers/MessageGenerationWorker.kt",
+            "core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt",
+            "core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt",
+            "core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcher.kt",
+        )
+
+        val notificationStringPattern = Regex(
+            pattern = "setContent(Title|Text)\\(\\s*\"|addAction\\([^\\n]*,\\s*\"|NotificationChannel\\([^\\n]*,\\s*\"",
+        )
+        val setupNotificationCallPattern = Regex(
+            pattern = "showSetupNotification\\([\\s\\S]*?\\)",
+        )
+        val rawLiteralArgumentPattern = Regex(
+            pattern = ",\\s*\"",
         )
     }
 }

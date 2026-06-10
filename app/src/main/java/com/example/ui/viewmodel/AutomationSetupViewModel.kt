@@ -101,8 +101,15 @@ class AutomationSetupViewModel @Inject constructor(
     }
 
     fun refreshChecks() {
+        refreshChecks(clearOperationMessage = true)
+    }
+
+    private fun refreshChecks(clearOperationMessage: Boolean) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRefreshing = true, operationMessage = null)
+            _uiState.value = _uiState.value.copy(
+                isRefreshing = true,
+                operationMessage = if (clearOperationMessage) null else _uiState.value.operationMessage,
+            )
             val report = withContext(Dispatchers.IO) { buildReport() }
             _uiState.value = _uiState.value.copy(
                 isRefreshing = false,
@@ -127,7 +134,7 @@ class AutomationSetupViewModel @Inject constructor(
                     operationMessage = text(R.string.automation_setup_sync_failed),
                 )
             }
-            refreshChecks()
+            refreshChecks(clearOperationMessage = false)
         }
     }
 
@@ -172,7 +179,7 @@ class AutomationSetupViewModel @Inject constructor(
                     operationMessage = text(R.string.automation_setup_ai_test_failed),
                 )
             }
-            refreshChecks()
+            refreshChecks(clearOperationMessage = false)
         }
     }
 
@@ -189,7 +196,7 @@ class AutomationSetupViewModel @Inject constructor(
                 isTestingEmail = false,
                 operationMessage = message,
             )
-            refreshChecks()
+            refreshChecks(clearOperationMessage = false)
         }
     }
 

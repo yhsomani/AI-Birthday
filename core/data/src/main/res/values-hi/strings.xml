@@ -1,0 +1,34 @@
+<resources>
+    <string name="notification_channel_approval_name">Approval Required</string>
+    <string name="notification_channel_approval_description">Message भेजने से पहले approval चाहिए होने पर notifications.</string>
+    <string name="notification_channel_revival_name">Revival Suggestions</string>
+    <string name="notification_channel_revival_description">जिन contacts से काफी समय बात नहीं हुई उनसे reconnect करने के suggestions.</string>
+    <string name="notification_channel_event_reminders_name">Event Reminders</string>
+    <string name="notification_channel_event_reminders_description">Contacts के birthdays और anniversaries के दिन reminders.</string>
+    <string name="notification_channel_system_name">System Alerts</string>
+    <string name="notification_channel_system_description">System notifications, warnings, और configuration reminders.</string>
+    <string name="notification_channel_dispatch_status_name">Dispatch Status</string>
+    <string name="notification_channel_dispatch_status_description">Background task और dispatch logs.</string>
+    <string name="notification_approval_title">%1$s event कल है</string>
+    <string name="notification_action_approve">Approve</string>
+    <string name="notification_action_reject">Reject</string>
+    <string name="notification_action_edit">Edit</string>
+    <string name="notification_revival_title">%1$s से reconnect करें</string>
+    <string name="notification_revival_text">आपने %1$d दिनों से बात नहीं की</string>
+    <string name="notification_revival_big_text">Suggested message:\n\n%1$s\n\nआप इसे Messages screen में edit और approve कर सकते हैं।</string>
+    <string name="notification_event_today_title">आज event है: %1$s</string>
+    <string name="notification_event_today_text">आज %1$s का %2$s है। उनसे reconnect करें।</string>
+    <string name="notification_setup_double_send_title">Double-send रोका गया</string>
+    <string name="notification_setup_double_send_message">%1$s के लिए duplicate send block कर दिया गया।</string>
+    <string name="notification_setup_message_expired_title">Message expired</string>
+    <string name="notification_setup_message_expired_message">%1$s के लिए birthday message approval के बिना expire हो गया।</string>
+    <string name="notification_setup_ai_title">RelateAI setup चाहिए</string>
+    <string name="notification_setup_ai_message">Messages generate करने के लिए Gemini API key या signed-in Google account चाहिए।</string>
+    <string name="notification_setup_revival_ai_message">Revival messages generate करने के लिए Gemini API key या signed-in Google account चाहिए।</string>
+    <string name="notification_setup_exact_alarm_title">Exact alarm permission चाहिए</string>
+    <string name="notification_setup_exact_alarm_message">RelateAI exact send schedule नहीं कर सका। Scheduled sends allow करने के लिए Automation Setup खोलें।</string>
+    <string name="notification_setup_sms_permission_title">SMS permission चाहिए</string>
+    <string name="notification_setup_sms_permission_message">%1$s को message नहीं भेजा जा सका क्योंकि SMS permission missing है। Permission देने के लिए tap करें।</string>
+    <string name="notification_setup_email_needed_title">Email setup चाहिए</string>
+    <string name="notification_setup_email_needed_message">Email wishes भेजने से पहले Settings में Gmail sender address और app password जोड़ें।</string>
+</resources>

@@ -11,6 +11,7 @@ import com.example.domain.repository.MessageRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RegeneratePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
+import com.example.domain.usecase.TestSendUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.impl.annotations.RelaxedMockK
@@ -55,6 +56,9 @@ class WishPreviewViewModelTest {
     @RelaxedMockK
     private lateinit var regeneratePendingMessageUseCase: RegeneratePendingMessageUseCase
 
+    @RelaxedMockK
+    private lateinit var testSendUseCase: TestSendUseCase
+
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -65,6 +69,7 @@ class WishPreviewViewModelTest {
         coEvery { giftHistoryRepository.getByContact(any()) } returns emptyList()
         coEvery { messageRepository.getSentByContact(any(), any()) } returns emptyList()
         coEvery { messageFeedbackRepository.getLatestForPendingMessage(any()) } returns null
+        coEvery { testSendUseCase(any()) } returns TestSendUseCase.Outcome.Sent
     }
 
     @After
@@ -100,6 +105,7 @@ class WishPreviewViewModelTest {
         approvePendingMessageUseCase = approvePendingMessageUseCase,
         rejectPendingMessageUseCase = rejectPendingMessageUseCase,
         regeneratePendingMessageUseCase = regeneratePendingMessageUseCase,
+        testSendUseCase = testSendUseCase,
     )
 
     @Test
@@ -169,6 +175,41 @@ class WishPreviewViewModelTest {
 
         viewModel.updateEditedText("Custom draft text")
         assertEquals("Custom draft text", viewModel.uiState.value.editedText)
+    }
+
+    @Test
+    fun `sendTestToMyself surfaces localized success feedback`() = runTest(testDispatcher) {
+        coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
+        coEvery { testSendUseCase("Wishing you a happy birthday!") } returns TestSendUseCase.Outcome.Sent
+
+        val viewModel = createViewModel()
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        viewModel.sendTestToMyself()
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.uiState.value.isTestingSend)
+        assertEquals(R.string.wish_preview_test_sent, viewModel.uiState.value.feedbackEvent?.message?.let {
+            (it as com.example.ui.feedback.UiText.Resource).resId
+        })
+    }
+
+    @Test
+    fun `sendTestToMyself surfaces missing email setup feedback`() = runTest(testDispatcher) {
+        coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
+        coEvery { testSendUseCase(any()) } returns TestSendUseCase.Outcome.MissingEmailSetup
+
+        val viewModel = createViewModel()
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        viewModel.sendTestToMyself()
+        advanceUntilIdle()
+
+        assertEquals(R.string.wish_preview_test_missing_email, viewModel.uiState.value.feedbackEvent?.message?.let {
+            (it as com.example.ui.feedback.UiText.Resource).resId
+        })
     }
 
     @Test

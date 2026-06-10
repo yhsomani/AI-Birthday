@@ -103,7 +103,7 @@ class GenerateMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke with valid parameters generates variants and saves in MANUAL mode`() = runTest {
+    fun `invoke with invalid manual legacy mode falls back to smart approval`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         val contact = ContactEntity(id = "c1", name = "John", relationshipType = "FRIEND", preferredChannel = "SMS", automationMode = "MANUAL")
         val variants = MessageVariantsResult("sh", "std", "lg", "fr", "fn", "em", "standard")
@@ -122,7 +122,7 @@ class GenerateMessageUseCaseTest {
 
         assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
         val generated = result as GenerateMessageUseCase.GenerationOutcome.Generated
-        assertEquals("MANUAL", generated.approvalMode)
+        assertEquals("SMART_APPROVE", generated.approvalMode)
         assertEquals(0, generated.retries)
 
         coVerify { messageRepository.insertPending(any()) }

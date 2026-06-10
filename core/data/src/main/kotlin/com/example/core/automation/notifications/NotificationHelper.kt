@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.example.core.data.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.gemini.MessageVariants
@@ -28,10 +29,10 @@ object NotificationHelper {
             if (manager.getNotificationChannel(APPROVAL) == null) {
                 val channel = NotificationChannel(
                     APPROVAL,
-                    "Approval Required",
+                    context.getString(R.string.notification_channel_approval_name),
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "Notifications for when your approval is needed to send a message."
+                    description = context.getString(R.string.notification_channel_approval_description)
                     enableVibration(true)
                 }
                 manager.createNotificationChannel(channel)
@@ -41,10 +42,10 @@ object NotificationHelper {
             if (manager.getNotificationChannel(REVIVAL) == null) {
                 val channel = NotificationChannel(
                     REVIVAL,
-                    "Revival Suggestions",
+                    context.getString(R.string.notification_channel_revival_name),
                     NotificationManager.IMPORTANCE_DEFAULT
                 ).apply {
-                    description = "Suggestions to reconnect with contacts you haven't spoken to in a while."
+                    description = context.getString(R.string.notification_channel_revival_description)
                 }
                 manager.createNotificationChannel(channel)
             }
@@ -53,10 +54,10 @@ object NotificationHelper {
             if (manager.getNotificationChannel(EVENT_REMINDERS) == null) {
                 val channel = NotificationChannel(
                     EVENT_REMINDERS,
-                    "Event Reminders",
+                    context.getString(R.string.notification_channel_event_reminders_name),
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "Reminders on the day of contacts' birthdays/anniversaries."
+                    description = context.getString(R.string.notification_channel_event_reminders_description)
                     enableVibration(true)
                 }
                 manager.createNotificationChannel(channel)
@@ -66,10 +67,10 @@ object NotificationHelper {
             if (manager.getNotificationChannel(SYSTEM) == null) {
                 val channel = NotificationChannel(
                     SYSTEM,
-                    "System Alerts",
+                    context.getString(R.string.notification_channel_system_name),
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "System notifications, warnings, and configuration reminders."
+                    description = context.getString(R.string.notification_channel_system_description)
                 }
                 manager.createNotificationChannel(channel)
             }
@@ -78,10 +79,10 @@ object NotificationHelper {
             if (manager.getNotificationChannel(DISPATCH_STATUS) == null) {
                 val channel = NotificationChannel(
                     DISPATCH_STATUS,
-                    "Dispatch Status",
+                    context.getString(R.string.notification_channel_dispatch_status_name),
                     NotificationManager.IMPORTANCE_LOW
                 ).apply {
-                    description = "Background task and dispatch logs."
+                    description = context.getString(R.string.notification_channel_dispatch_status_description)
                     enableVibration(false)
                     setSound(null, null)
                 }
@@ -130,12 +131,12 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, APPROVAL)
             .setSmallIcon(android.R.drawable.ic_dialog_email)
-            .setContentTitle("\uD83C\uDF82 ${contact.name}'s event tomorrow")
+            .setContentTitle(context.getString(R.string.notification_approval_title, contact.name))
             .setContentText(variants.standard)
             .setStyle(NotificationCompat.BigTextStyle().bigText(variants.standard))
-            .addAction(android.R.drawable.ic_input_add, "Approve", approveIntent)
-            .addAction(android.R.drawable.ic_delete, "Reject", rejectIntent)
-            .addAction(android.R.drawable.ic_menu_edit, "Edit", editIntent)
+            .addAction(android.R.drawable.ic_input_add, context.getString(R.string.notification_action_approve), approveIntent)
+            .addAction(android.R.drawable.ic_delete, context.getString(R.string.notification_action_reject), rejectIntent)
+            .addAction(android.R.drawable.ic_menu_edit, context.getString(R.string.notification_action_edit), editIntent)
             .setContentIntent(editIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -164,9 +165,9 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, REVIVAL)
             .setSmallIcon(android.R.drawable.ic_dialog_email)
-            .setContentTitle("Reconnect with $contactName")
-            .setContentText("You haven't spoken in ${daysSinceContact} days")
-            .setStyle(NotificationCompat.BigTextStyle().bigText("Suggested message:\n\n$suggestionText\n\nYou can edit and approve this in the Messages screen."))
+            .setContentTitle(context.getString(R.string.notification_revival_title, contactName))
+            .setContentText(context.getString(R.string.notification_revival_text, daysSinceContact))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(context.getString(R.string.notification_revival_big_text, suggestionText)))
             .setContentIntent(appIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -217,8 +218,14 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, EVENT_REMINDERS)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Event Today: ${contact.name}")
-            .setContentText("It's ${contact.name}'s ${event.type.lowercase().replace('_', ' ')} today! Reconnect with them.")
+            .setContentTitle(context.getString(R.string.notification_event_today_title, contact.name))
+            .setContentText(
+                context.getString(
+                    R.string.notification_event_today_text,
+                    contact.name,
+                    event.type.lowercase().replace('_', ' '),
+                )
+            )
             .setContentIntent(appIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

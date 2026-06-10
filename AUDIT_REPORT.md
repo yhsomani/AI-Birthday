@@ -784,3 +784,98 @@
 
 **Commit message**
 * `test: cover resilience primitives`
+
+### Feature 21: Functionality Gap and UX Feedback Implementation
+
+**Problem identified**
+* Device contacts were documented as part of sync but only Google contact sync was implemented.
+* Wish Preview had a simulated "send test to myself" path and AI Doctor had no email readiness/test action.
+* Several high-impact settings were persisted but not visible in Settings: Gmail sender credentials, quiet hours, channel blackout, and biometric lock.
+* Onboarding was informational instead of an actionable setup flow.
+* Contact personalization accepted enum-like values through free text and closed the dialog before save success.
+* Notification/setup surfaces and Splash still contained raw visible strings outside the hardcoded-string regression guard.
+
+**Root cause**
+* Earlier release-readiness passes localized and hardened screens in slices, but setup, sync, and send-readiness workflows still had mixed feedback patterns and hidden configuration.
+* Sync merging used one preferred key per contact, so contacts with both phone and email could miss an obvious Google/device duplicate match.
+
+**Fix implemented**
+* Added typed domain boundary values for `MessageStatus`, `MessageChannel`, `ApprovalMode`, and `EventType`.
+* Added `UiText` and `FeedbackEvent` primitives and applied them to Settings and Wish Preview feedback.
+* Implemented device contact import via `ContactsContract`, gated by `READ_CONTACTS` behind explicit Contact List/Settings sync actions.
+* Updated contact sync to merge Google and device contacts, preserve Google identity, fill missing device fields, count Google/device imports, recover when Google fails but device import succeeds, and match duplicates on any stable phone/email/name key.
+* Replaced fake Wish Preview test-send feedback with `TestSendUseCase` and `TestSendServiceImpl`, sending a real email test to the configured Gmail sender.
+* Added AI Doctor email readiness checks and a Test Email action that preserves operation feedback during automatic refresh.
+* Exposed Gmail sender/app password, quiet hours, disabled channels, and biometric lock in Settings with localized snackbar feedback.
+* Enforced email setup and disabled-channel checks in message dispatch.
+* Reworked onboarding into a setup checklist covering sign-in, contacts, AI/email, permissions, Style Coach, and AI Doctor readiness.
+* Reworked contact preferences to use typed controls for language, channel, formality, style, and automation mode, added send-time validation, and kept the dialog open until save succeeds.
+* Added a per-contact personalization quality checklist using nickname, interests, notes, and preferred channel.
+* Moved notification channel/setup strings into core/data resources and expanded the hardcoded-string regression guard to Splash and notification/setup surfaces.
+
+**Impact**
+* Users can now import local device contacts, understand import counts, and recover from Google sync failures with device data.
+* Test-send, email readiness, and hidden settings are real, visible, and actionable instead of simulated or buried.
+* Setup is clearer for first-run users and points directly to readiness diagnostics.
+* Contact personalization has lower invalid-input risk and clearer quality feedback before wish generation.
+* Notification and setup copy is resource-backed for localization and future regression protection.
+
+**Files modified**
+* `core/domain/src/main/kotlin/com/example/domain/model/*.kt`
+* `core/domain/src/main/kotlin/com/example/domain/usecase/SyncContactsUseCase.kt`
+* `core/domain/src/main/kotlin/com/example/domain/usecase/TestSendUseCase.kt`
+* `core/domain/src/main/kotlin/com/example/domain/service/TestSendService.kt`
+* `core/domain/src/main/kotlin/com/example/domain/service/ContactSyncService.kt`
+* `core/data/src/main/kotlin/com/example/core/contacts/DeviceContactsReader.kt`
+* `core/data/src/main/kotlin/com/example/core/contacts/ContactSyncServiceImpl.kt`
+* `core/data/src/main/kotlin/com/example/core/automation/sender/TestSendServiceImpl.kt`
+* `core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcher.kt`
+* `core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt`
+* `core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt`
+* `core/data/src/main/kotlin/com/example/core/automation/workers/MessageGenerationWorker.kt`
+* `core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt`
+* `core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt`
+* `core/data/src/main/res/values/strings.xml`
+* `core/data/src/main/res/values-hi/strings.xml`
+* `app/src/main/AndroidManifest.xml`
+* `app/src/main/java/com/example/ui/feedback/UiText.kt`
+* `app/src/main/java/com/example/ui/screens/onboarding/OnboardingScreen.kt`
+* `app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt`
+* `app/src/main/java/com/example/ui/screens/contacts/ContactListScreen.kt`
+* `app/src/main/java/com/example/ui/screens/contacts/ContactDetailScreen.kt`
+* `app/src/main/java/com/example/ui/screens/events/EventsScreen.kt`
+* `app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt`
+* `app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt`
+* `app/src/main/java/com/example/ui/screens/splash/SplashScreen.kt`
+* `app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt`
+* `app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt`
+* `app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt`
+* `app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt`
+* `core/domain/src/main/kotlin/com/example/domain/usecase/GenerateMessageUseCase.kt`
+* `app/src/main/res/values/strings.xml`
+* `app/src/main/res/values-hi/strings.xml`
+* `app/src/test/java/com/example/domain/model/DomainValueParsingTest.kt`
+* `app/src/test/java/com/example/domain/usecase/TestSendUseCaseTest.kt`
+* `app/src/test/java/com/example/domain/usecase/GenerateMessageUseCaseTest.kt`
+* `app/src/test/java/com/example/domain/usecase/SyncContactsUseCaseTest.kt`
+* `app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt`
+* `app/src/test/java/com/example/ui/viewmodel/AutomationSetupViewModelTest.kt`
+* `app/src/test/java/com/example/ui/viewmodel/SettingsViewModelTest.kt`
+* `app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt`
+* `SSOT_CONSOLIDATED.md`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `./gradlew :app:compileDebugKotlin :core:data:compileDebugKotlin :core:domain:compileDebugKotlin --no-configuration-cache` passed.
+* `./gradlew :app:testDebugUnitTest --tests com.example.domain.usecase.SyncContactsUseCaseTest --tests com.example.ui.viewmodel.AutomationSetupViewModelTest --tests com.example.domain.model.DomainValueParsingTest --tests com.example.domain.usecase.TestSendUseCaseTest --tests com.example.ui.viewmodel.WishPreviewViewModelTest --tests com.example.ui.viewmodel.SettingsViewModelTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+* `./gradlew testDebugUnitTest --no-configuration-cache` passed.
+* `./gradlew lintDebug assembleDebug --no-configuration-cache` passed.
+* Robolectric emitted a non-fatal temp-directory cleanup warning after tests; the Gradle task completed successfully.
+
+**Remaining improvements**
+* Full device smoke testing was not run in this pass.
+* Remaining ViewModels beyond Settings/Wish Preview/AI Doctor can continue migrating to the shared `FeedbackEvent` pattern.
+* Contact List performance with 500+ contacts still needs measured UI profiling and a Paging UI switch if full-list rendering regresses.
+
+**Commit message**
+* `feat: close setup and feedback gaps`
