@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
@@ -80,6 +81,7 @@ fun SettingsScreen(
     onNavigateToStyleCoach: () -> Unit = {},
     onNavigateToBackupRestore: () -> Unit = {},
     onNavigateToAutomationSetup: () -> Unit = {},
+    onNavigateToActivityHistory: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -312,6 +314,13 @@ fun SettingsScreen(
                         title = stringResource(R.string.backup_restore_title),
                         subtitle = stringResource(R.string.settings_backup_restore_subtitle),
                         onClick = onNavigateToBackupRestore
+                    )
+                    SettingsDivider()
+                    SettingsRow(
+                        icon = Icons.Filled.History,
+                        title = stringResource(R.string.activity_history_title),
+                        subtitle = stringResource(R.string.settings_activity_history_subtitle),
+                        onClick = onNavigateToActivityHistory
                     )
                 }
             }

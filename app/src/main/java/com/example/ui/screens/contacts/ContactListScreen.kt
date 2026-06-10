@@ -35,15 +35,14 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
@@ -55,9 +54,23 @@ import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.components.SyncErrorCard
+import com.example.ui.viewmodel.ContactFilter
 import com.example.ui.viewmodel.ContactListViewModel
+import com.example.ui.viewmodel.ContactSort
 
-private val filterOptions = listOf("All", "Family", "Friends", "Work", "Close Friends")
+private val filterOptions = listOf(
+    ContactFilter.ALL,
+    ContactFilter.FAMILY,
+    ContactFilter.FRIENDS,
+    ContactFilter.WORK,
+    ContactFilter.CLOSE_FRIENDS,
+)
+
+private val sortOptions = listOf(
+    ContactSort.NAME_ASC,
+    ContactSort.HEALTH_DESC,
+    ContactSort.HEALTH_ASC,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,16 +79,6 @@ fun ContactListScreen(
     viewModel: ContactListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf("All") }
-
-    val filteredContacts = state.contacts.filter { contact ->
-        val matchesSearch = contact.name.contains(searchQuery, ignoreCase = true) || searchQuery.isBlank()
-        val matchesFilter = selectedFilter == "All" ||
-                contact.contactGroup.equals(selectedFilter, ignoreCase = true) ||
-                (selectedFilter == "Friends" && contact.relationshipType == "FRIEND")
-        matchesSearch && matchesFilter
-    }
 
     Column(
         modifier = Modifier
@@ -85,24 +88,24 @@ fun ContactListScreen(
     ) {
         Spacer(modifier = Modifier.height(48.dp))
         Text(
-            text = "Contacts",
+            text = stringResource(R.string.nav_contacts),
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
+            value = state.searchQuery,
+            onValueChange = viewModel::updateSearchQuery,
             placeholder = {
-                Text("Search contacts...", color = RelateOnSurfaceVariant)
+                Text(stringResource(R.string.contacts_search_placeholder), color = RelateOnSurfaceVariant)
             },
             leadingIcon = {
-                Icon(Icons.Filled.Search, contentDescription = "Search", tint = RelateOnSurfaceVariant)
+                Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.search), tint = RelateOnSurfaceVariant)
             },
             trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Filled.Close, contentDescription = "Clear search", tint = RelateOnSurfaceVariant)
+                if (state.searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.clear_search), tint = RelateOnSurfaceVariant)
                     }
                 }
             },
@@ -127,9 +130,24 @@ fun ContactListScreen(
         ) {
             filterOptions.forEach { filter ->
                 FilterChip(
-                    label = filter,
-                    isSelected = selectedFilter == filter,
-                    onClick = { selectedFilter = filter },
+                    label = filter.label(),
+                    isSelected = state.selectedFilter == filter,
+                    onClick = { viewModel.selectFilter(filter) },
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            sortOptions.forEach { sort ->
+                FilterChip(
+                    label = sort.label(),
+                    isSelected = state.selectedSort == sort,
+                    onClick = { viewModel.selectSort(sort) },
                 )
             }
         }
@@ -168,16 +186,16 @@ fun ContactListScreen(
                             }
                         }
                     }
-                } else if (filteredContacts.isEmpty()) {
+                } else if (state.contacts.isEmpty()) {
                     Box(
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         contentAlignment = Alignment.Center
                     ) {
-                        EmptyState(message = "No contacts found")
+                        EmptyState(message = stringResource(R.string.contacts_no_contacts_found))
                     }
                 } else {
                     LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(filteredContacts, key = { it.id }) { contact ->
+                        items(state.contacts, key = { it.id }) { contact ->
                             ContactRow(
                                 contact = contact,
                                 onClick = { onContactClick(contact.id) },
@@ -188,6 +206,22 @@ fun ContactListScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ContactFilter.label(): String = when (this) {
+    ContactFilter.ALL -> stringResource(R.string.filter_all)
+    ContactFilter.FAMILY -> stringResource(R.string.contact_filter_family)
+    ContactFilter.FRIENDS -> stringResource(R.string.contact_filter_friends)
+    ContactFilter.WORK -> stringResource(R.string.contact_filter_work)
+    ContactFilter.CLOSE_FRIENDS -> stringResource(R.string.contact_filter_close_friends)
+}
+
+@Composable
+private fun ContactSort.label(): String = when (this) {
+    ContactSort.NAME_ASC -> stringResource(R.string.contact_sort_name)
+    ContactSort.HEALTH_DESC -> stringResource(R.string.contact_sort_health_high)
+    ContactSort.HEALTH_ASC -> stringResource(R.string.contact_sort_health_low)
 }
 
 @Composable

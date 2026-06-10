@@ -271,4 +271,114 @@
     <string name="backup_error_wrong_passphrase">The passphrase does not match this backup.</string>
     <string name="backup_error_unsupported_version">This backup was created by a newer version of RelateAI. Update the app and try again.</string>
     <string name="backup_error_database">Restore failed before any changes were saved. Check the backup file and try again.</string>
+
+    <!-- Broad workflow cleanup -->
+    <string name="filter_all">All</string>
+    <string name="filter_next_7_days">7 days</string>
+    <string name="filter_next_30_days">30 days</string>
+    <string name="filter_next_90_days">90 days</string>
+    <string name="optional">Optional</string>
+    <string name="saving">Saving...</string>
+    <string name="retry">Retry</string>
+    <string name="avatar">Avatar</string>
+    <string name="clear_search">Clear search</string>
+    <string name="days">days</string>
+
+    <!-- Home -->
+    <string name="home_greeting">Hello, %1$s</string>
+    <string name="home_stat_wishes_sent">Wishes Sent</string>
+    <string name="home_stat_upcoming">Upcoming</string>
+    <string name="home_stat_score">Score</string>
+    <string name="home_upcoming_birthdays">Upcoming Birthdays</string>
+    <string name="home_no_upcoming_birthdays">No upcoming birthdays</string>
+    <string name="home_birthday_on_date">Birthday on %1$s</string>
+
+    <!-- Contact list -->
+    <string name="contact_filter_family">Family</string>
+    <string name="contact_filter_friends">Friends</string>
+    <string name="contact_filter_work">Work</string>
+    <string name="contact_filter_close_friends">Close Friends</string>
+    <string name="contact_sort_name">Name</string>
+    <string name="contact_sort_health_high">Health high</string>
+    <string name="contact_sort_health_low">Health low</string>
+
+    <!-- Events cleanup -->
+    <string name="events_subtitle">Birthdays, anniversaries, and manual reminders.</string>
+    <string name="events_add_event">Add Event</string>
+    <string name="events_search_placeholder">Search events or contacts</string>
+    <string name="events_empty">No events yet. Add one manually or sync your contacts.</string>
+    <string name="events_existing_contact">Existing</string>
+    <string name="events_new_contact">New</string>
+    <string name="events_choose_contact">Choose contact</string>
+    <string name="events_no_contacts_for_manual">No contacts yet. Switch to New to add a local contact.</string>
+    <string name="events_new_contact_name">New contact name</string>
+    <string name="events_label">Label</string>
+    <string name="events_error_month_day">Enter month and day.</string>
+    <string name="events_error_choose_contact">Choose a contact.</string>
+    <string name="events_error_contact_name">Enter a contact name.</string>
+    <string name="event_type_birthday">Birthday</string>
+    <string name="event_type_anniversary">Anniversary</string>
+    <string name="event_type_work_anniversary">Work anniversary</string>
+    <string name="event_type_custom">Custom</string>
+    <string name="events_card_subtitle">%1$s • %2$s • %3$s</string>
+
+    <!-- Messages cleanup -->
+    <string name="messages_inbox_title">Messages Inbox</string>
+    <string name="messages_tab_today">Today (%1$d)</string>
+    <string name="messages_tab_pending">Pending (%1$d)</string>
+    <string name="messages_tab_approved">Approved (%1$d)</string>
+    <string name="messages_tab_sent">Sent (%1$d)</string>
+    <string name="messages_tab_failed">Failed (%1$d)</string>
+    <string name="messages_search_placeholder">Search by contact, event, channel, or message</string>
+    <string name="messages_reject_title">Reject Message</string>
+    <string name="messages_reject_body">Are you sure you want to reject this message? It will not be sent.</string>
+    <string name="messages_selected_count">%1$d selected</string>
+    <string name="messages_clear_selection">Clear selection</string>
+    <string name="messages_empty_today">No messages scheduled for today</string>
+    <string name="messages_empty_pending">No upcoming messages</string>
+    <string name="messages_empty_sent">No sent messages yet</string>
+    <string name="messages_empty_failed">No failed messages</string>
+    <string name="messages_empty_approved">No approved messages</string>
+    <string name="messages_auto_sends_minutes">Auto-sends in %1$d mins!</string>
+    <string name="messages_hours_left">%1$dh left</string>
+    <string name="messages_channel_format">Channel: %1$s</string>
+    <string name="messages_scheduled_format">Scheduled: %1$s</string>
+    <string name="messages_status_failed">Failed</string>
+    <string name="messages_status_approved">Approved</string>
+    <string name="messages_retry_send">Retry Send</string>
+    <string name="messages_revoke">Revoke</string>
+    <string name="channel_sms">SMS</string>
+    <string name="channel_whatsapp">WhatsApp</string>
+    <string name="channel_email">Email</string>
+    <string name="message_sort_oldest">Oldest</string>
+    <string name="message_sort_newest">Newest</string>
+    <string name="message_sort_contact">Contact</string>
+
+    <!-- Analytics export -->
+    <string name="analytics_export_report">Export report</string>
+    <string name="analytics_share_chooser">Share relationship report</string>
+    <string name="analytics_export_failed">Could not export the report. Please try again.</string>
+    <string name="analytics_monthly_wishes">Monthly Wishes</string>
+    <string name="analytics_no_wishes_this_year">No wishes sent yet this year</string>
+    <string name="analytics_contact_distribution">Contact Distribution</string>
+    <string name="analytics_others">Others</string>
+    <string name="analytics_relationship_health">Relationship Health</string>
+    <string name="analytics_health_healthy">Healthy (70%+)</string>
+    <string name="analytics_health_attention">Needs Attention</string>
+    <string name="analytics_health_at_risk">At Risk</string>
+
+    <!-- Activity history -->
+    <string name="activity_history_title">Activity History</string>
+    <string name="activity_history_subtitle">Recent app actions and exports</string>
+    <string name="activity_history_empty">No activity yet</string>
+    <string name="activity_history_date_pattern">MMM dd, yyyy HH:mm</string>
+    <string name="activity_filter_message">Messages</string>
+    <string name="activity_filter_event">Events</string>
+    <string name="activity_filter_sync">Sync</string>
+    <string name="activity_filter_analytics">Analytics</string>
+    <string name="activity_filter_settings">Settings</string>
+    <string name="activity_filter_today">Today</string>
+    <string name="activity_filter_last_7_days">7 days</string>
+    <string name="activity_filter_last_30_days">30 days</string>
+    <string name="settings_activity_history_subtitle">Review recent app activity</string>
 </resources>

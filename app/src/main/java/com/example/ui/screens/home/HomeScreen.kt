@@ -35,9 +35,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
 import com.example.core.ui.components.StatCard
@@ -72,7 +74,7 @@ fun HomeScreen(
                     if (state.userPhotoUrl != null) {
                         AsyncImage(
                             model = state.userPhotoUrl,
-                            contentDescription = "Profile photo",
+                            contentDescription = stringResource(R.string.profile_photo),
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape),
@@ -81,7 +83,7 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                     }
                     Text(
-                        text = "Hello, ${state.userName}",
+                        text = stringResource(R.string.home_greeting, state.userName),
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -89,7 +91,7 @@ fun HomeScreen(
                 IconButton(onClick = onNavigateToSettings) {
                     Icon(
                         imageVector = Icons.Filled.Settings,
-                        contentDescription = "Settings",
+                        contentDescription = stringResource(R.string.settings),
                         tint = RelateOnSurfaceVariant,
                     )
                 }
@@ -127,13 +129,13 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     StatCard(
-                        label = "Wishes Sent",
+                        label = stringResource(R.string.home_stat_wishes_sent),
                         value = "${state.sentCount}",
                         icon = Icons.Filled.Star,
                         modifier = Modifier.weight(1f),
                     )
                     StatCard(
-                        label = "Upcoming",
+                        label = stringResource(R.string.home_stat_upcoming),
                         value = "${state.upcomingEventsCount}",
                         icon = Icons.Filled.CalendarMonth,
                         modifier = Modifier.weight(1f),
@@ -145,19 +147,19 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     StatCard(
-                        label = "Contacts",
+                        label = stringResource(R.string.dashboard_contacts),
                         value = "${state.contactCount}",
                         icon = Icons.Filled.People,
                         modifier = Modifier.weight(1f),
                     )
                     StatCard(
-                        label = "Pending",
+                        label = stringResource(R.string.messages_pending),
                         value = "${state.pendingCount}",
                         icon = Icons.Filled.MailOutline,
                         modifier = Modifier.weight(1f),
                     )
                     StatCard(
-                        label = "Score",
+                        label = stringResource(R.string.home_stat_score),
                         value = "${state.healthScore}",
                         icon = Icons.Filled.Favorite,
                         modifier = Modifier.weight(1f),
@@ -168,7 +170,7 @@ fun HomeScreen(
 
         item {
             Spacer(modifier = Modifier.height(24.dp))
-            SectionHeader(title = "Upcoming Birthdays")
+            SectionHeader(title = stringResource(R.string.home_upcoming_birthdays))
         }
 
         item {
@@ -176,7 +178,7 @@ fun HomeScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     if (state.upcomingBirthdays.isEmpty()) {
                         Text(
-                            text = "No upcoming birthdays",
+                            text = stringResource(R.string.home_no_upcoming_birthdays),
                             style = MaterialTheme.typography.bodyMedium,
                             color = RelateOnSurfaceVariant,
                         )
@@ -225,7 +227,7 @@ private fun BirthdayRow(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = "Birthday on $date",
+                text = stringResource(R.string.home_birthday_on_date, date),
                 style = MaterialTheme.typography.bodySmall,
                 color = RelateOnSurfaceVariant,
             )

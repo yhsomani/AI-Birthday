@@ -1,11 +1,13 @@
 package com.example.ui.screens.messages
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,17 +22,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.example.R
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.ui.components.EmptyState
+import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.RelateGlassCard
+import com.example.core.ui.components.relateTextFieldColors
 import com.example.core.ui.theme.*
+import com.example.ui.viewmodel.MessageChannelFilter
+import com.example.ui.viewmodel.MessageSort
 import com.example.ui.viewmodel.MessagesViewModel
 import com.example.ui.viewmodel.PendingMessageItem
 import com.example.ui.viewmodel.SentMessageItem
@@ -38,6 +46,19 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private val channelFilters = listOf(
+    MessageChannelFilter.ALL,
+    MessageChannelFilter.SMS,
+    MessageChannelFilter.WHATSAPP,
+    MessageChannelFilter.EMAIL,
+)
+
+private val messageSortOptions = listOf(
+    MessageSort.SCHEDULED_ASC,
+    MessageSort.SCHEDULED_DESC,
+    MessageSort.CONTACT_ASC,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,11 +71,11 @@ fun MessagesScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val tabs = listOf(
-        "Today (${state.todayMessages.size})",
-        "Pending (${state.pendingMessages.size})",
-        "Approved (${state.approvedMessages.size})",
-        "Sent (${state.sentMessages.size})",
-        "Failed (${state.failedMessages.size})"
+        stringResource(R.string.messages_tab_today, state.todayMessages.size),
+        stringResource(R.string.messages_tab_pending, state.pendingMessages.size),
+        stringResource(R.string.messages_tab_approved, state.approvedMessages.size),
+        stringResource(R.string.messages_tab_sent, state.sentMessages.size),
+        stringResource(R.string.messages_tab_failed, state.failedMessages.size),
     )
 
     val pagerState = rememberPagerState(pageCount = { 5 })
@@ -70,8 +91,8 @@ fun MessagesScreen(
     if (showRejectDialogForId != null) {
         AlertDialog(
             onDismissRequest = { showRejectDialogForId = null },
-            title = { Text("Reject Message", color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("Are you sure you want to reject this message? It will not be sent.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            title = { Text(stringResource(R.string.messages_reject_title), color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text(stringResource(R.string.messages_reject_body), color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -81,12 +102,12 @@ fun MessagesScreen(
                         showRejectDialogForId = null
                     }
                 ) {
-                    Text("Reject", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.reject), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRejectDialogForId = null }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -100,7 +121,7 @@ fun MessagesScreen(
     ) {
         Spacer(modifier = Modifier.height(48.dp))
         Text(
-            text = "Messages Inbox",
+            text = stringResource(R.string.messages_inbox_title),
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold,
@@ -142,6 +163,51 @@ fun MessagesScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        OutlinedTextField(
+            value = state.searchQuery,
+            onValueChange = viewModel::updateSearchQuery,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.search)) },
+            placeholder = { Text(stringResource(R.string.messages_search_placeholder)) },
+            leadingIcon = {
+                Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.search))
+            },
+            singleLine = true,
+            colors = relateTextFieldColors(),
+            shape = RoundedCornerShape(10.dp),
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            channelFilters.forEach { filter ->
+                FilterChip(
+                    label = filter.label(),
+                    isSelected = state.selectedChannelFilter == filter,
+                    onClick = { viewModel.selectChannelFilter(filter) },
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            messageSortOptions.forEach { sort ->
+                FilterChip(
+                    label = sort.label(),
+                    isSelected = state.selectedSort == sort,
+                    onClick = { viewModel.selectSort(sort) },
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+
         if (state.selectedMessageIds.isNotEmpty()) {
             BulkActionBar(
                 selectedCount = state.selectedMessageIds.size,
@@ -175,7 +241,7 @@ fun MessagesScreen(
                                         when (page) {
                         0 -> PendingMessagesList(
                             messages = state.todayMessages,
-                            emptyText = "No messages scheduled for today",
+                            emptyText = stringResource(R.string.messages_empty_today),
                             onApprove = { viewModel.approveMessage(it) },
                             onReject = { showRejectDialogForId = it },
                             onEdit = onNavigateToWish,
@@ -185,7 +251,7 @@ fun MessagesScreen(
                         )
                         1 -> PendingMessagesList(
                             messages = state.pendingMessages,
-                            emptyText = "No upcoming messages",
+                            emptyText = stringResource(R.string.messages_empty_pending),
                             onApprove = { viewModel.approveMessage(it) },
                             onReject = { showRejectDialogForId = it },
                             onEdit = onNavigateToWish,
@@ -235,7 +301,7 @@ private fun BulkActionBar(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "$selectedCount selected",
+                text = stringResource(R.string.messages_selected_count, selectedCount),
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
@@ -247,7 +313,7 @@ private fun BulkActionBar(
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary, contentColor = Color.Black),
                 ) {
-                    Text("Approve", fontSize = 12.sp)
+                    Text(stringResource(R.string.approve), fontSize = 12.sp)
                 }
             }
             if (showRetry) {
@@ -257,14 +323,14 @@ private fun BulkActionBar(
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary, contentColor = Color.Black),
                 ) {
-                    Text("Retry", fontSize = 12.sp)
+                    Text(stringResource(R.string.retry), fontSize = 12.sp)
                 }
             }
             TextButton(onClick = onReject) {
-                Text("Reject", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                Text(stringResource(R.string.reject), color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
             }
             IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.Close, contentDescription = "Clear selection", tint = RelateOnSurfaceVariant)
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.messages_clear_selection), tint = RelateOnSurfaceVariant)
             }
         }
     }
@@ -306,7 +372,7 @@ private fun PendingMessagesList(
 @Composable
 private fun SentMessagesList(messages: List<SentMessageItem>) {
     if (messages.isEmpty()) {
-        EmptyState(message = "No sent messages yet")
+        EmptyState(message = stringResource(R.string.messages_empty_sent))
     } else {
         LazyColumn(
             contentPadding = PaddingValues(bottom = 16.dp),
@@ -328,7 +394,7 @@ private fun FailedMessagesList(
     onToggleSelection: (String) -> Unit,
 ) {
     if (messages.isEmpty()) {
-        EmptyState(message = "No failed messages")
+        EmptyState(message = stringResource(R.string.messages_empty_failed))
     } else {
         LazyColumn(
             contentPadding = PaddingValues(bottom = 16.dp),
@@ -396,7 +462,7 @@ private fun PendingMessageCard(
                 if (item.contactAvatarUrl != null) {
                     AsyncImage(
                         model = item.contactAvatarUrl,
-                        contentDescription = "Avatar",
+                        contentDescription = stringResource(R.string.avatar),
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape),
@@ -530,14 +596,14 @@ private fun PendingMessageCard(
                         val minutesLeft = (timeDiff / (1000 * 60)).toInt()
                         if (minutesLeft in 0..30) {
                             Text(
-                                text = "Auto-sends in $minutesLeft mins!",
+                                text = stringResource(R.string.messages_auto_sends_minutes, minutesLeft),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.Red,
                                 fontWeight = FontWeight.Bold,
                             )
                         } else if (minutesLeft > 30) {
                             Text(
-                                text = "${minutesLeft / 60}h left",
+                                text = stringResource(R.string.messages_hours_left, minutesLeft / 60),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = RelateOnSurfaceVariant,
                             )
@@ -561,7 +627,7 @@ private fun PendingMessageCard(
                             brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                         )
                     ) {
-                        Text("Reject", fontSize = 11.sp)
+                        Text(stringResource(R.string.reject), fontSize = 11.sp)
                     }
 
                     OutlinedButton(
@@ -576,7 +642,7 @@ private fun PendingMessageCard(
                             brush = androidx.compose.ui.graphics.SolidColor(RelatePrimary.copy(alpha = 0.5f))
                         )
                     ) {
-                        Text("Edit", fontSize = 11.sp)
+                        Text(stringResource(R.string.edit_contact), fontSize = 11.sp)
                     }
 
                     Button(
@@ -597,7 +663,7 @@ private fun PendingMessageCard(
                                 strokeWidth = 2.dp,
                             )
                         } else {
-                            Text("Approve", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.approve), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -617,7 +683,7 @@ private fun SentMessageCard(item: SentMessageItem) {
             if (item.contactAvatarUrl != null) {
                 AsyncImage(
                     model = item.contactAvatarUrl,
-                    contentDescription = "Avatar",
+                    contentDescription = stringResource(R.string.avatar),
                     modifier = Modifier
                         .size(44.dp)
                         .clip(CircleShape),
@@ -676,7 +742,7 @@ private fun SentMessageCard(item: SentMessageItem) {
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Channel: ${message.channel}",
+                    text = stringResource(R.string.messages_channel_format, message.channel),
                     style = MaterialTheme.typography.bodySmall,
                     color = RelateOnSurfaceVariant.copy(alpha = 0.8f),
                 )
@@ -708,7 +774,7 @@ private fun FailedMessageCard(
                 if (item.contactAvatarUrl != null) {
                     AsyncImage(
                         model = item.contactAvatarUrl,
-                        contentDescription = "Avatar",
+                        contentDescription = stringResource(R.string.avatar),
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape),
@@ -739,14 +805,14 @@ private fun FailedMessageCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Scheduled: " + dateFormat.format(Date(message.scheduledForMs)),
+                        text = stringResource(R.string.messages_scheduled_format, dateFormat.format(Date(message.scheduledForMs))),
                         style = MaterialTheme.typography.bodySmall,
                         color = RelateOnSurfaceVariant,
                     )
                 }
                 Icon(
                     imageVector = Icons.Filled.Error,
-                    contentDescription = "Failed",
+                    contentDescription = stringResource(R.string.messages_status_failed),
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(24.dp)
                 )
@@ -782,7 +848,7 @@ private fun FailedMessageCard(
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text("Retry Send", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.messages_retry_send), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -803,7 +869,7 @@ private fun ApprovedMessagesList(
     onToggleSelection: (String) -> Unit,
 ) {
     if (messages.isEmpty()) {
-        EmptyState(message = "No approved messages")
+        EmptyState(message = stringResource(R.string.messages_empty_approved))
     } else {
         LazyColumn(
             contentPadding = PaddingValues(bottom = 16.dp),
@@ -849,7 +915,7 @@ private fun ApprovedMessageCard(
                 if (item.contactAvatarUrl != null) {
                     AsyncImage(
                         model = item.contactAvatarUrl,
-                        contentDescription = "Avatar",
+                        contentDescription = stringResource(R.string.avatar),
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape),
@@ -880,14 +946,14 @@ private fun ApprovedMessageCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Scheduled: " + dateFormat.format(Date(message.scheduledForMs)),
+                        text = stringResource(R.string.messages_scheduled_format, dateFormat.format(Date(message.scheduledForMs))),
                         style = MaterialTheme.typography.bodySmall,
                         color = RelateOnSurfaceVariant,
                     )
                 }
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
-                    contentDescription = "Approved",
+                    contentDescription = stringResource(R.string.messages_status_approved),
                     tint = RelatePrimary,
                     modifier = Modifier.size(24.dp)
                 )
@@ -920,7 +986,7 @@ private fun ApprovedMessageCard(
                             brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                         )
                     ) {
-                        Text("Reject", fontSize = 11.sp)
+                        Text(stringResource(R.string.reject), fontSize = 11.sp)
                     }
 
                     OutlinedButton(
@@ -935,7 +1001,7 @@ private fun ApprovedMessageCard(
                             brush = androidx.compose.ui.graphics.SolidColor(RelatePrimary.copy(alpha = 0.5f))
                         )
                     ) {
-                        Text("Edit", fontSize = 11.sp)
+                        Text(stringResource(R.string.edit_contact), fontSize = 11.sp)
                     }
 
                     Button(
@@ -956,11 +1022,26 @@ private fun ApprovedMessageCard(
                                 strokeWidth = 2.dp,
                             )
                         } else {
-                            Text("Revoke", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.messages_revoke), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun MessageChannelFilter.label(): String = when (this) {
+    MessageChannelFilter.ALL -> stringResource(R.string.filter_all)
+    MessageChannelFilter.SMS -> stringResource(R.string.channel_sms)
+    MessageChannelFilter.WHATSAPP -> stringResource(R.string.channel_whatsapp)
+    MessageChannelFilter.EMAIL -> stringResource(R.string.channel_email)
+}
+
+@Composable
+private fun MessageSort.label(): String = when (this) {
+    MessageSort.SCHEDULED_ASC -> stringResource(R.string.message_sort_oldest)
+    MessageSort.SCHEDULED_DESC -> stringResource(R.string.message_sort_newest)
+    MessageSort.CONTACT_ASC -> stringResource(R.string.message_sort_contact)
 }

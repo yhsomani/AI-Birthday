@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
+import com.example.domain.service.AnalyticsReport
+import com.example.domain.service.AnalyticsReportService
 import com.example.domain.usecase.GetAnalyticsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +25,10 @@ data class AnalyticsUiState(
     val healthCounts: Map<String, Int> = emptyMap(),
     /** Real monthly sent counts for the current year, index 0 = January */
     val monthlyCounts: List<Pair<String, Float>> = emptyList(),
+    val exportReport: AnalyticsReport? = null,
     val isLoading: Boolean = true,
+    val isExporting: Boolean = false,
+    val exportError: Boolean = false,
 )
 
 @HiltViewModel
@@ -32,6 +37,7 @@ class AnalyticsViewModel @Inject constructor(
     private val contactRepository: ContactRepository,
     private val eventRepository: EventRepository,
     private val messageRepository: MessageRepository,
+    private val analyticsReportService: AnalyticsReportService,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AnalyticsUiState())
@@ -96,5 +102,31 @@ class AnalyticsViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    fun exportRelationshipReport() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isExporting = true, exportError = false)
+            try {
+                val report = analyticsReportService.buildRelationshipReport()
+                _uiState.value = _uiState.value.copy(
+                    exportReport = report,
+                    isExporting = false,
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isExporting = false,
+                    exportError = true,
+                )
+            }
+        }
+    }
+
+    fun clearExportReport() {
+        _uiState.value = _uiState.value.copy(exportReport = null)
+    }
+
+    fun clearExportError() {
+        _uiState.value = _uiState.value.copy(exportError = false)
     }
 }

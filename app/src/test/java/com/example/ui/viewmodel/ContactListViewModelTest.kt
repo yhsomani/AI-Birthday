@@ -72,4 +72,29 @@ class ContactListViewModelTest {
         assertFalse(viewModel.uiState.value.isRefreshing)
         assertEquals(1, viewModel.uiState.value.contacts.size)
     }
+
+    @Test
+    fun `search filter and sort are applied in viewmodel`() = runTest(testDispatcher) {
+        every { contactRepository.getAll() } returns flowOf(
+            listOf(
+                ContactEntity(id = "c_1", name = "Alice", relationshipType = "FAMILY", healthScore = 90),
+                ContactEntity(id = "c_2", name = "Bob", relationshipType = "WORK", healthScore = 30),
+                ContactEntity(id = "c_3", name = "Cara", contactGroup = "Friends", healthScore = 55),
+            )
+        )
+
+        val viewModel = ContactListViewModel(contactRepository, mockPreferencesRepository, syncContactsUseCase)
+        advanceUntilIdle()
+
+        viewModel.selectFilter(ContactFilter.FRIENDS)
+        assertEquals(listOf("Cara"), viewModel.uiState.value.contacts.map { it.name })
+
+        viewModel.selectFilter(ContactFilter.ALL)
+        viewModel.updateSearchQuery("bo")
+        assertEquals(listOf("Bob"), viewModel.uiState.value.contacts.map { it.name })
+
+        viewModel.updateSearchQuery("")
+        viewModel.selectSort(ContactSort.HEALTH_ASC)
+        assertEquals(listOf("Bob", "Cara", "Alice"), viewModel.uiState.value.contacts.map { it.name })
+    }
 }

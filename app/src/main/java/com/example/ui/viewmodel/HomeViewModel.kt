@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.auth.AuthManager
 import com.example.core.db.entities.EventEntity
+import com.example.core.resilience.StructuredLogger
 import com.example.domain.repository.EventRepository
 import com.example.domain.usecase.GetDashboardMetricsUseCase
 import com.example.domain.usecase.SyncContactsUseCase
@@ -44,6 +45,9 @@ class HomeViewModel @Inject constructor(
     private val syncContactsUseCase: SyncContactsUseCase,
     private val preferencesRepository: com.example.domain.service.PreferencesRepository,
 ) : ViewModel() {
+    private companion object {
+        const val TAG = "HomeViewModel"
+    }
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -101,7 +105,7 @@ class HomeViewModel @Inject constructor(
                     syncError = freshError ?: lastError,
                 )
             } catch (e: Exception) {
-                android.util.Log.e("HomeViewModel", "Failed to load metrics", e)
+                StructuredLogger.e(TAG, "Dashboard metrics load failed", e)
                 val lastError = try { preferencesRepository.getLastSyncError() } catch (ex: Exception) { null }
                 _uiState.value = _uiState.value.copy(isLoading = false, syncError = lastError)
             }

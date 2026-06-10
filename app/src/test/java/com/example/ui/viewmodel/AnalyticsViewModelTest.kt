@@ -3,6 +3,8 @@ package com.example.ui.viewmodel
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
+import com.example.domain.service.AnalyticsReport
+import com.example.domain.service.AnalyticsReportService
 import com.example.domain.usecase.GetAnalyticsUseCase
 import io.mockk.coEvery
 import io.mockk.every
@@ -25,6 +27,7 @@ class AnalyticsViewModelTest {
     private val contactRepository: ContactRepository = mockk(relaxed = true)
     private val eventRepository: EventRepository = mockk(relaxed = true)
     private val messageRepository: MessageRepository = mockk(relaxed = true)
+    private val analyticsReportService: AnalyticsReportService = mockk(relaxed = true)
     private val dispatcher = StandardTestDispatcher()
 
     @Before
@@ -54,11 +57,49 @@ class AnalyticsViewModelTest {
             contactRepository = contactRepository,
             eventRepository = eventRepository,
             messageRepository = messageRepository,
+            analyticsReportService = analyticsReportService,
         )
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals(false, state.isLoading)
         assertEquals(emptyList<Pair<String, Float>>(), state.monthlyCounts)
+    }
+
+    @Test
+    fun `exportRelationshipReport exposes generated report`() = runTest(dispatcher) {
+        stubEmptyAnalytics()
+        coEvery { analyticsReportService.buildRelationshipReport() } returns AnalyticsReport(
+            fileName = "report.csv",
+            mimeType = "text/csv",
+            content = "section,metric,value\n",
+        )
+
+        val viewModel = AnalyticsViewModel(
+            getAnalyticsUseCase = GetAnalyticsUseCase(contactRepository, messageRepository),
+            contactRepository = contactRepository,
+            eventRepository = eventRepository,
+            messageRepository = messageRepository,
+            analyticsReportService = analyticsReportService,
+        )
+        advanceUntilIdle()
+
+        viewModel.exportRelationshipReport()
+        advanceUntilIdle()
+
+        assertEquals("report.csv", viewModel.uiState.value.exportReport?.fileName)
+        assertEquals(false, viewModel.uiState.value.isExporting)
+    }
+
+    private fun stubEmptyAnalytics() {
+        every { messageRepository.countAllSent() } returns MutableStateFlow(0)
+        every { messageRepository.countPending() } returns MutableStateFlow(0)
+        every { contactRepository.countAll() } returns MutableStateFlow(0)
+        every { contactRepository.countByRelationshipType() } returns MutableStateFlow(emptyList())
+        coEvery { contactRepository.getTopByHealthScore(5) } returns emptyList()
+        coEvery { contactRepository.getBottomByHealthScore(5) } returns emptyList()
+        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { eventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { messageRepository.getSentSinceYearStart(any()) } returns emptyList()
     }
 }

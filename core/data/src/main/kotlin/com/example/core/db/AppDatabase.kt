@@ -7,8 +7,23 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.example.core.db.dao.*
-import com.example.core.db.entities.*
+import com.example.core.db.dao.ActivityLogDao
+import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.EventDao
+import com.example.core.db.dao.GiftHistoryDao
+import com.example.core.db.dao.MemoryNoteDao
+import com.example.core.db.dao.PendingMessageDao
+import com.example.core.db.dao.SentMessageDao
+import com.example.core.db.dao.StyleProfileDao
+import com.example.core.db.entities.ActivityLogEntity
+import com.example.core.db.entities.ContactEntity
+import com.example.core.db.entities.EventEntity
+import com.example.core.db.entities.GiftHistoryEntity
+import com.example.core.db.entities.MemoryNoteEntity
+import com.example.core.db.entities.PendingMessageEntity
+import com.example.core.db.entities.SentMessageEntity
+import com.example.core.db.entities.StyleProfileEntity
+import com.example.core.db.entities.StyleProfileHistoryEntity
 import com.example.core.prefs.SecurePrefs
 import net.sqlcipher.database.SupportFactory
 

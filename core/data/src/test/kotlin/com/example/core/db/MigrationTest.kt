@@ -438,7 +438,7 @@ class MigrationTest {
             assertTrue(cursor.moveToFirst())
             assertEquals("John Doe", cursor.getString(0))
             assertEquals(0, cursor.getInt(1))
-            assertEquals(if (sourceVersion == 10) 1200 else 0, cursor.getInt(2))
+            assertEquals(if (sourceVersion in setOf(10, 11)) 1200 else 0, cursor.getInt(2))
             assertTrue(cursor.getString(3).isNotBlank())
         }
 
@@ -451,8 +451,8 @@ class MigrationTest {
         db.query("SELECT standardVariant, scheduledYear, isUsingFallback FROM pending_messages WHERE id = 'pending_1'").use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals("Standard", cursor.getString(0))
-            assertEquals(if (sourceVersion == 10) 2027 else 0, cursor.getInt(1))
-            assertEquals(if (sourceVersion == 10) 1 else 0, cursor.getInt(2))
+            assertEquals(if (sourceVersion in setOf(10, 11)) 2027 else 0, cursor.getInt(1))
+            assertEquals(if (sourceVersion in setOf(10, 11)) 1 else 0, cursor.getInt(2))
         }
 
         db.query("SELECT messageText, replyReceived, isContactDeleted FROM sent_messages WHERE id = 'sent_1'").use { cursor ->

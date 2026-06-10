@@ -22,6 +22,7 @@ import com.example.ui.screens.events.EventsScreen
 import com.example.ui.screens.messages.MessagesScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.analytics.AnalyticsScreen
+import com.example.ui.screens.activity.ActivityHistoryScreen
 import com.example.ui.screens.wish.WishPreviewScreen
 import com.example.ui.screens.stylecoach.StyleCoachScreen
 import com.example.ui.screens.backup.BackupRestoreScreen
@@ -215,11 +216,23 @@ fun RelateNavGraph(
                 },
                 onNavigateToAutomationSetup = {
                     navController.navigate(Screen.AutomationSetup.route)
+                },
+                onNavigateToActivityHistory = {
+                    navController.navigate(Screen.ActivityHistory.route)
                 }
             )
         }
         composable(Screen.Analytics.route) {
-            AnalyticsScreen()
+            AnalyticsScreen(
+                onNavigateToActivityHistory = {
+                    navController.navigate(Screen.ActivityHistory.route)
+                }
+            )
+        }
+        composable(Screen.ActivityHistory.route) {
+            ActivityHistoryScreen(
+                onBack = { navController.popBackStack() }
+            )
         }
         composable(Screen.StyleCoach.route) {
             StyleCoachScreen(

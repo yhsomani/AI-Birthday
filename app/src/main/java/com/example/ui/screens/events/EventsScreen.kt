@@ -2,6 +2,7 @@ package com.example.ui.screens.events
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -49,10 +51,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.ui.components.EmptyState
@@ -65,6 +69,8 @@ import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.ui.viewmodel.EventHorizonFilter
+import com.example.ui.viewmodel.EventTypeFilter
 import com.example.ui.viewmodel.EventsViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -72,10 +78,25 @@ import java.util.Date
 import java.util.Locale
 
 private val eventTypeOptions = listOf(
-    "BIRTHDAY" to "Birthday",
-    "ANNIVERSARY" to "Anniversary",
-    "WORK_ANNIVERSARY" to "Work",
-    "CUSTOM" to "Custom",
+    "BIRTHDAY",
+    "ANNIVERSARY",
+    "WORK_ANNIVERSARY",
+    "CUSTOM",
+)
+
+private val eventTypeFilters = listOf(
+    EventTypeFilter.ALL,
+    EventTypeFilter.BIRTHDAY,
+    EventTypeFilter.ANNIVERSARY,
+    EventTypeFilter.WORK,
+    EventTypeFilter.CUSTOM,
+)
+
+private val eventHorizonFilters = listOf(
+    EventHorizonFilter.ALL,
+    EventHorizonFilter.NEXT_7_DAYS,
+    EventHorizonFilter.NEXT_30_DAYS,
+    EventHorizonFilter.NEXT_90_DAYS,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -122,8 +143,8 @@ fun EventsScreen(
             .background(RelateDarkBackground),
     ) {
         RelateScreen(
-            title = "Events",
-            subtitle = "Birthdays, anniversaries, and manual reminders.",
+            title = stringResource(R.string.nav_events),
+            subtitle = stringResource(R.string.events_subtitle),
             action = {
                 IconButton(
                     onClick = {
@@ -132,12 +153,52 @@ fun EventsScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Add,
-                        contentDescription = "Add event",
+                        contentDescription = stringResource(R.string.events_add_event),
                         tint = RelatePrimary,
                     )
                 }
             },
         ) {
+            OutlinedTextField(
+                value = state.searchQuery,
+                onValueChange = viewModel::updateSearchQuery,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.search)) },
+                placeholder = { Text(stringResource(R.string.events_search_placeholder)) },
+                singleLine = true,
+                colors = relateTextFieldColors(),
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                eventTypeFilters.forEach { filter ->
+                    FilterChip(
+                        label = filter.label(),
+                        isSelected = state.selectedTypeFilter == filter,
+                        onClick = { viewModel.selectTypeFilter(filter) },
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                eventHorizonFilters.forEach { filter ->
+                    FilterChip(
+                        label = filter.label(),
+                        isSelected = state.selectedHorizonFilter == filter,
+                        onClick = { viewModel.selectHorizonFilter(filter) },
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
             PullToRefreshBox(
                 isRefreshing = state.isRefreshing,
                 onRefresh = { viewModel.refresh() },
@@ -154,7 +215,7 @@ fun EventsScreen(
                     }
                 } else if (state.events.isEmpty()) {
                     EmptyState(
-                        message = "No events yet. Add one manually or sync your contacts.",
+                        message = stringResource(R.string.events_empty),
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
@@ -223,15 +284,18 @@ private fun ManualEventDialog(
     var dayText by remember { mutableStateOf("") }
     var yearText by remember { mutableStateOf("") }
     var localError by remember { mutableStateOf<String?>(null) }
+    val errorMonthDay = stringResource(R.string.events_error_month_day)
+    val errorChooseContact = stringResource(R.string.events_error_choose_contact)
+    val errorContactName = stringResource(R.string.events_error_contact_name)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Event", color = MaterialTheme.colorScheme.onSurface) },
+        title = { Text(stringResource(R.string.events_add_event), color = MaterialTheme.colorScheme.onSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
-                        label = "Existing",
+                        label = stringResource(R.string.events_existing_contact),
                         isSelected = useExistingContact,
                         onClick = {
                             useExistingContact = true
@@ -240,7 +304,7 @@ private fun ManualEventDialog(
                         modifier = Modifier.weight(1f),
                     )
                     FilterChip(
-                        label = "New",
+                        label = stringResource(R.string.events_new_contact),
                         isSelected = !useExistingContact,
                         onClick = { useExistingContact = false },
                         modifier = Modifier.weight(1f),
@@ -251,7 +315,7 @@ private fun ManualEventDialog(
                     Box {
                         OutlinedTextField(
                             value = contacts.firstOrNull { it.id == selectedContactId }?.name
-                                ?: "Choose contact",
+                                ?: stringResource(R.string.events_choose_contact),
                             onValueChange = {},
                             readOnly = true,
                             modifier = Modifier
@@ -259,7 +323,7 @@ private fun ManualEventDialog(
                                 .clickable(enabled = contacts.isNotEmpty()) {
                                     contactMenuExpanded = true
                                 },
-                            label = { Text("Contact") },
+                            label = { Text(stringResource(R.string.events_contact_label)) },
                             enabled = contacts.isNotEmpty(),
                             colors = relateTextFieldColors(),
                         )
@@ -280,7 +344,7 @@ private fun ManualEventDialog(
                     }
                     if (contacts.isEmpty()) {
                         Text(
-                            text = "No contacts yet. Switch to New to add a local contact.",
+                            text = stringResource(R.string.events_no_contacts_for_manual),
                             style = MaterialTheme.typography.bodySmall,
                             color = RelateOnSurfaceVariant,
                         )
@@ -290,7 +354,7 @@ private fun ManualEventDialog(
                         value = newContactName,
                         onValueChange = { newContactName = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("New contact name") },
+                        label = { Text(stringResource(R.string.events_new_contact_name)) },
                         singleLine = true,
                         colors = relateTextFieldColors(),
                     )
@@ -298,9 +362,9 @@ private fun ManualEventDialog(
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        eventTypeOptions.take(2).forEach { (value, text) ->
+                        eventTypeOptions.take(2).forEach { value ->
                             FilterChip(
-                                label = text,
+                                label = eventTypeLabel(value),
                                 isSelected = eventType == value,
                                 onClick = { eventType = value },
                                 modifier = Modifier.weight(1f),
@@ -308,9 +372,9 @@ private fun ManualEventDialog(
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        eventTypeOptions.drop(2).forEach { (value, text) ->
+                        eventTypeOptions.drop(2).forEach { value ->
                             FilterChip(
-                                label = text,
+                                label = eventTypeLabel(value),
                                 isSelected = eventType == value,
                                 onClick = { eventType = value },
                                 modifier = Modifier.weight(1f),
@@ -323,8 +387,8 @@ private fun ManualEventDialog(
                     value = label,
                     onValueChange = { label = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Label") },
-                    placeholder = { Text("Optional") },
+                    label = { Text(stringResource(R.string.events_label)) },
+                    placeholder = { Text(stringResource(R.string.optional)) },
                     singleLine = true,
                     colors = relateTextFieldColors(),
                 )
@@ -334,7 +398,7 @@ private fun ManualEventDialog(
                         value = monthText,
                         onValueChange = { monthText = it.filter(Char::isDigit).take(2) },
                         modifier = Modifier.weight(1f),
-                        label = { Text("Month") },
+                        label = { Text(stringResource(R.string.events_month_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         colors = relateTextFieldColors(),
@@ -343,7 +407,7 @@ private fun ManualEventDialog(
                         value = dayText,
                         onValueChange = { dayText = it.filter(Char::isDigit).take(2) },
                         modifier = Modifier.weight(1f),
-                        label = { Text("Day") },
+                        label = { Text(stringResource(R.string.events_day_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         colors = relateTextFieldColors(),
@@ -352,7 +416,7 @@ private fun ManualEventDialog(
                         value = yearText,
                         onValueChange = { yearText = it.filter(Char::isDigit).take(4) },
                         modifier = Modifier.weight(1f),
-                        label = { Text("Year") },
+                        label = { Text(stringResource(R.string.events_year_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         colors = relateTextFieldColors(),
@@ -378,25 +442,50 @@ private fun ManualEventDialog(
                     val existingId = selectedContactId.takeIf { useExistingContact }
                     val newName = newContactName.takeIf { !useExistingContact }
                     if (month == null || day == null) {
-                        localError = "Enter month and day."
+                        localError = errorMonthDay
                     } else if (useExistingContact && existingId == null) {
-                        localError = "Choose a contact."
+                        localError = errorChooseContact
                     } else if (!useExistingContact && newName.isNullOrBlank()) {
-                        localError = "Enter a contact name."
+                        localError = errorContactName
                     } else {
                         onSave(existingId, newName, eventType, label, month, day, year)
                     }
                 },
             ) {
-                Text(if (isSaving) "Saving..." else "Save")
+                Text(if (isSaving) stringResource(R.string.saving) else stringResource(R.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         },
     )
+}
+
+@Composable
+private fun EventTypeFilter.label(): String = when (this) {
+    EventTypeFilter.ALL -> stringResource(R.string.filter_all)
+    EventTypeFilter.BIRTHDAY -> stringResource(R.string.events_filter_birthdays)
+    EventTypeFilter.ANNIVERSARY -> stringResource(R.string.events_filter_anniversaries)
+    EventTypeFilter.WORK -> stringResource(R.string.events_filter_work)
+    EventTypeFilter.CUSTOM -> stringResource(R.string.events_filter_custom)
+}
+
+@Composable
+private fun EventHorizonFilter.label(): String = when (this) {
+    EventHorizonFilter.ALL -> stringResource(R.string.filter_all)
+    EventHorizonFilter.NEXT_7_DAYS -> stringResource(R.string.filter_next_7_days)
+    EventHorizonFilter.NEXT_30_DAYS -> stringResource(R.string.filter_next_30_days)
+    EventHorizonFilter.NEXT_90_DAYS -> stringResource(R.string.filter_next_90_days)
+}
+
+@Composable
+private fun eventTypeLabel(type: String): String = when (type) {
+    "BIRTHDAY" -> stringResource(R.string.event_type_birthday)
+    "ANNIVERSARY" -> stringResource(R.string.event_type_anniversary)
+    "WORK_ANNIVERSARY" -> stringResource(R.string.event_type_work_anniversary)
+    else -> stringResource(R.string.event_type_custom)
 }
 
 private fun eventTypeIcon(type: String): ImageVector = when (type) {
@@ -435,13 +524,18 @@ private fun EventCard(event: EventEntity) {
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = event.label ?: event.type.replace("_", " "),
+                    text = event.label ?: eventTypeLabel(event.type),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
-                    text = "${event.type.replace("_", " ")} • ${event.source} • ${dateFormat.format(Date(event.nextOccurrenceMs))}",
+                    text = stringResource(
+                        R.string.events_card_subtitle,
+                        eventTypeLabel(event.type),
+                        event.source,
+                        dateFormat.format(Date(event.nextOccurrenceMs)),
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = RelateOnSurfaceVariant,
                 )
@@ -454,7 +548,7 @@ private fun EventCard(event: EventEntity) {
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "days",
+                    text = stringResource(R.string.days),
                     style = MaterialTheme.typography.labelSmall,
                     color = RelateOnSurfaceVariant,
                 )
