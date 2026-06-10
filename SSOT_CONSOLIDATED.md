@@ -184,8 +184,8 @@ RelateAI
 | F-037 | Resilience, logging, health, dead-letter queue | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-038 | External API and service interfaces | Integration Feature | Fully Implemented | 85% | Partially Tested | 95% |
 | F-039 | Build, CI, release guard, coverage | Developer Feature | Fully Implemented | 90% | Partially Tested | 95% |
-| F-040 | Design system and localization | UI/Developer Feature | Partially Implemented | 75% | Partially Tested | 85% |
-| F-041 | Developer helper scripts and docs | Developer Feature | Partially Implemented | 60% | Not Tested | 75% |
+| F-040 | Design system and localization | UI/Developer Feature | Fully Implemented | 85% | Partially Tested | 90% |
+| F-041 | Developer helper scripts and docs | Developer Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-042 | Biometric app lock enforcement | Security Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-043 | Quiet hours, blackout dates, reminder toggles | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-044 | Event reminder scheduling | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
@@ -745,29 +745,29 @@ RelateAI
 
 - Category: UI/Developer Feature.
 - Description: Provides shared Compose UI components, theme tokens, feedback components, and English/Hindi strings.
-- Functionality: Defines Relate components, feedback components, shimmer loading, colors, type, theme, localized app strings, and regression tests for hardcoded UI strings.
-- Components involved: `:core:ui`, app screens, string resources, no-hardcoded-strings test.
-- Related files: `RelateComponents.kt`, `FeedbackComponents.kt`, `ShimmerLoading.kt`, `Color.kt`, `Theme.kt`, `Type.kt`, `app/src/main/res/values/strings.xml`, `app/src/main/res/values-hi/strings.xml`, `NoHardcodedStringsRegressionTest.kt`.
+- Functionality: Defines Relate components, feedback components, shimmer loading, colors, type, theme, localized app strings, app/core-data English-Hindi resource-key parity tests, and regression tests for hardcoded UI/notification strings.
+- Components involved: `:core:ui`, app screens, string resources, no-hardcoded-strings test, localization parity test.
+- Related files: `RelateComponents.kt`, `FeedbackComponents.kt`, `ShimmerLoading.kt`, `Color.kt`, `Theme.kt`, `Type.kt`, `app/src/main/res/values/strings.xml`, `app/src/main/res/values-hi/strings.xml`, `core/data/src/main/res/values/strings.xml`, `core/data/src/main/res/values-hi/strings.xml`, `NoHardcodedStringsRegressionTest.kt`, `LocalizationParityTest.kt`.
 - Dependencies: Compose Material3, resource system, localization resources.
-- User workflow: Users see consistent UI and localized strings where translations exist. Edge cases include incomplete Hindi coverage and strings still introduced in code during future edits.
-- Current status: Partially Implemented.
-- Completion percentage: 75%.
-- Test coverage: Partially Tested by `NoHardcodedStringsRegressionTest`; full localization quality requires manual review.
-- Confidence score: 85%.
+- User workflow: Users see consistent UI and localized strings where translations exist. Edge cases include translation quality, which still benefits from human review, and future raw strings introduced in code.
+- Current status: Fully Implemented.
+- Completion percentage: 85%.
+- Test coverage: Partially Tested by `NoHardcodedStringsRegressionTest` and `LocalizationParityTest`; full localization quality requires manual review.
+- Confidence score: 90%.
 
 ### F-041 Developer Helper Scripts and Docs
 
 - Category: Developer Feature.
 - Description: Provides auxiliary documentation and helper automation outside the app runtime.
-- Functionality: Branching docs describe workflow expectations; localization helper script scans for hardcoded `Text("...")` calls.
+- Functionality: Branching docs describe workflow expectations; localization helper script scans for hardcoded `Text("...")` calls from the dynamically detected repository root and excludes build outputs.
 - Components involved: Docs and scripts.
-- Related files: `docs/BRANCHING.md`, `scripts/extract_strings.sh`, existing audit/docs files.
-- Dependencies: Shell environment, repository path assumptions, developer discipline.
-- User workflow: Developers read docs and optionally run helper script. Edge cases include the helper script referencing `/workspace`, which appears stale for this local path.
-- Current status: Partially Implemented.
-- Completion percentage: 60%.
-- Test coverage: Not Tested.
-- Confidence score: 75%.
+- Related files: `docs/BRANCHING.md`, `scripts/extract_strings.sh`, `.kiro/steering/tech.md`, existing audit/docs files.
+- Dependencies: Shell environment, `rg`, optional Git checkout metadata, developer discipline.
+- User workflow: Developers read docs and optionally run helper script from any checkout path. Edge cases include running outside a Git checkout, which falls back to the current directory.
+- Current status: Fully Implemented.
+- Completion percentage: 85%.
+- Test coverage: Partially Tested by `HelperScriptsTest`.
+- Confidence score: 90%.
 
 ### F-042 Biometric App Lock Enforcement
 
@@ -956,7 +956,6 @@ Receivers:
 
 - `mood_logs`: historical migration table only; not an active feature.
 - Dedicated birthday quick-add FAB/modal: superseded by manual event creation flow.
-- `scripts/extract_strings.sh`: useful intent, but path assumptions appear stale for this local checkout.
 - `GeminiModels.kt`: may be legacy or future Retrofit-style model code; not clearly active in the current Gemini client path.
 - Older documentation references to feature modules: actual active modules are `:app`, `:core:domain`, `:core:data`, and `:core:ui`.
 - Older documentation claims with outdated test counts or blanket "fully implemented" security should be replaced with the current observed 212-test report and the partial biometric/enforcement notes above.

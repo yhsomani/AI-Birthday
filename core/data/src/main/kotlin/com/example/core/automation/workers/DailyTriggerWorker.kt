@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.automation.scheduler.WorkerScheduler
+import com.example.core.data.R
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.service.EventReminderSchedulerService
 import dagger.assisted.Assisted
@@ -29,8 +30,8 @@ class DailyTriggerWorker @AssistedInject constructor(
         } else if (now - lastBackupMs > thirtyDaysMs) {
             NotificationHelper.showSystemAlert(
                 applicationContext,
-                "Backup Reminder",
-                "You haven't backed up your data in over 30 days. Please create a backup to prevent data loss."
+                applicationContext.getString(R.string.notification_backup_reminder_title),
+                applicationContext.getString(R.string.notification_backup_reminder_message),
             )
         }
 

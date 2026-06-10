@@ -7,8 +7,11 @@
 - Added a shared automation scheduling policy for contact custom send times, quiet-hour deferral, blackout-date deferral, reminder timing, and channel-block parsing.
 - Added AlarmManager-backed event reminder scheduling from `notifyDaysBefore`, with boot/daily rescheduling and reminder-toggle guards.
 - Added event-aware Gmail SMTP subject generation for birthdays, anniversaries, work anniversaries, custom events, and SMTP test emails.
+- Added localization parity and helper-script portability regression tests.
 
 ### Changed
+- Notification backup reminder and AI fallback alert copy now uses localized string resources, and critical Hindi notification labels were refreshed.
+- `scripts/extract_strings.sh` now detects the repository root dynamically instead of assuming `/workspace`.
 - Background contact sync now runs through the same Google + device merge, relationship normalization, mock cleanup, and event-discovery path as foreground sync.
 - Automatic message generation now skips contacts with `skipAutoWish`, while manual generation forces review instead of auto-send for those contacts.
 - Dispatch workers now defer approved sends that become due during quiet hours or blackout dates.

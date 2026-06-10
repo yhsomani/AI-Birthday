@@ -137,8 +137,8 @@ class MessageGenerationWorker @AssistedInject constructor(
                                 try {
                                     com.example.core.automation.notifications.NotificationHelper.showSystemAlert(
                                         applicationContext,
-                                        "AI Generation Unavailable",
-                                        "A template message was used because the AI generator was offline or rate-limited."
+                                        applicationContext.getString(R.string.notification_ai_fallback_title),
+                                        applicationContext.getString(R.string.notification_ai_fallback_message),
                                     )
                                 } catch (e: Exception) {
                                     StructuredLogger.e(TAG, "Failed to show AI fallback alert", e)

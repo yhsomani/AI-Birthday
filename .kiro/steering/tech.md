@@ -3,8 +3,9 @@
 ## Build System
 
 - **Gradle Kotlin DSL** (`.gradle.kts`)
-- **Android Gradle Plugin**: Latest stable
-- **Kotlin**: 1.9+ with JVM 11 target
+- **Android Gradle Plugin**: 9.2.1
+- **Kotlin**: 2.2.10
+- **Java/Kotlin target**: JDK 21 toolchain with JVM 17 bytecode
 
 ## Project Structure
 
@@ -45,11 +46,11 @@
 # Run instrumented tests
 ./gradlew connectedDebugAndroidTest
 
-# Run Roborazzi tests
-./gradlew recordRoborazziDebug
-
 # Build with KSP (Kotlin Symbol Processing)
 ./gradlew kspDebugKotlin
+
+# Full feature-compliance validation
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug jacocoDebugUnitTestReport --no-configuration-cache
 
 # View dependency tree
 ./gradlew app:dependencies
@@ -59,8 +60,8 @@
 
 - **Min SDK**: 24 (Android 7.0)
 - **Target SDK**: 36
-- **Compile SDK**: 36 (API 1 minor)
-- **Java Compatibility**: 11
+- **Compile SDK**: 37
+- **Java Compatibility**: 17 bytecode on a JDK 21 toolchain
 - **Namespace**: `com.example`
 
 ## Development Setup
@@ -72,7 +73,7 @@
 
 2. Ensure `google-services.json` is present in `app/`
 
-3. For testing with Robolectric, run tests with the Android environment
+3. For local validation, use JDK 21. The root Gradle build configures unit tests to use the JDK 21 toolchain and applies the project-local Zscaler truststore when `.gradle/trust/cacerts-zscaler` exists.
 
 ## Code Generation
 

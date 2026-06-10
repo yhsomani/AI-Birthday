@@ -64,8 +64,8 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-037 | Resilience, logging, health, dead-letter queue | Fully Implemented | Keep resilience tests passing and validate AI Doctor surfacing. |
 | F-038 | External API and service interfaces | Fully Implemented | Keep domain/data boundaries stable while adding reminder scheduler service. |
 | F-039 | Build, CI, release guard, coverage | Fully Implemented | Keep JDK 21 Gradle validation and release guard documented. |
-| F-040 | Design system and localization | Partially Implemented | Add localization parity checks and resource raw notification strings touched by this pass. |
-| F-041 | Developer helper scripts and docs | Partially Implemented | Remove `/workspace` helper-script assumption and update stale docs. |
+| F-040 | Design system and localization | Fully Implemented | Resource-key parity tests cover English/Hindi app and core-data strings; touched notification/system-alert strings are resource-backed. |
+| F-041 | Developer helper scripts and docs | Fully Implemented | Helper string-audit script resolves the repository root dynamically; steering build docs reflect the active Gradle/JDK/SDK setup. |
 | F-042 | Biometric app lock enforcement | Fully Implemented | App access is gated at cold start/resume when enabled; live device unlock validation remains tracked in `docs/UI_VALIDATION.md`. |
 | F-043 | Quiet hours, blackout dates, reminder toggles | Fully Implemented | Reusable automation schedule policy enforces quiet hours, blackout dates, and reminder toggles. |
 | F-044 | Event reminder scheduling | Fully Implemented | Schedules, cancels, and reschedules alarms from `notifyDaysBefore` and the reminder toggle. |

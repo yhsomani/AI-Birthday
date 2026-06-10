@@ -29,7 +29,7 @@ class NoHardcodedStringsRegressionTest {
             val directNotificationOffenders = notificationStringPattern.findAll(text).map { match ->
                 "${file.path}:${lineNumber(text, match.range.first)}"
             }
-            val setupCallOffenders = setupNotificationCallPattern.findAll(text)
+            val setupCallOffenders = notificationCallPattern.findAll(text)
                 .filter { call -> rawLiteralArgumentPattern.containsMatchIn(call.value) }
                 .map { match -> "${file.path}:${lineNumber(text, match.range.first)}" }
             directNotificationOffenders + setupCallOffenders
@@ -84,6 +84,7 @@ class NoHardcodedStringsRegressionTest {
             "core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt",
             "core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt",
             "core/data/src/main/kotlin/com/example/core/automation/workers/MessageGenerationWorker.kt",
+            "core/data/src/main/kotlin/com/example/core/automation/workers/DailyTriggerWorker.kt",
             "core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt",
             "core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt",
             "core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcher.kt",
@@ -92,8 +93,8 @@ class NoHardcodedStringsRegressionTest {
         val notificationStringPattern = Regex(
             pattern = "setContent(Title|Text)\\(\\s*\"|addAction\\([^\\n]*,\\s*\"|NotificationChannel\\([^\\n]*,\\s*\"",
         )
-        val setupNotificationCallPattern = Regex(
-            pattern = "showSetupNotification\\([\\s\\S]*?\\)",
+        val notificationCallPattern = Regex(
+            pattern = "show(?:SetupNotification|SystemAlert)\\([\\s\\S]*?\\)",
         )
         val rawLiteralArgumentPattern = Regex(
             pattern = ",\\s*\"",
