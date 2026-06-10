@@ -115,9 +115,19 @@ class MessageDispatchWorker @AssistedInject constructor(
         if (shouldSend) {
             // Idempotency: mark status as DISPATCHING immediately
             pendingMessageDao.updateStatus(pendingMsg.id, "DISPATCHING")
-            
-            val dispatcher = MessageDispatcher(context, pendingMessageDao, sentMessageDao, contactDao)
-            dispatcher.dispatch(pendingMsg, contact)
+
+            try {
+                val dispatcher = MessageDispatcher(context, pendingMessageDao, sentMessageDao, contactDao)
+                dispatcher.dispatch(pendingMsg, contact)
+            } catch (e: Exception) {
+                StructuredLogger.e(TAG, "Dispatch failed unexpectedly for message ${pendingMsg.id}", e)
+                runCatching {
+                    pendingMessageDao.updateStatus(pendingMsg.id, "FAILED")
+                }.onFailure { statusError ->
+                    StructuredLogger.e(TAG, "Failed to mark message ${pendingMsg.id} as FAILED after dispatch exception", statusError)
+                }
+                return Result.failure()
+            }
         }
 
         return Result.success()

@@ -111,4 +111,41 @@ class MessageDispatchWorkerTest {
         coVerify { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
         coVerify { anyConstructed<MessageDispatcher>().dispatch(pendingMsg, contact) }
     }
+
+    @Test
+    fun `doWork marks message failed when dispatcher throws unexpectedly`() = runTest {
+        val pendingMsg = PendingMessageEntity(
+            id = "msg_1", contactId = "c1", eventId = "e1",
+            shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
+            formalVariant = "", funnyVariant = "", emotionalVariant = "",
+            selectedVariant = "standard", selectedVariantText = "Happy Birthday",
+            channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL",
+            status = "APPROVED"
+        )
+        val contact = ContactEntity(id = "c1", name = "Alice")
+
+        coEvery { pendingMessageDao.getById("msg_1") } returns pendingMsg
+        coEvery { contactDao.getById("c1") } returns contact
+        coEvery { anyConstructed<MessageDispatcher>().dispatch(pendingMsg, contact) } throws
+            IllegalStateException("dispatcher crashed")
+
+        val worker = TestListenableWorkerBuilder<MessageDispatchWorker>(context)
+            .setInputData(workDataOf(MessageDispatchWorkRequests.KEY_PENDING_MESSAGE_ID to "msg_1"))
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: Context,
+                    workerClassName: String,
+                    workerParameters: WorkerParameters
+                ): ListenableWorker {
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao)
+                }
+            })
+            .build()
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.failure(), result)
+        coVerify { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
+        coVerify { pendingMessageDao.updateStatus("msg_1", "FAILED") }
+    }
 }

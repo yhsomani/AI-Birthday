@@ -624,3 +624,35 @@
 
 **Commit message**
 * `fix: redact fallback provider logs`
+
+### Feature 16: Dispatch Worker Failure Recovery
+
+**Problem identified**
+* `MessageDispatchWorker` marked a pending message as `DISPATCHING` before invoking `MessageDispatcher`.
+* If the dispatcher threw an unexpected runtime/setup/DAO exception, the worker could exit without changing the message out of `DISPATCHING`.
+* The worker's double-send guard treats `DISPATCHING` as a terminal protected state, so the message could become stuck and invisible to normal retry paths.
+
+**Root cause**
+* Expected channel failures were handled inside `MessageDispatcher`, but the worker had no outer safety boundary for unexpected dispatcher exceptions after setting the idempotency status.
+
+**Fix implemented**
+* Wrapped dispatch invocation in an outer `try/catch` after setting `DISPATCHING`.
+* On unexpected dispatch failure, logs the failure, marks the pending message `FAILED`, and returns `Result.failure()` to avoid automatic duplicate-send retries.
+* Added a regression test proving dispatcher exceptions move the message from `DISPATCHING` to `FAILED`.
+
+**Impact**
+* Prevents pending messages from being stranded in `DISPATCHING` after unexpected dispatch crashes.
+* Keeps duplicate-send protection intact while leaving failed messages visible for manual/user-controlled recovery.
+
+**Files modified**
+* `core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt`
+* `app/src/test/java/com/example/core/automation/workers/MessageDispatchWorkerTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.core.automation.workers.MessageDispatchWorkerTest --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `fix: recover failed dispatch worker status`
