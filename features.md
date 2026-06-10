@@ -28,7 +28,7 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-001 | App shell, navigation, routes, permissions | Fully Implemented | Compose smoke coverage added for permission rationale and bottom navigation; connected device run is blocked by signature mismatch. |
 | F-002 | Splash and onboarding | Fully Implemented | Compose smoke coverage added for first-run onboarding-to-auth routing; connected device run is blocked by signature mismatch. |
 | F-003 | Authentication, guest mode, session state | Fully Implemented | Compose smoke coverage added for auth actions and guest app shell; live OAuth remains blocked by device install/signature and credential prerequisites. |
-| F-004 | Settings and secure configuration | Partially Implemented | Confirm biometric enforcement, quiet-hour enforcement, and settings actions. |
+| F-004 | Settings and secure configuration | Fully Implemented | Biometric, quiet-hour, reminder, channel blackout, sync, Gmail, AI, and sign-out settings are implemented; live device handoffs remain tracked in `docs/UI_VALIDATION.md`. |
 | F-005 | Home dashboard and relationship planner | Fully Implemented | Add UI smoke evidence for cards, links, and sync-error recovery. |
 | F-006 | Contact sync, import, and deduplication | Fully Implemented | Foreground and background sync share Google + device contact merge, relationship normalization, and event discovery. |
 | F-007 | Contact list search, filter, sort | Fully Implemented | Add UI smoke evidence for search, chips, sort, clear, and details navigation. |

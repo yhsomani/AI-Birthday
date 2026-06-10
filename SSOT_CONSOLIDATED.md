@@ -148,7 +148,7 @@ RelateAI
 | F-001 | App shell, navigation, routes, permissions | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-002 | Splash and onboarding | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-003 | Authentication, guest mode, session state | Core Feature | Fully Implemented | 90% | Partially Tested | 95% |
-| F-004 | Settings and secure configuration | UI/System Feature | Partially Implemented | 80% | Partially Tested | 90% |
+| F-004 | Settings and secure configuration | UI/System Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-005 | Home dashboard and relationship planner | UI Feature | Fully Implemented | 90% | Partially Tested | 90% |
 | F-006 | Contact sync, import, and deduplication | Core Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-007 | Contact list search, filter, sort | UI Feature | Fully Implemented | 90% | Partially Tested | 95% |
@@ -241,15 +241,15 @@ RelateAI
 
 - Category: UI/System Feature.
 - Description: Lets users configure AI, Gmail, automation mode, channel blackout, quiet hours, biometric toggle, birthday reminder toggle, sync, legacy DB notices, and sign-out.
-- Functionality: Loads and saves Gemini API key, Gmail sender credentials, global automation mode, quiet hours, channel blackout JSON, AI generation enabled, biometric setting, birthday reminders, and force sync action.
+- Functionality: Loads and saves Gemini API key, Gmail sender credentials, global automation mode, quiet hours, channel blackout JSON, AI generation enabled, biometric setting, birthday reminders, and force sync action. Saved settings are wired into biometric app locking, automation scheduling, event reminders, dispatch channel blackout, contact sync, and SMTP test/send flows.
 - Components involved: Settings screen/viewmodel, SecurePrefs, SyncContactsUseCase, AuthManager.
 - Related files: `SettingsScreen.kt`, `SettingsViewModel.kt`, `SecurePrefs.kt`, `AuthManager.kt`, `SyncContactsUseCase.kt`, `strings.xml`, `values-hi/strings.xml`.
 - Dependencies: Encrypted preferences, contact sync service, auth manager, localization resources.
 - User workflow: User opens Settings, edits credentials/toggles, saves settings, triggers sync, or signs out. Edge cases include invalid quiet-hour values, missing Gmail credentials, and sign-out cleanup.
-- Current status: Partially Implemented.
-- Completion percentage: 80%.
-- Test coverage: Partially Tested by `SettingsViewModelTest` and no-hardcoded-strings regression. Biometric enforcement, quiet-hour enforcement, and device setting handoffs require more validation.
-- Confidence score: 90%.
+- Current status: Fully Implemented.
+- Completion percentage: 90%.
+- Test coverage: Partially Tested by `SettingsViewModelTest`, `BiometricLockPolicyTest`, automation scheduling/dispatch tests, localization regressions, and no-hardcoded-strings regression. Live device system-setting handoffs remain tracked in `docs/UI_VALIDATION.md`.
+- Confidence score: 95%.
 
 ### F-005 Home Dashboard and Relationship Planner
 
