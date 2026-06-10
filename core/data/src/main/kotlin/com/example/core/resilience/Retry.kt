@@ -20,18 +20,20 @@ object Retry {
         description: String = "operation",
         block: suspend () -> T,
     ): T {
+        val safeDescription = SensitiveLogRedactor.redact(description)
         var lastException: Exception? = null
         for (attempt in 0..config.maxRetries) {
             try {
                 return block()
             } catch (e: CircuitBreakerOpenException) {
-                Log.w(TAG, "$description: Circuit breaker open, not retrying")
+                Log.w(TAG, "$safeDescription: Circuit breaker open, not retrying")
                 throw e
             } catch (e: Exception) {
                 lastException = e
                 if (attempt < config.maxRetries) {
                     val delayMs = calculateDelay(attempt, config)
-                    Log.w(TAG, "$description: Attempt ${attempt + 1} failed, retrying in ${delayMs}ms: ${e.message}")
+                    val safeMessage = SensitiveLogRedactor.redact(e.message ?: e.javaClass.simpleName)
+                    Log.w(TAG, "$safeDescription: Attempt ${attempt + 1} failed, retrying in ${delayMs}ms: $safeMessage")
                     delay(delayMs)
                 }
             }
@@ -47,10 +49,13 @@ object Retry {
         return try {
             withExponentialBackoff(config, description, block)
         } catch (e: RetryExhaustedException) {
-            Log.e(TAG, "$description: All retries exhausted", e.cause)
+            val safeDescription = SensitiveLogRedactor.redact(description)
+            val causeName = e.cause?.javaClass?.simpleName ?: "UnknownException"
+            Log.e(TAG, "$safeDescription: All retries exhausted ($causeName)")
             null
         } catch (e: Exception) {
-            Log.e(TAG, "$description: Non-retryable failure", e)
+            val safeDescription = SensitiveLogRedactor.redact(description)
+            Log.e(TAG, "$safeDescription: Non-retryable failure (${e.javaClass.simpleName})")
             null
         }
     }

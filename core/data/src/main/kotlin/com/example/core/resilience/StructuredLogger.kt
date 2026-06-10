@@ -32,21 +32,29 @@ object StructuredLogger {
     fun w(tag: String, message: String, throwable: Throwable? = null, extras: Map<String, String> = emptyMap()) {
         val entry = redactedEntry(LogEntry(tag, message, LogLevel.WARN, throwable, extras = extras))
         log(entry)
-        if (throwable != null) Log.w(tag, formatMessage(entry.message, entry.extras), throwable)
-        else Log.w(tag, formatMessage(entry.message, entry.extras))
+        Log.w(tag, formatMessage(entry.message, entry.extras))
     }
 
     fun e(tag: String, message: String, throwable: Throwable? = null, extras: Map<String, String> = emptyMap()) {
         val entry = redactedEntry(LogEntry(tag, message, LogLevel.ERROR, throwable, extras = extras))
         log(entry)
-        if (throwable != null) Log.e(tag, formatMessage(entry.message, entry.extras), throwable)
-        else Log.e(tag, formatMessage(entry.message, entry.extras))
+        Log.e(tag, formatMessage(entry.message, entry.extras))
     }
 
     private fun redactedEntry(entry: LogEntry): LogEntry {
+        val throwableExtras = entry.throwable?.let { throwable ->
+            buildMap {
+                put("exception", throwable.javaClass.simpleName)
+                throwable.message
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { put("exceptionMessage", SensitiveLogRedactor.redact(it)) }
+            }
+        } ?: emptyMap()
+
         return entry.copy(
             message = SensitiveLogRedactor.redact(entry.message),
-            extras = entry.extras.mapValues { (_, value) -> SensitiveLogRedactor.redact(value) },
+            throwable = null,
+            extras = entry.extras.mapValues { (_, value) -> SensitiveLogRedactor.redact(value) } + throwableExtras,
         )
     }
 
@@ -66,6 +74,12 @@ object StructuredLogger {
     fun getErrors(): List<LogEntry> {
         synchronized(history) {
             return history.filter { it.level == LogLevel.ERROR }
+        }
+    }
+
+    fun clearForTests() {
+        synchronized(history) {
+            history.clear()
         }
     }
 

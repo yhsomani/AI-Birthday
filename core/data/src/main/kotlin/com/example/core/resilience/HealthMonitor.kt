@@ -20,13 +20,15 @@ object HealthMonitor {
     }
 
     fun recordError(context: String, error: String) {
+        val safeContext = SensitiveLogRedactor.redact(context)
+        val safeError = SensitiveLogRedactor.redact(error)
         synchronized(recentErrors) {
-            recentErrors.add("[$context] $error")
+            recentErrors.add("[$safeContext] $safeError")
             if (recentErrors.size > MAX_RECENT_ERRORS) {
                 recentErrors.removeAt(0)
             }
         }
-        Log.w(TAG, "Error recorded: [$context] $error")
+        Log.w(TAG, "Error recorded: [$safeContext] $safeError")
     }
 
     fun snapshot(): HealthSnapshot {

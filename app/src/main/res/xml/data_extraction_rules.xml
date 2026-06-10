@@ -1,20 +1,23 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
--->
+<?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <!-- Custom backup rules applied: Exclude database since it uses SQLCipher -->
         <exclude domain="database" path="relateai.db"/>
         <exclude domain="database" path="relateai.db-wal"/>
         <exclude domain="database" path="relateai.db-shm"/>
+        <exclude domain="sharedpref" path="relateai_auth_prefs.xml"/>
+        <exclude domain="sharedpref" path="relateai_config_prefs.xml"/>
+        <exclude domain="sharedpref" path="relateai_db_meta_secure.xml"/>
+        <exclude domain="sharedpref" path="relateai_db_meta.xml"/>
         <exclude domain="sharedpref" path="encrypted_prefs.xml"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="database" path="relateai.db"/>
         <exclude domain="database" path="relateai.db-wal"/>
         <exclude domain="database" path="relateai.db-shm"/>
+        <exclude domain="sharedpref" path="relateai_auth_prefs.xml"/>
+        <exclude domain="sharedpref" path="relateai_config_prefs.xml"/>
+        <exclude domain="sharedpref" path="relateai_db_meta_secure.xml"/>
+        <exclude domain="sharedpref" path="relateai_db_meta.xml"/>
         <exclude domain="sharedpref" path="encrypted_prefs.xml"/>
     </device-transfer>
 </data-extraction-rules>

@@ -6,10 +6,12 @@ import com.example.core.resilience.CircuitBreakerConfig
 import com.example.core.resilience.HealthMonitor
 import com.example.core.resilience.Retry
 import com.example.core.resilience.RetryConfig
+import com.example.core.resilience.SensitiveLogRedactor
 import com.example.core.resilience.StructuredLogger
 import com.google.firebase.vertexai.GenerativeModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -58,10 +60,19 @@ class GeminiClient @Inject constructor(
             }
             response ?: """{ "error": "Empty response" }"""
         } catch (e: Exception) {
-            val msg = e.localizedMessage ?: "Unknown error"
-            StructuredLogger.e(TAG, "AI generation failure", e)
-            HealthMonitor.recordError("GeminiClient.generate", msg)
-            """{ "error": "AI generation failure: $msg" }"""
+            val safeMessage = SensitiveLogRedactor.redact(e.localizedMessage ?: e.message ?: "Unknown error")
+            StructuredLogger.e(
+                TAG,
+                "AI generation failure",
+                extras = mapOf(
+                    "exception" to e.javaClass.simpleName,
+                    "reason" to safeMessage,
+                ),
+            )
+            HealthMonitor.recordError("GeminiClient.generate", safeMessage)
+            JSONObject()
+                .put("error", "AI generation failure: $safeMessage")
+                .toString()
         }
     }
 

@@ -312,3 +312,25 @@
 
 **Commit message**
 * `refactor: harden backup and cleanup app boundaries`
+
+### Feature 8: Platform Backup, Release Signing, and Secret-Safe Runtime Reporting
+
+**Problem identified**
+* Android Auto Backup was still enabled even though the app stores relationship data, OAuth-adjacent state, API keys, and a SQLCipher database locally.
+* Legacy backup rule files did not exclude the actual encrypted preference files used by `SecurePrefs` and `DatabaseKeyDerivation`.
+* Release builds could fall back to debug signing, which can produce artifacts that look release-like but are not production-signable.
+* Exception messages could still flow into retry logs, health snapshots, AI error JSON, or structured log history without a final redaction boundary.
+
+**Fix implemented**
+* Disabled platform Auto Backup in `AndroidManifest.xml`; the app's explicit encrypted export/import remains the supported backup path.
+* Made both API 31+ data extraction rules and legacy backup rules explicitly exclude `relateai.db`, WAL/SHM files, auth/config secure prefs, and DB-key metadata prefs.
+* Removed debug signing fallback from release signing and added an early Gradle task-graph guard requiring `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD` for release artifact tasks.
+* Sanitized `HealthMonitor`, `Retry`, `GeminiClient`, and `StructuredLogger` so sensitive exception text is redacted before storage, logging, or user-visible AI fallback JSON.
+* Added regression tests for backup/signing configuration and secret redaction through health/structured logging.
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleRelease --no-configuration-cache` now fails fast when release signing env vars are absent, with the explicit production signing error.
+
+**Commit message**
+* `fix: harden production privacy and release boundaries`

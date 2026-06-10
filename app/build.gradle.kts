@@ -7,6 +7,52 @@ plugins {
     alias(libs.plugins.baselineprofile)
 }
 
+fun releaseSigningIssues(): List<String> = buildList {
+    val keystorePath = System.getenv("KEYSTORE_PATH")
+    if (keystorePath.isNullOrBlank()) {
+        add("KEYSTORE_PATH")
+    } else if (!file(keystorePath).isFile) {
+        add("KEYSTORE_PATH must point to an existing keystore file")
+    }
+
+    if (System.getenv("STORE_PASSWORD").isNullOrBlank()) add("STORE_PASSWORD")
+    if (System.getenv("KEY_ALIAS").isNullOrBlank()) add("KEY_ALIAS")
+    if (System.getenv("KEY_PASSWORD").isNullOrBlank()) add("KEY_PASSWORD")
+}
+
+fun releaseSigningFailureMessage(issues: List<String>): String =
+    "Release signing is not configured. Missing or invalid: ${issues.joinToString()}. " +
+        "Set KEYSTORE_PATH, STORE_PASSWORD, KEY_ALIAS, and KEY_PASSWORD for production release builds."
+
+fun validateReleaseSigning() {
+    val issues = releaseSigningIssues()
+    if (issues.isNotEmpty()) {
+        throw GradleException(releaseSigningFailureMessage(issues))
+    }
+}
+
+val releaseSigningConfigured = releaseSigningIssues().isEmpty()
+val releaseArtifactTaskNames = setOf(
+    "assemble",
+    "build",
+    "assembleRelease",
+    "bundleRelease",
+    "packageRelease",
+    "signReleaseBundle",
+    "validateSigningRelease",
+)
+fun isAppReleaseArtifactRequest(taskName: String): Boolean {
+    val normalizedTaskName = taskName.substringAfterLast(":")
+    val targetsRootOrApp = !taskName.contains(":") ||
+        taskName.startsWith(":app:") ||
+        taskName.startsWith("app:")
+    return targetsRootOrApp && normalizedTaskName in releaseArtifactTaskNames
+}
+
+if (gradle.startParameter.taskNames.any(::isAppReleaseArtifactRequest)) {
+    validateReleaseSigning()
+}
+
 android {
     namespace = "com.example"
     compileOptions {
@@ -29,18 +75,11 @@ android {
     signingConfigs {
         create("release") {
             val keystorePath = System.getenv("KEYSTORE_PATH")
-            if (keystorePath != null && file(keystorePath).exists()) {
+            if (releaseSigningConfigured && keystorePath != null) {
                 storeFile = file(keystorePath)
                 storePassword = System.getenv("STORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
+                keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
-            } else {
-                // Fall back to debug signing configuration so the release build can package locally
-                val debugConfig = signingConfigs.getByName("debug")
-                storeFile = debugConfig.storeFile
-                storePassword = debugConfig.storePassword
-                keyAlias = debugConfig.keyAlias
-                keyPassword = debugConfig.keyPassword
             }
         }
     }
@@ -51,7 +90,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             // Default to built-in debug signing configuration
@@ -168,4 +209,16 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.androidx.work.testing)
+}
+
+tasks.matching {
+    it.name in setOf(
+        "packageRelease",
+        "signReleaseBundle",
+        "validateSigningRelease",
+    )
+}.configureEach {
+    doFirst {
+        validateReleaseSigning()
+    }
 }
