@@ -36,13 +36,19 @@ class NoHardcodedStringsRegressionTest {
 
     private companion object {
         val CLEANED_SCREEN_SOURCES = listOf(
+            "app/src/main/java/com/example/ui/screens/activity/ActivityHistoryScreen.kt",
+            "app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt",
             "app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt",
+            "app/src/main/java/com/example/ui/screens/contacts/ContactListScreen.kt",
+            "app/src/main/java/com/example/ui/screens/events/EventsScreen.kt",
+            "app/src/main/java/com/example/ui/screens/home/HomeScreen.kt",
+            "app/src/main/java/com/example/ui/screens/messages/MessagesScreen.kt",
             "app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt",
             "app/src/main/java/com/example/ui/screens/onboarding/OnboardingScreen.kt",
         )
 
         val visibleStringPattern = Regex(
-            pattern = "(Text|SectionHeader)\\(\\s*\"|contentDescription\\s*=\\s*\"",
+            pattern = "(Text|SectionHeader)\\(\\s*\"|contentDescription\\s*=\\s*\"|EmptyState\\(message\\s*=\\s*\"",
         )
     }
 }
