@@ -334,3 +334,46 @@
 
 **Commit message**
 * `fix: harden production privacy and release boundaries`
+
+### Feature 9: Style Coach Release Readiness
+
+**Problem identified**
+* Style Coach still used hardcoded visible English strings and a lifecycle-unaware Compose state collector.
+* The screen only supported pasted manual samples even though the domain layer already had recent sent-message analysis.
+* Style Coach lacked ViewModel regression coverage and was not protected by the hardcoded-string guard.
+
+**Root cause**
+* Style Coach had not been included in the earlier localized-screen cleanup tranche.
+* `StyleAnalysisUseCase.invoke()` returned no signal for whether recent messages were actually analyzed, making a truthful user-facing auto-analysis result hard to show.
+
+**Fix implemented**
+* Localized all Style Coach visible copy and content descriptions in English and Hindi resources.
+* Switched Style Coach to `collectAsStateWithLifecycle()`.
+* Added a user-facing recent sent-message analysis action backed by `StyleAnalysisUseCase.invoke()`.
+* Made `StyleAnalysisUseCase.invoke()` return `true` when analysis was performed and `false` when no recent messages were available.
+* Added `StyleCoachViewModelTest` coverage for manual training success, auto-analysis success, empty recent-message state, and stable error messaging.
+* Added `StyleCoachScreen.kt` to `NoHardcodedStringsRegressionTest`.
+
+**Impact**
+* Improves localization, accessibility consistency, and lifecycle behavior for Style Coach.
+* Gives users a lower-effort way to train their writing profile from existing sent-message history.
+* Prevents raw exception text from being surfaced through Style Coach training failures.
+
+**Files modified**
+* `app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt`
+* `app/src/main/java/com/example/ui/viewmodel/StyleCoachViewModel.kt`
+* `core/domain/src/main/kotlin/com/example/domain/usecase/StyleAnalysisUseCase.kt`
+* `app/src/main/res/values/strings.xml`
+* `app/src/main/res/values-hi/strings.xml`
+* `app/src/test/java/com/example/ui/viewmodel/StyleCoachViewModelTest.kt`
+* `app/src/test/java/com/example/domain/usecase/StyleAnalysisUseCaseTest.kt`
+* `app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.StyleCoachViewModelTest --tests com.example.domain.usecase.StyleAnalysisUseCaseTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `ui: harden style coach release readiness`

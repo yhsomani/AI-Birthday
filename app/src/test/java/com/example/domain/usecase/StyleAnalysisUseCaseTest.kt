@@ -28,9 +28,32 @@ class StyleAnalysisUseCaseTest {
     fun `invoke with no messages does not perform analysis`() = runTest {
         coEvery { messageRepository.getRecentForStyleAnalysis(any(), 100) } returns emptyList()
 
-        useCase()
+        val analyzed = useCase()
 
+        assertEquals(false, analyzed)
         coVerify(exactly = 0) { styleProfileRepository.upsertWithHistory(any(), any()) }
+    }
+
+    @Test
+    fun `invoke with recent messages performs analysis`() = runTest {
+        coEvery { messageRepository.getRecentForStyleAnalysis(any(), 100) } returns listOf(
+            SentMessageEntity(
+                id = "sent_1",
+                contactId = "contact_1",
+                eventType = "BIRTHDAY",
+                eventYear = 2026,
+                messageText = "Dear John, wishing you a very happy birthday. Warm regards.",
+                channel = "SMS",
+                sentAtMs = 1L,
+                deliveryStatus = "SENT",
+            ),
+        )
+        coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileEntity()
+
+        val analyzed = useCase()
+
+        assertEquals(true, analyzed)
+        coVerify { styleProfileRepository.upsertWithHistory(any(), match { it.source == "AUTO_ANALYSIS" }) }
     }
 
     @Test

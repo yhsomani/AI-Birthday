@@ -105,6 +105,37 @@
     <string name="settings_style_coach">Style Coach</string>
     <string name="settings_paste_samples">Paste message or email samples</string>
     <string name="settings_samples_placeholder">e.g., \'Hey everyone! Hope you have an awesome week ahead. Talk soon!\'</string>
+    <string name="style_coach_title">AI Style Coach</string>
+    <string name="style_coach_train_title">अपना Style Coach ट्रेन करें</string>
+    <string name="style_coach_train_body">अपने लिखे हुए संदेशों के samples paste करें और उन्हें double newlines से अलग करें। RelateAI आपकी formality, emoji preference, greetings, और signature expressions सीखता है।</string>
+    <string name="style_coach_samples_label">Paste किए गए message samples</string>
+    <string name="style_coach_samples_placeholder">e.g. Hey buddy! Happy birthday, hope you have a great day.\n\nRespected Sir, wishing you a very happy birthday and a prosperous year ahead.</string>
+    <string name="style_coach_manual_analyze">Analyze करें और Style Profile अपडेट करें</string>
+    <string name="style_coach_auto_analyze">Recent Sent Messages Analyze करें</string>
+    <string name="style_coach_status_manual_success">Style analysis पूरा हुआ और save हो गया।</string>
+    <string name="style_coach_status_auto_success">Recent sent messages analyze होकर save हो गए।</string>
+    <string name="style_coach_status_auto_empty">Analysis के लिए recent sent messages उपलब्ध नहीं हैं।</string>
+    <string name="style_coach_error_manual_failed">Paste किए गए samples analyze नहीं हो सके। Text जांचें और फिर कोशिश करें।</string>
+    <string name="style_coach_error_auto_failed">Recent sent messages analyze नहीं हो सके। बाद में फिर कोशिश करें।</string>
+    <string name="style_coach_profile_title">आपकी सीखी हुई Writing Profile</string>
+    <string name="style_coach_formality_level">Formality Level</string>
+    <string name="style_coach_emoji_preference">Emoji Preference</string>
+    <string name="style_coach_emoji_expressive">Expressive (emojis)</string>
+    <string name="style_coach_emoji_plain">Plain text</string>
+    <string name="style_coach_language_accent">Language Accent</string>
+    <string name="style_coach_language_hindi">Hinglish/Hindi</string>
+    <string name="style_coach_language_english">English (en)</string>
+    <string name="style_coach_avg_message_length">Avg Message Length</string>
+    <string name="style_coach_avg_message_length_value">%1$d chars</string>
+    <string name="style_coach_common_greetings">Typical Openers / Greetings</string>
+    <string name="style_coach_most_used_emojis">Most Used Emojis</string>
+    <string name="style_coach_none_detected_yet">अभी कुछ detect नहीं हुआ</string>
+    <string name="style_coach_none_detected">कुछ detect नहीं हुआ</string>
+    <string name="style_coach_history_title">Profile History Snapshots</string>
+    <string name="style_coach_history_empty">अभी कोई training history record नहीं हुई।</string>
+    <string name="style_coach_history_summary">Formality: %1$s, Lang: %2$s, Avg Length: %3$d chars</string>
+    <string name="style_coach_source_manual">Manual training</string>
+    <string name="style_coach_source_auto">Recent-message analysis</string>
     
     <!-- Edit Contact -->
     <string name="edit_contact_title">Edit Contact</string>

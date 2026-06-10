@@ -1,53 +1,96 @@
 package com.example.ui.screens.stylecoach
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.surfaceColorAtElevation
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.R
+import com.example.core.db.entities.StyleProfileEntity
+import com.example.core.db.entities.StyleProfileHistoryEntity
 import com.example.ui.viewmodel.StyleCoachViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import org.json.JSONArray
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StyleCoachScreen(
     onBack: () -> Unit,
-    viewModel: StyleCoachViewModel = hiltViewModel()
+    viewModel: StyleCoachViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var samplesText by remember { mutableStateOf("") }
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("AI Style Coach", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        text = stringResource(R.string.style_coach_title),
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back),
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
-                )
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
+                ),
             )
-        }
+        },
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -57,257 +100,394 @@ fun StyleCoachScreen(
                     Brush.verticalGradient(
                         colors = listOf(
                             MaterialTheme.colorScheme.surface,
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                        )
-                    )
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        ),
+                    ),
                 )
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Training Card
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Filled.Psychology,
-                                contentDescription = "Coach",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(32.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                "Train Your Style Coach",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-
-                        Text(
-                            "Paste samples of messages you've written below, separated by double newlines. The AI will learn your formality, emoji preference, common greetings and signature expressions.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        OutlinedTextField(
-                            value = samplesText,
-                            onValueChange = { samplesText = it },
-                            label = { Text("Pasted Message Samples") },
-                            placeholder = { Text("e.g. Hey buddy! Happy Birthday, hope you have a blast! 🎂\n\nRespected Sir, wishing you a very happy birthday and prosperous year ahead.") },
-                            modifier = Modifier.fillMaxWidth(),
-                            minLines = 4,
-                            maxLines = 8
-                        )
-
-                        if (uiState.errorMessage != null) {
-                            Text(
-                                text = uiState.errorMessage ?: "",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                val split = samplesText.split("\n\n").map { it.trim() }.filter { it.isNotEmpty() }
-                                viewModel.trainStyle(split)
-                            },
-                            enabled = !uiState.isTraining && samplesText.isNotBlank(),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            if (uiState.isTraining) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            } else {
-                                Text("Analyze & Update Style Profile")
-                            }
-                        }
-
-                        if (uiState.trainSuccess) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Filled.CheckCircle, contentDescription = "Success", tint = Color(0xFF4CAF50))
-                                Text("Style analysis completed and saved!", color = Color(0xFF4CAF50))
-                            }
-                        }
-                    }
-                }
+                StyleTrainingCard(
+                    samplesText = samplesText,
+                    onSamplesChange = { samplesText = it },
+                    isTraining = uiState.isTraining,
+                    isAutoAnalyzing = uiState.isAutoAnalyzing,
+                    statusMessageRes = uiState.statusMessageRes,
+                    statusIsError = uiState.statusIsError,
+                    onManualAnalyze = {
+                        val samples = samplesText
+                            .split("\n\n")
+                            .map { it.trim() }
+                            .filter { it.isNotEmpty() }
+                        viewModel.trainStyle(samples)
+                    },
+                    onAutoAnalyze = viewModel::analyzeRecentSentMessages,
+                )
             }
 
-            // Learned Profile Metrics
             uiState.profile?.let { profile ->
                 item {
                     Text(
-                        "Your Learned Writing Profile",
+                        text = stringResource(R.string.style_coach_profile_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
 
                 item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        elevation = CardDefaults.cardElevation(2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column {
-                                    Text("Formality Level", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(profile.formalityLevel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text("Emoji Preference", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(if (profile.usesEmoji) "Expressive (Emojis)" else "Plain Text", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                }
-                            }
-
-                            Divider()
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column {
-                                    Text("Language Accent", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(if (profile.preferredLanguage == "hi") "Hinglish/Hindi" else "English (en)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text("Avg Message Length", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("${profile.avgMessageLength} chars", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-
-                            Divider()
-
-                            // Greetings / Closings
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("Typical Openers / Greetings", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                val greetingsList = remember(profile.commonGreetingsJson) {
-                                    try {
-                                        val arr = org.json.JSONArray(profile.commonGreetingsJson)
-                                        List(arr.length()) { arr.getString(it) }
-                                    } catch (_: Exception) { emptyList() }
-                                }
-                                if (greetingsList.isEmpty()) {
-                                    Text("None detected yet", style = MaterialTheme.typography.bodyMedium)
-                                } else {
-                                    Text(greetingsList.joinToString(", "), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                                }
-                            }
-
-                            // Emojis Set
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("Most Used Emojis", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                val emojiList = remember(profile.emojiSetJson) {
-                                    try {
-                                        val arr = org.json.JSONArray(profile.emojiSetJson)
-                                        List(arr.length()) { arr.getString(it) }
-                                    } catch (_: Exception) { emptyList() }
-                                }
-                                if (emojiList.isEmpty()) {
-                                    Text("None detected", style = MaterialTheme.typography.bodyMedium)
-                                } else {
-                                    Text(emojiList.joinToString("  "), style = MaterialTheme.typography.titleMedium)
-                                }
-                            }
-                        }
-                    }
+                    LearnedProfileCard(profile = profile)
                 }
             }
 
-            // Snapshots History
             item {
                 Text(
-                    "Profile History Snapshots",
+                    text = stringResource(R.string.style_coach_history_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
 
             if (uiState.history.isEmpty()) {
                 item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Filled.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("No training history recorded yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    EmptyHistoryRow()
                 }
             } else {
                 items(uiState.history, key = { it.id }) { snapshot ->
-                    val snapshotObj = remember(snapshot.profileJson) {
-                        try {
-                            org.json.JSONObject(snapshot.profileJson)
-                        } catch (_: Exception) { null }
-                    }
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = snapshot.source,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = dateFormat.format(Date(snapshot.savedAtMs)),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            snapshotObj?.let { obj ->
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Formality: ${obj.optString("formalityLevel")}, Lang: ${obj.optString("preferredLanguage")}, Avg Length: ${obj.optInt("avgMessageLength")} chars",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                        }
-                    }
+                    HistorySnapshotCard(
+                        snapshot = snapshot,
+                        savedAt = dateFormat.format(Date(snapshot.savedAtMs)),
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun StyleTrainingCard(
+    samplesText: String,
+    onSamplesChange: (String) -> Unit,
+    isTraining: Boolean,
+    isAutoAnalyzing: Boolean,
+    statusMessageRes: Int?,
+    statusIsError: Boolean,
+    onManualAnalyze: () -> Unit,
+    onAutoAnalyze: () -> Unit,
+) {
+    val busy = isTraining || isAutoAnalyzing
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Psychology,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.style_coach_train_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            Text(
+                text = stringResource(R.string.style_coach_train_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            OutlinedTextField(
+                value = samplesText,
+                onValueChange = onSamplesChange,
+                label = { Text(stringResource(R.string.style_coach_samples_label)) },
+                placeholder = { Text(stringResource(R.string.style_coach_samples_placeholder)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 4,
+                maxLines = 8,
+            )
+
+            statusMessageRes?.let { messageRes ->
+                StatusMessage(
+                    message = stringResource(messageRes),
+                    isError = statusIsError,
+                )
+            }
+
+            Button(
+                onClick = onManualAnalyze,
+                enabled = !busy && samplesText.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                if (isTraining) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                } else {
+                    Text(stringResource(R.string.style_coach_manual_analyze))
+                }
+            }
+
+            OutlinedButton(
+                onClick = onAutoAnalyze,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                if (isAutoAnalyzing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text(stringResource(R.string.style_coach_auto_analyze))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusMessage(
+    message: String,
+    isError: Boolean,
+) {
+    val color = if (isError) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Icon(
+            imageVector = if (isError) Icons.Filled.Info else Icons.Filled.CheckCircle,
+            contentDescription = null,
+            tint = color,
+        )
+        Text(
+            text = message,
+            color = color,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+@Composable
+private fun LearnedProfileCard(profile: StyleProfileEntity) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(2.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                MetricBlock(
+                    label = stringResource(R.string.style_coach_formality_level),
+                    value = profile.formalityLevel,
+                )
+                MetricBlock(
+                    label = stringResource(R.string.style_coach_emoji_preference),
+                    value = if (profile.usesEmoji) {
+                        stringResource(R.string.style_coach_emoji_expressive)
+                    } else {
+                        stringResource(R.string.style_coach_emoji_plain)
+                    },
+                    horizontalAlignment = Alignment.End,
+                )
+            }
+
+            HorizontalDivider()
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                MetricBlock(
+                    label = stringResource(R.string.style_coach_language_accent),
+                    value = if (profile.preferredLanguage == "hi") {
+                        stringResource(R.string.style_coach_language_hindi)
+                    } else {
+                        stringResource(R.string.style_coach_language_english)
+                    },
+                )
+                MetricBlock(
+                    label = stringResource(R.string.style_coach_avg_message_length),
+                    value = stringResource(
+                        R.string.style_coach_avg_message_length_value,
+                        profile.avgMessageLength,
+                    ),
+                    horizontalAlignment = Alignment.End,
+                )
+            }
+
+            HorizontalDivider()
+
+            ProfileListBlock(
+                label = stringResource(R.string.style_coach_common_greetings),
+                values = parseJsonArray(profile.commonGreetingsJson),
+                emptyText = stringResource(R.string.style_coach_none_detected_yet),
+            )
+
+            ProfileListBlock(
+                label = stringResource(R.string.style_coach_most_used_emojis),
+                values = parseJsonArray(profile.emojiSetJson),
+                emptyText = stringResource(R.string.style_coach_none_detected),
+                expressive = true,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MetricBlock(
+    label: String,
+    value: String,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+) {
+    Column(horizontalAlignment = horizontalAlignment) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun ProfileListBlock(
+    label: String,
+    values: List<String>,
+    emptyText: String,
+    expressive: Boolean = false,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = values.takeIf { it.isNotEmpty() }?.joinToString(if (expressive) "  " else ", ")
+                ?: emptyText,
+            style = if (expressive && values.isNotEmpty()) {
+                MaterialTheme.typography.titleMedium
+            } else {
+                MaterialTheme.typography.bodyMedium
+            },
+            fontWeight = if (values.isNotEmpty() && !expressive) FontWeight.Medium else null,
+        )
+    }
+}
+
+@Composable
+private fun EmptyHistoryRow() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Info,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = stringResource(R.string.style_coach_history_empty),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun HistorySnapshotCard(
+    snapshot: StyleProfileHistoryEntity,
+    savedAt: String,
+) {
+    val snapshotObj = remember(snapshot.profileJson) {
+        runCatching { JSONObject(snapshot.profileJson) }.getOrNull()
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        ),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = historySourceLabel(snapshot.source),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = savedAt,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            snapshotObj?.let { obj ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(
+                        R.string.style_coach_history_summary,
+                        obj.optString("formalityLevel"),
+                        obj.optString("preferredLanguage"),
+                        obj.optInt("avgMessageLength"),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun historySourceLabel(source: String): String {
+    return when (source) {
+        "MANUAL_TRAINING" -> stringResource(R.string.style_coach_source_manual)
+        "AUTO_ANALYSIS" -> stringResource(R.string.style_coach_source_auto)
+        else -> source
+    }
+}
+
+private fun parseJsonArray(raw: String): List<String> {
+    return runCatching {
+        val array = JSONArray(raw)
+        List(array.length()) { index -> array.getString(index) }
+    }.getOrDefault(emptyList())
 }

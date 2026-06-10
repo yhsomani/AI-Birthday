@@ -12,13 +12,14 @@ class StyleAnalysisUseCase @Inject constructor(
     private val messageRepository: MessageRepository,
     private val styleProfileRepository: StyleProfileRepository
 ) {
-    suspend operator fun invoke() {
+    suspend operator fun invoke(): Boolean {
         val sinceMs = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000L
         val sentMessages = messageRepository.getRecentForStyleAnalysis(sinceMs, 100)
-        if (sentMessages.isEmpty()) return
+        if (sentMessages.isEmpty()) return false
 
         val texts = sentMessages.map { it.messageText }
         analyzeAndSave(texts, "AUTO_ANALYSIS")
+        return true
     }
 
     suspend fun analyzeAndSave(texts: List<String>, source: String) {
