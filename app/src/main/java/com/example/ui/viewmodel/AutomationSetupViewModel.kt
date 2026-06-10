@@ -6,9 +6,11 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.core.db.entities.ContactEntity
@@ -17,6 +19,7 @@ import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.CircuitState
 import com.example.core.resilience.DeadLetterQueue
 import com.example.core.resilience.HealthMonitor
+import com.example.core.resilience.SensitiveLogRedactor
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.StyleProfileRepository
@@ -49,8 +52,8 @@ enum class AiDoctorAction {
 }
 
 data class AiDoctorSummary(
-    val title: String = "AI Doctor is checking your setup",
-    val detail: String = "Run a refresh to inspect AI, personalization, and automation health.",
+    val title: String = "",
+    val detail: String = "",
     val status: ReadinessStatus = ReadinessStatus.WARNING,
 )
 
@@ -112,12 +115,12 @@ class AutomationSetupViewModel @Inject constructor(
                 val outcome = syncContactsUseCase(forceRefresh = true)
                 _uiState.value = _uiState.value.copy(
                     isSyncingContacts = false,
-                    operationMessage = "Synced ${outcome.googleCount} contacts.",
+                    operationMessage = text(R.string.automation_setup_sync_success, outcome.googleCount),
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSyncingContacts = false,
-                    operationMessage = e.localizedMessage ?: "Contact sync failed.",
+                    operationMessage = text(R.string.automation_setup_sync_failed),
                 )
             }
             refreshChecks()
@@ -126,14 +129,15 @@ class AutomationSetupViewModel @Inject constructor(
 
     fun runSafeGenerationCheck() {
         val ready = securePrefs.isAiWishGenerationEnabled() &&
-            (securePrefs.getGeminiApiKey().isNotBlank() || com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null)
+            (securePrefs.getGeminiApiKey().isNotBlank() || currentFirebaseUserOrNull() != null)
         val firstBlocker = _uiState.value.checks.firstOrNull { it.status == ReadinessStatus.ACTION_REQUIRED }
         _uiState.value = _uiState.value.copy(
             operationMessage = if (ready) {
-                firstBlocker?.let { "Dry run found a setup blocker: ${it.title}. ${it.detail}" }
-                    ?: "AI generation is ready. This dry-run did not create or send messages."
+                firstBlocker?.let {
+                    text(R.string.automation_setup_dry_run_blocker, it.title, it.detail)
+                } ?: text(R.string.automation_setup_dry_run_ready)
             } else {
-                "AI generation needs a Gemini API key, signed-in Google account, and enabled AI toggle."
+                text(R.string.automation_setup_dry_run_missing_ai)
             }
         )
     }
@@ -155,13 +159,13 @@ class AutomationSetupViewModel @Inject constructor(
                     operationMessage = if (response.contains("\"error\"", ignoreCase = true)) {
                         diagnoseAiFailure(response)
                     } else {
-                        "AI test completed successfully."
+                        text(R.string.automation_setup_ai_test_success)
                     },
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isTestingAi = false,
-                    operationMessage = e.localizedMessage ?: "AI test failed.",
+                    operationMessage = text(R.string.automation_setup_ai_test_failed),
                 )
             }
             refreshChecks()
@@ -179,7 +183,7 @@ class AutomationSetupViewModel @Inject constructor(
         }
         val health = HealthMonitor.snapshot()
         val recentErrors = StructuredLogger.getErrors().takeLast(3)
-        val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+        val currentUser = currentFirebaseUserOrNull()
         val alarmManager = appContext.getSystemService(AlarmManager::class.java)
         val contacts = runCatching { contactRepository.getAllSync() }.getOrDefault(emptyList())
         val styleProfile = runCatching { styleProfileRepository.getProfileOnce() }.getOrNull()
@@ -187,118 +191,130 @@ class AutomationSetupViewModel @Inject constructor(
             styleProfile?.sampleCount ?: 0,
             countJsonArrayItems(styleProfile?.sampleMessagesJson),
         )
+        val hasGoogleAuth = securePrefs.getGoogleOAuthToken().isNotBlank() || currentUser != null
+        val hasGeminiAccess = securePrefs.getGeminiApiKey().isNotBlank() || currentUser != null
+        val aiEnabled = securePrefs.isAiWishGenerationEnabled()
+        val notificationsAllowed = hasNotificationPermission()
+        val smsAllowed = hasSmsPermission()
+        val whatsAppAutomationEnabled = isWhatsAppAutomationServiceEnabled()
+        val exactSendsAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        val deadLetterCount = DeadLetterQueue.count()
 
         val checks = listOf(
             ReadinessCheck(
-                "Google Contacts",
-                if (securePrefs.getGoogleOAuthToken().isNotBlank() || currentUser != null) {
-                    "Account/token available for sync."
+                text(R.string.automation_setup_check_google_contacts),
+                if (hasGoogleAuth) {
+                    text(R.string.automation_setup_google_contacts_ok)
                 } else {
-                    "Sign in with Google and grant Contacts access."
+                    text(R.string.automation_setup_google_contacts_missing)
                 },
-                if (securePrefs.getGoogleOAuthToken().isNotBlank() || currentUser != null) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
-                actionLabel = if (securePrefs.getGoogleOAuthToken().isBlank() && currentUser == null) "Sync Contacts" else null,
-                action = if (securePrefs.getGoogleOAuthToken().isBlank() && currentUser == null) AiDoctorAction.SYNC_CONTACTS else AiDoctorAction.NONE,
+                if (hasGoogleAuth) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = if (hasGoogleAuth) null else text(R.string.automation_setup_action_sync_contacts),
+                action = if (hasGoogleAuth) AiDoctorAction.NONE else AiDoctorAction.SYNC_CONTACTS,
             ),
             ReadinessCheck(
-                "Gemini",
-                if (securePrefs.getGeminiApiKey().isNotBlank()) "API key configured." else "Use Firebase auth or add a Gemini API key.",
-                if (securePrefs.getGeminiApiKey().isNotBlank() || currentUser != null) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
-                actionLabel = if (securePrefs.getGeminiApiKey().isBlank() && currentUser == null) "Open Settings" else "Test AI",
-                action = if (securePrefs.getGeminiApiKey().isBlank() && currentUser == null) AiDoctorAction.OPEN_SETTINGS else AiDoctorAction.TEST_AI,
+                text(R.string.automation_setup_check_gemini),
+                if (securePrefs.getGeminiApiKey().isNotBlank()) {
+                    text(R.string.automation_setup_gemini_key_ok)
+                } else {
+                    text(R.string.automation_setup_gemini_auth_missing)
+                },
+                if (hasGeminiAccess) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = if (hasGeminiAccess) text(R.string.automation_setup_action_test_ai) else text(R.string.automation_setup_action_open_settings),
+                action = if (hasGeminiAccess) AiDoctorAction.TEST_AI else AiDoctorAction.OPEN_SETTINGS,
             ),
             ReadinessCheck(
-                "AI Wish Generation",
-                if (securePrefs.isAiWishGenerationEnabled()) "Enabled in Settings." else "Disabled in Settings.",
-                if (securePrefs.isAiWishGenerationEnabled()) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
-                actionLabel = if (securePrefs.isAiWishGenerationEnabled()) null else "Open Settings",
-                action = if (securePrefs.isAiWishGenerationEnabled()) AiDoctorAction.NONE else AiDoctorAction.OPEN_SETTINGS,
+                text(R.string.automation_setup_check_ai_wish_generation),
+                if (aiEnabled) text(R.string.automation_setup_ai_wish_enabled) else text(R.string.automation_setup_ai_wish_disabled),
+                if (aiEnabled) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = if (aiEnabled) null else text(R.string.automation_setup_action_open_settings),
+                action = if (aiEnabled) AiDoctorAction.NONE else AiDoctorAction.OPEN_SETTINGS,
             ),
             ReadinessCheck(
-                "Style Coach",
+                text(R.string.automation_setup_check_style_coach),
                 when {
-                    styleSampleCount >= 3 -> "Trained with $styleSampleCount writing samples."
-                    styleSampleCount > 0 -> "Add ${3 - styleSampleCount} more writing sample(s) so AI can match your tone."
-                    else -> "No writing samples found. Messages may sound generic."
+                    styleSampleCount >= 3 -> text(R.string.automation_setup_style_trained, styleSampleCount)
+                    styleSampleCount > 0 -> text(R.string.automation_setup_style_needs_more, 3 - styleSampleCount)
+                    else -> text(R.string.automation_setup_style_empty)
                 },
                 when {
                     styleSampleCount >= 3 -> ReadinessStatus.OK
                     styleSampleCount > 0 -> ReadinessStatus.WARNING
                     else -> ReadinessStatus.ACTION_REQUIRED
                 },
-                actionLabel = if (styleSampleCount >= 3) null else "Open Style Coach",
+                actionLabel = if (styleSampleCount >= 3) null else text(R.string.automation_setup_action_open_style_coach),
                 action = if (styleSampleCount >= 3) AiDoctorAction.NONE else AiDoctorAction.OPEN_STYLE_COACH,
             ),
             personalizationCheck(contacts),
             ReadinessCheck(
-                "Gemini Circuit",
+                text(R.string.automation_setup_check_gemini_circuit),
                 health.circuitBreakerStates["gemini"]?.let { state ->
-                    if (state == CircuitState.CLOSED) "Gemini circuit is healthy." else "Gemini circuit is $state after repeated failures."
-                } ?: "Gemini circuit has not reported a state yet.",
+                    if (state == CircuitState.CLOSED) {
+                        text(R.string.automation_setup_gemini_circuit_ok)
+                    } else {
+                        text(R.string.automation_setup_gemini_circuit_state, state.name)
+                    }
+                } ?: text(R.string.automation_setup_gemini_circuit_none),
                 when (health.circuitBreakerStates["gemini"]) {
                     null, CircuitState.CLOSED -> ReadinessStatus.OK
                     CircuitState.HALF_OPEN -> ReadinessStatus.WARNING
                     CircuitState.OPEN -> ReadinessStatus.ACTION_REQUIRED
                 },
-                actionLabel = if (health.circuitBreakerStates["gemini"] == CircuitState.OPEN) "Test AI" else null,
+                actionLabel = if (health.circuitBreakerStates["gemini"] == CircuitState.OPEN) text(R.string.automation_setup_action_test_ai) else null,
                 action = if (health.circuitBreakerStates["gemini"] == CircuitState.OPEN) AiDoctorAction.TEST_AI else AiDoctorAction.NONE,
             ),
             ReadinessCheck(
-                "Notifications",
-                if (hasNotificationPermission()) "Approval and reminder notifications can be shown." else "Notification permission is missing.",
-                if (hasNotificationPermission()) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
-                actionLabel = if (hasNotificationPermission()) null else "App Settings",
-                action = if (hasNotificationPermission()) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
+                text(R.string.automation_setup_check_notifications),
+                if (notificationsAllowed) text(R.string.automation_setup_notifications_ok) else text(R.string.automation_setup_notifications_missing),
+                if (notificationsAllowed) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = if (notificationsAllowed) null else text(R.string.automation_setup_action_app_settings),
+                action = if (notificationsAllowed) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
             ),
             ReadinessCheck(
-                "SMS",
-                if (hasSmsPermission()) "SMS dispatch is allowed." else "SMS permission is missing.",
-                if (hasSmsPermission()) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
-                actionLabel = if (hasSmsPermission()) null else "App Settings",
-                action = if (hasSmsPermission()) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
+                text(R.string.automation_setup_check_sms),
+                if (smsAllowed) text(R.string.automation_setup_sms_ok) else text(R.string.automation_setup_sms_missing),
+                if (smsAllowed) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = if (smsAllowed) null else text(R.string.automation_setup_action_app_settings),
+                action = if (smsAllowed) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
             ),
             ReadinessCheck(
-                "WhatsApp Automation",
-                if (isWhatsAppAutomationServiceEnabled()) "Accessibility service is enabled." else "Enable only if you want automatic WhatsApp sends.",
-                if (isWhatsAppAutomationServiceEnabled()) ReadinessStatus.OK else ReadinessStatus.WARNING,
-                actionLabel = if (isWhatsAppAutomationServiceEnabled()) null else "Open Accessibility",
-                action = if (isWhatsAppAutomationServiceEnabled()) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS,
+                text(R.string.automation_setup_check_whatsapp),
+                if (whatsAppAutomationEnabled) text(R.string.automation_setup_whatsapp_ok) else text(R.string.automation_setup_whatsapp_missing),
+                if (whatsAppAutomationEnabled) ReadinessStatus.OK else ReadinessStatus.WARNING,
+                actionLabel = if (whatsAppAutomationEnabled) null else text(R.string.automation_setup_action_open_accessibility),
+                action = if (whatsAppAutomationEnabled) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS,
             ),
             ReadinessCheck(
-                "Exact Sends",
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
-                    "Exact alarm scheduling is available."
-                } else {
-                    "Exact alarm access is disabled by the system."
-                },
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
-                actionLabel = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) null else "App Settings",
-                action = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
+                text(R.string.automation_setup_check_exact_sends),
+                if (exactSendsAllowed) text(R.string.automation_setup_exact_sends_ok) else text(R.string.automation_setup_exact_sends_missing),
+                if (exactSendsAllowed) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = if (exactSendsAllowed) null else text(R.string.automation_setup_action_app_settings),
+                action = if (exactSendsAllowed) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
             ),
             ReadinessCheck(
-                "Daily Automation",
-                if (dailyScheduled) "Daily WorkManager trigger is scheduled." else "Daily automation work is not currently scheduled.",
+                text(R.string.automation_setup_check_daily_automation),
+                if (dailyScheduled) text(R.string.automation_setup_daily_ok) else text(R.string.automation_setup_daily_missing),
                 if (dailyScheduled) ReadinessStatus.OK else ReadinessStatus.WARNING,
-                actionLabel = if (dailyScheduled) null else "Refresh",
+                actionLabel = if (dailyScheduled) null else text(R.string.automation_setup_action_refresh),
                 action = if (dailyScheduled) AiDoctorAction.NONE else AiDoctorAction.REFRESH,
             ),
             ReadinessCheck(
-                "Recent Errors",
+                text(R.string.automation_setup_check_recent_errors),
                 if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) {
-                    "No recent automation errors."
+                    text(R.string.automation_setup_recent_errors_none)
                 } else {
                     diagnoseAiFailure(recentErrors.lastOrNull()?.message ?: health.recentErrors.last())
                 },
                 if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) ReadinessStatus.OK else ReadinessStatus.WARNING,
-                actionLabel = if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) null else "View Activity",
+                actionLabel = if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) null else text(R.string.automation_setup_action_view_activity),
                 action = if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACTIVITY_HISTORY,
             ),
             ReadinessCheck(
-                "Dead Letter Queue",
-                "${DeadLetterQueue.count()} failed dispatch records in memory.",
-                if (DeadLetterQueue.count() == 0) ReadinessStatus.OK else ReadinessStatus.WARNING,
-                actionLabel = if (DeadLetterQueue.count() == 0) null else "View Activity",
-                action = if (DeadLetterQueue.count() == 0) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACTIVITY_HISTORY,
+                text(R.string.automation_setup_check_dead_letter),
+                text(R.string.automation_setup_dead_letter_count, deadLetterCount),
+                if (deadLetterCount == 0) ReadinessStatus.OK else ReadinessStatus.WARNING,
+                actionLabel = if (deadLetterCount == 0) null else text(R.string.automation_setup_action_view_activity),
+                action = if (deadLetterCount == 0) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACTIVITY_HISTORY,
             ),
         )
         return AiDoctorReport(summary = checks.toSummary(), checks = checks)
@@ -307,10 +323,10 @@ class AutomationSetupViewModel @Inject constructor(
     private fun personalizationCheck(contacts: List<ContactEntity>): ReadinessCheck {
         if (contacts.isEmpty()) {
             return ReadinessCheck(
-                title = "Personalization Data",
-                detail = "No contacts found. Sync contacts before diagnosing generic AI messages.",
+                title = text(R.string.automation_setup_check_personalization),
+                detail = text(R.string.automation_setup_personalization_empty),
                 status = ReadinessStatus.WARNING,
-                actionLabel = "Sync Contacts",
+                actionLabel = text(R.string.automation_setup_action_sync_contacts),
                 action = AiDoctorAction.SYNC_CONTACTS,
             )
         }
@@ -318,14 +334,14 @@ class AutomationSetupViewModel @Inject constructor(
         val enriched = contacts.count { it.hasPersonalizationData() }
         val percentage = (enriched * 100) / contacts.size
         return ReadinessCheck(
-            title = "Personalization Data",
+            title = text(R.string.automation_setup_check_personalization),
             detail = if (percentage >= 50) {
-                "$enriched of ${contacts.size} contacts have nicknames, interests, memories, or notes."
+                text(R.string.automation_setup_personalization_ok, enriched, contacts.size)
             } else {
-                "Only $enriched of ${contacts.size} contacts have personal details. Generic inputs create generic wishes."
+                text(R.string.automation_setup_personalization_low, enriched, contacts.size)
             },
             status = if (percentage >= 50) ReadinessStatus.OK else ReadinessStatus.WARNING,
-            actionLabel = if (percentage >= 50) null else "Review Contacts",
+            actionLabel = if (percentage >= 50) null else text(R.string.automation_setup_action_review_contacts),
             action = if (percentage >= 50) AiDoctorAction.NONE else AiDoctorAction.OPEN_CONTACTS,
         )
     }
@@ -338,20 +354,22 @@ class AutomationSetupViewModel @Inject constructor(
 
         return when {
             blockers > 0 -> AiDoctorSummary(
-                title = "AI Doctor found $blockers fix needed",
-                detail = firstProblem?.let { "Start with ${it.title}: ${it.detail}" }
-                    ?: "Resolve the required setup items below.",
+                title = text(R.string.automation_setup_summary_blockers, blockers),
+                detail = firstProblem?.let {
+                    text(R.string.automation_setup_summary_start_with, it.title, it.detail)
+                } ?: text(R.string.automation_setup_summary_required),
                 status = ReadinessStatus.ACTION_REQUIRED,
             )
             warnings > 0 -> AiDoctorSummary(
-                title = "AI works, but quality can improve",
-                detail = firstProblem?.let { "${it.title}: ${it.detail}" }
-                    ?: "Review the warnings below for better results.",
+                title = text(R.string.automation_setup_summary_warnings),
+                detail = firstProblem?.let {
+                    text(R.string.automation_setup_summary_problem, it.title, it.detail)
+                } ?: text(R.string.automation_setup_summary_review_warnings),
                 status = ReadinessStatus.WARNING,
             )
             else -> AiDoctorSummary(
-                title = "AI Doctor found no issues",
-                detail = "Generation, personalization, and automation checks look healthy.",
+                title = text(R.string.automation_setup_summary_ok),
+                detail = text(R.string.automation_setup_summary_ok_detail),
                 status = ReadinessStatus.OK,
             )
         }
@@ -381,17 +399,28 @@ class AutomationSetupViewModel @Inject constructor(
         val lower = raw.lowercase()
         return when {
             lower.contains("429") || lower.contains("quota") || lower.contains("exhausted") ->
-                "Gemini quota or rate limit was hit. Wait a few minutes, then run Test AI again."
+                text(R.string.automation_setup_ai_error_quota)
             lower.contains("api key") || lower.contains("apikey") || lower.contains("permission") || lower.contains("403") || lower.contains("unauthenticated") ->
-                "Gemini authentication failed. Check the API key, Firebase auth, and project permissions."
+                text(R.string.automation_setup_ai_error_auth)
             lower.contains("network") || lower.contains("timeout") || lower.contains("unavailable") || lower.contains("unable to resolve") ->
-                "Network access failed. Check the connection and retry the AI test."
+                text(R.string.automation_setup_ai_error_network)
             lower.contains("json") || lower.contains("parse") || lower.contains("empty response") ->
-                "AI returned an invalid or empty response. Regenerate once; if it repeats, check recent errors."
+                text(R.string.automation_setup_ai_error_json)
             lower.contains("circuit breaker") ->
-                "AI calls are temporarily paused after repeated failures. Wait a minute, then run Test AI."
-            else -> "Recent AI issue: ${raw.take(160)}"
+                text(R.string.automation_setup_ai_error_circuit)
+            else -> text(
+                R.string.automation_setup_ai_error_recent,
+                SensitiveLogRedactor.redact(raw).take(160),
+            )
         }
+    }
+
+    internal fun diagnoseAiFailureForTesting(raw: String): String = diagnoseAiFailure(raw)
+
+    internal fun summarizeForTesting(checks: List<ReadinessCheck>): AiDoctorSummary = checks.toSummary()
+
+    private fun text(@StringRes resId: Int, vararg args: Any): String {
+        return appContext.getString(resId, *args)
     }
 
     private fun hasSmsPermission(): Boolean {
@@ -415,4 +444,8 @@ class AutomationSetupViewModel @Inject constructor(
             it.equals(expectedService, ignoreCase = true)
         }
     }
+
+    private fun currentFirebaseUserOrNull() = runCatching {
+        com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+    }.getOrNull()
 }

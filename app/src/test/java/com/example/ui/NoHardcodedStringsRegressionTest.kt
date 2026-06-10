@@ -47,6 +47,7 @@ class NoHardcodedStringsRegressionTest {
             "app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt",
             "app/src/main/java/com/example/ui/screens/onboarding/OnboardingScreen.kt",
             "app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt",
+            "app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt",
         )
 
         val visibleStringPattern = Regex(

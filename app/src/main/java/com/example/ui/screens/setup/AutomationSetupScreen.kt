@@ -35,16 +35,18 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
 import com.example.core.ui.components.RelateStatusBanner
@@ -70,13 +72,13 @@ fun AutomationSetupScreen(
 ) {
     val context = LocalContext.current
     val isIgnoringBattery = remember { context.isIgnoringBatteryOptimizations() }
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     RelateScreen(
-        title = "AI Doctor",
-        subtitle = "Find why AI wishes feel wrong or fail, then fix the exact blocker.",
+        title = stringResource(R.string.automation_setup_title),
+        subtitle = stringResource(R.string.automation_setup_subtitle),
         navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-        navigationContentDescription = "Back",
+        navigationContentDescription = stringResource(R.string.back),
         onNavigationClick = onBack,
     ) {
         Column(
@@ -120,37 +122,37 @@ fun AutomationSetupScreen(
 
             SetupCard(
                 icon = Icons.AutoMirrored.Filled.Chat,
-                title = "Enable WhatsApp automation",
-                body = "Open Accessibility settings and enable RelateAI - Auto WhatsApp. The service only looks for WhatsApp compose and send controls.",
-                actionText = "Open Accessibility",
+                title = stringResource(R.string.automation_setup_whatsapp_card_title),
+                body = stringResource(R.string.automation_setup_whatsapp_card_body),
+                actionText = stringResource(R.string.automation_setup_action_open_accessibility),
                 onClick = { context.safeStartActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
             )
 
             SetupCard(
                 icon = Icons.Filled.BatterySaver,
-                title = "Allow background reliability",
+                title = stringResource(R.string.automation_setup_battery_card_title),
                 body = if (isIgnoringBattery) {
-                    "Battery optimization is already ignored for RelateAI."
+                    stringResource(R.string.automation_setup_battery_card_ignored)
                 } else {
-                    "Review OS battery settings if scheduled workers are delayed on this device."
+                    stringResource(R.string.automation_setup_battery_card_body)
                 },
-                actionText = "Open Battery Settings",
+                actionText = stringResource(R.string.automation_setup_action_open_battery_settings),
                 onClick = { context.openBatteryOptimizationSettings() },
             )
 
             SetupCard(
                 icon = Icons.Filled.Notifications,
-                title = "Review notification access",
-                body = "Notifications are used for reminders and approval prompts before messages are sent.",
-                actionText = "App Settings",
+                title = stringResource(R.string.automation_setup_notifications_card_title),
+                body = stringResource(R.string.automation_setup_notifications_card_body),
+                actionText = stringResource(R.string.automation_setup_action_app_settings),
                 onClick = { context.openAppSettings() },
             )
 
             SetupCard(
                 icon = Icons.Filled.Security,
-                title = "Automation stays approval-first",
-                body = "Use SMART_APPROVE, VIP_APPROVE, or ALWAYS_ASK in Settings when you want review before scheduling or sending.",
-                actionText = "Done",
+                title = stringResource(R.string.automation_setup_approval_card_title),
+                body = stringResource(R.string.automation_setup_approval_card_body),
+                actionText = stringResource(R.string.automation_setup_action_done),
                 onClick = onBack,
                 secondary = true,
             )
@@ -181,7 +183,7 @@ private fun ReadinessDashboard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Diagnostic Checks",
+                    text = stringResource(R.string.automation_setup_diagnostic_checks),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
@@ -219,13 +221,13 @@ private fun ReadinessDashboard(
                     modifier = Modifier.weight(1f),
                     enabled = !isRefreshing,
                 ) {
-                    Text("Refresh")
+                    Text(stringResource(R.string.automation_setup_action_refresh))
                 }
                 OutlinedButton(
                     onClick = onDryRun,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("Dry Run")
+                    Text(stringResource(R.string.automation_setup_action_dry_run))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -242,7 +244,10 @@ private fun ReadinessDashboard(
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text("Sync Contacts", color = RelateDarkBackground)
+                        Text(
+                            text = stringResource(R.string.automation_setup_action_sync_contacts),
+                            color = RelateDarkBackground,
+                        )
                     }
                 }
                 Button(
@@ -258,7 +263,10 @@ private fun ReadinessDashboard(
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Text("Test AI", color = RelateDarkBackground)
+                        Text(
+                            text = stringResource(R.string.automation_setup_action_test_ai),
+                            color = RelateDarkBackground,
+                        )
                     }
                 }
             }

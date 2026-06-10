@@ -377,3 +377,45 @@
 
 **Commit message**
 * `ui: harden style coach release readiness`
+
+### Feature 10: Automation Setup / AI Doctor Release Readiness
+
+**Problem identified**
+* Automation Setup and AI Doctor still used hardcoded visible English strings and lifecycle-unaware Compose state collection.
+* The diagnostic ViewModel generated raw English copy, surfaced raw exception text in sync/test failures, and included an unredacted fallback for unexpected AI errors.
+* Firebase Auth access in diagnostics could fail in unit-test or degraded runtime contexts instead of treating auth as unavailable.
+
+**Root cause**
+* The AI Doctor screen was added after the earlier localized-screen cleanup and kept display strings in both Compose and ViewModel logic.
+* Diagnostic status generation mixed product copy, environment probing, and error classification in one path without a redaction boundary.
+
+**Fix implemented**
+* Localized Automation Setup screen copy, diagnostic rows, actions, setup cards, summaries, operation messages, and AI failure explanations in English and Hindi resources.
+* Switched Automation Setup to `collectAsStateWithLifecycle()`.
+* Replaced raw sync/test exception messages with stable localized user-facing messages.
+* Redacted unexpected AI diagnostic fallback text with `SensitiveLogRedactor` before display.
+* Wrapped Firebase Auth reads so diagnostics degrade gracefully when Firebase is unavailable.
+* Added `AutomationSetupViewModelTest` coverage for required/healthy summaries and redacted diagnostic fallback text.
+* Added `AutomationSetupScreen.kt` to `NoHardcodedStringsRegressionTest`.
+
+**Impact**
+* Improves localization, lifecycle safety, and diagnostic consistency for the app's automation setup workflow.
+* Reduces risk of exposing email addresses, bearer tokens, phone numbers, or other sensitive text through unexpected AI error messages.
+* Makes the readiness screen more robust in partially configured environments.
+
+**Files modified**
+* `app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt`
+* `app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt`
+* `app/src/main/res/values/strings.xml`
+* `app/src/main/res/values-hi/strings.xml`
+* `app/src/test/java/com/example/ui/viewmodel/AutomationSetupViewModelTest.kt`
+* `app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.AutomationSetupViewModelTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `ui: harden automation diagnostics`
