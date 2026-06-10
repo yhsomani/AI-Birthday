@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-10
 
-This document is the feature and architecture source of truth for the current Android project in this repository. It is based on source inspection of `:app`, `:core:domain`, `:core:data`, `:core:ui`, Gradle configuration, Android manifest resources, CI workflow, Room schemas, test result XML, JaCoCo output, and existing documentation.
+`features.md` is the primary feature source of truth for the current Android project in this repository. This document is the expanded architecture and evidence companion. It is based on source inspection of `:app`, `:core:domain`, `:core:data`, `:core:ui`, Gradle configuration, Android manifest resources, CI workflow, Room schemas, test result XML, JaCoCo output, and existing documentation.
 
 Code remains the final authority. If this document conflicts with implementation, update this document after verifying the code.
 
