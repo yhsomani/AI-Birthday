@@ -1,6 +1,7 @@
 package com.example.ui.screens.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,27 +18,32 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
@@ -53,9 +59,14 @@ import com.example.ui.viewmodel.HomeViewModel
 fun HomeScreen(
     onNavigateToContact: (String) -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
+    onNavigateToAnalytics: () -> Unit = {},
+    onNavigateToActivityHistory: () -> Unit = {},
+    onNavigateToStyleCoach: () -> Unit = {},
+    onNavigateToBackupRestore: () -> Unit = {},
+    onNavigateToAutomationSetup: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = Modifier
@@ -170,6 +181,53 @@ fun HomeScreen(
 
         item {
             Spacer(modifier = Modifier.height(24.dp))
+            SectionHeader(title = stringResource(R.string.dashboard_quick_actions))
+            Spacer(modifier = Modifier.height(8.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    QuickActionTile(
+                        label = stringResource(R.string.analytics),
+                        icon = Icons.Filled.Analytics,
+                        onClick = onNavigateToAnalytics,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickActionTile(
+                        label = stringResource(R.string.activity_history_title),
+                        icon = Icons.Filled.History,
+                        onClick = onNavigateToActivityHistory,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    QuickActionTile(
+                        label = stringResource(R.string.settings_ai_style_coach),
+                        icon = Icons.Filled.SmartToy,
+                        onClick = onNavigateToStyleCoach,
+                        modifier = Modifier.weight(1f),
+                    )
+                    QuickActionTile(
+                        label = stringResource(R.string.settings_automation_setup),
+                        icon = Icons.Filled.Settings,
+                        onClick = onNavigateToAutomationSetup,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                QuickActionTile(
+                    label = stringResource(R.string.backup_restore_title),
+                    icon = Icons.Filled.Storage,
+                    onClick = onNavigateToBackupRestore,
+                )
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(24.dp))
             SectionHeader(title = stringResource(R.string.home_upcoming_birthdays))
         }
 
@@ -193,6 +251,37 @@ fun HomeScreen(
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun QuickActionTile(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    RelateGlassCard(
+        modifier = modifier.clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = RelatePrimary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+            )
         }
     }
 }

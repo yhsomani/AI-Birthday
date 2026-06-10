@@ -125,6 +125,21 @@ fun RelateNavGraph(
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
                 },
+                onNavigateToAnalytics = {
+                    navController.navigate(Screen.Analytics.route)
+                },
+                onNavigateToActivityHistory = {
+                    navController.navigate(Screen.ActivityHistory.route)
+                },
+                onNavigateToStyleCoach = {
+                    navController.navigate(Screen.StyleCoach.route)
+                },
+                onNavigateToBackupRestore = {
+                    navController.navigate(Screen.BackupRestore.route)
+                },
+                onNavigateToAutomationSetup = {
+                    navController.navigate(Screen.AutomationSetup.route)
+                },
             )
         }
         composable(Screen.ContactList.route) {

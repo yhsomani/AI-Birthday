@@ -557,3 +557,38 @@
 
 **Commit message**
 * `ui: harden relationship detail flows`
+
+### Feature 14: Navigation and Feature Discoverability
+
+**Problem identified**
+* Analytics, Activity History, Style Coach, Backup/Restore, and Automation Setup existed as implemented routes, but Home only exposed Settings and contact drill-in.
+* Several operational workflows were discoverable only after knowing to open Settings or a secondary screen.
+* Home still used lifecycle-unaware Compose state collection.
+
+**Root cause**
+* The navigation graph had accumulated feature routes without a dashboard-level entry point strategy.
+* Home focused on metrics and birthdays, leaving implemented operational workflows hidden behind indirect navigation.
+
+**Fix implemented**
+* Added Home quick actions for the already-implemented Analytics, Activity History, AI Style Coach, AI Doctor, and Backup/Restore workflows.
+* Wired Home callbacks through `NavGraph` to existing routes without adding new product scope or destinations.
+* Switched Home to `collectAsStateWithLifecycle()`.
+* Reused existing localized string resources and Material icons for the quick actions.
+
+**Impact**
+* Makes high-value implemented workflows discoverable from the main dashboard.
+* Reduces navigation depth for diagnostics, history review, analytics, backup/restore, and writing-style training.
+* Preserves existing Settings and bottom-navigation entry points while adding a dashboard path.
+
+**Files modified**
+* `app/src/main/java/com/example/ui/screens/home/HomeScreen.kt`
+* `app/src/main/java/com/example/ui/navigation/NavGraph.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.NoHardcodedStringsRegressionTest --tests com.example.ui.navigation.RouteArgumentCodecTest --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `ui: improve feature discoverability`
