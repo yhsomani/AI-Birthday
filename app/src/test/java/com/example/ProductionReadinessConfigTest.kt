@@ -65,7 +65,23 @@ class ProductionReadinessConfigTest {
         assertTrue(workflow.contains("actions/upload-artifact@v4"))
         assertTrue(workflow.contains("lint-reports"))
         assertTrue(workflow.contains("unit-test-reports"))
+        assertTrue(workflow.contains("./gradlew jacocoDebugUnitTestReport --no-configuration-cache"))
+        assertTrue(workflow.contains("coverage-reports"))
         assertTrue(workflow.contains("debug-apk"))
+    }
+
+    @Test
+    fun rootGradle_exposesMeasuredCoverageReportTask() {
+        val buildScript = File(projectRoot(), "build.gradle.kts").readText()
+
+        assertTrue(buildScript.contains("tasks.register<JacocoReport>(\"jacocoDebugUnitTestReport\")"))
+        assertTrue(buildScript.contains("coverageReportRequested"))
+        assertTrue(buildScript.contains("xml.required.set(true)"))
+        assertTrue(buildScript.contains("html.required.set(true)"))
+        assertTrue(buildScript.contains("testDebugUnitTest"))
+        assertTrue(buildScript.contains("intermediates/classes/debug/transformDebugClassesWithAsm/dirs"))
+        assertTrue(buildScript.contains("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"))
+        assertTrue(buildScript.contains("jacoco/testDebugUnitTest.exec"))
     }
 
     @Test
@@ -99,6 +115,10 @@ class ProductionReadinessConfigTest {
 
         return candidates.firstOrNull { it.isFile }
             ?: error("Could not find source file: $relativePath from $start")
+    }
+
+    private fun projectRoot(): File {
+        return requireNotNull(rootFile("settings.gradle.kts").parentFile)
     }
 
     private companion object {

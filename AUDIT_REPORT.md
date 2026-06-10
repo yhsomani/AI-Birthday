@@ -718,3 +718,38 @@
 
 **Commit message**
 * `fix: bound backup import memory use`
+
+### Feature 19: Measured Coverage Reporting
+
+**Problem identified**
+* CI uploaded unit-test reports, but the project still lacked measured coverage evidence.
+* The release checklist depended on test count and broad coverage claims rather than a reproducible coverage report.
+
+**Root cause**
+* No aggregate JaCoCo report task existed for the Android debug unit-test suite.
+* CI had no coverage-generation or artifact-upload step.
+
+**Fix implemented**
+* Added a root `jacocoDebugUnitTestReport` task that aggregates debug unit coverage across `:app`, `:core:data`, `:core:domain`, and `:core:ui`.
+* Scoped JaCoCo agent attachment to coverage-report invocations so normal validation does not depend on the coverage agent.
+* Filtered generated Android/Hilt/Room/Moshi classes from the report and mapped AGP 9 debug class directories explicitly.
+* Updated Android CI to generate and upload `coverage-reports`.
+* Extended `ProductionReadinessConfigTest` to protect the CI coverage artifact and root coverage task configuration.
+
+**Impact**
+* Produces reproducible XML and HTML coverage evidence at `build/reports/jacoco/jacocoDebugUnitTestReport/`.
+* Current aggregate line coverage is 30.37% (`3714` covered lines, `8517` missed lines), satisfying the documented minimum release evidence threshold while still showing remaining UI/device coverage risk.
+
+**Files modified**
+* `build.gradle.kts`
+* `.github/workflows/android.yml`
+* `app/src/test/java/com/example/ProductionReadinessConfigTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew jacocoDebugUnitTestReport --no-configuration-cache -Djavax.net.ssl.trustStore=/Users/yashsomani/Desktop/Android\ Project/AI-Birthday/.gradle/trust/cacerts-zscaler -Djavax.net.ssl.trustStorePassword=changeit` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `test: add measured coverage reporting`

@@ -25,6 +25,9 @@ jobs:
       - name: Run verification
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
 
+      - name: Generate coverage report
+        run: ./gradlew jacocoDebugUnitTestReport --no-configuration-cache
+
       - name: Verify release signing guard
         run: |
           set +e
@@ -58,6 +61,14 @@ jobs:
           path: |
             **/build/reports/tests/testDebugUnitTest/**
             **/build/test-results/testDebugUnitTest/**
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            build/reports/jacoco/jacocoDebugUnitTestReport/**
 
       - name: Upload debug APK
         if: always()
