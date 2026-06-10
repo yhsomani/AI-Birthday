@@ -24,3 +24,44 @@ jobs:
 
       - name: Run verification
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
+
+      - name: Verify release signing guard
+        run: |
+          set +e
+          ./gradlew assembleRelease --no-configuration-cache > release-signing.log 2>&1
+          status=$?
+          set -e
+          cat release-signing.log
+          if [ "$status" -eq 0 ]; then
+            echo "assembleRelease succeeded without release signing environment variables."
+            exit 1
+          fi
+          grep -q "Release signing is not configured" release-signing.log
+          grep -q "KEYSTORE_PATH" release-signing.log
+          grep -q "STORE_PASSWORD" release-signing.log
+          grep -q "KEY_ALIAS" release-signing.log
+          grep -q "KEY_PASSWORD" release-signing.log
+
+      - name: Upload lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          path: |
+            **/build/reports/lint-results-debug.*
+
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            **/build/reports/tests/testDebugUnitTest/**
+            **/build/test-results/testDebugUnitTest/**
+
+      - name: Upload debug APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
