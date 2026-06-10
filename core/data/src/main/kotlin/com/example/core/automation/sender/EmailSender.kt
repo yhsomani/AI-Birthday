@@ -13,7 +13,14 @@ import javax.mail.internet.InternetAddress
 import javax.mail.internet.MimeMessage
 
 class EmailSender(private val prefs: SecurePrefs) {
-    suspend fun send(toEmail: String, contactName: String, messageText: String) = withContext(Dispatchers.IO) {
+    suspend fun send(
+        toEmail: String,
+        contactName: String,
+        messageText: String,
+        eventType: String? = null,
+        eventLabel: String? = null,
+        subjectOverride: String? = null,
+    ) = withContext(Dispatchers.IO) {
         val props = Properties().apply {
             put("mail.smtp.auth", "true")
             put("mail.smtp.starttls.enable", "true")
@@ -31,7 +38,7 @@ class EmailSender(private val prefs: SecurePrefs) {
         val mimeMessage = MimeMessage(session).apply {
             setFrom(InternetAddress(prefs.getSenderEmail()))
             setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail))
-            subject = "Happy Birthday, $contactName!"
+            subject = subjectOverride ?: EmailSubjectBuilder.build(contactName, eventType, eventLabel)
             setText(messageText)
         }
 

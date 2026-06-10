@@ -15,6 +15,7 @@ class TestSendServiceImpl @Inject constructor(
             toEmail = senderEmail,
             contactName = "RelateAI Test",
             messageText = messageText,
+            subjectOverride = "RelateAI SMTP test",
         )
     }
 }

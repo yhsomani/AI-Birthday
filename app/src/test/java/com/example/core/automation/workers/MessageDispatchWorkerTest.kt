@@ -10,6 +10,7 @@ import androidx.work.workDataOf
 import com.example.core.automation.sender.MessageDispatcher
 import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
@@ -34,6 +35,7 @@ class MessageDispatchWorkerTest {
     private val pendingMessageDao: PendingMessageDao = mockk(relaxed = true)
     private val sentMessageDao: SentMessageDao = mockk(relaxed = true)
     private val contactDao: ContactDao = mockk(relaxed = true)
+    private val eventDao: EventDao = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -76,7 +78,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao)
                 }
             })
             .build()
@@ -109,7 +111,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao)
                 }
             })
             .build()
@@ -146,7 +148,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao)
                 }
             })
             .build()
@@ -184,7 +186,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao)
                 }
             })
             .build()

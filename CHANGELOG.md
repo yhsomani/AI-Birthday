@@ -6,6 +6,7 @@
 - Enforced the biometric app lock at app cold start/resume when the Settings toggle is enabled, with localized lock and prompt text.
 - Added a shared automation scheduling policy for contact custom send times, quiet-hour deferral, blackout-date deferral, reminder timing, and channel-block parsing.
 - Added AlarmManager-backed event reminder scheduling from `notifyDaysBefore`, with boot/daily rescheduling and reminder-toggle guards.
+- Added event-aware Gmail SMTP subject generation for birthdays, anniversaries, work anniversaries, custom events, and SMTP test emails.
 
 ### Changed
 - Background contact sync now runs through the same Google + device merge, relationship normalization, mock cleanup, and event-discovery path as foreground sync.

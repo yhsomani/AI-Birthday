@@ -2,6 +2,7 @@ package com.example.core.automation.sender
 
 import android.content.Context
 import com.example.core.data.R
+import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
@@ -21,7 +22,8 @@ class MessageDispatcher(
     private val context: Context,
     private val pendingMessageDao: PendingMessageDao,
     private val sentMessageDao: SentMessageDao,
-    private val contactDao: com.example.core.db.dao.ContactDao? = null
+    private val contactDao: com.example.core.db.dao.ContactDao? = null,
+    private val eventDao: EventDao? = null,
 ) {
     suspend fun dispatch(message: PendingMessageEntity, contact: ContactEntity) = withContext(Dispatchers.IO) {
         val prefs = SecurePrefs(context)
@@ -149,8 +151,15 @@ class MessageDispatcher(
                             success = false
                         } else {
                             try {
+                                val event = eventDao?.getById(message.eventId)
                                 val emailSender = EmailSender(prefs)
-                                emailSender.send(primaryEmail, contact.name, messageText)
+                                emailSender.send(
+                                    toEmail = primaryEmail,
+                                    contactName = contact.name,
+                                    messageText = messageText,
+                                    eventType = event?.type,
+                                    eventLabel = event?.label,
+                                )
                                 success = true
                             } catch (e: Exception) {
                                 StructuredLogger.e(TAG, "Email send failed for ${message.id}", e)

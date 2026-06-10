@@ -54,7 +54,7 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-027 | Dispatch orchestration | Fully Implemented | Dispatch defers during quiet hours or blackout dates before final send. |
 | F-028 | SMS delivery and status callbacks | Fully Implemented | Validate live SMS with test recipient when safe. |
 | F-029 | WhatsApp Accessibility delivery | Fully Implemented | Validate live WhatsApp test flow when WhatsApp/accessibility are configured. |
-| F-030 | Gmail SMTP delivery and test send | Partially Implemented | Make subjects event-aware and validate SMTP test send. |
+| F-030 | Gmail SMTP delivery and test send | Fully Implemented | Email subjects now reflect birthdays, anniversaries, work anniversaries, custom labels, and SMTP test sends; live SMTP credentials remain required for device validation. |
 | F-031 | Notifications and action receivers | Fully Implemented | Add event-reminder scheduler evidence and notification action smoke tests. |
 | F-032 | Revival suggestions | Fully Implemented | Validate AI-disabled/live-AI notification paths. |
 | F-033 | Relationship health scoring | Fully Implemented | Keep scoring tests passing and validate UI surfaces. |

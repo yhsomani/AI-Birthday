@@ -55,6 +55,7 @@ class AutomationPipelineTest {
         mockkObject(DailyScheduler)
         mockkObject(NotificationHelper)
         mockkConstructor(MessageDispatcher::class)
+        mockkConstructor(SecurePrefs::class)
 
         val mockAuth = mockk<FirebaseAuth>()
         val mockUser = mockk<FirebaseUser>()
@@ -66,6 +67,9 @@ class AutomationPipelineTest {
         every { NotificationHelper.showApprovalNotification(any(), any(), any(), any(), any()) } just Runs
         every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
         every { prefs.isAiWishGenerationEnabled() } returns true
+        every { anyConstructed<SecurePrefs>().getQuietHoursStart() } returns 0
+        every { anyConstructed<SecurePrefs>().getQuietHoursEnd() } returns 0
+        every { anyConstructed<SecurePrefs>().getBlackoutDates() } returns "[]"
         coEvery { anyConstructed<MessageDispatcher>().dispatch(any(), any()) } returns Unit
     }
 
@@ -134,7 +138,7 @@ class AutomationPipelineTest {
             .setInputData(workDataOf("event_id" to event.id))
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, db.pendingMessageDao(), db.sentMessageDao(), db.contactDao())
+                    return MessageDispatchWorker(appContext, workerParameters, db.pendingMessageDao(), db.sentMessageDao(), db.contactDao(), db.eventDao())
                 }
             })
             .build()

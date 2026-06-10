@@ -7,6 +7,7 @@ import com.example.core.automation.sender.MessageDispatcher
 import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.data.R
 import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.prefs.SecurePrefs
@@ -22,7 +23,8 @@ class MessageDispatchWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val pendingMessageDao: PendingMessageDao,
     private val sentMessageDao: SentMessageDao,
-    private val contactDao: ContactDao
+    private val contactDao: ContactDao,
+    private val eventDao: EventDao,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -139,7 +141,7 @@ class MessageDispatchWorker @AssistedInject constructor(
             pendingMessageDao.updateStatus(pendingMsg.id, "DISPATCHING")
 
             try {
-                val dispatcher = MessageDispatcher(context, pendingMessageDao, sentMessageDao, contactDao)
+                val dispatcher = MessageDispatcher(context, pendingMessageDao, sentMessageDao, contactDao, eventDao)
                 dispatcher.dispatch(pendingMsg, contact)
             } catch (e: Exception) {
                 StructuredLogger.e(TAG, "Dispatch failed unexpectedly for message ${pendingMsg.id}", e)

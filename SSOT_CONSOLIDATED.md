@@ -605,14 +605,14 @@ RelateAI
 
 - Category: Integration Feature.
 - Description: Sends email wishes through Gmail SMTP and supports test send to self.
-- Functionality: Stores sender email/password, validates configuration, sends SMTP email through `smtp.gmail.com:587`, exposes a test-send use case, and reports readiness in AI Doctor.
-- Components involved: EmailSender, TestSendServiceImpl, TestSendUseCase, Settings, Wish Preview, MessageDispatcher.
-- Related files: `EmailSender.kt`, `TestSendServiceImpl.kt`, `TestSendUseCase.kt`, `SettingsViewModel.kt`, `WishPreviewViewModel.kt`, `MessageDispatcher.kt`.
+- Functionality: Stores sender email/password, validates configuration, sends SMTP email through `smtp.gmail.com:587`, builds event-aware subjects for birthdays, anniversaries, work anniversaries, custom events, and test sends, exposes a test-send use case, and reports readiness in AI Doctor.
+- Components involved: EmailSender, EmailSubjectBuilder, TestSendServiceImpl, TestSendUseCase, Settings, Wish Preview, MessageDispatcher.
+- Related files: `EmailSender.kt`, `EmailSubjectBuilder.kt`, `TestSendServiceImpl.kt`, `TestSendUseCase.kt`, `SettingsViewModel.kt`, `WishPreviewViewModel.kt`, `MessageDispatcher.kt`.
 - Dependencies: JavaMail Android, Gmail app password or SMTP credentials, internet permission, SecurePrefs.
 - User workflow: User enters Gmail settings, sends a test email, and approves email-channel wishes. Edge cases include invalid email, wrong password, network failure, and Gmail security restrictions.
 - Current status: Fully Implemented.
 - Completion percentage: 80%.
-- Test coverage: Partially Tested by `TestSendUseCaseTest`, settings and wish preview tests. Live SMTP must be validated with real credentials.
+- Test coverage: Partially Tested by `EmailSubjectBuilderTest`, `TestSendUseCaseTest`, settings and wish preview tests. Live SMTP must be validated with real credentials.
 - Confidence score: 85%.
 
 ### F-031 Notifications and Action Receivers
@@ -950,7 +950,6 @@ Receivers:
 - Biometric app lock: manager, toggle, app-wide cold-start/resume gate, and policy test exist; live device prompt validation remains required.
 - Live device validation is still required for quiet-hour deferral, blackout-date deferral, and event-reminder notifications.
 - Dynamic shortcuts: implemented as entry points, but not deeply route-specific beyond their configured intents.
-- Gmail event-specific subject: email subject appears birthday-oriented even when dispatching other event types.
 - UI/device smoke coverage: many viewmodels and use cases are tested, but Compose rendering, notifications, widgets, exact alarms, SMS, WhatsApp, OAuth, SMTP, and ContactsProvider require device validation.
 
 ## 12. Dead, Deprecated, or Unused Features
