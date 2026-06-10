@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import androidx.lifecycle.SavedStateHandle
+import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.MemoryNoteEntity
 import com.example.domain.repository.ContactRepository
@@ -60,5 +61,44 @@ class MemoryVaultViewModelTest {
         assertEquals("note_2", viewModel.uiState.value.notes[0].id)
         assertEquals("note_1", viewModel.uiState.value.notes[1].id)
         assertEquals(false, viewModel.uiState.value.isLoading)
+    }
+
+    @Test
+    fun `addNote trims note text and defaults unknown category`() = runTest(testDispatcher) {
+        coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
+        coEvery { memoryNoteRepository.getByContact("contact_1") } returns emptyList()
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
+        advanceUntilIdle()
+
+        viewModel.addNote("  Likes mango lassi  ", "UNKNOWN")
+        advanceUntilIdle()
+
+        coVerify {
+            memoryNoteRepository.upsert(
+                match {
+                    it.contactId == "contact_1" &&
+                        it.noteText == "Likes mango lassi" &&
+                        it.category == MemoryVaultViewModel.CATEGORY_GENERAL
+                },
+            )
+        }
+    }
+
+    @Test
+    fun `addNote rejects notes over maximum length`() = runTest(testDispatcher) {
+        coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
+        coEvery { memoryNoteRepository.getByContact("contact_1") } returns emptyList()
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
+        advanceUntilIdle()
+
+        viewModel.addNote("x".repeat(MemoryVaultViewModel.MAX_NOTE_LENGTH + 1), MemoryVaultViewModel.CATEGORY_GENERAL)
+        advanceUntilIdle()
+
+        assertEquals(R.string.memory_vault_error_note_too_long, viewModel.uiState.value.errorMessageRes)
+        coVerify(exactly = 0) { memoryNoteRepository.upsert(any()) }
     }
 }

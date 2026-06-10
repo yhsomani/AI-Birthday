@@ -419,3 +419,45 @@
 
 **Commit message**
 * `ui: harden automation diagnostics`
+
+### Feature 11: Memory Vault Workflow Release Readiness
+
+**Problem identified**
+* Memory Vault still used hardcoded visible English strings, hardcoded content descriptions, and lifecycle-unaware Compose state collection.
+* The ViewModel surfaced raw exception messages and relied mostly on UI button state for note validation.
+* Category chips displayed internal enum-like values directly and the screen was not protected by the hardcoded-string regression guard.
+
+**Root cause**
+* Memory Vault had not been included in the earlier localized-screen cleanup tranche.
+* Validation and display concerns were split across the screen and ViewModel without stable user-facing error codes.
+
+**Fix implemented**
+* Localized all Memory Vault visible copy, category labels, content descriptions, empty states, and error states in English and Hindi resources.
+* Switched Memory Vault to `collectAsStateWithLifecycle()`.
+* Replaced raw ViewModel error strings with stable resource-backed messages.
+* Trimmed note text, enforced a 500-character maximum in the ViewModel, and normalized unknown categories to `GENERAL`.
+* Added a localized note length counter and accessible pin/delete labels.
+* Added ViewModel regression tests for trimming/default category behavior and maximum-length rejection.
+* Added `MemoryVaultScreen.kt` to `NoHardcodedStringsRegressionTest`.
+
+**Impact**
+* Improves localization, accessibility, and lifecycle safety for the Memory Vault workflow.
+* Prevents raw exception text and invalid category values from leaking into user-facing state or persisted notes.
+* Moves note validation to the ViewModel boundary so programmatic calls are protected, not only Compose interactions.
+
+**Files modified**
+* `app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt`
+* `app/src/main/java/com/example/ui/viewmodel/MemoryVaultViewModel.kt`
+* `app/src/main/res/values/strings.xml`
+* `app/src/main/res/values-hi/strings.xml`
+* `app/src/test/java/com/example/ui/viewmodel/MemoryVaultViewModelTest.kt`
+* `app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.MemoryVaultViewModelTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `ui: harden memory vault workflow`
