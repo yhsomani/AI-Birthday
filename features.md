@@ -29,7 +29,7 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-002 | Splash and onboarding | Fully Implemented | Compose smoke coverage added for first-run onboarding-to-auth routing; debug builds install side-by-side; connected device run installed/started but stalled while another app was foregrounded. |
 | F-003 | Authentication, guest mode, session state | Fully Implemented | Compose smoke coverage added for auth actions and guest app shell; live OAuth remains blocked by idle-device and credential prerequisites. |
 | F-004 | Settings and secure configuration | Fully Implemented | Biometric, quiet-hour, reminder, channel blackout, sync, Gmail, AI, and sign-out settings are implemented; live device handoffs remain tracked in `docs/UI_VALIDATION.md`. |
-| F-005 | Home dashboard and relationship planner | Fully Implemented | Add UI smoke evidence for cards, links, and sync-error recovery. |
+| F-005 | Home dashboard and relationship planner | Fully Implemented | `HomeScreenInteractionTest` covers dashboard cards, settings/readiness/quick-action/planner links, and sync-error retry/dismiss behavior. |
 | F-006 | Contact sync, import, and deduplication | Fully Implemented | Foreground and background sync share Google + device contact merge, relationship normalization, and event discovery. |
 | F-007 | Contact list search, filter, sort | Fully Implemented | Add UI smoke evidence for search, chips, sort, clear, and details navigation. |
 | F-008 | Contact detail personalization | Fully Implemented | Custom send time and skip-auto-wish now affect generation/scheduling; live UI validation remains tracked in `docs/UI_VALIDATION.md`. |

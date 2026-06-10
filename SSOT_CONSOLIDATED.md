@@ -149,7 +149,7 @@ RelateAI
 | F-002 | Splash and onboarding | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-003 | Authentication, guest mode, session state | Core Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-004 | Settings and secure configuration | UI/System Feature | Fully Implemented | 90% | Partially Tested | 95% |
-| F-005 | Home dashboard and relationship planner | UI Feature | Fully Implemented | 90% | Partially Tested | 90% |
+| F-005 | Home dashboard and relationship planner | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-006 | Contact sync, import, and deduplication | Core Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-007 | Contact list search, filter, sort | UI Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-008 | Contact detail personalization | Core Feature | Fully Implemented | 90% | Partially Tested | 95% |
@@ -261,9 +261,9 @@ RelateAI
 - Dependencies: Contact/event/message data, auth state, sync use case, analytics aggregates.
 - User workflow: User sees relationship status after entering Home, can retry or dismiss sync errors, and can navigate to contacts/events/messages. Edge cases include first-run empty data and sync failures.
 - Current status: Fully Implemented.
-- Completion percentage: 90%.
-- Test coverage: Partially Tested by `HomeViewModelTest`; Compose visual states need UI smoke validation.
-- Confidence score: 90%.
+- Completion percentage: 95%.
+- Test coverage: Partially Tested by `HomeViewModelTest` and `HomeScreenInteractionTest`; the Compose smoke covers dashboard cards, settings/readiness/quick-action/planner navigation, and sync-error retry/dismiss controls. Live device visual validation remains tracked in `docs/UI_VALIDATION.md`.
+- Confidence score: 95%.
 
 ### F-006 Contact Sync, Import, and Deduplication
 

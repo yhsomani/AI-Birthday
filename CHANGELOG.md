@@ -10,6 +10,7 @@
 - Added localization parity and helper-script portability regression tests.
 - Added Compose instrumented smoke coverage for onboarding/auth routing and app-shell bottom navigation.
 - Added a side-by-side debug package (`com.aistudio.relateai.qxtjrk.debug`) and matching debug Firebase config so UI validation can run without uninstalling an existing production-signed app.
+- Added Home dashboard Compose/Robolectric interaction coverage for dashboard links, planner navigation, and sync-error retry/dismiss controls.
 
 ### Changed
 - Notification backup reminder and AI fallback alert copy now uses localized string resources, and critical Hindi notification labels were refreshed.

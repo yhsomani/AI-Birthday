@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -54,8 +55,20 @@ import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.ui.components.SyncErrorCard
+import com.example.ui.viewmodel.HomeUiState
 import com.example.ui.viewmodel.HomeViewModel
 import com.example.ui.viewmodel.RelationshipPlannerItem
+
+internal object HomeScreenTestTags {
+    const val SYNC_ERROR_CARD = "home_sync_error_card"
+    const val READINESS_BANNER = "home_readiness_banner"
+    const val QUICK_ACTION_ANALYTICS = "home_quick_action_analytics"
+    const val QUICK_ACTION_ACTIVITY_HISTORY = "home_quick_action_activity_history"
+    const val QUICK_ACTION_STYLE_COACH = "home_quick_action_style_coach"
+    const val QUICK_ACTION_AUTOMATION_SETUP = "home_quick_action_automation_setup"
+    const val QUICK_ACTION_BACKUP_RESTORE = "home_quick_action_backup_restore"
+    const val PLANNER_ITEM_PREFIX = "home_planner_item_"
+}
 
 @Composable
 fun HomeScreen(
@@ -69,7 +82,33 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    HomeContent(
+        state = state,
+        onNavigateToContact = onNavigateToContact,
+        onNavigateToSettings = onNavigateToSettings,
+        onNavigateToAnalytics = onNavigateToAnalytics,
+        onNavigateToActivityHistory = onNavigateToActivityHistory,
+        onNavigateToStyleCoach = onNavigateToStyleCoach,
+        onNavigateToBackupRestore = onNavigateToBackupRestore,
+        onNavigateToAutomationSetup = onNavigateToAutomationSetup,
+        onRetrySync = { viewModel.loadMetrics() },
+        onDismissSyncError = { viewModel.dismissSyncError() },
+    )
+}
 
+@Composable
+internal fun HomeContent(
+    state: HomeUiState,
+    onNavigateToContact: (String) -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToAnalytics: () -> Unit = {},
+    onNavigateToActivityHistory: () -> Unit = {},
+    onNavigateToStyleCoach: () -> Unit = {},
+    onNavigateToBackupRestore: () -> Unit = {},
+    onNavigateToAutomationSetup: () -> Unit = {},
+    onRetrySync: () -> Unit = {},
+    onDismissSyncError: () -> Unit = {},
+) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -116,9 +155,11 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 SyncErrorCard(
                     message = errorMsg,
-                    onRetry = { viewModel.loadMetrics() },
-                    onDismiss = { viewModel.dismissSyncError() },
-                    modifier = Modifier.fillMaxWidth(),
+                    onRetry = onRetrySync,
+                    onDismiss = onDismissSyncError,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(HomeScreenTestTags.SYNC_ERROR_CARD),
                 )
             }
         }
@@ -132,6 +173,7 @@ fun HomeScreen(
                     title = readinessTitle,
                     detail = readinessDetail,
                     onClick = onNavigateToAutomationSetup,
+                    modifier = Modifier.testTag(HomeScreenTestTags.READINESS_BANNER),
                 )
             }
         }
@@ -208,12 +250,14 @@ fun HomeScreen(
                         icon = Icons.Filled.Analytics,
                         onClick = onNavigateToAnalytics,
                         modifier = Modifier.weight(1f),
+                        testTag = HomeScreenTestTags.QUICK_ACTION_ANALYTICS,
                     )
                     QuickActionTile(
                         label = stringResource(R.string.activity_history_title),
                         icon = Icons.Filled.History,
                         onClick = onNavigateToActivityHistory,
                         modifier = Modifier.weight(1f),
+                        testTag = HomeScreenTestTags.QUICK_ACTION_ACTIVITY_HISTORY,
                     )
                 }
                 Row(
@@ -225,18 +269,21 @@ fun HomeScreen(
                         icon = Icons.Filled.SmartToy,
                         onClick = onNavigateToStyleCoach,
                         modifier = Modifier.weight(1f),
+                        testTag = HomeScreenTestTags.QUICK_ACTION_STYLE_COACH,
                     )
                     QuickActionTile(
                         label = stringResource(R.string.settings_automation_setup),
                         icon = Icons.Filled.Settings,
                         onClick = onNavigateToAutomationSetup,
                         modifier = Modifier.weight(1f),
+                        testTag = HomeScreenTestTags.QUICK_ACTION_AUTOMATION_SETUP,
                     )
                 }
                 QuickActionTile(
                     label = stringResource(R.string.backup_restore_title),
                     icon = Icons.Filled.Storage,
                     onClick = onNavigateToBackupRestore,
+                    testTag = HomeScreenTestTags.QUICK_ACTION_BACKUP_RESTORE,
                 )
             }
         }
@@ -254,6 +301,9 @@ fun HomeScreen(
                                 item.contactId?.let(onNavigateToContact)
                                     ?: onNavigateToAutomationSetup()
                             },
+                            modifier = Modifier.testTag(
+                                HomeScreenTestTags.PLANNER_ITEM_PREFIX + (item.contactId ?: "setup")
+                            ),
                         )
                     }
                 }
@@ -293,9 +343,10 @@ fun HomeScreen(
 private fun PlannerItemCard(
     item: RelationshipPlannerItem,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     RelateGlassCard(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
     ) {
@@ -331,9 +382,10 @@ private fun ReadinessBanner(
     title: String,
     detail: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     RelateGlassCard(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
     ) {
@@ -371,9 +423,12 @@ private fun QuickActionTile(
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    testTag: String? = null,
 ) {
     RelateGlassCard(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier
+            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
+            .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
