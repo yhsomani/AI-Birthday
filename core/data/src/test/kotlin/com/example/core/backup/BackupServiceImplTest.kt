@@ -18,6 +18,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.ByteArrayInputStream
 import java.io.File
 
 @RunWith(AndroidJUnit4::class)
@@ -98,6 +99,26 @@ class BackupServiceImplTest {
         val value = (result as BackupOperationResult.Success).value
         assertTrue(value.fileName.startsWith("relateai_backup_"))
         assertTrue(value.sizeBytes > 0)
+    }
+
+    @Test
+    fun readUtf8TextWithLimit_readsContentWithinLimit() {
+        val input = ByteArrayInputStream("backup-content".toByteArray(Charsets.UTF_8))
+
+        val text = readUtf8TextWithLimit(input, maxBytes = 20)
+
+        assertEquals("backup-content", text)
+    }
+
+    @Test
+    fun readUtf8TextWithLimit_rejectsContentOverLimit() {
+        val input = ByteArrayInputStream("backup-content".toByteArray(Charsets.UTF_8))
+
+        val result = runCatching {
+            readUtf8TextWithLimit(input, maxBytes = 4)
+        }
+
+        assertTrue(result.exceptionOrNull() is BackupFileTooLargeException)
     }
 
     private fun encryptedFixture(json: String): Uri {

@@ -25,6 +25,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -33,6 +34,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private const val MAX_IMPORT_BYTES = 25 * 1024 * 1024
 
 @Singleton
 class BackupServiceImpl @Inject constructor(
@@ -102,8 +105,13 @@ class BackupServiceImpl @Inject constructor(
         }
 
         val encryptedJson = try {
-            context.contentResolver.openInputStream(inputUri)?.bufferedReader()?.use { it.readText() }
+            context.contentResolver.openInputStream(inputUri)?.use { inputStream ->
+                readUtf8TextWithLimit(inputStream)
+            }
                 ?: return@withContext BackupOperationResult.Failure(BackupFailureReason.CANNOT_READ_BACKUP)
+        } catch (e: BackupFileTooLargeException) {
+            StructuredLogger.w(TAG, "Backup file exceeds import size limit")
+            return@withContext BackupOperationResult.Failure(BackupFailureReason.INVALID_BACKUP_FILE)
         } catch (e: Exception) {
             StructuredLogger.e(TAG, "Failed to read backup file", e)
             return@withContext BackupOperationResult.Failure(BackupFailureReason.CANNOT_READ_BACKUP)
@@ -192,3 +200,24 @@ class BackupServiceImpl @Inject constructor(
         const val TAG = "BackupService"
     }
 }
+
+internal fun readUtf8TextWithLimit(
+    inputStream: InputStream,
+    maxBytes: Int = MAX_IMPORT_BYTES,
+): String {
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    val output = java.io.ByteArrayOutputStream()
+    var totalBytes = 0
+    while (true) {
+        val bytesRead = inputStream.read(buffer)
+        if (bytesRead == -1) break
+        totalBytes += bytesRead
+        if (totalBytes > maxBytes) {
+            throw BackupFileTooLargeException()
+        }
+        output.write(buffer, 0, bytesRead)
+    }
+    return output.toString(Charsets.UTF_8.name())
+}
+
+internal class BackupFileTooLargeException : Exception()

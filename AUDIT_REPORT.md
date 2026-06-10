@@ -687,3 +687,34 @@
 
 **Commit message**
 * `fix: validate cached database key metadata`
+
+### Feature 18: Backup Import Size Guard
+
+**Problem identified**
+* Backup import read the entire selected encrypted file into memory with `readText()`.
+* A very large or malformed selected file could create avoidable memory pressure before validation and decryption.
+
+**Root cause**
+* Import treated the selected URI as a trusted small encrypted backup and had no bounded read guard.
+
+**Fix implemented**
+* Added a bounded UTF-8 read helper with a 25 MB encrypted import limit.
+* Oversized selected files now return `INVALID_BACKUP_FILE` before decryption or JSON parsing.
+* Added focused tests for reads within the limit and rejection of over-limit content.
+
+**Impact**
+* Reduces out-of-memory and memory-pressure risk during backup import.
+* Fails oversized or malformed backup inputs predictably through existing user-facing invalid-backup handling.
+
+**Files modified**
+* `core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt`
+* `core/data/src/test/kotlin/com/example/core/backup/BackupServiceImplTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest --tests com.example.core.backup.BackupServiceImplTest --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `fix: bound backup import memory use`
