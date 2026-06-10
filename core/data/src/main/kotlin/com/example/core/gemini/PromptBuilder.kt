@@ -26,11 +26,11 @@ data class ContactContextObject(
     val commonPhrases: List<String>,
     val previousWishes: List<String>,
     val formalityLevel: String,
-    val memoryNotes: List<String>,
-    val giftHistory: List<String>,
-    val sensitiveTopics: List<String>,
-    val currentLifePhase: String?,
-    val preferredChannel: String,
+    val memoryNotes: List<String> = emptyList(),
+    val giftHistory: List<String> = emptyList(),
+    val sensitiveTopics: List<String> = emptyList(),
+    val currentLifePhase: String? = null,
+    val preferredChannel: String = "SMS",
 )
 
 class PromptBuilder {

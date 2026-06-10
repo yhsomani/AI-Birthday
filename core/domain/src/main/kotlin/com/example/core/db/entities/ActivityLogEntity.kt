@@ -2,6 +2,7 @@ package com.example.core.db.entities
 
 import androidx.room.Entity
 import androidx.room.Index
+import androidx.room.ColumnInfo
 import androidx.room.PrimaryKey
 
 @Entity(
@@ -12,6 +13,8 @@ import androidx.room.PrimaryKey
         Index(value = ["contactId"], name = "idx_activity_logs_contactId"),
         Index(value = ["eventId"], name = "idx_activity_logs_eventId"),
         Index(value = ["messageId"], name = "idx_activity_logs_messageId"),
+        Index(value = ["status"], name = "idx_activity_logs_status"),
+        Index(value = ["severity"], name = "idx_activity_logs_severity"),
     ],
 )
 data class ActivityLogEntity(
@@ -22,9 +25,9 @@ data class ActivityLogEntity(
     val contactId: String? = null,
     val eventId: String? = null,
     val messageId: String? = null,
-    val severity: String = "INFO",
-    val status: String = "OPEN",
+    @ColumnInfo(defaultValue = "'INFO'") val severity: String = "INFO",
+    @ColumnInfo(defaultValue = "'OPEN'") val status: String = "OPEN",
     val actionRoute: String? = null,
-    val metadataJson: String = "{}",
+    @ColumnInfo(defaultValue = "'{}'") val metadataJson: String = "{}",
     val createdAtMs: Long = System.currentTimeMillis(),
 )
