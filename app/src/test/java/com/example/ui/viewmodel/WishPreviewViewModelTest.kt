@@ -1,5 +1,6 @@
 package com.example.ui.viewmodel
 
+import com.example.R
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.MessageRepository
@@ -81,7 +82,7 @@ class WishPreviewViewModelTest {
         assertEquals("standard", state.selectedVariant)
         assertEquals("Wishing you a happy birthday!", state.editedText)
         assertEquals(false, state.isLoading)
-        assertTrue(state.error == null)
+        assertTrue(state.errorMessageRes == null)
     }
 
     @Test
@@ -93,7 +94,7 @@ class WishPreviewViewModelTest {
         viewModel.loadPending("missing")
         advanceUntilIdle()
 
-        assertEquals("Message not found.", viewModel.uiState.value.error)
+        assertEquals(R.string.wish_preview_error_message_not_found, viewModel.uiState.value.errorMessageRes)
         assertEquals(false, viewModel.uiState.value.isLoading)
     }
 
@@ -157,7 +158,8 @@ class WishPreviewViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals("Fresh AI draft", state.editedText)
-        assertEquals("AI regenerated a fresh draft.", state.qualityMessage)
+        assertEquals(R.string.wish_preview_quality_regenerated, state.qualityMessageRes)
+        assertEquals(null, state.qualityMessageArgRes)
         assertEquals(false, state.isRegenerating)
     }
 
@@ -182,7 +184,8 @@ class WishPreviewViewModelTest {
         advanceUntilIdle()
 
         assertEquals("too_generic", viewModel.uiState.value.selectedFeedbackKey)
-        assertEquals("AI regenerated using your feedback: Too generic.", viewModel.uiState.value.qualityMessage)
+        assertEquals(R.string.wish_preview_quality_regenerated_with_feedback, viewModel.uiState.value.qualityMessageRes)
+        assertEquals(R.string.wish_feedback_too_generic, viewModel.uiState.value.qualityMessageArgRes)
         coVerify { activityLogRepository.record(match { it.type == "AI" && it.messageId == "pm_1" }) }
     }
 
@@ -214,7 +217,7 @@ class WishPreviewViewModelTest {
         viewModel.approve()
         advanceUntilIdle()
 
-        assertEquals("Message not found.", viewModel.uiState.value.error)
+        assertEquals(R.string.wish_preview_error_message_not_found, viewModel.uiState.value.errorMessageRes)
         assertEquals(false, viewModel.uiState.value.isApproving)
         assertEquals(false, viewModel.uiState.value.approved)
     }

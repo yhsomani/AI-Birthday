@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import androidx.lifecycle.SavedStateHandle
+import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.domain.repository.ContactRepository
@@ -155,7 +156,7 @@ class ContactDetailViewModelTest {
         advanceUntilIdle()
 
         assertNull(viewModel.uiState.value.generationResult)
-        assertNotNull(viewModel.uiState.value.generationError)
+        assertNotNull(viewModel.uiState.value.generationErrorRes)
         assertEquals(false, viewModel.uiState.value.isGenerating)
     }
 
@@ -191,6 +192,6 @@ class ContactDetailViewModelTest {
         advanceUntilIdle()
 
         assertNull(viewModel.uiState.value.generationResult)
-        assertEquals("AI wish generation is disabled in Settings.", viewModel.uiState.value.generationError)
+        assertEquals(R.string.contact_detail_error_ai_disabled, viewModel.uiState.value.generationErrorRes)
     }
 }

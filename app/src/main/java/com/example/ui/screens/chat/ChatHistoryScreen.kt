@@ -7,43 +7,48 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.R
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
-import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Date
-import java.util.Locale
 
 @Composable
 fun ChatHistoryScreen(
     onBack: () -> Unit,
     viewModel: ChatHistoryViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     RelateScreen(
-        title = "Chat History",
-        subtitle = "Messages already sent for this contact.",
+        title = stringResource(R.string.chat_history_title),
+        subtitle = stringResource(R.string.chat_history_subtitle),
         navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-        navigationContentDescription = "Back",
+        navigationContentDescription = stringResource(R.string.back),
         onNavigationClick = onBack,
     ) {
         if (uiState.isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = RelatePrimary)
             }
+        } else if (uiState.errorMessageRes != null) {
+            EmptyState(
+                message = stringResource(uiState.errorMessageRes ?: R.string.chat_history_error_load),
+                modifier = Modifier.fillMaxSize(),
+            )
         } else if (uiState.messages.isEmpty()) {
             EmptyState(
-                message = "No messages sent yet.",
+                message = stringResource(R.string.chat_history_empty),
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -62,9 +67,11 @@ fun ChatHistoryScreen(
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             Spacer(modifier = Modifier.height(4.dp))
-                            val date = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(Date(message.sentAtMs))
+                            val date = DateFormat
+                                .getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+                                .format(Date(message.sentAtMs))
                             Text(
-                                text = "Sent via ${message.channel} • $date",
+                                text = stringResource(R.string.chat_history_sent_via_format, message.channel, date),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = RelateOnSurfaceVariant,
                             )

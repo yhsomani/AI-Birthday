@@ -31,15 +31,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.R
 import com.example.core.ui.components.HealthIndicatorDot
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelatePrimaryButton
@@ -61,7 +63,7 @@ fun ContactDetailScreen(
     onNavigateToChatHistory: (String) -> Unit = {},
     viewModel: ContactDetailViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(state.generationResult) {
         state.generationResult?.let { pendingId ->
@@ -84,7 +86,7 @@ fun ContactDetailScreen(
             IconButton(onClick = onBack) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.back),
                     tint = RelateOnBackground,
                 )
             }
@@ -153,14 +155,20 @@ fun ContactDetailScreen(
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant)
                     ) {
-                        Text("Memory Vault", color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            text = stringResource(R.string.contact_detail_memory_vault),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
                     }
                     Button(
                         onClick = { onNavigateToGiftAdvisor(contactId) },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant)
                     ) {
-                        Text("Gift Advisor", color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            text = stringResource(R.string.contact_detail_gift_advisor),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -176,11 +184,14 @@ fun ContactDetailScreen(
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Chat History", color = MaterialTheme.colorScheme.onSurface)
+                    Text(
+                        text = stringResource(R.string.contact_detail_chat_history),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                SectionHeader(title = "Contact Info")
+                SectionHeader(title = stringResource(R.string.contact_detail_contact_info))
                 RelateGlassCard {
                     Column(modifier = Modifier.padding(16.dp)) {
                         contact?.primaryPhone?.let {
@@ -191,15 +202,22 @@ fun ContactDetailScreen(
                             InfoRow(Icons.Filled.Email, it)
                             Spacer(modifier = Modifier.height(12.dp))
                         }
-                        val birthday = if (contact?.birthdayDay != null && contact.birthdayMonth != null) {
-                            "${contact.birthdayMonth}/${contact.birthdayDay}"
-                        } else "Unknown"
-                        InfoRow(Icons.Filled.CalendarMonth, "Birthday: $birthday")
+                        val birthdayMonth = contact?.birthdayMonth
+                        val birthdayDay = contact?.birthdayDay
+                        val birthday = if (birthdayMonth != null && birthdayDay != null) {
+                            stringResource(R.string.contact_detail_birthday_date_format, birthdayMonth, birthdayDay)
+                        } else {
+                            stringResource(R.string.contact_detail_unknown)
+                        }
+                        InfoRow(
+                            Icons.Filled.CalendarMonth,
+                            stringResource(R.string.contact_detail_birthday_format, birthday),
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                SectionHeader(title = "Next Birthday")
+                SectionHeader(title = stringResource(R.string.contact_detail_next_birthday))
                 RelateGlassCard {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -210,8 +228,8 @@ fun ContactDetailScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             val daysText = state.upcomingBirthdayDaysLeft?.let {
-                                "in $it days"
-                            } ?: "No upcoming event"
+                                stringResource(R.string.contact_detail_days_left_format, it)
+                            } ?: stringResource(R.string.contact_detail_no_upcoming_event)
                             Text(
                                 text = daysText,
                                 style = MaterialTheme.typography.titleMedium,
@@ -228,14 +246,14 @@ fun ContactDetailScreen(
                             }
                         } else {
                             RelatePrimaryButton(
-                                text = "Generate AI Wish",
+                                text = stringResource(R.string.contact_detail_generate_ai_wish),
                                 onClick = { viewModel.generateWish() },
                             )
                         }
-                        state.generationError?.let { error ->
+                        state.generationErrorRes?.let { errorRes ->
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = error,
+                                text = stringResource(errorRes),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = RelateOnSurfaceVariant,
                             )

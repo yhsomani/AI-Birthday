@@ -35,14 +35,16 @@ import kotlinx.coroutines.launch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelatePrimaryButton
 import com.example.core.ui.theme.RelateDarkBackground
@@ -53,12 +55,12 @@ import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.viewmodel.WishPreviewViewModel
 
 private val variantOptions = listOf(
-    "short" to "Short",
-    "standard" to "Standard",
-    "long" to "Long",
-    "formal" to "Formal",
-    "funny" to "Funny",
-    "emotional" to "Emotional",
+    "short" to R.string.wish_variant_short,
+    "standard" to R.string.wish_variant_standard,
+    "long" to R.string.wish_variant_long,
+    "formal" to R.string.wish_variant_formal,
+    "funny" to R.string.wish_variant_funny,
+    "emotional" to R.string.wish_variant_emotional,
 )
 
 @Composable
@@ -69,7 +71,8 @@ fun WishPreviewScreen(
     onSent: () -> Unit = {},
     viewModel: WishPreviewViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val testSentMessage = stringResource(R.string.wish_preview_test_sent)
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -77,7 +80,7 @@ fun WishPreviewScreen(
     LaunchedEffect(state.testSent) {
         if (state.testSent) {
             coroutineScope.launch {
-                snackbarHostState.showSnackbar("Test message sent to your device!")
+                snackbarHostState.showSnackbar(testSentMessage)
                 viewModel.dismissTestSent()
             }
         }
@@ -94,92 +97,117 @@ fun WishPreviewScreen(
         }
     }
 
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(RelateDarkBackground),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.back),
+                        tint = RelateOnBackground,
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.wish_preview_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            if (state.isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = RelatePrimary)
+                }
+            } else if (state.errorMessageRes != null && state.pendingMessage == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(state.errorMessageRes ?: R.string.wish_preview_error_unknown),
+                        color = RelateOnSurfaceVariant,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            } else {
+                WishPreviewContent(
+                    state = state,
+                    viewModel = viewModel,
+                )
+            }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp),
+        )
+    }
+}
+
+@Composable
+private fun WishPreviewContent(
+    state: com.example.ui.viewmodel.WishPreviewUiState,
+    viewModel: WishPreviewViewModel,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(RelateDarkBackground)
-            .padding(horizontal = 16.dp),
+            .verticalScroll(rememberScrollState()),
     ) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.wish_preview_choose_tone),
+            style = MaterialTheme.typography.titleSmall,
+            color = RelatePrimary,
+        )
         Spacer(modifier = Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = RelateOnBackground,
+            variantOptions.take(3).forEach { (key, labelRes) ->
+                ToneChip(
+                    label = stringResource(labelRes),
+                    isSelected = state.selectedVariant == key,
+                    onClick = { viewModel.selectVariant(key) },
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Preview AI Wish",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            variantOptions.drop(3).forEach { (key, labelRes) ->
+                ToneChip(
+                    label = stringResource(labelRes),
+                    isSelected = state.selectedVariant == key,
+                    onClick = { viewModel.selectVariant(key) },
+                )
+            }
         }
 
-        if (state.isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(color = RelatePrimary)
-            }
-        } else if (state.error != null && state.pendingMessage == null) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = state.error ?: "Unknown error",
-                    color = RelateOnSurfaceVariant,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState()),
-            ) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Choose a tone",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = RelatePrimary,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    variantOptions.take(3).forEach { (key, label) ->
-                        ToneChip(
-                            label = label,
-                            isSelected = state.selectedVariant == key,
-                            onClick = { viewModel.selectVariant(key) },
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    variantOptions.drop(3).forEach { (key, label) ->
-                        ToneChip(
-                            label = label,
-                            isSelected = state.selectedVariant == key,
-                            onClick = { viewModel.selectVariant(key) },
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Message",
+                    text = stringResource(R.string.wish_preview_message_label),
                     style = MaterialTheme.typography.titleSmall,
                     color = RelatePrimary,
                 )
@@ -205,19 +233,19 @@ fun WishPreviewScreen(
                     )
                 }
 
-                state.error?.let { error ->
+                state.errorMessageRes?.let { errorRes ->
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = error,
+                        text = stringResource(errorRes),
                         style = MaterialTheme.typography.bodySmall,
                         color = RelateOnSurfaceVariant,
                     )
                 }
 
-                state.qualityMessage?.let { message ->
+                state.qualityMessageRes?.let { messageRes ->
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = message,
+                        text = messageResource(messageRes, state.qualityMessageArgRes),
                         style = MaterialTheme.typography.bodySmall,
                         color = RelateOnSurfaceVariant,
                     )
@@ -225,7 +253,7 @@ fun WishPreviewScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Tell AI what went wrong",
+                    text = stringResource(R.string.wish_preview_feedback_title),
                     style = MaterialTheme.typography.titleSmall,
                     color = RelatePrimary,
                 )
@@ -237,7 +265,7 @@ fun WishPreviewScreen(
                     ) {
                         rowOptions.forEach { option ->
                             FeedbackChip(
-                                label = option.label,
+                                label = stringResource(option.labelRes),
                                 isSelected = state.selectedFeedbackKey == option.key,
                                 onClick = { viewModel.submitFeedback(option.key) },
                                 modifier = Modifier.weight(1f),
@@ -249,9 +277,9 @@ fun WishPreviewScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
-                state.feedbackMessage?.let { message ->
+                state.feedbackMessageRes?.let { messageRes ->
                     Text(
-                        text = message,
+                        text = stringResource(messageRes),
                         style = MaterialTheme.typography.bodySmall,
                         color = RelateOnSurfaceVariant,
                     )
@@ -282,7 +310,7 @@ fun WishPreviewScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Regenerate AI Draft",
+                            text = stringResource(R.string.wish_preview_regenerate),
                             color = RelateOnBackground,
                         )
                     }
@@ -320,30 +348,37 @@ fun WishPreviewScreen(
                                 )
                             } else {
                                 Text(
-                                    text = "Reject",
+                                    text = stringResource(R.string.wish_preview_reject),
                                     style = MaterialTheme.typography.labelLarge,
                                     color = RelateOnBackground,
                                 )
                             }
                         }
                         RelatePrimaryButton(
-                            text = "Approve & Schedule",
+                            text = stringResource(R.string.wish_preview_approve_schedule),
                             onClick = { viewModel.approve() },
                             modifier = Modifier.weight(1f),
                         )
                     }
                 } else if (state.approved) {
                     Text(
-                        text = "Wish approved and scheduled!",
+                        text = stringResource(R.string.wish_preview_approved),
                         style = MaterialTheme.typography.bodyLarge,
                         color = RelatePrimary,
                         fontWeight = FontWeight.Medium,
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-        }
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun messageResource(messageRes: Int, argRes: Int?): String {
+    return if (argRes != null) {
+        stringResource(messageRes, stringResource(argRes))
+    } else {
+        stringResource(messageRes)
     }
 }
 

@@ -505,3 +505,55 @@
 
 **Commit message**
 * `ui: harden gift advisor workflow`
+
+### Feature 13: Relationship Detail Flow Release Readiness
+
+**Problem identified**
+* Contact Detail, Wish Preview, and Chat History still used hardcoded visible English strings and lifecycle-unaware Compose state collection.
+* Contact Detail and Wish Preview ViewModels surfaced raw English error/status strings, including AI-disabled and message-not-found states.
+* Wish Preview created a `SnackbarHostState` for test-send feedback but did not attach a `SnackbarHost`, so the feedback could not render.
+* Chat History swallowed repository failures and showed the empty state instead of a real error state.
+
+**Root cause**
+* These relationship-detail flows had not been included in the earlier localized-screen cleanup tranche.
+* UI copy, ViewModel state, and feedback status text were mixed as raw strings instead of stable message codes/resources.
+
+**Fix implemented**
+* Localized Contact Detail, Wish Preview, and Chat History visible copy, actions, content descriptions, empty states, loading/error states, tone labels, and feedback labels in English and Hindi resources.
+* Switched Contact Detail, Wish Preview, and Chat History to `collectAsStateWithLifecycle()`.
+* Replaced Contact Detail generation errors with stable resource IDs, including a visible no-upcoming-event error.
+* Replaced Wish Preview user-facing error, quality, feedback, and fallback status strings with resource-backed IDs and resource-backed formatting.
+* Attached a `SnackbarHost` to Wish Preview so test-send confirmation can render.
+* Added a Chat History load error state and localized sent-message timestamp formatting.
+* Added `ChatHistoryViewModelTest` coverage for loaded history and repository failure.
+* Updated Contact Detail and Wish Preview ViewModel tests for resource-backed state.
+* Added `ContactDetailScreen.kt`, `WishPreviewScreen.kt`, and `ChatHistoryScreen.kt` to `NoHardcodedStringsRegressionTest`.
+
+**Impact**
+* Improves localization, accessibility, lifecycle safety, and error clarity across relationship detail workflows.
+* Prevents raw exception/status copy from leaking through ViewModel state.
+* Restores a previously invisible snackbar feedback path in Wish Preview.
+* Distinguishes a real Chat History load failure from an empty conversation.
+
+**Files modified**
+* `app/src/main/java/com/example/ui/screens/contacts/ContactDetailScreen.kt`
+* `app/src/main/java/com/example/ui/viewmodel/ContactDetailViewModel.kt`
+* `app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt`
+* `app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt`
+* `app/src/main/java/com/example/ui/screens/chat/ChatHistoryScreen.kt`
+* `app/src/main/java/com/example/ui/screens/chat/ChatHistoryViewModel.kt`
+* `app/src/main/res/values/strings.xml`
+* `app/src/main/res/values-hi/strings.xml`
+* `app/src/test/java/com/example/ui/viewmodel/ContactDetailViewModelTest.kt`
+* `app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt`
+* `app/src/test/java/com/example/ui/screens/chat/ChatHistoryViewModelTest.kt`
+* `app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt`
+* `AUDIT_REPORT.md`
+
+**Validation performed**
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.ContactDetailViewModelTest --tests com.example.ui.viewmodel.WishPreviewViewModelTest --tests com.example.ui.screens.chat.ChatHistoryViewModelTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+* `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` passed.
+* Manual device validation was not run because `adb devices` shows no attached devices.
+
+**Commit message**
+* `ui: harden relationship detail flows`

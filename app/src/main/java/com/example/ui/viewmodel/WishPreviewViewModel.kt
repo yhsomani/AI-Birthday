@@ -2,6 +2,7 @@ package com.example.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.repository.ActivityLogRepository
@@ -19,39 +20,39 @@ import javax.inject.Inject
 
 data class AiFeedbackOption(
     val key: String,
-    val label: String,
+    val labelRes: Int,
     val instruction: String,
 )
 
 private val aiFeedbackOptions = listOf(
     AiFeedbackOption(
         key = "too_generic",
-        label = "Too generic",
+        labelRes = R.string.wish_feedback_too_generic,
         instruction = "Make it more personal. Use a specific memory, interest, nickname, or relationship detail from the contact context.",
     ),
     AiFeedbackOption(
         key = "too_formal",
-        label = "Too formal",
+        labelRes = R.string.wish_feedback_too_formal,
         instruction = "Make it more casual and natural, like a real personal message instead of a polished greeting.",
     ),
     AiFeedbackOption(
         key = "wrong_language",
-        label = "Wrong language",
+        labelRes = R.string.wish_feedback_wrong_language,
         instruction = "Regenerate in the contact's preferred language and keep the wording culturally natural.",
     ),
     AiFeedbackOption(
         key = "too_long",
-        label = "Too long",
+        labelRes = R.string.wish_feedback_too_long,
         instruction = "Make the message shorter, tighter, and easier to send without losing warmth.",
     ),
     AiFeedbackOption(
         key = "not_warm",
-        label = "Not warm enough",
+        labelRes = R.string.wish_feedback_not_warm,
         instruction = "Make it warmer and more emotionally specific without sounding dramatic or artificial.",
     ),
     AiFeedbackOption(
         key = "repetitive",
-        label = "Repeated idea",
+        labelRes = R.string.wish_feedback_repetitive,
         instruction = "Avoid the current wording and any previous wishes. Use a different structure, reference, and opening line.",
     ),
 )
@@ -66,22 +67,14 @@ data class WishPreviewUiState(
     val isRegenerating: Boolean = false,
     val approved: Boolean = false,
     val rejected: Boolean = false,
-    val error: String? = null,
+    val errorMessageRes: Int? = null,
     val testSent: Boolean = false,
     val usedFallback: Boolean = false,
-    val qualityMessage: String? = null,
+    val qualityMessageRes: Int? = null,
+    val qualityMessageArgRes: Int? = null,
     val feedbackOptions: List<AiFeedbackOption> = aiFeedbackOptions,
     val selectedFeedbackKey: String? = null,
-    val feedbackMessage: String? = null,
-)
-
-private val variantOptions = listOf(
-    "short" to "Short",
-    "standard" to "Standard",
-    "long" to "Long",
-    "formal" to "Formal",
-    "funny" to "Funny",
-    "emotional" to "Emotional",
+    val feedbackMessageRes: Int? = null,
 )
 
 @HiltViewModel
@@ -108,8 +101,8 @@ class WishPreviewViewModel @Inject constructor(
                         editedText = pending.selectedVariantText,
                         isLoading = false,
                         usedFallback = pending.isUsingFallback,
-                        qualityMessage = if (pending.isUsingFallback) {
-                            "Template used because AI generation was unavailable."
+                        qualityMessageRes = if (pending.isUsingFallback) {
+                            R.string.wish_preview_quality_template_used
                         } else {
                             null
                         },
@@ -117,13 +110,13 @@ class WishPreviewViewModel @Inject constructor(
                 } else {
                     _uiState.value = WishPreviewUiState(
                         isLoading = false,
-                        error = "Message not found.",
+                        errorMessageRes = R.string.wish_preview_error_message_not_found,
                     )
                 }
             } catch (e: Exception) {
                 _uiState.value = WishPreviewUiState(
                     isLoading = false,
-                    error = "Failed to load message: ${e.message}",
+                    errorMessageRes = R.string.wish_preview_error_load,
                 )
             }
         }
@@ -161,24 +154,29 @@ class WishPreviewViewModel @Inject constructor(
         val draft = _uiState.value.editedText
         val feedback = selectedFeedback()
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRegenerating = true, error = null, qualityMessage = null)
+            _uiState.value = _uiState.value.copy(
+                isRegenerating = true,
+                errorMessageRes = null,
+                qualityMessageRes = null,
+                qualityMessageArgRes = null,
+            )
             when (val result = regeneratePendingMessageUseCase(pendingId, draft, feedback?.instruction)) {
                 RegeneratePendingMessageUseCase.Outcome.AiDisabled -> {
                     _uiState.value = _uiState.value.copy(
                         isRegenerating = false,
-                        error = "AI wish generation is disabled in Settings.",
+                        errorMessageRes = R.string.wish_preview_error_ai_disabled,
                     )
                 }
                 RegeneratePendingMessageUseCase.Outcome.ContextNotFound -> {
                     _uiState.value = _uiState.value.copy(
                         isRegenerating = false,
-                        error = "Could not find the contact or event for this message.",
+                        errorMessageRes = R.string.wish_preview_error_context_not_found,
                     )
                 }
                 RegeneratePendingMessageUseCase.Outcome.PendingNotFound -> {
                     _uiState.value = _uiState.value.copy(
                         isRegenerating = false,
-                        error = "Message not found.",
+                        errorMessageRes = R.string.wish_preview_error_message_not_found,
                     )
                 }
                 is RegeneratePendingMessageUseCase.Outcome.Regenerated -> {
@@ -190,18 +188,19 @@ class WishPreviewViewModel @Inject constructor(
                             editedText = updated.selectedVariantText,
                             isRegenerating = false,
                             usedFallback = result.usedFallback,
-                            qualityMessage = if (result.usedFallback) {
-                                "Template used because AI generation was unavailable."
+                            qualityMessageRes = if (result.usedFallback) {
+                                R.string.wish_preview_quality_template_used
                             } else if (feedback != null) {
-                                "AI regenerated using your feedback: ${feedback.label}."
+                                R.string.wish_preview_quality_regenerated_with_feedback
                             } else {
-                                "AI regenerated a fresh draft."
+                                R.string.wish_preview_quality_regenerated
                             },
+                            qualityMessageArgRes = feedback?.labelRes,
                         )
                     } else {
                         _uiState.value = _uiState.value.copy(
                             isRegenerating = false,
-                            error = "Message not found.",
+                            errorMessageRes = R.string.wish_preview_error_message_not_found,
                         )
                     }
                 }
@@ -214,8 +213,9 @@ class WishPreviewViewModel @Inject constructor(
         val pending = _uiState.value.pendingMessage
         _uiState.value = _uiState.value.copy(
             selectedFeedbackKey = key,
-            feedbackMessage = "Feedback saved. Regenerate to apply it.",
-            qualityMessage = "Next regeneration will fix: ${option.label}.",
+            feedbackMessageRes = R.string.wish_preview_feedback_saved,
+            qualityMessageRes = R.string.wish_preview_quality_next_regeneration,
+            qualityMessageArgRes = option.labelRes,
         )
         if (pending != null) {
             viewModelScope.launch {
@@ -223,7 +223,7 @@ class WishPreviewViewModel @Inject constructor(
                     ActivityLogEntity(
                         id = UUID.randomUUID().toString(),
                         type = "AI",
-                        title = "AI feedback: ${option.label}",
+                        title = "AI feedback: ${option.key}",
                         detail = option.instruction,
                         contactId = pending.contactId,
                         eventId = pending.eventId,
@@ -241,7 +241,7 @@ class WishPreviewViewModel @Inject constructor(
     fun approve() {
         val pendingId = _uiState.value.pendingMessage?.id ?: return
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isApproving = true, error = null)
+            _uiState.value = _uiState.value.copy(isApproving = true, errorMessageRes = null)
             val finalText = _uiState.value.editedText
             when (val result = approvePendingMessageUseCase(pendingId, finalText)) {
                 is ApprovePendingMessageUseCase.ApprovalOutcome.Approved -> {
@@ -253,7 +253,7 @@ class WishPreviewViewModel @Inject constructor(
                 is ApprovePendingMessageUseCase.ApprovalOutcome.PendingNotFound -> {
                     _uiState.value = _uiState.value.copy(
                         isApproving = false,
-                        error = "Message not found.",
+                        errorMessageRes = R.string.wish_preview_error_message_not_found,
                     )
                 }
             }
@@ -263,7 +263,7 @@ class WishPreviewViewModel @Inject constructor(
     fun reject() {
         val pendingId = _uiState.value.pendingMessage?.id ?: return
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRejecting = true, error = null)
+            _uiState.value = _uiState.value.copy(isRejecting = true, errorMessageRes = null)
             when (val result = rejectPendingMessageUseCase(pendingId)) {
                 is RejectPendingMessageUseCase.RejectionOutcome.Rejected -> {
                     _uiState.value = _uiState.value.copy(
@@ -274,7 +274,7 @@ class WishPreviewViewModel @Inject constructor(
                 is RejectPendingMessageUseCase.RejectionOutcome.PendingNotFound -> {
                     _uiState.value = _uiState.value.copy(
                         isRejecting = false,
-                        error = "Message not found.",
+                        errorMessageRes = R.string.wish_preview_error_message_not_found,
                     )
                 }
             }

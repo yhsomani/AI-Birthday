@@ -27,7 +27,7 @@
     <string name="onboarding_step_done_description">Start nurturing your connections with AI-powered wishes and smart reminders.</string>
     <string name="onboarding_setup_whatsapp_automation">Set up WhatsApp automation</string>
     <string name="continue_action">Continue</string>
-    
+
     <!-- Memory Vault -->
     <string name="memory_vault_title">Memory Vault</string>
     <string name="memory_vault_subtitle">Log meaningful moments and insights</string>
@@ -125,10 +125,64 @@
     <string name="contact_dnd_subtitle">Never auto-send messages</string>
     <string name="contact_send_time_label">Custom Send Time</string>
     <string name="contact_send_time_default">Default (09:00 AM)</string>
+    <string name="contact_detail_memory_vault">Memory Vault</string>
+    <string name="contact_detail_gift_advisor">Gift Advisor</string>
+    <string name="contact_detail_chat_history">Chat History</string>
+    <string name="contact_detail_contact_info">Contact Info</string>
+    <string name="contact_detail_birthday_date_format">%1$d/%2$d</string>
+    <string name="contact_detail_unknown">Unknown</string>
+    <string name="contact_detail_birthday_format">Birthday: %1$s</string>
+    <string name="contact_detail_next_birthday">Next Birthday</string>
+    <string name="contact_detail_days_left_format">in %1$d days</string>
+    <string name="contact_detail_no_upcoming_event">No upcoming event</string>
+    <string name="contact_detail_generate_ai_wish">Generate AI Wish</string>
+    <string name="contact_detail_error_no_upcoming_event">No upcoming event is available for this contact.</string>
+    <string name="contact_detail_error_already_generated">A wish has already been generated for this event.</string>
+    <string name="contact_detail_error_event_not_found">Event not found.</string>
+    <string name="contact_detail_error_contact_not_found">Contact not found.</string>
+    <string name="contact_detail_error_ai_disabled">AI wish generation is disabled in Settings.</string>
     <string name="edit">EDIT</string>
     
     <!-- Messages -->
     <string name="messages_no_recent">No recent messages</string>
+    <string name="chat_history_title">Chat History</string>
+    <string name="chat_history_subtitle">Messages already sent for this contact.</string>
+    <string name="chat_history_empty">No messages sent yet.</string>
+    <string name="chat_history_error_load">Could not load chat history. Try again.</string>
+    <string name="chat_history_sent_via_format">Sent via %1$s • %2$s</string>
+
+    <!-- Wish preview -->
+    <string name="wish_preview_title">Preview AI Wish</string>
+    <string name="wish_preview_test_sent">Test message sent to your device.</string>
+    <string name="wish_preview_choose_tone">Choose a tone</string>
+    <string name="wish_preview_message_label">Message</string>
+    <string name="wish_preview_feedback_title">Tell AI what went wrong</string>
+    <string name="wish_preview_regenerate">Regenerate AI Draft</string>
+    <string name="wish_preview_reject">Reject</string>
+    <string name="wish_preview_approve_schedule">Approve &amp; Schedule</string>
+    <string name="wish_preview_approved">Wish approved and scheduled.</string>
+    <string name="wish_variant_short">Short</string>
+    <string name="wish_variant_standard">Standard</string>
+    <string name="wish_variant_long">Long</string>
+    <string name="wish_variant_formal">Formal</string>
+    <string name="wish_variant_funny">Funny</string>
+    <string name="wish_variant_emotional">Emotional</string>
+    <string name="wish_feedback_too_generic">Too generic</string>
+    <string name="wish_feedback_too_formal">Too formal</string>
+    <string name="wish_feedback_wrong_language">Wrong language</string>
+    <string name="wish_feedback_too_long">Too long</string>
+    <string name="wish_feedback_not_warm">Not warm enough</string>
+    <string name="wish_feedback_repetitive">Repeated idea</string>
+    <string name="wish_preview_feedback_saved">Feedback saved. Regenerate to apply it.</string>
+    <string name="wish_preview_quality_template_used">Template used because AI generation was unavailable.</string>
+    <string name="wish_preview_quality_regenerated">AI regenerated a fresh draft.</string>
+    <string name="wish_preview_quality_regenerated_with_feedback">AI regenerated using your feedback: %1$s.</string>
+    <string name="wish_preview_quality_next_regeneration">Next regeneration will fix: %1$s.</string>
+    <string name="wish_preview_error_unknown">Unknown error.</string>
+    <string name="wish_preview_error_message_not_found">Message not found.</string>
+    <string name="wish_preview_error_load">Could not load the message. Try again.</string>
+    <string name="wish_preview_error_ai_disabled">AI wish generation is disabled in Settings.</string>
+    <string name="wish_preview_error_context_not_found">Could not find the contact or event for this message.</string>
     
     <!-- Analytics -->
     <string name="analytics_reconnect">Reconnect</string>

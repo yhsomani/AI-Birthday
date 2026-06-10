@@ -3,6 +3,7 @@ package com.example.ui.viewmodel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.domain.repository.ContactRepository
@@ -22,7 +23,7 @@ data class ContactDetailUiState(
     val isLoading: Boolean = true,
     val isGenerating: Boolean = false,
     val generationResult: String? = null,
-    val generationError: String? = null,
+    val generationErrorRes: Int? = null,
 )
 
 @HiltViewModel
@@ -68,9 +69,13 @@ class ContactDetailViewModel @Inject constructor(
     }
 
     fun generateWish() {
-        val event = _uiState.value.upcomingEvent ?: return
+        val event = _uiState.value.upcomingEvent
+        if (event == null) {
+            _uiState.value = _uiState.value.copy(generationErrorRes = R.string.contact_detail_error_no_upcoming_event)
+            return
+        }
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isGenerating = true, generationError = null)
+            _uiState.value = _uiState.value.copy(isGenerating = true, generationErrorRes = null)
             when (val result = generateMessageUseCase(event.id)) {
                 is GenerateMessageUseCase.GenerationOutcome.Generated -> {
                     _uiState.value = _uiState.value.copy(
@@ -81,25 +86,25 @@ class ContactDetailViewModel @Inject constructor(
                 is GenerateMessageUseCase.GenerationOutcome.AlreadyExists -> {
                     _uiState.value = _uiState.value.copy(
                         isGenerating = false,
-                        generationError = "A wish has already been generated for this event.",
+                        generationErrorRes = R.string.contact_detail_error_already_generated,
                     )
                 }
                 is GenerateMessageUseCase.GenerationOutcome.EventNotFound -> {
                     _uiState.value = _uiState.value.copy(
                         isGenerating = false,
-                        generationError = "Event not found.",
+                        generationErrorRes = R.string.contact_detail_error_event_not_found,
                     )
                 }
                 is GenerateMessageUseCase.GenerationOutcome.ContactNotFound -> {
                     _uiState.value = _uiState.value.copy(
                         isGenerating = false,
-                        generationError = "Contact not found.",
+                        generationErrorRes = R.string.contact_detail_error_contact_not_found,
                     )
                 }
                 is GenerateMessageUseCase.GenerationOutcome.AiDisabled -> {
                     _uiState.value = _uiState.value.copy(
                         isGenerating = false,
-                        generationError = "AI wish generation is disabled in Settings.",
+                        generationErrorRes = R.string.contact_detail_error_ai_disabled,
                     )
                 }
             }
@@ -107,6 +112,6 @@ class ContactDetailViewModel @Inject constructor(
     }
 
     fun clearGenerationResult() {
-        _uiState.value = _uiState.value.copy(generationResult = null, generationError = null)
+        _uiState.value = _uiState.value.copy(generationResult = null, generationErrorRes = null)
     }
 }

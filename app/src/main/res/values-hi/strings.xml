@@ -28,7 +28,7 @@
     <string name="onboarding_step_done_description">AI शुभकामनाओं और स्मार्ट रिमाइंडर के साथ अपने रिश्ते बेहतर रखना शुरू करें।</string>
     <string name="onboarding_setup_whatsapp_automation">WhatsApp ऑटोमेशन सेट करें</string>
     <string name="continue_action">जारी रखें</string>
-    
+
     <!-- Memory Vault -->
     <string name="memory_vault_title">Memory Vault</string>
     <string name="memory_vault_subtitle">Log meaningful moments and insights</string>
@@ -126,10 +126,64 @@
     <string name="contact_dnd_subtitle">Never auto-send messages</string>
     <string name="contact_send_time_label">Custom Send Time</string>
     <string name="contact_send_time_default">Default (09:00 AM)</string>
+    <string name="contact_detail_memory_vault">Memory Vault</string>
+    <string name="contact_detail_gift_advisor">Gift Advisor</string>
+    <string name="contact_detail_chat_history">Chat History</string>
+    <string name="contact_detail_contact_info">Contact Info</string>
+    <string name="contact_detail_birthday_date_format">%1$d/%2$d</string>
+    <string name="contact_detail_unknown">Unknown</string>
+    <string name="contact_detail_birthday_format">Birthday: %1$s</string>
+    <string name="contact_detail_next_birthday">Next Birthday</string>
+    <string name="contact_detail_days_left_format">%1$d दिन में</string>
+    <string name="contact_detail_no_upcoming_event">कोई upcoming event नहीं</string>
+    <string name="contact_detail_generate_ai_wish">AI wish generate करें</string>
+    <string name="contact_detail_error_no_upcoming_event">इस contact के लिए कोई upcoming event उपलब्ध नहीं है।</string>
+    <string name="contact_detail_error_already_generated">इस event के लिए wish पहले से generated है।</string>
+    <string name="contact_detail_error_event_not_found">Event नहीं मिला।</string>
+    <string name="contact_detail_error_contact_not_found">Contact नहीं मिला।</string>
+    <string name="contact_detail_error_ai_disabled">AI wish generation Settings में disabled है।</string>
     <string name="edit">संपादित करें</string>
     
     <!-- Messages -->
     <string name="messages_no_recent">No recent messages</string>
+    <string name="chat_history_title">Chat History</string>
+    <string name="chat_history_subtitle">इस contact के लिए पहले भेजे गए messages.</string>
+    <string name="chat_history_empty">अभी कोई messages sent नहीं हैं।</string>
+    <string name="chat_history_error_load">Chat history load नहीं हो सकी। फिर कोशिश करें।</string>
+    <string name="chat_history_sent_via_format">%1$s से sent • %2$s</string>
+
+    <!-- Wish preview -->
+    <string name="wish_preview_title">AI Wish Preview</string>
+    <string name="wish_preview_test_sent">Test message आपके device पर sent हो गया।</string>
+    <string name="wish_preview_choose_tone">Tone चुनें</string>
+    <string name="wish_preview_message_label">Message</string>
+    <string name="wish_preview_feedback_title">AI को बताएं क्या गलत था</string>
+    <string name="wish_preview_regenerate">AI draft regenerate करें</string>
+    <string name="wish_preview_reject">Reject</string>
+    <string name="wish_preview_approve_schedule">Approve &amp; Schedule</string>
+    <string name="wish_preview_approved">Wish approved और scheduled है।</string>
+    <string name="wish_variant_short">Short</string>
+    <string name="wish_variant_standard">Standard</string>
+    <string name="wish_variant_long">Long</string>
+    <string name="wish_variant_formal">Formal</string>
+    <string name="wish_variant_funny">Funny</string>
+    <string name="wish_variant_emotional">Emotional</string>
+    <string name="wish_feedback_too_generic">Too generic</string>
+    <string name="wish_feedback_too_formal">Too formal</string>
+    <string name="wish_feedback_wrong_language">Wrong language</string>
+    <string name="wish_feedback_too_long">Too long</string>
+    <string name="wish_feedback_not_warm">Not warm enough</string>
+    <string name="wish_feedback_repetitive">Repeated idea</string>
+    <string name="wish_preview_feedback_saved">Feedback saved. Apply करने के लिए regenerate करें।</string>
+    <string name="wish_preview_quality_template_used">AI generation unavailable होने से template इस्तेमाल हुआ।</string>
+    <string name="wish_preview_quality_regenerated">AI ने fresh draft regenerate किया।</string>
+    <string name="wish_preview_quality_regenerated_with_feedback">AI ने आपके feedback से regenerate किया: %1$s.</string>
+    <string name="wish_preview_quality_next_regeneration">Next regeneration इसे fix करेगी: %1$s.</string>
+    <string name="wish_preview_error_unknown">Unknown error.</string>
+    <string name="wish_preview_error_message_not_found">Message नहीं मिला।</string>
+    <string name="wish_preview_error_load">Message load नहीं हो सका। फिर कोशिश करें।</string>
+    <string name="wish_preview_error_ai_disabled">AI wish generation Settings में disabled है।</string>
+    <string name="wish_preview_error_context_not_found">इस message के लिए contact या event नहीं मिला।</string>
     
     <!-- Analytics -->
     <string name="analytics_reconnect">Reconnect</string>
