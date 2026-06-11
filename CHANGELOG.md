@@ -19,6 +19,7 @@
 - Added cache-backed FileProvider CSV attachment sharing for Analytics exports, with a readable attachment regression test.
 - Added Activity History Compose/Robolectric interaction coverage for search, type/date/status filters, action-route opening, back navigation, loading, empty, and error states.
 - Added Style Coach Compose/Robolectric interaction coverage for sample entry, manual analysis, recent-message analysis, back navigation, learned profile/history rendering, empty history, loading, error, and disabled busy states.
+- Added Memory Vault Compose/Robolectric interaction coverage for note entry, category chips, add, pin, unpin, delete, back navigation, loading, empty, error, and add-button validation states.
 
 ### Changed
 - Notification backup reminder and AI fallback alert copy now uses localized string resources, and critical Hindi notification labels were refreshed.
@@ -30,10 +31,11 @@
 - Activity History now exposes repository load failures, and search also matches severity, status, and action routes.
 - Activity History Hindi search, action, AI, and status labels were refreshed.
 - Style Coach Hindi copy was refreshed for the screen title, training controls, profile metrics, history labels, and status/error text.
+- Memory Vault category chips now wrap across rows on narrow screens, and touched Hindi Memory Vault labels were refreshed.
 
 ### Validation
-- Full local validation passes with 262 unit tests, lint, debug assemble, and JaCoCo report.
-- Debug Android-test APK build passes after the Style Coach UI test refactor.
+- Full local validation passes with 267 unit tests, lint, debug assemble, and JaCoCo report.
+- Debug Android-test APK build passes after the Memory Vault UI test refactor.
 - Connected UI smoke execution now targets the side-by-side debug package. Device `1b87b5db` installed and started the test run, but it stalled at 0/2 tests while another app was foregrounded; live UI validation needs an idle, unlocked device.
 
 ## [1.0.0] - 2026-06-08

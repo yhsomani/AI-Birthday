@@ -161,7 +161,7 @@ RelateAI
 | F-014 | Analytics and CSV export | UI/Backend Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-015 | Activity history and audit log | System Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-016 | Style Coach | AI Feature | Fully Implemented | 95% | Partially Tested | 95% |
-| F-017 | Memory Vault | Core Feature | Fully Implemented | 85% | Partially Tested | 90% |
+| F-017 | Memory Vault | Core Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-018 | Gift Advisor | AI/UI Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-019 | Encrypted backup and restore | System Feature | Fully Implemented | 90% | Partially Tested | 90% |
 | F-020 | Automation setup / AI Doctor | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
@@ -429,9 +429,9 @@ RelateAI
 - Dependencies: Contact id routing, Room, AI prompt builder context.
 - User workflow: User opens Memory Vault from a contact, adds or pins context, and future AI prompts reference memories. Edge cases include empty notes, note length limits, and deleted contacts.
 - Current status: Fully Implemented.
-- Completion percentage: 85%.
-- Test coverage: Partially Tested by `MemoryVaultViewModelTest`.
-- Confidence score: 90%.
+- Completion percentage: 95%.
+- Test coverage: Partially Tested by `MemoryVaultViewModelTest` and `MemoryVaultScreenInteractionTest`; the Compose/Robolectric smoke covers note text input, category chip selection, add, pin, unpin, delete, back navigation, loading, empty, error, and disabled/enabled add states. ViewModel coverage verifies load success/error, add trimming/category fallback, maximum-length validation, pin persistence, delete persistence, and reload behavior.
+- Confidence score: 95%.
 
 ### F-018 Gift Advisor
 

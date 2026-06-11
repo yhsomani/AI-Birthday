@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,6 +58,7 @@ import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.ui.viewmodel.MemoryVaultUiState
 import com.example.ui.viewmodel.MemoryVaultViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -74,6 +78,18 @@ private val memoryCategoryOptions = listOf(
     MemoryCategoryOption("MILESTONE", R.string.memory_category_milestone_short, R.string.memory_category_milestone),
 )
 
+internal object MemoryVaultTestTags {
+    const val LOADING = "memory_vault_loading"
+    const val NOTE_FIELD = "memory_vault_note_field"
+    const val CATEGORY_PREFIX = "memory_vault_category_"
+    const val ADD_BUTTON = "memory_vault_add_button"
+    const val ERROR_CARD = "memory_vault_error_card"
+    const val EMPTY_STATE = "memory_vault_empty_state"
+    const val NOTE_CARD_PREFIX = "memory_vault_note_"
+    const val PIN_BUTTON_PREFIX = "memory_vault_pin_"
+    const val DELETE_BUTTON_PREFIX = "memory_vault_delete_"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MemoryVaultScreen(
@@ -82,10 +98,44 @@ fun MemoryVaultScreen(
     viewModel: MemoryVaultViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
     var newNoteText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(MemoryVaultViewModel.CATEGORY_GENERAL) }
+
+    MemoryVaultContent(
+        uiState = uiState,
+        newNoteText = newNoteText,
+        selectedCategory = selectedCategory,
+        onNoteChange = { nextText ->
+            if (nextText.length <= MemoryVaultViewModel.MAX_NOTE_LENGTH) {
+                newNoteText = nextText
+            }
+        },
+        onCategoryChange = { selectedCategory = it },
+        onAdd = {
+            viewModel.addNote(newNoteText, selectedCategory)
+            newNoteText = ""
+        },
+        onBack = onBack,
+        onTogglePin = viewModel::togglePin,
+        onDelete = viewModel::deleteNote,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun MemoryVaultContent(
+    uiState: MemoryVaultUiState,
+    newNoteText: String,
+    selectedCategory: String,
+    onNoteChange: (String) -> Unit,
+    onCategoryChange: (String) -> Unit,
+    onAdd: () -> Unit,
+    onBack: () -> Unit,
+    onTogglePin: (MemoryNoteEntity) -> Unit,
+    onDelete: (MemoryNoteEntity) -> Unit,
+) {
+    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
     Scaffold(
         topBar = {
@@ -116,6 +166,7 @@ fun MemoryVaultScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .testTag(MemoryVaultTestTags.LOADING)
                     .background(RelateDarkBackground),
                 contentAlignment = Alignment.Center,
             ) {
@@ -134,16 +185,9 @@ fun MemoryVaultScreen(
                     AddMemoryCard(
                         newNoteText = newNoteText,
                         selectedCategory = selectedCategory,
-                        onNoteChange = { nextText ->
-                            if (nextText.length <= MemoryVaultViewModel.MAX_NOTE_LENGTH) {
-                                newNoteText = nextText
-                            }
-                        },
-                        onCategoryChange = { selectedCategory = it },
-                        onAdd = {
-                            viewModel.addNote(newNoteText, selectedCategory)
-                            newNoteText = ""
-                        },
+                        onNoteChange = onNoteChange,
+                        onCategoryChange = onCategoryChange,
+                        onAdd = onAdd,
                     )
                 }
 
@@ -163,6 +207,7 @@ fun MemoryVaultScreen(
                             message = stringResource(R.string.memory_vault_empty_message),
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .testTag(MemoryVaultTestTags.EMPTY_STATE)
                                 .height(150.dp),
                         )
                     }
@@ -171,8 +216,9 @@ fun MemoryVaultScreen(
                         MemoryNoteCard(
                             note = note,
                             date = dateFormat.format(Date(note.dateMs)),
-                            onTogglePin = { viewModel.togglePin(note) },
-                            onDelete = { viewModel.deleteNote(note) },
+                            onTogglePin = { onTogglePin(note) },
+                            onDelete = { onDelete(note) },
+                            modifier = Modifier.testTag(MemoryVaultTestTags.NOTE_CARD_PREFIX + note.id),
                         )
                     }
                 }
@@ -181,6 +227,7 @@ fun MemoryVaultScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AddMemoryCard(
     newNoteText: String,
@@ -204,7 +251,9 @@ private fun AddMemoryCard(
                 value = newNoteText,
                 onValueChange = onNoteChange,
                 placeholder = { Text(stringResource(R.string.memory_vault_note_placeholder)) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(MemoryVaultTestTags.NOTE_FIELD),
                 minLines = 2,
                 maxLines = 4,
                 supportingText = {
@@ -218,26 +267,27 @@ private fun AddMemoryCard(
                 },
             )
 
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 memoryCategoryOptions.forEach { option ->
-                    Box(modifier = Modifier.weight(1f)) {
-                        FilterChip(
-                            label = stringResource(option.shortLabelRes),
-                            isSelected = selectedCategory == option.value,
-                            onClick = { onCategoryChange(option.value) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                    FilterChip(
+                        label = stringResource(option.shortLabelRes),
+                        isSelected = selectedCategory == option.value,
+                        onClick = { onCategoryChange(option.value) },
+                        modifier = Modifier.testTag(MemoryVaultTestTags.CATEGORY_PREFIX + option.value),
+                    )
                 }
             }
 
             Button(
                 onClick = onAdd,
                 enabled = newNoteText.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(MemoryVaultTestTags.ADD_BUTTON),
                 colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
             ) {
                 Text(stringResource(R.string.memory_vault_add_button))
@@ -249,7 +299,9 @@ private fun AddMemoryCard(
 @Composable
 private fun ErrorCard(message: String) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(MemoryVaultTestTags.ERROR_CARD),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
     ) {
         Text(
@@ -266,9 +318,10 @@ private fun MemoryNoteCard(
     date: String,
     onTogglePin: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (note.isPinned) {
                 RelateSurfaceVariant.copy(alpha = 0.5f)
@@ -288,7 +341,10 @@ private fun MemoryNoteCard(
                     label = { Text(memoryCategoryLabel(note.category)) },
                 )
                 Row {
-                    IconButton(onClick = onTogglePin) {
+                    IconButton(
+                        onClick = onTogglePin,
+                        modifier = Modifier.testTag(MemoryVaultTestTags.PIN_BUTTON_PREFIX + note.id),
+                    ) {
                         Icon(
                             imageVector = Icons.Filled.PushPin,
                             contentDescription = if (note.isPinned) {
@@ -299,7 +355,10 @@ private fun MemoryNoteCard(
                             tint = if (note.isPinned) RelatePrimary else RelateOnSurfaceVariant.copy(alpha = 0.4f),
                         )
                     }
-                    IconButton(onClick = onDelete) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.testTag(MemoryVaultTestTags.DELETE_BUTTON_PREFIX + note.id),
+                    ) {
                         Icon(
                             imageVector = Icons.Filled.Delete,
                             contentDescription = stringResource(R.string.memory_vault_delete_note),
