@@ -2,12 +2,14 @@ package com.example.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.example.core.db.entities.ActivityLogEntity
 import com.example.domain.repository.ActivityLogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -42,6 +44,7 @@ data class ActivityHistoryUiState(
     val selectedStatusFilter: ActivityLogStatusFilter = ActivityLogStatusFilter.ALL,
     val searchQuery: String = "",
     val isLoading: Boolean = true,
+    val errorMessageRes: Int? = null,
 )
 
 @HiltViewModel
@@ -53,12 +56,22 @@ class ActivityHistoryViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            activityLogRepository.getRecent(100).collect { entries ->
-                _uiState.value = _uiState.value.copy(
-                    allEntries = entries,
-                    isLoading = false,
-                ).withFilteredEntries()
-            }
+            activityLogRepository.getRecent(100)
+                .catch {
+                    _uiState.value = _uiState.value.copy(
+                        allEntries = emptyList(),
+                        entries = emptyList(),
+                        isLoading = false,
+                        errorMessageRes = R.string.activity_history_error_load,
+                    )
+                }
+                .collect { entries ->
+                    _uiState.value = _uiState.value.copy(
+                        allEntries = entries,
+                        isLoading = false,
+                        errorMessageRes = null,
+                    ).withFilteredEntries()
+                }
         }
     }
 
@@ -96,7 +109,10 @@ class ActivityHistoryViewModel @Inject constructor(
                 query.isBlank() ||
                     entry.title.contains(query, ignoreCase = true) ||
                     entry.detail.contains(query, ignoreCase = true) ||
-                    entry.type.contains(query, ignoreCase = true)
+                    entry.type.contains(query, ignoreCase = true) ||
+                    entry.severity.contains(query, ignoreCase = true) ||
+                    entry.status.contains(query, ignoreCase = true) ||
+                    entry.actionRoute.orEmpty().contains(query, ignoreCase = true)
             }
             .sortedByDescending { it.createdAtMs }
             .toList()

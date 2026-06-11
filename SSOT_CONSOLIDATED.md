@@ -159,7 +159,7 @@ RelateAI
 | F-012 | Wish preview, editing, feedback, regeneration | Core Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-013 | Chat history | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-014 | Analytics and CSV export | UI/Backend Feature | Fully Implemented | 95% | Partially Tested | 95% |
-| F-015 | Activity history and audit log | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
+| F-015 | Activity history and audit log | System Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-016 | Style Coach | AI Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-017 | Memory Vault | Core Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-018 | Gift Advisor | AI/UI Feature | Fully Implemented | 85% | Partially Tested | 90% |
@@ -395,15 +395,15 @@ RelateAI
 
 - Category: System Feature.
 - Description: Records and displays important app actions for traceability and troubleshooting.
-- Functionality: Persists activity logs, filters by type/date/status, searches recent entries, and supports resolved/open status views.
+- Functionality: Persists activity logs, filters by type/date/status, searches recent entries including severity/status/action routes, supports resolved/open status views, and surfaces load failures instead of hanging in the loading state.
 - Components involved: ActivityHistoryScreen, ActivityHistoryViewModel, ActivityLogRepository, ActivityLogDao.
 - Related files: `ActivityHistoryScreen.kt`, `ActivityHistoryViewModel.kt`, `ActivityLogEntity.kt`, `ActivityLogDao.kt`, `ActivityLogRepositoryImpl.kt`.
-- Dependencies: Room, repositories, domain activity model.
-- User workflow: User or maintainer opens Activity History to inspect sync, message, event, settings, analytics, and AI activity. Edge cases include large logs and missing contact references.
+- Dependencies: Room, repositories, domain activity model, action-route navigation, and resilient activity-log flow collection.
+- User workflow: User or maintainer opens Activity History to inspect sync, message, event, settings, analytics, and AI activity; searches titles/details/type/severity/status/action routes; filters by type/date/status; and opens action routes. Edge cases include large logs, empty logs, repository failures, and missing contact references.
 - Current status: Fully Implemented.
-- Completion percentage: 85%.
-- Test coverage: Partially Tested by `ActivityHistoryViewModelTest` and `ActivityLogRepositoryImplTest`.
-- Confidence score: 90%.
+- Completion percentage: 95%.
+- Test coverage: Partially Tested by `ActivityHistoryViewModelTest`, `ActivityLogRepositoryImplTest`, and `ActivityHistoryScreenInteractionTest`; the Compose/Robolectric smoke covers search input, type/date/status chips, action-route button, back navigation, loading, empty, and repository-error states. Viewmodel tests cover in-memory type/date filtering, severity/status/action-route search matching, and repository failure recovery.
+- Confidence score: 95%.
 
 ### F-016 Style Coach
 

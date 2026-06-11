@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,6 +49,7 @@ import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.ui.viewmodel.ActivityHistoryUiState
 import com.example.ui.viewmodel.ActivityHistoryViewModel
 import com.example.ui.viewmodel.ActivityLogDateFilter
 import com.example.ui.viewmodel.ActivityLogStatusFilter
@@ -55,6 +57,18 @@ import com.example.ui.viewmodel.ActivityLogTypeFilter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+internal object ActivityHistoryTestTags {
+    const val SEARCH_FIELD = "activity_history_search_field"
+    const val LOADING = "activity_history_loading"
+    const val EMPTY = "activity_history_empty"
+    const val ERROR = "activity_history_error"
+    const val TYPE_FILTER_PREFIX = "activity_history_type_filter_"
+    const val DATE_FILTER_PREFIX = "activity_history_date_filter_"
+    const val STATUS_FILTER_PREFIX = "activity_history_status_filter_"
+    const val LOG_CARD_PREFIX = "activity_history_log_"
+    const val OPEN_ROUTE_PREFIX = "activity_history_open_route_"
+}
 
 @Composable
 fun ActivityHistoryScreen(
@@ -64,6 +78,27 @@ fun ActivityHistoryScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    ActivityHistoryContent(
+        state = state,
+        onBack = onBack,
+        onOpenRoute = onOpenRoute,
+        onSearchQueryChange = viewModel::updateSearchQuery,
+        onTypeFilterSelected = viewModel::selectTypeFilter,
+        onDateFilterSelected = viewModel::selectDateFilter,
+        onStatusFilterSelected = viewModel::selectStatusFilter,
+    )
+}
+
+@Composable
+internal fun ActivityHistoryContent(
+    state: ActivityHistoryUiState,
+    onBack: () -> Unit,
+    onOpenRoute: (String) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onTypeFilterSelected: (ActivityLogTypeFilter) -> Unit,
+    onDateFilterSelected: (ActivityLogDateFilter) -> Unit,
+    onStatusFilterSelected: (ActivityLogStatusFilter) -> Unit,
+) {
     RelateScreen(
         title = stringResource(R.string.activity_history_title),
         subtitle = stringResource(R.string.activity_history_subtitle),
@@ -73,8 +108,10 @@ fun ActivityHistoryScreen(
     ) {
         OutlinedTextField(
             value = state.searchQuery,
-            onValueChange = viewModel::updateSearchQuery,
-            modifier = Modifier.fillMaxWidth(),
+            onValueChange = onSearchQueryChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(ActivityHistoryTestTags.SEARCH_FIELD),
             singleLine = true,
             leadingIcon = {
                 Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.search))
@@ -86,21 +123,24 @@ fun ActivityHistoryScreen(
             filters = ActivityLogTypeFilter.entries,
             selected = state.selectedTypeFilter,
             label = { it.label() },
-            onSelected = viewModel::selectTypeFilter,
+            tag = { ActivityHistoryTestTags.TYPE_FILTER_PREFIX + it.name },
+            onSelected = onTypeFilterSelected,
         )
         Spacer(modifier = Modifier.height(8.dp))
         FilterRow(
             filters = ActivityLogDateFilter.entries,
             selected = state.selectedDateFilter,
             label = { it.label() },
-            onSelected = viewModel::selectDateFilter,
+            tag = { ActivityHistoryTestTags.DATE_FILTER_PREFIX + it.name },
+            onSelected = onDateFilterSelected,
         )
         Spacer(modifier = Modifier.height(12.dp))
         FilterRow(
             filters = ActivityLogStatusFilter.entries,
             selected = state.selectedStatusFilter,
             label = { it.label() },
-            onSelected = viewModel::selectStatusFilter,
+            tag = { ActivityHistoryTestTags.STATUS_FILTER_PREFIX + it.name },
+            onSelected = onStatusFilterSelected,
         )
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -110,12 +150,24 @@ fun ActivityHistoryScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                CircularProgressIndicator(color = RelatePrimary)
+                CircularProgressIndicator(
+                    color = RelatePrimary,
+                    modifier = Modifier.testTag(ActivityHistoryTestTags.LOADING),
+                )
             }
+        } else if (state.errorMessageRes != null) {
+            EmptyState(
+                message = stringResource(state.errorMessageRes),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag(ActivityHistoryTestTags.ERROR),
+            )
         } else if (state.entries.isEmpty()) {
             EmptyState(
                 message = stringResource(R.string.activity_history_empty),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag(ActivityHistoryTestTags.EMPTY),
             )
         } else {
             LazyColumn(
@@ -136,6 +188,7 @@ private fun <T> FilterRow(
     filters: List<T>,
     selected: T,
     label: @Composable (T) -> String,
+    tag: (T) -> String,
     onSelected: (T) -> Unit,
 ) {
     Row(
@@ -149,6 +202,7 @@ private fun <T> FilterRow(
                 label = label(filter),
                 isSelected = selected == filter,
                 onClick = { onSelected(filter) },
+                modifier = Modifier.testTag(tag(filter)),
             )
         }
     }
@@ -160,7 +214,9 @@ private fun ActivityLogCard(
     onOpenRoute: (String) -> Unit,
 ) {
     val dateFormat = rememberActivityDateFormat()
-    RelateGlassCard {
+    RelateGlassCard(
+        modifier = Modifier.testTag(ActivityHistoryTestTags.LOG_CARD_PREFIX + entry.id),
+    ) {
         Row(
             modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.Top,
@@ -206,6 +262,7 @@ private fun ActivityLogCard(
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(
                         onClick = { onOpenRoute(route) },
+                        modifier = Modifier.testTag(ActivityHistoryTestTags.OPEN_ROUTE_PREFIX + entry.id),
                         colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
                     ) {
                         Text(stringResource(R.string.activity_history_open_action))

@@ -618,6 +618,7 @@
     <string name="activity_history_title">Activity History</string>
     <string name="activity_history_subtitle">Recent app actions and exports</string>
     <string name="activity_history_empty">No activity yet</string>
+    <string name="activity_history_error_load">Could not load activity history.</string>
     <string name="activity_history_search_placeholder">Search activity, errors, or actions</string>
     <string name="activity_history_open_action">Open</string>
     <string name="activity_history_date_pattern">MMM dd, yyyy HH:mm</string>

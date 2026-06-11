@@ -619,20 +619,21 @@
     <string name="activity_history_title">गतिविधि इतिहास</string>
     <string name="activity_history_subtitle">हाल की ऐप गतिविधियां और एक्सपोर्ट</string>
     <string name="activity_history_empty">अभी कोई गतिविधि नहीं</string>
-    <string name="activity_history_search_placeholder">Activity, errors, या actions खोजें</string>
-    <string name="activity_history_open_action">Open</string>
+    <string name="activity_history_error_load">गतिविधि इतिहास लोड नहीं हो सका।</string>
+    <string name="activity_history_search_placeholder">गतिविधि, त्रुटियां या कार्रवाइयां खोजें</string>
+    <string name="activity_history_open_action">खोलें</string>
     <string name="activity_history_date_pattern">MMM dd, yyyy HH:mm</string>
     <string name="activity_filter_message">संदेश</string>
     <string name="activity_filter_event">इवेंट</string>
     <string name="activity_filter_sync">सिंक</string>
     <string name="activity_filter_analytics">विश्लेषण</string>
     <string name="activity_filter_settings">सेटिंग्स</string>
-    <string name="activity_filter_ai">AI</string>
+    <string name="activity_filter_ai">एआई</string>
     <string name="activity_filter_today">आज</string>
     <string name="activity_filter_last_7_days">7 दिन</string>
     <string name="activity_filter_last_30_days">30 दिन</string>
-    <string name="activity_filter_open">Open</string>
-    <string name="activity_filter_resolved">Resolved</string>
+    <string name="activity_filter_open">खुला</string>
+    <string name="activity_filter_resolved">हल किया गया</string>
     <string name="settings_activity_history_subtitle">हाल की ऐप गतिविधि देखें</string>
 
     <!-- Roadmap implementation -->
