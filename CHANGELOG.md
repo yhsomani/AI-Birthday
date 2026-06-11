@@ -11,6 +11,7 @@
 - Added Compose instrumented smoke coverage for onboarding/auth routing and app-shell bottom navigation.
 - Added a side-by-side debug package (`com.aistudio.relateai.qxtjrk.debug`) and matching debug Firebase config so UI validation can run without uninstalling an existing production-signed app.
 - Added Home dashboard Compose/Robolectric interaction coverage for dashboard links, planner navigation, and sync-error retry/dismiss controls.
+- Added Contact List Compose/Robolectric interaction coverage for search, clear search, filters, sort, sync-error actions, and row navigation.
 
 ### Changed
 - Notification backup reminder and AI fallback alert copy now uses localized string resources, and critical Hindi notification labels were refreshed.
@@ -21,6 +22,7 @@
 
 ### Validation
 - Full local validation passes with unit tests, lint, debug assemble, and JaCoCo report.
+- Contact List targeted interaction validation passes; the full Gradle rerun after this pass is blocked by sandboxed Gradle wrapper/cache and local socket permissions, with escalated approval review timing out.
 - Connected UI smoke execution now targets the side-by-side debug package. Device `1b87b5db` installed and started the test run, but it stalled at 0/2 tests while another app was foregrounded; live UI validation needs an idle, unlocked device.
 
 ## [1.0.0] - 2026-06-08

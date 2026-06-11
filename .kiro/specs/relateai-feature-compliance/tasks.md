@@ -10,6 +10,7 @@
 - [x] F-010/F-031/F-044: implement event reminder scheduling from `notifyDaysBefore` and user reminder toggle.
 - [ ] F-008/F-023/F-025/F-027/F-043/F-044: validate scheduling, deferral, and reminders on device.
 - [x] F-005: add Home dashboard Compose/Robolectric interaction coverage for cards, links, and sync-error actions.
+- [x] F-007: add Contact List Compose/Robolectric interaction coverage for search, clear search, filters, sort, sync-error actions, and row navigation.
 - [x] F-030: make Gmail SMTP subject event-aware.
 - [x] F-040: add localization parity tests and remove raw user-visible notification strings touched by this pass.
 - [x] F-041: make helper scripts repo-root aware and update stale steering docs.

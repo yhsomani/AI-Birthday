@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,8 +62,17 @@ import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.components.SyncErrorCard
 import com.example.ui.viewmodel.ContactFilter
+import com.example.ui.viewmodel.ContactListUiState
 import com.example.ui.viewmodel.ContactListViewModel
 import com.example.ui.viewmodel.ContactSort
+
+internal object ContactListTestTags {
+    const val SEARCH_FIELD = "contact_list_search_field"
+    const val SYNC_ERROR_CARD = "contact_list_sync_error_card"
+    const val FILTER_PREFIX = "contact_list_filter_"
+    const val SORT_PREFIX = "contact_list_sort_"
+    const val ROW_PREFIX = "contact_list_row_"
+}
 
 private val filterOptions = listOf(
     ContactFilter.ALL,
@@ -103,6 +113,30 @@ fun ContactListScreen(
         }
     }
 
+    ContactListContent(
+        state = state,
+        onContactClick = onContactClick,
+        onSearchQueryChange = viewModel::updateSearchQuery,
+        onClearSearch = { viewModel.updateSearchQuery("") },
+        onFilterSelected = viewModel::selectFilter,
+        onSortSelected = viewModel::selectSort,
+        onRefresh = syncContacts,
+        onDismissSyncError = { viewModel.dismissSyncError() },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ContactListContent(
+    state: ContactListUiState,
+    onContactClick: (String) -> Unit = {},
+    onSearchQueryChange: (String) -> Unit = {},
+    onClearSearch: () -> Unit = {},
+    onFilterSelected: (ContactFilter) -> Unit = {},
+    onSortSelected: (ContactSort) -> Unit = {},
+    onRefresh: () -> Unit = {},
+    onDismissSyncError: () -> Unit = {},
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -118,7 +152,7 @@ fun ContactListScreen(
         Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(
             value = state.searchQuery,
-            onValueChange = viewModel::updateSearchQuery,
+            onValueChange = onSearchQueryChange,
             placeholder = {
                 Text(stringResource(R.string.contacts_search_placeholder), color = RelateOnSurfaceVariant)
             },
@@ -127,12 +161,14 @@ fun ContactListScreen(
             },
             trailingIcon = {
                 if (state.searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                    IconButton(onClick = onClearSearch) {
                         Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.clear_search), tint = RelateOnSurfaceVariant)
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(ContactListTestTags.SEARCH_FIELD),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = RelatePrimary,
@@ -155,7 +191,8 @@ fun ContactListScreen(
                 FilterChip(
                     label = filter.label(),
                     isSelected = state.selectedFilter == filter,
-                    onClick = { viewModel.selectFilter(filter) },
+                    onClick = { onFilterSelected(filter) },
+                    modifier = Modifier.testTag(ContactListTestTags.FILTER_PREFIX + filter.name),
                 )
             }
         }
@@ -170,7 +207,8 @@ fun ContactListScreen(
                 FilterChip(
                     label = sort.label(),
                     isSelected = state.selectedSort == sort,
-                    onClick = { viewModel.selectSort(sort) },
+                    onClick = { onSortSelected(sort) },
+                    modifier = Modifier.testTag(ContactListTestTags.SORT_PREFIX + sort.name),
                 )
             }
         }
@@ -178,16 +216,19 @@ fun ContactListScreen(
 
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
-            onRefresh = syncContacts,
+            onRefresh = onRefresh,
             modifier = Modifier.weight(1f),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 state.syncError?.let { errorMsg ->
                     SyncErrorCard(
                         message = errorMsg,
-                        onRetry = syncContacts,
-                        onDismiss = { viewModel.dismissSyncError() },
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        onRetry = onRefresh,
+                        onDismiss = onDismissSyncError,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .testTag(ContactListTestTags.SYNC_ERROR_CARD),
                     )
                 }
 
@@ -222,6 +263,7 @@ fun ContactListScreen(
                             ContactRow(
                                 contact = contact,
                                 onClick = { onContactClick(contact.id) },
+                                modifier = Modifier.testTag(ContactListTestTags.ROW_PREFIX + contact.id),
                             )
                         }
                     }
@@ -252,9 +294,10 @@ private fun ContactSort.label(): String = when (this) {
 private fun ContactRow(
     contact: ContactEntity,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(vertical = 12.dp),

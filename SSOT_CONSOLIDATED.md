@@ -151,7 +151,7 @@ RelateAI
 | F-004 | Settings and secure configuration | UI/System Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-005 | Home dashboard and relationship planner | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-006 | Contact sync, import, and deduplication | Core Feature | Fully Implemented | 90% | Partially Tested | 95% |
-| F-007 | Contact list search, filter, sort | UI Feature | Fully Implemented | 90% | Partially Tested | 95% |
+| F-007 | Contact list search, filter, sort | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-008 | Contact detail personalization | Core Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-009 | Event discovery | Backend Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-010 | Manual and custom event creation | Core Feature | Fully Implemented | 90% | Partially Tested | 90% |
@@ -289,8 +289,8 @@ RelateAI
 - Dependencies: Room contact data, paging support, sync use case, Compose.
 - User workflow: User opens Contacts, filters/searches/sorts, selects a contact, or refreshes sync. Edge cases include empty contacts and sync error display.
 - Current status: Fully Implemented.
-- Completion percentage: 90%.
-- Test coverage: Partially Tested by `ContactListViewModelTest`; paging/UI rendering needs smoke validation.
+- Completion percentage: 95%.
+- Test coverage: Partially Tested by `ContactListViewModelTest` and `ContactListScreenInteractionTest`; the Compose/Robolectric smoke covers search input, clear search, filter chips, sort chips, sync-error retry/dismiss refresh controls, and contact row navigation. Live seeded-device visual validation remains tracked in `docs/UI_VALIDATION.md`.
 - Confidence score: 95%.
 
 ### F-008 Contact Detail Personalization
