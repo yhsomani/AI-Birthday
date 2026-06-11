@@ -13,6 +13,7 @@
 - [x] F-007: add Contact List Compose/Robolectric interaction coverage for search, clear search, filters, sort, sync-error actions, and row navigation.
 - [x] F-011: add Messages inbox Compose/Robolectric interaction coverage for tabs, search, filters, sort, row actions, selection, and bulk actions.
 - [x] F-012: add Wish Preview Compose/Robolectric interaction coverage for variants, editing, feedback, regenerate, test-send, approve, reject, and back.
+- [x] F-013: add Chat History Compose/Robolectric interaction coverage for populated history, back, loading, empty, and error states.
 - [x] F-030: make Gmail SMTP subject event-aware.
 - [x] F-040: add localization parity tests and remove raw user-visible notification strings touched by this pass.
 - [x] F-041: make helper scripts repo-root aware and update stale steering docs.

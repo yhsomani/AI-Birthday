@@ -157,7 +157,7 @@ RelateAI
 | F-010 | Manual and custom event creation | Core Feature | Fully Implemented | 90% | Partially Tested | 90% |
 | F-011 | Messages inbox and bulk actions | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-012 | Wish preview, editing, feedback, regeneration | Core Feature | Fully Implemented | 95% | Partially Tested | 95% |
-| F-013 | Chat history | UI Feature | Fully Implemented | 85% | Partially Tested | 90% |
+| F-013 | Chat history | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-014 | Analytics and CSV export | UI/Backend Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-015 | Activity history and audit log | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-016 | Style Coach | AI Feature | Fully Implemented | 85% | Partially Tested | 90% |
@@ -373,9 +373,9 @@ RelateAI
 - Dependencies: Sent message persistence and contact id routing.
 - User workflow: User opens a contact's chat history to see prior wishes and delivery results. Edge cases include deleted contacts and empty history.
 - Current status: Fully Implemented.
-- Completion percentage: 85%.
-- Test coverage: Partially Tested by `ChatHistoryViewModelTest`.
-- Confidence score: 90%.
+- Completion percentage: 95%.
+- Test coverage: Partially Tested by `ChatHistoryViewModelTest` and `ChatHistoryScreenInteractionTest`; the Compose/Robolectric smoke covers populated sent-message history, back navigation, loading, empty, and repository-error states. Live sent-message visual validation remains tracked in `docs/UI_VALIDATION.md`.
+- Confidence score: 95%.
 
 ### F-014 Analytics and CSV Export
 
