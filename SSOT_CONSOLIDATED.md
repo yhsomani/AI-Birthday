@@ -163,7 +163,7 @@ RelateAI
 | F-016 | Style Coach | AI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-017 | Memory Vault | Core Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-018 | Gift Advisor | AI/UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
-| F-019 | Encrypted backup and restore | System Feature | Fully Implemented | 90% | Partially Tested | 90% |
+| F-019 | Encrypted backup and restore | System Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-020 | Automation setup / AI Doctor | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-021 | Room database, schema, migrations | Backend Feature | Fully Implemented | 95% | Partially Tested | 98% |
 | F-022 | AI contact classification | AI Feature | Fully Implemented | 85% | Partially Tested | 90% |
@@ -457,9 +457,9 @@ RelateAI
 - Dependencies: Room repositories, Android file/document APIs, cryptography, passphrase input.
 - User workflow: User chooses a passphrase, exports backup, later imports with the same passphrase. Edge cases include wrong passphrase, corrupt file, missing OAuth/API secrets, and large datasets.
 - Current status: Fully Implemented.
-- Completion percentage: 90%.
-- Test coverage: Partially Tested by `BackupRestoreViewModelTest`, `BackupServiceImplTest`, and `BackupEncryptionTest`.
-- Confidence score: 90%.
+- Completion percentage: 95%.
+- Test coverage: Partially Tested by `BackupRestoreScreenInteractionTest`, `BackupRestoreViewModelTest`, `BackupServiceImplTest`, and `BackupEncryptionTest`; the Compose/Robolectric smoke covers passphrase entry, visibility toggle, export, restore, dismiss, back navigation, loading, success, error, blank/weak invalid states, and disabled busy states. Data-layer tests cover wrong passphrase, malformed/oversized input, unsupported versions, rollback, selected-document encrypted export, and selected-document import restore. Live Android document-picker validation still needs an idle, unlocked device.
+- Confidence score: 95%.
 
 ### F-020 Automation Setup / AI Doctor
 

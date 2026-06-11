@@ -67,6 +67,17 @@ class BackupRestoreViewModelTest {
     }
 
     @Test
+    fun `blank passphrase blocks import before service call`() {
+        val service = FakeBackupService()
+        val viewModel = viewModel(service)
+
+        viewModel.importBackup(Uri.EMPTY)
+
+        assertFalse(service.importCalled)
+        assertEquals("Passphrase cannot be blank.", viewModel.uiState.value.errorMessage)
+    }
+
+    @Test
     fun `export success updates file status`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
@@ -131,6 +142,7 @@ class BackupRestoreViewModelTest {
             BackupOperationResult.Success(BackupImportResult(3)),
     ) : BackupService {
         var exportCalled = false
+        var importCalled = false
 
         override suspend fun exportBackup(
             outputUri: Uri?,
@@ -144,6 +156,7 @@ class BackupRestoreViewModelTest {
             inputUri: Uri,
             passphrase: String,
         ): BackupOperationResult<BackupImportResult> {
+            importCalled = true
             return importResult
         }
     }

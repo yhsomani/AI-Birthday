@@ -26,6 +26,7 @@ import java.io.File
 class BackupServiceImplTest {
     private lateinit var context: Context
     private lateinit var database: AppDatabase
+    private lateinit var securePrefs: SecurePrefs
     private lateinit var service: BackupServiceImpl
 
     @Before
@@ -34,13 +35,15 @@ class BackupServiceImplTest {
         database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        service = BackupServiceImpl(context, database, SecurePrefs(context))
+        securePrefs = SecurePrefs(context)
+        service = BackupServiceImpl(context, database, securePrefs)
     }
 
     @After
     fun tearDown() {
         database.close()
         File(context.filesDir, "backup-test.enc").delete()
+        File(context.filesDir, "selected-backup.enc").delete()
     }
 
     @Test
@@ -99,6 +102,40 @@ class BackupServiceImplTest {
         val value = (result as BackupOperationResult.Success).value
         assertTrue(value.fileName.startsWith("relateai_backup_"))
         assertTrue(value.sizeBytes > 0)
+    }
+
+    @Test
+    fun exportBackup_writesSelectedDocument() = runTest {
+        val selectedFile = File(context.filesDir, "selected-backup.enc").apply { delete() }
+        database.contactDao().upsert(ContactEntity(id = "contact_1", name = "Alice"))
+
+        val result = service.exportBackup(Uri.fromFile(selectedFile), PASSPHRASE)
+
+        assertTrue(result is BackupOperationResult.Success)
+        assertTrue(selectedFile.exists())
+        assertTrue(selectedFile.length() > 0L)
+        val decrypted = BackupEncryption.decrypt(selectedFile.readText(), PASSPHRASE)
+        assertTrue(decrypted.contains("Alice"))
+    }
+
+    @Test
+    fun importBackup_restoresRecordsFromSelectedDocument() = runTest {
+        val uri = encryptedFixture(
+            """
+            {
+              "version": 1,
+              "contacts": [
+                { "id": "contact_1", "name": "Alice", "relationshipType": "FRIEND" }
+              ]
+            }
+            """.trimIndent()
+        )
+
+        val result = service.importBackup(uri, PASSPHRASE)
+
+        assertTrue(result is BackupOperationResult.Success)
+        assertEquals("Alice", database.contactDao().getById("contact_1")?.name)
+        assertEquals("FRIEND", database.contactDao().getById("contact_1")?.relationshipType)
     }
 
     @Test
