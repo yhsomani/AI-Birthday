@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,12 +53,25 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.db.entities.StyleProfileHistoryEntity
+import com.example.ui.viewmodel.StyleCoachUiState
 import com.example.ui.viewmodel.StyleCoachViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import org.json.JSONArray
 import org.json.JSONObject
+
+internal object StyleCoachTestTags {
+    const val SAMPLE_FIELD = "style_coach_sample_field"
+    const val MANUAL_ANALYZE_BUTTON = "style_coach_manual_analyze_button"
+    const val AUTO_ANALYZE_BUTTON = "style_coach_auto_analyze_button"
+    const val MANUAL_PROGRESS = "style_coach_manual_progress"
+    const val AUTO_PROGRESS = "style_coach_auto_progress"
+    const val STATUS_MESSAGE = "style_coach_status_message"
+    const val PROFILE_CARD = "style_coach_profile_card"
+    const val EMPTY_HISTORY = "style_coach_empty_history"
+    const val HISTORY_CARD_PREFIX = "style_coach_history_"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +81,27 @@ fun StyleCoachScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var samplesText by remember { mutableStateOf("") }
+
+    StyleCoachContent(
+        uiState = uiState,
+        samplesText = samplesText,
+        onSamplesChange = { samplesText = it },
+        onBack = onBack,
+        onManualAnalyze = viewModel::trainStyle,
+        onAutoAnalyze = viewModel::analyzeRecentSentMessages,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun StyleCoachContent(
+    uiState: StyleCoachUiState,
+    samplesText: String,
+    onSamplesChange: (String) -> Unit,
+    onBack: () -> Unit,
+    onManualAnalyze: (List<String>) -> Unit,
+    onAutoAnalyze: () -> Unit,
+) {
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
 
     Scaffold(
@@ -110,19 +145,15 @@ fun StyleCoachScreen(
             item {
                 StyleTrainingCard(
                     samplesText = samplesText,
-                    onSamplesChange = { samplesText = it },
+                    onSamplesChange = onSamplesChange,
                     isTraining = uiState.isTraining,
                     isAutoAnalyzing = uiState.isAutoAnalyzing,
                     statusMessageRes = uiState.statusMessageRes,
                     statusIsError = uiState.statusIsError,
                     onManualAnalyze = {
-                        val samples = samplesText
-                            .split("\n\n")
-                            .map { it.trim() }
-                            .filter { it.isNotEmpty() }
-                        viewModel.trainStyle(samples)
+                        onManualAnalyze(parseSampleBlocks(samplesText))
                     },
-                    onAutoAnalyze = viewModel::analyzeRecentSentMessages,
+                    onAutoAnalyze = onAutoAnalyze,
                 )
             }
 
@@ -137,7 +168,10 @@ fun StyleCoachScreen(
                 }
 
                 item {
-                    LearnedProfileCard(profile = profile)
+                    LearnedProfileCard(
+                        profile = profile,
+                        modifier = Modifier.testTag(StyleCoachTestTags.PROFILE_CARD),
+                    )
                 }
             }
 
@@ -159,6 +193,7 @@ fun StyleCoachScreen(
                     HistorySnapshotCard(
                         snapshot = snapshot,
                         savedAt = dateFormat.format(Date(snapshot.savedAtMs)),
+                        modifier = Modifier.testTag(StyleCoachTestTags.HISTORY_CARD_PREFIX + snapshot.id),
                     )
                 }
             }
@@ -215,7 +250,9 @@ private fun StyleTrainingCard(
                 onValueChange = onSamplesChange,
                 label = { Text(stringResource(R.string.style_coach_samples_label)) },
                 placeholder = { Text(stringResource(R.string.style_coach_samples_placeholder)) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(StyleCoachTestTags.SAMPLE_FIELD),
                 minLines = 4,
                 maxLines = 8,
             )
@@ -230,12 +267,16 @@ private fun StyleTrainingCard(
             Button(
                 onClick = onManualAnalyze,
                 enabled = !busy && samplesText.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(StyleCoachTestTags.MANUAL_ANALYZE_BUTTON),
                 shape = RoundedCornerShape(8.dp),
             ) {
                 if (isTraining) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier
+                            .size(24.dp)
+                            .testTag(StyleCoachTestTags.MANUAL_PROGRESS),
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
                 } else {
@@ -246,12 +287,16 @@ private fun StyleTrainingCard(
             OutlinedButton(
                 onClick = onAutoAnalyze,
                 enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(StyleCoachTestTags.AUTO_ANALYZE_BUTTON),
                 shape = RoundedCornerShape(8.dp),
             ) {
                 if (isAutoAnalyzing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier
+                            .size(20.dp)
+                            .testTag(StyleCoachTestTags.AUTO_PROGRESS),
                         strokeWidth = 2.dp,
                     )
                 } else {
@@ -271,7 +316,9 @@ private fun StatusMessage(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(StyleCoachTestTags.STATUS_MESSAGE),
     ) {
         Icon(
             imageVector = if (isError) Icons.Filled.Info else Icons.Filled.CheckCircle,
@@ -287,9 +334,12 @@ private fun StatusMessage(
 }
 
 @Composable
-private fun LearnedProfileCard(profile: StyleProfileEntity) {
+private fun LearnedProfileCard(
+    profile: StyleProfileEntity,
+    modifier: Modifier = Modifier,
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp),
@@ -410,6 +460,7 @@ private fun EmptyHistoryRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag(StyleCoachTestTags.EMPTY_HISTORY)
             .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
@@ -431,12 +482,13 @@ private fun EmptyHistoryRow() {
 private fun HistorySnapshotCard(
     snapshot: StyleProfileHistoryEntity,
     savedAt: String,
+    modifier: Modifier = Modifier,
 ) {
     val snapshotObj = remember(snapshot.profileJson) {
         runCatching { JSONObject(snapshot.profileJson) }.getOrNull()
     }
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
@@ -491,3 +543,9 @@ private fun parseJsonArray(raw: String): List<String> {
         List(array.length()) { index -> array.getString(index) }
     }.getOrDefault(emptyList())
 }
+
+private fun parseSampleBlocks(samplesText: String): List<String> =
+    samplesText
+        .split("\n\n")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }

@@ -18,6 +18,7 @@
 - Added Analytics Compose/Robolectric interaction coverage for activity navigation, export, loading, empty, populated dashboard, and disabled export states.
 - Added cache-backed FileProvider CSV attachment sharing for Analytics exports, with a readable attachment regression test.
 - Added Activity History Compose/Robolectric interaction coverage for search, type/date/status filters, action-route opening, back navigation, loading, empty, and error states.
+- Added Style Coach Compose/Robolectric interaction coverage for sample entry, manual analysis, recent-message analysis, back navigation, learned profile/history rendering, empty history, loading, error, and disabled busy states.
 
 ### Changed
 - Notification backup reminder and AI fallback alert copy now uses localized string resources, and critical Hindi notification labels were refreshed.
@@ -28,10 +29,11 @@
 - Analytics export now shares an actual `text/csv` attachment instead of only placing CSV text in the share intent body.
 - Activity History now exposes repository load failures, and search also matches severity, status, and action routes.
 - Activity History Hindi search, action, AI, and status labels were refreshed.
+- Style Coach Hindi copy was refreshed for the screen title, training controls, profile metrics, history labels, and status/error text.
 
 ### Validation
-- Full local validation passes with 260 unit tests, lint, debug assemble, and JaCoCo report.
-- Debug Android-test APK build passes after the Activity History UI refactor.
+- Full local validation passes with 262 unit tests, lint, debug assemble, and JaCoCo report.
+- Debug Android-test APK build passes after the Style Coach UI test refactor.
 - Connected UI smoke execution now targets the side-by-side debug package. Device `1b87b5db` installed and started the test run, but it stalled at 0/2 tests while another app was foregrounded; live UI validation needs an idle, unlocked device.
 
 ## [1.0.0] - 2026-06-08

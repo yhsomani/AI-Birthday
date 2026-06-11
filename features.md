@@ -40,7 +40,7 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-013 | Chat history | Fully Implemented | `ChatHistoryScreenInteractionTest` covers populated sent-message history, back navigation, loading, empty, and error states. |
 | F-014 | Analytics and CSV export | Fully Implemented | `AnalyticsScreenInteractionTest` covers activity link, export action, loading, empty, and populated dashboard states; `AnalyticsExportShareTest` verifies a cache-backed FileProvider CSV attachment. Live share-sheet validation remains tracked in `docs/UI_VALIDATION.md`. |
 | F-015 | Activity history and audit log | Fully Implemented | `ActivityHistoryScreenInteractionTest` covers search, type/date/status filters, route opening, back, loading, empty, and error states; `ActivityHistoryViewModelTest` covers filter/search/error logic. Live visual validation with real activity data remains tracked in `docs/UI_VALIDATION.md`. |
-| F-016 | Style Coach | Fully Implemented | Validate manual sample and recent-message analysis UI. |
+| F-016 | Style Coach | Fully Implemented | `StyleCoachScreenInteractionTest` covers sample entry, manual analysis, recent-message analysis, back navigation, profile/history rendering, loading/error/empty states, and disabled busy controls; touched Hindi strings were refreshed. Live AI/device validation remains tracked in `docs/UI_VALIDATION.md`. |
 | F-017 | Memory Vault | Fully Implemented | Validate add, pin, unpin, delete, and validation states. |
 | F-018 | Gift Advisor | Fully Implemented | Validate record, delete, feedback, and AI suggestions where credentials allow. |
 | F-019 | Encrypted backup and restore | Fully Implemented | Validate document export/import flow on device. |

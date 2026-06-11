@@ -19,7 +19,9 @@
 * Added Activity History Compose/Robolectric interaction coverage for F-015: search input, type/date/status filters, action-route opening, back navigation, loading, empty, and repository-error states render or dispatch as expected.
 * Hardened Activity History against repository load failures and expanded audit-log search to severity, status, and action routes.
 * Refreshed stale Activity History Hindi search, action, AI, and status labels while touching the feature.
-* Completed full non-device validation with 260 unit tests, lint, debug assemble, JaCoCo report, and debug Android-test APK build using JDK 21.
+* Added Style Coach Compose/Robolectric interaction coverage for F-016: sample entry, manual analysis, recent-message analysis, back navigation, learned profile/history rendering, empty history, loading, error, and disabled busy states render or dispatch as expected.
+* Refreshed stale Style Coach Hindi title, training-control, profile-metric, history, status, and error labels while touching the feature.
+* Completed full non-device validation with 262 unit tests, lint, debug assemble, JaCoCo report, and debug Android-test APK build using JDK 21.
 * Kept the existing single Gradle root project and active modules (`:app`, `:core:domain`, `:core:data`, `:core:ui`) instead of collapsing them into one module.
 * Migrated the inactive WhatsApp setup idea into the active app as an Automation Setup screen reachable from onboarding and settings.
 * Removed the inactive `feature/onboarding` source tree and updated steering docs so future work uses the active `app/src/main/java/com/example/ui` UI structure.

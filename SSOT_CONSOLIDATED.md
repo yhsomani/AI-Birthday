@@ -160,7 +160,7 @@ RelateAI
 | F-013 | Chat history | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-014 | Analytics and CSV export | UI/Backend Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-015 | Activity history and audit log | System Feature | Fully Implemented | 95% | Partially Tested | 95% |
-| F-016 | Style Coach | AI Feature | Fully Implemented | 85% | Partially Tested | 90% |
+| F-016 | Style Coach | AI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-017 | Memory Vault | Core Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-018 | Gift Advisor | AI/UI Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-019 | Encrypted backup and restore | System Feature | Fully Implemented | 90% | Partially Tested | 90% |
@@ -415,9 +415,9 @@ RelateAI
 - Dependencies: Sent messages, AI prompt context, Room, WorkManager.
 - User workflow: User trains style manually or lets background analysis run. Generated wishes then use style profile context. Edge cases include too few samples and mixed-language messages.
 - Current status: Fully Implemented.
-- Completion percentage: 85%.
-- Test coverage: Partially Tested by `StyleCoachViewModelTest`, `StyleAnalysisUseCaseTest`, and `StyleAnalysisWorkerTest`.
-- Confidence score: 90%.
+- Completion percentage: 95%.
+- Test coverage: Partially Tested by `StyleCoachViewModelTest`, `StyleAnalysisUseCaseTest`, `StyleAnalysisWorkerTest`, and `StyleCoachScreenInteractionTest`; the Compose/Robolectric smoke covers sample text input, manual training, recent-message analysis, back navigation, learned-profile and history rendering, empty history, loading spinners, error status, and disabled busy controls.
+- Confidence score: 95%.
 
 ### F-017 Memory Vault
 
