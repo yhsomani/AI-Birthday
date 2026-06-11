@@ -162,7 +162,7 @@ RelateAI
 | F-015 | Activity history and audit log | System Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-016 | Style Coach | AI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-017 | Memory Vault | Core Feature | Fully Implemented | 95% | Partially Tested | 95% |
-| F-018 | Gift Advisor | AI/UI Feature | Fully Implemented | 85% | Partially Tested | 90% |
+| F-018 | Gift Advisor | AI/UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-019 | Encrypted backup and restore | System Feature | Fully Implemented | 90% | Partially Tested | 90% |
 | F-020 | Automation setup / AI Doctor | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-021 | Room database, schema, migrations | Backend Feature | Fully Implemented | 95% | Partially Tested | 98% |
@@ -443,9 +443,9 @@ RelateAI
 - Dependencies: Contact preferences, gift history, Gemini prompt/response parsing, Room.
 - User workflow: User opens Gift Advisor for a contact, records prior gifts, sets price/outcome, requests ideas, and reviews budget stats. Edge cases include invalid cost, no AI key, empty suggestions, and budget overflow.
 - Current status: Fully Implemented.
-- Completion percentage: 85%.
-- Test coverage: Partially Tested by `GiftAdvisorViewModelTest`; live AI suggestion quality needs integration validation.
-- Confidence score: 90%.
+- Completion percentage: 95%.
+- Test coverage: Partially Tested by `GiftAdvisorViewModelTest` and `GiftAdvisorScreenInteractionTest`; the Compose/Robolectric smoke covers AI suggestion action/results, record dialog field entry, liked/disliked feedback buttons, save, delete, back navigation, loading, empty, error, generating, and validation states. ViewModel coverage verifies load success/error, budget stats, add parsing/trimming, invalid cost, overlong notes, delete persistence, AI suggestion success/failure, and missing-contact behavior; live AI suggestion quality still needs credentialed integration validation.
+- Confidence score: 95%.
 
 ### F-019 Encrypted Backup and Restore
 

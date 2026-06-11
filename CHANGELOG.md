@@ -20,6 +20,7 @@
 - Added Activity History Compose/Robolectric interaction coverage for search, type/date/status filters, action-route opening, back navigation, loading, empty, and error states.
 - Added Style Coach Compose/Robolectric interaction coverage for sample entry, manual analysis, recent-message analysis, back navigation, learned profile/history rendering, empty history, loading, error, and disabled busy states.
 - Added Memory Vault Compose/Robolectric interaction coverage for note entry, category chips, add, pin, unpin, delete, back navigation, loading, empty, error, and add-button validation states.
+- Added Gift Advisor Compose/Robolectric interaction coverage for AI suggestions, record dialog entry, feedback buttons, save, delete, back navigation, loading, empty, error, generating, and validation states.
 
 ### Changed
 - Notification backup reminder and AI fallback alert copy now uses localized string resources, and critical Hindi notification labels were refreshed.
@@ -32,10 +33,11 @@
 - Activity History Hindi search, action, AI, and status labels were refreshed.
 - Style Coach Hindi copy was refreshed for the screen title, training controls, profile metrics, history labels, and status/error text.
 - Memory Vault category chips now wrap across rows on narrow screens, and touched Hindi Memory Vault labels were refreshed.
+- Gift Advisor add-record dialog now scrolls on small screens, and touched Hindi Gift Advisor labels were refreshed.
 
 ### Validation
-- Full local validation passes with 267 unit tests, lint, debug assemble, and JaCoCo report.
-- Debug Android-test APK build passes after the Memory Vault UI test refactor.
+- Full local validation passes with 272 unit tests, lint, debug assemble, and JaCoCo report.
+- Debug Android-test APK build passes after the Gift Advisor UI test refactor.
 - Connected UI smoke execution now targets the side-by-side debug package. Device `1b87b5db` installed and started the test run, but it stalled at 0/2 tests while another app was foregrounded; live UI validation needs an idle, unlocked device.
 
 ## [1.0.0] - 2026-06-08

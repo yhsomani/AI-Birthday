@@ -86,6 +86,18 @@ class GiftAdvisorViewModelTest {
     }
 
     @Test
+    fun `loadData emits stable error when repository fails`() = runTest(testDispatcher) {
+        coEvery { contactRepository.getById("contact_1") } throws IllegalStateException("boom")
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.uiState.value.isLoading)
+        assertEquals(R.string.gift_advisor_error_load, viewModel.uiState.value.errorMessageRes)
+    }
+
+    @Test
     fun `generateGiftSuggestions updates state with suggestions`() = runTest(testDispatcher) {
         val contact = ContactEntity(id = "contact_1", name = "John Doe", giftBudgetInr = 1000)
         val suggestions = listOf(
@@ -107,6 +119,25 @@ class GiftAdvisorViewModelTest {
         assertEquals(2, viewModel.uiState.value.suggestions.size)
         assertEquals("AI Suggestion 1", viewModel.uiState.value.suggestions[0].name)
         assertEquals(false, viewModel.uiState.value.isGeneratingSuggestions)
+    }
+
+    @Test
+    fun `generateGiftSuggestions exposes stable error when ai fails`() = runTest(testDispatcher) {
+        val contact = ContactEntity(id = "contact_1", name = "John Doe", giftBudgetInr = 1000)
+
+        coEvery { contactRepository.getById("contact_1") } returns contact
+        coEvery { giftHistoryRepository.getByContact("contact_1") } returns emptyList()
+        coEvery { aiService.generateGiftSuggestions(any(), any()) } throws IllegalStateException("ai down")
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
+        advanceUntilIdle()
+
+        viewModel.generateGiftSuggestions()
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.uiState.value.isGeneratingSuggestions)
+        assertEquals(R.string.gift_advisor_error_suggestions, viewModel.uiState.value.errorMessageRes)
     }
 
     @Test
@@ -191,6 +222,31 @@ class GiftAdvisorViewModelTest {
         assertEquals(false, accepted)
         assertEquals(R.string.gift_advisor_error_notes_too_long, viewModel.uiState.value.errorMessageRes)
         coVerify(exactly = 0) { giftHistoryRepository.upsert(any()) }
+    }
+
+    @Test
+    fun `deleteGiftRecord deletes gift and reloads history`() = runTest(testDispatcher) {
+        val gift = GiftHistoryEntity(
+            id = "gift_1",
+            contactId = "contact_1",
+            giftName = "Book",
+            giftCategory = "Books",
+            occasionType = "Birthday",
+            year = Calendar.getInstance().get(Calendar.YEAR),
+            approxCostInr = 400,
+        )
+        coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
+        coEvery { giftHistoryRepository.getByContact("contact_1") } returns listOf(gift)
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
+        advanceUntilIdle()
+
+        viewModel.deleteGiftRecord(gift)
+        advanceUntilIdle()
+
+        coVerify { giftHistoryRepository.delete(gift) }
+        coVerify(atLeast = 2) { giftHistoryRepository.getByContact("contact_1") }
     }
 
     @Test

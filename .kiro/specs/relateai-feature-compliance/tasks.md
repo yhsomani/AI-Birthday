@@ -18,6 +18,7 @@
 - [x] F-015: add Activity History Compose/Robolectric interaction coverage and repository-error handling.
 - [x] F-016: add Style Coach Compose/Robolectric interaction coverage and refresh touched Hindi strings.
 - [x] F-017: add Memory Vault Compose/Robolectric interaction coverage and refresh touched Hindi strings.
+- [x] F-018: add Gift Advisor Compose/Robolectric interaction coverage and refresh touched Hindi strings.
 - [x] F-030: make Gmail SMTP subject event-aware.
 - [x] F-040: add localization parity tests and remove raw user-visible notification strings touched by this pass.
 - [x] F-041: make helper scripts repo-root aware and update stale steering docs.

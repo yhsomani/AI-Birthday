@@ -23,7 +23,9 @@
 * Refreshed stale Style Coach Hindi title, training-control, profile-metric, history, status, and error labels while touching the feature.
 * Added Memory Vault Compose/Robolectric interaction coverage for F-017: note entry, category chip selection, add, pin, unpin, delete, back navigation, loading, empty, error, and add-button validation states render or dispatch as expected.
 * Reworked Memory Vault category chips to wrap on narrow screens and refreshed stale Hindi Memory Vault labels while touching the feature.
-* Completed full non-device validation with 267 unit tests, lint, debug assemble, JaCoCo report, and debug Android-test APK build using JDK 21.
+* Added Gift Advisor Compose/Robolectric interaction coverage for F-018: AI suggestions, record dialog entry, liked/disliked feedback buttons, save, delete, back navigation, loading, empty, error, generating, and validation states render or dispatch as expected.
+* Made the Gift Advisor add-record dialog scrollable on small screens and refreshed stale Hindi Gift Advisor labels while touching the feature.
+* Completed full non-device validation with 272 unit tests, lint, debug assemble, JaCoCo report, and debug Android-test APK build using JDK 21.
 * Kept the existing single Gradle root project and active modules (`:app`, `:core:domain`, `:core:data`, `:core:ui`) instead of collapsing them into one module.
 * Migrated the inactive WhatsApp setup idea into the active app as an Automation Setup screen reachable from onboarding and settings.
 * Removed the inactive `feature/onboarding` source tree and updated steering docs so future work uses the active `app/src/main/java/com/example/ui` UI structure.
