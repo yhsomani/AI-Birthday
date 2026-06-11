@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,11 +48,22 @@ import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
 import com.example.core.ui.components.StatCard
 import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.ui.viewmodel.AnalyticsUiState
 import com.example.ui.viewmodel.AnalyticsViewModel
+
+internal object AnalyticsScreenTestTags {
+    const val ACTIVITY_HISTORY_BUTTON = "analytics_activity_history_button"
+    const val EXPORT_BUTTON = "analytics_export_button"
+    const val LOADING = "analytics_loading"
+    const val MONTHLY_SECTION = "analytics_monthly_section"
+    const val DISTRIBUTION_SECTION = "analytics_distribution_section"
+    const val HEALTH_SECTION = "analytics_health_section"
+    const val GROWTH_SECTION = "analytics_growth_section"
+    const val NEGLECTED_SECTION = "analytics_neglected_section"
+}
 
 @Composable
 fun AnalyticsScreen(
@@ -65,14 +77,14 @@ fun AnalyticsScreen(
 
     LaunchedEffect(state.exportReport) {
         state.exportReport?.let { report ->
-            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                type = report.mimeType
-                putExtra(Intent.EXTRA_TITLE, report.fileName)
-                putExtra(Intent.EXTRA_SUBJECT, report.fileName)
-                putExtra(Intent.EXTRA_TEXT, report.content)
+            runCatching {
+                val sendIntent = AnalyticsExportShare.createSendIntent(context, report)
+                context.startActivity(Intent.createChooser(sendIntent, chooserTitle))
+            }.onFailure {
+                Toast.makeText(context, exportError, Toast.LENGTH_LONG).show()
+            }.also {
+                viewModel.clearExportReport()
             }
-            context.startActivity(Intent.createChooser(sendIntent, chooserTitle))
-            viewModel.clearExportReport()
         }
     }
 
@@ -83,6 +95,19 @@ fun AnalyticsScreen(
         }
     }
 
+    AnalyticsContent(
+        state = state,
+        onNavigateToActivityHistory = onNavigateToActivityHistory,
+        onExportReport = viewModel::exportRelationshipReport,
+    )
+}
+
+@Composable
+internal fun AnalyticsContent(
+    state: AnalyticsUiState,
+    onNavigateToActivityHistory: () -> Unit,
+    onExportReport: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -102,7 +127,10 @@ fun AnalyticsScreen(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Row {
-                IconButton(onClick = onNavigateToActivityHistory) {
+                IconButton(
+                    onClick = onNavigateToActivityHistory,
+                    modifier = Modifier.testTag(AnalyticsScreenTestTags.ACTIVITY_HISTORY_BUTTON),
+                ) {
                     Icon(
                         imageVector = Icons.Filled.History,
                         contentDescription = stringResource(R.string.activity_history_title),
@@ -110,8 +138,9 @@ fun AnalyticsScreen(
                     )
                 }
                 IconButton(
-                    onClick = viewModel::exportRelationshipReport,
+                    onClick = onExportReport,
                     enabled = !state.isExporting,
+                    modifier = Modifier.testTag(AnalyticsScreenTestTags.EXPORT_BUTTON),
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Share,
@@ -129,7 +158,10 @@ fun AnalyticsScreen(
                     .height(200.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator(color = RelatePrimary)
+                CircularProgressIndicator(
+                    color = RelatePrimary,
+                    modifier = Modifier.testTag(AnalyticsScreenTestTags.LOADING),
+                )
             }
         } else {
             Spacer(modifier = Modifier.height(24.dp))
@@ -153,7 +185,7 @@ fun AnalyticsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
         SectionHeader(title = stringResource(R.string.analytics_monthly_wishes))
-        RelateGlassCard {
+        RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.MONTHLY_SECTION)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 if (state.monthlyCounts.isEmpty()) {
                     Text(
@@ -169,7 +201,7 @@ fun AnalyticsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
         SectionHeader(title = stringResource(R.string.analytics_contact_distribution))
-        RelateGlassCard {
+        RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.DISTRIBUTION_SECTION)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 val family = state.relationshipCounts["FAMILY"] ?: 0
                 val friends = state.relationshipCounts["FRIEND"] ?: 0
@@ -189,7 +221,7 @@ fun AnalyticsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
         SectionHeader(title = stringResource(R.string.analytics_relationship_health))
-        RelateGlassCard {
+        RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.HEALTH_SECTION)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 val healthy = state.healthCounts["Healthy (70%+)"] ?: 0
                 val attention = state.healthCounts["Needs Attention"] ?: 0
@@ -203,7 +235,7 @@ fun AnalyticsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
         SectionHeader(title = stringResource(R.string.analytics_growth_metrics))
-        RelateGlassCard {
+        RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.GROWTH_SECTION)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 DistributionRow(
                     stringResource(R.string.analytics_delivery_reliability),
@@ -228,7 +260,7 @@ fun AnalyticsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
         SectionHeader(title = stringResource(R.string.analytics_top_neglected))
-        RelateGlassCard {
+        RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.NEGLECTED_SECTION)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 if (state.topNeglectedContacts.isEmpty()) {
                     Text(

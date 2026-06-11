@@ -38,7 +38,7 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-011 | Messages inbox and bulk actions | Fully Implemented | `MessagesScreenInteractionTest` covers tabs, search, channel filters, sort chips, pending row edit/approve/reject, reject confirmation, selection, approved revoke, failed retry, and approve/reject/retry bulk actions. |
 | F-012 | Wish preview, editing, feedback, regeneration | Fully Implemented | `WishPreviewScreenInteractionTest` covers back navigation, variant selection, draft editing, why-signals, feedback chips, regeneration, test-send, reject, approve, approved state, and missing-message error state. |
 | F-013 | Chat history | Fully Implemented | `ChatHistoryScreenInteractionTest` covers populated sent-message history, back navigation, loading, empty, and error states. |
-| F-014 | Analytics and CSV export | Fully Implemented | Validate export/share workflow on device. |
+| F-014 | Analytics and CSV export | Fully Implemented | `AnalyticsScreenInteractionTest` covers activity link, export action, loading, empty, and populated dashboard states; `AnalyticsExportShareTest` verifies a cache-backed FileProvider CSV attachment. Live share-sheet validation remains tracked in `docs/UI_VALIDATION.md`. |
 | F-015 | Activity history and audit log | Fully Implemented | Validate filters, search, and route opening on device. |
 | F-016 | Style Coach | Fully Implemented | Validate manual sample and recent-message analysis UI. |
 | F-017 | Memory Vault | Fully Implemented | Validate add, pin, unpin, delete, and validation states. |

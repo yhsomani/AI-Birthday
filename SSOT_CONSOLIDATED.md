@@ -158,7 +158,7 @@ RelateAI
 | F-011 | Messages inbox and bulk actions | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-012 | Wish preview, editing, feedback, regeneration | Core Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-013 | Chat history | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
-| F-014 | Analytics and CSV export | UI/Backend Feature | Fully Implemented | 85% | Partially Tested | 90% |
+| F-014 | Analytics and CSV export | UI/Backend Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-015 | Activity history and audit log | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-016 | Style Coach | AI Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-017 | Memory Vault | Core Feature | Fully Implemented | 85% | Partially Tested | 90% |
@@ -381,15 +381,15 @@ RelateAI
 
 - Category: UI/Backend Feature.
 - Description: Reports relationship and delivery performance from local data.
-- Functionality: Calculates wishes sent, contact totals, pending approvals, upcoming events, relationship counts, health buckets, monthly counts, delivery reliability, response rate, personalization coverage, neglected contacts, and relationship CSV export.
-- Components involved: AnalyticsScreen, AnalyticsViewModel, GetAnalyticsUseCase, AnalyticsReportServiceImpl, DAOs.
-- Related files: `AnalyticsScreen.kt`, `AnalyticsViewModel.kt`, `GetAnalyticsUseCase.kt`, `AnalyticsReportService.kt`, `AnalyticsReportServiceImpl.kt`, `ContactDao.kt`, `EventDao.kt`, `SentMessageDao.kt`.
-- Dependencies: Room aggregate queries, sent message state, contact health data, local file/share behavior for export.
+- Functionality: Calculates wishes sent, contact totals, pending approvals, upcoming events, relationship counts, health buckets, monthly counts, delivery reliability, response rate, personalization coverage, neglected contacts, and relationship CSV export as a cache-backed share attachment.
+- Components involved: AnalyticsScreen, AnalyticsExportShare, AnalyticsViewModel, GetAnalyticsUseCase, AnalyticsReportServiceImpl, DAOs, Android FileProvider.
+- Related files: `AnalyticsScreen.kt`, `AnalyticsExportShare.kt`, `AnalyticsViewModel.kt`, `GetAnalyticsUseCase.kt`, `AnalyticsReportService.kt`, `AnalyticsReportServiceImpl.kt`, `AndroidManifest.xml`, `analytics_export_paths.xml`, `ContactDao.kt`, `EventDao.kt`, `SentMessageDao.kt`.
+- Dependencies: Room aggregate queries, sent message state, contact health data, localized share copy, and FileProvider-scoped cache export behavior.
 - User workflow: User opens Analytics to inspect trends or export relationship data. Edge cases include empty data and insufficient sent history.
 - Current status: Fully Implemented.
-- Completion percentage: 85%.
-- Test coverage: Partially Tested by `GetAnalyticsUseCaseTest`, `AnalyticsViewModelTest`, and `AnalyticsReportServiceImplTest`.
-- Confidence score: 90%.
+- Completion percentage: 95%.
+- Test coverage: Partially Tested by `GetAnalyticsUseCaseTest`, `AnalyticsViewModelTest`, `AnalyticsReportServiceImplTest`, `AnalyticsScreenInteractionTest`, and `AnalyticsExportShareTest`; the Compose/Robolectric smoke covers activity navigation, export click, loading, empty, populated dashboard, trend, distribution, growth, and neglected-contact states. The export test verifies the shared CSV is a readable `text/csv` FileProvider attachment with grant-read permissions. Live share-sheet validation remains tracked in `docs/UI_VALIDATION.md`.
+- Confidence score: 95%.
 
 ### F-015 Activity History and Audit Log
 

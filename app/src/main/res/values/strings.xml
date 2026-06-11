@@ -597,6 +597,7 @@
     <!-- Analytics export -->
     <string name="analytics_export_report">Export report</string>
     <string name="analytics_share_chooser">Share relationship report</string>
+    <string name="analytics_export_share_body">Relationship analytics CSV attached.</string>
     <string name="analytics_export_failed">Could not export the report. Please try again.</string>
     <string name="analytics_monthly_wishes">Monthly Wishes</string>
     <string name="analytics_no_wishes_this_year">No wishes sent yet this year</string>

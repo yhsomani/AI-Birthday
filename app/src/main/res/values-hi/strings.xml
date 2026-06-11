@@ -598,6 +598,7 @@
     <!-- Analytics export -->
     <string name="analytics_export_report">रिपोर्ट एक्सपोर्ट करें</string>
     <string name="analytics_share_chooser">रिलेशनशिप रिपोर्ट शेयर करें</string>
+    <string name="analytics_export_share_body">रिलेशनशिप एनालिटिक्स CSV संलग्न है।</string>
     <string name="analytics_export_failed">रिपोर्ट एक्सपोर्ट नहीं हो सकी। कृपया फिर कोशिश करें।</string>
     <string name="analytics_monthly_wishes">मासिक शुभकामनाएं</string>
     <string name="analytics_no_wishes_this_year">इस साल अभी कोई शुभकामना नहीं भेजी गई</string>

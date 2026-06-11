@@ -14,7 +14,9 @@
 * Added Messages inbox Compose/Robolectric interaction coverage for F-011: tabs, search, channel filters, sort chips, pending row edit/approve/reject, reject confirmation, selection, approved revoke, failed retry, and approve/reject/retry bulk actions dispatch expected callbacks.
 * Added Wish Preview Compose/Robolectric interaction coverage for F-012: back navigation, variant selection, draft editing, why-signals, feedback chips, regeneration, test-send, reject, approve, approved state, and missing-message error state dispatch or render as expected.
 * Added Chat History Compose/Robolectric interaction coverage for F-013: populated sent-message history, back navigation, loading, empty, and repository-error states render or dispatch as expected.
-* Completed full non-device validation with 253 unit tests, lint, debug assemble, JaCoCo report, and debug Android-test APK build using JDK 21.
+* Added Analytics Compose/Robolectric interaction coverage for F-014: activity navigation, export, loading, empty, populated dashboard, trend, distribution, growth, neglected-contact, and disabled export states render or dispatch as expected.
+* Upgraded Analytics CSV export to share a cache-backed FileProvider `text/csv` attachment and added a regression test that verifies the exported attachment is readable with grant-read permissions.
+* Completed full non-device validation with 256 unit tests, lint, debug assemble, JaCoCo report, and debug Android-test APK build using JDK 21.
 * Kept the existing single Gradle root project and active modules (`:app`, `:core:domain`, `:core:data`, `:core:ui`) instead of collapsing them into one module.
 * Migrated the inactive WhatsApp setup idea into the active app as an Automation Setup screen reachable from onboarding and settings.
 * Removed the inactive `feature/onboarding` source tree and updated steering docs so future work uses the active `app/src/main/java/com/example/ui` UI structure.

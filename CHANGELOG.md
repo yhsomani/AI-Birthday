@@ -15,6 +15,8 @@
 - Added Messages inbox Compose/Robolectric interaction coverage for tabs, search, filters, sort, row actions, reject confirmation, selection, and approve/reject/retry bulk actions.
 - Added Wish Preview Compose/Robolectric interaction coverage for back navigation, variants, editing, why-signals, feedback, regeneration, test-send, approval, rejection, and terminal states.
 - Added Chat History Compose/Robolectric interaction coverage for populated sent-message history, back navigation, loading, empty, and error states.
+- Added Analytics Compose/Robolectric interaction coverage for activity navigation, export, loading, empty, populated dashboard, and disabled export states.
+- Added cache-backed FileProvider CSV attachment sharing for Analytics exports, with a readable attachment regression test.
 
 ### Changed
 - Notification backup reminder and AI fallback alert copy now uses localized string resources, and critical Hindi notification labels were refreshed.
@@ -22,10 +24,11 @@
 - Background contact sync now runs through the same Google + device merge, relationship normalization, mock cleanup, and event-discovery path as foreground sync.
 - Automatic message generation now skips contacts with `skipAutoWish`, while manual generation forces review instead of auto-send for those contacts.
 - Dispatch workers now defer approved sends that become due during quiet hours or blackout dates.
+- Analytics export now shares an actual `text/csv` attachment instead of only placing CSV text in the share intent body.
 
 ### Validation
-- Full local validation passes with 253 unit tests, lint, debug assemble, and JaCoCo report.
-- Debug Android-test APK build passes after the Chat History UI refactor.
+- Full local validation passes with 256 unit tests, lint, debug assemble, and JaCoCo report.
+- Debug Android-test APK build passes after the Analytics CSV export UI refactor.
 - Connected UI smoke execution now targets the side-by-side debug package. Device `1b87b5db` installed and started the test run, but it stalled at 0/2 tests while another app was foregrounded; live UI validation needs an idle, unlocked device.
 
 ## [1.0.0] - 2026-06-08
