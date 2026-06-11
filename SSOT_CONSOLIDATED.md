@@ -155,7 +155,7 @@ RelateAI
 | F-008 | Contact detail personalization | Core Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-009 | Event discovery | Backend Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-010 | Manual and custom event creation | Core Feature | Fully Implemented | 90% | Partially Tested | 90% |
-| F-011 | Messages inbox and bulk actions | UI Feature | Fully Implemented | 85% | Partially Tested | 90% |
+| F-011 | Messages inbox and bulk actions | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-012 | Wish preview, editing, feedback, regeneration | Core Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-013 | Chat history | UI Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-014 | Analytics and CSV export | UI/Backend Feature | Fully Implemented | 85% | Partially Tested | 90% |
@@ -345,9 +345,9 @@ RelateAI
 - Dependencies: Pending/sent message DAOs, scheduler service, notification service, activity log repository.
 - User workflow: User reviews queued messages, filters, opens preview, approves or rejects one or many. Edge cases include stale pending messages, failed retries, rejected messages, and legacy event-id navigation.
 - Current status: Fully Implemented.
-- Completion percentage: 85%.
-- Test coverage: Partially Tested by `MessagesViewModelTest` and approval/rejection use-case tests.
-- Confidence score: 90%.
+- Completion percentage: 95%.
+- Test coverage: Partially Tested by `MessagesViewModelTest`, approval/rejection use-case tests, and `MessagesScreenInteractionTest`; the Compose/Robolectric smoke covers tabs, search, channel filters, sort chips, pending row edit/approve/reject, reject confirmation, selection, approved revoke, failed retry, and approve/reject/retry bulk actions. Live generated-message visual validation remains tracked in `docs/UI_VALIDATION.md`.
+- Confidence score: 95%.
 
 ### F-012 Wish Preview, Editing, Feedback, Regeneration
 

@@ -35,7 +35,7 @@ The target implementation is the Android app in this repository, not an IDE exte
 | F-008 | Contact detail personalization | Fully Implemented | Custom send time and skip-auto-wish now affect generation/scheduling; live UI validation remains tracked in `docs/UI_VALIDATION.md`. |
 | F-009 | Event discovery | Fully Implemented | Preserve leap-day and deactivation behavior. |
 | F-010 | Manual and custom event creation | Fully Implemented | Add reminder scheduling after manual event save. |
-| F-011 | Messages inbox and bulk actions | Fully Implemented | Add UI smoke evidence for tabs, search, selection, and bulk actions. |
+| F-011 | Messages inbox and bulk actions | Fully Implemented | `MessagesScreenInteractionTest` covers tabs, search, channel filters, sort chips, pending row edit/approve/reject, reject confirmation, selection, approved revoke, failed retry, and approve/reject/retry bulk actions. |
 | F-012 | Wish preview, editing, feedback, regeneration | Fully Implemented | Add UI smoke evidence for variants, editing, approve/reject/test/regenerate. |
 | F-013 | Chat history | Fully Implemented | Add UI smoke evidence for contact history navigation. |
 | F-014 | Analytics and CSV export | Fully Implemented | Validate export/share workflow on device. |
