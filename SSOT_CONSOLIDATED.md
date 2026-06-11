@@ -156,7 +156,7 @@ RelateAI
 | F-009 | Event discovery | Backend Feature | Fully Implemented | 90% | Partially Tested | 95% |
 | F-010 | Manual and custom event creation | Core Feature | Fully Implemented | 90% | Partially Tested | 90% |
 | F-011 | Messages inbox and bulk actions | UI Feature | Fully Implemented | 95% | Partially Tested | 95% |
-| F-012 | Wish preview, editing, feedback, regeneration | Core Feature | Fully Implemented | 90% | Partially Tested | 95% |
+| F-012 | Wish preview, editing, feedback, regeneration | Core Feature | Fully Implemented | 95% | Partially Tested | 95% |
 | F-013 | Chat history | UI Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-014 | Analytics and CSV export | UI/Backend Feature | Fully Implemented | 85% | Partially Tested | 90% |
 | F-015 | Activity history and audit log | System Feature | Fully Implemented | 85% | Partially Tested | 90% |
@@ -359,8 +359,8 @@ RelateAI
 - Dependencies: AI service, scheduler service, notification service, message feedback repository, activity logging.
 - User workflow: User opens preview from notification, Messages, or deep link; selects/edits a variant; sends a test email if configured; approves or rejects. Edge cases include missing pending message, fallback AI text, wrong language feedback, and already-sent messages.
 - Current status: Fully Implemented.
-- Completion percentage: 90%.
-- Test coverage: Partially Tested by `WishPreviewViewModelTest`, regeneration tests, and test-send tests.
+- Completion percentage: 95%.
+- Test coverage: Partially Tested by `WishPreviewViewModelTest`, regeneration tests, test-send tests, and `WishPreviewScreenInteractionTest`; the Compose/Robolectric smoke covers back navigation, variant selection, draft editing, why-signals, feedback chips, regeneration, test-send, reject, approve, approved state, and missing-message error state. Live SMTP test-send remains tracked in `docs/UI_VALIDATION.md`.
 - Confidence score: 95%.
 
 ### F-013 Chat History

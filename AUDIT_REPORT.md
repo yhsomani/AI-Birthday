@@ -12,7 +12,8 @@
 * Added Home dashboard Compose/Robolectric interaction coverage for F-005: dashboard cards render from a populated state, settings/readiness/quick-action/planner links dispatch their callbacks, and sync-error retry/dismiss controls are clickable.
 * Added Contact List Compose/Robolectric interaction coverage for F-007: search/clear search, filter chips, sort chips, sync-error retry/dismiss refresh controls, and contact row navigation dispatch the expected callbacks.
 * Added Messages inbox Compose/Robolectric interaction coverage for F-011: tabs, search, channel filters, sort chips, pending row edit/approve/reject, reject confirmation, selection, approved revoke, failed retry, and approve/reject/retry bulk actions dispatch expected callbacks.
-* Completed full non-device validation with 249 unit tests, lint, debug assemble, JaCoCo report, and debug Android-test APK build using JDK 21.
+* Added Wish Preview Compose/Robolectric interaction coverage for F-012: back navigation, variant selection, draft editing, why-signals, feedback chips, regeneration, test-send, reject, approve, approved state, and missing-message error state dispatch or render as expected.
+* Completed full non-device validation with 251 unit tests, lint, debug assemble, JaCoCo report, and debug Android-test APK build using JDK 21.
 * Kept the existing single Gradle root project and active modules (`:app`, `:core:domain`, `:core:data`, `:core:ui`) instead of collapsing them into one module.
 * Migrated the inactive WhatsApp setup idea into the active app as an Automation Setup screen reachable from onboarding and settings.
 * Removed the inactive `feature/onboarding` source tree and updated steering docs so future work uses the active `app/src/main/java/com/example/ui` UI structure.

@@ -13,6 +13,7 @@
 - Added Home dashboard Compose/Robolectric interaction coverage for dashboard links, planner navigation, and sync-error retry/dismiss controls.
 - Added Contact List Compose/Robolectric interaction coverage for search, clear search, filters, sort, sync-error actions, and row navigation.
 - Added Messages inbox Compose/Robolectric interaction coverage for tabs, search, filters, sort, row actions, reject confirmation, selection, and approve/reject/retry bulk actions.
+- Added Wish Preview Compose/Robolectric interaction coverage for back navigation, variants, editing, why-signals, feedback, regeneration, test-send, approval, rejection, and terminal states.
 
 ### Changed
 - Notification backup reminder and AI fallback alert copy now uses localized string resources, and critical Hindi notification labels were refreshed.
@@ -22,8 +23,8 @@
 - Dispatch workers now defer approved sends that become due during quiet hours or blackout dates.
 
 ### Validation
-- Full local validation passes with 249 unit tests, lint, debug assemble, and JaCoCo report.
-- Debug Android-test APK build passes after the Messages UI refactor.
+- Full local validation passes with 251 unit tests, lint, debug assemble, and JaCoCo report.
+- Debug Android-test APK build passes after the Wish Preview UI refactor.
 - Connected UI smoke execution now targets the side-by-side debug package. Device `1b87b5db` installed and started the test run, but it stalled at 0/2 tests while another app was foregrounded; live UI validation needs an idle, unlocked device.
 
 ## [1.0.0] - 2026-06-08

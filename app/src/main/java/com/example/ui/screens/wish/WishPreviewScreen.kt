@@ -38,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,6 +54,7 @@ import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.feedback.asString
+import com.example.ui.viewmodel.WishPreviewUiState
 import com.example.ui.viewmodel.WishPreviewViewModel
 import com.example.ui.viewmodel.WhySignal
 
@@ -64,6 +66,20 @@ private val variantOptions = listOf(
     "funny" to R.string.wish_variant_funny,
     "emotional" to R.string.wish_variant_emotional,
 )
+
+internal object WishPreviewTestTags {
+    const val BACK_BUTTON = "wish_preview_back"
+    const val MESSAGE_FIELD = "wish_preview_message_field"
+    const val WHY_PANEL = "wish_preview_why_panel"
+    const val REGENERATE_BUTTON = "wish_preview_regenerate"
+    const val TEST_SEND_BUTTON = "wish_preview_test_send"
+    const val REJECT_BUTTON = "wish_preview_reject"
+    const val APPROVE_BUTTON = "wish_preview_approve"
+    const val APPROVED_MESSAGE = "wish_preview_approved_message"
+    const val ERROR_MESSAGE = "wish_preview_error_message"
+    const val VARIANT_PREFIX = "wish_preview_variant_"
+    const val FEEDBACK_PREFIX = "wish_preview_feedback_"
+}
 
 @Composable
 fun WishPreviewScreen(
@@ -107,6 +123,33 @@ fun WishPreviewScreen(
         }
     }
 
+    WishPreviewScreenContent(
+        state = state,
+        snackbarHostState = snackbarHostState,
+        onBack = onBack,
+        onVariantSelected = viewModel::selectVariant,
+        onEditedTextChange = viewModel::updateEditedText,
+        onFeedbackSelected = viewModel::submitFeedback,
+        onRegenerate = viewModel::regenerate,
+        onSendTest = viewModel::sendTestToMyself,
+        onReject = viewModel::reject,
+        onApprove = viewModel::approve,
+    )
+}
+
+@Composable
+internal fun WishPreviewScreenContent(
+    state: WishPreviewUiState,
+    snackbarHostState: SnackbarHostState,
+    onBack: () -> Unit = {},
+    onVariantSelected: (String) -> Unit = {},
+    onEditedTextChange: (String) -> Unit = {},
+    onFeedbackSelected: (String) -> Unit = {},
+    onRegenerate: () -> Unit = {},
+    onSendTest: () -> Unit = {},
+    onReject: () -> Unit = {},
+    onApprove: () -> Unit = {},
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -122,7 +165,10 @@ fun WishPreviewScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBack) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.testTag(WishPreviewTestTags.BACK_BUTTON),
+                ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.back),
@@ -153,12 +199,19 @@ fun WishPreviewScreen(
                         text = stringResource(state.errorMessageRes ?: R.string.wish_preview_error_unknown),
                         color = RelateOnSurfaceVariant,
                         style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.testTag(WishPreviewTestTags.ERROR_MESSAGE),
                     )
                 }
             } else {
                 WishPreviewContent(
                     state = state,
-                    viewModel = viewModel,
+                    onVariantSelected = onVariantSelected,
+                    onEditedTextChange = onEditedTextChange,
+                    onFeedbackSelected = onFeedbackSelected,
+                    onRegenerate = onRegenerate,
+                    onSendTest = onSendTest,
+                    onReject = onReject,
+                    onApprove = onApprove,
                 )
             }
         }
@@ -173,9 +226,15 @@ fun WishPreviewScreen(
 }
 
 @Composable
-private fun WishPreviewContent(
-    state: com.example.ui.viewmodel.WishPreviewUiState,
-    viewModel: WishPreviewViewModel,
+internal fun WishPreviewContent(
+    state: WishPreviewUiState,
+    onVariantSelected: (String) -> Unit = {},
+    onEditedTextChange: (String) -> Unit = {},
+    onFeedbackSelected: (String) -> Unit = {},
+    onRegenerate: () -> Unit = {},
+    onSendTest: () -> Unit = {},
+    onReject: () -> Unit = {},
+    onApprove: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -197,7 +256,8 @@ private fun WishPreviewContent(
                 ToneChip(
                     label = stringResource(labelRes),
                     isSelected = state.selectedVariant == key,
-                    onClick = { viewModel.selectVariant(key) },
+                    onClick = { onVariantSelected(key) },
+                    modifier = Modifier.testTag(WishPreviewTestTags.VARIANT_PREFIX + key),
                 )
             }
         }
@@ -210,7 +270,8 @@ private fun WishPreviewContent(
                 ToneChip(
                     label = stringResource(labelRes),
                     isSelected = state.selectedVariant == key,
-                    onClick = { viewModel.selectVariant(key) },
+                    onClick = { onVariantSelected(key) },
+                    modifier = Modifier.testTag(WishPreviewTestTags.VARIANT_PREFIX + key),
                 )
             }
         }
@@ -225,10 +286,11 @@ private fun WishPreviewContent(
                 RelateGlassCard {
                     OutlinedTextField(
                         value = state.editedText,
-                        onValueChange = { viewModel.updateEditedText(it) },
+                        onValueChange = onEditedTextChange,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp),
+                            .padding(8.dp)
+                            .testTag(WishPreviewTestTags.MESSAGE_FIELD),
                         textStyle = MaterialTheme.typography.bodyLarge,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = RelatePrimary,
@@ -263,7 +325,10 @@ private fun WishPreviewContent(
 
                 if (state.whySignals.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
-                    WhyThisMessagePanel(signals = state.whySignals)
+                    WhyThisMessagePanel(
+                        signals = state.whySignals,
+                        modifier = Modifier.testTag(WishPreviewTestTags.WHY_PANEL),
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -282,8 +347,10 @@ private fun WishPreviewContent(
                             FeedbackChip(
                                 label = stringResource(option.labelRes),
                                 isSelected = state.selectedFeedbackKey == option.key,
-                                onClick = { viewModel.submitFeedback(option.key) },
-                                modifier = Modifier.weight(1f),
+                                onClick = { onFeedbackSelected(option.key) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag(WishPreviewTestTags.FEEDBACK_PREFIX + option.key),
                             )
                         }
                         if (rowOptions.size == 1) {
@@ -302,8 +369,10 @@ private fun WishPreviewContent(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = { viewModel.regenerate() },
-                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onRegenerate,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(WishPreviewTestTags.REGENERATE_BUTTON),
                     enabled = !state.isRegenerating && !state.isApproving && !state.isRejecting && !state.isTestingSend,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -333,8 +402,10 @@ private fun WishPreviewContent(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
-                    onClick = { viewModel.sendTestToMyself() },
-                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onSendTest,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(WishPreviewTestTags.TEST_SEND_BUTTON),
                     enabled = !state.isTestingSend && !state.isRegenerating && !state.isApproving && !state.isRejecting,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -369,10 +440,11 @@ private fun WishPreviewContent(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Button(
-                            onClick = { viewModel.reject() },
+                            onClick = onReject,
                             modifier = Modifier
                                 .weight(1f)
-                                .height(52.dp),
+                                .height(52.dp)
+                                .testTag(WishPreviewTestTags.REJECT_BUTTON),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = RelateSurfaceVariant,
@@ -395,8 +467,10 @@ private fun WishPreviewContent(
                         }
                         RelatePrimaryButton(
                             text = stringResource(R.string.wish_preview_approve_schedule),
-                            onClick = { viewModel.approve() },
-                            modifier = Modifier.weight(1f),
+                            onClick = onApprove,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag(WishPreviewTestTags.APPROVE_BUTTON),
                         )
                     }
                 } else if (state.approved) {
@@ -405,6 +479,7 @@ private fun WishPreviewContent(
                         style = MaterialTheme.typography.bodyLarge,
                         color = RelatePrimary,
                         fontWeight = FontWeight.Medium,
+                        modifier = Modifier.testTag(WishPreviewTestTags.APPROVED_MESSAGE),
                     )
                 }
 
@@ -451,8 +526,11 @@ private fun FeedbackChip(
 }
 
 @Composable
-private fun WhyThisMessagePanel(signals: List<WhySignal>) {
-    RelateGlassCard {
+private fun WhyThisMessagePanel(
+    signals: List<WhySignal>,
+    modifier: Modifier = Modifier,
+) {
+    RelateGlassCard(modifier = modifier) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -494,9 +572,10 @@ private fun ToneChip(
     label: String,
     isSelected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .clickable(onClick = onClick)
             .background(
                 color = if (isSelected) RelatePrimary else RelateSurfaceVariant,
