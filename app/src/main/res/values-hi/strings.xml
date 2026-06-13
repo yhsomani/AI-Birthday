@@ -52,6 +52,8 @@
     <string name="memory_vault_pin_note">Note pin करें</string>
     <string name="memory_vault_unpin_note">Note unpin करें</string>
     <string name="memory_vault_delete_note">Note delete करें</string>
+    <string name="memory_vault_delete_confirm_title">Memory delete करें</string>
+    <string name="memory_vault_delete_confirm_message">क्या आप वाकई इस memory को delete करना चाहते हैं? यह कार्रवाई पहले जैसी नहीं की जा सकती।</string>
     <string name="memory_category_general">General</string>
     <string name="memory_category_preference">Preference</string>
     <string name="memory_category_event">Event</string>
