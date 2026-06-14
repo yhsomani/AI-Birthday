@@ -748,4 +748,6 @@
     <string name="personalization_quality_interests">Interests or hobbies added</string>
     <string name="personalization_quality_memory_notes">Personal notes or memory context added</string>
     <string name="personalization_quality_channel">Preferred channel selected</string>
+    <string name="memory_vault_delete_confirm_title">Delete Memory?</string>
+    <string name="memory_vault_delete_confirm_body">Are you sure you want to delete this memory? This action cannot be undone.</string>
 </resources>

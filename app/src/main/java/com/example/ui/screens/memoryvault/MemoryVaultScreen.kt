@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.surfaceColorAtElevation
@@ -86,6 +88,7 @@ fun MemoryVaultScreen(
 
     var newNoteText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(MemoryVaultViewModel.CATEGORY_GENERAL) }
+    var itemToDelete by remember { mutableStateOf<MemoryNoteEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -172,12 +175,35 @@ fun MemoryVaultScreen(
                             note = note,
                             date = dateFormat.format(Date(note.dateMs)),
                             onTogglePin = { viewModel.togglePin(note) },
-                            onDelete = { viewModel.deleteNote(note) },
+                            onDelete = { itemToDelete = note },
                         )
                     }
                 }
             }
         }
+    }
+
+    itemToDelete?.let { note ->
+        AlertDialog(
+            onDismissRequest = { itemToDelete = null },
+            title = { Text(stringResource(R.string.memory_vault_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.memory_vault_delete_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteNote(note)
+                        itemToDelete = null
+                    }
+                ) {
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { itemToDelete = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 }
 
