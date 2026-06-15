@@ -42,8 +42,8 @@ class PromptBuilder {
 
     private fun sanitizeNotes(notes: String): String {
         var sanitized = notes
-        sanitized = sanitized.replace(Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"), "[EMAIL]")
-        sanitized = sanitized.replace(Regex("\\+?\\d{1,4}?[-.\\s]?\\(?\\d{1,3}?\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}"), "[PHONE]")
+        sanitized = sanitized.replace(EMAIL_PATTERN, "[EMAIL]")
+        sanitized = sanitized.replace(PHONE_PATTERN, "[PHONE]")
         return sanitized
     }
 
@@ -299,5 +299,10 @@ class PromptBuilder {
             appendLine("  }")
             append("]")
         }
+    }
+
+    companion object {
+        private val EMAIL_PATTERN = Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")
+        private val PHONE_PATTERN = Regex("\\+?\\d{1,4}?[-.\\s]?\\(?\\d{1,3}?\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}")
     }
 }
