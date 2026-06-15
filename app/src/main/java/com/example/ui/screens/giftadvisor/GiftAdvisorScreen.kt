@@ -391,6 +391,7 @@ private fun GiftHistoryCard(
     gift: GiftHistoryEntity,
     onDelete: () -> Unit,
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = RelateCard),
@@ -434,7 +435,7 @@ private fun GiftHistoryCard(
                         modifier = Modifier.padding(horizontal = 8.dp),
                     )
                     GiftFeedbackIcon(receivedWell = gift.receivedWell)
-                    IconButton(onClick = onDelete) {
+                    IconButton(onClick = { showDeleteConfirm = true }) {
                         Icon(
                             imageVector = Icons.Filled.Delete,
                             contentDescription = stringResource(R.string.gift_delete_record, gift.giftName),
@@ -452,6 +453,29 @@ private fun GiftHistoryCard(
                 )
             }
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text(text = stringResource(R.string.gift_delete_confirm_title)) },
+            text = { Text(text = stringResource(R.string.gift_delete_confirm_text, gift.giftName)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDelete()
+                    }
+                ) {
+                    Text(text = stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text(text = stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 }
 
