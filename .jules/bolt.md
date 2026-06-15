@@ -22,3 +22,6 @@
 ## 2026-06-09 - Compose List Performance without Keys
 **Learning:** For dynamic lists such as chat histories or generated items, omitting the `key` parameter in `LazyColumn.items` can cause unnecessary UI recompositions. This is specifically relevant when updates occur frequently or lists grow long.
 **Action:** Always provide stable `key` closures in `LazyColumn` and `LazyRow` items blocks using unique Entity IDs.
+## 2026-06-15 - Pre-compile Regex patterns
+**Learning:** Instantiating `Regex` objects inside loops or frequently called functions causes unnecessary compilation overhead.
+**Action:** Always extract `Regex` patterns to `companion object`s or class properties to reuse the compiled pattern.
