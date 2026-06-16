@@ -749,4 +749,6 @@
     <string name="personalization_quality_interests">Interests या hobbies जोड़े गए</string>
     <string name="personalization_quality_memory_notes">Personal notes या memory context जोड़ा गया</string>
     <string name="personalization_quality_channel">Preferred channel selected</string>
+    <string name="memory_vault_delete_confirm_title">नोट हटाएं</string>
+    <string name="memory_vault_delete_confirm_text">क्या आप वाकई इस मेमोरी नोट को हटाना चाहते हैं?</string>
 </resources>
