@@ -23,4 +23,10 @@ class DatabaseKeyDerivationTest {
         assertNull(DatabaseKeyDerivation.decodeStoredKeyHex("00ff"))
         assertNull(DatabaseKeyDerivation.decodeStoredKeyHex("z".repeat(64)))
     }
+
+    @Test
+    fun computeKeyFromScratch_generatesValidKeyLength() {
+        val key = DatabaseKeyDerivation.computeKeyFromScratch()
+        assertEquals(32, key.size)
+    }
 }
