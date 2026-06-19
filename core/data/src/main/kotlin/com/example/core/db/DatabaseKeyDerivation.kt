@@ -2,8 +2,6 @@ package com.example.core.db
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
-import android.provider.Settings
 import android.util.Base64
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -12,12 +10,9 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
-import java.security.MessageDigest
-import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.PBEKeySpec
 
 object DatabaseKeyDerivation {
-    private const val ITERATIONS = 65536
+    private const val KEY_LENGTH_BYTES = 32
     private const val KEY_LENGTH = 256
     private const val TAG = "DatabaseKeyDerivation"
     private const val PREFS_NAME = "relateai_db_meta_secure"
@@ -52,7 +47,7 @@ object DatabaseKeyDerivation {
             prefs.edit().remove(PREF_DB_KEY).apply()
         }
 
-        val derived = computeKeyFromScratch(context)
+        val derived = computeKeyFromScratch()
         prefs.edit()
             .putString(PREF_DB_KEY, byteArrayToHex(derived))
             .apply()
@@ -60,56 +55,14 @@ object DatabaseKeyDerivation {
         return derived
     }
 
-    private fun computeKeyFromScratch(context: Context): ByteArray {
-        val androidId = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ANDROID_ID
-        ) ?: java.util.UUID.randomUUID().toString()
-
-        val appSignatureHash = getAppCertificateHash(context)
-        val keyMaterial = "$androidId:$appSignatureHash:relateai_v2"
-
-        val salt = androidId.take(16).toByteArray(Charsets.UTF_8)
-        val spec = PBEKeySpec(
-            keyMaterial.toCharArray(),
-            salt,
-            ITERATIONS,
-            KEY_LENGTH
-        )
-
-        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val secret = factory.generateSecret(spec)
-        return secret.encoded
+    internal fun computeKeyFromScratch(): ByteArray {
+        val random = java.security.SecureRandom()
+        val secret = ByteArray(KEY_LENGTH_BYTES)
+        random.nextBytes(secret)
+        return secret
     }
 
-    private fun getAppCertificateHash(context: Context): String {
-        return try {
-            val info = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                context.packageManager.getPackageInfo(
-                    context.packageName,
-                    PackageManager.GET_SIGNING_CERTIFICATES
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
-            }
 
-            val signatures = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                info.signingInfo?.apkContentsSigners
-            } else {
-                @Suppress("DEPRECATION")
-                info.signatures
-            }
-
-            signatures?.firstOrNull()?.let { signature ->
-                val md = MessageDigest.getInstance("SHA-256")
-                val digest = md.digest(signature.toByteArray())
-                Base64.encodeToString(digest, Base64.NO_WRAP)
-            } ?: "fallback"
-        } catch (e: Exception) {
-            "fallback"
-        }
-    }
 
     fun deriveKeyString(context: Context): String {
         val keyBytes = deriveKey(context)
