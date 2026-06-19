@@ -87,6 +87,7 @@ fun GiftAdvisorScreen(
     var approxCost by remember { mutableStateOf("") }
     var receivedWellState by remember { mutableStateOf<Boolean?>(null) }
     var giftNotes by remember { mutableStateOf("") }
+    var itemToDelete by remember { mutableStateOf<GiftHistoryEntity?>(null) }
     var attemptedSubmit by remember { mutableStateOf(false) }
 
     fun resetGiftForm() {
@@ -199,12 +200,35 @@ fun GiftAdvisorScreen(
                     items(uiState.giftHistory, key = { it.id }) { gift ->
                         GiftHistoryCard(
                             gift = gift,
-                            onDelete = { viewModel.deleteGiftRecord(gift) },
+                            onDelete = { itemToDelete = gift },
                         )
                     }
                 }
             }
         }
+    }
+
+    itemToDelete?.let { gift ->
+        AlertDialog(
+            onDismissRequest = { itemToDelete = null },
+            title = { Text(stringResource(R.string.confirm_delete_title)) },
+            text = { Text(stringResource(R.string.confirm_delete_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteGiftRecord(gift)
+                        itemToDelete = null
+                    }
+                ) {
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { itemToDelete = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 
     if (showAddDialog) {

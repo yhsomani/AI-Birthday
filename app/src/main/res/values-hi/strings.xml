@@ -391,6 +391,8 @@
     <string name="save">सहेजें</string>
     <string name="saved">सेव हो गया</string>
     <string name="cancel">रद्द करें</string>
+    <string name="confirm_delete_title">हटाने की पुष्टि करें</string>
+    <string name="confirm_delete_message">क्या आप वाकई इस आइटम को हटाना चाहते हैं? इस क्रिया को पूर्ववत नहीं किया जा सकता है।</string>
     <string name="search">खोजें</string>
     <string name="sync">सिंक</string>
     <string name="approve">स्वीकार करें</string>
