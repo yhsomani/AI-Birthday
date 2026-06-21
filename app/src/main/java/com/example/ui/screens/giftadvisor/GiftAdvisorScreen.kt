@@ -81,6 +81,7 @@ fun GiftAdvisorScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var giftToDelete by remember { mutableStateOf<GiftHistoryEntity?>(null) }
     var giftName by remember { mutableStateOf("") }
     var giftCategory by remember { mutableStateOf("") }
     var occasionType by remember { mutableStateOf("") }
@@ -199,12 +200,35 @@ fun GiftAdvisorScreen(
                     items(uiState.giftHistory, key = { it.id }) { gift ->
                         GiftHistoryCard(
                             gift = gift,
-                            onDelete = { viewModel.deleteGiftRecord(gift) },
+                            onDelete = { giftToDelete = gift },
                         )
                     }
                 }
             }
         }
+    }
+
+    if (giftToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { giftToDelete = null },
+            title = { Text(text = stringResource(R.string.gift_delete_confirm_title)) },
+            text = { Text(text = stringResource(R.string.gift_delete_confirm_message, giftToDelete!!.giftName)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteGiftRecord(giftToDelete!!)
+                        giftToDelete = null
+                    }
+                ) {
+                    Text(text = stringResource(R.string.delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { giftToDelete = null }) {
+                    Text(text = stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 
     if (showAddDialog) {
