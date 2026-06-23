@@ -22,6 +22,13 @@ class StyleAnalysisUseCase @Inject constructor(
         return true
     }
 
+    companion object {
+        // Bolt: Extracting Regex to companion object to prevent recompilation in loops
+        private val PUNCTUATION_REGEX = Regex("[^a-zA-Z0-9\\s\u0900-\u097F]")
+        private val WHITESPACE_REGEX = Regex("\\s+")
+        private val NON_ALPHANUMERIC_REGEX = Regex("[^a-zA-Z0-9]")
+    }
+
     suspend fun analyzeAndSave(texts: List<String>, source: String) {
         if (texts.isEmpty()) return
 
@@ -49,7 +56,7 @@ class StyleAnalysisUseCase @Inject constructor(
         // 4. Identify common bi-grams (phrases)
         val bigrams = mutableListOf<String>()
         texts.forEach { text ->
-            val words = text.lowercase().replace(Regex("[^a-zA-Z0-9\\s\u0900-\u097F]"), "").split(Regex("\\s+")).filter { it.length > 2 }
+            val words = text.lowercase().replace(PUNCTUATION_REGEX, "").split(WHITESPACE_REGEX).filter { it.length > 2 }
             for (i in 0 until words.size - 1) {
                 bigrams.add("${words[i]} ${words[i+1]}")
             }
@@ -62,7 +69,7 @@ class StyleAnalysisUseCase @Inject constructor(
 
         // 5. Common greetings and closings
         val greetings = texts.mapNotNull { text ->
-            val words = text.trim().split(Regex("\\s+"))
+            val words = text.trim().split(WHITESPACE_REGEX)
             if (words.isNotEmpty()) words.take(2).joinToString(" ") else null
         }
         val topGreetings = greetings.groupBy { it.lowercase() }
@@ -72,7 +79,7 @@ class StyleAnalysisUseCase @Inject constructor(
             .map { entry -> greetings.first { it.lowercase() == entry.key } }
 
         val closings = texts.mapNotNull { text ->
-            val words = text.trim().split(Regex("\\s+"))
+            val words = text.trim().split(WHITESPACE_REGEX)
             if (words.isNotEmpty()) words.takeLast(2).joinToString(" ") else null
         }
         val topClosings = closings.groupBy { it.lowercase() }
@@ -169,8 +176,8 @@ class StyleAnalysisUseCase @Inject constructor(
     private fun findCommonPhrases(texts: List<String>): List<String> {
         val wordFreq = mutableMapOf<String, Int>()
         texts.forEach { text ->
-            text.lowercase().split(Regex("\\s+")).distinct().forEach { word ->
-                val cleanWord = word.replace(Regex("[^a-zA-Z0-9]"), "")
+            text.lowercase().split(WHITESPACE_REGEX).distinct().forEach { word ->
+                val cleanWord = word.replace(NON_ALPHANUMERIC_REGEX, "")
                 if (cleanWord.length > 3) {
                     wordFreq[cleanWord] = wordFreq.getOrDefault(cleanWord, 0) + 1
                 }
