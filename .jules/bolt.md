@@ -22,3 +22,7 @@
 ## 2026-06-09 - Compose List Performance without Keys
 **Learning:** For dynamic lists such as chat histories or generated items, omitting the `key` parameter in `LazyColumn.items` can cause unnecessary UI recompositions. This is specifically relevant when updates occur frequently or lists grow long.
 **Action:** Always provide stable `key` closures in `LazyColumn` and `LazyRow` items blocks using unique Entity IDs.
+
+## 2024-07-25 - Avoid O(N) object allocations in groupBy during recomposition
+**Learning:** Instantiating new objects (e.g., `Calendar.getInstance()`) inside high-frequency lambda loops like `groupBy` within a Composable causes unnecessary GC pressure. Furthermore, failing to `remember` the result of a grouping calculation means it executes on every recomposition.
+**Action:** Extract heavy object instantiations outside of iteration loops, mutating a single instance where thread safety isn't an issue, and wrap expensive data transformation operations in a `remember` block to tie them to the composable lifecycle rather than frame paints.

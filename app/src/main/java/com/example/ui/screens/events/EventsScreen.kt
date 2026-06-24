@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -240,10 +241,14 @@ fun EventsScreen(
 
 @Composable
 private fun EventsList(events: List<EventEntity>) {
-    val groupedEvents = events.groupBy {
+    // ⚡ Bolt: Memoize the grouping to avoid recalculation on every recomposition.
+    // Reuse a single Calendar instance to prevent O(N) object allocations during grouping.
+    val groupedEvents = remember(events) {
         val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = it.nextOccurrenceMs
-        cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+        events.groupBy {
+            cal.timeInMillis = it.nextOccurrenceMs
+            cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+        }
     }
 
     LazyColumn(
@@ -254,10 +259,12 @@ private fun EventsList(events: List<EventEntity>) {
             item(key = month) {
                 SectionHeader(title = month)
             }
-            monthEvents.forEach { event ->
-                item(key = event.id) {
-                    EventCard(event = event)
-                }
+            // ⚡ Bolt: Use items() instead of forEach { item { ... } } for better LazyColumn performance
+            items(
+                items = monthEvents,
+                key = { it.id }
+            ) { event ->
+                EventCard(event = event)
             }
         }
         item { Spacer(modifier = Modifier.height(24.dp)) }
