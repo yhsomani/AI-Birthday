@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -302,6 +303,13 @@ internal fun WishPreviewContent(
                         ),
                         minLines = 4,
                         maxLines = 8,
+                        trailingIcon = {
+                            if (state.editedText.isNotEmpty()) {
+                                IconButton(onClick = { onEditedTextChange("") }) {
+                                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.clear_text), tint = RelateOnSurfaceVariant)
+                                }
+                            }
+                        },
                     )
                 }
 

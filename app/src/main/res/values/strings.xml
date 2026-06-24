@@ -521,6 +521,7 @@
     <string name="retry">Retry</string>
     <string name="avatar">Avatar</string>
     <string name="clear_search">Clear search</string>
+    <string name="clear_text">Clear text</string>
     <string name="days">days</string>
 
     <!-- Home -->
