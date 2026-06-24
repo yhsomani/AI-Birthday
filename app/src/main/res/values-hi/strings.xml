@@ -522,6 +522,7 @@
     <string name="retry">फिर कोशिश करें</string>
     <string name="avatar">अवतार</string>
     <string name="clear_search">खोज साफ करें</string>
+    <string name="clear_text">पाठ साफ करें</string>
     <string name="days">दिन</string>
 
     <!-- Home -->
