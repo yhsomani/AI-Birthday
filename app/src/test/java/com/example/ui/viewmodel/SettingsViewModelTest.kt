@@ -56,8 +56,11 @@ class SettingsViewModelTest {
         every { securePrefs.getChannelBlackout() } returns "[]"
         every { securePrefs.isBiometricLockEnabled() } returns false
         every { securePrefs.wasLegacyUnencryptedDbQuarantined() } returns false
+        every { securePrefs.getLastBackupMs() } returns 0L
         every { context.getString(R.string.settings_last_sync_never) } returns "Never"
         every { context.getString(R.string.settings_last_sync_just_now) } returns "Just now"
+        every { context.getString(R.string.settings_last_backup_today) } returns "Today"
+        every { context.getString(R.string.settings_last_backup_yesterday) } returns "Yesterday"
         every { context.getString(R.string.settings_sync_contacts_failed) } returns "Contact sync failed."
     }
 
@@ -97,6 +100,21 @@ class SettingsViewModelTest {
 
         assertFalse(viewModel.uiState.value.isSyncing)
         assertEquals("Just now", viewModel.uiState.value.lastSyncTimestamp)
+    }
+
+    @Test
+    fun `init shows no backup freshness when backup has never run`() = runTest(testDispatcher) {
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+
+        assertEquals("Never", viewModel.uiState.value.lastBackupTimestamp)
+    }
+
+    @Test
+    fun `init shows today for fresh backup timestamp`() = runTest(testDispatcher) {
+        every { securePrefs.getLastBackupMs() } returns System.currentTimeMillis()
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+
+        assertEquals("Today", viewModel.uiState.value.lastBackupTimestamp)
     }
 
     @Test

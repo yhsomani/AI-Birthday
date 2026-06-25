@@ -28,7 +28,19 @@ data class RelationshipPlannerItem(
     val title: String,
     val detail: String,
     val contactId: String? = null,
+    val destination: HomeActionDestination = HomeActionDestination.CONTACT_DETAIL,
 )
+
+enum class HomeActionDestination {
+    AUTOMATION_SETUP,
+    CONTACT_DETAIL,
+    MESSAGES,
+}
+
+enum class HomeReadinessAction {
+    AUTOMATION_SETUP,
+    MESSAGES,
+}
 
 data class HomeUiState(
     val userName: String = "User",
@@ -44,6 +56,7 @@ data class HomeUiState(
     val syncError: String? = null,
     val readinessTitle: String? = null,
     val readinessDetail: String? = null,
+    val readinessAction: HomeReadinessAction? = null,
     val plannerItems: List<RelationshipPlannerItem> = emptyList(),
 )
 
@@ -136,6 +149,7 @@ class HomeViewModel @Inject constructor(
             items += RelationshipPlannerItem(
                 title = "Review pending wishes",
                 detail = "$pendingCount approval(s) are waiting before send time.",
+                destination = HomeActionDestination.MESSAGES,
             )
         }
         atRiskContacts.forEach { contact ->
@@ -160,16 +174,23 @@ class HomeViewModel @Inject constructor(
             syncError != null -> copy(
                 readinessTitle = "Setup needs attention",
                 readinessDetail = "Contact sync is reporting an issue. Open AI Doctor for the exact fix.",
+                readinessAction = HomeReadinessAction.AUTOMATION_SETUP,
             )
             contactCount == 0 -> copy(
                 readinessTitle = "Sync contacts to start",
                 readinessDetail = "RelateAI needs contacts before it can discover events or personalize wishes.",
+                readinessAction = HomeReadinessAction.AUTOMATION_SETUP,
             )
             pendingCount > 0 -> copy(
                 readinessTitle = "Approvals waiting",
                 readinessDetail = "$pendingCount message(s) need review before they can send.",
+                readinessAction = HomeReadinessAction.MESSAGES,
             )
-            else -> copy(readinessTitle = null, readinessDetail = null)
+            else -> copy(
+                readinessTitle = null,
+                readinessDetail = null,
+                readinessAction = null,
+            )
         }
     }
 

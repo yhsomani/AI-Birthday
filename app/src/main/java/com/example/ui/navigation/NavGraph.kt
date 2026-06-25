@@ -140,6 +140,9 @@ fun RelateNavGraph(
                 onNavigateToAutomationSetup = {
                     navController.navigate(Screen.AutomationSetup.route)
                 },
+                onNavigateToMessages = {
+                    navController.navigate(Screen.Messages.route)
+                },
             )
         }
         composable(Screen.ContactList.route) {

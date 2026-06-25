@@ -427,7 +427,10 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Icons.Filled.Storage,
                         title = stringResource(R.string.backup_restore_title),
-                        subtitle = stringResource(R.string.settings_backup_restore_subtitle),
+                        subtitle = stringResource(
+                            R.string.settings_backup_restore_subtitle_with_status,
+                            state.lastBackupTimestamp,
+                        ),
                         onClick = onNavigateToBackupRestore
                     )
                     SettingsDivider()

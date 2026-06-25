@@ -473,6 +473,7 @@
     <string name="settings_last_synced_format">Last synced: %1$s</string>
     <string name="settings_sync_contacts">Sync Contacts</string>
     <string name="settings_backup_restore_subtitle">Encrypted database import and export</string>
+    <string name="settings_backup_restore_subtitle_with_status">Encrypted database import and export. Last backup: %1$s</string>
 
     <!-- Backup & restore -->
     <string name="backup_restore_title">Backup &amp; Restore</string>
@@ -719,6 +720,9 @@
     <string name="settings_channel_blackout_saved">Channel preferences saved.</string>
     <string name="settings_last_sync_never">Never</string>
     <string name="settings_last_sync_just_now">Just now</string>
+    <string name="settings_last_backup_today">Today</string>
+    <string name="settings_last_backup_yesterday">Yesterday</string>
+    <string name="settings_last_backup_days_ago">%1$d days ago</string>
     <string name="settings_sync_contacts_success">Contacts synced.</string>
     <string name="settings_sync_contacts_failed">Failed to sync contacts.</string>
     <string name="wish_preview_send_test">Send test to myself</string>

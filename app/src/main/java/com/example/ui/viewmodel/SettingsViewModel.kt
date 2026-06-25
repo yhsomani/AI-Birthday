@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -29,6 +30,7 @@ data class SettingsUiState(
     val contactSyncEnabled: Boolean = true,
     val isSyncing: Boolean = false,
     val lastSyncTimestamp: String = "Never",
+    val lastBackupTimestamp: String = "Never",
     // AI configuration
     val geminiApiKey: String = "",
     val geminiApiKeySaved: Boolean = false,
@@ -67,6 +69,7 @@ class SettingsViewModel @Inject constructor(
             senderEmailPassword = securePrefs.getSenderEmailPassword(),
             automationMode = securePrefs.getGlobalAutomationMode(),
             lastSyncTimestamp = appContext.getString(R.string.settings_last_sync_never),
+            lastBackupTimestamp = formatLastBackupTimestamp(securePrefs.getLastBackupMs()),
             quietHoursStart = securePrefs.getQuietHoursStart().toString(),
             quietHoursEnd = securePrefs.getQuietHoursEnd().toString(),
             biometricLockEnabled = securePrefs.isBiometricLockEnabled(),
@@ -279,5 +282,19 @@ class SettingsViewModel @Inject constructor(
 
     private fun Set<String>.toJsonArray(): String {
         return org.json.JSONArray(toList().sorted()).toString()
+    }
+
+    private fun formatLastBackupTimestamp(timestampMs: Long): String {
+        if (timestampMs <= 0L) {
+            return appContext.getString(R.string.settings_last_sync_never)
+        }
+
+        val ageMs = (System.currentTimeMillis() - timestampMs).coerceAtLeast(0L)
+        val ageDays = TimeUnit.MILLISECONDS.toDays(ageMs)
+        return when {
+            ageDays == 0L -> appContext.getString(R.string.settings_last_backup_today)
+            ageDays == 1L -> appContext.getString(R.string.settings_last_backup_yesterday)
+            else -> appContext.getString(R.string.settings_last_backup_days_ago, ageDays)
+        }
     }
 }

@@ -474,6 +474,7 @@
     <string name="settings_last_synced_format">आखिरी सिंक: %1$s</string>
     <string name="settings_sync_contacts">संपर्क सिंक करें</string>
     <string name="settings_backup_restore_subtitle">एन्क्रिप्टेड डेटाबेस आयात और निर्यात</string>
+    <string name="settings_backup_restore_subtitle_with_status">एन्क्रिप्टेड डेटाबेस आयात और निर्यात। आखिरी बैकअप: %1$s</string>
 
     <!-- Backup & restore -->
     <string name="backup_restore_title">बैकअप और रिस्टोर</string>
@@ -720,6 +721,9 @@
     <string name="settings_channel_blackout_saved">Channel preferences saved.</string>
     <string name="settings_last_sync_never">कभी नहीं</string>
     <string name="settings_last_sync_just_now">अभी</string>
+    <string name="settings_last_backup_today">आज</string>
+    <string name="settings_last_backup_yesterday">कल</string>
+    <string name="settings_last_backup_days_ago">%1$d दिन पहले</string>
     <string name="settings_sync_contacts_success">Contacts synced.</string>
     <string name="settings_sync_contacts_failed">Contacts sync failed.</string>
     <string name="wish_preview_send_test">खुद को test भेजें</string>

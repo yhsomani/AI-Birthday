@@ -55,6 +55,8 @@ import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.ui.components.SyncErrorCard
+import com.example.ui.viewmodel.HomeActionDestination
+import com.example.ui.viewmodel.HomeReadinessAction
 import com.example.ui.viewmodel.HomeUiState
 import com.example.ui.viewmodel.HomeViewModel
 import com.example.ui.viewmodel.RelationshipPlannerItem
@@ -79,6 +81,7 @@ fun HomeScreen(
     onNavigateToStyleCoach: () -> Unit = {},
     onNavigateToBackupRestore: () -> Unit = {},
     onNavigateToAutomationSetup: () -> Unit = {},
+    onNavigateToMessages: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,6 +94,7 @@ fun HomeScreen(
         onNavigateToStyleCoach = onNavigateToStyleCoach,
         onNavigateToBackupRestore = onNavigateToBackupRestore,
         onNavigateToAutomationSetup = onNavigateToAutomationSetup,
+        onNavigateToMessages = onNavigateToMessages,
         onRetrySync = { viewModel.loadMetrics() },
         onDismissSyncError = { viewModel.dismissSyncError() },
     )
@@ -106,6 +110,7 @@ internal fun HomeContent(
     onNavigateToStyleCoach: () -> Unit = {},
     onNavigateToBackupRestore: () -> Unit = {},
     onNavigateToAutomationSetup: () -> Unit = {},
+    onNavigateToMessages: () -> Unit = {},
     onRetrySync: () -> Unit = {},
     onDismissSyncError: () -> Unit = {},
 ) {
@@ -172,7 +177,13 @@ internal fun HomeContent(
                 ReadinessBanner(
                     title = readinessTitle,
                     detail = readinessDetail,
-                    onClick = onNavigateToAutomationSetup,
+                    onClick = {
+                        when (state.readinessAction) {
+                            HomeReadinessAction.MESSAGES -> onNavigateToMessages()
+                            HomeReadinessAction.AUTOMATION_SETUP,
+                            null -> onNavigateToAutomationSetup()
+                        }
+                    },
                     modifier = Modifier.testTag(HomeScreenTestTags.READINESS_BANNER),
                 )
             }
@@ -298,11 +309,18 @@ internal fun HomeContent(
                         PlannerItemCard(
                             item = item,
                             onClick = {
-                                item.contactId?.let(onNavigateToContact)
-                                    ?: onNavigateToAutomationSetup()
+                                when (item.destination) {
+                                    HomeActionDestination.CONTACT_DETAIL ->
+                                        item.contactId?.let(onNavigateToContact)
+                                            ?: onNavigateToAutomationSetup()
+                                    HomeActionDestination.MESSAGES -> onNavigateToMessages()
+                                    HomeActionDestination.AUTOMATION_SETUP -> onNavigateToAutomationSetup()
+                                }
                             },
                             modifier = Modifier.testTag(
-                                HomeScreenTestTags.PLANNER_ITEM_PREFIX + (item.contactId ?: "setup")
+                                HomeScreenTestTags.PLANNER_ITEM_PREFIX + (
+                                    item.contactId ?: item.destination.name.lowercase()
+                                )
                             ),
                         )
                     }
