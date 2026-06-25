@@ -2,10 +2,12 @@ package com.example.domain.usecase
 
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
+import com.example.domain.event.EventDatePolicy
+import com.example.domain.event.EventIdentityPolicy
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
-import java.util.Calendar
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,10 +26,11 @@ class DiscoverEventsUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(): DiscoveryOutcome {
         val contacts = contactRepository.getAllSync()
+        val existingEvents = runCatching { eventRepository.getAll().first() }.getOrDefault(emptyList())
         var discovered = 0
 
         contacts.forEach { contact ->
-            val events = buildEventsFor(contact)
+            val events = buildEventsFor(contact, existingEvents)
             events.forEach { event ->
                 eventRepository.upsert(event)
                 eventReminderSchedulerService.scheduleReminder(event)
@@ -38,81 +41,87 @@ class DiscoverEventsUseCase @Inject constructor(
         return DiscoveryOutcome(contacts = contacts.size, events = discovered)
     }
 
-    private fun buildEventsFor(contact: ContactEntity): List<EventEntity> {
+    private fun buildEventsFor(
+        contact: ContactEntity,
+        existingEvents: List<EventEntity>,
+    ): List<EventEntity> {
         val events = mutableListOf<EventEntity>()
 
         contact.birthdayDay?.let { day ->
             contact.birthdayMonth?.let { month ->
-                val nextMs = nextOccurrenceMs(day, month)
-                events.add(
-                    EventEntity(
-                        id = "${contact.id}_birthday",
-                        contactId = contact.id,
-                        type = "BIRTHDAY",
-                        label = contact.name,
-                        dayOfMonth = day,
-                        month = month,
-                        year = contact.birthdayYear,
-                        nextOccurrenceMs = nextMs,
-                        isActive = true,
-                        source = "CONTACTS"
-                    )
-                )
+                buildContactEvent(
+                    contact = contact,
+                    existingEvents = existingEvents,
+                    type = "BIRTHDAY",
+                    day = day,
+                    month = month,
+                    year = contact.birthdayYear,
+                )?.let(events::add)
             }
         }
 
         contact.anniversaryDay?.let { day ->
             contact.anniversaryMonth?.let { month ->
-                val nextMs = nextOccurrenceMs(day, month)
-                events.add(
-                    EventEntity(
-                        id = "${contact.id}_anniversary",
-                        contactId = contact.id,
-                        type = "ANNIVERSARY",
-                        label = contact.name,
-                        dayOfMonth = day,
-                        month = month,
-                        year = contact.anniversaryYear,
-                        nextOccurrenceMs = nextMs,
-                        isActive = true,
-                        source = "CONTACTS"
-                    )
-                )
+                buildContactEvent(
+                    contact = contact,
+                    existingEvents = existingEvents,
+                    type = "ANNIVERSARY",
+                    day = day,
+                    month = month,
+                    year = contact.anniversaryYear,
+                )?.let(events::add)
             }
         }
 
         contact.workStartDay?.let { day ->
             contact.workStartMonth?.let { month ->
-                val nextMs = nextOccurrenceMs(day, month)
-                events.add(
-                    EventEntity(
-                        id = "${contact.id}_work_anniversary",
-                        contactId = contact.id,
-                        type = "WORK_ANNIVERSARY",
-                        label = contact.name,
-                        dayOfMonth = day,
-                        month = month,
-                        year = contact.workStartYear,
-                        nextOccurrenceMs = nextMs,
-                        isActive = true,
-                        source = "CONTACTS"
-                    )
-                )
+                buildContactEvent(
+                    contact = contact,
+                    existingEvents = existingEvents,
+                    type = "WORK_ANNIVERSARY",
+                    day = day,
+                    month = month,
+                    year = contact.workStartYear,
+                )?.let(events::add)
             }
         }
 
         return events
     }
 
-    private fun nextOccurrenceMs(day: Int, month: Int): Long {
-        val cal = Calendar.getInstance()
-        val currentYear = cal.get(Calendar.YEAR)
-        cal.set(currentYear, month - 1, day, 0, 0, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        if (cal.timeInMillis < System.currentTimeMillis()) {
-            cal.add(Calendar.YEAR, 1)
+    private fun buildContactEvent(
+        contact: ContactEntity,
+        existingEvents: List<EventEntity>,
+        type: String,
+        day: Int,
+        month: Int,
+        year: Int?,
+    ): EventEntity? {
+        if (!EventDatePolicy.isValidDate(day, month, year)) return null
+        val existingMatchingEvent = EventIdentityPolicy.findMatchingActiveEvent(
+            events = existingEvents,
+            contactId = contact.id,
+            eventType = type,
+            month = month,
+            dayOfMonth = day,
+        )
+        if (existingMatchingEvent != null && !existingMatchingEvent.source.equals("CONTACTS", ignoreCase = true)) {
+            return null
         }
-        return cal.timeInMillis
+        val nextMs = EventDatePolicy.nextOccurrenceMs(day, month) ?: return null
+        return EventEntity(
+            id = EventIdentityPolicy.canonicalId(contact.id, type)
+                ?: return null,
+            contactId = contact.id,
+            type = type,
+            label = contact.name,
+            dayOfMonth = day,
+            month = month,
+            year = year,
+            nextOccurrenceMs = nextMs,
+            isActive = true,
+            source = "CONTACTS"
+        )
     }
 
     private fun daysUntil(futureMs: Long): Int {

@@ -15,7 +15,11 @@ object MessageDispatchWorkRequests {
         .setRequiresStorageNotLow(true)
         .build()
 
-    fun create(pendingMessageId: String, eventId: String? = null): OneTimeWorkRequest {
+    fun create(
+        pendingMessageId: String,
+        eventId: String? = null,
+        initialDelayMs: Long = 0L,
+    ): OneTimeWorkRequest {
         val data = Data.Builder()
             .putString(KEY_PENDING_MESSAGE_ID, pendingMessageId)
             .apply {
@@ -29,10 +33,18 @@ object MessageDispatchWorkRequests {
             .setInputData(data)
             .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .apply {
+                if (initialDelayMs > 0L) {
+                    setInitialDelay(initialDelayMs, TimeUnit.MILLISECONDS)
+                }
+            }
             .build()
     }
 
-    fun createForEvent(eventId: String): OneTimeWorkRequest {
+    fun createForEvent(
+        eventId: String,
+        initialDelayMs: Long = 0L,
+    ): OneTimeWorkRequest {
         val data = Data.Builder()
             .putString(KEY_EVENT_ID, eventId)
             .build()
@@ -41,6 +53,11 @@ object MessageDispatchWorkRequests {
             .setInputData(data)
             .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .apply {
+                if (initialDelayMs > 0L) {
+                    setInitialDelay(initialDelayMs, TimeUnit.MILLISECONDS)
+                }
+            }
             .build()
     }
 }

@@ -23,6 +23,7 @@ import com.example.core.resilience.StructuredLogger
 import com.example.domain.automation.AiAutoSendQualityGate
 import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.ApprovalModeResolver
+import com.example.domain.model.ApprovalMode
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import androidx.hilt.work.HiltWorker
@@ -160,7 +161,6 @@ class MessageGenerationWorker @AssistedInject constructor(
                                 selectedMessage = selectedVariantText,
                                 isUsingFallback = variants.isUsingFallback,
                             )
-                            val approvalMode = qualityDecision.approvalMode
                             val scheduledForMs = AutomationSchedulePolicy.messageSendTimeMs(
                                 eventOccurrenceMs = event.nextOccurrenceMs,
                                 customHour = contact.customSendTimeHour,
@@ -169,18 +169,23 @@ class MessageGenerationWorker @AssistedInject constructor(
                                 quietHoursEnd = prefs.getQuietHoursEnd(),
                                 blackoutDatesJson = prefs.getBlackoutDates(),
                             )
-                            val selectedChannel = AutoSendChannelSelector.select(
+                            val channelSelection = AutoSendChannelSelector.selectRoute(
                                 contact = contact,
                                 previousMessages = previousMessages,
                                 channelBlackoutJson = prefs.getChannelBlackout(),
                                 senderEmail = prefs.getSenderEmail(),
                                 senderEmailPassword = prefs.getSenderEmailPassword(),
                             )
+                            val approvalMode = if (channelSelection.hasAvailableRoute) {
+                                qualityDecision.approvalMode
+                            } else {
+                                ApprovalMode.ALWAYS_ASK
+                            }
 
                             StructuredLogger.i(TAG, "Generated message for event ${event.id}", mapOf(
                                 "contactId" to contact.id,
                                 "approvalMode" to approvalMode.raw,
-                                "channel" to selectedChannel,
+                                "channel" to channelSelection.channel,
                                 "qualityScore" to qualityDecision.qualityScore.toString(),
                                 "retries" to retries.toString(),
                             ))
@@ -197,7 +202,7 @@ class MessageGenerationWorker @AssistedInject constructor(
                                 emotionalVariant = variants.emotional,
                                 selectedVariant = variants.recommended,
                                 selectedVariantText = selectedVariantText,
-                                channel = selectedChannel,
+                                channel = channelSelection.channel,
                                 scheduledForMs = scheduledForMs,
                                 approvalMode = approvalMode.raw,
                                 status = if (approvalMode.raw == "FULLY_AUTO") "APPROVED" else "PENDING",

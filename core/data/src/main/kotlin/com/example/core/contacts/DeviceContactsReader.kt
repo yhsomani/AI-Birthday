@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
 import com.example.core.db.entities.ContactEntity
+import com.example.domain.service.DeviceContactsPermissionDeniedException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -16,7 +17,7 @@ class DeviceContactsReader(private val context: Context) {
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) !=
             PackageManager.PERMISSION_GRANTED
         ) {
-            return@withContext emptyList()
+            throw DeviceContactsPermissionDeniedException()
         }
 
         val rowsById = linkedMapOf<String, MutableDeviceContact>()
@@ -104,8 +105,8 @@ class DeviceContactsReader(private val context: Context) {
                     }
                 }
             }
-        } catch (_: SecurityException) {
-            return@withContext emptyList()
+        } catch (e: SecurityException) {
+            throw DeviceContactsPermissionDeniedException(e.message ?: "Device contacts permission is missing.")
         }
 
         rowsById.values

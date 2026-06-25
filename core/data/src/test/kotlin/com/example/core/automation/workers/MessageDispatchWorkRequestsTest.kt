@@ -27,4 +27,11 @@ class MessageDispatchWorkRequestsTest {
         assertEquals(null, workSpec.input.getString(MessageDispatchWorkRequests.KEY_PENDING_MESSAGE_ID))
         assertEquals("event_1", workSpec.input.getString(MessageDispatchWorkRequests.KEY_EVENT_ID))
     }
+
+    @Test
+    fun create_appliesInitialDelayWhenProvided() {
+        val request = MessageDispatchWorkRequests.create("pending_1", "event_1", initialDelayMs = 60_000L)
+
+        assertEquals(60_000L, request.workSpec.initialDelay)
+    }
 }

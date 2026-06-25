@@ -130,6 +130,44 @@ class EventsViewModelTest {
         assertNull(viewModel.uiState.value.error)
         assertEquals("Alice", viewModel.uiState.value.duplicateWarning?.contactName)
         assertEquals("BIRTHDAY", viewModel.uiState.value.duplicateWarning?.eventType)
+        assertEquals(ManualEventWarningKind.DUPLICATE, viewModel.uiState.value.duplicateWarning?.kind)
+    }
+
+    @Test
+    fun `saveManualEvent conflict exposes date conflict warning`() = runTest(testDispatcher) {
+        val contact = ContactEntity(id = "c1", name = "Alice")
+        val event = EventEntity(
+            id = "c1_birthday",
+            contactId = "c1",
+            type = "BIRTHDAY",
+            dayOfMonth = 12,
+            month = 6,
+            nextOccurrenceMs = 100L,
+        )
+        every { eventRepository.getAll() } returns MutableStateFlow(listOf(event))
+        every { contactRepository.getAll() } returns MutableStateFlow(listOf(contact))
+        coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.ConflictFound(
+            contact = contact,
+            existingEvent = event,
+            requestedMonth = 7,
+            requestedDayOfMonth = 1,
+            requestedYear = null,
+        )
+
+        val viewModel = EventsViewModel(eventRepository, contactRepository, saveManualEventUseCase, activityLogRepository)
+        advanceUntilIdle()
+        viewModel.saveManualEvent("c1", null, "BIRTHDAY", null, 7, 1, null)
+        advanceUntilIdle()
+
+        val warning = viewModel.uiState.value.duplicateWarning
+        assertFalse(viewModel.uiState.value.isSavingManualEvent)
+        assertNull(viewModel.uiState.value.error)
+        assertEquals(ManualEventWarningKind.DATE_CONFLICT, warning?.kind)
+        assertEquals("Alice", warning?.contactName)
+        assertEquals(6, warning?.month)
+        assertEquals(12, warning?.dayOfMonth)
+        assertEquals(7, warning?.requestedMonth)
+        assertEquals(1, warning?.requestedDayOfMonth)
     }
 
     @Test

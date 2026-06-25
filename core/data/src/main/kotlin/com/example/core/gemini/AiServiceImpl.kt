@@ -44,7 +44,7 @@ class AiServiceImpl @Inject constructor(
         RateLimiter.waitIfNeeded()
         val prompt = prompter.buildMessageGenerationPrompt(contextObj)
         val response = geminiClient.generate(prompt)
-        val variants = ResponseParser.parseMessageVariants(response)
+        val variants = ResponseParser.parseMessageVariants(response, eventType = event.type)
 
         StructuredLogger.d(TAG, "Message generated", mapOf(
             "recommended" to variants.recommended.take(50),
@@ -88,7 +88,7 @@ class AiServiceImpl @Inject constructor(
         RateLimiter.waitIfNeeded()
         val prompt = prompter.buildRegenerationPrompt(previousMessage, contextObj, feedbackInstruction)
         val response = geminiClient.generate(prompt)
-        val variants = ResponseParser.parseMessageVariants(response)
+        val variants = ResponseParser.parseMessageVariants(response, eventType = event.type)
 
         return MessageVariantsResult(
             short = variants.short,

@@ -106,7 +106,14 @@ class GenerateMessageUseCaseTest {
     @Test
     fun `invoke with invalid manual legacy mode falls back to smart approval`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
-        val contact = ContactEntity(id = "c1", name = "John", relationshipType = "FRIEND", preferredChannel = "SMS", automationMode = "MANUAL")
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            relationshipType = "FRIEND",
+            primaryPhone = "+15551234567",
+            preferredChannel = "SMS",
+            automationMode = "MANUAL",
+        )
         val variants = MessageVariantsResult("sh", "std", "lg", "fr", "fn", "em", "standard")
 
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
@@ -134,7 +141,14 @@ class GenerateMessageUseCaseTest {
     @Test
     fun `invoke with FULLY_AUTO mode schedules exact dispatch`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
-        val contact = ContactEntity(id = "c1", name = "John", relationshipType = "FRIEND", preferredChannel = "SMS", automationMode = "FULLY_AUTO")
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            relationshipType = "FRIEND",
+            primaryPhone = "+15551234567",
+            preferredChannel = "SMS",
+            automationMode = "FULLY_AUTO",
+        )
         val draft = "Happy birthday John, hope the new year brings more weekend rides and good coffee catchups."
         val variants = MessageVariantsResult(draft, draft, draft, draft, draft, draft, "standard")
 
@@ -159,9 +173,54 @@ class GenerateMessageUseCaseTest {
     }
 
     @Test
+    fun `invoke forces review and skips scheduling when no delivery route is available`() = runTest {
+        val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            relationshipType = "FRIEND",
+            preferredChannel = "SMS",
+            automationMode = "FULLY_AUTO",
+        )
+        val draft = "Happy birthday John, hope the day gives you time to relax and enjoy a great coffee."
+        val variants = MessageVariantsResult(draft, draft, draft, draft, draft, draft, "standard")
+        val pendingSlot = slot<PendingMessageEntity>()
+
+        coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
+        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { contactRepository.getById("c1") } returns contact
+        coEvery { styleProfileRepository.getProfileOnce() } returns null
+        coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
+        coEvery { memoryNoteRepository.getByContact("c1") } returns emptyList()
+        coEvery { giftHistoryRepository.getByContact("c1") } returns emptyList()
+        coEvery { aiService.generateMessage(any(), any(), any(), any()) } returns variants
+        every { preferencesRepository.getChannelBlackout() } returns "[]"
+        every { preferencesRepository.getSenderEmail() } returns ""
+        every { preferencesRepository.getSenderEmailPassword() } returns ""
+
+        val result = useCase("e1")
+
+        assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
+        assertEquals("ALWAYS_ASK", (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
+        coVerify { messageRepository.insertPending(capture(pendingSlot)) }
+        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
+        assertEquals("PENDING", pendingSlot.captured.status)
+        assertEquals("SMS", pendingSlot.captured.channel)
+        coVerify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
+        coVerify { notificationService.showApprovalNotification(contact, event, variants, pendingSlot.captured.id) }
+    }
+
+    @Test
     fun `invoke downgrades fallback fully auto draft to smart approve before scheduling`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
-        val contact = ContactEntity(id = "c1", name = "John", relationshipType = "FRIEND", preferredChannel = "SMS", automationMode = "FULLY_AUTO")
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            relationshipType = "FRIEND",
+            primaryPhone = "+15551234567",
+            preferredChannel = "SMS",
+            automationMode = "FULLY_AUTO",
+        )
         val variants = MessageVariantsResult(
             short = "Wishing you a very happy birthday! Hope you have a wonderful day!",
             standard = "Wishing you a very happy birthday! Hope you have a wonderful day!",

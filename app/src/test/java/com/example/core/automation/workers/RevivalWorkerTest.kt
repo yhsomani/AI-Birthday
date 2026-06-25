@@ -73,7 +73,13 @@ class RevivalWorkerTest {
 
     @Test
     fun `doWork with revival contacts generates reconnect message`() = runTest {
-        val contact = ContactEntity(id = "c1", name = "Priya", healthScore = 20, lastInteractionDate = System.currentTimeMillis() - 40L * 24 * 60 * 60 * 1000L)
+        val contact = ContactEntity(
+            id = "c1",
+            name = "Priya",
+            primaryPhone = "+15551234567",
+            healthScore = 20,
+            lastInteractionDate = System.currentTimeMillis() - 40L * 24 * 60 * 60 * 1000L,
+        )
         val pendingSlot = slot<PendingMessageEntity>()
         coEvery { contactDao.getContactsForRevival(any()) } returns listOf(contact)
         coEvery { geminiClient.generate(any()) } returns "Hey Priya, it's been a while!"
@@ -106,6 +112,7 @@ class RevivalWorkerTest {
         val contact = ContactEntity(
             id = "c1",
             name = "Priya",
+            primaryPhone = "+15551234567",
             healthScore = 20,
             automationMode = "FULLY_AUTO",
             lastInteractionDate = System.currentTimeMillis() - 40L * 24 * 60 * 60 * 1000L,
@@ -137,10 +144,47 @@ class RevivalWorkerTest {
     }
 
     @Test
+    fun `doWork forces review and skips scheduling revival when no route is available`() = runTest {
+        val contact = ContactEntity(
+            id = "c1",
+            name = "Priya",
+            healthScore = 20,
+            automationMode = "FULLY_AUTO",
+            lastInteractionDate = System.currentTimeMillis() - 40L * 24 * 60 * 60 * 1000L,
+        )
+        val pendingSlot = slot<PendingMessageEntity>()
+        coEvery { contactDao.getContactsForRevival(any()) } returns listOf(contact)
+        coEvery { geminiClient.generate(any()) } returns "Hey Priya, it's been a while. Want to catch up this weekend?"
+
+        val worker = TestListenableWorkerBuilder<RevivalWorker>(context)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: Context,
+                    workerClassName: String,
+                    workerParameters: WorkerParameters
+                ): ListenableWorker {
+                    return RevivalWorker(appContext, workerParameters, contactDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
+                }
+            })
+            .build()
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
+        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
+        assertEquals("PENDING", pendingSlot.captured.status)
+        assertEquals("SMS", pendingSlot.captured.channel)
+        verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
+        verify { NotificationHelper.showRevivalNotification(any(), "Priya", any(), pendingSlot.captured.selectedVariantText, "c1") }
+    }
+
+    @Test
     fun `doWork downgrades fallback fully auto revival to smart approve`() = runTest {
         val contact = ContactEntity(
             id = "c1",
             name = "Priya",
+            primaryPhone = "+15551234567",
             healthScore = 20,
             automationMode = "FULLY_AUTO",
             lastInteractionDate = System.currentTimeMillis() - 40L * 24 * 60 * 60 * 1000L,

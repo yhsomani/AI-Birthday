@@ -21,6 +21,7 @@ import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.domain.automation.RevivalCadencePolicy
+import com.example.domain.model.ApprovalMode
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.Calendar
@@ -107,15 +108,19 @@ class RevivalWorker @AssistedInject constructor(
                     selectedMessage = suggestion.text,
                     isUsingFallback = suggestion.isFallback,
                 )
-                val approvalMode = qualityDecision.approvalMode
                 val previousMessages = sentMessageDao.getByContact(contact.id)
-                val selectedChannel = AutoSendChannelSelector.select(
+                val channelSelection = AutoSendChannelSelector.selectRoute(
                     contact = contact,
                     previousMessages = previousMessages,
                     channelBlackoutJson = prefs.getChannelBlackout(),
                     senderEmail = prefs.getSenderEmail(),
                     senderEmailPassword = prefs.getSenderEmailPassword(),
                 )
+                val approvalMode = if (channelSelection.hasAvailableRoute) {
+                    qualityDecision.approvalMode
+                } else {
+                    ApprovalMode.ALWAYS_ASK
+                }
 
                 val pendingMsg = PendingMessageEntity(
                     id = UUID.randomUUID().toString(),
@@ -129,7 +134,7 @@ class RevivalWorker @AssistedInject constructor(
                     emotionalVariant = suggestion.text,
                     selectedVariant = "standard",
                     selectedVariantText = suggestion.text,
-                    channel = selectedChannel,
+                    channel = channelSelection.channel,
                     scheduledForMs = scheduledMs,
                     approvalMode = approvalMode.raw,
                     status = if (approvalMode.raw == "FULLY_AUTO") "APPROVED" else "PENDING",

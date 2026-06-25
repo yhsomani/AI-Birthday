@@ -6,6 +6,7 @@ import com.example.core.auth.UserProfile
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.repository.ContactRepository
 import com.example.domain.usecase.SyncContactsUseCase
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
@@ -62,6 +63,7 @@ class SettingsViewModelTest {
         every { context.getString(R.string.settings_last_backup_today) } returns "Today"
         every { context.getString(R.string.settings_last_backup_yesterday) } returns "Yesterday"
         every { context.getString(R.string.settings_sync_contacts_failed) } returns "Contact sync failed."
+        every { context.getString(R.string.settings_sync_contacts_device_permission_missing) } returns "Contacts permission missing."
     }
 
     @After
@@ -100,6 +102,26 @@ class SettingsViewModelTest {
 
         assertFalse(viewModel.uiState.value.isSyncing)
         assertEquals("Just now", viewModel.uiState.value.lastSyncTimestamp)
+    }
+
+    @Test
+    fun `syncContacts exposes device permission outcome without generic failure`() = runTest(testDispatcher) {
+        coEvery { syncContactsUseCase(forceRefresh = true) } returns SyncContactsUseCase.SyncOutcome(
+            googleCount = 1,
+            deviceCount = 0,
+            inserted = 1,
+            updated = 0,
+            deviceContactsPermissionDenied = true,
+        )
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+
+        viewModel.syncContacts()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isSyncing)
+        assertEquals("Just now", viewModel.uiState.value.lastSyncTimestamp)
+        assertEquals("Contacts permission missing.", viewModel.uiState.value.syncError)
+        assertEquals("Contacts permission missing.", (viewModel.uiState.value.feedbackEvent?.message as com.example.ui.feedback.UiText.Dynamic).value)
     }
 
     @Test

@@ -124,6 +124,82 @@ class MessageDispatchWorkerTest {
     }
 
     @Test
+    fun `doWork defers future approved message without dispatching`() = runTest {
+        val scheduledForMs = System.currentTimeMillis() + 60_000L
+        val pendingMsg = PendingMessageEntity(
+            id = "msg_1", contactId = "c1", eventId = "e1",
+            shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
+            formalVariant = "", funnyVariant = "", emotionalVariant = "",
+            selectedVariant = "standard", selectedVariantText = "Happy Birthday",
+            channel = "SMS", scheduledForMs = scheduledForMs, approvalMode = "FULLY_AUTO",
+            status = "APPROVED"
+        )
+        val contact = ContactEntity(id = "c1", name = "Alice")
+
+        coEvery { pendingMessageDao.getById("msg_1") } returns pendingMsg
+        coEvery { contactDao.getById("c1") } returns contact
+
+        val worker = buildWorker("msg_1")
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        verify { DailyScheduler.scheduleExactSend(any(), "msg_1") }
+        coVerify(exactly = 0) { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
+        coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any(), any()) }
+    }
+
+    @Test
+    fun `doWork sends due smart approve pending message`() = runTest {
+        val pendingMsg = PendingMessageEntity(
+            id = "msg_1", contactId = "c1", eventId = "e1",
+            shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
+            formalVariant = "", funnyVariant = "", emotionalVariant = "",
+            selectedVariant = "standard", selectedVariantText = "Happy Birthday",
+            channel = "SMS", scheduledForMs = 0, approvalMode = "SMART_APPROVE",
+            status = "PENDING"
+        )
+        val contact = ContactEntity(id = "c1", name = "Alice")
+
+        coEvery { pendingMessageDao.getById("msg_1") } returns pendingMsg
+        coEvery { contactDao.getById("c1") } returns contact
+
+        val worker = buildWorker("msg_1")
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
+        coVerify { anyConstructed<MessageDispatcher>().dispatch(pendingMsg, contact) }
+    }
+
+    @Test
+    fun `doWork expires overdue vip approve pending message`() = runTest {
+        val pendingMsg = PendingMessageEntity(
+            id = "msg_1", contactId = "c1", eventId = "e1",
+            shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
+            formalVariant = "", funnyVariant = "", emotionalVariant = "",
+            selectedVariant = "standard", selectedVariantText = "Happy Birthday",
+            channel = "SMS",
+            scheduledForMs = System.currentTimeMillis() - (3 * 60 * 60 * 1000L),
+            approvalMode = "VIP_APPROVE",
+            status = "PENDING"
+        )
+        val contact = ContactEntity(id = "c1", name = "Alice")
+
+        coEvery { pendingMessageDao.getById("msg_1") } returns pendingMsg
+        coEvery { contactDao.getById("c1") } returns contact
+
+        val worker = buildWorker("msg_1")
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify { pendingMessageDao.updateStatus("msg_1", "EXPIRED") }
+        coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any(), any()) }
+    }
+
+    @Test
     fun `doWork marks message failed when dispatcher throws unexpectedly`() = runTest {
         val pendingMsg = PendingMessageEntity(
             id = "msg_1", contactId = "c1", eventId = "e1",
@@ -198,5 +274,20 @@ class MessageDispatchWorkerTest {
         verify { DailyScheduler.scheduleExactSend(any(), "msg_1") }
         coVerify(exactly = 0) { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
         coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any(), any()) }
+    }
+
+    private fun buildWorker(pendingMessageId: String): MessageDispatchWorker {
+        return TestListenableWorkerBuilder<MessageDispatchWorker>(context)
+            .setInputData(workDataOf(MessageDispatchWorkRequests.KEY_PENDING_MESSAGE_ID to pendingMessageId))
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: Context,
+                    workerClassName: String,
+                    workerParameters: WorkerParameters
+                ): ListenableWorker {
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao)
+                }
+            })
+            .build()
     }
 }

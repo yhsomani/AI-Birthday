@@ -98,7 +98,18 @@ class GenerateMessageUseCase @Inject constructor(
             selectedMessage = selectedVariantText,
             isUsingFallback = variants.isUsingFallback,
         )
-        val approvalMode = qualityDecision.approvalMode
+        val channelSelection = AutoSendChannelSelector.selectRoute(
+            contact = contact,
+            previousMessages = previousMessages,
+            channelBlackoutJson = preferencesRepository.getChannelBlackout(),
+            senderEmail = preferencesRepository.getSenderEmail(),
+            senderEmailPassword = preferencesRepository.getSenderEmailPassword(),
+        )
+        val approvalMode = if (channelSelection.hasAvailableRoute) {
+            qualityDecision.approvalMode
+        } else {
+            ApprovalMode.ALWAYS_ASK
+        }
         val scheduledForMs = AutomationSchedulePolicy.messageSendTimeMs(
             eventOccurrenceMs = event.nextOccurrenceMs,
             customHour = contact.customSendTimeHour,
@@ -106,13 +117,6 @@ class GenerateMessageUseCase @Inject constructor(
             quietHoursStart = preferencesRepository.getQuietHoursStart(),
             quietHoursEnd = preferencesRepository.getQuietHoursEnd(),
             blackoutDatesJson = preferencesRepository.getBlackoutDates(),
-        )
-        val selectedChannel = AutoSendChannelSelector.select(
-            contact = contact,
-            previousMessages = previousMessages,
-            channelBlackoutJson = preferencesRepository.getChannelBlackout(),
-            senderEmail = preferencesRepository.getSenderEmail(),
-            senderEmailPassword = preferencesRepository.getSenderEmailPassword(),
         )
 
         val pending = PendingMessageEntity(
@@ -127,7 +131,7 @@ class GenerateMessageUseCase @Inject constructor(
             emotionalVariant = variants.emotional,
             selectedVariant = variants.recommended,
             selectedVariantText = selectedVariantText,
-            channel = selectedChannel,
+            channel = channelSelection.channel,
             scheduledForMs = scheduledForMs,
             approvalMode = approvalMode.raw,
             status = if (approvalMode == ApprovalMode.FULLY_AUTO) MessageStatus.APPROVED.raw else MessageStatus.PENDING.raw,

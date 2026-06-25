@@ -2,7 +2,14 @@
 
 Last updated: 2026-06-25
 
-This is the only maintained project documentation file for this repository. It consolidates the former `features.md`, `SSOT_CONSOLIDATED.md`, `AUDIT_REPORT.md`, `CHANGELOG.md`, `docs/BRANCHING.md`, `docs/UI_VALIDATION.md`, `.kiro/steering/*.md`, `.kiro/specs/**/*.md`, and `.Jules/*.md` content.
+This is the canonical product and technical source of truth for this repository. It consolidates the former `features.md`, `SSOT_CONSOLIDATED.md`, `AUDIT_REPORT.md`, `CHANGELOG.md`, `docs/BRANCHING.md`, `docs/UI_VALIDATION.md`, `.kiro/steering/*.md`, `.kiro/specs/**/*.md`, and `.Jules/*.md` content.
+
+Companion execution documents:
+
+- [PLAN.md](PLAN.md): current audit, stabilization plan, architecture decisions, and debt registry.
+- [PRODUCT_BLUEPRINT.md](PRODUCT_BLUEPRINT.md): refined product model, user journeys, operating principles, and release definition.
+- [IMPLEMENTATION_TASKS.md](IMPLEMENTATION_TASKS.md): micro-task backlog for building the major product step by step.
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md): completed incremental changes, UX rationale, and validation evidence.
 
 Code remains the final authority. If this document conflicts with source, update this document after inspecting the source.
 
@@ -2569,4 +2576,4 @@ When changing the project:
 - Separate local automated evidence from live device/integration evidence.
 - Preserve known live-validation blockers with concrete prerequisites.
 - Do not paste secrets, API keys, app passwords, OAuth tokens, or keystore values into this file.
-- Keep this file as the only maintained project documentation file.
+- Keep this file as the canonical source of truth, and keep `PLAN.md`, `PRODUCT_BLUEPRINT.md`, and `IMPLEMENTATION_TASKS.md` aligned when product scope, debt status, or execution order changes.

@@ -6,11 +6,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -74,6 +77,7 @@ import com.example.ui.viewmodel.EventHorizonFilter
 import com.example.ui.viewmodel.EventTypeFilter
 import com.example.ui.viewmodel.EventsViewModel
 import com.example.ui.viewmodel.ManualEventDuplicateWarning
+import com.example.ui.viewmodel.ManualEventWarningKind
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -247,7 +251,7 @@ fun EventsScreen(
 }
 
 @Composable
-private fun EventsList(events: List<EventEntity>) {
+internal fun EventsList(events: List<EventEntity>) {
     val groupedEvents = events.groupBy {
         val cal = java.util.Calendar.getInstance()
         cal.timeInMillis = it.nextOccurrenceMs
@@ -474,21 +478,38 @@ private fun ManualEventDialog(
                 }
 
                 duplicateWarning?.let { warning ->
+                    val warningMessage = when (warning.kind) {
+                        ManualEventWarningKind.DUPLICATE -> stringResource(
+                            R.string.events_duplicate_message,
+                            warning.contactName,
+                            eventTypeLabel(warning.eventType),
+                            warning.month,
+                            warning.dayOfMonth,
+                        )
+                        ManualEventWarningKind.DATE_CONFLICT -> stringResource(
+                            R.string.events_conflict_message,
+                            warning.contactName,
+                            eventTypeLabel(warning.eventType),
+                            warning.month,
+                            warning.dayOfMonth,
+                            warning.requestedMonth ?: warning.month,
+                            warning.requestedDayOfMonth ?: warning.dayOfMonth,
+                        )
+                    }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = stringResource(R.string.events_duplicate_title),
+                            text = stringResource(
+                                when (warning.kind) {
+                                    ManualEventWarningKind.DUPLICATE -> R.string.events_duplicate_title
+                                    ManualEventWarningKind.DATE_CONFLICT -> R.string.events_conflict_title
+                                }
+                            ),
                             style = MaterialTheme.typography.labelLarge,
                             color = RelateWarning,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = stringResource(
-                                R.string.events_duplicate_message,
-                                warning.contactName,
-                                eventTypeLabel(warning.eventType),
-                                warning.month,
-                                warning.dayOfMonth,
-                            ),
+                            text = warningMessage,
                             style = MaterialTheme.typography.bodySmall,
                             color = RelateOnSurfaceVariant,
                         )
@@ -574,9 +595,54 @@ private fun eventTypeIcon(type: String): ImageVector = when (type) {
 }
 
 @Composable
+private fun eventSourceLabel(source: String): String = when (source.trim().uppercase(Locale.US)) {
+    "CONTACTS" -> stringResource(R.string.event_source_contacts)
+    "MANUAL" -> stringResource(R.string.event_source_manual)
+    "CALENDAR" -> stringResource(R.string.event_source_calendar)
+    "AI_INFERRED" -> stringResource(R.string.event_source_ai_inferred)
+    "MERGED" -> stringResource(R.string.event_source_merged)
+    "CONFLICT" -> stringResource(R.string.event_source_conflict)
+    else -> source.toReadableEventSource()
+}
+
+private fun String.toReadableEventSource(): String {
+    val words = trim()
+        .replace('_', ' ')
+        .lowercase(Locale.US)
+        .split(' ')
+        .filter { it.isNotBlank() }
+    if (words.isEmpty()) return ""
+    return words.joinToString(" ") { word ->
+        word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+    }
+}
+
+@Composable
+private fun eventVerificationLabel(event: EventEntity): String {
+    return when {
+        event.source.equals("CONFLICT", ignoreCase = true) -> stringResource(R.string.event_verification_conflict)
+        event.isVerified -> stringResource(R.string.event_verification_verified)
+        else -> stringResource(R.string.event_verification_needs_review, event.confidenceScore)
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun EventCard(event: EventEntity) {
     val daysUntil = event.daysUntil
     val dateFormat = remember { SimpleDateFormat("MMM dd", Locale.getDefault()) }
+    val sourceLabel = eventSourceLabel(event.source).ifBlank { stringResource(R.string.event_source_unknown) }
+    val verificationLabel = eventVerificationLabel(event)
+    val sourceColor = when (event.source.trim().uppercase(Locale.US)) {
+        "MANUAL" -> RelatePrimary
+        "CONFLICT" -> MaterialTheme.colorScheme.error
+        else -> RelateOnSurfaceVariant
+    }
+    val verificationColor = when {
+        event.source.equals("CONFLICT", ignoreCase = true) -> MaterialTheme.colorScheme.error
+        event.isVerified -> RelatePrimary
+        else -> RelateWarning
+    }
 
     RelateGlassCard {
         Row(
@@ -612,12 +678,25 @@ private fun EventCard(event: EventEntity) {
                     text = stringResource(
                         R.string.events_card_subtitle,
                         eventTypeLabel(event.type),
-                        event.source,
                         dateFormat.format(Date(event.nextOccurrenceMs)),
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = RelateOnSurfaceVariant,
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    EventMetadataChip(
+                        text = sourceLabel,
+                        color = sourceColor,
+                    )
+                    EventMetadataChip(
+                        text = verificationLabel,
+                        color = verificationColor,
+                    )
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
@@ -634,4 +713,21 @@ private fun EventCard(event: EventEntity) {
             }
         }
     }
+}
+
+@Composable
+private fun EventMetadataChip(
+    text: String,
+    color: Color,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        modifier = Modifier
+            .sizeIn(minHeight = 24.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+    )
 }

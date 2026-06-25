@@ -594,11 +594,23 @@
     <string name="events_duplicate_title">Possible duplicate</string>
     <string name="events_duplicate_message">%1$s के पास %3$d/%4$d पर पहले से %2$s है। अलग reminder चाहिए तभी save करें।</string>
     <string name="events_duplicate_save_anyway">फिर भी save करें</string>
+    <string name="events_conflict_title">Date conflict</string>
+    <string name="events_conflict_message">%1$s के पास %3$d/%4$d पर पहले से %2$s है। आपने %5$d/%6$d दर्ज किया। दोनों reminders चाहिए तभी save करें।</string>
     <string name="event_type_birthday">जन्मदिन</string>
     <string name="event_type_anniversary">सालगिरह</string>
     <string name="event_type_work_anniversary">काम की सालगिरह</string>
     <string name="event_type_custom">कस्टम</string>
-    <string name="events_card_subtitle">%1$s • %2$s • %3$s</string>
+    <string name="events_card_subtitle">%1$s • %2$s</string>
+    <string name="event_source_contacts">Imported</string>
+    <string name="event_source_manual">Manual</string>
+    <string name="event_source_calendar">Calendar</string>
+    <string name="event_source_ai_inferred">AI inferred</string>
+    <string name="event_source_merged">Merged</string>
+    <string name="event_source_conflict">Conflict</string>
+    <string name="event_source_unknown">Unknown source</string>
+    <string name="event_verification_verified">Verified</string>
+    <string name="event_verification_needs_review">Needs review • %1$d%% confidence</string>
+    <string name="event_verification_conflict">Conflict to resolve</string>
 
     <!-- Messages cleanup -->
     <string name="messages_inbox_title">संदेश इनबॉक्स</string>
@@ -777,6 +789,7 @@
     <string name="settings_last_backup_days_ago">%1$d दिन पहले</string>
     <string name="settings_sync_contacts_success">Contacts synced.</string>
     <string name="settings_sync_contacts_failed">Contacts sync failed.</string>
+    <string name="settings_sync_contacts_device_permission_missing">Device contacts permission missing है। Phone contacts import करने के लिए contacts access allow करें।</string>
     <string name="wish_preview_send_test">खुद को test भेजें</string>
     <string name="wish_preview_test_missing_email">Test भेजने से पहले Settings में Gmail sender details जोड़ें।</string>
     <string name="wish_preview_test_blank">Test भेजने से पहले message लिखें।</string>

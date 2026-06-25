@@ -24,6 +24,7 @@ import com.example.domain.automation.AiAutoSendQualityGate
 import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutomationSchedulePolicy
+import com.example.domain.model.ApprovalMode
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.Calendar
@@ -102,7 +103,6 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                         selectedMessage = suggestion.text,
                         isUsingFallback = suggestion.isFallback,
                     )
-                    val approvalMode = qualityDecision.approvalMode
                     val scheduledMs = AutomationSchedulePolicy.nextAllowedSendMs(
                         candidateMs = now + FOLLOW_UP_SEND_DELAY_MS,
                         quietHoursStart = prefs.getQuietHoursStart(),
@@ -111,13 +111,18 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                         nowMs = now,
                     )
                     val previousMessages = sentMessageDao.getByContact(contact.id)
-                    val selectedChannel = AutoSendChannelSelector.select(
+                    val channelSelection = AutoSendChannelSelector.selectRoute(
                         contact = contact,
                         previousMessages = previousMessages,
                         channelBlackoutJson = prefs.getChannelBlackout(),
                         senderEmail = prefs.getSenderEmail(),
                         senderEmailPassword = prefs.getSenderEmailPassword(),
                     )
+                    val approvalMode = if (channelSelection.hasAvailableRoute) {
+                        qualityDecision.approvalMode
+                    } else {
+                        ApprovalMode.ALWAYS_ASK
+                    }
 
                     val pending = PendingMessageEntity(
                         id = UUID.randomUUID().toString(),
@@ -131,7 +136,7 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                         emotionalVariant = suggestion.text,
                         selectedVariant = "standard",
                         selectedVariantText = suggestion.text,
-                        channel = selectedChannel,
+                        channel = channelSelection.channel,
                         scheduledForMs = scheduledMs,
                         approvalMode = approvalMode.raw,
                         status = if (approvalMode.raw == "FULLY_AUTO") "APPROVED" else "PENDING",

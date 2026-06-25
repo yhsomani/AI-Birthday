@@ -99,4 +99,75 @@ class DispatchMessageUseCaseTest {
 
         coVerify { messageDispatcherService.dispatch(pendingMsg, contact) }
     }
+
+    @Test
+    fun `invoke with future approved message returns Deferred and does not dispatch`() = runTest {
+        val scheduledForMs = System.currentTimeMillis() + 60_000L
+        val pendingMsg = PendingMessageEntity(
+            id = "msg_1",
+            contactId = "c1",
+            eventId = "e1",
+            shortVariant = "", standardVariant = "hi", longVariant = "",
+            formalVariant = "", funnyVariant = "", emotionalVariant = "",
+            selectedVariant = "standard", selectedVariantText = "hi",
+            channel = "SMS", scheduledForMs = scheduledForMs, approvalMode = "FULLY_AUTO",
+            status = "APPROVED"
+        )
+
+        coEvery { messageRepository.getPendingById("msg_1") } returns pendingMsg
+
+        val result = useCase("msg_1")
+
+        assertTrue(result is DispatchMessageUseCase.DispatchOutcome.Deferred)
+        assertEquals(scheduledForMs, (result as DispatchMessageUseCase.DispatchOutcome.Deferred).scheduledForMs)
+        coVerify(exactly = 0) { messageDispatcherService.dispatch(any(), any()) }
+    }
+
+    @Test
+    fun `invoke with due smart approve pending message dispatches successfully`() = runTest {
+        val pendingMsg = PendingMessageEntity(
+            id = "msg_1",
+            contactId = "c1",
+            eventId = "e1",
+            shortVariant = "", standardVariant = "hi", longVariant = "",
+            formalVariant = "", funnyVariant = "", emotionalVariant = "",
+            selectedVariant = "standard", selectedVariantText = "hi",
+            channel = "SMS", scheduledForMs = 0, approvalMode = "SMART_APPROVE",
+            status = "PENDING"
+        )
+        val contact = ContactEntity(id = "c1", name = "John Doe")
+
+        coEvery { messageRepository.getPendingById("msg_1") } returns pendingMsg
+        coEvery { contactRepository.getById("c1") } returns contact
+
+        val result = useCase("msg_1")
+
+        assertTrue(result is DispatchMessageUseCase.DispatchOutcome.Sent)
+        coVerify { messageDispatcherService.dispatch(pendingMsg, contact) }
+    }
+
+    @Test
+    fun `invoke with expired vip pending message updates status`() = runTest {
+        val pendingMsg = PendingMessageEntity(
+            id = "msg_1",
+            contactId = "c1",
+            eventId = "e1",
+            shortVariant = "", standardVariant = "hi", longVariant = "",
+            formalVariant = "", funnyVariant = "", emotionalVariant = "",
+            selectedVariant = "standard", selectedVariantText = "hi",
+            channel = "SMS",
+            scheduledForMs = System.currentTimeMillis() - (3 * 60 * 60 * 1000L),
+            approvalMode = "VIP_APPROVE",
+            status = "PENDING"
+        )
+
+        coEvery { messageRepository.getPendingById("msg_1") } returns pendingMsg
+        coEvery { messageRepository.updatePendingStatus(any(), any()) } returns Unit
+
+        val result = useCase("msg_1")
+
+        assertEquals(DispatchMessageUseCase.DispatchOutcome.Expired("msg_1"), result)
+        coVerify { messageRepository.updatePendingStatus("msg_1", "EXPIRED") }
+        coVerify(exactly = 0) { messageDispatcherService.dispatch(any(), any()) }
+    }
 }

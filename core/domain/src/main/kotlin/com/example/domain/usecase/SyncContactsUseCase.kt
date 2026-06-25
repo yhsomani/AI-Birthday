@@ -3,6 +3,7 @@ package com.example.domain.usecase
 import com.example.core.db.entities.ContactEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.service.ContactSyncService
+import com.example.domain.service.DeviceContactsPermissionDeniedException
 import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -52,8 +53,13 @@ class SyncContactsUseCase @Inject constructor(
 
         var deviceContacts = emptyList<ContactEntity>()
         var deviceError: String? = null
+        var deviceContactsPermissionDenied = false
         try {
             deviceContacts = contactSyncService.fetchDeviceContacts()
+        } catch (e: DeviceContactsPermissionDeniedException) {
+            android.util.Log.w("SyncContactsUseCase", "Device contacts permission denied", e)
+            deviceContactsPermissionDenied = true
+            deviceError = e.message ?: DEVICE_CONTACTS_PERMISSION_ERROR
         } catch (e: Exception) {
             android.util.Log.e("SyncContactsUseCase", "Device contacts sync failed", e)
             deviceError = e.message ?: "Failed to fetch device contacts"
@@ -66,6 +72,8 @@ class SyncContactsUseCase @Inject constructor(
             preferencesRepository.setLastSyncError(null)
         } else if (googleError != null) {
             preferencesRepository.setLastSyncError("Google sync failed; imported ${deviceContacts.size} device contacts.")
+        } else if (deviceContactsPermissionDenied) {
+            preferencesRepository.setLastSyncError(DEVICE_CONTACTS_PERMISSION_ERROR)
         } else if (deviceError != null) {
             preferencesRepository.setLastSyncError(deviceError)
         }
@@ -93,6 +101,7 @@ class SyncContactsUseCase @Inject constructor(
             deviceCount = deviceContacts.size,
             inserted = inserted,
             updated = updated,
+            deviceContactsPermissionDenied = deviceContactsPermissionDenied,
         )
     }
 
@@ -246,6 +255,12 @@ class SyncContactsUseCase @Inject constructor(
         val googleCount: Int,
         val deviceCount: Int,
         val inserted: Int,
-        val updated: Int
+        val updated: Int,
+        val deviceContactsPermissionDenied: Boolean = false,
     )
+
+    companion object {
+        const val DEVICE_CONTACTS_PERMISSION_ERROR =
+            "Device contacts permission is missing. Allow contacts access to import phone contacts."
+    }
 }

@@ -42,7 +42,8 @@ object DailyScheduler {
                     flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
 
-                if (scheduledForMs <= System.currentTimeMillis()) {
+                val nowMs = System.currentTimeMillis()
+                if (scheduledForMs <= nowMs) {
                     androidx.work.WorkManager.getInstance(context)
                         .enqueue(MessageDispatchWorkRequests.create(pending.id, pending.eventId))
                     return@launch
@@ -60,7 +61,13 @@ object DailyScheduler {
                         context.getString(R.string.notification_setup_exact_alarm_message),
                     )
                     androidx.work.WorkManager.getInstance(context)
-                        .enqueue(MessageDispatchWorkRequests.create(pending.id, pending.eventId))
+                        .enqueue(
+                            MessageDispatchWorkRequests.create(
+                                pendingMessageId = pending.id,
+                                eventId = pending.eventId,
+                                initialDelayMs = scheduledForMs - nowMs,
+                            )
+                        )
                 }
             }
         }

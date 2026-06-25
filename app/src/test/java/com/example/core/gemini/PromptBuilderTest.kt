@@ -31,6 +31,19 @@ class PromptBuilderTest {
     }
 
     @Test
+    fun `buildClassificationPrompt requests communication style parsed by ResponseParser`() {
+        val contact = ContactEntity(
+            id = "1",
+            name = "Alice",
+        )
+
+        val prompt = builder.buildClassificationPrompt(contact)
+
+        assertTrue(prompt.contains("\"communication_style\""))
+        assertTrue(prompt.contains("WARM|FUNNY|PROFESSIONAL|EMOTIONAL"))
+    }
+
+    @Test
     fun `buildContactContext handles birthday with year correctly`() {
         val contact = ContactEntity(
             id = "1", name = "Bob",

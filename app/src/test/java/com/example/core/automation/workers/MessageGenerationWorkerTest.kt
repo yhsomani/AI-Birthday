@@ -80,7 +80,14 @@ class MessageGenerationWorkerTest {
     @Test
     fun `doWork with valid key and event generates message`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
-        val contact = ContactEntity(id = "c1", name = "John", relationshipType = "FRIEND", preferredChannel = "SMS", automationMode = "FULLY_AUTO")
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            relationshipType = "FRIEND",
+            primaryPhone = "+15551234567",
+            preferredChannel = "SMS",
+            automationMode = "FULLY_AUTO",
+        )
         val variants = MessageVariants("sh", "std", "lg", "fr", "fn", "em", "standard")
 
         every { prefs.getGeminiApiKey() } returns "mock_key"
@@ -119,6 +126,65 @@ class MessageGenerationWorkerTest {
     }
 
     @Test
+    fun `doWork forces review and skips scheduling when no delivery route is available`() = runTest {
+        val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            relationshipType = "FRIEND",
+            preferredChannel = "SMS",
+            automationMode = "FULLY_AUTO",
+        )
+        val variants = MessageVariants(
+            short = "Happy birthday John, hope you get a calm day and great coffee.",
+            standard = "Happy birthday John, hope you get a calm day and great coffee.",
+            long = "Happy birthday John, hope you get a calm day and great coffee.",
+            formal = "Happy birthday John, hope you get a calm day and great coffee.",
+            funny = "Happy birthday John, hope you get a calm day and great coffee.",
+            emotional = "Happy birthday John, hope you get a calm day and great coffee.",
+            recommended = "standard",
+        )
+        val pendingSlot = slot<PendingMessageEntity>()
+
+        every { prefs.getGeminiApiKey() } returns "mock_key"
+        coEvery { eventDao.getEventsBefore(any()) } returns listOf(event)
+        coEvery { pendingMessageDao.getPendingMessage("c1", "e1", any()) } returns null
+        coEvery { contactDao.getById("c1") } returns contact
+        coEvery { styleProfileDao.get() } returns null
+        coEvery { sentMessageDao.getByContact("c1") } returns emptyList()
+        coEvery { memoryNoteDao.getByContact("c1") } returns emptyList()
+        coEvery { giftHistoryDao.getByContact("c1") } returns emptyList()
+        coEvery { geminiClient.generate(any()) } returns "mock_response"
+        every { ResponseParser.parseMessageVariants(any(), any()) } returns variants
+
+        val worker = TestListenableWorkerBuilder<MessageGenerationWorker>(context)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: Context,
+                    workerClassName: String,
+                    workerParameters: WorkerParameters
+                ): ListenableWorker {
+                    return MessageGenerationWorker(
+                        appContext, workerParameters,
+                        contactDao, eventDao, pendingMessageDao, sentMessageDao, styleProfileDao,
+                        memoryNoteDao, giftHistoryDao, geminiClient, prefs
+                    )
+                }
+            })
+            .build()
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
+        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
+        assertEquals("PENDING", pendingSlot.captured.status)
+        assertEquals("SMS", pendingSlot.captured.channel)
+        verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
+        verify { NotificationHelper.showApprovalNotification(any(), contact, event, variants, pendingSlot.captured.id) }
+    }
+
+    @Test
     fun `doWork looks ahead seven days for weekly AI draft preparation`() = runTest {
         every { prefs.getGeminiApiKey() } returns "mock_key"
         coEvery { eventDao.getEventsBefore(any()) } returns emptyList()
@@ -154,7 +220,14 @@ class MessageGenerationWorkerTest {
     @Test
     fun `doWork schedules SMART_APPROVE messages for automatic due-time dispatch`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
-        val contact = ContactEntity(id = "c1", name = "John", relationshipType = "FRIEND", preferredChannel = "SMS", automationMode = "DEFAULT")
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            relationshipType = "FRIEND",
+            primaryPhone = "+15551234567",
+            preferredChannel = "SMS",
+            automationMode = "DEFAULT",
+        )
         val variants = MessageVariants("sh", "std", "lg", "fr", "fn", "em", "standard")
         val pendingSlot = slot<PendingMessageEntity>()
 
@@ -199,7 +272,14 @@ class MessageGenerationWorkerTest {
     @Test
     fun `doWork downgrades fallback fully auto draft to smart approve`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
-        val contact = ContactEntity(id = "c1", name = "John", relationshipType = "FRIEND", preferredChannel = "SMS", automationMode = "FULLY_AUTO")
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            relationshipType = "FRIEND",
+            primaryPhone = "+15551234567",
+            preferredChannel = "SMS",
+            automationMode = "FULLY_AUTO",
+        )
         val variants = MessageVariants.fromFallback("Wishing you a very happy birthday! Hope you have a wonderful day!")
         val pendingSlot = slot<PendingMessageEntity>()
 

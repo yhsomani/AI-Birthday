@@ -128,6 +128,26 @@ class HolidayWishWorkerTest {
     }
 
     @Test
+    fun `doWork forces review and skips scheduling holiday wish when no route is available`() = runTest {
+        val contact = contact(automationMode = "FULLY_AUTO", primaryPhone = null)
+        val pendingSlot = slot<PendingMessageEntity>()
+
+        coEvery { contactDao.getAllSync() } returns listOf(contact)
+        coEvery { pendingMessageDao.getByEventId("HOLIDAY_NEW_YEAR_c1_2027") } returns null
+        coEvery { geminiClient.generate(any()) } returns "Happy New Year Amit, hope the year brings more cricket nights and relaxed coffee catchups."
+
+        val result = worker().doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
+        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
+        assertEquals("PENDING", pendingSlot.captured.status)
+        assertEquals("SMS", pendingSlot.captured.channel)
+        verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
+        verify { NotificationHelper.showApprovalNotification(any(), contact, any(), any(), pendingSlot.captured.id) }
+    }
+
+    @Test
     fun `doWork skips holiday wish when deterministic pending already exists`() = runTest {
         val contact = contact(automationMode = "SMART_APPROVE")
         val existing = PendingMessageEntity(
@@ -178,11 +198,15 @@ class HolidayWishWorkerTest {
             .build()
     }
 
-    private fun contact(automationMode: String): ContactEntity {
+    private fun contact(
+        automationMode: String,
+        primaryPhone: String? = "+15551234567",
+    ): ContactEntity {
         return ContactEntity(
             id = "c1",
             name = "Amit Shah",
             relationshipType = "FRIEND",
+            primaryPhone = primaryPhone,
             preferredChannel = "SMS",
             automationMode = automationMode,
             interestsJson = "[\"cricket\",\"coffee\"]",

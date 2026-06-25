@@ -64,7 +64,8 @@ class PromptBuilder {
             appendLine("  \"type\": \"FAMILY|BEST_FRIEND|CLOSE_FRIEND|FRIEND|RELATIVE|COLLEAGUE|CLIENT|MANAGER|MENTOR|ALUMNI|VENDOR|UNKNOWN\",")
             appendLine("  \"confidence\": 0.0,")
             appendLine("  \"language\": \"en|hi|mr|gu|ta|te|bn|pa\",")
-            appendLine("  \"formality\": \"CASUAL|SEMI_FORMAL|FORMAL\"")
+            appendLine("  \"formality\": \"CASUAL|SEMI_FORMAL|FORMAL\",")
+            appendLine("  \"communication_style\": \"WARM|FUNNY|PROFESSIONAL|EMOTIONAL\"")
             append("}")
         }
     }

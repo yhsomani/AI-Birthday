@@ -35,11 +35,19 @@ enum class EventHorizonFilter {
     NEXT_90_DAYS,
 }
 
+enum class ManualEventWarningKind {
+    DUPLICATE,
+    DATE_CONFLICT,
+}
+
 data class ManualEventDuplicateWarning(
     val contactName: String,
     val eventType: String,
     val month: Int,
     val dayOfMonth: Int,
+    val kind: ManualEventWarningKind = ManualEventWarningKind.DUPLICATE,
+    val requestedMonth: Int? = null,
+    val requestedDayOfMonth: Int? = null,
 )
 
 data class EventsUiState(
@@ -155,6 +163,19 @@ class EventsViewModel @Inject constructor(
                         eventType = outcome.existingEvent.type,
                         month = outcome.existingEvent.month,
                         dayOfMonth = outcome.existingEvent.dayOfMonth,
+                    ),
+                    error = null,
+                )
+                is SaveManualEventUseCase.Outcome.ConflictFound -> _uiState.value.copy(
+                    isSavingManualEvent = false,
+                    duplicateWarning = ManualEventDuplicateWarning(
+                        contactName = outcome.contact.name,
+                        eventType = outcome.existingEvent.type,
+                        month = outcome.existingEvent.month,
+                        dayOfMonth = outcome.existingEvent.dayOfMonth,
+                        kind = ManualEventWarningKind.DATE_CONFLICT,
+                        requestedMonth = outcome.requestedMonth,
+                        requestedDayOfMonth = outcome.requestedDayOfMonth,
                     ),
                     error = null,
                 )

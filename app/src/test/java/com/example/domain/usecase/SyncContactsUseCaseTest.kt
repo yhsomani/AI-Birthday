@@ -3,6 +3,7 @@ package com.example.domain.usecase
 import com.example.core.db.entities.ContactEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.service.ContactSyncService
+import com.example.domain.service.DeviceContactsPermissionDeniedException
 import com.example.domain.service.PreferencesRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -111,6 +112,31 @@ class SyncContactsUseCaseTest {
         assertEquals(1, outcome.inserted)
         coVerify { preferencesRepository.setLastSyncError("Google sync failed; imported 1 device contacts.") }
         coVerify { contactRepository.upsert(match { it.id == "device_2" }) }
+    }
+
+    @Test
+    fun `invoke returns device permission outcome when phone contacts permission is denied`() = runTest {
+        val googleContact = ContactEntity(
+            id = "google_1",
+            name = "Anaya Shah",
+            googleContactId = "people/c1",
+        )
+
+        coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
+        coEvery { contactSyncService.fetchDeviceContacts() } throws DeviceContactsPermissionDeniedException()
+        coEvery { preferencesRepository.isGuestMode() } returns false
+        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getById(any()) } returns null
+
+        val outcome = useCase()
+
+        assertEquals(1, outcome.googleCount)
+        assertEquals(0, outcome.deviceCount)
+        assertEquals(true, outcome.deviceContactsPermissionDenied)
+        coVerify {
+            preferencesRepository.setLastSyncError(SyncContactsUseCase.DEVICE_CONTACTS_PERMISSION_ERROR)
+        }
+        coVerify { contactRepository.upsert(match { it.id == "google_1" }) }
     }
 
     @Test

@@ -105,20 +105,11 @@ class GoogleContactsSync(private val context: Context) {
         
         try {
             do {
-                val urlBuilder = StringBuilder("https://people.googleapis.com/v1/people/me/connections")
-                urlBuilder.append("?personFields=").append(baseFields)
-                urlBuilder.append("&pageSize=1000")
-                
-                if (syncToken.isNotEmpty()) {
-                    urlBuilder.append("&syncToken=").append(syncToken)
-                } else {
-                    urlBuilder.append("&requestSyncToken=true")
-                }
-                if (!pageToken.isNullOrEmpty()) {
-                    urlBuilder.append("&pageToken=").append(pageToken)
-                }
-                
-                val url = urlBuilder.toString()
+                val url = PeopleConnectionsRequestUrl.build(
+                    personFields = baseFields,
+                    syncToken = syncToken,
+                    pageToken = pageToken,
+                )
                 Log.d(
                     TAG,
                     "fetchAll: Requesting People API connections page " +

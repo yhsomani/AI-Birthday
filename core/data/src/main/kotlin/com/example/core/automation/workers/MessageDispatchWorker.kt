@@ -13,6 +13,10 @@ import com.example.core.db.dao.SentMessageDao
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.automation.AutomationSchedulePolicy
+import com.example.domain.automation.DispatchBlockReason
+import com.example.domain.automation.DispatchDecision
+import com.example.domain.automation.DispatchEligibilityPolicy
+import com.example.domain.model.MessageStatus
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import androidx.hilt.work.HiltWorker
@@ -57,101 +61,90 @@ class MessageDispatchWorker @AssistedInject constructor(
             return Result.failure()
         }
 
-        val scheduledForMs = pendingMsg.scheduledForMs
-        val approvalWindowMs = 2 * 60 * 60 * 1000L // 2 hours
-        val approvalDeadlineMs = scheduledForMs + approvalWindowMs
         val now = System.currentTimeMillis()
-
-        var shouldSend = false
-
-        when {
-            pendingMsg.status == "APPROVED" -> {
-                shouldSend = true
-            }
-            pendingMsg.status == "SENT" || pendingMsg.status == "DISPATCHING" -> {
-                StructuredLogger.w(TAG, "Message ${pendingMsg.id} is already in state ${pendingMsg.status}; aborting to prevent double-send")
-                com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
-                    context,
-                    context.getString(R.string.notification_setup_double_send_title),
-                    context.getString(R.string.notification_setup_double_send_message, contact.name),
-                )
-                return Result.success()
-            }
-            pendingMsg.status == "REJECTED" -> {
-                StructuredLogger.i(TAG, "Message ${pendingMsg.id} was rejected; skipping")
-                return Result.success()
-            }
-            pendingMsg.status == "PENDING" -> {
-                when {
-                    pendingMsg.approvalMode == "FULLY_AUTO" -> {
-                        shouldSend = true
-                    }
-                    pendingMsg.approvalMode == "SMART_APPROVE" -> {
-                        if (now >= scheduledForMs) {
-                            StructuredLogger.i(TAG, "SMART_APPROVE window passed for ${pendingMsg.id}; auto-sending")
-                            shouldSend = true
-                        } else {
-                            StructuredLogger.i(TAG, "SMART_APPROVE window still active; deferring dispatch")
-                            return Result.success()
-                        }
-                    }
-                    pendingMsg.approvalMode == "VIP_APPROVE" -> {
-                        if (now >= approvalDeadlineMs) {
-                            StructuredLogger.i(TAG, "VIP_APPROVE deadline passed for ${pendingMsg.id} without user action; expiring")
-                            pendingMessageDao.updateStatus(pendingMsg.id, "EXPIRED")
-                            com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
-                                context,
-                                context.getString(R.string.notification_setup_message_expired_title),
-                                context.getString(R.string.notification_setup_message_expired_message, contact.name),
-                            )
-                            return Result.success()
-                        } else {
-                            StructuredLogger.i(TAG, "VIP_APPROVE message still pending user action; waiting")
-                            return Result.success()
-                        }
-                    }
-                    else -> {
-                        StructuredLogger.i(TAG, "Message still pending approval; waiting")
-                        return Result.success()
-                    }
-                }
-            }
-        }
-
-        if (shouldSend) {
-            val prefs = SecurePrefs(context)
-            val nextAllowedSendMs = AutomationSchedulePolicy.nextAllowedSendMs(
-                candidateMs = now,
-                quietHoursStart = prefs.getQuietHoursStart(),
-                quietHoursEnd = prefs.getQuietHoursEnd(),
-                blackoutDatesJson = prefs.getBlackoutDates(),
-                nowMs = now,
-            )
-            if (nextAllowedSendMs > now) {
-                StructuredLogger.i(TAG, "Deferring dispatch due to quiet hours or blackout date", mapOf(
+        when (val decision = DispatchEligibilityPolicy.evaluate(pendingMsg, nowMs = now)) {
+            DispatchDecision.SendNow -> Unit
+            is DispatchDecision.DeferUntil -> {
+                StructuredLogger.i(TAG, "Deferring dispatch until scheduled time", mapOf(
                     "pendingMessageId" to pendingMsg.id,
-                    "nextAllowedSendMs" to nextAllowedSendMs.toString(),
+                    "scheduledForMs" to decision.epochMs.toString(),
+                    "reason" to decision.reason.name,
                 ))
-                pendingMessageDao.insert(pendingMsg.copy(scheduledForMs = nextAllowedSendMs))
+                if (decision.epochMs != pendingMsg.scheduledForMs) {
+                    pendingMessageDao.insert(pendingMsg.copy(scheduledForMs = decision.epochMs))
+                }
                 DailyScheduler.scheduleExactSend(context, pendingMsg.id)
                 return Result.success()
             }
-
-            // Idempotency: mark status as DISPATCHING immediately
-            pendingMessageDao.updateStatus(pendingMsg.id, "DISPATCHING")
-
-            try {
-                val dispatcher = MessageDispatcher(context, pendingMessageDao, sentMessageDao, contactDao, eventDao)
-                dispatcher.dispatch(pendingMsg, contact)
-            } catch (e: Exception) {
-                StructuredLogger.e(TAG, "Dispatch failed unexpectedly for message ${pendingMsg.id}", e)
-                runCatching {
-                    pendingMessageDao.updateStatus(pendingMsg.id, "FAILED")
-                }.onFailure { statusError ->
-                    StructuredLogger.e(TAG, "Failed to mark message ${pendingMsg.id} as FAILED after dispatch exception", statusError)
-                }
-                return Result.failure()
+            is DispatchDecision.NeedsApproval -> {
+                StructuredLogger.i(TAG, "Message still pending approval; waiting", mapOf(
+                    "pendingMessageId" to pendingMsg.id,
+                    "approvalMode" to decision.approvalMode.raw,
+                ))
+                return Result.success()
             }
+            is DispatchDecision.Expire -> {
+                StructuredLogger.i(TAG, "Approval deadline passed without user action; expiring", mapOf(
+                    "pendingMessageId" to pendingMsg.id,
+                    "reason" to decision.reason.name,
+                ))
+                pendingMessageDao.updateStatus(pendingMsg.id, MessageStatus.EXPIRED.raw)
+                com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
+                    context,
+                    context.getString(R.string.notification_setup_message_expired_title),
+                    context.getString(R.string.notification_setup_message_expired_message, contact.name),
+                )
+                return Result.success()
+            }
+            is DispatchDecision.Blocked -> {
+                StructuredLogger.i(TAG, "Dispatch blocked by message state", mapOf(
+                    "pendingMessageId" to pendingMsg.id,
+                    "status" to pendingMsg.status,
+                    "reason" to decision.reason.name,
+                ))
+                if (decision.reason == DispatchBlockReason.ALREADY_HANDLED) {
+                    com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
+                        context,
+                        context.getString(R.string.notification_setup_double_send_title),
+                        context.getString(R.string.notification_setup_double_send_message, contact.name),
+                    )
+                }
+                return Result.success()
+            }
+        }
+
+        val prefs = SecurePrefs(context)
+        val nextAllowedSendMs = AutomationSchedulePolicy.nextAllowedSendMs(
+            candidateMs = now,
+            quietHoursStart = prefs.getQuietHoursStart(),
+            quietHoursEnd = prefs.getQuietHoursEnd(),
+            blackoutDatesJson = prefs.getBlackoutDates(),
+            nowMs = now,
+        )
+        if (nextAllowedSendMs > now) {
+            StructuredLogger.i(TAG, "Deferring dispatch due to quiet hours or blackout date", mapOf(
+                "pendingMessageId" to pendingMsg.id,
+                "nextAllowedSendMs" to nextAllowedSendMs.toString(),
+            ))
+            pendingMessageDao.insert(pendingMsg.copy(scheduledForMs = nextAllowedSendMs))
+            DailyScheduler.scheduleExactSend(context, pendingMsg.id)
+            return Result.success()
+        }
+
+        // Idempotency: mark status as DISPATCHING immediately
+        pendingMessageDao.updateStatus(pendingMsg.id, MessageStatus.DISPATCHING.raw)
+
+        try {
+            val dispatcher = MessageDispatcher(context, pendingMessageDao, sentMessageDao, contactDao, eventDao)
+            dispatcher.dispatch(pendingMsg, contact)
+        } catch (e: Exception) {
+            StructuredLogger.e(TAG, "Dispatch failed unexpectedly for message ${pendingMsg.id}", e)
+            runCatching {
+                pendingMessageDao.updateStatus(pendingMsg.id, MessageStatus.FAILED.raw)
+            }.onFailure { statusError ->
+                StructuredLogger.e(TAG, "Failed to mark message ${pendingMsg.id} as FAILED after dispatch exception", statusError)
+            }
+            return Result.failure()
         }
 
         return Result.success()

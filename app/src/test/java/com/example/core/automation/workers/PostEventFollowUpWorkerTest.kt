@@ -92,6 +92,7 @@ class PostEventFollowUpWorkerTest {
             id = "c1",
             name = "Amit",
             relationshipType = "FRIEND",
+            primaryPhone = "+15551234567",
             preferredChannel = "SMS",
             automationMode = "FULLY_AUTO",
         )
@@ -117,12 +118,42 @@ class PostEventFollowUpWorkerTest {
     }
 
     @Test
+    fun `doWork forces review and skips scheduling follow-up when no route is available`() = runTest {
+        val sent = sentMessage(id = "sent1", contactId = "c1", eventType = "event1")
+        val contact = ContactEntity(
+            id = "c1",
+            name = "Amit",
+            relationshipType = "FRIEND",
+            preferredChannel = "SMS",
+            automationMode = "FULLY_AUTO",
+        )
+        val pendingSlot = slot<PendingMessageEntity>()
+
+        coEvery { sentMessageDao.getPostEventFollowUpCandidates(any(), any(), any()) } returns listOf(sent)
+        coEvery { pendingMessageDao.getByEventId("FOLLOWUP_sent1") } returns null
+        coEvery { contactDao.getById("c1") } returns contact
+        coEvery { eventDao.getById("event1") } returns null
+        coEvery { geminiClient.generate(any()) } returns "Hey Amit, hope your birthday dinner was fun. Did you try that new place?"
+
+        val result = worker().doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
+        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
+        assertEquals("PENDING", pendingSlot.captured.status)
+        assertEquals("SMS", pendingSlot.captured.channel)
+        verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
+        verify { NotificationHelper.showApprovalNotification(any(), contact, any(), any(), pendingSlot.captured.id) }
+    }
+
+    @Test
     fun `doWork downgrades fallback fully auto follow-up to smart approve`() = runTest {
         val sent = sentMessage(id = "sent1", contactId = "c1", eventType = "event1")
         val contact = ContactEntity(
             id = "c1",
             name = "Amit",
             relationshipType = "FRIEND",
+            primaryPhone = "+15551234567",
             preferredChannel = "SMS",
             automationMode = "FULLY_AUTO",
         )

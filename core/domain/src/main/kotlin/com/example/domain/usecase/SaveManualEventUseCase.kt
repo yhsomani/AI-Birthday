@@ -2,11 +2,12 @@ package com.example.domain.usecase
 
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
+import com.example.domain.event.EventDatePolicy
+import com.example.domain.event.EventIdentityPolicy
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
 import kotlinx.coroutines.flow.first
-import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
@@ -36,34 +37,66 @@ class SaveManualEventUseCase @Inject constructor(
             else -> return Outcome.InvalidInput("Choose a contact or enter a new contact name.")
         }
 
-        if (!isValidDate(request.dayOfMonth, request.month, request.year)) {
+        if (!EventDatePolicy.isValidDate(request.dayOfMonth, request.month, request.year)) {
             return Outcome.InvalidInput("Enter a valid date.")
         }
 
+        val existingEvents = existingEvents()
+        val existingConflict = EventIdentityPolicy.findConflictingActiveEvent(
+            events = existingEvents,
+            contactId = contact.id,
+            eventType = normalizedType,
+            month = request.month,
+            dayOfMonth = request.dayOfMonth,
+            label = normalizedLabel,
+        )
+
         if (!request.allowDuplicate) {
-            val existingDuplicate = findDuplicateEvent(
+            val existingDuplicate = EventIdentityPolicy.findMatchingActiveEvent(
+                events = existingEvents,
                 contactId = contact.id,
                 eventType = normalizedType,
-                label = normalizedLabel,
                 month = request.month,
                 dayOfMonth = request.dayOfMonth,
+                label = normalizedLabel,
             )
             if (existingDuplicate != null) {
                 return Outcome.DuplicateFound(contact = contact, existingEvent = existingDuplicate)
             }
+            if (existingConflict != null) {
+                return Outcome.ConflictFound(
+                    contact = contact,
+                    existingEvent = existingConflict,
+                    requestedMonth = request.month,
+                    requestedDayOfMonth = request.dayOfMonth,
+                    requestedYear = request.year,
+                )
+            }
         }
 
-        val nextOccurrenceMs = nextOccurrenceMs(request.dayOfMonth, request.month)
-        val updatedContact = contact.withEventDate(
-            eventType = normalizedType,
-            day = request.dayOfMonth,
-            month = request.month,
-            year = request.year,
-        )
-        contactRepository.upsert(updatedContact)
+        val nextOccurrenceMs = EventDatePolicy.nextOccurrenceMs(request.dayOfMonth, request.month)
+            ?: return Outcome.InvalidInput("Enter a valid date.")
+        val shouldUpdateContactEventDate = existingConflict == null
+        val updatedContact = if (shouldUpdateContactEventDate) {
+            contact.withEventDate(
+                eventType = normalizedType,
+                day = request.dayOfMonth,
+                month = request.month,
+                year = request.year,
+            )
+        } else {
+            contact
+        }
+        if (shouldUpdateContactEventDate) {
+            contactRepository.upsert(updatedContact)
+        }
 
         val event = EventEntity(
-            id = "manual_${UUID.randomUUID()}",
+            id = eventIdFor(
+                contact = updatedContact,
+                eventType = normalizedType,
+                allowDuplicate = request.allowDuplicate,
+            ),
             contactId = updatedContact.id,
             type = normalizedType,
             label = normalizedLabel ?: updatedContact.name,
@@ -125,96 +158,37 @@ class SaveManualEventUseCase @Inject constructor(
         data class Saved(val contact: ContactEntity, val event: EventEntity) : Outcome()
         data class InvalidInput(val message: String) : Outcome()
         data class DuplicateFound(val contact: ContactEntity, val existingEvent: EventEntity) : Outcome()
+        data class ConflictFound(
+            val contact: ContactEntity,
+            val existingEvent: EventEntity,
+            val requestedMonth: Int,
+            val requestedDayOfMonth: Int,
+            val requestedYear: Int?,
+        ) : Outcome()
         data object ContactNotFound : Outcome()
     }
 
-    private suspend fun findDuplicateEvent(
-        contactId: String,
-        eventType: String,
-        label: String?,
-        month: Int,
-        dayOfMonth: Int,
-    ): EventEntity? {
-        val events = runCatching { eventRepository.getAll().first() }.getOrDefault(emptyList())
-        return events.firstOrNull { event ->
-            event.isActive &&
-                event.contactId == contactId &&
-                event.type.equals(eventType, ignoreCase = true) &&
-                event.month == month &&
-                event.dayOfMonth == dayOfMonth &&
-                labelsAreCompatibleForDuplicate(eventType, event.label, label)
-        }
+    private suspend fun existingEvents(): List<EventEntity> {
+        return runCatching { eventRepository.getAll().first() }.getOrDefault(emptyList())
     }
 
-    private fun labelsAreCompatibleForDuplicate(
+    private fun eventIdFor(
+        contact: ContactEntity,
         eventType: String,
-        existingLabel: String?,
-        newLabel: String?,
-    ): Boolean {
-        if (eventType != "CUSTOM") return true
-        val normalizedExisting = existingLabel.orEmpty().trim().lowercase(Locale.US)
-        val normalizedNew = newLabel.orEmpty().trim().lowercase(Locale.US)
-        return normalizedExisting.isBlank() ||
-            normalizedNew.isBlank() ||
-            normalizedExisting == normalizedNew
+        allowDuplicate: Boolean,
+    ): String {
+        if (allowDuplicate) return "manual_${UUID.randomUUID()}"
+        return EventIdentityPolicy.canonicalId(contact.id, eventType) ?: "manual_${UUID.randomUUID()}"
     }
 
     companion object {
         fun isValidDate(day: Int, month: Int, year: Int?): Boolean {
-            if (month !in 1..12 || day !in 1..31) return false
-            val validationYear = year ?: 2024
-            return try {
-                Calendar.getInstance().apply {
-                    isLenient = false
-                    set(Calendar.YEAR, validationYear)
-                    set(Calendar.MONTH, month - 1)
-                    set(Calendar.DAY_OF_MONTH, day)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                    timeInMillis
-                }
-                true
-            } catch (_: IllegalArgumentException) {
-                false
-            }
+            return EventDatePolicy.isValidDate(day, month, year)
         }
 
         fun nextOccurrenceMs(day: Int, month: Int, nowMs: Long = System.currentTimeMillis()): Long {
-            val calendar = Calendar.getInstance().apply {
-                timeInMillis = nowMs
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-            var candidateYear = calendar.get(Calendar.YEAR)
-            while (true) {
-                val candidate = tryCreateDate(candidateYear, month, day)
-                if (candidate != null && candidate.timeInMillis >= calendar.timeInMillis) {
-                    return candidate.timeInMillis
-                }
-                candidateYear++
-            }
-        }
-
-        private fun tryCreateDate(year: Int, month: Int, day: Int): Calendar? {
-            return try {
-                Calendar.getInstance().apply {
-                    isLenient = false
-                    set(Calendar.YEAR, year)
-                    set(Calendar.MONTH, month - 1)
-                    set(Calendar.DAY_OF_MONTH, day)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                    timeInMillis
-                }
-            } catch (_: IllegalArgumentException) {
-                null
-            }
+            return EventDatePolicy.nextOccurrenceMs(day, month, nowMs)
+                ?: throw IllegalArgumentException("Invalid event date")
         }
     }
 }

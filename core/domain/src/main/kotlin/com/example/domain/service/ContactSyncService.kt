@@ -6,3 +6,7 @@ interface ContactSyncService {
     suspend fun fetchGoogleContacts(forceRefresh: Boolean = false): List<ContactEntity>
     suspend fun fetchDeviceContacts(): List<ContactEntity>
 }
+
+class DeviceContactsPermissionDeniedException(
+    message: String = "Device contacts permission is missing."
+) : SecurityException(message)

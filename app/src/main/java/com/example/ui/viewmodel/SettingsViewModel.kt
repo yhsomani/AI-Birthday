@@ -218,14 +218,19 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSyncing = true, syncError = null)
             try {
-                syncContactsUseCase(forceRefresh = true)
+                val outcome = syncContactsUseCase(forceRefresh = true)
+                val permissionMessage = appContext.getString(R.string.settings_sync_contacts_device_permission_missing)
                 _uiState.value = _uiState.value.copy(
                     isSyncing = false,
                     lastSyncTimestamp = appContext.getString(R.string.settings_last_sync_just_now),
-                    syncError = null,
+                    syncError = if (outcome.deviceContactsPermissionDenied) permissionMessage else null,
                     feedbackEvent = FeedbackEvent(
-                        message = UiText.Resource(R.string.settings_sync_contacts_success),
-                        type = FeedbackType.SUCCESS,
+                        message = if (outcome.deviceContactsPermissionDenied) {
+                            UiText.Dynamic(permissionMessage)
+                        } else {
+                            UiText.Resource(R.string.settings_sync_contacts_success)
+                        },
+                        type = if (outcome.deviceContactsPermissionDenied) FeedbackType.ERROR else FeedbackType.SUCCESS,
                     ),
                 )
             } catch (e: Exception) {

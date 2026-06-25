@@ -114,6 +114,24 @@ class ResponseParserTest {
     }
 
     @Test
+    fun `parseMessageVariants returns anniversary fallback for malformed anniversary response`() {
+        val variants = ResponseParser.parseMessageVariants("garbage", eventType = "ANNIVERSARY")
+
+        assertEquals("Happy Anniversary! Wishing you both a lifetime of love and happiness.", variants.standard)
+        assertEquals("standard", variants.recommended)
+        assertTrue(variants.isUsingFallback)
+    }
+
+    @Test
+    fun `parseMessageVariants returns work anniversary fallback for malformed work anniversary response`() {
+        val variants = ResponseParser.parseMessageVariants("garbage", eventType = "WORK_ANNIVERSARY")
+
+        assertEquals("Congratulations on your work anniversary! Thank you for your hard work and dedication.", variants.standard)
+        assertEquals("standard", variants.recommended)
+        assertTrue(variants.isUsingFallback)
+    }
+
+    @Test
     fun `parseMessageVariants fills missing fields with defaults`() {
         val json = """{"short": "Hey!"}""".trimIndent()
 

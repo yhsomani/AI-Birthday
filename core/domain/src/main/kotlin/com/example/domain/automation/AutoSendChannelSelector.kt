@@ -8,6 +8,33 @@ object AutoSendChannelSelector {
     private val supportedChannels = setOf("SMS", "WHATSAPP", "EMAIL")
     private val deliverySuccessStatuses = setOf("SENT", "DELIVERED", "PENDING_DELIVERY")
 
+    sealed class ChannelSelection {
+        abstract val channel: String
+        abstract val hasAvailableRoute: Boolean
+
+        data class Selected(
+            override val channel: String,
+            val availableChannels: Set<String>,
+        ) : ChannelSelection() {
+            override val hasAvailableRoute: Boolean = true
+        }
+
+        data class NoAvailableRoute(
+            override val channel: String,
+            val reasons: Set<NoRouteReason>,
+        ) : ChannelSelection() {
+            override val hasAvailableRoute: Boolean = false
+        }
+    }
+
+    enum class NoRouteReason {
+        CHANNEL_BLACKED_OUT,
+        MISSING_PHONE,
+        MISSING_EMAIL,
+        EMAIL_SENDER_NOT_CONFIGURED,
+        NO_SUPPORTED_CONTACT_CHANNEL,
+    }
+
     fun select(
         contact: ContactEntity,
         previousMessages: List<SentMessageEntity>,
@@ -15,6 +42,22 @@ object AutoSendChannelSelector {
         senderEmail: String,
         senderEmailPassword: String,
     ): String {
+        return selectRoute(
+            contact = contact,
+            previousMessages = previousMessages,
+            channelBlackoutJson = channelBlackoutJson,
+            senderEmail = senderEmail,
+            senderEmailPassword = senderEmailPassword,
+        ).channel
+    }
+
+    fun selectRoute(
+        contact: ContactEntity,
+        previousMessages: List<SentMessageEntity>,
+        channelBlackoutJson: String,
+        senderEmail: String,
+        senderEmailPassword: String,
+    ): ChannelSelection {
         val availableChannels = availableChannels(
             contact = contact,
             channelBlackoutJson = channelBlackoutJson,
@@ -22,7 +65,15 @@ object AutoSendChannelSelector {
             senderEmailPassword = senderEmailPassword,
         )
         if (availableChannels.isEmpty()) {
-            return contact.preferredChannel.normalizedChannel().takeIf { it in supportedChannels } ?: "SMS"
+            return ChannelSelection.NoAvailableRoute(
+                channel = fallbackChannel(contact),
+                reasons = noRouteReasons(
+                    contact = contact,
+                    channelBlackoutJson = channelBlackoutJson,
+                    senderEmail = senderEmail,
+                    senderEmailPassword = senderEmailPassword,
+                ),
+            )
         }
 
         val preferred = contact.preferredChannel.normalizedChannel()
@@ -39,11 +90,15 @@ object AutoSendChannelSelector {
             )
             ?.key
 
-        return when {
+        val selectedChannel = when {
             bestHistorical != null -> bestHistorical
             preferred in availableChannels -> preferred
             else -> defaultOrder.first { it in availableChannels }
         }
+        return ChannelSelection.Selected(
+            channel = selectedChannel,
+            availableChannels = availableChannels,
+        )
     }
 
     private fun availableChannels(
@@ -64,6 +119,44 @@ object AutoSendChannelSelector {
                 }
             }
             .toSet()
+    }
+
+    private fun noRouteReasons(
+        contact: ContactEntity,
+        channelBlackoutJson: String,
+        senderEmail: String,
+        senderEmailPassword: String,
+    ): Set<NoRouteReason> {
+        val blocked = channelBlackoutJson.toChannelSet()
+        val reasons = mutableSetOf<NoRouteReason>()
+
+        defaultOrder.forEach { channel ->
+            if (channel in blocked) {
+                reasons += NoRouteReason.CHANNEL_BLACKED_OUT
+                return@forEach
+            }
+            when (channel) {
+                "SMS", "WHATSAPP" -> {
+                    if (contact.primaryPhone.isNullOrBlank()) {
+                        reasons += NoRouteReason.MISSING_PHONE
+                    }
+                }
+                "EMAIL" -> {
+                    if (contact.primaryEmail.isNullOrBlank()) {
+                        reasons += NoRouteReason.MISSING_EMAIL
+                    }
+                    if (senderEmail.isBlank() || senderEmailPassword.isBlank()) {
+                        reasons += NoRouteReason.EMAIL_SENDER_NOT_CONFIGURED
+                    }
+                }
+            }
+        }
+
+        return reasons.ifEmpty { setOf(NoRouteReason.NO_SUPPORTED_CONTACT_CHANNEL) }
+    }
+
+    private fun fallbackChannel(contact: ContactEntity): String {
+        return contact.preferredChannel.normalizedChannel().takeIf { it in supportedChannels } ?: "SMS"
     }
 
     private fun preferredTieBreakRank(channel: String, preferred: String): Int {

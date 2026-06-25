@@ -2,7 +2,10 @@ package com.example.domain.automation
 
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.SentMessageEntity
+import com.example.domain.automation.AutoSendChannelSelector.NoRouteReason
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AutoSendChannelSelectorTest {
@@ -102,6 +105,54 @@ class AutoSendChannelSelectorTest {
         )
 
         assertEquals("EMAIL", result)
+    }
+
+    @Test
+    fun `selectRoute returns no available route with reasons when every channel is unsendable`() {
+        val contact = contact(preferredChannel = "email")
+
+        val result = AutoSendChannelSelector.selectRoute(
+            contact = contact,
+            previousMessages = emptyList(),
+            channelBlackoutJson = "[]",
+            senderEmail = "",
+            senderEmailPassword = "",
+        )
+
+        assertTrue(result is AutoSendChannelSelector.ChannelSelection.NoAvailableRoute)
+        val noRoute = result as AutoSendChannelSelector.ChannelSelection.NoAvailableRoute
+        assertFalse(noRoute.hasAvailableRoute)
+        assertEquals("EMAIL", noRoute.channel)
+        assertEquals(
+            setOf(
+                NoRouteReason.MISSING_PHONE,
+                NoRouteReason.MISSING_EMAIL,
+                NoRouteReason.EMAIL_SENDER_NOT_CONFIGURED,
+            ),
+            noRoute.reasons,
+        )
+    }
+
+    @Test
+    fun `selectRoute returns no available route when all usable channels are blacked out`() {
+        val contact = contact(
+            preferredChannel = "SMS",
+            primaryPhone = "+15551234567",
+            primaryEmail = "alex@example.com",
+        )
+
+        val result = AutoSendChannelSelector.selectRoute(
+            contact = contact,
+            previousMessages = emptyList(),
+            channelBlackoutJson = "[\"SMS\", \"WHATSAPP\", \"EMAIL\"]",
+            senderEmail = "me@example.com",
+            senderEmailPassword = "app-password",
+        )
+
+        assertTrue(result is AutoSendChannelSelector.ChannelSelection.NoAvailableRoute)
+        val noRoute = result as AutoSendChannelSelector.ChannelSelection.NoAvailableRoute
+        assertEquals("SMS", noRoute.channel)
+        assertEquals(setOf(NoRouteReason.CHANNEL_BLACKED_OUT), noRoute.reasons)
     }
 
     private fun contact(
