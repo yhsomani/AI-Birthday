@@ -3,12 +3,16 @@ package com.example.ui.screens.contacts
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.ui.viewmodel.MemoryNoteCategorySummary
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,6 +59,10 @@ class ContactDetailPersonalizationQualityCardTest {
                 notesText = "Met at college reunion.",
                 preferredChannel = "EMAIL",
             ),
+            memoryNoteCount = 1,
+            memoryNoteCategorySummary = listOf(
+                MemoryNoteCategorySummary(category = "GENERAL", count = 1),
+            ),
         )
 
         composeRule.onNodeWithText(
@@ -65,12 +73,76 @@ class ContactDetailPersonalizationQualityCardTest {
         ).assertIsDisplayed()
     }
 
+    @Test
+    fun memoryVaultNotesCompleteMemorySignal() {
+        composeRule.setQualityCardContent(
+            contact = ContactEntity(
+                id = "contact_1",
+                name = "Asha",
+                nickname = "Ash",
+                interestsJson = """["music"]""",
+                notesText = "",
+                preferredChannel = "SMS",
+            ),
+            memoryNoteCount = 2,
+            memoryNoteCategorySummary = listOf(
+                MemoryNoteCategorySummary(category = "GIFT", count = 1),
+                MemoryNoteCategorySummary(category = "PREFERENCE", count = 1),
+            ),
+        )
+
+        composeRule.onNodeWithText(
+            context.getString(R.string.personalization_quality_title, 100),
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            context.getString(R.string.personalization_quality_ready),
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            context.getString(
+                R.string.personalization_quality_memory_summary,
+                2,
+                "${context.getString(R.string.memory_category_gift)} 1, ${context.getString(R.string.memory_category_preference)} 1",
+            ),
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun missingMemoryShowsClearAddMemoryAction() {
+        val actions = mutableListOf<String>()
+        composeRule.setQualityCardContent(
+            contact = ContactEntity(
+                id = "contact_1",
+                name = "Asha",
+                nickname = "Ash",
+                interestsJson = """["music"]""",
+                preferredChannel = "SMS",
+            ),
+            onAddMemory = { actions += "add-memory" },
+        )
+
+        composeRule.onNodeWithText(
+            context.getString(R.string.personalization_quality_add_one_memory),
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(ContactDetailTestTags.PERSONALIZATION_ADD_MEMORY)
+            .performClick()
+
+        assertEquals(listOf("add-memory"), actions)
+    }
+
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.setQualityCardContent(
         contact: ContactEntity,
+        memoryNoteCount: Int = 0,
+        memoryNoteCategorySummary: List<MemoryNoteCategorySummary> = emptyList(),
+        onAddMemory: () -> Unit = {},
     ) {
         setContent {
             RelateAITheme {
-                PersonalizationQualityCard(contact = contact)
+                PersonalizationQualityCard(
+                    contact = contact,
+                    memoryNoteCount = memoryNoteCount,
+                    memoryNoteCategorySummary = memoryNoteCategorySummary,
+                    onAddMemory = onAddMemory,
+                )
             }
         }
     }

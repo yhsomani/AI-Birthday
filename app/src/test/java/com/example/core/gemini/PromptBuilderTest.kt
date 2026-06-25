@@ -5,6 +5,7 @@ import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.db.entities.StyleProfileEntity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -186,6 +187,32 @@ class PromptBuilderTest {
         assertTrue(prompt.contains("photography"))
         assertTrue(prompt.contains("Paris trip"))
         assertTrue(prompt.contains("JSON"))
+    }
+
+    @Test
+    fun `buildMessageGenerationPrompt does not demand invented specifics when context is sparse`() {
+        val ctx = ContactContextObject(
+            firstName = "Grace", nickname = null,
+            relationshipType = "FRIEND",
+            knownSince = null, ageTurning = null,
+            interests = emptyList(),
+            sharedHistory = emptyList(),
+            daysSinceLastContact = 0,
+            eventType = "BIRTHDAY",
+            eventOccurrenceNumber = null,
+            preferredLanguage = "en",
+            userStyleSamples = emptyList(),
+            usesEmoji = true,
+            avgMessageLength = 100,
+            commonPhrases = emptyList(),
+            previousWishes = emptyList(),
+            formalityLevel = "CASUAL",
+        )
+
+        val prompt = builder.buildMessageGenerationPrompt(ctx)
+
+        assertTrue(prompt.contains("Do not invent interests, memories, life events, or private details"))
+        assertFalse(prompt.contains("Reference at least one real specific interest"))
     }
 
     @Test

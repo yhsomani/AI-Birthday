@@ -39,6 +39,17 @@
     <string name="memory_vault_title_with_contact">Memory Vault: %1$s</string>
     <string name="memory_vault_add_title">Add new memory or fact</string>
     <string name="memory_vault_note_placeholder">e.g. Likes mango lassi; met at college reunion</string>
+    <string name="memory_vault_suggested_prompts_title">Memory prompts</string>
+    <string name="memory_prompt_favorite_food">Favorite food</string>
+    <string name="memory_prompt_favorite_food_template">Favorite food: </string>
+    <string name="memory_prompt_recent_life_update">Recent life update</string>
+    <string name="memory_prompt_recent_life_update_template">Recent life update: </string>
+    <string name="memory_prompt_inside_joke">Inside joke</string>
+    <string name="memory_prompt_inside_joke_template">Inside joke: </string>
+    <string name="memory_prompt_things_to_avoid">Things to avoid</string>
+    <string name="memory_prompt_things_to_avoid_template">Things to avoid: </string>
+    <string name="memory_prompt_gift_preference">Gift preference</string>
+    <string name="memory_prompt_gift_preference_template">Gift preference: </string>
     <string name="memory_vault_note_counter">%1$d/%2$d characters</string>
     <string name="memory_vault_add_button">Add to Vault</string>
     <string name="memory_vault_journal_title">Relationship Journal</string>
@@ -796,6 +807,9 @@
     <string name="personalization_quality_channel">Preferred channel selected</string>
     <string name="personalization_quality_next_step">Next: %1$s</string>
     <string name="personalization_quality_ready">Ready for personalized wishes.</string>
+    <string name="personalization_quality_memory_summary">%1$d memory note(s): %2$s</string>
+    <string name="personalization_quality_memory_category_count">%1$s %2$d</string>
+    <string name="personalization_quality_add_one_memory">Add 1 memory to improve AI quality</string>
     <string name="personalization_quality_add_nickname">add a nickname or close name</string>
     <string name="personalization_quality_add_interests">add interests or hobbies</string>
     <string name="personalization_quality_add_memory_notes">add a memory or personal note</string>

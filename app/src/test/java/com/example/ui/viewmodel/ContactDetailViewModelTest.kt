@@ -4,8 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
+import com.example.core.db.entities.MemoryNoteEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.usecase.GenerateMessageUseCase
 import com.example.domain.usecase.UpdateContactPreferencesUseCase
 import io.mockk.coEvery
@@ -39,6 +41,9 @@ class ContactDetailViewModelTest {
     private lateinit var mockEventRepo: EventRepository
 
     @RelaxedMockK
+    private lateinit var mockMemoryNoteRepository: MemoryNoteRepository
+
+    @RelaxedMockK
     private lateinit var mockGenerateUseCase: GenerateMessageUseCase
 
     @RelaxedMockK
@@ -49,6 +54,7 @@ class ContactDetailViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        coEvery { mockMemoryNoteRepository.getByContact("contact1") } returns emptyList()
     }
 
     @After
@@ -77,18 +83,41 @@ class ContactDetailViewModelTest {
 
         coEvery { mockContactRepo.getById("contact1") } returns contact
         coEvery { mockEventRepo.getUpcoming(365) } returns listOf(event)
+        coEvery { mockMemoryNoteRepository.getByContact("contact1") } returns listOf(
+            MemoryNoteEntity(
+                id = "memory1",
+                contactId = "contact1",
+                noteText = "Met at college reunion.",
+                category = "EVENT",
+            ),
+            MemoryNoteEntity(
+                id = "memory2",
+                contactId = "contact1",
+                noteText = "Likes books.",
+                category = "GIFT",
+            ),
+        )
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact1"))
         val viewModel = ContactDetailViewModel(
             savedStateHandle = savedStateHandle,
             contactRepository = mockContactRepo,
             eventRepository = mockEventRepo,
+            memoryNoteRepository = mockMemoryNoteRepository,
             generateMessageUseCase = mockGenerateUseCase,
             updateContactPreferencesUseCase = mockUpdateContactPreferencesUseCase,
         )
         advanceUntilIdle()
 
         assertEquals("Alice", viewModel.uiState.value.contact?.name)
+        assertEquals(2, viewModel.uiState.value.memoryNoteCount)
+        assertEquals(
+            listOf(
+                MemoryNoteCategorySummary(category = "EVENT", count = 1),
+                MemoryNoteCategorySummary(category = "GIFT", count = 1),
+            ),
+            viewModel.uiState.value.memoryNoteCategorySummary,
+        )
         assertNotNull(viewModel.uiState.value.upcomingBirthdayDaysLeft)
         assertEquals(false, viewModel.uiState.value.isLoading)
     }
@@ -118,6 +147,7 @@ class ContactDetailViewModelTest {
             savedStateHandle = savedStateHandle,
             contactRepository = mockContactRepo,
             eventRepository = mockEventRepo,
+            memoryNoteRepository = mockMemoryNoteRepository,
             generateMessageUseCase = mockGenerateUseCase,
             updateContactPreferencesUseCase = mockUpdateContactPreferencesUseCase,
         )
@@ -154,6 +184,7 @@ class ContactDetailViewModelTest {
             savedStateHandle = savedStateHandle,
             contactRepository = mockContactRepo,
             eventRepository = mockEventRepo,
+            memoryNoteRepository = mockMemoryNoteRepository,
             generateMessageUseCase = mockGenerateUseCase,
             updateContactPreferencesUseCase = mockUpdateContactPreferencesUseCase,
         )
@@ -191,6 +222,7 @@ class ContactDetailViewModelTest {
             savedStateHandle = savedStateHandle,
             contactRepository = mockContactRepo,
             eventRepository = mockEventRepo,
+            memoryNoteRepository = mockMemoryNoteRepository,
             generateMessageUseCase = mockGenerateUseCase,
             updateContactPreferencesUseCase = mockUpdateContactPreferencesUseCase,
         )

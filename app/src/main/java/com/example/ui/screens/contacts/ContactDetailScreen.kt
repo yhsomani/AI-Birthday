@@ -46,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,6 +66,11 @@ import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.core.db.entities.ContactEntity
 import com.example.domain.usecase.UpdateContactPreferencesUseCase
 import com.example.ui.viewmodel.ContactDetailViewModel
+import com.example.ui.viewmodel.MemoryNoteCategorySummary
+
+internal object ContactDetailTestTags {
+    const val PERSONALIZATION_ADD_MEMORY = "contact_detail_personalization_add_memory"
+}
 
 @Composable
 fun ContactDetailScreen(
@@ -249,7 +255,12 @@ fun ContactDetailScreen(
                         },
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    PersonalizationQualityCard(contact = it)
+                    PersonalizationQualityCard(
+                        contact = it,
+                        memoryNoteCount = state.memoryNoteCount,
+                        memoryNoteCategorySummary = state.memoryNoteCategorySummary,
+                        onAddMemory = { onNavigateToMemoryVault(contactId) },
+                    )
                 }
 
                 state.preferenceMessageRes?.let { messageRes ->
@@ -359,7 +370,12 @@ fun ContactDetailScreen(
 }
 
 @Composable
-internal fun PersonalizationQualityCard(contact: ContactEntity) {
+internal fun PersonalizationQualityCard(
+    contact: ContactEntity,
+    memoryNoteCount: Int = 0,
+    memoryNoteCategorySummary: List<MemoryNoteCategorySummary> = emptyList(),
+    onAddMemory: () -> Unit = {},
+) {
     val checklist = listOf(
         PersonalizationQualityItem(
             labelRes = R.string.personalization_quality_nickname,
@@ -374,7 +390,7 @@ internal fun PersonalizationQualityCard(contact: ContactEntity) {
         PersonalizationQualityItem(
             labelRes = R.string.personalization_quality_memory_notes,
             promptRes = R.string.personalization_quality_add_memory_notes,
-            isComplete = contact.notesText.isNotBlank(),
+            isComplete = memoryNoteCount > 0,
         ),
         PersonalizationQualityItem(
             labelRes = R.string.personalization_quality_channel,
@@ -406,6 +422,30 @@ internal fun PersonalizationQualityCard(contact: ContactEntity) {
                 style = MaterialTheme.typography.bodySmall,
                 color = RelateOnSurfaceVariant,
             )
+            if (memoryNoteCount > 0) {
+                Text(
+                    text = stringResource(
+                        R.string.personalization_quality_memory_summary,
+                        memoryNoteCount,
+                        memoryNoteCategorySummaryText(memoryNoteCategorySummary),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RelateOnSurfaceVariant,
+                )
+            } else {
+                Button(
+                    onClick = onAddMemory,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(ContactDetailTestTags.PERSONALIZATION_ADD_MEMORY),
+                    colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                ) {
+                    Text(
+                        text = stringResource(R.string.personalization_quality_add_one_memory),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
             checklist.forEach { item ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -423,6 +463,30 @@ internal fun PersonalizationQualityCard(contact: ContactEntity) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun memoryNoteCategorySummaryText(
+    summary: List<MemoryNoteCategorySummary>,
+): String {
+    if (summary.isEmpty()) return stringResource(R.string.memory_category_general)
+    val parts = mutableListOf<String>()
+    for (item in summary) {
+        val label = memoryCategoryLabel(item.category)
+        parts += stringResource(R.string.personalization_quality_memory_category_count, label, item.count)
+    }
+    return parts.joinToString(", ")
+}
+
+@Composable
+private fun memoryCategoryLabel(category: String): String {
+    return when (category) {
+        "PREFERENCE" -> stringResource(R.string.memory_category_preference)
+        "EVENT" -> stringResource(R.string.memory_category_event)
+        "GIFT" -> stringResource(R.string.memory_category_gift)
+        "MILESTONE" -> stringResource(R.string.memory_category_milestone)
+        else -> stringResource(R.string.memory_category_general)
     }
 }
 

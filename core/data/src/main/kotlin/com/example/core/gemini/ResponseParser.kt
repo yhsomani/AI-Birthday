@@ -42,7 +42,7 @@ data class MessageVariants(
 object ResponseParser {
     fun parseContactClassification(jsonString: String): ClassificationResult {
         return try {
-            val json = JSONObject(jsonString)
+            val json = JSONObject(cleanJson(jsonString))
             ClassificationResult(
                 type = json.optString("type", "UNKNOWN"),
                 subtype = if (json.isNull("subtype")) null else json.optString("subtype"),
@@ -90,12 +90,18 @@ object ResponseParser {
     }
 
     private fun cleanJson(raw: String): String {
-        return raw.trim()
-            .removePrefix("```json")
-            .removePrefix("```JSON")
-            .removePrefix("```")
-            .removeSuffix("```")
-            .trim()
+        var text = raw.trim()
+        if (!text.startsWith("```")) return text
+
+        text = text.removePrefix("```").trimStart()
+        val firstLineEnd = text.indexOf('\n')
+        if (firstLineEnd >= 0) {
+            val firstLine = text.substring(0, firstLineEnd).trim()
+            if (firstLine.equals("json", ignoreCase = true)) {
+                text = text.substring(firstLineEnd + 1)
+            }
+        }
+        return text.removeSuffix("```").trim()
     }
 
     private fun fallbackTextFor(eventType: String): String {
@@ -109,8 +115,12 @@ object ResponseParser {
 
     fun parseGiftSuggestions(jsonString: String): List<com.example.domain.service.GiftSuggestion> {
         return try {
-            val cleanJson = jsonString.trim().removeSurrounding("```json", "```").trim()
-            val arr = org.json.JSONArray(cleanJson)
+            val cleaned = cleanJson(jsonString)
+            val arr = if (cleaned.trim().startsWith("[")) {
+                org.json.JSONArray(cleaned)
+            } else {
+                JSONObject(cleaned).optJSONArray("suggestions") ?: org.json.JSONArray()
+            }
             List(arr.length()) { i ->
                 val obj = arr.getJSONObject(i)
                 com.example.domain.service.GiftSuggestion(

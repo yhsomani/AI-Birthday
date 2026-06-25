@@ -40,6 +40,17 @@
     <string name="memory_vault_title_with_contact">मेमोरी वॉल्ट: %1$s</string>
     <string name="memory_vault_add_title">नई मेमोरी या तथ्य जोड़ें</string>
     <string name="memory_vault_note_placeholder">जैसे: आम लस्सी पसंद है; कॉलेज रीयूनियन में मिले</string>
+    <string name="memory_vault_suggested_prompts_title">Memory prompts</string>
+    <string name="memory_prompt_favorite_food">Favorite food</string>
+    <string name="memory_prompt_favorite_food_template">Favorite food: </string>
+    <string name="memory_prompt_recent_life_update">Recent life update</string>
+    <string name="memory_prompt_recent_life_update_template">Recent life update: </string>
+    <string name="memory_prompt_inside_joke">Inside joke</string>
+    <string name="memory_prompt_inside_joke_template">Inside joke: </string>
+    <string name="memory_prompt_things_to_avoid">Things to avoid</string>
+    <string name="memory_prompt_things_to_avoid_template">Things to avoid: </string>
+    <string name="memory_prompt_gift_preference">Gift preference</string>
+    <string name="memory_prompt_gift_preference_template">Gift preference: </string>
     <string name="memory_vault_note_counter">%1$d/%2$d अक्षर</string>
     <string name="memory_vault_add_button">वॉल्ट में जोड़ें</string>
     <string name="memory_vault_journal_title">रिश्ते की डायरी</string>
@@ -797,6 +808,9 @@
     <string name="personalization_quality_channel">Preferred channel selected</string>
     <string name="personalization_quality_next_step">अगला: %1$s</string>
     <string name="personalization_quality_ready">Personalized wishes के लिए तैयार।</string>
+    <string name="personalization_quality_memory_summary">%1$d memory note(s): %2$s</string>
+    <string name="personalization_quality_memory_category_count">%1$s %2$d</string>
+    <string name="personalization_quality_add_one_memory">AI quality सुधारने के लिए 1 memory जोड़ें</string>
     <string name="personalization_quality_add_nickname">nickname या close name जोड़ें</string>
     <string name="personalization_quality_add_interests">interests या hobbies जोड़ें</string>
     <string name="personalization_quality_add_memory_notes">memory या personal note जोड़ें</string>

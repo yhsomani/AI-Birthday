@@ -151,13 +151,22 @@ class PromptBuilder {
     }
 
     fun buildMessageGenerationPrompt(context: ContactContextObject): String {
+        val hasSpecificContext = context.interests.isNotEmpty() ||
+            context.sharedHistory.isNotEmpty() ||
+            context.memoryNotes.isNotEmpty() ||
+            context.giftHistory.isNotEmpty()
+
         return buildString {
             appendLine("You are a personalised message writer. Write a birthday/event wish that sounds ")
             appendLine("EXACTLY like the user personally wrote it — NOT like an AI.")
             appendLine()
             appendLine("STRICT RULES:")
             appendLine("1. Never use generic phrases: \"wishing you all the best\", \"have a great day\", \"many happy returns\"")
-            appendLine("2. Reference at least one specific interest or shared memory from the context")
+            if (hasSpecificContext) {
+                appendLine("2. Reference at least one real specific interest, shared memory, Memory Vault note, or gift-history detail from the context")
+            } else {
+                appendLine("2. Do not invent interests, memories, life events, or private details that are not in the context")
+            }
             appendLine("3. Match the user's exact writing style (tone, emojis, sentence length)")
             appendLine("4. Never repeat or paraphrase any previous wish listed below")
             appendLine("5. Write in language: ${context.preferredLanguage}")

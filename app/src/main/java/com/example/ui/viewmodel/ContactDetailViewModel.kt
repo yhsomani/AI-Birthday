@@ -8,6 +8,7 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.usecase.GenerateMessageUseCase
 import com.example.domain.usecase.UpdateContactPreferencesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,8 +18,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class MemoryNoteCategorySummary(
+    val category: String,
+    val count: Int,
+)
+
 data class ContactDetailUiState(
     val contact: ContactEntity? = null,
+    val memoryNoteCount: Int = 0,
+    val memoryNoteCategorySummary: List<MemoryNoteCategorySummary> = emptyList(),
     val upcomingBirthdayDaysLeft: Int? = null,
     val upcomingEvent: EventEntity? = null,
     val isLoading: Boolean = true,
@@ -35,6 +43,7 @@ class ContactDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val contactRepository: ContactRepository,
     private val eventRepository: EventRepository,
+    private val memoryNoteRepository: MemoryNoteRepository,
     private val generateMessageUseCase: GenerateMessageUseCase,
     private val updateContactPreferencesUseCase: UpdateContactPreferencesUseCase,
 ) : ViewModel() {
@@ -56,6 +65,17 @@ class ContactDetailViewModel @Inject constructor(
                 val birthdayEvent = events.find {
                     contact?.let { c -> it.contactId == c.id } == true
                 }
+                val memoryNotes = contact?.let { currentContact ->
+                    runCatching {
+                        memoryNoteRepository.getByContact(currentContact.id)
+                    }.getOrDefault(emptyList())
+                } ?: emptyList()
+                val memoryNoteCategorySummary = memoryNotes
+                    .groupingBy { it.category }
+                    .eachCount()
+                    .entries
+                    .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+                    .map { MemoryNoteCategorySummary(category = it.key, count = it.value) }
                 val daysLeft = if (birthdayEvent != null) {
                     val days = (birthdayEvent.nextOccurrenceMs - System.currentTimeMillis()) / 86400000
                     days.toInt().coerceAtLeast(0)
@@ -63,6 +83,8 @@ class ContactDetailViewModel @Inject constructor(
 
                 _uiState.value = ContactDetailUiState(
                     contact = contact,
+                    memoryNoteCount = memoryNotes.size,
+                    memoryNoteCategorySummary = memoryNoteCategorySummary,
                     upcomingBirthdayDaysLeft = daysLeft,
                     upcomingEvent = birthdayEvent,
                     isLoading = false,

@@ -78,9 +78,24 @@ private val memoryCategoryOptions = listOf(
     MemoryCategoryOption("MILESTONE", R.string.memory_category_milestone_short, R.string.memory_category_milestone),
 )
 
+private data class MemoryPromptOption(
+    val category: String,
+    val labelRes: Int,
+    val templateRes: Int,
+)
+
+private val memoryPromptOptions = listOf(
+    MemoryPromptOption("PREFERENCE", R.string.memory_prompt_favorite_food, R.string.memory_prompt_favorite_food_template),
+    MemoryPromptOption("MILESTONE", R.string.memory_prompt_recent_life_update, R.string.memory_prompt_recent_life_update_template),
+    MemoryPromptOption("GENERAL", R.string.memory_prompt_inside_joke, R.string.memory_prompt_inside_joke_template),
+    MemoryPromptOption("PREFERENCE", R.string.memory_prompt_things_to_avoid, R.string.memory_prompt_things_to_avoid_template),
+    MemoryPromptOption("GIFT", R.string.memory_prompt_gift_preference, R.string.memory_prompt_gift_preference_template),
+)
+
 internal object MemoryVaultTestTags {
     const val LOADING = "memory_vault_loading"
     const val NOTE_FIELD = "memory_vault_note_field"
+    const val PROMPT_PREFIX = "memory_vault_prompt_"
     const val CATEGORY_PREFIX = "memory_vault_category_"
     const val ADD_BUTTON = "memory_vault_add_button"
     const val ERROR_CARD = "memory_vault_error_card"
@@ -111,6 +126,10 @@ fun MemoryVaultScreen(
                 newNoteText = nextText
             }
         },
+        onPromptSelected = { promptText, category ->
+            newNoteText = promptText
+            selectedCategory = category
+        },
         onCategoryChange = { selectedCategory = it },
         onAdd = {
             viewModel.addNote(newNoteText, selectedCategory)
@@ -129,6 +148,7 @@ internal fun MemoryVaultContent(
     newNoteText: String,
     selectedCategory: String,
     onNoteChange: (String) -> Unit,
+    onPromptSelected: (String, String) -> Unit,
     onCategoryChange: (String) -> Unit,
     onAdd: () -> Unit,
     onBack: () -> Unit,
@@ -186,6 +206,7 @@ internal fun MemoryVaultContent(
                         newNoteText = newNoteText,
                         selectedCategory = selectedCategory,
                         onNoteChange = onNoteChange,
+                        onPromptSelected = onPromptSelected,
                         onCategoryChange = onCategoryChange,
                         onAdd = onAdd,
                     )
@@ -233,6 +254,7 @@ private fun AddMemoryCard(
     newNoteText: String,
     selectedCategory: String,
     onNoteChange: (String) -> Unit,
+    onPromptSelected: (String, String) -> Unit,
     onCategoryChange: (String) -> Unit,
     onAdd: () -> Unit,
 ) {
@@ -248,6 +270,26 @@ private fun AddMemoryCard(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
+
+            Text(
+                text = stringResource(R.string.memory_vault_suggested_prompts_title),
+                style = MaterialTheme.typography.bodySmall,
+                color = RelateOnSurfaceVariant,
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                memoryPromptOptions.forEach { option ->
+                    val promptText = stringResource(option.templateRes)
+                    SuggestionChip(
+                        onClick = { onPromptSelected(promptText, option.category) },
+                        label = { Text(stringResource(option.labelRes)) },
+                        modifier = Modifier.testTag(MemoryVaultTestTags.PROMPT_PREFIX + option.category + "_" + option.labelRes),
+                    )
+                }
+            }
 
             OutlinedTextField(
                 value = newNoteText,

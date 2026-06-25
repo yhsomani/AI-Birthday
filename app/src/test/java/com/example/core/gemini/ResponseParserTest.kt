@@ -60,6 +60,26 @@ class ResponseParserTest {
     }
 
     @Test
+    fun `parseContactClassification accepts fenced json`() {
+        val json = """
+            ```JSON
+            {
+                "type": "COLLEAGUE",
+                "confidence": 0.7,
+                "language": "en",
+                "formality": "FORMAL"
+            }
+            ```
+        """.trimIndent()
+
+        val result = ResponseParser.parseContactClassification(json)
+
+        assertEquals("COLLEAGUE", result.type)
+        assertEquals(0.7, result.confidence, 0.001)
+        assertEquals("FORMAL", result.formality)
+    }
+
+    @Test
     fun `parseMessageVariants returns all variants`() {
         val json = """
             {
@@ -156,6 +176,39 @@ class ResponseParserTest {
         assertEquals("standard", variants.recommended)
         assertTrue(variants.isUsingFallback)
         assertEquals("Wishing you a very happy birthday! Hope you have a wonderful day!", variants.standard)
+    }
+
+    @Test
+    fun `parseGiftSuggestions accepts plain fenced json array`() {
+        val suggestions = ResponseParser.parseGiftSuggestions(
+            """
+            ```
+            [
+                {"name":"Book","reason":"Loves reading","estimatedCostInr":500}
+            ]
+            ```
+            """.trimIndent(),
+        )
+
+        assertEquals(1, suggestions.size)
+        assertEquals("Book", suggestions.first().name)
+        assertEquals(500, suggestions.first().estimatedCostInr)
+    }
+
+    @Test
+    fun `parseGiftSuggestions accepts wrapped suggestions array`() {
+        val suggestions = ResponseParser.parseGiftSuggestions(
+            """
+            {
+                "suggestions": [
+                    {"name":"Coffee kit","reason":"Enjoys coffee","estimatedCostInr":1200}
+                ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(1, suggestions.size)
+        assertEquals("Coffee kit", suggestions.first().name)
     }
 
     @Test

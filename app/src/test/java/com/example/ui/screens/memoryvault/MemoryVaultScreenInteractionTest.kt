@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
@@ -93,6 +95,7 @@ class MemoryVaultScreenInteractionTest {
         composeRule.onNodeWithTag(MemoryVaultTestTags.CATEGORY_PREFIX + "GIFT")
             .assertIsDisplayed()
             .performClick()
+        composeRule.assertLazyItemVisible(MemoryVaultTestTags.ADD_BUTTON)
         composeRule.onNodeWithTag(MemoryVaultTestTags.ADD_BUTTON)
             .assertIsEnabled()
             .performClick()
@@ -188,6 +191,7 @@ class MemoryVaultScreenInteractionTest {
             .performTextClearance()
         composeRule.onNodeWithTag(MemoryVaultTestTags.NOTE_FIELD)
             .performTextInput("Important note")
+        composeRule.assertLazyItemVisible(MemoryVaultTestTags.ADD_BUTTON)
         composeRule.onNodeWithTag(MemoryVaultTestTags.ADD_BUTTON)
             .assertIsEnabled()
             .performClick()
@@ -195,11 +199,39 @@ class MemoryVaultScreenInteractionTest {
         assertEquals(listOf("add:Important note"), actions)
     }
 
+    @Test
+    fun suggestedPromptPrefillsNoteAndCategory() {
+        var noteText by mutableStateOf("")
+        var selectedCategory by mutableStateOf(MemoryVaultViewModel.CATEGORY_GENERAL)
+
+        composeRule.setMemoryVaultContent(
+            state = { MemoryVaultUiState(isLoading = false) },
+            noteText = { noteText },
+            selectedCategory = { selectedCategory },
+            onNoteChange = { noteText = it },
+            onPromptSelected = { text, category ->
+                noteText = text
+                selectedCategory = category
+            },
+        )
+
+        composeRule.onNodeWithText(context.getString(R.string.memory_prompt_gift_preference))
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.onNodeWithTag(MemoryVaultTestTags.NOTE_FIELD)
+            .assertTextContains(context.getString(R.string.memory_prompt_gift_preference_template))
+        composeRule.onNodeWithTag(MemoryVaultTestTags.CATEGORY_PREFIX + "GIFT")
+            .assertIsDisplayed()
+        assertEquals("GIFT", selectedCategory)
+    }
+
     private fun ComposeContentTestRule.setMemoryVaultContent(
         state: () -> MemoryVaultUiState,
         noteText: () -> String,
         selectedCategory: () -> String = { MemoryVaultViewModel.CATEGORY_GENERAL },
         onNoteChange: (String) -> Unit = {},
+        onPromptSelected: (String, String) -> Unit = { _, _ -> },
         onCategoryChange: (String) -> Unit = {},
         onAdd: () -> Unit = {},
         onBack: () -> Unit = {},
@@ -213,6 +245,7 @@ class MemoryVaultScreenInteractionTest {
                     newNoteText = noteText(),
                     selectedCategory = selectedCategory(),
                     onNoteChange = onNoteChange,
+                    onPromptSelected = onPromptSelected,
                     onCategoryChange = onCategoryChange,
                     onAdd = onAdd,
                     onBack = onBack,
@@ -225,6 +258,7 @@ class MemoryVaultScreenInteractionTest {
 
     private fun ComposeContentTestRule.assertLazyItemVisible(tag: String) {
         onNode(hasScrollAction()).performScrollToNode(hasTestTag(tag))
+        onNodeWithTag(tag).performScrollTo()
         onNodeWithTag(tag).assertIsDisplayed()
     }
 
