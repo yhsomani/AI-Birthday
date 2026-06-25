@@ -111,7 +111,8 @@ class AutomationPipelineTest {
         assertEquals("BIRTHDAY", event.type)
 
         // 3. Generate message
-        val variants = MessageVariants("sh", "std", "lg", "fr", "fn", "em", "standard")
+        val draft = "Happy birthday Amit, hope this year brings more cricket nights and relaxed family time."
+        val variants = MessageVariants(draft, draft, draft, draft, draft, draft, "standard")
         every { prefs.getGeminiApiKey() } returns "mock_key"
         every { ResponseParser.parseMessageVariants(any(), any()) } returns variants
         every { prefs.getGlobalAutomationMode() } returns "MANUAL"

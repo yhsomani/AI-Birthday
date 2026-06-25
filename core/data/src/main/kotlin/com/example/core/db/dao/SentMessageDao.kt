@@ -41,4 +41,24 @@ interface SentMessageDao {
 
     @Query("SELECT * FROM sent_messages WHERE sentAtMs >= :yearStartMs ORDER BY sentAtMs ASC")
     suspend fun getSentSinceYearStart(yearStartMs: Long): List<SentMessageEntity>
+
+    @Query(
+        """
+        SELECT * FROM sent_messages
+        WHERE aiGenerated = 1
+          AND contactId IS NOT NULL
+          AND replyReceived = 0
+          AND deliveryStatus IN ('SENT', 'DELIVERED')
+          AND sentAtMs BETWEEN :windowStartMs AND :windowEndMs
+          AND eventType NOT LIKE 'FOLLOWUP%'
+          AND eventType NOT LIKE 'REVIVAL%'
+        ORDER BY sentAtMs ASC
+        LIMIT :limit
+        """
+    )
+    suspend fun getPostEventFollowUpCandidates(
+        windowStartMs: Long,
+        windowEndMs: Long,
+        limit: Int = 25,
+    ): List<SentMessageEntity>
 }

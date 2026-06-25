@@ -141,8 +141,8 @@ class BootReceiver : BroadcastReceiver() {
             val db = AppDatabase.getInstance(context)
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    // 1. Reschedule approved alarms
-                    val pending = db.pendingMessageDao().getAllApproved()
+                    // 1. Reschedule alarms that can send without more user action.
+                    val pending = db.pendingMessageDao().getBootRecoverableAutoSends()
                     pending.forEach { msg ->
                         DailyScheduler.scheduleExactSend(context, msg.id)
                     }

@@ -2,6 +2,9 @@ package com.example.domain.usecase
 
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
+import com.example.domain.automation.AiAutoSendQualityGate
+import com.example.domain.automation.AutoSendChannelSelector
+import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
@@ -25,7 +28,7 @@ import java.util.UUID
  * - Loads contact, event, style profile, and previous messages for context
  * - Calls Gemini with anti-repetition guard (up to 2 retries)
  * - Persists a PendingMessageEntity in APPROVED or PENDING state based on approval mode
- * - Schedules an exact-time dispatch if approved
+ * - Schedules exact-time dispatch for fully automatic and smart-approve messages
  * - Posts a notification for user review if pending
  */
 @Singleton
@@ -83,13 +86,19 @@ class GenerateMessageUseCase @Inject constructor(
         }
 
         val globalMode = preferencesRepository.getGlobalAutomationMode()
-        val approvalMode = determineApprovalMode(
+        val requestedApprovalMode = ApprovalModeResolver.resolve(
             relationship = contact.relationshipType,
             contactOverride = contact.automationMode,
             globalMode = globalMode,
             skipAutoWish = contact.skipAutoWish,
         )
         val selectedVariantText = variants.get(variants.recommended)
+        val qualityDecision = AiAutoSendQualityGate.evaluate(
+            requestedMode = requestedApprovalMode,
+            selectedMessage = selectedVariantText,
+            isUsingFallback = variants.isUsingFallback,
+        )
+        val approvalMode = qualityDecision.approvalMode
         val scheduledForMs = AutomationSchedulePolicy.messageSendTimeMs(
             eventOccurrenceMs = event.nextOccurrenceMs,
             customHour = contact.customSendTimeHour,
@@ -97,6 +106,13 @@ class GenerateMessageUseCase @Inject constructor(
             quietHoursStart = preferencesRepository.getQuietHoursStart(),
             quietHoursEnd = preferencesRepository.getQuietHoursEnd(),
             blackoutDatesJson = preferencesRepository.getBlackoutDates(),
+        )
+        val selectedChannel = AutoSendChannelSelector.select(
+            contact = contact,
+            previousMessages = previousMessages,
+            channelBlackoutJson = preferencesRepository.getChannelBlackout(),
+            senderEmail = preferencesRepository.getSenderEmail(),
+            senderEmailPassword = preferencesRepository.getSenderEmailPassword(),
         )
 
         val pending = PendingMessageEntity(
@@ -111,39 +127,24 @@ class GenerateMessageUseCase @Inject constructor(
             emotionalVariant = variants.emotional,
             selectedVariant = variants.recommended,
             selectedVariantText = selectedVariantText,
-            channel = contact.preferredChannel,
+            channel = selectedChannel,
             scheduledForMs = scheduledForMs,
             approvalMode = approvalMode.raw,
             status = if (approvalMode == ApprovalMode.FULLY_AUTO) MessageStatus.APPROVED.raw else MessageStatus.PENDING.raw,
+            qualityScore = qualityDecision.qualityScore,
             scheduledYear = scheduledYear,
             isUsingFallback = variants.isUsingFallback
         )
         messageRepository.insertPending(pending)
 
-        if (approvalMode == ApprovalMode.FULLY_AUTO) {
+        if (ApprovalModeResolver.schedulesAutomaticDispatch(approvalMode)) {
             schedulerService.scheduleExactSend(pending.id)
-        } else {
+        }
+        if (ApprovalModeResolver.needsReviewNotification(approvalMode)) {
             notificationService.showApprovalNotification(contact, event, variants, pending.id)
         }
 
         return GenerationOutcome.Generated(pending.id, approvalMode.raw, retries)
-    }
-
-    private fun determineApprovalMode(
-        relationship: String,
-        contactOverride: String,
-        globalMode: String,
-        skipAutoWish: Boolean,
-    ): ApprovalMode {
-        if (skipAutoWish) return ApprovalMode.ALWAYS_ASK
-        val contactMode = ApprovalMode.fromRaw(contactOverride)
-        if (contactMode != ApprovalMode.DEFAULT && contactMode != ApprovalMode.UNKNOWN) return contactMode
-        val global = ApprovalMode.fromRaw(globalMode).takeIf { it != ApprovalMode.UNKNOWN } ?: ApprovalMode.SMART_APPROVE
-        return when (relationship) {
-            "FAMILY", "BEST_FRIEND" -> ApprovalMode.VIP_APPROVE
-            "CLOSE_FRIEND", "RELATIVE" -> if (global == ApprovalMode.ALWAYS_ASK) ApprovalMode.ALWAYS_ASK else ApprovalMode.SMART_APPROVE
-            else -> global
-        }
     }
 
     private fun isPreviouslyUsed(newMessage: String, previous: List<SentMessageEntity>): Boolean {

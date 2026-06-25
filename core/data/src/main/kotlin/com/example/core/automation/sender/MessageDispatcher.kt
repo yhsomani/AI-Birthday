@@ -44,70 +44,54 @@ class MessageDispatcher(
             "contactId" to contact.id,
         ))
 
-        val sentMessageId = UUID.randomUUID().toString()
-        var isSentMessageInserted = false
+        var successfulSentMessageInserted = false
         var success = false
         val primaryPhone = contact.primaryPhone
         val primaryEmail = contact.primaryEmail
         var finalChannel = message.channel
         val blockedChannels = prefs.getChannelBlackout().toChannelSet()
+        val deliveryRoutes = DeliveryChannelResolver.resolveRoutes(
+            preferredChannel = message.channel,
+            primaryPhone = primaryPhone,
+            primaryEmail = primaryEmail,
+            senderEmail = prefs.getSenderEmail(),
+            senderEmailPassword = prefs.getSenderEmailPassword(),
+            blockedChannels = blockedChannels,
+        )
 
-        if (message.channel.uppercase() in blockedChannels) {
-            StructuredLogger.w(TAG, "Dispatch channel is disabled", extras = mapOf("channel" to message.channel))
-        } else {
-            when (message.channel) {
+        if (deliveryRoutes.isEmpty()) {
+            StructuredLogger.w(
+                TAG,
+                "No available delivery route for automatic message dispatch",
+                extras = mapOf(
+                    "messageId" to message.id,
+                    "preferredChannel" to message.channel,
+                    "blockedChannels" to blockedChannels.joinToString(","),
+                    "hasPhone" to (!primaryPhone.isNullOrBlank()).toString(),
+                    "hasEmail" to (!primaryEmail.isNullOrBlank()).toString(),
+                ),
+            )
+        }
+
+        for (route in deliveryRoutes) {
+            finalChannel = route
+            when (route) {
                 "WHATSAPP" -> {
                     if (primaryPhone != null) {
                         val waSender = WhatsAppSender(context)
                         success = waSender.send(primaryPhone, messageText, message.eventId)
                         if (!success) {
-                            StructuredLogger.w(TAG, "WhatsApp failed, falling back to SMS for ${message.id}")
-                            finalChannel = "SMS"
-                            if ("SMS" in blockedChannels) {
-                                StructuredLogger.w(TAG, "SMS fallback skipped because channel is disabled")
-                            } else {
-                                try {
-                                    sentMessageDao.insert(SentMessageEntity(
-                                        id = sentMessageId,
-                                        contactId = message.contactId,
-                                        eventType = message.eventId,
-                                        eventYear = Calendar.getInstance().get(Calendar.YEAR),
-                                        messageText = messageText,
-                                        channel = "SMS",
-                                        sentAtMs = System.currentTimeMillis(),
-                                        deliveryStatus = "PENDING_DELIVERY",
-                                        aiGenerated = true
-                                    ))
-                                    isSentMessageInserted = true
-
-                                    val smsSender = SmsSender(context)
-                                    smsSender.send(primaryPhone, messageText, sentMessageId)
-                                    success = true
-                                } catch (e: SecurityException) {
-                                    if (isSentMessageInserted) {
-                                        sentMessageDao.updateDeliveryStatus(sentMessageId, "FAILED")
-                                    }
-                                    StructuredLogger.e(TAG, "SMS permission not granted during WhatsApp fallback for message ${message.id}", e)
-                                    com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
-                                        context,
-                                        context.getString(R.string.notification_setup_sms_permission_title),
-                                        context.getString(R.string.notification_setup_sms_permission_message, contact.name),
-                                    )
-                                } catch (e: Exception) {
-                                    if (isSentMessageInserted) {
-                                        sentMessageDao.updateDeliveryStatus(sentMessageId, "FAILED")
-                                    }
-                                    StructuredLogger.e(TAG, "SMS send failed during WhatsApp fallback for message ${message.id}", e)
-                                }
-                            }
+                            StructuredLogger.w(TAG, "WhatsApp route failed for ${message.id}; trying next automatic route")
                         }
                     }
                 }
                 "SMS" -> {
                     if (primaryPhone != null) {
+                        val smsSentMessageId = UUID.randomUUID().toString()
+                        var smsAttemptInserted = false
                         try {
                             sentMessageDao.insert(SentMessageEntity(
-                                id = sentMessageId,
+                                id = smsSentMessageId,
                                 contactId = message.contactId,
                                 eventType = message.eventId,
                                 eventYear = Calendar.getInstance().get(Calendar.YEAR),
@@ -117,14 +101,15 @@ class MessageDispatcher(
                                 deliveryStatus = "PENDING_DELIVERY",
                                 aiGenerated = true
                             ))
-                            isSentMessageInserted = true
+                            smsAttemptInserted = true
 
                             val smsSender = SmsSender(context)
-                            smsSender.send(primaryPhone, messageText, sentMessageId)
+                            smsSender.send(primaryPhone, messageText, smsSentMessageId)
+                            successfulSentMessageInserted = true
                             success = true
                         } catch (e: SecurityException) {
-                            if (isSentMessageInserted) {
-                                sentMessageDao.updateDeliveryStatus(sentMessageId, "FAILED")
+                            if (smsAttemptInserted) {
+                                sentMessageDao.updateDeliveryStatus(smsSentMessageId, "FAILED")
                             }
                             StructuredLogger.e(TAG, "SMS permission not granted for message ${message.id}", e)
                             com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
@@ -133,8 +118,8 @@ class MessageDispatcher(
                                 context.getString(R.string.notification_setup_sms_permission_message, contact.name),
                             )
                         } catch (e: Exception) {
-                            if (isSentMessageInserted) {
-                                sentMessageDao.updateDeliveryStatus(sentMessageId, "FAILED")
+                            if (smsAttemptInserted) {
+                                sentMessageDao.updateDeliveryStatus(smsSentMessageId, "FAILED")
                             }
                             StructuredLogger.e(TAG, "SMS send failed for message ${message.id}", e)
                         }
@@ -142,32 +127,24 @@ class MessageDispatcher(
                 }
                 "EMAIL" -> {
                     if (primaryEmail != null) {
-                        if (prefs.getSenderEmail().isBlank() || prefs.getSenderEmailPassword().isBlank()) {
-                            com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
-                                context,
-                                context.getString(R.string.notification_setup_email_needed_title),
-                                context.getString(R.string.notification_setup_email_needed_message),
+                        try {
+                            val event = eventDao?.getById(message.eventId)
+                            val emailSender = EmailSender(prefs)
+                            emailSender.send(
+                                toEmail = primaryEmail,
+                                contactName = contact.name,
+                                messageText = messageText,
+                                eventType = event?.type,
+                                eventLabel = event?.label,
                             )
-                            success = false
-                        } else {
-                            try {
-                                val event = eventDao?.getById(message.eventId)
-                                val emailSender = EmailSender(prefs)
-                                emailSender.send(
-                                    toEmail = primaryEmail,
-                                    contactName = contact.name,
-                                    messageText = messageText,
-                                    eventType = event?.type,
-                                    eventLabel = event?.label,
-                                )
-                                success = true
-                            } catch (e: Exception) {
-                                StructuredLogger.e(TAG, "Email send failed for ${message.id}", e)
-                            }
+                            success = true
+                        } catch (e: Exception) {
+                            StructuredLogger.e(TAG, "Email route failed for ${message.id}; trying next automatic route", e)
                         }
                     }
                 }
             }
+            if (success) break
         }
 
         if (success) {
@@ -176,9 +153,9 @@ class MessageDispatcher(
                 "channel" to finalChannel,
             ))
             pendingMessageDao.updateStatus(message.id, "SENT")
-            if (!isSentMessageInserted) {
+            if (!successfulSentMessageInserted) {
                 sentMessageDao.insert(SentMessageEntity(
-                    id = sentMessageId,
+                    id = UUID.randomUUID().toString(),
                     contactId = message.contactId,
                     eventType = message.eventId,
                     eventYear = Calendar.getInstance().get(Calendar.YEAR),
@@ -196,9 +173,6 @@ class MessageDispatcher(
             }
         } else {
             pendingMessageDao.updateStatus(message.id, "FAILED")
-            if (isSentMessageInserted) {
-                sentMessageDao.updateDeliveryStatus(sentMessageId, "FAILED")
-            }
             StructuredLogger.w(TAG, "Failed to dispatch message ${message.id} via ${message.channel}")
             HealthMonitor.recordError("MessageDispatcher.dispatch", "Failed to send ${message.id} via ${message.channel}")
             DeadLetterQueue.enqueue(DeadLetterEntry(

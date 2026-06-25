@@ -20,6 +20,9 @@ import com.example.core.db.dao.StyleProfileDao
 import com.example.core.db.dao.MemoryNoteDao
 import com.example.core.db.dao.GiftHistoryDao
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.automation.AiAutoSendQualityGate
+import com.example.domain.automation.AutoSendChannelSelector
+import com.example.domain.automation.ApprovalModeResolver
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import androidx.hilt.work.HiltWorker
@@ -64,11 +67,11 @@ class MessageGenerationWorker @AssistedInject constructor(
 
         return try {
             val prompter = PromptBuilder()
-            // Use 36 hours lookahead to ensure tomorrow's events (scheduled at 9:00 AM)
-            // are always captured regardless of the time of day the worker runs.
-            val tomorrow = System.currentTimeMillis() + 36 * 60 * 60 * 1000L
+            // Prepare a week of AI drafts so Smart Approve has a useful review window
+            // while exact dispatch still happens at each contact's scheduled send time.
+            val lookaheadEndMs = System.currentTimeMillis() + MESSAGE_GENERATION_LOOKAHEAD_MS
 
-            val upcomingEvents = eventDao.getEventsBefore(tomorrow)
+            val upcomingEvents = eventDao.getEventsBefore(lookaheadEndMs)
             StructuredLogger.i(TAG, "Found ${upcomingEvents.size} upcoming events for generation")
 
             coroutineScope {
@@ -146,7 +149,18 @@ class MessageGenerationWorker @AssistedInject constructor(
                             }
 
                             val globalMode = prefs.getGlobalAutomationMode()
-                            val approvalMode = determineApprovalMode(contact.relationshipType, contact.automationMode, globalMode)
+                            val requestedApprovalMode = ApprovalModeResolver.resolve(
+                                relationship = contact.relationshipType,
+                                contactOverride = contact.automationMode,
+                                globalMode = globalMode,
+                            )
+                            val selectedVariantText = variants.get(variants.recommended)
+                            val qualityDecision = AiAutoSendQualityGate.evaluate(
+                                requestedMode = requestedApprovalMode,
+                                selectedMessage = selectedVariantText,
+                                isUsingFallback = variants.isUsingFallback,
+                            )
+                            val approvalMode = qualityDecision.approvalMode
                             val scheduledForMs = AutomationSchedulePolicy.messageSendTimeMs(
                                 eventOccurrenceMs = event.nextOccurrenceMs,
                                 customHour = contact.customSendTimeHour,
@@ -155,12 +169,19 @@ class MessageGenerationWorker @AssistedInject constructor(
                                 quietHoursEnd = prefs.getQuietHoursEnd(),
                                 blackoutDatesJson = prefs.getBlackoutDates(),
                             )
-
-                            val selectedVariantText = variants.get(variants.recommended)
+                            val selectedChannel = AutoSendChannelSelector.select(
+                                contact = contact,
+                                previousMessages = previousMessages,
+                                channelBlackoutJson = prefs.getChannelBlackout(),
+                                senderEmail = prefs.getSenderEmail(),
+                                senderEmailPassword = prefs.getSenderEmailPassword(),
+                            )
 
                             StructuredLogger.i(TAG, "Generated message for event ${event.id}", mapOf(
                                 "contactId" to contact.id,
-                                "approvalMode" to approvalMode,
+                                "approvalMode" to approvalMode.raw,
+                                "channel" to selectedChannel,
+                                "qualityScore" to qualityDecision.qualityScore.toString(),
                                 "retries" to retries.toString(),
                             ))
 
@@ -176,18 +197,22 @@ class MessageGenerationWorker @AssistedInject constructor(
                                 emotionalVariant = variants.emotional,
                                 selectedVariant = variants.recommended,
                                 selectedVariantText = selectedVariantText,
-                                channel = contact.preferredChannel,
+                                channel = selectedChannel,
                                 scheduledForMs = scheduledForMs,
-                                approvalMode = approvalMode,
-                                status = if (approvalMode == "FULLY_AUTO") "APPROVED" else "PENDING",
+                                approvalMode = approvalMode.raw,
+                                status = if (approvalMode.raw == "FULLY_AUTO") "APPROVED" else "PENDING",
+                                qualityScore = qualityDecision.qualityScore,
                                 scheduledYear = scheduledYear,
                                 isUsingFallback = variants.isUsingFallback
                             ))
 
-                            if (approvalMode == "FULLY_AUTO") {
-                                StructuredLogger.i(TAG, "Auto-approving message for event ${event.id}")
+                            if (ApprovalModeResolver.schedulesAutomaticDispatch(approvalMode)) {
+                                StructuredLogger.i(TAG, "Scheduling automatic dispatch for event ${event.id}", mapOf(
+                                    "approvalMode" to approvalMode.raw,
+                                ))
                                 DailyScheduler.scheduleExactSend(applicationContext, messageId)
-                            } else {
+                            }
+                            if (ApprovalModeResolver.needsReviewNotification(approvalMode)) {
                                 com.example.core.automation.notifications.NotificationHelper.showApprovalNotification(applicationContext, contact, event, variants, messageId)
                             }
                         } catch (e: Exception) {
@@ -205,15 +230,6 @@ class MessageGenerationWorker @AssistedInject constructor(
         }
     }
 
-    private fun determineApprovalMode(relationship: String, contactOverride: String, globalMode: String): String {
-        if (contactOverride != "DEFAULT" && contactOverride.isNotEmpty()) return contactOverride
-        return when (relationship) {
-            "FAMILY", "BEST_FRIEND" -> "VIP_APPROVE"
-            "CLOSE_FRIEND", "RELATIVE" -> if(globalMode == "ALWAYS_ASK") "ALWAYS_ASK" else "SMART_APPROVE"
-            else -> globalMode
-        }
-    }
-
     private suspend fun isPreviouslyUsed(contactId: String, newMessage: String): Boolean {
         val previous = sentMessageDao.getByContact(contactId)
         val newWords = newMessage.lowercase().split(" ").toSet()
@@ -227,5 +243,6 @@ class MessageGenerationWorker @AssistedInject constructor(
 
     private companion object {
         const val TAG = "MessageGenerationWorker"
+        const val MESSAGE_GENERATION_LOOKAHEAD_MS = 7L * 24L * 60L * 60L * 1000L
     }
 }

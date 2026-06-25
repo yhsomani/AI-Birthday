@@ -12,6 +12,13 @@ interface PendingMessageDao {
     @Query("SELECT * FROM pending_messages WHERE status = 'APPROVED'")
     suspend fun getAllApproved(): List<PendingMessageEntity>
 
+    @Query("""
+        SELECT * FROM pending_messages
+        WHERE status = 'APPROVED'
+           OR (status = 'PENDING' AND approvalMode = 'SMART_APPROVE')
+    """)
+    suspend fun getBootRecoverableAutoSends(): List<PendingMessageEntity>
+
     @Query("SELECT * FROM pending_messages WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): PendingMessageEntity?
     

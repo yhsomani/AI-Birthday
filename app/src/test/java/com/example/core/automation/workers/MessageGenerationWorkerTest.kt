@@ -17,6 +17,7 @@ import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.dao.StyleProfileDao
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
+import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.gemini.GeminiClient
 import com.example.core.gemini.RateLimiter
 import com.example.core.gemini.ResponseParser
@@ -67,6 +68,7 @@ class MessageGenerationWorkerTest {
         every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
         every { NotificationHelper.showApprovalNotification(any(), any(), any(), any(), any()) } just Runs
         every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
+        every { NotificationHelper.showSystemAlert(any(), any(), any()) } just Runs
         every { prefs.isAiWishGenerationEnabled() } returns true
     }
 
@@ -114,6 +116,130 @@ class MessageGenerationWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(any()) }
         verify { DailyScheduler.scheduleExactSend(any(), any()) }
+    }
+
+    @Test
+    fun `doWork looks ahead seven days for weekly AI draft preparation`() = runTest {
+        every { prefs.getGeminiApiKey() } returns "mock_key"
+        coEvery { eventDao.getEventsBefore(any()) } returns emptyList()
+
+        val beforeMs = System.currentTimeMillis()
+        val worker = TestListenableWorkerBuilder<MessageGenerationWorker>(context)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: Context,
+                    workerClassName: String,
+                    workerParameters: WorkerParameters
+                ): ListenableWorker {
+                    return MessageGenerationWorker(
+                        appContext, workerParameters,
+                        contactDao, eventDao, pendingMessageDao, sentMessageDao, styleProfileDao,
+                        memoryNoteDao, giftHistoryDao, geminiClient, prefs
+                    )
+                }
+            })
+            .build()
+
+        val result = worker.doWork()
+        val afterMs = System.currentTimeMillis()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify {
+            eventDao.getEventsBefore(match { cutoffMs ->
+                cutoffMs in (beforeMs + 7L * 24L * 60L * 60L * 1000L)..(afterMs + 7L * 24L * 60L * 60L * 1000L)
+            })
+        }
+    }
+
+    @Test
+    fun `doWork schedules SMART_APPROVE messages for automatic due-time dispatch`() = runTest {
+        val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
+        val contact = ContactEntity(id = "c1", name = "John", relationshipType = "FRIEND", preferredChannel = "SMS", automationMode = "DEFAULT")
+        val variants = MessageVariants("sh", "std", "lg", "fr", "fn", "em", "standard")
+        val pendingSlot = slot<PendingMessageEntity>()
+
+        every { prefs.getGeminiApiKey() } returns "mock_key"
+        every { prefs.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        coEvery { eventDao.getEventsBefore(any()) } returns listOf(event)
+        coEvery { pendingMessageDao.getPendingMessage("c1", "e1", any()) } returns null
+        coEvery { contactDao.getById("c1") } returns contact
+        coEvery { styleProfileDao.get() } returns null
+        coEvery { sentMessageDao.getByContact("c1") } returns emptyList()
+        coEvery { memoryNoteDao.getByContact("c1") } returns emptyList()
+        coEvery { giftHistoryDao.getByContact("c1") } returns emptyList()
+        coEvery { geminiClient.generate(any()) } returns "mock_response"
+        every { ResponseParser.parseMessageVariants(any(), any()) } returns variants
+
+        val worker = TestListenableWorkerBuilder<MessageGenerationWorker>(context)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: Context,
+                    workerClassName: String,
+                    workerParameters: WorkerParameters
+                ): ListenableWorker {
+                    return MessageGenerationWorker(
+                        appContext, workerParameters,
+                        contactDao, eventDao, pendingMessageDao, sentMessageDao, styleProfileDao,
+                        memoryNoteDao, giftHistoryDao, geminiClient, prefs
+                    )
+                }
+            })
+            .build()
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
+        assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
+        assertEquals("PENDING", pendingSlot.captured.status)
+        verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
+        verify { NotificationHelper.showApprovalNotification(any(), contact, event, variants, pendingSlot.captured.id) }
+    }
+
+    @Test
+    fun `doWork downgrades fallback fully auto draft to smart approve`() = runTest {
+        val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
+        val contact = ContactEntity(id = "c1", name = "John", relationshipType = "FRIEND", preferredChannel = "SMS", automationMode = "FULLY_AUTO")
+        val variants = MessageVariants.fromFallback("Wishing you a very happy birthday! Hope you have a wonderful day!")
+        val pendingSlot = slot<PendingMessageEntity>()
+
+        every { prefs.getGeminiApiKey() } returns "mock_key"
+        every { prefs.getGlobalAutomationMode() } returns "FULLY_AUTO"
+        coEvery { eventDao.getEventsBefore(any()) } returns listOf(event)
+        coEvery { pendingMessageDao.getPendingMessage("c1", "e1", any()) } returns null
+        coEvery { contactDao.getById("c1") } returns contact
+        coEvery { styleProfileDao.get() } returns null
+        coEvery { sentMessageDao.getByContact("c1") } returns emptyList()
+        coEvery { memoryNoteDao.getByContact("c1") } returns emptyList()
+        coEvery { giftHistoryDao.getByContact("c1") } returns emptyList()
+        coEvery { geminiClient.generate(any()) } returns "mock_response"
+        every { ResponseParser.parseMessageVariants(any(), any()) } returns variants
+
+        val worker = TestListenableWorkerBuilder<MessageGenerationWorker>(context)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: Context,
+                    workerClassName: String,
+                    workerParameters: WorkerParameters
+                ): ListenableWorker {
+                    return MessageGenerationWorker(
+                        appContext, workerParameters,
+                        contactDao, eventDao, pendingMessageDao, sentMessageDao, styleProfileDao,
+                        memoryNoteDao, giftHistoryDao, geminiClient, prefs
+                    )
+                }
+            })
+            .build()
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
+        assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
+        assertEquals("PENDING", pendingSlot.captured.status)
+        assertEquals(35, pendingSlot.captured.qualityScore)
+        verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
+        verify { NotificationHelper.showApprovalNotification(any(), contact, event, variants, pendingSlot.captured.id) }
     }
 
     @Test

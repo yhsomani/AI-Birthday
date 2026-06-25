@@ -173,6 +173,44 @@ class DaoTest {
     }
 
     @Test
+    fun pendingMessageDao_getBootRecoverableAutoSends_includesApprovedAndPendingSmartApprove() = runTest {
+        pendingMessageDao.insert(
+            testPending("approved_full_auto", "event_approved").copy(
+                approvalMode = "FULLY_AUTO",
+                status = "APPROVED",
+            )
+        )
+        pendingMessageDao.insert(
+            testPending("pending_smart", "event_smart").copy(
+                approvalMode = "SMART_APPROVE",
+                status = "PENDING",
+            )
+        )
+        pendingMessageDao.insert(
+            testPending("pending_vip", "event_vip").copy(
+                approvalMode = "VIP_APPROVE",
+                status = "PENDING",
+            )
+        )
+        pendingMessageDao.insert(
+            testPending("pending_always_ask", "event_always").copy(
+                approvalMode = "ALWAYS_ASK",
+                status = "PENDING",
+            )
+        )
+        pendingMessageDao.insert(
+            testPending("sent_smart", "event_sent").copy(
+                approvalMode = "SMART_APPROVE",
+                status = "SENT",
+            )
+        )
+
+        val ids = pendingMessageDao.getBootRecoverableAutoSends().map { it.id }.toSet()
+
+        assertEquals(setOf("approved_full_auto", "pending_smart"), ids)
+    }
+
+    @Test
     fun sentMessageDao_insertAndCount() = runTest {
         sentMessageDao.insert(testSent("s1"))
         sentMessageDao.insert(testSent("s2"))

@@ -101,12 +101,26 @@ object WorkerScheduler {
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
 
+        val holidayWishRequest = OneTimeWorkRequestBuilder<com.example.core.automation.workers.HolidayWishWorker>()
+            .setConstraints(networkConstraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .addTag("holiday_wishes")
+            .build()
+
+        val followUpRequest = OneTimeWorkRequestBuilder<com.example.core.automation.workers.PostEventFollowUpWorker>()
+            .setConstraints(networkConstraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .addTag("post_event_follow_up")
+            .build()
+
         workManager.beginUniqueWork(
             "daily_automation_chain",
             ExistingWorkPolicy.KEEP,
             contactSyncRequest
         ).then(eventDiscoveryRequest)
          .then(messageGenRequest)
+         .then(holidayWishRequest)
+         .then(followUpRequest)
          .enqueue()
     }
 

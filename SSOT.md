@@ -298,6 +298,7 @@ RelateAI
 |   +-- WorkManager daily chain
 |   +-- Exact send alarms
 |   +-- Boot rescheduling
+|   +-- Automatic delivery route fallback
 |   +-- SMS dispatch
 |   +-- WhatsApp dispatch
 |   +-- Email dispatch
@@ -359,9 +360,9 @@ Status definitions:
 | F-022 | AI contact classification | Fully Implemented | AI-disabled and generated classification outcomes covered; live AI pending. |
 | F-023 | AI message generation and fallback | Fully Implemented | Respects skip-auto-wish, custom send time, quiet hours, blackout dates. |
 | F-024 | Approval lifecycle | Fully Implemented | Approve/reject/retry/revoke domain and notification actions implemented. |
-| F-025 | Exact scheduling and boot recovery | Fully Implemented | Exact send scheduling and boot rescheduling implemented; live alarm validation pending. |
-| F-026 | WorkManager automation chain | Fully Implemented | Daily chain covers sync, event discovery, message generation, reminders, revival, style analysis. |
-| F-027 | Dispatch orchestration | Fully Implemented | Dispatch defers during quiet hours or blackout dates and recovers failed worker status. |
+| F-025 | Exact scheduling and boot recovery | Fully Implemented | Exact send scheduling and boot rescheduling restore approved and pending Smart Approve auto-sends; live alarm validation pending. |
+| F-026 | WorkManager automation chain | Fully Implemented | Daily chain covers sync, event discovery, message generation, holiday wishes, follow-ups, reminders, revival, style analysis. |
+| F-027 | Dispatch orchestration and automatic delivery routing | Fully Implemented | Dispatch defers during quiet hours or blackout dates, resolves available delivery routes across enabled channels, and recovers failed worker status. |
 | F-028 | SMS delivery and status callbacks | Fully Implemented | SMS sender/status receiver implemented; live SMS requires safe test recipient/SIM. |
 | F-029 | WhatsApp Accessibility delivery | Fully Implemented | Service and sender implemented; live WhatsApp/accessibility validation pending. |
 | F-030 | Gmail SMTP delivery and test send | Fully Implemented | Event-aware subject and test-send paths implemented; live credentials pending. |
@@ -848,6 +849,14 @@ scripts/extract_strings.sh
 
 Unreleased changes:
 
+- Added automatic delivery route fallback so AI-generated messages can send through the best available enabled channel when the preferred channel is unavailable.
+- Added smart initial channel selection for AI-created pending messages using contact availability, disabled-channel settings, email setup, and past successful delivery history before dispatch fallback runs.
+- Smart Approve generated wishes now schedule exact due-time dispatch while still notifying the user for review before send time.
+- Daily AI message generation now prepares a 7-day queue of upcoming event drafts so automatic sends are scheduled earlier and Smart Approve has more review time.
+- Revival AI reconnect messages now respect contact/global automation modes and schedule automatic send for Fully Auto and Smart Approve.
+- Added AI auto-send quality gate so fallback or generic Fully Auto drafts are downgraded to Smart Approve review before automatic due-time dispatch.
+- Added post-event AI follow-ups that scan recent unreplied AI wishes, draft a light follow-up, and schedule it with the same automation, quality, quiet-hour, and channel-routing rules.
+- Added fixed-date holiday AI wishes that generate personalized New Year, Republic Day, Women's Day, Independence Day, Gandhi Jayanti, and Christmas messages and schedule them automatically through the same approval and dispatch rules.
 - Added Failed tab recovery assistant in Messages with direct AI Doctor routing while keeping retry manual.
 - Added Settings sign-out confirmation checklist before local data is cleared.
 - Added duplicate manual event detection with an explicit Save anyway override.
@@ -1571,6 +1580,7 @@ Main files:
 - `DailyScheduler.kt`
 - `MessageDispatchWorker.kt`
 - `DispatchMessageUseCase.kt`
+- `DeliveryChannelResolver.kt`
 - `MessageDispatcher.kt`
 - `SmsSender.kt`
 - `WhatsAppSender.kt`
@@ -1597,6 +1607,13 @@ How it works:
 - Exact send scheduling uses AlarmManager `setAlarmClock` when exact alarm access is available.
 - If exact alarm access is unavailable, a setup notification is shown and WorkManager dispatch is enqueued.
 - Dispatch worker accepts pending-message id first, or legacy event id.
+- Message generation prepares upcoming event drafts 7 days ahead and schedules exact dispatch for `FULLY_AUTO` and `SMART_APPROVE`; Smart Approve also shows a review notification before its due-time auto-send.
+- Revival/reconnect suggestions use the same contact/global automation modes; Fully Auto and Smart Approve revival messages are scheduled automatically.
+- Boot recovery reschedules approved pending messages and pending `SMART_APPROVE` messages that can auto-send at their due time.
+- `AiAutoSendQualityGate` scores generated drafts and downgrades fallback or obviously generic `FULLY_AUTO` drafts to `SMART_APPROVE`, preserving due-time automatic dispatch while adding review visibility.
+- `AutoSendChannelSelector` chooses the initial pending-message channel from contact availability, channel blackout preferences, Gmail setup, and previous successful delivery history.
+- `HolidayWishWorker` runs in the daily automation chain, checks a fixed-date holiday catalog, asks Gemini for relationship-aware holiday wishes, and creates deterministic `HOLIDAY_<holiday>_<contact>_<year>` pending messages to avoid duplicates.
+- `PostEventFollowUpWorker` runs in the daily automation chain after message generation, finds recent unreplied AI wishes, asks Gemini for a short low-pressure follow-up, and creates deterministic `FOLLOWUP_<sent_message_id>` pending messages to avoid duplicates.
 - Dispatch checks status:
   - APPROVED sends;
   - SENT/DISPATCHING aborts to avoid duplicate sends and shows setup warning;
@@ -1607,9 +1624,11 @@ How it works:
   - other pending modes wait.
 - Before sending, dispatch rechecks quiet hours and blackout dates and reschedules when blocked.
 - Dispatch marks the pending row DISPATCHING before calling channel code.
+- `DeliveryChannelResolver` builds preferred-first automatic routes from the pending message channel, available contact phone/email, configured Gmail credentials, and disabled-channel preferences.
+- Dispatch tries each available delivery route in order and stops at the first successful send.
 - SMS inserts a sent row as PENDING_DELIVERY, calls SmsSender, then SMS broadcasts update SENT/DELIVERED/FAILED.
-- WhatsApp uses Accessibility sender; if it fails, SMS fallback is attempted unless SMS is disabled.
-- Email requires sender email/app password and primary contact email.
+- WhatsApp, SMS, and Email failures move to the next available route when one exists.
+- Email routes require sender email/app password and primary contact email.
 - Successful dispatch marks pending SENT, inserts sent history if not already inserted, updates contact last wished date, increments consecutive years wished, and adds +5 health score.
 - Failed dispatch marks pending FAILED, updates sent row if needed, records HealthMonitor error, and enqueues a dead-letter item.
 
@@ -1625,10 +1644,10 @@ Outputs:
 
 Failure and edge behavior:
 
-- Disabled channel blocks that channel.
-- Missing phone/email causes channel failure.
+- Disabled channel blocks that channel and allows fallback to the next enabled route.
+- Missing phone/email or Gmail credentials removes that route from automatic dispatch.
+- If no automatic route is available, pending dispatch fails with a dead-letter entry.
 - SMS permission failure shows a setup notification.
-- Missing email settings shows a setup notification.
 - Unexpected dispatch exception marks pending FAILED so it does not remain stuck DISPATCHING.
 
 ### 24.11 Background Automation Workers
@@ -1664,13 +1683,14 @@ How it works:
   - revival check every 7 days;
   - style analysis every 14 days with network.
 - Daily trigger checks for stale backups, schedules the daily chain, and reschedules all event reminders.
-- Daily automation chain runs contact sync -> event discovery -> message generation.
+- Daily automation chain runs contact sync -> event discovery -> message generation -> holiday wishes -> post-event follow-ups.
 - Contact sync worker also classifies unknown contacts when Gemini/auth is available.
 - Event discovery worker deactivates generated event types when matching contact date fields disappear.
-- Message generation worker scans events due within 36 hours.
-- Revival worker scans contacts with health below 40 and no recent revival attempt, generates a short reconnect suggestion, stores it as a VIP_APPROVE pending message, and shows a revival notification.
+- Message generation worker scans events due within 7 days and schedules automatic dispatch for Fully Auto and Smart Approve messages.
+- Revival worker scans contacts with health below 40 and no recent revival attempt, generates a short reconnect suggestion, resolves approval mode, and schedules Fully Auto or Smart Approve revival messages automatically.
+- Holiday wish and post-event follow-up workers create deterministic AI pending messages so repeated daily runs do not duplicate them.
 - Style analysis worker analyzes sent messages from the last 30 days.
-- Boot receiver reschedules approved exact sends, active event reminders, and missing periodic workers.
+- Boot receiver reschedules approved exact sends, pending Smart Approve exact sends, active event reminders, and missing periodic workers.
 
 Outputs:
 
@@ -2351,12 +2371,26 @@ Cross-cutting performance concerns:
 | Direct task routing from dashboard | Faster task completion | One tap from insight to relevant work queue | Typed dashboard action targets now cover Messages, Contact Detail, AI Doctor, and Backup/Restore for readiness/planner cards | Critical actions still open task screens; no message approval, send, sync, or backup runs without user action. |
 | Smart personalization prompts | Better AI quality and retention | User adds useful details without opening advanced form | Compute missing fields per contact and suggest one small prompt at a time | User chooses what to save; never infer sensitive notes without confirmation. |
 | Batch approval queue | Faster review of many wishes | Review multiple pending drafts in a focused flow | Initial Wish Preview Review next action implemented from the pending queue; future work can add Messages queue context and bulk review mode | No bulk auto-send without explicit user confirmation. |
-| Channel readiness precheck | Fewer failed sends | User knows before approval if SMS/email/WhatsApp is not ready | Add per-message readiness status from permissions, contact data, disabled channels, credentials | Do not block manual approval unless send is impossible; show override/retry paths. |
-| Smart default channel | Better deliverability | Preferred channel is suggested based on available phone/email and prior success | Add local scoring from sent history and contact fields | User can override per contact; do not switch channel silently for approved messages. |
+| Channel readiness precheck | Fewer failed sends | User knows before approval if SMS/email/WhatsApp is not ready | `DeliveryChannelResolver` now powers dispatch routing; next expose the resolved route/readiness in Messages and Wish Preview | Do not block manual approval unless send is impossible; show override/retry paths. |
+| Smart default channel | Better deliverability | Preferred channel is suggested based on available phone/email and prior success | Initial automatic fallback is implemented; next add local scoring from sent history and contact fields | User can override per contact; automatic routing must respect disabled channels and available contact destinations. |
 | Event duplicate detection | Cleaner reminders | Avoids duplicate birthday/custom events | Initial same-contact, same-type, same-day/month warning is implemented before save | Users can cancel or explicitly Save anyway; future work can add merge/keep options. |
 | Backup reminder surfacing | Reduces data loss | User sees stale backup before a problem | Add Home/Settings last-backup card using existing pref | No automatic export; user must choose destination and passphrase. |
 | Smart regeneration feedback | Faster better drafts | Feedback immediately suggests likely fix | Persist selected feedback and show "Regenerate with X" primary action | User can edit prompt/draft manually; feedback is stored locally. |
-| Recovery assistant for failed sends | Lower support burden | User sees exact fix and retry path | Initial Failed tab assistant links to AI Doctor while row readiness explains blockers; next add deeper Activity History details | Do not retry automatically across channels without configured fallback rules. |
+| Recovery assistant for failed sends | Lower support burden | User sees exact fix and retry path | Initial Failed tab assistant links to AI Doctor while row readiness explains blockers; next add deeper Activity History details | Automatic fallback is limited to `DeliveryChannelResolver` routes; user-visible retry remains explicit. |
+
+### 25.3.1 AI-First Automatic Messaging Feature Candidates
+
+All new messaging features should satisfy this product rule: AI creates or improves the message, the scheduler handles send timing, `DeliveryChannelResolver` chooses an enabled available route, and automation modes decide whether the message sends automatically or waits for review.
+
+| Feature candidate | AI behavior | Automatic message behavior | Priority |
+|---|---|---|---|
+| Festival and holiday wishes | Generate culturally appropriate wishes from contact language, relationship, and user style. | Implemented for fixed-date holidays; pending messages are created automatically and sent by Fully Auto or Smart Approve rules. | P1 |
+| Post-event follow-up | Generate a short follow-up after birthdays, anniversaries, or important custom events. | Implemented for recent unreplied AI-sent wishes; follow-ups are scheduled through the same automation modes, quality gate, quiet-hour policy, and dispatch routing. | P1 |
+| Relationship revival cadence | Improve reconnect text using memories, interests, last interaction, and health score. | Initial revival auto-scheduling is implemented; next add user-controlled cadence and per-contact limits. | P1 |
+| Gift-to-message assistant | Turn selected AI gift suggestions into a warm note or reminder message. | Schedule gift reminder or gift-accompanying message before the event. | P2 |
+| Bulk AI wish preparation | Generate messages for upcoming events in a review queue. | Implemented as 7-day AI draft preparation; Smart Approve can auto-send unchanged drafts at due time and Always Ask requires review. | P2 |
+| AI quality gate before auto-send | Initial gate scores fallback, blank, too-short, and generic AI drafts. | Implemented for generated wishes and revival messages by downgrading low-quality Fully Auto drafts to Smart Approve review before due-time automatic dispatch. | P0 |
+| Smart channel recommendation | Learn which channel works best per contact from delivery history and configured availability. | Implemented for AI-created pending messages via `AutoSendChannelSelector`; dispatcher fallback still handles send-time failures. | P1 |
 
 ### 25.4 User Experience Improvement Plan
 

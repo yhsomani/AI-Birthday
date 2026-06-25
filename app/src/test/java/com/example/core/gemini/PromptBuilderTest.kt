@@ -229,6 +229,32 @@ class PromptBuilderTest {
     }
 
     @Test
+    fun `buildReconnectPrompt includes relationship context and safety constraints`() {
+        val contact = ContactEntity(
+            id = "6",
+            name = "Henry",
+            relationshipType = "FRIEND",
+            healthScore = 18,
+            interactionFrequencyPerMonth = 2f,
+            interestsJson = "[\"cricket\"]",
+            hobbiesJson = "[\"guitar\"]",
+            sharedHistoryJson = "[\"college roommates\"]",
+            sensitiveTopicsJson = "[\"job search\"]",
+            notesText = "Uses +91 99999 99999 for work.",
+        )
+
+        val prompt = builder.buildReconnectPrompt(contact, 100)
+
+        assertTrue(prompt.contains("18/100"))
+        assertTrue(prompt.contains("cricket"))
+        assertTrue(prompt.contains("guitar"))
+        assertTrue(prompt.contains("college roommates"))
+        assertTrue(prompt.contains("job search"))
+        assertTrue(prompt.contains("do not invent memories", ignoreCase = true))
+        assertTrue(prompt.contains("[PHONE]"))
+    }
+
+    @Test
     fun `buildRegenerationPrompt includes original message`() {
         val ctx = ContactContextObject(
             firstName = "Ivy", nickname = null,
