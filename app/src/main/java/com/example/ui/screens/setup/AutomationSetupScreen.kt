@@ -30,6 +30,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -58,8 +59,10 @@ import com.example.core.ui.theme.RelateWarning
 import com.example.ui.viewmodel.AiDoctorAction
 import com.example.ui.viewmodel.AiDoctorSummary
 import com.example.ui.viewmodel.AutomationSetupViewModel
+import com.example.ui.viewmodel.ReadinessGroup
 import com.example.ui.viewmodel.ReadinessCheck
 import com.example.ui.viewmodel.ReadinessStatus
+import com.example.ui.viewmodel.SetupProgressSummary
 
 @Composable
 fun AutomationSetupScreen(
@@ -98,6 +101,7 @@ fun AutomationSetupScreen(
 
             ReadinessDashboard(
                 summary = state.summary,
+                setupProgress = state.setupProgress,
                 checks = state.checks,
                 isRefreshing = state.isRefreshing,
                 isSyncingContacts = state.isSyncingContacts,
@@ -167,6 +171,7 @@ fun AutomationSetupScreen(
 @Composable
 private fun ReadinessDashboard(
     summary: AiDoctorSummary,
+    setupProgress: SetupProgressSummary,
     checks: List<ReadinessCheck>,
     isRefreshing: Boolean,
     isSyncingContacts: Boolean,
@@ -207,8 +212,17 @@ private fun ReadinessDashboard(
                 color = RelateOnSurfaceVariant,
             )
 
-            checks.forEach { check ->
-                ReadinessRow(check = check, onAction = onAction)
+            SetupProgressStrip(summary = setupProgress)
+
+            readinessGroupOrder.forEach { group ->
+                val groupChecks = checks.filter { it.group == group }
+                if (groupChecks.isNotEmpty()) {
+                    ReadinessGroupSection(
+                        group = group,
+                        checks = groupChecks,
+                        onAction = onAction,
+                    )
+                }
             }
 
             operationMessage?.let {
@@ -295,6 +309,98 @@ private fun ReadinessDashboard(
             }
         }
     }
+}
+
+private val readinessGroupOrder = listOf(
+    ReadinessGroup.REQUIRED,
+    ReadinessGroup.QUALITY,
+    ReadinessGroup.RELIABILITY,
+    ReadinessGroup.RECOVERY,
+)
+
+@Composable
+private fun SetupProgressStrip(summary: SetupProgressSummary) {
+    if (summary.totalSteps == 0) return
+
+    val status = when {
+        summary.actionRequiredCount > 0 -> ReadinessStatus.ACTION_REQUIRED
+        summary.warningCount > 0 -> ReadinessStatus.WARNING
+        else -> ReadinessStatus.OK
+    }
+    val color = status.statusColors().content
+    val detail = when {
+        summary.actionRequiredCount > 0 -> stringResource(
+            R.string.setup_progress_blockers,
+            summary.actionRequiredCount,
+        )
+        summary.warningCount > 0 -> stringResource(
+            R.string.setup_progress_warnings,
+            summary.warningCount,
+        )
+        else -> stringResource(R.string.setup_progress_ready)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.setup_progress_title),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(
+                    R.string.setup_progress_count,
+                    summary.completedSteps,
+                    summary.totalSteps,
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = color,
+            )
+        }
+        LinearProgressIndicator(
+            progress = { summary.progressFraction.coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth(),
+            color = color,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
+        Text(
+            text = detail,
+            style = MaterialTheme.typography.bodySmall,
+            color = RelateOnSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ReadinessGroupSection(
+    group: ReadinessGroup,
+    checks: List<ReadinessCheck>,
+    onAction: (AiDoctorAction) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = group.label(),
+            style = MaterialTheme.typography.labelLarge,
+            color = RelatePrimary,
+            fontWeight = FontWeight.SemiBold,
+        )
+        checks.forEach { check ->
+            ReadinessRow(check = check, onAction = onAction)
+        }
+    }
+}
+
+@Composable
+private fun ReadinessGroup.label(): String = when (this) {
+    ReadinessGroup.REQUIRED -> stringResource(R.string.automation_setup_group_required)
+    ReadinessGroup.QUALITY -> stringResource(R.string.automation_setup_group_quality)
+    ReadinessGroup.RELIABILITY -> stringResource(R.string.automation_setup_group_reliability)
+    ReadinessGroup.RECOVERY -> stringResource(R.string.automation_setup_group_recovery)
 }
 
 @Composable

@@ -339,7 +339,7 @@ Status definitions:
 | F-002 | Splash and onboarding | Fully Implemented | First-run onboarding-to-auth routing covered; connected run needs idle device. |
 | F-003 | Authentication, guest mode, session state | Fully Implemented | Auth ViewModel and smoke action coverage exists; live OAuth requires credentials/device validation. |
 | F-004 | Settings and secure configuration | Fully Implemented | Biometric, quiet-hour, reminder, channel blackout, sync, Gmail, AI, and sign-out settings implemented; live handoffs pending. |
-| F-005 | Home dashboard and relationship planner | Fully Implemented | `HomeScreenInteractionTest` covers dashboard links and sync-error controls. |
+| F-005 | Home dashboard and relationship planner | Fully Implemented | `HomeScreenInteractionTest` covers dashboard links, sync-error controls, and setup progress routing. |
 | F-006 | Contact sync, import, and deduplication | Fully Implemented | Foreground/background sync share Google + device merge and event discovery. |
 | F-007 | Contact list search, filter, sort | Fully Implemented | `ContactListScreenInteractionTest` covers search, filter, sort, retry/dismiss, row navigation. |
 | F-008 | Contact detail personalization | Fully Implemented | Custom send time and skip-auto-wish affect generation/scheduling; live seeded validation pending. |
@@ -717,6 +717,28 @@ Focused validation evidence from 2026-06-25:
 - Gradle result: `BUILD SUCCESSFUL in 53s`, 89 actionable tasks, 11 executed, 78 up-to-date.
 - `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.SettingsViewModelTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
 - Gradle result: `BUILD SUCCESSFUL in 26s`, 89 actionable tasks, 21 executed, 68 up-to-date.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.MemoryVaultViewModelTest --tests com.example.ui.screens.memoryvault.MemoryVaultScreenInteractionTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+- Gradle result: `BUILD SUCCESSFUL in 27s`, 89 actionable tasks, 21 executed, 68 up-to-date.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.MessagesViewModelTest --tests com.example.ui.screens.messages.MessagesScreenInteractionTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+- Gradle result: `BUILD SUCCESSFUL in 12s`, 89 actionable tasks, 4 executed, 85 up-to-date.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.AutomationSetupViewModelTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+- Gradle result: `BUILD SUCCESSFUL in 20s`, 89 actionable tasks, 11 executed, 78 up-to-date.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.contacts.ContactDetailPersonalizationQualityCardTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+- Gradle result: `BUILD SUCCESSFUL in 24s`, 89 actionable tasks, 19 executed, 70 up-to-date.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.HomeViewModelTest --tests com.example.ui.screens.home.HomeScreenInteractionTest --tests com.example.ui.viewmodel.AutomationSetupViewModelTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+- Gradle result: `BUILD SUCCESSFUL in 44s`, 89 actionable tasks, 22 executed, 67 up-to-date.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.domain.usecase.SaveManualEventUseCaseTest --tests com.example.ui.viewmodel.EventsViewModelTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+- Gradle result: `BUILD SUCCESSFUL in 39s`, 89 actionable tasks, 27 executed, 62 up-to-date.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.settings.SettingsScreenInteractionTest --tests com.example.ui.viewmodel.SettingsViewModelTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+- Gradle result: `BUILD SUCCESSFUL in 34s`, 89 actionable tasks, 10 executed, 79 up-to-date.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.MessagesViewModelTest --tests com.example.ui.screens.messages.MessagesScreenInteractionTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+- Gradle result: `BUILD SUCCESSFUL in 1m 2s`, 89 actionable tasks, 9 executed, 80 up-to-date.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.WishPreviewViewModelTest --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+- Gradle result: `BUILD SUCCESSFUL in 37s`, 89 actionable tasks, 21 executed, 68 up-to-date.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.HomeViewModelTest --tests com.example.ui.screens.home.HomeScreenInteractionTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
+- Gradle result: `BUILD SUCCESSFUL in 43s`, 89 actionable tasks, 11 executed, 78 up-to-date.
+- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest :app:lintDebug --no-configuration-cache` passed.
+- Gradle result: `BUILD SUCCESSFUL in 54s`, 161 actionable tasks, 26 executed, 135 up-to-date. Lint report: `app/build/reports/lint-results-debug.html`.
 
 Representative automated coverage:
 
@@ -826,6 +848,14 @@ scripts/extract_strings.sh
 
 Unreleased changes:
 
+- Added Failed tab recovery assistant in Messages with direct AI Doctor routing while keeping retry manual.
+- Added Settings sign-out confirmation checklist before local data is cleared.
+- Added duplicate manual event detection with an explicit Save anyway override.
+- Added shared setup progress summary on Home and AI Doctor so setup status is visible before opening detailed diagnostics.
+- Added Contact Detail personalization next-step prompts to reduce generic AI wish inputs.
+- Grouped AI Doctor readiness checks into Required, Quality, Reliability, and Recovery sections.
+- Added Messages readiness labels for review, approved, failed, and channel/setup prerequisite states.
+- Added inline Memory Vault validation for whitespace-only notes and a defensive ViewModel guard against empty note saves.
 - Added Settings backup freshness so users can see the last encrypted backup status before opening Backup & Restore.
 - Routed Home pending-approval readiness and planner items directly to Messages while keeping setup problems routed to AI Doctor.
 - Added feature source of truth, compliance specs, UI validation ledger, now consolidated here.
@@ -1073,6 +1103,7 @@ How it works:
 - Google sign-in requests email, ID token, and Google Contacts readonly scope.
 - AuthManager signs into Firebase with Google credentials and stores profile state.
 - Guest bypass sets guest mode and a local developer profile.
+- Settings shows a destructive-action checklist before sign-out so the user sees what local data, preferences, credentials, and external access state are affected.
 - Sign-out cancels WorkManager jobs, clears notifications, clears Room tables, closes and resets the database, clears encrypted preferences, clears cached DB key material, deletes DB/WAL/SHM files, signs out from Firebase, and revokes Google access.
 
 Outputs:
@@ -1108,6 +1139,7 @@ Dashboard contents:
 | Header | Greeting with user name, optional profile photo, Settings button | `AuthManager.userProfile` |
 | Sync error card | Last contact-sync error with retry and dismiss actions | `PreferencesRepository.getLastSyncError()` |
 | Readiness banner | Setup warning, no-contact prompt, or pending-approval prompt | Derived from sync error, contact count, pending count |
+| Setup progress | Shared completed/total readiness summary with blocker or warning count; tap opens AI Doctor | `SetupProgressSummary` from contact/sync, AI, and approval signals |
 | Stats row 1 | Wishes Sent, Upcoming | Sent message count, events in next 30 days |
 | Stats row 2 | Contacts, Pending, Score | Contact count, pending message count, average contact health |
 | Quick actions | Analytics, Activity History, Style Coach, AI Doctor, Backup/Restore | Static navigation actions |
@@ -1124,6 +1156,7 @@ Inputs:
 - Upcoming events for the next 30 days.
 - User profile.
 - Last sync error.
+- AI wish generation toggle and Gemini API-key readiness.
 - User taps on quick actions, planner items, Settings, retry, and dismiss.
 
 How it works:
@@ -1132,18 +1165,21 @@ How it works:
 - If there are zero contacts, it attempts an automatic contact sync once, then reloads metrics.
 - Average health score is computed from all contacts.
 - Birthday events are filtered from upcoming events and formatted as month/day display values.
+- Setup progress is computed from contacts/sync health, AI generation availability, and pending approval workload.
 - Relationship Planner adds:
   - a pending-review item when pending count is greater than zero;
   - up to three low-health contacts where health is under 50;
   - up to two upcoming events.
 - Readiness state is computed in priority order: sync error, no contacts, pending approvals, otherwise no banner.
+- Planner and readiness cards route through typed action targets for Messages, Contact Detail, AI Doctor, and Backup/Restore instead of inferring behavior from nullable contact ids.
 
 Outputs:
 
 - Dashboard cards and navigation actions.
+- Setup progress card opens AI Doctor for the full diagnostic checklist.
 - Retry action reloads metrics and may trigger contact sync.
 - Dismiss action clears `last_sync_error`.
-- Planner item with a contact id opens Contact Detail; a setup item opens AI Doctor.
+- Planner and readiness actions open the exact target represented by their typed action: Contact Detail, Messages, AI Doctor, or Backup/Restore.
 
 Failure and edge behavior:
 
@@ -1307,6 +1343,7 @@ How it works:
 - Manual event creation can attach to an existing contact or create a manual local contact.
 - Manual date validation uses non-lenient `Calendar`.
 - Manual reminders clamp `notifyDaysBefore` to 0-30.
+- Manual save checks active same-contact, same-type, same-day/month events before persistence and returns a duplicate warning unless the user explicitly chooses Save anyway.
 - Events are upserted and their reminder alarms are scheduled.
 - Event list combines events and contacts, then filters by query/type/horizon and sorts by next occurrence.
 - Event reminder alarms fire through `EventReminderReceiver`, which rechecks the reminder toggle, loads contact/event, and shows an event reminder notification.
@@ -1323,6 +1360,7 @@ Failure and edge behavior:
 
 - Manual save requires either an existing contact or a new contact name.
 - Invalid dates return a visible input error.
+- Likely duplicate manual events show a visible warning and require explicit override before a second reminder is saved.
 - Missing selected contact returns Contact Not Found.
 - Inactive events or disabled reminders cancel reminder alarms.
 - If exact alarm permission is unavailable, reminders fall back to inexact while-idle scheduling.
@@ -1422,6 +1460,7 @@ Inputs:
   - repetitive.
 - Gmail sender email/app password for test-send.
 - Approve or reject action.
+- Pending review queue, read from pending messages with `PENDING` status.
 
 How it works:
 
@@ -1434,6 +1473,8 @@ How it works:
 - Test-send sends the current edited text to the configured sender email via Gmail SMTP.
 - Approve saves the edited text when changed, marks the pending message APPROVED, and schedules exact send.
 - Reject marks the pending message REJECTED and cancels scheduled send if needed.
+- While loading the draft, the ViewModel computes the next pending review target by scheduled time, excluding the current draft and ignoring non-pending statuses.
+- After approval or rejection, the result state can show a Review next action when another pending wish exists; approval still returns automatically when there is no next pending wish.
 
 Outputs:
 
@@ -1442,6 +1483,7 @@ Outputs:
 - Regenerated pending message variants.
 - Test-send success/error event.
 - Approved or rejected state.
+- Next-review target and remaining pending-review count when available.
 - Activity log for AI feedback.
 
 Failure and edge behavior:
@@ -1452,6 +1494,7 @@ Failure and edge behavior:
 - Blank test message fails validation.
 - Missing Gmail setup blocks test-send.
 - Gmail send exceptions return test-send failed.
+- Review-queue lookup is fail-soft; if it cannot be read, the preview still loads and approval keeps the existing no-queue behavior.
 
 ### 24.9 Messages Inbox and Approval Lifecycle
 
@@ -1478,6 +1521,7 @@ Inputs:
 - Channel filter: All, SMS, WhatsApp, Email.
 - Sort: scheduled oldest, scheduled newest, contact name.
 - Row actions: review/edit, approve, reject, revoke, retry.
+- Failed recovery action: open AI Doctor for setup checks before retry.
 - Bulk selected message ids.
 - Notification actions: approve, reject, retry.
 
@@ -1488,6 +1532,7 @@ How it works:
 - Pending contains due-within-30-days pending/unknown/dispatching messages after today.
 - Approved contains APPROVED messages.
 - Failed contains FAILED messages.
+- Failed tab includes a recovery assistant summary with failure count, setup-blocker guidance, and an AI Doctor action.
 - Rejected, Sent, and Expired pending rows are excluded from active pending lists.
 - Sent rows come from `SentMessageEntity`.
 - Search matches contact, event type, channel, message text, delivery status, or variant text.
@@ -1501,6 +1546,7 @@ How it works:
 Outputs:
 
 - Filtered and sorted tab lists.
+- Failed send recovery assistant and AI Doctor route.
 - Pending status transitions.
 - Exact-send alarms or immediate WorkManager dispatch jobs.
 - Activity log entries for message actions.
@@ -1510,6 +1556,7 @@ Failure and edge behavior:
 - Missing pending message returns not found in use cases.
 - Revoking a non-approved message returns Not Approved.
 - Message action failures show stable screen errors.
+- Failed retry remains explicit; the recovery assistant does not retry or change messages automatically.
 - Notification actions resolve by message id first, then legacy event id.
 
 ### 24.10 Scheduling, Automation Modes, and Delivery Channels
@@ -2222,10 +2269,10 @@ Manual versus automated processes:
 
 | Process | Manual today | Automated today | Gap |
 |---|---|---|---|
-| Setup | User signs in, grants permissions, configures Gemini/Gmail, trains Style Coach | AI Doctor detects blockers | Needs a single guided setup progress path. |
+| Setup | User signs in, grants permissions, configures Gemini/Gmail, trains Style Coach | AI Doctor detects blockers; Home and AI Doctor share setup progress counts | Needs a guided resume path that opens each remaining fix step. |
 | Contact import | User taps sync or foreground refresh | Daily sync chain and auto event discovery | Partial failures need clearer recovery and import summaries. |
 | Personalization | User fills rich fields, memories, gifts | Classification and inferred group relationship | Needs smarter prompts for missing details and one-tap enrichment. |
-| Event management | User adds manual events | Contact-derived event discovery and reminders | Needs conflict/duplicate review for manual plus synced events. |
+| Event management | User adds manual events and can override duplicate warnings | Contact-derived event discovery, duplicate warning before manual saves, and reminders | Needs richer merge/keep controls for duplicate families beyond the initial warning. |
 | Wish writing | User generates/reviews/regenerates | AI generates variants and learns feedback | Needs batch preview and smarter default variant/channel suggestions. |
 | Approval | User reviews, approves, rejects, revokes | Notifications and automation modes | Needs more direct task routing and clearer send-risk labels. |
 | Delivery | User configures channel credentials/permissions | Exact scheduling, dispatch, fallback, retries | Needs pre-send channel readiness checks in context. |
@@ -2262,13 +2309,13 @@ Dependencies and integrations:
 
 | Feature | Current behavior | UX/accessibility/performance issues | Recommended improvement |
 |---|---|---|---|
-| Onboarding and setup | Explains value and links to setup checklist | Setup spans several screens; users may not know completion state | Add a single setup progress model with remaining steps, completion percentage, and resume action. |
+| Onboarding and setup | Explains value and links to setup checklist; Home and AI Doctor now show shared setup progress | Setup still spans several screens and onboarding does not yet resume unfinished steps | Extend the setup progress model into a guided resume flow with exact next actions. |
 | Auth and guest mode | Google sign-in plus developer bypass | Guest mode can hide missing production setup | Label guest mode clearly and show upgrade-to-sign-in action on dashboard. |
-| Home dashboard | Metrics, readiness, quick actions, planner, birthdays | Some planner items lack task-specific routing; backup and setup progress are not visible enough | Route each insight to its exact task, show setup/back-up status, and make pending approvals one tap from review. |
+| Home dashboard | Metrics, readiness, setup progress, quick actions, planner, birthdays | Planner/readiness actions now use typed targets; backup freshness is surfaced in Settings rather than Home | Consider a Home backup-staleness prompt once stale-backup thresholds are productized for the dashboard. |
 | Contacts list | Search, filter, sort, sync error controls | Needs-details filter is useful but not action-oriented | Add personalization score chips and quick "complete details" action. |
 | Contact detail | Rich personalization, generate wish, memory/gift/chat links | Many fields increase cognitive load; automation values are technical | Use progressive disclosure: essentials first, advanced automation collapsed, explain quality impact. |
-| Event list | Search/filter/horizon and manual event creation | Manual event flow may require choosing between existing/new contact before user understands impact | Use guided event form with smart contact suggestions and duplicate detection. |
-| Messages inbox | Today/Pending/Approved/Sent/Failed tabs, bulk actions | Many statuses require understanding lifecycle; failed recovery is separate from diagnostics | Add status explainer, next-best action, and failure reason summary per row. |
+| Event list | Search/filter/horizon and manual event creation with duplicate warning | Manual event flow may require choosing between existing/new contact before user understands impact | Add smarter contact suggestions and future merge/keep options for duplicates. |
+| Messages inbox | Today/Pending/Approved/Sent/Failed tabs, bulk actions, readiness labels, failed recovery assistant | Many statuses still require understanding lifecycle | Continue improving failure reason depth and fix-and-retry paths. |
 | Wish preview | Variant tabs, edit, feedback, why signals, approve/reject/test | High-value screen but dense; feedback only applies after regenerate | Group actions by intent: edit, improve, test, approve. Show selected feedback as pending regeneration input. |
 | Scheduling/delivery | Honors approvals, quiet hours, blackout dates, disabled channels | Channel readiness is often discovered late at send time | Show pre-send readiness on pending rows and contact detail before approval. |
 | Analytics | Metrics, charts, export | Metrics are not directly actionable | Attach recommended actions: enrich low-personalization contacts, review failed channels, reconnect neglected contacts. |
@@ -2279,7 +2326,7 @@ Dependencies and integrations:
 | Backup/Restore | Secure passphrase export/import | Strong security but high anxiety; passphrase loss consequences need persistent clarity | Show last backup date on Home/Settings and a restore rehearsal checklist. |
 | AI Doctor | Strong diagnostic checklist | Dense diagnostic list can overwhelm non-technical users | Split into "Required to send", "Improves quality", and "Reliability" groups. |
 | Widget/shortcuts | Birthday/upcoming/pending summary | Widget is passive; no direct pending approval action shown in SSOT | Add deep-link actions where launcher/widget APIs allow. |
-| Security/sign-out | Strong local wipe | Destructive sign-out could surprise users | Add confirmation summary: what is deleted, what remains in external services, backup recommendation. |
+| Security/sign-out | Strong local wipe with destructive-action checklist | External service data and backup implications still require user understanding | Keep the checklist explicit and consider linking directly to Backup & Restore before final confirmation. |
 
 Cross-cutting accessibility issues and improvements:
 
@@ -2300,16 +2347,16 @@ Cross-cutting performance concerns:
 
 | Opportunity | Business value | User benefit | Implementation approach | Risks and safeguards |
 |---|---|---|---|---|
-| Setup progress automation | Improves activation and reduces support issues | User sees exactly what remains before reliable automation | Create setup state aggregator from AI Doctor checks; show progress on Home and onboarding | Do not auto-enable permissions or credentials; every external/system action remains explicit. |
-| Direct task routing from dashboard | Faster task completion | One tap from insight to relevant work queue | Add typed dashboard action destinations for Messages, Contacts, AI Doctor, Backup | Keep fallback to AI Doctor for unknown/setup actions. Implemented first for pending approvals. |
+| Setup progress automation | Improves activation and reduces support issues | User sees exactly what remains before reliable automation | Initial shared `SetupProgressSummary` now powers Home and AI Doctor; next extend it to onboarding and guided fix routing | Do not auto-enable permissions or credentials; every external/system action remains explicit. |
+| Direct task routing from dashboard | Faster task completion | One tap from insight to relevant work queue | Typed dashboard action targets now cover Messages, Contact Detail, AI Doctor, and Backup/Restore for readiness/planner cards | Critical actions still open task screens; no message approval, send, sync, or backup runs without user action. |
 | Smart personalization prompts | Better AI quality and retention | User adds useful details without opening advanced form | Compute missing fields per contact and suggest one small prompt at a time | User chooses what to save; never infer sensitive notes without confirmation. |
-| Batch approval queue | Faster review of many wishes | Review multiple pending drafts in a focused flow | Add "review next" from Wish Preview and Messages queue context | No bulk auto-send without explicit user confirmation. |
+| Batch approval queue | Faster review of many wishes | Review multiple pending drafts in a focused flow | Initial Wish Preview Review next action implemented from the pending queue; future work can add Messages queue context and bulk review mode | No bulk auto-send without explicit user confirmation. |
 | Channel readiness precheck | Fewer failed sends | User knows before approval if SMS/email/WhatsApp is not ready | Add per-message readiness status from permissions, contact data, disabled channels, credentials | Do not block manual approval unless send is impossible; show override/retry paths. |
 | Smart default channel | Better deliverability | Preferred channel is suggested based on available phone/email and prior success | Add local scoring from sent history and contact fields | User can override per contact; do not switch channel silently for approved messages. |
-| Event duplicate detection | Cleaner reminders | Avoids duplicate birthday/custom events | Compare manual event date/type/contact against existing events before save | Show confirmation with merge/keep options. |
+| Event duplicate detection | Cleaner reminders | Avoids duplicate birthday/custom events | Initial same-contact, same-type, same-day/month warning is implemented before save | Users can cancel or explicitly Save anyway; future work can add merge/keep options. |
 | Backup reminder surfacing | Reduces data loss | User sees stale backup before a problem | Add Home/Settings last-backup card using existing pref | No automatic export; user must choose destination and passphrase. |
 | Smart regeneration feedback | Faster better drafts | Feedback immediately suggests likely fix | Persist selected feedback and show "Regenerate with X" primary action | User can edit prompt/draft manually; feedback is stored locally. |
-| Recovery assistant for failed sends | Lower support burden | User sees exact fix and retry path | Link FAILED messages to AI Doctor checks and Activity History details | Do not retry automatically across channels without configured fallback rules. |
+| Recovery assistant for failed sends | Lower support burden | User sees exact fix and retry path | Initial Failed tab assistant links to AI Doctor while row readiness explains blockers; next add deeper Activity History details | Do not retry automatically across channels without configured fallback rules. |
 
 ### 25.4 User Experience Improvement Plan
 
@@ -2323,6 +2370,7 @@ Information architecture:
 Workflow simplification:
 
 - Pending approval from Home -> Messages or Wish Preview, not AI Doctor.
+- Wish Preview approved/rejected result -> Review next when another pending wish exists.
 - Contact needing details -> Contact Detail edit section with missing fields pre-highlighted.
 - Failed message -> Failed tab -> failure reason -> fix action -> retry.
 - Setup -> one progress checklist, each row opens exactly one fix location.
@@ -2367,7 +2415,7 @@ Short-term, 1-2 weeks:
 | Contact personalization score and missing-detail prompts | P0 | High | Medium | Contact quality helper, strings | Better AI output |
 | Failed-send recovery assistant in Messages | P1 | High | Medium | Activity/health/dead-letter mapping | Lower support load |
 | Duplicate manual event detection | P1 | Medium | Medium | Event repository query | Cleaner reminders |
-| Wish Preview "review next" queue flow | P2 | Medium | Medium | Navigation queue context | Faster batch approvals |
+| Wish Preview "review next" queue flow | P2 | Medium | Medium | Navigation queue context | Initial implementation complete for sequential pending review |
 
 Medium-term, 2-6 weeks:
 
@@ -2392,7 +2440,7 @@ Long-term strategic improvements:
 Technical architecture changes:
 
 - Extract reusable setup/readiness aggregation from `AutomationSetupViewModel` into a domain-facing service or use case so Home, Onboarding, Settings, and AI Doctor share one truth.
-- Introduce typed action destinations for dashboard/planner/readiness items instead of inferring from nullable contact ids.
+- Typed action destinations now cover dashboard planner/readiness items instead of inferring from nullable contact ids; future dashboard cards should reuse this target model.
 - Add contact personalization quality helper shared by Contact Detail, Contacts List, AI Doctor, and Analytics.
 - Add message readiness helper shared by Messages, Wish Preview, Dispatch, and AI Doctor.
 
@@ -2439,22 +2487,32 @@ Analytics and tracking recommendations:
 | ID | Backlog item | Priority | Status |
 |---|---|---|---|
 | UX-001 | Route Home pending approvals directly to Messages | P0 | Implemented in code after this audit section was added. |
-| UX-002 | Add typed dashboard action destinations for all planner/readiness cards | P0 | Started with UX-001; extend for backup/sync/contact actions. |
-| UX-003 | Create setup progress summary shared by Home and AI Doctor | P0 | Planned |
-| UX-004 | Add contact personalization score and missing-detail prompts | P0 | Planned |
-| UX-005 | Add per-message readiness and failure reason labels | P1 | Planned |
+| UX-002 | Add typed dashboard action destinations for all planner/readiness cards | P0 | Implemented typed action targets for Messages, Contact Detail, AI Doctor, and Backup/Restore. |
+| UX-003 | Create setup progress summary shared by Home and AI Doctor | P0 | Implemented initial shared summary and Home/AI Doctor UI. |
+| UX-004 | Add contact personalization score and missing-detail prompts | P0 | Implemented initial Contact Detail next-step prompts. |
+| UX-005 | Add per-message readiness and failure reason labels | P1 | Implemented initial readiness labels for Messages rows. |
 | UX-006 | Add last backup freshness to Home or Settings | P1 | Implemented in Settings. |
-| UX-007 | Group AI Doctor checks by Required, Quality, Reliability, Recovery | P1 | Planned |
-| UX-008 | Add duplicate manual event detection | P1 | Planned |
-| UX-009 | Add failed-send recovery assistant | P1 | Planned |
-| UX-010 | Add Wish Preview review-next queue | P2 | Planned |
-| UX-011 | Add Memory Vault inline validation for blank notes | P2 | Planned |
-| UX-012 | Add sign-out destructive-action checklist | P2 | Planned |
+| UX-007 | Group AI Doctor checks by Required, Quality, Reliability, Recovery | P1 | Implemented. |
+| UX-008 | Add duplicate manual event detection | P1 | Implemented initial warning with explicit Save anyway override. |
+| UX-009 | Add failed-send recovery assistant | P1 | Implemented initial Failed tab assistant with AI Doctor route. |
+| UX-010 | Add Wish Preview review-next queue | P2 | Implemented initial explicit Review next action after approval/rejection. |
+| UX-011 | Add Memory Vault inline validation for blank notes | P2 | Implemented. |
+| UX-012 | Add sign-out destructive-action checklist | P2 | Implemented Settings confirmation checklist. |
 
 ### 25.8 Incremental Implementation Log
 
 | Change | Why it improves UX | User effort reduction | User control preserved | Validation |
 |---|---|---|---|---|
+| UX-002: Home planner and readiness cards now use a shared typed action target model for Messages, Contact Detail, AI Doctor, and Backup/Restore. | Dashboard insights route to the exact task surface without relying on nullable contact ids or ad hoc fallback logic. | Reduces wrong turns from dashboard prompts and makes future dashboard actions cheaper to add consistently. | Cards only navigate; setup, backup, approval, sync, and send actions still require explicit user action on the destination screen. | Focused Home ViewModel, screen interaction, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
+| UX-010: Wish Preview now offers an explicit Review next action after approval or rejection when another pending wish exists. | Users can continue a review session from the result state instead of backing out and finding the next pending draft manually. | Reduces repeated navigation through Messages or Contact Detail during sequential approvals. | The app never auto-approves, auto-rejects, or silently advances to the next draft; users choose Review next, and approval still returns automatically only when no next item exists. | Focused Wish Preview ViewModel, screen interaction, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
+| UX-009: Messages Failed tab now includes a recovery assistant with failed count, setup guidance, retry reminder, and direct AI Doctor route. | Users get a single recovery entry point instead of interpreting failed rows alone. | Reduces diagnostic navigation by pointing failed-send work straight to setup checks. | The assistant does not retry or alter messages; users still review fixes and retry individual or selected rows explicitly. | Focused Messages ViewModel, screen interaction, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
+| UX-012: Settings now requires a sign-out confirmation dialog with a checklist of local data deletion, cleared preferences/keys, external access behavior, and backup recommendation. | Users see the consequences before a destructive local wipe. | Reduces recovery effort caused by accidental sign-out or misunderstanding what is deleted. | Sign-out only runs after explicit confirmation; cancel keeps all local data untouched. | Focused Settings screen interaction, Settings ViewModel, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
+| UX-008: Manual event save now detects likely duplicate active events for the same contact, event type, and day/month before persistence. | Users are warned before creating duplicate reminders that can cause repeated notifications or duplicate AI wish generation. | Prevents cleanup work caused by accidental duplicate manual entries. | Users can cancel by editing/dismissing or explicitly choose Save anyway when a separate reminder is intentional. | Focused SaveManualEventUseCase, EventsViewModel, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
+| UX-003: Home and AI Doctor now share a setup progress summary with completed/total readiness counts, blocker count, warning count, and progress indicator. | Users can understand setup health from Home before opening detailed diagnostics, then inspect the full AI Doctor checklist when needed. | Reduces navigation and scanning effort by surfacing readiness status on the dashboard and summarizing AI Doctor checks before the long list. | The summary is informational and routes to AI Doctor; it does not auto-enable permissions, credentials, channels, or sends. | Focused Home ViewModel, Home screen interaction, Automation Setup ViewModel, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
+| UX-004: Contact Detail personalization quality card now shows the next missing detail to add, or a ready state when core signals are complete. | Users can see which input will most improve message personalization before generating a wish. | Reduces guesswork around which relationship fields matter for AI quality. | The prompt is advisory; users still choose whether to edit preferences, add memories, or generate immediately. | Focused Contact Detail quality-card, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
+| UX-007: AI Doctor checks are grouped into Required, Quality, Reliability, and Recovery sections. | The diagnostic list is easier to scan and separates setup blockers from quality and recovery concerns. | Reduces cognitive load when deciding what to fix first. | Existing check actions remain explicit; no permission, credential, or send behavior is changed automatically. | Focused Automation Setup ViewModel, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
+| UX-005: Messages rows show readiness labels for review, approval, sending, failed retry, missing contact, disabled channel, missing phone/email, and Gmail setup gaps. | Users see likely send blockers directly in the work queue instead of discovering them after approval or retry. | Reduces diagnostic navigation and failed retry loops by showing the next problem at row level. | Labels are informational; approve, edit, reject, revoke, and retry actions remain explicit user choices. | Focused Messages ViewModel, screen interaction, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
+| UX-011: Memory Vault shows inline validation for whitespace-only notes and rejects blank saves defensively. | Users understand why the Add button stays disabled instead of facing a silent no-op. | Avoids repeated taps or confusion when whitespace was entered accidentally. | Users decide what note to save; the app only blocks empty data that would not be useful. | Focused Memory Vault ViewModel, screen interaction, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
 | UX-006: Settings Backup & Restore row shows last backup freshness from existing secure preferences. | Data-protection status is visible before the user enters the backup flow. | Reduces the need to open Backup & Restore just to check whether a recent backup exists. | The app only surfaces status; export and restore remain explicit user actions. | Focused Settings ViewModel, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
 | UX-001: Home pending-approval readiness and planner items route directly to Messages. | Approval review is a message task, not a setup diagnosis task. | Reduces path from Home alert to review queue to one tap. | User still reviews, edits, approves, rejects, or revokes before critical sends. | Focused Home interaction tests passed on 2026-06-25. |
 

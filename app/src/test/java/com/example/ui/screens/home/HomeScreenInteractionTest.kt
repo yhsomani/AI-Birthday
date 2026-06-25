@@ -14,10 +14,10 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.ui.theme.RelateAITheme
-import com.example.ui.viewmodel.HomeActionDestination
-import com.example.ui.viewmodel.HomeReadinessAction
+import com.example.ui.viewmodel.HomeActionTarget
 import com.example.ui.viewmodel.HomeUiState
 import com.example.ui.viewmodel.RelationshipPlannerItem
+import com.example.ui.viewmodel.SetupProgressSummary
 import com.example.ui.viewmodel.UpcomingBirthday
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -103,12 +103,12 @@ class HomeScreenInteractionTest {
             state = populatedHomeState(
                 readinessTitle = "Approvals waiting",
                 readinessDetail = "2 message(s) need review before they can send.",
-                readinessAction = HomeReadinessAction.MESSAGES,
+                readinessAction = HomeActionTarget.Messages,
                 plannerItems = listOf(
                     RelationshipPlannerItem(
                         title = "Review pending wishes",
                         detail = "2 approval(s) are waiting before send time.",
-                        destination = HomeActionDestination.MESSAGES,
+                        actionTarget = HomeActionTarget.Messages,
                     ),
                 ),
             ),
@@ -129,13 +129,67 @@ class HomeScreenInteractionTest {
             state = populatedHomeState(
                 readinessTitle = "Setup needs attention",
                 readinessDetail = "Contact sync is reporting an issue.",
-                readinessAction = HomeReadinessAction.AUTOMATION_SETUP,
+                readinessAction = HomeActionTarget.AutomationSetup,
             ),
         )
 
         clickTaggedCard(HomeScreenTestTags.READINESS_BANNER)
 
         assertEquals(listOf("automation"), actions)
+    }
+
+    @Test
+    fun setupProgressCard_opensAutomationDoctor() {
+        val actions = mutableListOf<String>()
+
+        setHomeContent(
+            actions = actions,
+            state = populatedHomeState(
+                setupProgress = SetupProgressSummary(
+                    completedSteps = 2,
+                    totalSteps = 3,
+                    warningCount = 1,
+                ),
+            ),
+        )
+
+        clickTaggedCard(HomeScreenTestTags.SETUP_PROGRESS_CARD)
+
+        assertEquals(listOf("automation"), actions)
+    }
+
+    @Test
+    fun plannerItems_routeThroughTypedTargets() {
+        val actions = mutableListOf<String>()
+
+        setHomeContent(
+            actions = actions,
+            state = populatedHomeState(
+                plannerItems = listOf(
+                    RelationshipPlannerItem(
+                        title = "Open backup",
+                        detail = "Recent backup is missing.",
+                        actionTarget = HomeActionTarget.BackupRestore,
+                    ),
+                    RelationshipPlannerItem(
+                        title = "Fix setup",
+                        detail = "Automation setup needs attention.",
+                        actionTarget = HomeActionTarget.AutomationSetup,
+                    ),
+                    RelationshipPlannerItem(
+                        title = "Review contact",
+                        detail = "Personalization is incomplete.",
+                        actionTarget = HomeActionTarget.ContactDetail("contact-2"),
+                    ),
+                ),
+            ),
+        )
+
+        clickTaggedCard(HomeScreenTestTags.PLANNER_ITEM_PREFIX + "backup_restore")
+        clickTaggedCard(HomeScreenTestTags.PLANNER_ITEM_PREFIX + "automation_setup")
+        clickTaggedCard(HomeScreenTestTags.PLANNER_ITEM_PREFIX + "contact-2")
+
+        assertEquals(listOf("backup", "automation", "contact:contact-2"), actions)
     }
 
     private fun setHomeContent(
@@ -170,12 +224,17 @@ class HomeScreenInteractionTest {
         syncError: String? = null,
         readinessTitle: String? = null,
         readinessDetail: String? = null,
-        readinessAction: HomeReadinessAction? = null,
+        readinessAction: HomeActionTarget? = null,
+        setupProgress: SetupProgressSummary = SetupProgressSummary(
+            completedSteps = 2,
+            totalSteps = 3,
+            warningCount = 1,
+        ),
         plannerItems: List<RelationshipPlannerItem> = listOf(
             RelationshipPlannerItem(
                 title = "Reconnect with Asha",
                 detail = "Relationship health is 42.",
-                contactId = "contact-1",
+                actionTarget = HomeActionTarget.ContactDetail("contact-1"),
             ),
         ),
     ) = HomeUiState(
@@ -191,6 +250,7 @@ class HomeScreenInteractionTest {
         readinessTitle = readinessTitle,
         readinessDetail = readinessDetail,
         readinessAction = readinessAction,
+        setupProgress = setupProgress,
         plannerItems = plannerItems,
     )
 }

@@ -7,6 +7,7 @@ import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.usecase.SaveManualEventUseCase
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
@@ -21,6 +22,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -102,6 +104,58 @@ class EventsViewModelTest {
 
         assertEquals("Enter a valid date.", viewModel.uiState.value.error)
         assertFalse(viewModel.uiState.value.isSavingManualEvent)
+    }
+
+    @Test
+    fun `saveManualEvent duplicate exposes warning without snackbar error`() = runTest(testDispatcher) {
+        val contact = ContactEntity(id = "c1", name = "Alice")
+        val event = EventEntity(
+            id = "existing",
+            contactId = "c1",
+            type = "BIRTHDAY",
+            dayOfMonth = 5,
+            month = 6,
+            nextOccurrenceMs = 100L,
+        )
+        every { eventRepository.getAll() } returns MutableStateFlow(listOf(event))
+        every { contactRepository.getAll() } returns MutableStateFlow(listOf(contact))
+        coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.DuplicateFound(contact, event)
+
+        val viewModel = EventsViewModel(eventRepository, contactRepository, saveManualEventUseCase, activityLogRepository)
+        advanceUntilIdle()
+        viewModel.saveManualEvent("c1", null, "BIRTHDAY", null, 6, 5, null)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isSavingManualEvent)
+        assertNull(viewModel.uiState.value.error)
+        assertEquals("Alice", viewModel.uiState.value.duplicateWarning?.contactName)
+        assertEquals("BIRTHDAY", viewModel.uiState.value.duplicateWarning?.eventType)
+    }
+
+    @Test
+    fun `saveManualEvent override passes allowDuplicate to use case`() = runTest(testDispatcher) {
+        val contact = ContactEntity(id = "c1", name = "Alice")
+        val event = EventEntity(
+            id = "manual",
+            contactId = "c1",
+            type = "BIRTHDAY",
+            dayOfMonth = 5,
+            month = 6,
+            nextOccurrenceMs = 100L,
+        )
+        every { eventRepository.getAll() } returns MutableStateFlow(emptyList())
+        every { contactRepository.getAll() } returns MutableStateFlow(listOf(contact))
+        coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.Saved(contact, event)
+
+        val viewModel = EventsViewModel(eventRepository, contactRepository, saveManualEventUseCase, activityLogRepository)
+        advanceUntilIdle()
+        viewModel.saveManualEvent("c1", null, "BIRTHDAY", null, 6, 5, null, allowDuplicate = true)
+        advanceUntilIdle()
+
+        coVerify {
+            saveManualEventUseCase(match { it.allowDuplicate })
+        }
+        assertTrue(viewModel.uiState.value.saveMessage?.contains("Alice") == true)
     }
 
     @Test

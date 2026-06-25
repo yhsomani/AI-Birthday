@@ -99,6 +99,22 @@ class MemoryVaultViewModelTest {
     }
 
     @Test
+    fun `addNote rejects blank note with validation error`() = runTest(testDispatcher) {
+        coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
+        coEvery { memoryNoteRepository.getByContact("contact_1") } returns emptyList()
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
+        advanceUntilIdle()
+
+        viewModel.addNote("   ", MemoryVaultViewModel.CATEGORY_GENERAL)
+        advanceUntilIdle()
+
+        assertEquals(R.string.memory_vault_error_blank_note, viewModel.uiState.value.errorMessageRes)
+        coVerify(exactly = 0) { memoryNoteRepository.upsert(any()) }
+    }
+
+    @Test
     fun `addNote rejects notes over maximum length`() = runTest(testDispatcher) {
         coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
         coEvery { memoryNoteRepository.getByContact("contact_1") } returns emptyList()

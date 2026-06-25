@@ -5,6 +5,7 @@ import com.example.core.db.entities.EventEntity
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
+import kotlinx.coroutines.flow.first
 import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
@@ -37,6 +38,19 @@ class SaveManualEventUseCase @Inject constructor(
 
         if (!isValidDate(request.dayOfMonth, request.month, request.year)) {
             return Outcome.InvalidInput("Enter a valid date.")
+        }
+
+        if (!request.allowDuplicate) {
+            val existingDuplicate = findDuplicateEvent(
+                contactId = contact.id,
+                eventType = normalizedType,
+                label = normalizedLabel,
+                month = request.month,
+                dayOfMonth = request.dayOfMonth,
+            )
+            if (existingDuplicate != null) {
+                return Outcome.DuplicateFound(contact = contact, existingEvent = existingDuplicate)
+            }
         }
 
         val nextOccurrenceMs = nextOccurrenceMs(request.dayOfMonth, request.month)
@@ -104,12 +118,45 @@ class SaveManualEventUseCase @Inject constructor(
         val dayOfMonth: Int,
         val year: Int? = null,
         val notifyDaysBefore: Int = 1,
+        val allowDuplicate: Boolean = false,
     )
 
     sealed class Outcome {
         data class Saved(val contact: ContactEntity, val event: EventEntity) : Outcome()
         data class InvalidInput(val message: String) : Outcome()
+        data class DuplicateFound(val contact: ContactEntity, val existingEvent: EventEntity) : Outcome()
         data object ContactNotFound : Outcome()
+    }
+
+    private suspend fun findDuplicateEvent(
+        contactId: String,
+        eventType: String,
+        label: String?,
+        month: Int,
+        dayOfMonth: Int,
+    ): EventEntity? {
+        val events = runCatching { eventRepository.getAll().first() }.getOrDefault(emptyList())
+        return events.firstOrNull { event ->
+            event.isActive &&
+                event.contactId == contactId &&
+                event.type.equals(eventType, ignoreCase = true) &&
+                event.month == month &&
+                event.dayOfMonth == dayOfMonth &&
+                labelsAreCompatibleForDuplicate(eventType, event.label, label)
+        }
+    }
+
+    private fun labelsAreCompatibleForDuplicate(
+        eventType: String,
+        existingLabel: String?,
+        newLabel: String?,
+    ): Boolean {
+        if (eventType != "CUSTOM") return true
+        val normalizedExisting = existingLabel.orEmpty().trim().lowercase(Locale.US)
+        val normalizedNew = newLabel.orEmpty().trim().lowercase(Locale.US)
+        return normalizedExisting.isBlank() ||
+            normalizedNew.isBlank() ||
+            normalizedExisting == normalizedNew
     }
 
     companion object {

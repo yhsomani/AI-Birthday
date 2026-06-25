@@ -7,8 +7,10 @@ import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -98,6 +100,68 @@ class SaveManualEventUseCaseTest {
         coVerify(exactly = 0) { contactRepository.upsert(any()) }
         coVerify(exactly = 0) { eventRepository.upsert(any()) }
         coVerify(exactly = 0) { eventReminderSchedulerService.scheduleReminder(any()) }
+    }
+
+    @Test
+    fun `duplicate existing event returns warning before persisting`() = runTest {
+        val contact = ContactEntity(id = "c1", name = "Alice")
+        val existingEvent = EventEntity(
+            id = "existing",
+            contactId = "c1",
+            type = "BIRTHDAY",
+            dayOfMonth = 12,
+            month = 6,
+            nextOccurrenceMs = 100L,
+            source = "CONTACTS",
+        )
+        coEvery { contactRepository.getById("c1") } returns contact
+        every { eventRepository.getAll() } returns MutableStateFlow(listOf(existingEvent))
+
+        val outcome = useCase(
+            SaveManualEventUseCase.Request(
+                existingContactId = "c1",
+                eventType = "BIRTHDAY",
+                month = 6,
+                dayOfMonth = 12,
+            )
+        )
+
+        assertTrue(outcome is SaveManualEventUseCase.Outcome.DuplicateFound)
+        assertEquals(existingEvent, (outcome as SaveManualEventUseCase.Outcome.DuplicateFound).existingEvent)
+        coVerify(exactly = 0) { contactRepository.upsert(any()) }
+        coVerify(exactly = 0) { eventRepository.upsert(any()) }
+        coVerify(exactly = 0) { eventReminderSchedulerService.scheduleReminder(any()) }
+    }
+
+    @Test
+    fun `allowDuplicate saves even when matching event exists`() = runTest {
+        val contact = ContactEntity(id = "c1", name = "Alice")
+        val existingEvent = EventEntity(
+            id = "existing",
+            contactId = "c1",
+            type = "BIRTHDAY",
+            dayOfMonth = 12,
+            month = 6,
+            nextOccurrenceMs = 100L,
+            source = "CONTACTS",
+        )
+        coEvery { contactRepository.getById("c1") } returns contact
+        every { eventRepository.getAll() } returns MutableStateFlow(listOf(existingEvent))
+
+        val outcome = useCase(
+            SaveManualEventUseCase.Request(
+                existingContactId = "c1",
+                eventType = "BIRTHDAY",
+                month = 6,
+                dayOfMonth = 12,
+                allowDuplicate = true,
+            )
+        )
+
+        assertTrue(outcome is SaveManualEventUseCase.Outcome.Saved)
+        coVerify { contactRepository.upsert(any()) }
+        coVerify { eventRepository.upsert(any()) }
+        coVerify { eventReminderSchedulerService.scheduleReminder(any()) }
     }
 
     @Test

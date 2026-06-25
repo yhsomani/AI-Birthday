@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -144,6 +145,15 @@ class MemoryVaultScreenInteractionTest {
         composeRule.assertLazyItemVisible(MemoryVaultTestTags.NOTE_FIELD)
         composeRule.onNodeWithTag(MemoryVaultTestTags.NOTE_FIELD)
             .assertIsDisplayed()
+            .performTextInput("   ")
+        composeRule.onNodeWithTag(MemoryVaultTestTags.ADD_BUTTON)
+            .assertIsNotEnabled()
+        composeRule.onNodeWithText(context.getString(R.string.memory_vault_error_blank_note))
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithTag(MemoryVaultTestTags.NOTE_FIELD)
+            .performTextClearance()
+        composeRule.onNodeWithTag(MemoryVaultTestTags.NOTE_FIELD)
             .performTextInput("Important note")
         composeRule.onNodeWithTag(MemoryVaultTestTags.ADD_BUTTON)
             .assertIsEnabled()
@@ -154,6 +164,35 @@ class MemoryVaultScreenInteractionTest {
                 MemoryVaultViewModel.MAX_NOTE_LENGTH,
             )
         ).assertIsDisplayed()
+    }
+
+    @Test
+    fun addButtonDispatchesOnlyWhenMeaningfulTextIsPresent() {
+        val actions = mutableListOf<String>()
+        var noteText by mutableStateOf("")
+
+        composeRule.setMemoryVaultContent(
+            state = { MemoryVaultUiState(isLoading = false) },
+            noteText = { noteText },
+            onNoteChange = { noteText = it },
+            onAdd = { actions += "add:$noteText" },
+        )
+
+        composeRule.onNodeWithTag(MemoryVaultTestTags.NOTE_FIELD)
+            .performTextInput("   ")
+        composeRule.onNodeWithTag(MemoryVaultTestTags.ADD_BUTTON)
+            .assertIsNotEnabled()
+        assertEquals(emptyList<String>(), actions)
+
+        composeRule.onNodeWithTag(MemoryVaultTestTags.NOTE_FIELD)
+            .performTextClearance()
+        composeRule.onNodeWithTag(MemoryVaultTestTags.NOTE_FIELD)
+            .performTextInput("Important note")
+        composeRule.onNodeWithTag(MemoryVaultTestTags.ADD_BUTTON)
+            .assertIsEnabled()
+            .performClick()
+
+        assertEquals(listOf("add:Important note"), actions)
     }
 
     private fun ComposeContentTestRule.setMemoryVaultContent(

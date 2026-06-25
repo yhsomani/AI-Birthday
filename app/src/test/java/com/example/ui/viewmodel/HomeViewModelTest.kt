@@ -57,6 +57,8 @@ class HomeViewModelTest {
         every { android.util.Log.e(any(), any()) } returns 0
         every { android.util.Log.e(any(), any(), any()) } returns 0
         every { mockPreferencesRepository.getLastSyncError() } returns null
+        every { mockPreferencesRepository.getGeminiApiKey() } returns "gemini-key"
+        every { mockPreferencesRepository.isAiWishGenerationEnabled() } returns true
         coEvery { mockContactRepository.getBottomByHealthScore(3) } returns emptyList()
         every { mockAuthManager.userProfile } returns MutableStateFlow(
             UserProfile(displayName = "TestUser", email = "test@example.com")
@@ -90,6 +92,12 @@ class HomeViewModelTest {
         assertEquals(10, viewModel.uiState.value.contactCount)
         assertEquals(2, viewModel.uiState.value.sentCount)
         assertEquals(true, viewModel.uiState.value.upcomingBirthdays.isEmpty())
+        assertEquals(2, viewModel.uiState.value.setupProgress.completedSteps)
+        assertEquals(3, viewModel.uiState.value.setupProgress.totalSteps)
+        assertEquals(0, viewModel.uiState.value.setupProgress.actionRequiredCount)
+        assertEquals(1, viewModel.uiState.value.setupProgress.warningCount)
+        assertEquals(HomeActionTarget.Messages, viewModel.uiState.value.plannerItems.first().actionTarget)
+        assertEquals(HomeActionTarget.Messages, viewModel.uiState.value.readinessAction)
         assertEquals(false, viewModel.uiState.value.isLoading)
     }
 

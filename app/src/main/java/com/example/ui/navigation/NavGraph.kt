@@ -200,6 +200,12 @@ fun RelateNavGraph(
                 onSent = {
                     navController.popBackStack()
                 },
+                onReviewNext = { nextContactId, nextMessageRef ->
+                    navController.navigate(Screen.WishPreview.createRoute(nextContactId, nextMessageRef)) {
+                        popUpTo(Screen.WishPreview.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
             )
         }
         composable(Screen.Events.route) {
@@ -209,7 +215,10 @@ fun RelateNavGraph(
             MessagesScreen(
                 onNavigateToWish = { contactId, messageRef ->
                     navController.navigate(Screen.WishPreview.createRoute(contactId, messageRef))
-                }
+                },
+                onNavigateToAutomationSetup = {
+                    navController.navigate(Screen.AutomationSetup.route)
+                },
             )
         }
         composable(

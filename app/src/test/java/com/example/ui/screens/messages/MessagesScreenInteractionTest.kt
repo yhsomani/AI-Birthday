@@ -3,10 +3,13 @@ package com.example.ui.screens.messages
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -15,6 +18,7 @@ import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.ui.theme.RelateAITheme
 import com.example.ui.viewmodel.MessageChannelFilter
+import com.example.ui.viewmodel.MessageReadiness
 import com.example.ui.viewmodel.MessageSort
 import com.example.ui.viewmodel.MessagesUiState
 import com.example.ui.viewmodel.PendingMessageItem
@@ -191,10 +195,63 @@ class MessagesScreenInteractionTest {
         assertEquals(listOf("bulkRetry"), actions)
     }
 
+    @Test
+    fun failedRecoveryAssistant_opensAutomationSetup() {
+        val actions = mutableListOf<String>()
+
+        composeRule.setContent {
+            RelateAITheme {
+                FailedRecoveryAssistant(
+                    messages = messagesState().failedMessages,
+                    onOpenAutomationSetup = { actions += "automation" },
+                    modifier = Modifier.testTag(MessagesTestTags.FAILED_RECOVERY_ASSISTANT),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(MessagesTestTags.FAILED_RECOVERY_ASSISTANT)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Failed send recovery")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(MessagesTestTags.FAILED_RECOVERY_OPEN_SETUP)
+            .assertIsDisplayed()
+            .performClick()
+
+        assertEquals(listOf("automation"), actions)
+    }
+
+    @Test
+    fun readinessBadges_renderExpectedStatuses() {
+        composeRule.setMessagesContent(
+            state = { messagesState() },
+        )
+
+        composeRule.onNodeWithTag(MessagesTestTags.READINESS_PREFIX + TODAY_ID)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Ready for review")
+            .assertIsDisplayed()
+
+        assertMessageCardVisible(MessagesTestTags.APPROVED_CARD_PREFIX + APPROVED_ID, tabIndex = 2)
+        composeRule.onNodeWithTag(MessagesTestTags.READINESS_PREFIX + APPROVED_ID)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Approved and scheduled")
+            .assertIsDisplayed()
+
+        assertMessageCardVisible(MessagesTestTags.FAILED_CARD_PREFIX + FAILED_ID, tabIndex = 4)
+        composeRule.onNodeWithTag(MessagesTestTags.READINESS_PREFIX + FAILED_ID)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Failed - check setup before retry")
+            .assertIsDisplayed()
+    }
+
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.setMessagesContent(
         state: () -> MessagesUiState,
         initialPage: Int = 0,
         onNavigateToWish: (String, String) -> Unit = { _, _ -> },
+        onNavigateToAutomationSetup: () -> Unit = {},
         onSearchQueryChange: (String) -> Unit = {},
         onChannelFilterSelected: (MessageChannelFilter) -> Unit = {},
         onSortSelected: (MessageSort) -> Unit = {},
@@ -214,6 +271,7 @@ class MessagesScreenInteractionTest {
                     state = state(),
                     initialPage = initialPage,
                     onNavigateToWish = onNavigateToWish,
+                    onNavigateToAutomationSetup = onNavigateToAutomationSetup,
                     onSearchQueryChange = onSearchQueryChange,
                     onChannelFilterSelected = onChannelFilterSelected,
                     onSortSelected = onSortSelected,
@@ -238,6 +296,9 @@ class MessagesScreenInteractionTest {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
         }
+        if (tabIndex == 4) {
+            composeRule.onNodeWithTag(tag).performScrollTo()
+        }
         composeRule.onNodeWithTag(tag).assertIsDisplayed()
     }
 
@@ -259,10 +320,21 @@ class MessagesScreenInteractionTest {
                 "WHATSAPP",
                 "WORK_ANNIVERSARY",
                 status = "APPROVED",
+                readiness = MessageReadiness.APPROVED_SCHEDULED,
             ),
         ),
         sentMessages = listOf(sentItem()),
-        failedMessages = listOf(pendingItem(FAILED_ID, "contact-failed", "Faye", "SMS", "BIRTHDAY", status = "FAILED")),
+        failedMessages = listOf(
+            pendingItem(
+                FAILED_ID,
+                "contact-failed",
+                "Faye",
+                "SMS",
+                "BIRTHDAY",
+                status = "FAILED",
+                readiness = MessageReadiness.FAILED_CHECK_SETUP,
+            ),
+        ),
         isLoading = false,
     )
 
@@ -273,6 +345,7 @@ class MessagesScreenInteractionTest {
         channel: String,
         eventType: String,
         status: String = "PENDING",
+        readiness: MessageReadiness = MessageReadiness.READY_FOR_REVIEW,
     ) = PendingMessageItem(
         entity = PendingMessageEntity(
             id = id,
@@ -293,6 +366,7 @@ class MessagesScreenInteractionTest {
         ),
         contactName = contactName,
         eventType = eventType,
+        readiness = readiness,
     )
 
     private fun sentItem() = SentMessageItem(

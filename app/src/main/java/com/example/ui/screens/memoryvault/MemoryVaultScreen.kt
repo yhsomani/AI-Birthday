@@ -236,6 +236,8 @@ private fun AddMemoryCard(
     onCategoryChange: (String) -> Unit,
     onAdd: () -> Unit,
 ) {
+    val noteHasOnlyWhitespace = newNoteText.isNotEmpty() && newNoteText.isBlank()
+
     RelateGlassCard {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -256,14 +258,19 @@ private fun AddMemoryCard(
                     .testTag(MemoryVaultTestTags.NOTE_FIELD),
                 minLines = 2,
                 maxLines = 4,
+                isError = noteHasOnlyWhitespace,
                 supportingText = {
-                    Text(
-                        text = stringResource(
-                            R.string.memory_vault_note_counter,
-                            newNoteText.length,
-                            MemoryVaultViewModel.MAX_NOTE_LENGTH,
-                        ),
-                    )
+                    if (noteHasOnlyWhitespace) {
+                        Text(text = stringResource(R.string.memory_vault_error_blank_note))
+                    } else {
+                        Text(
+                            text = stringResource(
+                                R.string.memory_vault_note_counter,
+                                newNoteText.length,
+                                MemoryVaultViewModel.MAX_NOTE_LENGTH,
+                            ),
+                        )
+                    }
                 },
             )
 

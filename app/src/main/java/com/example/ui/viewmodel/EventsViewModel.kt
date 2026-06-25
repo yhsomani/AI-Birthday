@@ -35,6 +35,13 @@ enum class EventHorizonFilter {
     NEXT_90_DAYS,
 }
 
+data class ManualEventDuplicateWarning(
+    val contactName: String,
+    val eventType: String,
+    val month: Int,
+    val dayOfMonth: Int,
+)
+
 data class EventsUiState(
     val allEvents: List<EventEntity> = emptyList(),
     val events: List<EventEntity> = emptyList(),
@@ -46,6 +53,7 @@ data class EventsUiState(
     val isRefreshing: Boolean = false,
     val isSavingManualEvent: Boolean = false,
     val saveMessage: String? = null,
+    val duplicateWarning: ManualEventDuplicateWarning? = null,
     val error: String? = null,
 )
 
@@ -101,11 +109,13 @@ class EventsViewModel @Inject constructor(
         month: Int,
         day: Int,
         year: Int?,
+        allowDuplicate: Boolean = false,
     ) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isSavingManualEvent = true,
                 saveMessage = null,
+                duplicateWarning = null,
                 error = null,
             )
             val outcome = saveManualEventUseCase(
@@ -117,6 +127,7 @@ class EventsViewModel @Inject constructor(
                     month = month,
                     dayOfMonth = day,
                     year = year,
+                    allowDuplicate = allowDuplicate,
                 )
             )
             _uiState.value = when (outcome) {
@@ -137,6 +148,16 @@ class EventsViewModel @Inject constructor(
                         error = null,
                     )
                 }
+                is SaveManualEventUseCase.Outcome.DuplicateFound -> _uiState.value.copy(
+                    isSavingManualEvent = false,
+                    duplicateWarning = ManualEventDuplicateWarning(
+                        contactName = outcome.contact.name,
+                        eventType = outcome.existingEvent.type,
+                        month = outcome.existingEvent.month,
+                        dayOfMonth = outcome.existingEvent.dayOfMonth,
+                    ),
+                    error = null,
+                )
                 SaveManualEventUseCase.Outcome.ContactNotFound -> _uiState.value.copy(
                     isSavingManualEvent = false,
                     error = "Selected contact was not found.",
@@ -147,6 +168,10 @@ class EventsViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    fun clearManualEventDuplicateWarning() {
+        _uiState.value = _uiState.value.copy(duplicateWarning = null)
     }
 
     fun refresh() {
@@ -160,7 +185,7 @@ class EventsViewModel @Inject constructor(
                         contacts = _uiState.value.contacts,
                         isLoading = false,
                         isRefreshing = false,
-                    ) 
+                    )
                 }
             } catch (e: Exception) {
                 StructuredLogger.e(TAG, "Event refresh failed", e)

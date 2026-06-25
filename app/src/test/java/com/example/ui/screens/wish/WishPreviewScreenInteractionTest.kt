@@ -15,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.ui.viewmodel.ReviewNextTarget
 import com.example.ui.viewmodel.WhySignal
 import com.example.ui.viewmodel.WishPreviewUiState
 import org.junit.Assert.assertEquals
@@ -109,6 +110,35 @@ class WishPreviewScreenInteractionTest {
             .assertIsDisplayed()
     }
 
+    @Test
+    fun approvedState_withNextPendingWish_offersExplicitReviewNextAction() {
+        var selectedTarget: ReviewNextTarget? = null
+
+        composeRule.setWishPreviewContent(
+            state = {
+                wishState().copy(
+                    approved = true,
+                    nextReviewTarget = ReviewNextTarget(contactId = "contact_2", messageRef = "pm_2"),
+                    remainingReviewCount = 1,
+                )
+            },
+            onReviewNext = { selectedTarget = it },
+        )
+
+        composeRule.onNodeWithTag(WishPreviewTestTags.APPROVED_MESSAGE)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(WishPreviewTestTags.REVIEW_NEXT_COUNT)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(WishPreviewTestTags.REVIEW_NEXT_BUTTON)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+
+        assertEquals(ReviewNextTarget(contactId = "contact_2", messageRef = "pm_2"), selectedTarget)
+    }
+
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.setWishPreviewContent(
         state: () -> WishPreviewUiState,
         onBack: () -> Unit = {},
@@ -119,6 +149,7 @@ class WishPreviewScreenInteractionTest {
         onSendTest: () -> Unit = {},
         onReject: () -> Unit = {},
         onApprove: () -> Unit = {},
+        onReviewNext: (ReviewNextTarget) -> Unit = {},
     ) {
         setContent {
             RelateAITheme {
@@ -134,6 +165,7 @@ class WishPreviewScreenInteractionTest {
                     onSendTest = onSendTest,
                     onReject = onReject,
                     onApprove = onApprove,
+                    onReviewNext = onReviewNext,
                 )
             }
         }

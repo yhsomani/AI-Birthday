@@ -23,6 +23,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -36,6 +37,11 @@ data class AiFeedbackOption(
 data class WhySignal(
     val labelRes: Int,
     val value: String,
+)
+
+data class ReviewNextTarget(
+    val contactId: String,
+    val messageRef: String,
 )
 
 private val aiFeedbackOptions = listOf(
@@ -92,6 +98,8 @@ data class WishPreviewUiState(
     val feedbackMessageRes: Int? = null,
     val feedbackEvent: FeedbackEvent? = null,
     val whySignals: List<WhySignal> = emptyList(),
+    val nextReviewTarget: ReviewNextTarget? = null,
+    val remainingReviewCount: Int = 0,
 )
 
 @HiltViewModel
@@ -118,6 +126,7 @@ class WishPreviewViewModel @Inject constructor(
                     ?: messageRepository.getPendingByEventId(messageRef)
                 if (pending != null) {
                     val whySignals = buildWhySignals(pending)
+                    val reviewQueueState = buildReviewQueueState(pending)
                     _uiState.value = WishPreviewUiState(
                         pendingMessage = pending,
                         selectedVariant = pending.selectedVariant,
@@ -125,6 +134,8 @@ class WishPreviewViewModel @Inject constructor(
                         isLoading = false,
                         usedFallback = pending.isUsingFallback,
                         whySignals = whySignals,
+                        nextReviewTarget = reviewQueueState.nextTarget,
+                        remainingReviewCount = reviewQueueState.remainingReviewCount,
                         qualityMessageRes = if (pending.isUsingFallback) {
                             R.string.wish_preview_quality_template_used
                         } else {
@@ -360,6 +371,33 @@ class WishPreviewViewModel @Inject constructor(
         return aiFeedbackOptions.firstOrNull { it.key == key }
     }
 
+    private suspend fun buildReviewQueueState(current: PendingMessageEntity): ReviewQueueState {
+        val reviewableMessages = runCatching {
+            messageRepository.getAllPending()
+                .first()
+                .filter { it.status.equals("PENDING", ignoreCase = true) }
+                .sortedWith(compareBy<PendingMessageEntity> { it.scheduledForMs }.thenBy { it.id })
+        }.getOrElse {
+            emptyList()
+        }
+        val remainingReviewCount = reviewableMessages.count { it.id != current.id }
+        val currentIndex = reviewableMessages.indexOfFirst { it.id == current.id }
+        val nextMessage = when {
+            remainingReviewCount == 0 -> null
+            currentIndex == -1 -> reviewableMessages.firstOrNull { it.id != current.id }
+            else -> reviewableMessages
+                .drop(currentIndex + 1)
+                .firstOrNull { it.id != current.id }
+                ?: reviewableMessages.firstOrNull { it.id != current.id }
+        }
+        return ReviewQueueState(
+            nextTarget = nextMessage?.let {
+                ReviewNextTarget(contactId = it.contactId, messageRef = it.id)
+            },
+            remainingReviewCount = remainingReviewCount,
+        )
+    }
+
     private suspend fun buildWhySignals(pending: PendingMessageEntity): List<WhySignal> {
         val contact = contactRepository.getById(pending.contactId)
         val memoryCount = memoryNoteRepository.getByContact(pending.contactId).size
@@ -375,4 +413,9 @@ class WishPreviewViewModel @Inject constructor(
             WhySignal(R.string.wish_why_previous, previousWishes.toString()),
         )
     }
+
+    private data class ReviewQueueState(
+        val nextTarget: ReviewNextTarget? = null,
+        val remainingReviewCount: Int = 0,
+    )
 }

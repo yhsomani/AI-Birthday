@@ -14,10 +14,12 @@ import com.example.domain.usecase.RejectPendingMessageUseCase
 import com.example.domain.usecase.TestSendUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.*
 import org.junit.Assert.assertEquals
@@ -68,6 +70,7 @@ class WishPreviewViewModelTest {
         coEvery { memoryNoteRepository.getByContact(any()) } returns emptyList()
         coEvery { giftHistoryRepository.getByContact(any()) } returns emptyList()
         coEvery { messageRepository.getSentByContact(any(), any()) } returns emptyList()
+        every { messageRepository.getAllPending() } returns flowOf(emptyList())
         coEvery { messageFeedbackRepository.getLatestForPendingMessage(any()) } returns null
         coEvery { testSendUseCase(any()) } returns TestSendUseCase.Outcome.Sent
     }
@@ -122,6 +125,38 @@ class WishPreviewViewModelTest {
         assertEquals("Wishing you a happy birthday!", state.editedText)
         assertEquals(false, state.isLoading)
         assertTrue(state.errorMessageRes == null)
+    }
+
+    @Test
+    fun `loadPending exposes next pending review target`() = runTest(testDispatcher) {
+        val current = samplePending().copy(
+            id = "pm_1",
+            contactId = "c_1",
+            scheduledForMs = 1_700_000_000_000L,
+        )
+        val next = samplePending().copy(
+            id = "pm_2",
+            contactId = "c_2",
+            eventId = "e_2",
+            scheduledForMs = 1_700_000_100_000L,
+        )
+        val ignoredApproved = samplePending().copy(
+            id = "pm_3",
+            contactId = "c_3",
+            eventId = "e_3",
+            scheduledForMs = 1_700_000_050_000L,
+            status = "APPROVED",
+        )
+        coEvery { messageRepository.getPendingById("pm_1") } returns current
+        every { messageRepository.getAllPending() } returns flowOf(listOf(current, ignoredApproved, next))
+
+        val viewModel = createViewModel()
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(ReviewNextTarget(contactId = "c_2", messageRef = "pm_2"), state.nextReviewTarget)
+        assertEquals(1, state.remainingReviewCount)
     }
 
     @Test

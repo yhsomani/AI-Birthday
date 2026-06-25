@@ -61,7 +61,10 @@ class MemoryVaultViewModel @Inject constructor(
 
     fun addNote(text: String, category: String) {
         val cleanedText = text.trim()
-        if (cleanedText.isBlank()) return
+        if (cleanedText.isBlank()) {
+            _uiState.value = _uiState.value.copy(errorMessageRes = R.string.memory_vault_error_blank_note)
+            return
+        }
         if (cleanedText.length > MAX_NOTE_LENGTH) {
             _uiState.value = _uiState.value.copy(errorMessageRes = R.string.memory_vault_error_note_too_long)
             return

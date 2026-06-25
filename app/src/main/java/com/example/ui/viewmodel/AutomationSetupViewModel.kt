@@ -38,6 +38,13 @@ import org.json.JSONArray
 
 enum class ReadinessStatus { OK, WARNING, ACTION_REQUIRED }
 
+enum class ReadinessGroup {
+    REQUIRED,
+    QUALITY,
+    RELIABILITY,
+    RECOVERY,
+}
+
 enum class AiDoctorAction {
     NONE,
     REFRESH,
@@ -65,11 +72,13 @@ data class ReadinessCheck(
     val status: ReadinessStatus,
     val actionLabel: String? = null,
     val action: AiDoctorAction = AiDoctorAction.NONE,
+    val group: ReadinessGroup = ReadinessGroup.REQUIRED,
 )
 
 data class AutomationSetupUiState(
     val checks: List<ReadinessCheck> = emptyList(),
     val summary: AiDoctorSummary = AiDoctorSummary(),
+    val setupProgress: SetupProgressSummary = SetupProgressSummary(),
     val isRefreshing: Boolean = false,
     val isSyncingContacts: Boolean = false,
     val isTestingAi: Boolean = false,
@@ -80,6 +89,7 @@ data class AutomationSetupUiState(
 private data class AiDoctorReport(
     val summary: AiDoctorSummary,
     val checks: List<ReadinessCheck>,
+    val setupProgress: SetupProgressSummary,
 )
 
 @HiltViewModel
@@ -115,6 +125,7 @@ class AutomationSetupViewModel @Inject constructor(
                 isRefreshing = false,
                 checks = report.checks,
                 summary = report.summary,
+                setupProgress = report.setupProgress,
             )
         }
     }
@@ -222,10 +233,12 @@ class AutomationSetupViewModel @Inject constructor(
         val hasGoogleAuth = securePrefs.getGoogleOAuthToken().isNotBlank() || currentUser != null
         val hasGeminiAccess = securePrefs.getGeminiApiKey().isNotBlank() || currentUser != null
         val aiEnabled = securePrefs.isAiWishGenerationEnabled()
-        val notificationsAllowed = hasNotificationPermission()
-        val smsAllowed = hasSmsPermission()
-        val whatsAppAutomationEnabled = isWhatsAppAutomationServiceEnabled()
-        val exactSendsAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        val notificationsAllowed = runCatching { hasNotificationPermission() }.getOrDefault(false)
+        val smsAllowed = runCatching { hasSmsPermission() }.getOrDefault(false)
+        val whatsAppAutomationEnabled = runCatching { isWhatsAppAutomationServiceEnabled() }.getOrDefault(false)
+        val exactSendsAllowed = runCatching {
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        }.getOrDefault(false)
         val deadLetterCount = DeadLetterQueue.count()
         val senderEmailReady = securePrefs.getSenderEmail().isNotBlank() &&
             securePrefs.getSenderEmailPassword().isNotBlank()
@@ -244,6 +257,7 @@ class AutomationSetupViewModel @Inject constructor(
                 if (hasGoogleAuth) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
                 actionLabel = if (hasGoogleAuth) null else text(R.string.automation_setup_action_sync_contacts),
                 action = if (hasGoogleAuth) AiDoctorAction.NONE else AiDoctorAction.SYNC_CONTACTS,
+                group = ReadinessGroup.REQUIRED,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_gemini),
@@ -255,6 +269,7 @@ class AutomationSetupViewModel @Inject constructor(
                 if (hasGeminiAccess) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
                 actionLabel = if (hasGeminiAccess) text(R.string.automation_setup_action_test_ai) else text(R.string.automation_setup_action_open_settings),
                 action = if (hasGeminiAccess) AiDoctorAction.TEST_AI else AiDoctorAction.OPEN_SETTINGS,
+                group = ReadinessGroup.REQUIRED,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_ai_wish_generation),
@@ -262,6 +277,7 @@ class AutomationSetupViewModel @Inject constructor(
                 if (aiEnabled) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
                 actionLabel = if (aiEnabled) null else text(R.string.automation_setup_action_open_settings),
                 action = if (aiEnabled) AiDoctorAction.NONE else AiDoctorAction.OPEN_SETTINGS,
+                group = ReadinessGroup.REQUIRED,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_style_coach),
@@ -277,6 +293,7 @@ class AutomationSetupViewModel @Inject constructor(
                 },
                 actionLabel = if (styleSampleCount >= 3) null else text(R.string.automation_setup_action_open_style_coach),
                 action = if (styleSampleCount >= 3) AiDoctorAction.NONE else AiDoctorAction.OPEN_STYLE_COACH,
+                group = ReadinessGroup.QUALITY,
             ),
             personalizationCheck(contacts),
             ReadinessCheck(
@@ -295,6 +312,7 @@ class AutomationSetupViewModel @Inject constructor(
                 },
                 actionLabel = if (health.circuitBreakerStates["gemini"] == CircuitState.OPEN) text(R.string.automation_setup_action_test_ai) else null,
                 action = if (health.circuitBreakerStates["gemini"] == CircuitState.OPEN) AiDoctorAction.TEST_AI else AiDoctorAction.NONE,
+                group = ReadinessGroup.RELIABILITY,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_notifications),
@@ -302,6 +320,7 @@ class AutomationSetupViewModel @Inject constructor(
                 if (notificationsAllowed) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
                 actionLabel = if (notificationsAllowed) null else text(R.string.automation_setup_action_app_settings),
                 action = if (notificationsAllowed) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
+                group = ReadinessGroup.REQUIRED,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_sms),
@@ -309,6 +328,7 @@ class AutomationSetupViewModel @Inject constructor(
                 if (smsAllowed) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
                 actionLabel = if (smsAllowed) null else text(R.string.automation_setup_action_app_settings),
                 action = if (smsAllowed) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
+                group = ReadinessGroup.REQUIRED,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_email),
@@ -327,6 +347,7 @@ class AutomationSetupViewModel @Inject constructor(
                 },
                 actionLabel = if (senderEmailReady) text(R.string.automation_setup_action_test_email) else text(R.string.automation_setup_action_open_settings),
                 action = if (senderEmailReady) AiDoctorAction.TEST_EMAIL else AiDoctorAction.OPEN_SETTINGS,
+                group = ReadinessGroup.REQUIRED,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_whatsapp),
@@ -334,6 +355,7 @@ class AutomationSetupViewModel @Inject constructor(
                 if (whatsAppAutomationEnabled) ReadinessStatus.OK else ReadinessStatus.WARNING,
                 actionLabel = if (whatsAppAutomationEnabled) null else text(R.string.automation_setup_action_open_accessibility),
                 action = if (whatsAppAutomationEnabled) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS,
+                group = ReadinessGroup.RELIABILITY,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_exact_sends),
@@ -341,6 +363,7 @@ class AutomationSetupViewModel @Inject constructor(
                 if (exactSendsAllowed) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
                 actionLabel = if (exactSendsAllowed) null else text(R.string.automation_setup_action_app_settings),
                 action = if (exactSendsAllowed) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
+                group = ReadinessGroup.RELIABILITY,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_daily_automation),
@@ -348,6 +371,7 @@ class AutomationSetupViewModel @Inject constructor(
                 if (dailyScheduled) ReadinessStatus.OK else ReadinessStatus.WARNING,
                 actionLabel = if (dailyScheduled) null else text(R.string.automation_setup_action_refresh),
                 action = if (dailyScheduled) AiDoctorAction.NONE else AiDoctorAction.REFRESH,
+                group = ReadinessGroup.RELIABILITY,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_recent_errors),
@@ -359,6 +383,7 @@ class AutomationSetupViewModel @Inject constructor(
                 if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) ReadinessStatus.OK else ReadinessStatus.WARNING,
                 actionLabel = if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) null else text(R.string.automation_setup_action_view_activity),
                 action = if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACTIVITY_HISTORY,
+                group = ReadinessGroup.RECOVERY,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_dead_letter),
@@ -366,9 +391,14 @@ class AutomationSetupViewModel @Inject constructor(
                 if (deadLetterCount == 0) ReadinessStatus.OK else ReadinessStatus.WARNING,
                 actionLabel = if (deadLetterCount == 0) null else text(R.string.automation_setup_action_view_activity),
                 action = if (deadLetterCount == 0) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACTIVITY_HISTORY,
+                group = ReadinessGroup.RECOVERY,
             ),
         )
-        return AiDoctorReport(summary = checks.toSummary(), checks = checks)
+        return AiDoctorReport(
+            summary = checks.toSummary(),
+            checks = checks,
+            setupProgress = checks.toSetupProgressSummary(),
+        )
     }
 
     private fun personalizationCheck(contacts: List<ContactEntity>): ReadinessCheck {
@@ -379,6 +409,7 @@ class AutomationSetupViewModel @Inject constructor(
                 status = ReadinessStatus.WARNING,
                 actionLabel = text(R.string.automation_setup_action_sync_contacts),
                 action = AiDoctorAction.SYNC_CONTACTS,
+                group = ReadinessGroup.QUALITY,
             )
         }
 
@@ -394,6 +425,7 @@ class AutomationSetupViewModel @Inject constructor(
             status = if (percentage >= 50) ReadinessStatus.OK else ReadinessStatus.WARNING,
             actionLabel = if (percentage >= 50) null else text(R.string.automation_setup_action_review_contacts),
             action = if (percentage >= 50) AiDoctorAction.NONE else AiDoctorAction.OPEN_CONTACTS,
+            group = ReadinessGroup.QUALITY,
         )
     }
 
@@ -469,6 +501,11 @@ class AutomationSetupViewModel @Inject constructor(
     internal fun diagnoseAiFailureForTesting(raw: String): String = diagnoseAiFailure(raw)
 
     internal fun summarizeForTesting(checks: List<ReadinessCheck>): AiDoctorSummary = checks.toSummary()
+
+    internal fun setupProgressForTesting(checks: List<ReadinessCheck>): SetupProgressSummary =
+        checks.toSetupProgressSummary()
+
+    internal suspend fun buildChecksForTesting(): List<ReadinessCheck> = buildReport().checks
 
     private fun text(@StringRes resId: Int, vararg args: Any): String {
         return appContext.getString(resId, *args)

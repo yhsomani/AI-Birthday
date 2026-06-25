@@ -3,9 +3,12 @@ package com.example.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.db.entities.ActivityLogEntity
+import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
+import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageStatus
 import com.example.domain.repository.ActivityLogRepository
@@ -39,11 +42,24 @@ enum class MessageSort {
     CONTACT_ASC,
 }
 
+enum class MessageReadiness {
+    READY_FOR_REVIEW,
+    APPROVED_SCHEDULED,
+    SENDING_NOW,
+    CONTACT_MISSING,
+    CHANNEL_DISABLED,
+    MISSING_PHONE,
+    MISSING_EMAIL,
+    EMAIL_SETUP_MISSING,
+    FAILED_CHECK_SETUP,
+}
+
 data class PendingMessageItem(
     val entity: PendingMessageEntity,
     val contactName: String,
     val contactAvatarUrl: String? = null,
     val eventType: String = "BIRTHDAY",
+    val readiness: MessageReadiness = MessageReadiness.READY_FOR_REVIEW,
 )
 
 data class SentMessageItem(
@@ -86,6 +102,7 @@ class MessagesViewModel @Inject constructor(
     private val revokeApprovalUseCase: RevokeApprovalUseCase,
     private val schedulerService: SchedulerService,
     private val activityLogRepository: ActivityLogRepository,
+    private val securePrefs: SecurePrefs,
 ) : ViewModel() {
     private companion object {
         const val TAG = "MessagesViewModel"
@@ -148,7 +165,11 @@ class MessagesViewModel @Inject constructor(
                             entity = msg,
                             contactName = contact?.name ?: msg.contactId,
                             contactAvatarUrl = contact?.profilePhotoUri,
-                            eventType = event?.type ?: "BIRTHDAY"
+                            eventType = event?.type ?: "BIRTHDAY",
+                            readiness = msg.readinessFor(
+                                contact = contact,
+                                status = MessageStatus.fromRaw(msg.status),
+                            ),
                         )
     
                         when (MessageStatus.fromRaw(msg.status)) {
@@ -475,6 +496,37 @@ class MessagesViewModel @Inject constructor(
             MessageChannelFilter.SMS -> MessageChannel.fromRaw(channel) == MessageChannel.SMS
             MessageChannelFilter.WHATSAPP -> MessageChannel.fromRaw(channel) == MessageChannel.WHATSAPP
             MessageChannelFilter.EMAIL -> MessageChannel.fromRaw(channel) == MessageChannel.EMAIL
+        }
+    }
+
+    private fun PendingMessageEntity.readinessFor(
+        contact: ContactEntity?,
+        status: MessageStatus,
+    ): MessageReadiness {
+        if (contact == null) return MessageReadiness.CONTACT_MISSING
+        if (AutomationSchedulePolicy.isChannelBlocked(channel, securePrefs.getChannelBlackout())) {
+            return MessageReadiness.CHANNEL_DISABLED
+        }
+
+        when (MessageChannel.fromRaw(channel)) {
+            MessageChannel.SMS,
+            MessageChannel.WHATSAPP -> {
+                if (contact.primaryPhone.isNullOrBlank()) return MessageReadiness.MISSING_PHONE
+            }
+            MessageChannel.EMAIL -> {
+                if (contact.primaryEmail.isNullOrBlank()) return MessageReadiness.MISSING_EMAIL
+                if (securePrefs.getSenderEmail().isBlank() || securePrefs.getSenderEmailPassword().isBlank()) {
+                    return MessageReadiness.EMAIL_SETUP_MISSING
+                }
+            }
+            MessageChannel.UNKNOWN -> return MessageReadiness.CHANNEL_DISABLED
+        }
+
+        return when (status) {
+            MessageStatus.APPROVED -> MessageReadiness.APPROVED_SCHEDULED
+            MessageStatus.DISPATCHING -> MessageReadiness.SENDING_NOW
+            MessageStatus.FAILED -> MessageReadiness.FAILED_CHECK_SETUP
+            else -> MessageReadiness.READY_FOR_REVIEW
         }
     }
 

@@ -27,19 +27,14 @@ data class UpcomingBirthday(
 data class RelationshipPlannerItem(
     val title: String,
     val detail: String,
-    val contactId: String? = null,
-    val destination: HomeActionDestination = HomeActionDestination.CONTACT_DETAIL,
+    val actionTarget: HomeActionTarget,
 )
 
-enum class HomeActionDestination {
-    AUTOMATION_SETUP,
-    CONTACT_DETAIL,
-    MESSAGES,
-}
-
-enum class HomeReadinessAction {
-    AUTOMATION_SETUP,
-    MESSAGES,
+sealed interface HomeActionTarget {
+    data object AutomationSetup : HomeActionTarget
+    data object BackupRestore : HomeActionTarget
+    data object Messages : HomeActionTarget
+    data class ContactDetail(val contactId: String) : HomeActionTarget
 }
 
 data class HomeUiState(
@@ -56,7 +51,8 @@ data class HomeUiState(
     val syncError: String? = null,
     val readinessTitle: String? = null,
     val readinessDetail: String? = null,
-    val readinessAction: HomeReadinessAction? = null,
+    val readinessAction: HomeActionTarget? = null,
+    val setupProgress: SetupProgressSummary = SetupProgressSummary(),
     val plannerItems: List<RelationshipPlannerItem> = emptyList(),
 )
 
@@ -117,6 +113,16 @@ class HomeViewModel @Inject constructor(
                 }
                 val profile = authManager.userProfile.value
                 val freshError = preferencesRepository.getLastSyncError()
+                val hasAiAccess = readStringPreference { preferencesRepository.getGeminiApiKey() }.isNotBlank()
+                val setupProgress = buildHomeSetupProgressSummary(
+                    contactCount = metrics.contactCount,
+                    syncError = freshError ?: lastError,
+                    aiGenerationEnabled = readBooleanPreference {
+                        preferencesRepository.isAiWishGenerationEnabled()
+                    },
+                    hasAiAccess = hasAiAccess,
+                    pendingCount = metrics.pendingCount,
+                )
                 _uiState.value = HomeUiState(
                     userName = profile.displayName,
                     userEmail = profile.email,
@@ -130,6 +136,7 @@ class HomeViewModel @Inject constructor(
                     plannerItems = buildPlannerItems(atRiskContacts, metrics.pendingCount, events),
                     isLoading = false,
                     syncError = freshError ?: lastError,
+                    setupProgress = setupProgress,
                 ).withReadiness()
             } catch (e: Exception) {
                 StructuredLogger.e(TAG, "Dashboard metrics load failed", e)
@@ -149,21 +156,21 @@ class HomeViewModel @Inject constructor(
             items += RelationshipPlannerItem(
                 title = "Review pending wishes",
                 detail = "$pendingCount approval(s) are waiting before send time.",
-                destination = HomeActionDestination.MESSAGES,
+                actionTarget = HomeActionTarget.Messages,
             )
         }
         atRiskContacts.forEach { contact ->
             items += RelationshipPlannerItem(
                 title = "Reconnect with ${contact.name}",
                 detail = "Relationship health is ${contact.healthScore}. Add a memory or generate a warm check-in.",
-                contactId = contact.id,
+                actionTarget = HomeActionTarget.ContactDetail(contact.id),
             )
         }
         upcomingEvents.take(2).forEach { event ->
             items += RelationshipPlannerItem(
                 title = event.label ?: event.type.replace("_", " "),
                 detail = "Upcoming in ${event.daysUntil} day(s). Check personalization before the wish is generated.",
-                contactId = event.contactId,
+                actionTarget = HomeActionTarget.ContactDetail(event.contactId),
             )
         }
         return items.take(5)
@@ -174,17 +181,17 @@ class HomeViewModel @Inject constructor(
             syncError != null -> copy(
                 readinessTitle = "Setup needs attention",
                 readinessDetail = "Contact sync is reporting an issue. Open AI Doctor for the exact fix.",
-                readinessAction = HomeReadinessAction.AUTOMATION_SETUP,
+                readinessAction = HomeActionTarget.AutomationSetup,
             )
             contactCount == 0 -> copy(
                 readinessTitle = "Sync contacts to start",
                 readinessDetail = "RelateAI needs contacts before it can discover events or personalize wishes.",
-                readinessAction = HomeReadinessAction.AUTOMATION_SETUP,
+                readinessAction = HomeActionTarget.AutomationSetup,
             )
             pendingCount > 0 -> copy(
                 readinessTitle = "Approvals waiting",
                 readinessDetail = "$pendingCount message(s) need review before they can send.",
-                readinessAction = HomeReadinessAction.MESSAGES,
+                readinessAction = HomeActionTarget.Messages,
             )
             else -> copy(
                 readinessTitle = null,
@@ -204,4 +211,16 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
+
+    private fun <T> readPreference(fallback: T, read: () -> T): T {
+        return try {
+            read()
+        } catch (e: Exception) {
+            fallback
+        }
+    }
+
+    private fun readStringPreference(read: () -> String): String = readPreference("", read)
+
+    private fun readBooleanPreference(read: () -> Boolean): Boolean = readPreference(false, read)
 }

@@ -359,15 +359,32 @@ fun ContactDetailScreen(
 }
 
 @Composable
-private fun PersonalizationQualityCard(contact: ContactEntity) {
-    val checklist: List<Pair<Int, Boolean>> = listOf(
-        R.string.personalization_quality_nickname to !contact.nickname.isNullOrBlank(),
-        R.string.personalization_quality_interests to contact.interestsJson.hasJsonArrayContent(),
-        R.string.personalization_quality_memory_notes to contact.notesText.isNotBlank(),
-        R.string.personalization_quality_channel to (contact.preferredChannel in setOf("SMS", "WHATSAPP", "EMAIL")),
+internal fun PersonalizationQualityCard(contact: ContactEntity) {
+    val checklist = listOf(
+        PersonalizationQualityItem(
+            labelRes = R.string.personalization_quality_nickname,
+            promptRes = R.string.personalization_quality_add_nickname,
+            isComplete = !contact.nickname.isNullOrBlank(),
+        ),
+        PersonalizationQualityItem(
+            labelRes = R.string.personalization_quality_interests,
+            promptRes = R.string.personalization_quality_add_interests,
+            isComplete = contact.interestsJson.hasJsonArrayContent(),
+        ),
+        PersonalizationQualityItem(
+            labelRes = R.string.personalization_quality_memory_notes,
+            promptRes = R.string.personalization_quality_add_memory_notes,
+            isComplete = contact.notesText.isNotBlank(),
+        ),
+        PersonalizationQualityItem(
+            labelRes = R.string.personalization_quality_channel,
+            promptRes = R.string.personalization_quality_choose_channel,
+            isComplete = contact.preferredChannel in setOf("SMS", "WHATSAPP", "EMAIL"),
+        ),
     )
-    val complete = checklist.count { it.second }
+    val complete = checklist.count { it.isComplete }
     val score = (complete * 100) / checklist.size
+    val nextPromptRes = checklist.firstOrNull { !it.isComplete }?.promptRes
 
     RelateGlassCard {
         Column(
@@ -380,25 +397,40 @@ private fun PersonalizationQualityCard(contact: ContactEntity) {
                 color = RelatePrimary,
                 fontWeight = FontWeight.SemiBold,
             )
-            checklist.forEach { (labelRes, isComplete) ->
+            Text(
+                text = if (nextPromptRes == null) {
+                    stringResource(R.string.personalization_quality_ready)
+                } else {
+                    stringResource(R.string.personalization_quality_next_step, stringResource(nextPromptRes))
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = RelateOnSurfaceVariant,
+            )
+            checklist.forEach { item ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = if (isComplete) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                        imageVector = if (item.isComplete) Icons.Filled.CheckCircle else Icons.Filled.Warning,
                         contentDescription = null,
-                        tint = if (isComplete) RelatePrimary else MaterialTheme.colorScheme.error,
+                        tint = if (item.isComplete) RelatePrimary else MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = stringResource(labelRes),
+                        text = stringResource(item.labelRes),
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (isComplete) MaterialTheme.colorScheme.onSurface else RelateOnSurfaceVariant,
+                        color = if (item.isComplete) MaterialTheme.colorScheme.onSurface else RelateOnSurfaceVariant,
                     )
                 }
             }
         }
     }
 }
+
+private data class PersonalizationQualityItem(
+    val labelRes: Int,
+    val promptRes: Int,
+    val isComplete: Boolean,
+)
 
 @Composable
 private fun QuickPersonalizationCard(

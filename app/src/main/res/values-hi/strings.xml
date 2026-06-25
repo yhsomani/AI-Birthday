@@ -48,6 +48,7 @@
     <string name="memory_vault_error_add">नोट जोड़ नहीं सका। फिर कोशिश करें।</string>
     <string name="memory_vault_error_pin">पिन स्थिति अपडेट नहीं हो सकी। फिर कोशिश करें।</string>
     <string name="memory_vault_error_delete">नोट हट नहीं सका। फिर कोशिश करें।</string>
+    <string name="memory_vault_error_blank_note">वॉल्ट में जोड़ने से पहले नोट लिखें।</string>
     <string name="memory_vault_error_note_too_long">मेमोरी नोट 500 अक्षर या कम होने चाहिए।</string>
     <string name="memory_vault_pin_note">नोट पिन करें</string>
     <string name="memory_vault_unpin_note">नोट अनपिन करें</string>
@@ -162,6 +163,10 @@
     <string name="wish_preview_reject">Reject</string>
     <string name="wish_preview_approve_schedule">Approve &amp; Schedule</string>
     <string name="wish_preview_approved">Wish approved और scheduled है।</string>
+    <string name="wish_preview_rejected">Wish rejected है।</string>
+    <string name="wish_preview_review_next">Next review करें</string>
+    <string name="wish_preview_review_next_count_one">1 pending wish बची है।</string>
+    <string name="wish_preview_review_next_count_many">%1$d pending wishes बची हैं।</string>
     <string name="wish_variant_short">Short</string>
     <string name="wish_variant_standard">Standard</string>
     <string name="wish_variant_long">Long</string>
@@ -258,6 +263,10 @@
     <string name="automation_setup_title">AI Doctor</string>
     <string name="automation_setup_subtitle">AI wishes गलत क्यों लगती हैं या fail होती हैं, उसका exact blocker ढूंढें और fix करें।</string>
     <string name="automation_setup_diagnostic_checks">Diagnostic Checks</string>
+    <string name="automation_setup_group_required">जरूरी</string>
+    <string name="automation_setup_group_quality">क्वालिटी</string>
+    <string name="automation_setup_group_reliability">भरोसेमंदी</string>
+    <string name="automation_setup_group_recovery">रिकवरी</string>
     <string name="automation_setup_action_refresh">Refresh</string>
     <string name="automation_setup_action_dry_run">Dry Run</string>
     <string name="automation_setup_action_sync_contacts">Sync Contacts</string>
@@ -396,6 +405,14 @@
     <string name="approve">स्वीकार करें</string>
     <string name="reject">अस्वीकार करें</string>
     <string name="sign_out">साइन आउट</string>
+    <string name="settings_sign_out_title">साइन आउट करके स्थानीय डेटा साफ करें?</string>
+    <string name="settings_sign_out_body">यह action इस device से RelateAI data हटाएगा।</string>
+    <string name="settings_sign_out_check_local_data">इस device पर contacts, events, messages, memories, gifts, और activity logs delete होंगे।</string>
+    <string name="settings_sign_out_check_preferences">API keys, email settings, automation preferences, और cached database keys clear होंगी।</string>
+    <string name="settings_sign_out_check_external">जहां उपलब्ध हो, Google और Firebase access sign out या revoke होगा; external services अपना data रखेंगी।</string>
+    <string name="settings_sign_out_check_backup">अगर यह data बाद में चाहिए हो तो पहले encrypted backup export करें।</string>
+    <string name="settings_sign_out_cancel">Data रखें</string>
+    <string name="settings_sign_out_confirm">Sign out करके data clear करें</string>
     <string name="settings">सेटिंग्स</string>
     <string name="analytics">विश्लेषण</string>
     <string name="style_coach">स्टाइल कोच</string>
@@ -524,6 +541,11 @@
     <string name="avatar">अवतार</string>
     <string name="clear_search">खोज साफ करें</string>
     <string name="days">दिन</string>
+    <string name="setup_progress_title">Setup progress</string>
+    <string name="setup_progress_count">%1$d of %2$d ready</string>
+    <string name="setup_progress_blockers">%1$d setup item(s) को attention चाहिए।</string>
+    <string name="setup_progress_warnings">%1$d item(s) automation quality सुधार सकते हैं।</string>
+    <string name="setup_progress_ready">Automation setup ready लग रहा है।</string>
 
     <!-- Home -->
     <string name="home_greeting">नमस्ते, %1$s</string>
@@ -558,6 +580,9 @@
     <string name="events_error_month_day">महीना और दिन दर्ज करें।</string>
     <string name="events_error_choose_contact">संपर्क चुनें।</string>
     <string name="events_error_contact_name">संपर्क नाम दर्ज करें।</string>
+    <string name="events_duplicate_title">Possible duplicate</string>
+    <string name="events_duplicate_message">%1$s के पास %3$d/%4$d पर पहले से %2$s है। अलग reminder चाहिए तभी save करें।</string>
+    <string name="events_duplicate_save_anyway">फिर भी save करें</string>
     <string name="event_type_birthday">जन्मदिन</string>
     <string name="event_type_anniversary">सालगिरह</string>
     <string name="event_type_work_anniversary">काम की सालगिरह</string>
@@ -581,12 +606,27 @@
     <string name="messages_empty_sent">अभी कोई संदेश नहीं भेजा गया</string>
     <string name="messages_empty_failed">कोई विफल संदेश नहीं</string>
     <string name="messages_empty_approved">कोई स्वीकृत संदेश नहीं</string>
+    <string name="messages_recovery_title">Failed send recovery</string>
+    <string name="messages_recovery_summary">%1$d failed message(s) को review चाहिए</string>
+    <string name="messages_recovery_setup_detail">%1$d message(s) में contact, channel, या Gmail setup missing है। Retry से पहले blockers fix करें।</string>
+    <string name="messages_recovery_retry_detail">अगर setup सही लग रहा है, recent failures के लिए AI Doctor देखें, फिर selected rows retry करें।</string>
+    <string name="messages_recovery_retry_hint">Fix review करने के बाद retry manual ही रहता है।</string>
+    <string name="messages_recovery_open_setup">AI Doctor खोलें</string>
     <string name="messages_auto_sends_minutes">%1$d मिनट में अपने-आप भेजेगा!</string>
     <string name="messages_hours_left">%1$d घंटे बचे</string>
     <string name="messages_channel_format">चैनल: %1$s</string>
     <string name="messages_scheduled_format">शेड्यूल: %1$s</string>
     <string name="messages_status_failed">विफल</string>
     <string name="messages_status_approved">स्वीकृत</string>
+    <string name="messages_readiness_ready_review">रिव्यू के लिए तैयार</string>
+    <string name="messages_readiness_approved_scheduled">स्वीकृत और शेड्यूल्ड</string>
+    <string name="messages_readiness_sending_now">अभी भेज रहा है</string>
+    <string name="messages_readiness_contact_missing">संपर्क नहीं मिला</string>
+    <string name="messages_readiness_channel_disabled">चैनल बंद है</string>
+    <string name="messages_readiness_missing_phone">फोन नंबर नहीं है</string>
+    <string name="messages_readiness_missing_email">ईमेल पता नहीं है</string>
+    <string name="messages_readiness_email_setup_missing">Gmail setup नहीं है</string>
+    <string name="messages_readiness_failed_check_setup">विफल - retry से पहले setup जांचें</string>
     <string name="messages_retry_send">फिर भेजें</string>
     <string name="messages_revoke">वापस लें</string>
     <string name="channel_sms">SMS</string>
@@ -755,4 +795,10 @@
     <string name="personalization_quality_interests">Interests या hobbies जोड़े गए</string>
     <string name="personalization_quality_memory_notes">Personal notes या memory context जोड़ा गया</string>
     <string name="personalization_quality_channel">Preferred channel selected</string>
+    <string name="personalization_quality_next_step">अगला: %1$s</string>
+    <string name="personalization_quality_ready">Personalized wishes के लिए तैयार।</string>
+    <string name="personalization_quality_add_nickname">nickname या close name जोड़ें</string>
+    <string name="personalization_quality_add_interests">interests या hobbies जोड़ें</string>
+    <string name="personalization_quality_add_memory_notes">memory या personal note जोड़ें</string>
+    <string name="personalization_quality_choose_channel">preferred channel चुनें</string>
 </resources>

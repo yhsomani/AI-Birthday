@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MailOutline
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,16 +57,19 @@ import com.example.core.ui.components.StatCard
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSuccess
+import com.example.core.ui.theme.RelateWarning
 import com.example.ui.components.SyncErrorCard
-import com.example.ui.viewmodel.HomeActionDestination
-import com.example.ui.viewmodel.HomeReadinessAction
+import com.example.ui.viewmodel.HomeActionTarget
 import com.example.ui.viewmodel.HomeUiState
 import com.example.ui.viewmodel.HomeViewModel
 import com.example.ui.viewmodel.RelationshipPlannerItem
+import com.example.ui.viewmodel.SetupProgressSummary
 
 internal object HomeScreenTestTags {
     const val SYNC_ERROR_CARD = "home_sync_error_card"
     const val READINESS_BANNER = "home_readiness_banner"
+    const val SETUP_PROGRESS_CARD = "home_setup_progress_card"
     const val QUICK_ACTION_ANALYTICS = "home_quick_action_analytics"
     const val QUICK_ACTION_ACTIVITY_HISTORY = "home_quick_action_activity_history"
     const val QUICK_ACTION_STYLE_COACH = "home_quick_action_style_coach"
@@ -114,6 +120,15 @@ internal fun HomeContent(
     onRetrySync: () -> Unit = {},
     onDismissSyncError: () -> Unit = {},
 ) {
+    val navigateToAction: (HomeActionTarget) -> Unit = { target ->
+        when (target) {
+            HomeActionTarget.AutomationSetup -> onNavigateToAutomationSetup()
+            HomeActionTarget.BackupRestore -> onNavigateToBackupRestore()
+            is HomeActionTarget.ContactDetail -> onNavigateToContact(target.contactId)
+            HomeActionTarget.Messages -> onNavigateToMessages()
+        }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -178,11 +193,7 @@ internal fun HomeContent(
                     title = readinessTitle,
                     detail = readinessDetail,
                     onClick = {
-                        when (state.readinessAction) {
-                            HomeReadinessAction.MESSAGES -> onNavigateToMessages()
-                            HomeReadinessAction.AUTOMATION_SETUP,
-                            null -> onNavigateToAutomationSetup()
-                        }
+                        state.readinessAction?.let(navigateToAction) ?: onNavigateToAutomationSetup()
                     },
                     modifier = Modifier.testTag(HomeScreenTestTags.READINESS_BANNER),
                 )
@@ -203,6 +214,14 @@ internal fun HomeContent(
         } else {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
+                if (state.setupProgress.totalSteps > 0) {
+                    SetupProgressCard(
+                        summary = state.setupProgress,
+                        onClick = onNavigateToAutomationSetup,
+                        modifier = Modifier.testTag(HomeScreenTestTags.SETUP_PROGRESS_CARD),
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -308,19 +327,9 @@ internal fun HomeContent(
                     state.plannerItems.forEach { item ->
                         PlannerItemCard(
                             item = item,
-                            onClick = {
-                                when (item.destination) {
-                                    HomeActionDestination.CONTACT_DETAIL ->
-                                        item.contactId?.let(onNavigateToContact)
-                                            ?: onNavigateToAutomationSetup()
-                                    HomeActionDestination.MESSAGES -> onNavigateToMessages()
-                                    HomeActionDestination.AUTOMATION_SETUP -> onNavigateToAutomationSetup()
-                                }
-                            },
+                            onClick = { navigateToAction(item.actionTarget) },
                             modifier = Modifier.testTag(
-                                HomeScreenTestTags.PLANNER_ITEM_PREFIX + (
-                                    item.contactId ?: item.destination.name.lowercase()
-                                )
+                                HomeScreenTestTags.PLANNER_ITEM_PREFIX + item.actionTarget.testKey()
                             ),
                         )
                     }
@@ -353,6 +362,94 @@ internal fun HomeContent(
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+private fun HomeActionTarget.testKey(): String {
+    return when (this) {
+        HomeActionTarget.AutomationSetup -> "automation_setup"
+        HomeActionTarget.BackupRestore -> "backup_restore"
+        is HomeActionTarget.ContactDetail -> contactId
+        HomeActionTarget.Messages -> "messages"
+    }
+}
+
+@Composable
+private fun SetupProgressCard(
+    summary: SetupProgressSummary,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val statusColor = when {
+        summary.actionRequiredCount > 0 -> MaterialTheme.colorScheme.error
+        summary.warningCount > 0 -> RelateWarning
+        else -> RelateSuccess
+    }
+    val statusIcon = when {
+        summary.actionRequiredCount > 0 -> Icons.Filled.Error
+        summary.warningCount > 0 -> Icons.Filled.Warning
+        else -> Icons.Filled.CheckCircle
+    }
+    val detail = when {
+        summary.actionRequiredCount > 0 -> stringResource(
+            R.string.setup_progress_blockers,
+            summary.actionRequiredCount,
+        )
+        summary.warningCount > 0 -> stringResource(
+            R.string.setup_progress_warnings,
+            summary.warningCount,
+        )
+        else -> stringResource(R.string.setup_progress_ready)
+    }
+
+    RelateGlassCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = statusIcon,
+                    contentDescription = null,
+                    tint = statusColor,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = stringResource(R.string.setup_progress_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = stringResource(
+                        R.string.setup_progress_count,
+                        summary.completedSteps,
+                        summary.totalSteps,
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = statusColor,
+                )
+            }
+            LinearProgressIndicator(
+                progress = { summary.progressFraction.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth(),
+                color = statusColor,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = RelateOnSurfaceVariant,
+            )
         }
     }
 }

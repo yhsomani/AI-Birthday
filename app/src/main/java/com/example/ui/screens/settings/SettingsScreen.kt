@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -62,6 +64,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -84,6 +87,12 @@ import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.feedback.asString
 import com.example.ui.viewmodel.SettingsViewModel
 
+internal object SettingsScreenTestTags {
+    const val SIGN_OUT_TRIGGER = "settings_sign_out_trigger"
+    const val SIGN_OUT_DIALOG = "settings_sign_out_dialog"
+    const val SIGN_OUT_CONFIRM = "settings_sign_out_confirm"
+}
+
 @Composable
 fun SettingsScreen(
     onSignOut: () -> Unit = {},
@@ -98,6 +107,7 @@ fun SettingsScreen(
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     var showModeMenu by remember { mutableStateOf(false) }
+    var showSignOutDialog by remember { mutableStateOf(false) }
     val contactsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) {
@@ -459,9 +469,9 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = {
-                        viewModel.signOut(context)
-                        onSignOut()
+                        showSignOutDialog = true
                     })
+                    .testTag(SettingsScreenTestTags.SIGN_OUT_TRIGGER)
                     .padding(vertical = 16.dp),
             )
 
@@ -473,6 +483,91 @@ fun SettingsScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(16.dp),
+        )
+
+        if (showSignOutDialog) {
+            SignOutConfirmationDialog(
+                onDismiss = { showSignOutDialog = false },
+                onConfirm = {
+                    showSignOutDialog = false
+                    viewModel.signOut(context)
+                    onSignOut()
+                },
+            )
+        }
+    }
+}
+
+@Composable
+internal fun SignOutConfirmationDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        modifier = Modifier.testTag(SettingsScreenTestTags.SIGN_OUT_DIALOG),
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+            )
+        },
+        title = {
+            Text(
+                text = stringResource(R.string.settings_sign_out_title),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_sign_out_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = RelateOnSurfaceVariant,
+                )
+                SignOutChecklistItem(text = stringResource(R.string.settings_sign_out_check_local_data))
+                SignOutChecklistItem(text = stringResource(R.string.settings_sign_out_check_preferences))
+                SignOutChecklistItem(text = stringResource(R.string.settings_sign_out_check_external))
+                SignOutChecklistItem(text = stringResource(R.string.settings_sign_out_check_backup))
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.testTag(SettingsScreenTestTags.SIGN_OUT_CONFIRM),
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_sign_out_confirm),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.settings_sign_out_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun SignOutChecklistItem(text: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Check,
+            contentDescription = null,
+            tint = RelatePrimary,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = RelateOnSurfaceVariant,
+            modifier = Modifier.weight(1f),
         )
     }
 }

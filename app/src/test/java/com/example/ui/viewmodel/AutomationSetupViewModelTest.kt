@@ -119,6 +119,64 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
+    fun `refresh assigns readiness checks to grouped AI Doctor sections`() = runTest(testDispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val groupsByTitle = viewModel.buildChecksForTesting().associate {
+            it.title to it.group
+        }
+
+        assertEquals(
+            ReadinessGroup.REQUIRED,
+            groupsByTitle[context.getString(R.string.automation_setup_check_sms)],
+        )
+        assertEquals(
+            ReadinessGroup.QUALITY,
+            groupsByTitle[context.getString(R.string.automation_setup_check_style_coach)],
+        )
+        assertEquals(
+            ReadinessGroup.RELIABILITY,
+            groupsByTitle[context.getString(R.string.automation_setup_check_exact_sends)],
+        )
+        assertEquals(
+            ReadinessGroup.RECOVERY,
+            groupsByTitle[context.getString(R.string.automation_setup_check_recent_errors)],
+        )
+    }
+
+    @Test
+    fun `setupProgressForTesting counts ok warnings and blockers`() = runTest(testDispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val progress = viewModel.setupProgressForTesting(
+            listOf(
+                ReadinessCheck(
+                    title = "Ready",
+                    detail = "Ready",
+                    status = ReadinessStatus.OK,
+                ),
+                ReadinessCheck(
+                    title = "Warning",
+                    detail = "Warning",
+                    status = ReadinessStatus.WARNING,
+                ),
+                ReadinessCheck(
+                    title = "Blocker",
+                    detail = "Blocker",
+                    status = ReadinessStatus.ACTION_REQUIRED,
+                ),
+            ),
+        )
+
+        assertEquals(1, progress.completedSteps)
+        assertEquals(3, progress.totalSteps)
+        assertEquals(1, progress.warningCount)
+        assertEquals(1, progress.actionRequiredCount)
+    }
+
+    @Test
     fun `diagnoseAiFailureForTesting redacts sensitive fallback text`() = runTest(testDispatcher) {
         val viewModel = newViewModel()
         advanceUntilIdle()

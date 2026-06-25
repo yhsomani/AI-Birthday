@@ -69,9 +69,11 @@ import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.core.ui.theme.RelateWarning
 import com.example.ui.viewmodel.EventHorizonFilter
 import com.example.ui.viewmodel.EventTypeFilter
 import com.example.ui.viewmodel.EventsViewModel
+import com.example.ui.viewmodel.ManualEventDuplicateWarning
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -127,8 +129,13 @@ fun EventsScreen(
         ManualEventDialog(
             contacts = state.contacts,
             isSaving = state.isSavingManualEvent,
-            onDismiss = { showManualDialog = false },
-            onSave = { existingContactId, newContactName, eventType, label, month, day, year ->
+            duplicateWarning = state.duplicateWarning,
+            onDismiss = {
+                viewModel.clearManualEventDuplicateWarning()
+                showManualDialog = false
+            },
+            onInputChanged = viewModel::clearManualEventDuplicateWarning,
+            onSave = { existingContactId, newContactName, eventType, label, month, day, year, allowDuplicate ->
                 viewModel.saveManualEvent(
                     existingContactId = existingContactId,
                     newContactName = newContactName,
@@ -137,6 +144,7 @@ fun EventsScreen(
                     month = month,
                     day = day,
                     year = year,
+                    allowDuplicate = allowDuplicate,
                 )
             },
         )
@@ -268,7 +276,9 @@ private fun EventsList(events: List<EventEntity>) {
 private fun ManualEventDialog(
     contacts: List<ContactEntity>,
     isSaving: Boolean,
+    duplicateWarning: ManualEventDuplicateWarning?,
     onDismiss: () -> Unit,
+    onInputChanged: () -> Unit,
     onSave: (
         existingContactId: String?,
         newContactName: String?,
@@ -277,6 +287,7 @@ private fun ManualEventDialog(
         month: Int,
         day: Int,
         year: Int?,
+        allowDuplicate: Boolean,
     ) -> Unit,
 ) {
     var useExistingContact by remember { mutableStateOf(contacts.isNotEmpty()) }
@@ -303,6 +314,7 @@ private fun ManualEventDialog(
                         label = stringResource(R.string.events_existing_contact),
                         isSelected = useExistingContact,
                         onClick = {
+                            onInputChanged()
                             useExistingContact = true
                             selectedContactId = selectedContactId ?: contacts.firstOrNull()?.id
                         },
@@ -311,7 +323,10 @@ private fun ManualEventDialog(
                     FilterChip(
                         label = stringResource(R.string.events_new_contact),
                         isSelected = !useExistingContact,
-                        onClick = { useExistingContact = false },
+                        onClick = {
+                            onInputChanged()
+                            useExistingContact = false
+                        },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -340,6 +355,7 @@ private fun ManualEventDialog(
                                 DropdownMenuItem(
                                     text = { Text(contact.name) },
                                     onClick = {
+                                        onInputChanged()
                                         selectedContactId = contact.id
                                         contactMenuExpanded = false
                                     },
@@ -357,7 +373,10 @@ private fun ManualEventDialog(
                 } else {
                     OutlinedTextField(
                         value = newContactName,
-                        onValueChange = { newContactName = it },
+                        onValueChange = {
+                            onInputChanged()
+                            newContactName = it
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(R.string.events_new_contact_name)) },
                         singleLine = true,
@@ -371,7 +390,10 @@ private fun ManualEventDialog(
                             FilterChip(
                                 label = eventTypeLabel(value),
                                 isSelected = eventType == value,
-                                onClick = { eventType = value },
+                                onClick = {
+                                    onInputChanged()
+                                    eventType = value
+                                },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -381,7 +403,10 @@ private fun ManualEventDialog(
                             FilterChip(
                                 label = eventTypeLabel(value),
                                 isSelected = eventType == value,
-                                onClick = { eventType = value },
+                                onClick = {
+                                    onInputChanged()
+                                    eventType = value
+                                },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -390,7 +415,10 @@ private fun ManualEventDialog(
 
                 OutlinedTextField(
                     value = label,
-                    onValueChange = { label = it },
+                    onValueChange = {
+                        onInputChanged()
+                        label = it
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.events_label)) },
                     placeholder = { Text(stringResource(R.string.optional)) },
@@ -401,7 +429,10 @@ private fun ManualEventDialog(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = monthText,
-                        onValueChange = { monthText = it.filter(Char::isDigit).take(2) },
+                        onValueChange = {
+                            onInputChanged()
+                            monthText = it.filter(Char::isDigit).take(2)
+                        },
                         modifier = Modifier.weight(1f),
                         label = { Text(stringResource(R.string.events_month_label)) },
                         singleLine = true,
@@ -410,7 +441,10 @@ private fun ManualEventDialog(
                     )
                     OutlinedTextField(
                         value = dayText,
-                        onValueChange = { dayText = it.filter(Char::isDigit).take(2) },
+                        onValueChange = {
+                            onInputChanged()
+                            dayText = it.filter(Char::isDigit).take(2)
+                        },
                         modifier = Modifier.weight(1f),
                         label = { Text(stringResource(R.string.events_day_label)) },
                         singleLine = true,
@@ -419,7 +453,10 @@ private fun ManualEventDialog(
                     )
                     OutlinedTextField(
                         value = yearText,
-                        onValueChange = { yearText = it.filter(Char::isDigit).take(4) },
+                        onValueChange = {
+                            onInputChanged()
+                            yearText = it.filter(Char::isDigit).take(4)
+                        },
                         modifier = Modifier.weight(1f),
                         label = { Text(stringResource(R.string.events_year_label)) },
                         singleLine = true,
@@ -434,6 +471,28 @@ private fun ManualEventDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
+                }
+
+                duplicateWarning?.let { warning ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = stringResource(R.string.events_duplicate_title),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = RelateWarning,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.events_duplicate_message,
+                                warning.contactName,
+                                eventTypeLabel(warning.eventType),
+                                warning.month,
+                                warning.dayOfMonth,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = RelateOnSurfaceVariant,
+                        )
+                    }
                 }
             }
         },
@@ -453,11 +512,26 @@ private fun ManualEventDialog(
                     } else if (!useExistingContact && newName.isNullOrBlank()) {
                         localError = errorContactName
                     } else {
-                        onSave(existingId, newName, eventType, label, month, day, year)
+                        onSave(
+                            existingId,
+                            newName,
+                            eventType,
+                            label,
+                            month,
+                            day,
+                            year,
+                            duplicateWarning != null,
+                        )
                     }
                 },
             ) {
-                Text(if (isSaving) stringResource(R.string.saving) else stringResource(R.string.save))
+                Text(
+                    when {
+                        isSaving -> stringResource(R.string.saving)
+                        duplicateWarning != null -> stringResource(R.string.events_duplicate_save_anyway)
+                        else -> stringResource(R.string.save)
+                    }
+                )
             }
         },
         dismissButton = {

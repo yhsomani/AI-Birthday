@@ -47,6 +47,7 @@
     <string name="memory_vault_error_add">Could not add the note. Try again.</string>
     <string name="memory_vault_error_pin">Could not update the pinned state. Try again.</string>
     <string name="memory_vault_error_delete">Could not delete the note. Try again.</string>
+    <string name="memory_vault_error_blank_note">Write a note before adding it to the vault.</string>
     <string name="memory_vault_error_note_too_long">Memory notes must be 500 characters or fewer.</string>
     <string name="memory_vault_pin_note">Pin note</string>
     <string name="memory_vault_unpin_note">Unpin note</string>
@@ -161,6 +162,10 @@
     <string name="wish_preview_reject">Reject</string>
     <string name="wish_preview_approve_schedule">Approve &amp; Schedule</string>
     <string name="wish_preview_approved">Wish approved and scheduled.</string>
+    <string name="wish_preview_rejected">Wish rejected.</string>
+    <string name="wish_preview_review_next">Review next</string>
+    <string name="wish_preview_review_next_count_one">1 pending wish remains.</string>
+    <string name="wish_preview_review_next_count_many">%1$d pending wishes remain.</string>
     <string name="wish_variant_short">Short</string>
     <string name="wish_variant_standard">Standard</string>
     <string name="wish_variant_long">Long</string>
@@ -257,6 +262,10 @@
     <string name="automation_setup_title">AI Doctor</string>
     <string name="automation_setup_subtitle">Find why AI wishes feel wrong or fail, then fix the exact blocker.</string>
     <string name="automation_setup_diagnostic_checks">Diagnostic Checks</string>
+    <string name="automation_setup_group_required">Required</string>
+    <string name="automation_setup_group_quality">Quality</string>
+    <string name="automation_setup_group_reliability">Reliability</string>
+    <string name="automation_setup_group_recovery">Recovery</string>
     <string name="automation_setup_action_refresh">Refresh</string>
     <string name="automation_setup_action_dry_run">Dry Run</string>
     <string name="automation_setup_action_sync_contacts">Sync Contacts</string>
@@ -395,6 +404,14 @@
     <string name="approve">Approve</string>
     <string name="reject">Reject</string>
     <string name="sign_out">Sign Out</string>
+    <string name="settings_sign_out_title">Sign out and clear local data?</string>
+    <string name="settings_sign_out_body">This action removes RelateAI data from this device.</string>
+    <string name="settings_sign_out_check_local_data">Contacts, events, messages, memories, gifts, and activity logs on this device will be deleted.</string>
+    <string name="settings_sign_out_check_preferences">API keys, email settings, automation preferences, and cached database keys will be cleared.</string>
+    <string name="settings_sign_out_check_external">Google and Firebase access will be signed out or revoked where available; external services keep their own data.</string>
+    <string name="settings_sign_out_check_backup">Export an encrypted backup first if you may need this data later.</string>
+    <string name="settings_sign_out_cancel">Keep data</string>
+    <string name="settings_sign_out_confirm">Sign out and clear data</string>
     <string name="settings">Settings</string>
     <string name="analytics">Analytics</string>
     <string name="style_coach">Style Coach</string>
@@ -523,6 +540,11 @@
     <string name="avatar">Avatar</string>
     <string name="clear_search">Clear search</string>
     <string name="days">days</string>
+    <string name="setup_progress_title">Setup progress</string>
+    <string name="setup_progress_count">%1$d of %2$d ready</string>
+    <string name="setup_progress_blockers">%1$d setup item(s) need attention.</string>
+    <string name="setup_progress_warnings">%1$d item(s) can improve automation quality.</string>
+    <string name="setup_progress_ready">Automation setup looks ready.</string>
 
     <!-- Home -->
     <string name="home_greeting">Hello, %1$s</string>
@@ -557,6 +579,9 @@
     <string name="events_error_month_day">Enter month and day.</string>
     <string name="events_error_choose_contact">Choose a contact.</string>
     <string name="events_error_contact_name">Enter a contact name.</string>
+    <string name="events_duplicate_title">Possible duplicate</string>
+    <string name="events_duplicate_message">%1$s already has %2$s on %3$d/%4$d. Save only if this should be a separate reminder.</string>
+    <string name="events_duplicate_save_anyway">Save anyway</string>
     <string name="event_type_birthday">Birthday</string>
     <string name="event_type_anniversary">Anniversary</string>
     <string name="event_type_work_anniversary">Work anniversary</string>
@@ -580,12 +605,27 @@
     <string name="messages_empty_sent">No sent messages yet</string>
     <string name="messages_empty_failed">No failed messages</string>
     <string name="messages_empty_approved">No approved messages</string>
+    <string name="messages_recovery_title">Failed send recovery</string>
+    <string name="messages_recovery_summary">%1$d failed message(s) need review</string>
+    <string name="messages_recovery_setup_detail">%1$d message(s) have missing contact, channel, or Gmail setup. Fix blockers before retrying.</string>
+    <string name="messages_recovery_retry_detail">If setup looks correct, review AI Doctor for recent failures, then retry selected rows.</string>
+    <string name="messages_recovery_retry_hint">Retry stays manual after you review the fix.</string>
+    <string name="messages_recovery_open_setup">Open AI Doctor</string>
     <string name="messages_auto_sends_minutes">Auto-sends in %1$d mins!</string>
     <string name="messages_hours_left">%1$dh left</string>
     <string name="messages_channel_format">Channel: %1$s</string>
     <string name="messages_scheduled_format">Scheduled: %1$s</string>
     <string name="messages_status_failed">Failed</string>
     <string name="messages_status_approved">Approved</string>
+    <string name="messages_readiness_ready_review">Ready for review</string>
+    <string name="messages_readiness_approved_scheduled">Approved and scheduled</string>
+    <string name="messages_readiness_sending_now">Sending now</string>
+    <string name="messages_readiness_contact_missing">Contact missing</string>
+    <string name="messages_readiness_channel_disabled">Channel disabled</string>
+    <string name="messages_readiness_missing_phone">Phone number missing</string>
+    <string name="messages_readiness_missing_email">Email address missing</string>
+    <string name="messages_readiness_email_setup_missing">Gmail setup missing</string>
+    <string name="messages_readiness_failed_check_setup">Failed - check setup before retry</string>
     <string name="messages_retry_send">Retry Send</string>
     <string name="messages_revoke">Revoke</string>
     <string name="channel_sms">SMS</string>
@@ -754,4 +794,10 @@
     <string name="personalization_quality_interests">Interests or hobbies added</string>
     <string name="personalization_quality_memory_notes">Personal notes or memory context added</string>
     <string name="personalization_quality_channel">Preferred channel selected</string>
+    <string name="personalization_quality_next_step">Next: %1$s</string>
+    <string name="personalization_quality_ready">Ready for personalized wishes.</string>
+    <string name="personalization_quality_add_nickname">add a nickname or close name</string>
+    <string name="personalization_quality_add_interests">add interests or hobbies</string>
+    <string name="personalization_quality_add_memory_notes">add a memory or personal note</string>
+    <string name="personalization_quality_choose_channel">choose a preferred channel</string>
 </resources>

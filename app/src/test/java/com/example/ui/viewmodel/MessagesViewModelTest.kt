@@ -3,6 +3,7 @@ package com.example.ui.viewmodel
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
+import com.example.core.prefs.SecurePrefs
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
@@ -39,6 +40,7 @@ class MessagesViewModelTest {
     private val revokeApprovalUseCase: RevokeApprovalUseCase = mockk(relaxed = true)
     private val schedulerService: SchedulerService = mockk(relaxed = true)
     private val activityLogRepository: ActivityLogRepository = mockk(relaxed = true)
+    private val securePrefs: SecurePrefs = mockk(relaxed = true)
     private val dispatcher = StandardTestDispatcher()
 
     @Before
@@ -48,6 +50,9 @@ class MessagesViewModelTest {
         every { messageRepository.getAllSent() } returns MutableStateFlow(emptyList())
         every { contactRepository.getAll() } returns MutableStateFlow(emptyList())
         every { eventRepository.getAll() } returns MutableStateFlow(emptyList())
+        every { securePrefs.getChannelBlackout() } returns "[]"
+        every { securePrefs.getSenderEmail() } returns "sender@example.com"
+        every { securePrefs.getSenderEmailPassword() } returns "app-password"
     }
 
     @After
@@ -110,6 +115,7 @@ class MessagesViewModelTest {
             revokeApprovalUseCase = revokeApprovalUseCase,
             schedulerService = schedulerService,
             activityLogRepository = activityLogRepository,
+            securePrefs = securePrefs,
         )
         advanceUntilIdle()
 
@@ -157,6 +163,7 @@ class MessagesViewModelTest {
             revokeApprovalUseCase = revokeApprovalUseCase,
             schedulerService = schedulerService,
             activityLogRepository = activityLogRepository,
+            securePrefs = securePrefs,
         )
         advanceUntilIdle()
 
@@ -172,5 +179,54 @@ class MessagesViewModelTest {
         viewModel.updateSearchQuery("")
         viewModel.selectSort(MessageSort.SCHEDULED_DESC)
         assertEquals(listOf("pm_2", "pm_1"), viewModel.uiState.value.pendingMessages.map { it.entity.id })
+    }
+
+    @Test
+    fun `pending messages expose readiness labels from channel prerequisites`() = runTest(dispatcher) {
+        val now = System.currentTimeMillis()
+        every { securePrefs.getChannelBlackout() } returns "[\"WHATSAPP\"]"
+        every { securePrefs.getSenderEmail() } returns ""
+        every { securePrefs.getSenderEmailPassword() } returns ""
+        every { messageRepository.getAllPending() } returns MutableStateFlow(
+            listOf(
+                pending("pm_sms", "c_sms", "e_sms", "SMS", now + 2 * 86_400_000L),
+                pending("pm_email", "c_email", "e_email", "EMAIL", now + 3 * 86_400_000L),
+                pending("pm_whatsapp", "c_whatsapp", "e_whatsapp", "WHATSAPP", now + 4 * 86_400_000L),
+            )
+        )
+        every { contactRepository.getAll() } returns MutableStateFlow(
+            listOf(
+                ContactEntity(id = "c_sms", name = "No Phone"),
+                ContactEntity(id = "c_email", name = "No Gmail", primaryEmail = "no-gmail@example.com"),
+                ContactEntity(id = "c_whatsapp", name = "Blocked WA", primaryPhone = "+919999900000"),
+            )
+        )
+        every { eventRepository.getAll() } returns MutableStateFlow(
+            listOf(
+                EventEntity(id = "e_sms", contactId = "c_sms", type = "BIRTHDAY", dayOfMonth = 1, month = 1, nextOccurrenceMs = now),
+                EventEntity(id = "e_email", contactId = "c_email", type = "BIRTHDAY", dayOfMonth = 1, month = 1, nextOccurrenceMs = now),
+                EventEntity(id = "e_whatsapp", contactId = "c_whatsapp", type = "BIRTHDAY", dayOfMonth = 1, month = 1, nextOccurrenceMs = now),
+            )
+        )
+
+        val viewModel = MessagesViewModel(
+            messageRepository = messageRepository,
+            contactRepository = contactRepository,
+            eventRepository = eventRepository,
+            approvePendingMessageUseCase = approvePendingMessageUseCase,
+            rejectPendingMessageUseCase = rejectPendingMessageUseCase,
+            revokeApprovalUseCase = revokeApprovalUseCase,
+            schedulerService = schedulerService,
+            activityLogRepository = activityLogRepository,
+            securePrefs = securePrefs,
+        )
+        advanceUntilIdle()
+
+        val readinessById = viewModel.uiState.value.pendingMessages.associate {
+            it.entity.id to it.readiness
+        }
+        assertEquals(MessageReadiness.MISSING_PHONE, readinessById["pm_sms"])
+        assertEquals(MessageReadiness.EMAIL_SETUP_MISSING, readinessById["pm_email"])
+        assertEquals(MessageReadiness.CHANNEL_DISABLED, readinessById["pm_whatsapp"])
     }
 }

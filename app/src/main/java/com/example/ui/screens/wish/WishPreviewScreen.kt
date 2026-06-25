@@ -54,6 +54,7 @@ import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.feedback.asString
+import com.example.ui.viewmodel.ReviewNextTarget
 import com.example.ui.viewmodel.WishPreviewUiState
 import com.example.ui.viewmodel.WishPreviewViewModel
 import com.example.ui.viewmodel.WhySignal
@@ -76,6 +77,9 @@ internal object WishPreviewTestTags {
     const val REJECT_BUTTON = "wish_preview_reject"
     const val APPROVE_BUTTON = "wish_preview_approve"
     const val APPROVED_MESSAGE = "wish_preview_approved_message"
+    const val REJECTED_MESSAGE = "wish_preview_rejected_message"
+    const val REVIEW_NEXT_BUTTON = "wish_preview_review_next"
+    const val REVIEW_NEXT_COUNT = "wish_preview_review_next_count"
     const val ERROR_MESSAGE = "wish_preview_error_message"
     const val VARIANT_PREFIX = "wish_preview_variant_"
     const val FEEDBACK_PREFIX = "wish_preview_feedback_"
@@ -87,6 +91,7 @@ fun WishPreviewScreen(
     messageRef: String,
     onBack: () -> Unit = {},
     onSent: () -> Unit = {},
+    onReviewNext: (contactId: String, messageRef: String) -> Unit = { _, _ -> },
     viewModel: WishPreviewViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -117,8 +122,8 @@ fun WishPreviewScreen(
         viewModel.loadPending(messageRef)
     }
 
-    LaunchedEffect(state.approved) {
-        if (state.approved) {
+    LaunchedEffect(state.approved, state.nextReviewTarget) {
+        if (state.approved && state.nextReviewTarget == null) {
             onSent()
         }
     }
@@ -134,6 +139,7 @@ fun WishPreviewScreen(
         onSendTest = viewModel::sendTestToMyself,
         onReject = viewModel::reject,
         onApprove = viewModel::approve,
+        onReviewNext = { target -> onReviewNext(target.contactId, target.messageRef) },
     )
 }
 
@@ -149,6 +155,7 @@ internal fun WishPreviewScreenContent(
     onSendTest: () -> Unit = {},
     onReject: () -> Unit = {},
     onApprove: () -> Unit = {},
+    onReviewNext: (ReviewNextTarget) -> Unit = {},
 ) {
     Box(
         modifier = Modifier
@@ -212,6 +219,7 @@ internal fun WishPreviewScreenContent(
                     onSendTest = onSendTest,
                     onReject = onReject,
                     onApprove = onApprove,
+                    onReviewNext = onReviewNext,
                 )
             }
         }
@@ -235,6 +243,7 @@ internal fun WishPreviewContent(
     onSendTest: () -> Unit = {},
     onReject: () -> Unit = {},
     onApprove: () -> Unit = {},
+    onReviewNext: (ReviewNextTarget) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -474,16 +483,68 @@ internal fun WishPreviewContent(
                         )
                     }
                 } else if (state.approved) {
-                    Text(
-                        text = stringResource(R.string.wish_preview_approved),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = RelatePrimary,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.testTag(WishPreviewTestTags.APPROVED_MESSAGE),
+                    ReviewResultPanel(
+                        message = stringResource(R.string.wish_preview_approved),
+                        messageTag = WishPreviewTestTags.APPROVED_MESSAGE,
+                        state = state,
+                        onReviewNext = onReviewNext,
+                    )
+                } else if (state.rejected) {
+                    ReviewResultPanel(
+                        message = stringResource(R.string.wish_preview_rejected),
+                        messageTag = WishPreviewTestTags.REJECTED_MESSAGE,
+                        state = state,
+                        onReviewNext = onReviewNext,
                     )
                 }
 
         Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun ReviewResultPanel(
+    message: String,
+    messageTag: String,
+    state: WishPreviewUiState,
+    onReviewNext: (ReviewNextTarget) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyLarge,
+            color = RelatePrimary,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.testTag(messageTag),
+        )
+        val nextTarget = state.nextReviewTarget
+        if (nextTarget != null) {
+            Text(
+                text = reviewQueueText(state.remainingReviewCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = RelateOnSurfaceVariant,
+                modifier = Modifier.testTag(WishPreviewTestTags.REVIEW_NEXT_COUNT),
+            )
+            RelatePrimaryButton(
+                text = stringResource(R.string.wish_preview_review_next),
+                onClick = { onReviewNext(nextTarget) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(WishPreviewTestTags.REVIEW_NEXT_BUTTON),
+            )
+        }
+    }
+}
+
+@Composable
+private fun reviewQueueText(remainingReviewCount: Int): String {
+    return if (remainingReviewCount == 1) {
+        stringResource(R.string.wish_preview_review_next_count_one)
+    } else {
+        stringResource(R.string.wish_preview_review_next_count_many, remainingReviewCount)
     }
 }
 

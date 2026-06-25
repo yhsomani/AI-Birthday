@@ -40,6 +40,7 @@ import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.relateTextFieldColors
 import com.example.core.ui.theme.*
 import com.example.ui.viewmodel.MessageChannelFilter
+import com.example.ui.viewmodel.MessageReadiness
 import com.example.ui.viewmodel.MessageSort
 import com.example.ui.viewmodel.MessagesUiState
 import com.example.ui.viewmodel.MessagesViewModel
@@ -79,6 +80,9 @@ internal object MessagesTestTags {
     const val PENDING_CARD_PREFIX = "messages_pending_card_"
     const val APPROVED_CARD_PREFIX = "messages_approved_card_"
     const val FAILED_CARD_PREFIX = "messages_failed_card_"
+    const val FAILED_RECOVERY_ASSISTANT = "messages_failed_recovery_assistant"
+    const val FAILED_RECOVERY_OPEN_SETUP = "messages_failed_recovery_open_setup"
+    const val READINESS_PREFIX = "messages_readiness_"
     const val SENT_CARD_PREFIX = "messages_sent_card_"
     const val SELECT_PREFIX = "messages_select_"
     const val PENDING_APPROVE_PREFIX = "messages_pending_approve_"
@@ -94,6 +98,7 @@ internal object MessagesTestTags {
 @Composable
 fun MessagesScreen(
     onNavigateToWish: (String, String) -> Unit = { _, _ -> },
+    onNavigateToAutomationSetup: () -> Unit = {},
     viewModel: MessagesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -101,6 +106,7 @@ fun MessagesScreen(
     MessagesContent(
         state = state,
         onNavigateToWish = onNavigateToWish,
+        onNavigateToAutomationSetup = onNavigateToAutomationSetup,
         onSearchQueryChange = viewModel::updateSearchQuery,
         onChannelFilterSelected = viewModel::selectChannelFilter,
         onSortSelected = viewModel::selectSort,
@@ -124,6 +130,7 @@ internal fun MessagesContent(
     state: MessagesUiState,
     initialPage: Int = 0,
     onNavigateToWish: (String, String) -> Unit = { _, _ -> },
+    onNavigateToAutomationSetup: () -> Unit = {},
     onSearchQueryChange: (String) -> Unit = {},
     onChannelFilterSelected: (MessageChannelFilter) -> Unit = {},
     onSortSelected: (MessageSort) -> Unit = {},
@@ -355,6 +362,7 @@ internal fun MessagesContent(
                         4 -> FailedMessagesList(
                             messages = state.failedMessages,
                             onRetry = onRetryMessage,
+                            onOpenAutomationSetup = onNavigateToAutomationSetup,
                             retryingMessageId = state.retryingMessageId,
                             selectedMessageIds = state.selectedMessageIds,
                             onToggleSelection = onToggleSelection,
@@ -487,6 +495,7 @@ private fun SentMessagesList(messages: List<SentMessageItem>) {
 private fun FailedMessagesList(
     messages: List<PendingMessageItem>,
     onRetry: (String) -> Unit,
+    onOpenAutomationSetup: () -> Unit,
     retryingMessageId: String?,
     selectedMessageIds: Set<String>,
     onToggleSelection: (String) -> Unit,
@@ -508,8 +517,91 @@ private fun FailedMessagesList(
                     modifier = Modifier.testTag(MessagesTestTags.FAILED_CARD_PREFIX + item.entity.id),
                 )
             }
+            item(key = "failed_recovery_assistant") {
+                FailedRecoveryAssistant(
+                    messages = messages,
+                    onOpenAutomationSetup = onOpenAutomationSetup,
+                    modifier = Modifier.testTag(MessagesTestTags.FAILED_RECOVERY_ASSISTANT),
+                )
+            }
         }
     }
+}
+
+@Composable
+internal fun FailedRecoveryAssistant(
+    messages: List<PendingMessageItem>,
+    onOpenAutomationSetup: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val setupBlockers = messages.count { it.readiness.requiresContactOrChannelFix() }
+    val detail = if (setupBlockers > 0) {
+        stringResource(R.string.messages_recovery_setup_detail, setupBlockers)
+    } else {
+        stringResource(R.string.messages_recovery_retry_detail)
+    }
+
+    RelateGlassCard(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Build,
+                    contentDescription = null,
+                    tint = RelatePrimary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.messages_recovery_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = stringResource(R.string.messages_recovery_summary, messages.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = RelateOnSurfaceVariant,
+                    )
+                }
+                TextButton(
+                    onClick = onOpenAutomationSetup,
+                    modifier = Modifier.testTag(MessagesTestTags.FAILED_RECOVERY_OPEN_SETUP),
+                ) {
+                    Text(stringResource(R.string.messages_recovery_open_setup))
+                }
+            }
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = RelateOnSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(R.string.messages_recovery_retry_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = RelateOnSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun MessageReadiness.requiresContactOrChannelFix(): Boolean = when (this) {
+    MessageReadiness.CONTACT_MISSING,
+    MessageReadiness.CHANNEL_DISABLED,
+    MessageReadiness.MISSING_PHONE,
+    MessageReadiness.MISSING_EMAIL,
+    MessageReadiness.EMAIL_SETUP_MISSING -> true
+    MessageReadiness.READY_FOR_REVIEW,
+    MessageReadiness.APPROVED_SCHEDULED,
+    MessageReadiness.SENDING_NOW,
+    MessageReadiness.FAILED_CHECK_SETUP -> false
 }
 
 @Composable
@@ -665,6 +757,12 @@ private fun PendingMessageCard(
                 color = RelateOnSurfaceVariant,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+            MessageReadinessBadge(
+                readiness = item.readiness,
+                modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + message.id),
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -938,6 +1036,12 @@ private fun FailedMessageCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(12.dp))
+            MessageReadinessBadge(
+                readiness = item.readiness,
+                modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + message.id),
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -1084,6 +1188,12 @@ private fun ApprovedMessageCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(12.dp))
+            MessageReadinessBadge(
+                readiness = item.readiness,
+                modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + message.id),
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -1152,6 +1262,74 @@ private fun ApprovedMessageCard(
             }
         }
     }
+}
+
+@Composable
+private fun MessageReadinessBadge(
+    readiness: MessageReadiness,
+    modifier: Modifier = Modifier,
+) {
+    val label = readiness.label()
+    val color = when (readiness) {
+        MessageReadiness.READY_FOR_REVIEW,
+        MessageReadiness.APPROVED_SCHEDULED,
+        MessageReadiness.SENDING_NOW -> Color(0xFF10B981)
+        MessageReadiness.FAILED_CHECK_SETUP -> Color(0xFFFBBF24)
+        MessageReadiness.CONTACT_MISSING,
+        MessageReadiness.CHANNEL_DISABLED,
+        MessageReadiness.MISSING_PHONE,
+        MessageReadiness.MISSING_EMAIL,
+        MessageReadiness.EMAIL_SETUP_MISSING -> MaterialTheme.colorScheme.error
+    }
+    val icon = when (readiness) {
+        MessageReadiness.READY_FOR_REVIEW,
+        MessageReadiness.APPROVED_SCHEDULED,
+        MessageReadiness.SENDING_NOW -> Icons.Filled.CheckCircle
+        MessageReadiness.FAILED_CHECK_SETUP -> Icons.Filled.Warning
+        MessageReadiness.CONTACT_MISSING,
+        MessageReadiness.CHANNEL_DISABLED,
+        MessageReadiness.MISSING_PHONE,
+        MessageReadiness.MISSING_EMAIL,
+        MessageReadiness.EMAIL_SETUP_MISSING -> Icons.Filled.Error
+    }
+
+    Surface(
+        modifier = modifier,
+        color = color.copy(alpha = 0.14f),
+        shape = RoundedCornerShape(6.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(13.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = color,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MessageReadiness.label(): String = when (this) {
+    MessageReadiness.READY_FOR_REVIEW -> stringResource(R.string.messages_readiness_ready_review)
+    MessageReadiness.APPROVED_SCHEDULED -> stringResource(R.string.messages_readiness_approved_scheduled)
+    MessageReadiness.SENDING_NOW -> stringResource(R.string.messages_readiness_sending_now)
+    MessageReadiness.CONTACT_MISSING -> stringResource(R.string.messages_readiness_contact_missing)
+    MessageReadiness.CHANNEL_DISABLED -> stringResource(R.string.messages_readiness_channel_disabled)
+    MessageReadiness.MISSING_PHONE -> stringResource(R.string.messages_readiness_missing_phone)
+    MessageReadiness.MISSING_EMAIL -> stringResource(R.string.messages_readiness_missing_email)
+    MessageReadiness.EMAIL_SETUP_MISSING -> stringResource(R.string.messages_readiness_email_setup_missing)
+    MessageReadiness.FAILED_CHECK_SETUP -> stringResource(R.string.messages_readiness_failed_check_setup)
 }
 
 @Composable
