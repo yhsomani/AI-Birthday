@@ -248,10 +248,14 @@ fun EventsScreen(
 
 @Composable
 private fun EventsList(events: List<EventEntity>) {
-    val groupedEvents = events.groupBy {
+    // ⚡ Bolt: Memoize grouping and reuse Calendar instance to prevent GC churn on recomposition
+    val groupedEvents = remember(events) {
         val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = it.nextOccurrenceMs
-        cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+        events.groupBy {
+            cal.timeInMillis = it.nextOccurrenceMs
+            cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault())
+                ?: "Other"
+        }
     }
 
     LazyColumn(
