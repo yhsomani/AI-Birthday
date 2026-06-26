@@ -39,6 +39,9 @@ import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.relateTextFieldColors
 import com.example.core.ui.theme.*
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.EventType
+import com.example.domain.model.MessageChannel
 import com.example.ui.viewmodel.MessageChannelFilter
 import com.example.ui.viewmodel.MessageReadiness
 import com.example.ui.viewmodel.MessageSort
@@ -78,11 +81,13 @@ internal object MessagesTestTags {
     const val CHANNEL_FILTER_PREFIX = "messages_channel_filter_"
     const val SORT_PREFIX = "messages_sort_"
     const val PENDING_CARD_PREFIX = "messages_pending_card_"
+    const val BLOCKED_CARD_PREFIX = "messages_blocked_card_"
     const val APPROVED_CARD_PREFIX = "messages_approved_card_"
     const val FAILED_CARD_PREFIX = "messages_failed_card_"
     const val FAILED_RECOVERY_ASSISTANT = "messages_failed_recovery_assistant"
     const val FAILED_RECOVERY_OPEN_SETUP = "messages_failed_recovery_open_setup"
     const val READINESS_PREFIX = "messages_readiness_"
+    const val CHANNEL_PREFIX = "messages_channel_"
     const val SENT_CARD_PREFIX = "messages_sent_card_"
     const val SELECT_PREFIX = "messages_select_"
     const val PENDING_APPROVE_PREFIX = "messages_pending_approve_"
@@ -150,9 +155,9 @@ internal fun MessagesContent(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val tabs = listOf(
-        stringResource(R.string.messages_tab_today, state.todayMessages.size),
-        stringResource(R.string.messages_tab_pending, state.pendingMessages.size),
-        stringResource(R.string.messages_tab_approved, state.approvedMessages.size),
+        stringResource(R.string.messages_tab_needs_review, state.needsReviewMessages.size),
+        stringResource(R.string.messages_tab_scheduled, state.scheduledMessages.size),
+        stringResource(R.string.messages_tab_blocked, state.blockedMessages.size),
         stringResource(R.string.messages_tab_sent, state.sentMessages.size),
         stringResource(R.string.messages_tab_failed, state.failedMessages.size),
     )
@@ -211,11 +216,12 @@ internal fun MessagesContent(
             fontWeight = FontWeight.Bold,
         )
         Spacer(modifier = Modifier.height(16.dp))
-        
-        TabRow(
+
+        ScrollableTabRow(
             selectedTabIndex = pagerState.currentPage,
             containerColor = RelateDarkBackground,
             contentColor = RelatePrimary,
+            edgePadding = 0.dp,
             indicator = { tabPositions ->
                 SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
@@ -300,7 +306,7 @@ internal fun MessagesContent(
         if (state.selectedMessageIds.isNotEmpty()) {
             BulkActionBar(
                 selectedCount = state.selectedMessageIds.size,
-                showApprove = pagerState.currentPage in listOf(0, 1),
+                showApprove = pagerState.currentPage == 0,
                 showRetry = pagerState.currentPage == 4,
                 onApprove = onBulkApproveSelected,
                 onRetry = onBulkRetrySelected,
@@ -328,10 +334,10 @@ internal fun MessagesContent(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
                 ) { page ->
-                                        when (page) {
+                    when (page) {
                         0 -> PendingMessagesList(
-                            messages = state.todayMessages,
-                            emptyText = stringResource(R.string.messages_empty_today),
+                            messages = state.needsReviewMessages,
+                            emptyText = stringResource(R.string.messages_empty_needs_review),
                             onApprove = onApproveMessage,
                             onReject = { showRejectDialogForId = it },
                             onEdit = onNavigateToWish,
@@ -339,24 +345,27 @@ internal fun MessagesContent(
                             selectedMessageIds = state.selectedMessageIds,
                             onToggleSelection = onToggleSelection,
                         )
-                        1 -> PendingMessagesList(
-                            messages = state.pendingMessages,
-                            emptyText = stringResource(R.string.messages_empty_pending),
-                            onApprove = onApproveMessage,
-                            onReject = { showRejectDialogForId = it },
-                            onEdit = onNavigateToWish,
-                            approvingMessageId = state.approvingMessageId,
-                            selectedMessageIds = state.selectedMessageIds,
-                            onToggleSelection = onToggleSelection,
-                        )
-                        2 -> ApprovedMessagesList(
-                            messages = state.approvedMessages,
+                        1 -> ApprovedMessagesList(
+                            messages = state.scheduledMessages,
+                            emptyText = stringResource(R.string.messages_empty_scheduled),
                             onRevoke = onRevokeApproval,
                             onReject = { showRejectDialogForId = it },
                             onEdit = onNavigateToWish,
                             revokingMessageId = state.revokingMessageId,
                             selectedMessageIds = state.selectedMessageIds,
                             onToggleSelection = onToggleSelection,
+                        )
+                        2 -> PendingMessagesList(
+                            messages = state.blockedMessages,
+                            emptyText = stringResource(R.string.messages_empty_blocked),
+                            onApprove = onApproveMessage,
+                            onReject = { showRejectDialogForId = it },
+                            onEdit = onNavigateToWish,
+                            approvingMessageId = state.approvingMessageId,
+                            selectedMessageIds = state.selectedMessageIds,
+                            onToggleSelection = onToggleSelection,
+                            showApproveAction = false,
+                            cardTagPrefix = MessagesTestTags.BLOCKED_CARD_PREFIX,
                         )
                         3 -> SentMessagesList(messages = state.sentMessages)
                         4 -> FailedMessagesList(
@@ -448,6 +457,8 @@ private fun PendingMessagesList(
     approvingMessageId: String?,
     selectedMessageIds: Set<String>,
     onToggleSelection: (String) -> Unit,
+    showApproveAction: Boolean = true,
+    cardTagPrefix: String = MessagesTestTags.PENDING_CARD_PREFIX,
 ) {
     if (messages.isEmpty()) {
         EmptyState(message = emptyText)
@@ -465,7 +476,8 @@ private fun PendingMessagesList(
                     isApproving = approvingMessageId == item.entity.id,
                     selected = item.entity.id in selectedMessageIds,
                     onToggleSelection = onToggleSelection,
-                    modifier = Modifier.testTag(MessagesTestTags.PENDING_CARD_PREFIX + item.entity.id),
+                    showApproveAction = showApproveAction,
+                    modifier = Modifier.testTag(cardTagPrefix + item.entity.id),
                 )
             }
         }
@@ -613,28 +625,33 @@ private fun PendingMessageCard(
     isApproving: Boolean,
     selected: Boolean,
     onToggleSelection: (String) -> Unit,
+    showApproveAction: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val message = item.entity
-    val eventTypeColor = when (item.eventType) {
-        "BIRTHDAY" -> Color(0xFF8B5CF6) // NeonViolet
-        "ANNIVERSARY" -> Color(0xFFF43F5E) // CyberRose
-        "WORK_ANNIVERSARY" -> Color(0xFF06B6D4) // ElectricCyan
+    val eventType = EventType.fromRaw(item.eventType)
+    val eventTypeColor = when (eventType) {
+        EventType.BIRTHDAY -> Color(0xFF8B5CF6) // NeonViolet
+        EventType.ANNIVERSARY -> Color(0xFFF43F5E) // CyberRose
+        EventType.WORK_ANNIVERSARY -> Color(0xFF06B6D4) // ElectricCyan
         else -> Color.Gray
     }
-    
-    val eventIcon = when (item.eventType) {
-        "BIRTHDAY" -> Icons.Filled.Cake
-        "ANNIVERSARY" -> Icons.Filled.Favorite
-        "WORK_ANNIVERSARY" -> Icons.Filled.Work
+
+    val eventIcon = when (eventType) {
+        EventType.BIRTHDAY -> Icons.Filled.Cake
+        EventType.ANNIVERSARY -> Icons.Filled.Favorite
+        EventType.WORK_ANNIVERSARY -> Icons.Filled.Work
         else -> Icons.Filled.Info
     }
 
-    val channelIcon = when (message.channel) {
-        "WHATSAPP" -> Icons.Filled.Phone
-        "EMAIL" -> Icons.Filled.Email
-        else -> Icons.Filled.Message
+    val messageChannel = MessageChannel.fromRaw(message.channel)
+    val channelIcon = when (messageChannel) {
+        MessageChannel.WHATSAPP -> Icons.Filled.Phone
+        MessageChannel.EMAIL -> Icons.Filled.Email
+        MessageChannel.SMS,
+        MessageChannel.UNKNOWN -> Icons.Filled.Message
     }
+    val channelText = channelLabel(message.channel)
 
     val previewText = remember(message) {
         val raw = if (message.editedByUser) message.userEditedText ?: message.selectedVariantText else message.selectedVariantText
@@ -713,7 +730,7 @@ private fun PendingMessageCard(
                                 )
                             }
                         }
-                        
+
                         // Channel badge
                         Surface(
                             color = RelateSurfaceVariant.copy(alpha = 0.3f),
@@ -731,9 +748,10 @@ private fun PendingMessageCard(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = message.channel,
+                                    text = channelText,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = RelateOnSurfaceVariant,
+                                    modifier = Modifier.testTag(MessagesTestTags.CHANNEL_PREFIX + message.id),
                                 )
                             }
                         }
@@ -777,20 +795,16 @@ private fun PendingMessageCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    val modeColor = when (message.approvalMode) {
-                        "FULLY_AUTO" -> Color(0xFF10B981)
-                        "SMART_APPROVE" -> Color(0xFFFBBF24)
-                        "VIP_APPROVE" -> Color(0xFFEF4444)
-                        else -> Color.Gray
-                    }
+                    val approvalMode = ApprovalMode.fromRaw(message.approvalMode)
+                    val modeColor = approvalModeColor(approvalMode)
                     Text(
-                        text = message.approvalMode,
+                        text = approvalModeLabel(approvalMode),
                         style = MaterialTheme.typography.labelSmall,
                         color = modeColor,
                         fontWeight = FontWeight.Bold,
                     )
-                    
-                    if (message.approvalMode == "SMART_APPROVE") {
+
+                    if (approvalMode == ApprovalMode.SMART_APPROVE) {
                         val timeDiff = message.scheduledForMs - System.currentTimeMillis()
                         val minutesLeft = (timeDiff / (1000 * 60)).toInt()
                         if (minutesLeft in 0..30) {
@@ -848,27 +862,29 @@ private fun PendingMessageCard(
                         Text(stringResource(R.string.edit_contact), fontSize = 11.sp)
                     }
 
-                    Button(
-                        onClick = { onApprove(message.id) },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        modifier = Modifier
-                            .height(32.dp)
-                            .testTag(MessagesTestTags.PENDING_APPROVE_PREFIX + message.id),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = RelatePrimary,
-                            contentColor = Color.Black,
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        enabled = !isApproving,
-                    ) {
-                        if (isApproving) {
-                            CircularProgressIndicator(
-                                color = Color.Black,
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text(stringResource(R.string.approve), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    if (showApproveAction) {
+                        Button(
+                            onClick = { onApprove(message.id) },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .height(32.dp)
+                                .testTag(MessagesTestTags.PENDING_APPROVE_PREFIX + message.id),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = RelatePrimary,
+                                contentColor = Color.Black,
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            enabled = !isApproving,
+                        ) {
+                            if (isApproving) {
+                                CircularProgressIndicator(
+                                    color = Color.Black,
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Text(stringResource(R.string.approve), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -950,9 +966,10 @@ private fun SentMessageCard(
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = stringResource(R.string.messages_channel_format, message.channel),
+                    text = stringResource(R.string.messages_channel_format, channelLabel(message.channel)),
                     style = MaterialTheme.typography.bodySmall,
                     color = RelateOnSurfaceVariant.copy(alpha = 0.8f),
+                    modifier = Modifier.testTag(MessagesTestTags.CHANNEL_PREFIX + message.id),
                 )
             }
         }
@@ -1079,6 +1096,7 @@ private fun FailedMessageCard(
 @Composable
 private fun ApprovedMessagesList(
     messages: List<PendingMessageItem>,
+    emptyText: String,
     onRevoke: (String) -> Unit,
     onReject: (String) -> Unit,
     onEdit: (String, String) -> Unit,
@@ -1087,7 +1105,7 @@ private fun ApprovedMessagesList(
     onToggleSelection: (String) -> Unit,
 ) {
     if (messages.isEmpty()) {
-        EmptyState(message = stringResource(R.string.messages_empty_approved))
+        EmptyState(message = emptyText)
     } else {
         LazyColumn(
             contentPadding = PaddingValues(bottom = 16.dp),
@@ -1265,6 +1283,25 @@ private fun ApprovedMessageCard(
 }
 
 @Composable
+private fun approvalModeLabel(approvalMode: ApprovalMode): String = when (approvalMode) {
+    ApprovalMode.FULLY_AUTO -> stringResource(R.string.automation_mode_fully_auto)
+    ApprovalMode.SMART_APPROVE -> stringResource(R.string.automation_mode_smart_approve_default)
+    ApprovalMode.VIP_APPROVE -> stringResource(R.string.automation_mode_vip_approve)
+    ApprovalMode.ALWAYS_ASK -> stringResource(R.string.automation_mode_always_ask)
+    ApprovalMode.DEFAULT,
+    ApprovalMode.UNKNOWN -> stringResource(R.string.automation_mode_default)
+}
+
+private fun approvalModeColor(approvalMode: ApprovalMode): Color = when (approvalMode) {
+    ApprovalMode.FULLY_AUTO -> Color(0xFF10B981)
+    ApprovalMode.SMART_APPROVE -> Color(0xFFFBBF24)
+    ApprovalMode.VIP_APPROVE -> Color(0xFFEF4444)
+    ApprovalMode.ALWAYS_ASK -> Color(0xFF94A3B8)
+    ApprovalMode.DEFAULT,
+    ApprovalMode.UNKNOWN -> Color.Gray
+}
+
+@Composable
 private fun MessageReadinessBadge(
     readiness: MessageReadiness,
     modifier: Modifier = Modifier,
@@ -1338,6 +1375,14 @@ private fun MessageChannelFilter.label(): String = when (this) {
     MessageChannelFilter.SMS -> stringResource(R.string.channel_sms)
     MessageChannelFilter.WHATSAPP -> stringResource(R.string.channel_whatsapp)
     MessageChannelFilter.EMAIL -> stringResource(R.string.channel_email)
+}
+
+@Composable
+private fun channelLabel(channel: String): String = when (MessageChannel.fromRaw(channel)) {
+    MessageChannel.SMS -> stringResource(R.string.channel_sms)
+    MessageChannel.WHATSAPP -> stringResource(R.string.channel_whatsapp)
+    MessageChannel.EMAIL -> stringResource(R.string.channel_email)
+    MessageChannel.UNKNOWN -> channel
 }
 
 @Composable

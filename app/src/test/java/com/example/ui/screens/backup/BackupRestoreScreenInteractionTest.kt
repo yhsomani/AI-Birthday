@@ -21,6 +21,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.service.BackupRestoreMode
+import com.example.ui.viewmodel.BackupImportPreviewUiModel
 import com.example.ui.viewmodel.BackupRestoreUiState
 import com.example.ui.viewmodel.PasswordStrength
 import org.junit.Assert.assertEquals
@@ -72,8 +74,21 @@ class BackupRestoreScreenInteractionTest {
                 uiState = uiState.copy(
                     exportSuccessFileName = null,
                     exportSuccessSizeBytes = 0L,
-                    importSuccessCount = 7,
+                    importPreview = BackupImportPreviewUiModel(
+                        backupVersion = 2,
+                        appVersion = "1.0",
+                        exportedAtMs = 1_700_000_000_000,
+                        totalRecords = 7,
+                        restoreMode = BackupRestoreMode.REPLACE,
+                    ),
                     errorMessage = null,
+                )
+            },
+            onConfirmImport = {
+                actions += "confirm"
+                uiState = uiState.copy(
+                    importPreview = null,
+                    importSuccessCount = 7,
                 )
             },
             onClearStatus = {
@@ -113,6 +128,14 @@ class BackupRestoreScreenInteractionTest {
             .assertIsEnabled()
             .performClick()
         composeRule.assertScrollableTagVisible(BackupRestoreTestTags.STATUS_CARD)
+        composeRule.onNodeWithText(context.getString(R.string.backup_import_preview_title))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.backup_import_replace_warning))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(BackupRestoreTestTags.CONFIRM_IMPORT)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.assertScrollableTagVisible(BackupRestoreTestTags.STATUS_CARD)
         composeRule.onNodeWithText(context.getString(R.string.backup_import_success_title))
             .assertIsDisplayed()
 
@@ -122,7 +145,7 @@ class BackupRestoreScreenInteractionTest {
 
         assertEquals("Abc12345!", uiState.passphrase)
         assertEquals(
-            listOf("back", "visibility:true", "export", "import", "dismiss"),
+            listOf("back", "visibility:true", "export", "import", "confirm", "dismiss"),
             actions,
         )
     }
@@ -212,6 +235,7 @@ class BackupRestoreScreenInteractionTest {
         onTogglePasswordVisibility: () -> Unit = {},
         onExportRequested: () -> Unit = {},
         onImportRequested: () -> Unit = {},
+        onConfirmImport: () -> Unit = {},
         onClearStatus: () -> Unit = {},
         onBack: () -> Unit = {},
     ) {
@@ -224,6 +248,7 @@ class BackupRestoreScreenInteractionTest {
                     onTogglePasswordVisibility = onTogglePasswordVisibility,
                     onExportRequested = onExportRequested,
                     onImportRequested = onImportRequested,
+                    onConfirmImport = onConfirmImport,
                     onClearStatus = onClearStatus,
                     onBack = onBack,
                 )

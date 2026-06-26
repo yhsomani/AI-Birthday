@@ -17,6 +17,9 @@ interface GiftHistoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(gift: GiftHistoryEntity)
 
+    @Query("DELETE FROM gift_history")
+    suspend fun deleteAll()
+
     @Delete
     suspend fun delete(gift: GiftHistoryEntity)
 }

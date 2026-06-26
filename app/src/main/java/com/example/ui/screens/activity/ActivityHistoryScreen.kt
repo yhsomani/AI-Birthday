@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MailOutline
@@ -49,6 +50,8 @@ import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.domain.model.ActivityLogSeverity
+import com.example.domain.model.ActivityLogType
 import com.example.ui.viewmodel.ActivityHistoryUiState
 import com.example.ui.viewmodel.ActivityHistoryViewModel
 import com.example.ui.viewmodel.ActivityLogDateFilter
@@ -276,12 +279,14 @@ private fun ActivityLogCard(
 @Composable
 private fun ActivityLogTypeFilter.label(): String = when (this) {
     ActivityLogTypeFilter.ALL -> stringResource(R.string.filter_all)
+    ActivityLogTypeFilter.DISPATCH -> stringResource(R.string.activity_filter_dispatch)
+    ActivityLogTypeFilter.AI -> stringResource(R.string.activity_filter_ai)
+    ActivityLogTypeFilter.SYNC -> stringResource(R.string.activity_filter_sync)
+    ActivityLogTypeFilter.BACKUP -> stringResource(R.string.activity_filter_backup)
+    ActivityLogTypeFilter.SETTINGS -> stringResource(R.string.activity_filter_settings)
     ActivityLogTypeFilter.MESSAGE -> stringResource(R.string.activity_filter_message)
     ActivityLogTypeFilter.EVENT -> stringResource(R.string.activity_filter_event)
-    ActivityLogTypeFilter.SYNC -> stringResource(R.string.activity_filter_sync)
     ActivityLogTypeFilter.ANALYTICS -> stringResource(R.string.activity_filter_analytics)
-    ActivityLogTypeFilter.SETTINGS -> stringResource(R.string.activity_filter_settings)
-    ActivityLogTypeFilter.AI -> stringResource(R.string.activity_filter_ai)
 }
 
 @Composable
@@ -303,19 +308,21 @@ private fun ActivityLogStatusFilter.label(): String = when (this) {
 private fun rememberActivityDateFormat(): SimpleDateFormat =
     SimpleDateFormat(stringResource(R.string.activity_history_date_pattern), Locale.getDefault())
 
-private fun String.icon(): ImageVector = when (uppercase(Locale.US)) {
-    "MESSAGE" -> Icons.Filled.MailOutline
-    "EVENT" -> Icons.Filled.Event
-    "SYNC" -> Icons.Filled.Sync
-    "ANALYTICS" -> Icons.Filled.Analytics
-    "SETTINGS" -> Icons.Filled.Settings
-    "AI" -> Icons.Filled.SmartToy
-    else -> Icons.Filled.History
+private fun String.icon(): ImageVector = when (ActivityLogType.fromRaw(this)) {
+    ActivityLogType.DISPATCH -> Icons.Filled.MailOutline
+    ActivityLogType.BACKUP -> Icons.Filled.Backup
+    ActivityLogType.MESSAGE -> Icons.Filled.MailOutline
+    ActivityLogType.EVENT -> Icons.Filled.Event
+    ActivityLogType.SYNC -> Icons.Filled.Sync
+    ActivityLogType.ANALYTICS -> Icons.Filled.Analytics
+    ActivityLogType.SETTINGS -> Icons.Filled.Settings
+    ActivityLogType.AI -> Icons.Filled.SmartToy
+    ActivityLogType.UNKNOWN -> Icons.Filled.History
 }
 
 @Composable
-private fun String.severityColor() = when (uppercase(Locale.US)) {
-    "ERROR" -> MaterialTheme.colorScheme.error
-    "WARNING" -> androidx.compose.ui.graphics.Color(0xFFF59E0B)
+private fun String.severityColor() = when (ActivityLogSeverity.fromRaw(this)) {
+    ActivityLogSeverity.ERROR -> MaterialTheme.colorScheme.error
+    ActivityLogSeverity.WARNING -> androidx.compose.ui.graphics.Color(0xFFF59E0B)
     else -> RelatePrimary
 }

@@ -67,6 +67,9 @@ interface ContactDao {
     @Query("UPDATE contacts SET isDeleted = 1 WHERE id = :id")
     suspend fun softDelete(id: String)
 
+    @Query("DELETE FROM contacts")
+    suspend fun deleteAll()
+
     @Delete
     suspend fun delete(contact: ContactEntity)
 }

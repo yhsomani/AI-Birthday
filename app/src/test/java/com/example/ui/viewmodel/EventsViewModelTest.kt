@@ -1,10 +1,15 @@
 package com.example.ui.viewmodel
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.usecase.ResolveEventConflictUseCase
 import com.example.domain.usecase.SaveManualEventUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -27,8 +32,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@RunWith(AndroidJUnit4::class)
+@Config(sdk = [34])
 class EventsViewModelTest {
     @get:Rule
     val mockkRule = MockKRule(this)
@@ -43,13 +52,18 @@ class EventsViewModelTest {
     private lateinit var saveManualEventUseCase: SaveManualEventUseCase
 
     @RelaxedMockK
+    private lateinit var resolveEventConflictUseCase: ResolveEventConflictUseCase
+
+    @RelaxedMockK
     private lateinit var activityLogRepository: ActivityLogRepository
 
     private val testDispatcher = StandardTestDispatcher()
+    private lateinit var context: Context
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        context = ApplicationProvider.getApplicationContext()
     }
 
     @After
@@ -66,12 +80,68 @@ class EventsViewModelTest {
             listOf(ContactEntity(id = "c1", name = "Alice"))
         )
 
-        val viewModel = EventsViewModel(eventRepository, contactRepository, saveManualEventUseCase, activityLogRepository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         assertFalse(viewModel.uiState.value.isLoading)
         assertEquals(1, viewModel.uiState.value.events.size)
         assertEquals(1, viewModel.uiState.value.contacts.size)
+    }
+
+    @Test
+    fun `init derives event trust states from source verification and active conflicts`() = runTest(testDispatcher) {
+        val events = listOf(
+            EventEntity(
+                id = "imported",
+                contactId = "c1",
+                type = "BIRTHDAY",
+                dayOfMonth = 5,
+                month = 6,
+                nextOccurrenceMs = 100L,
+                source = "CONTACTS",
+                isVerified = true,
+            ),
+            EventEntity(
+                id = "manual_conflict",
+                contactId = "c1",
+                type = "BIRTHDAY",
+                dayOfMonth = 1,
+                month = 7,
+                nextOccurrenceMs = 200L,
+                source = "MANUAL",
+                isVerified = true,
+            ),
+            EventEntity(
+                id = "low_confidence",
+                contactId = "c2",
+                type = "ANNIVERSARY",
+                dayOfMonth = 2,
+                month = 8,
+                nextOccurrenceMs = 300L,
+                source = "CONTACTS",
+                confidenceScore = 62,
+                isVerified = false,
+            ),
+        )
+        every { eventRepository.getAll() } returns MutableStateFlow(events)
+        every { contactRepository.getAll() } returns MutableStateFlow(
+            listOf(
+                ContactEntity(id = "c1", name = "Alice"),
+                ContactEntity(id = "c2", name = "Bob"),
+            )
+        )
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val trust = viewModel.uiState.value.eventTrust
+        assertEquals(EventVerificationState.CONFLICT, trust["imported"]?.verification)
+        assertEquals(EventTrustConflictState.DATE_CONFLICT, trust["imported"]?.conflict)
+        assertEquals(EventVerificationState.CONFLICT, trust["manual_conflict"]?.verification)
+        assertEquals(EventTrustConflictState.DATE_CONFLICT, trust["manual_conflict"]?.conflict)
+        assertEquals(EventVerificationState.NEEDS_REVIEW, trust["low_confidence"]?.verification)
+        assertEquals(EventTrustConflictState.NONE, trust["low_confidence"]?.conflict)
+        assertEquals(62, trust["low_confidence"]?.confidenceScore)
     }
 
     @Test
@@ -82,7 +152,7 @@ class EventsViewModelTest {
         every { contactRepository.getAll() } returns MutableStateFlow(listOf(contact))
         coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.Saved(contact, event)
 
-        val viewModel = EventsViewModel(eventRepository, contactRepository, saveManualEventUseCase, activityLogRepository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
         viewModel.saveManualEvent("c1", null, "BIRTHDAY", null, 6, 5, null)
         advanceUntilIdle()
@@ -95,14 +165,16 @@ class EventsViewModelTest {
     fun `saveManualEvent invalid input exposes error`() = runTest(testDispatcher) {
         every { eventRepository.getAll() } returns MutableStateFlow(emptyList())
         every { contactRepository.getAll() } returns MutableStateFlow(emptyList())
-        coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.InvalidInput("Enter a valid date.")
+        coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.InvalidInput(
+            SaveManualEventUseCase.InvalidInputReason.INVALID_DATE,
+        )
 
-        val viewModel = EventsViewModel(eventRepository, contactRepository, saveManualEventUseCase, activityLogRepository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
         viewModel.saveManualEvent(null, "Bad Date", "BIRTHDAY", null, 2, 30, null)
         advanceUntilIdle()
 
-        assertEquals("Enter a valid date.", viewModel.uiState.value.error)
+        assertEquals(context.getString(R.string.events_error_invalid_date), viewModel.uiState.value.error)
         assertFalse(viewModel.uiState.value.isSavingManualEvent)
     }
 
@@ -121,7 +193,7 @@ class EventsViewModelTest {
         every { contactRepository.getAll() } returns MutableStateFlow(listOf(contact))
         coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.DuplicateFound(contact, event)
 
-        val viewModel = EventsViewModel(eventRepository, contactRepository, saveManualEventUseCase, activityLogRepository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
         viewModel.saveManualEvent("c1", null, "BIRTHDAY", null, 6, 5, null)
         advanceUntilIdle()
@@ -154,7 +226,7 @@ class EventsViewModelTest {
             requestedYear = null,
         )
 
-        val viewModel = EventsViewModel(eventRepository, contactRepository, saveManualEventUseCase, activityLogRepository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
         viewModel.saveManualEvent("c1", null, "BIRTHDAY", null, 7, 1, null)
         advanceUntilIdle()
@@ -185,7 +257,7 @@ class EventsViewModelTest {
         every { contactRepository.getAll() } returns MutableStateFlow(listOf(contact))
         coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.Saved(contact, event)
 
-        val viewModel = EventsViewModel(eventRepository, contactRepository, saveManualEventUseCase, activityLogRepository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
         viewModel.saveManualEvent("c1", null, "BIRTHDAY", null, 6, 5, null, allowDuplicate = true)
         advanceUntilIdle()
@@ -194,6 +266,44 @@ class EventsViewModelTest {
             saveManualEventUseCase(match { it.allowDuplicate })
         }
         assertTrue(viewModel.uiState.value.saveMessage?.contains("Alice") == true)
+    }
+
+    @Test
+    fun `resolveEventConflict keep separate delegates to use case and exposes feedback`() = runTest(testDispatcher) {
+        val event = EventEntity(
+            id = "manual",
+            contactId = "c1",
+            type = "BIRTHDAY",
+            dayOfMonth = 5,
+            month = 6,
+            nextOccurrenceMs = 100L,
+        )
+        every { eventRepository.getAll() } returns MutableStateFlow(emptyList())
+        every { contactRepository.getAll() } returns MutableStateFlow(emptyList())
+        coEvery { resolveEventConflictUseCase(any()) } returns ResolveEventConflictUseCase.Outcome.Resolved(
+            keptEvent = event,
+            affectedEventIds = listOf("imported", "manual"),
+            action = ResolveEventConflictUseCase.Action.KEEP_SEPARATE,
+        )
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+        viewModel.resolveEventConflict(event.id, EventResolutionAction.KEEP_SEPARATE)
+        advanceUntilIdle()
+
+        coVerify {
+            resolveEventConflictUseCase(
+                match {
+                    it.eventId == event.id &&
+                        it.action == ResolveEventConflictUseCase.Action.KEEP_SEPARATE
+                }
+            )
+        }
+        coVerify {
+            activityLogRepository.record(match { it.type == "EVENT" && it.eventId == event.id })
+        }
+        assertNull(viewModel.uiState.value.resolvingEventId)
+        assertTrue(viewModel.uiState.value.saveMessage?.contains("separate", ignoreCase = true) == true)
     }
 
     @Test
@@ -224,7 +334,7 @@ class EventsViewModelTest {
         every { eventRepository.getAll() } returns MutableStateFlow(events)
         every { contactRepository.getAll() } returns MutableStateFlow(contacts)
 
-        val viewModel = EventsViewModel(eventRepository, contactRepository, saveManualEventUseCase, activityLogRepository)
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         viewModel.selectHorizonFilter(EventHorizonFilter.NEXT_7_DAYS)
@@ -237,5 +347,16 @@ class EventsViewModelTest {
         viewModel.selectTypeFilter(EventTypeFilter.ALL)
         viewModel.updateSearchQuery("alice")
         assertEquals(listOf("e1"), viewModel.uiState.value.events.map { it.id })
+    }
+
+    private fun newViewModel(): EventsViewModel {
+        return EventsViewModel(
+            appContext = context,
+            eventRepository = eventRepository,
+            contactRepository = contactRepository,
+            saveManualEventUseCase = saveManualEventUseCase,
+            resolveEventConflictUseCase = resolveEventConflictUseCase,
+            activityLogRepository = activityLogRepository,
+        )
     }
 }

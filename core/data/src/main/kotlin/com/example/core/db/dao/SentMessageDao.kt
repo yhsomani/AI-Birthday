@@ -39,6 +39,9 @@ interface SentMessageDao {
     @Query("SELECT * FROM sent_messages")
     suspend fun getAllSync(): List<SentMessageEntity>
 
+    @Query("DELETE FROM sent_messages")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM sent_messages WHERE sentAtMs >= :yearStartMs ORDER BY sentAtMs ASC")
     suspend fun getSentSinceYearStart(yearStartMs: Long): List<SentMessageEntity>
 

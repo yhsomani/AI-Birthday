@@ -1,11 +1,15 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.PendingMessageEntity
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.SchedulerService
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -19,6 +23,7 @@ class ApprovePendingMessageUseCaseTest {
 
     @Test
     fun `invoke with valid pendingMessageId updates status to APPROVED`() = runTest {
+        val inserted = slot<PendingMessageEntity>()
         val pendingMsg = PendingMessageEntity(
             id = "msg_1",
             contactId = "contact_1",
@@ -26,8 +31,8 @@ class ApprovePendingMessageUseCaseTest {
             shortVariant = "", standardVariant = "hi", longVariant = "",
             formalVariant = "", funnyVariant = "", emotionalVariant = "",
             selectedVariant = "standard", selectedVariantText = "hi",
-            channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL",
-            status = "PENDING"
+            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "MANUAL",
+            status = MessageStatus.PENDING.raw
         )
         coEvery { messageRepository.getPendingById("msg_1") } returns pendingMsg
 
@@ -36,8 +41,9 @@ class ApprovePendingMessageUseCaseTest {
         assertTrue(result is ApprovePendingMessageUseCase.ApprovalOutcome.Approved)
         val approved = result as ApprovePendingMessageUseCase.ApprovalOutcome.Approved
         assertEquals("msg_1", approved.id)
-        assertEquals("MANUAL", approved.approvalMode)
-        coVerify { messageRepository.insertPending(any()) }
+        assertEquals(ApprovalMode.UNKNOWN, approved.approvalMode)
+        coVerify { messageRepository.insertPending(capture(inserted)) }
+        assertEquals(MessageStatus.APPROVED.raw, inserted.captured.status)
         coVerify { schedulerService.scheduleExactSend("msg_1") }
     }
 
@@ -50,8 +56,8 @@ class ApprovePendingMessageUseCaseTest {
             shortVariant = "", standardVariant = "hi", longVariant = "",
             formalVariant = "", funnyVariant = "", emotionalVariant = "",
             selectedVariant = "standard", selectedVariantText = "hi",
-            channel = "SMS", scheduledForMs = 0, approvalMode = "FULLY_AUTO",
-            status = "PENDING"
+            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "FULLY_AUTO",
+            status = MessageStatus.PENDING.raw
         )
         coEvery { messageRepository.getPendingById("msg_1") } returns pendingMsg
 

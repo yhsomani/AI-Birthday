@@ -1,5 +1,7 @@
 package com.example.domain.service
 
+import com.example.domain.model.ApprovalMode
+
 interface PreferencesRepository {
     fun setGoogleOAuthToken(token: String)
     fun getGoogleOAuthToken(): String
@@ -13,8 +15,8 @@ interface PreferencesRepository {
     fun setSenderEmailPassword(pw: String)
     fun getSenderEmailPassword(): String
 
-    fun setGlobalAutomationMode(mode: String)
-    fun getGlobalAutomationMode(): String
+    fun setGlobalAutomationMode(mode: ApprovalMode)
+    fun getGlobalAutomationMode(): ApprovalMode
 
     fun setThemeMode(mode: String)
     fun getThemeMode(): String
@@ -53,6 +55,8 @@ interface PreferencesRepository {
 
     fun setLastSyncError(error: String?)
     fun getLastSyncError(): String?
+
+    fun getLastBackupMs(): Long
 
     fun clearAll()
 }

@@ -6,8 +6,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
@@ -15,7 +17,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.MessageChannel
 import com.example.ui.viewmodel.ReviewNextTarget
+import com.example.ui.viewmodel.WishDraftReadiness
+import com.example.ui.viewmodel.WishPreviewSendSummary
 import com.example.ui.viewmodel.WhySignal
 import com.example.ui.viewmodel.WishPreviewUiState
 import org.junit.Assert.assertEquals
@@ -45,7 +50,7 @@ class WishPreviewScreenInteractionTest {
             },
             onEditedTextChange = {
                 actions += "edit:$it"
-                state = state.copy(editedText = it)
+                state = state.copy(editedText = it, draftReadiness = WishDraftReadiness.EDITED_READY)
             },
             onFeedbackSelected = {
                 actions += "feedback:$it"
@@ -64,9 +69,18 @@ class WishPreviewScreenInteractionTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.onNodeWithTag(WishPreviewTestTags.MESSAGE_FIELD)
+            .performScrollTo()
             .assertIsDisplayed()
             .performTextReplacement("Custom birthday draft")
+        composeRule.onNodeWithTag(WishPreviewTestTags.DRAFT_READINESS)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Edited draft will be saved when approved.")
+            .assertIsDisplayed()
         composeRule.onNodeWithTag(WishPreviewTestTags.WHY_PANEL)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(WishPreviewTestTags.SEND_SUMMARY)
             .performScrollTo()
             .assertIsDisplayed()
         clickScrollableTag(WishPreviewTestTags.FEEDBACK_PREFIX + "too_generic")
@@ -88,6 +102,53 @@ class WishPreviewScreenInteractionTest {
             ),
             actions,
         )
+    }
+
+    @Test
+    fun sendSummary_rendersApprovalPlanBeforeActions() {
+        composeRule.setWishPreviewContent(
+            state = {
+                wishState().copy(
+                    sendSummary = WishPreviewSendSummary(
+                        eventType = "ANNIVERSARY",
+                        channel = " ${MessageChannel.EMAIL.raw.lowercase()} ",
+                        scheduledForMs = 1_800_000_000_000L,
+                        approvalMode = "SMART_APPROVE",
+                        usesFallback = true,
+                    ),
+                )
+            },
+        )
+
+        composeRule.onNodeWithTag(WishPreviewTestTags.SEND_SUMMARY)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Approval plan").assertIsDisplayed()
+        composeRule.onNodeWithText("Anniversary").assertIsDisplayed()
+        composeRule.onNodeWithText("Email").assertIsDisplayed()
+        composeRule.onNodeWithText("Smart Approve (default)").assertIsDisplayed()
+        composeRule.onNodeWithText("Template fallback").assertIsDisplayed()
+    }
+
+    @Test
+    fun blankDraftReadinessDisablesApprovalAction() {
+        composeRule.setWishPreviewContent(
+            state = {
+                wishState().copy(
+                    editedText = "",
+                    draftReadiness = WishDraftReadiness.BLANK,
+                )
+            },
+        )
+
+        composeRule.onNodeWithTag(WishPreviewTestTags.DRAFT_READINESS)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Write a message before approval.")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(WishPreviewTestTags.APPROVE_BUTTON)
+            .performScrollTo()
+            .assertIsNotEnabled()
     }
 
     @Test
@@ -187,6 +248,14 @@ class WishPreviewScreenInteractionTest {
             WhySignal(R.string.wish_why_relationship, "FRIEND"),
             WhySignal(R.string.wish_why_language, "en"),
         ),
+        sendSummary = WishPreviewSendSummary(
+            eventType = "BIRTHDAY",
+            channel = MessageChannel.SMS.raw,
+            scheduledForMs = 1_800_000_000_000L,
+            approvalMode = "VIP_APPROVE",
+            usesFallback = false,
+        ),
+        draftReadiness = WishDraftReadiness.READY,
     )
 
     private fun pendingMessage() = PendingMessageEntity(
@@ -201,7 +270,7 @@ class WishPreviewScreenInteractionTest {
         emotionalVariant = "Emotional birthday draft",
         selectedVariant = "standard",
         selectedVariantText = "Standard birthday draft",
-        channel = "SMS",
+        channel = MessageChannel.SMS.raw,
         scheduledForMs = 1_800_000_000_000L,
         approvalMode = "VIP_APPROVE",
         status = "PENDING",

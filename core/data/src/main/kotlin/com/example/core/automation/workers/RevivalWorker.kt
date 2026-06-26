@@ -22,6 +22,7 @@ import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.domain.automation.RevivalCadencePolicy
 import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageStatus
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.Calendar
@@ -100,8 +101,8 @@ class RevivalWorker @AssistedInject constructor(
                 )
                 val requestedApprovalMode = ApprovalModeResolver.resolve(
                     relationship = contact.relationshipType,
-                    contactOverride = contact.automationMode,
-                    globalMode = prefs.getGlobalAutomationMode(),
+                    contactOverride = ApprovalMode.fromRaw(contact.automationMode),
+                    globalMode = prefs.getGlobalApprovalMode(),
                 )
                 val qualityDecision = AiAutoSendQualityGate.evaluate(
                     requestedMode = requestedApprovalMode,
@@ -122,6 +123,12 @@ class RevivalWorker @AssistedInject constructor(
                     ApprovalMode.ALWAYS_ASK
                 }
 
+                val status = if (approvalMode == ApprovalMode.FULLY_AUTO) {
+                    MessageStatus.APPROVED
+                } else {
+                    MessageStatus.PENDING
+                }
+
                 val pendingMsg = PendingMessageEntity(
                     id = UUID.randomUUID().toString(),
                     contactId = contact.id,
@@ -134,10 +141,10 @@ class RevivalWorker @AssistedInject constructor(
                     emotionalVariant = suggestion.text,
                     selectedVariant = "standard",
                     selectedVariantText = suggestion.text,
-                    channel = channelSelection.channel,
+                    channel = channelSelection.channel.raw,
                     scheduledForMs = scheduledMs,
                     approvalMode = approvalMode.raw,
-                    status = if (approvalMode.raw == "FULLY_AUTO") "APPROVED" else "PENDING",
+                    status = status.raw,
                     qualityScore = qualityDecision.qualityScore,
                     scheduledYear = scheduledYear,
                     isUsingFallback = suggestion.isFallback,

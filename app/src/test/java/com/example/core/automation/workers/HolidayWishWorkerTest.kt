@@ -17,6 +17,9 @@ import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.gemini.GeminiClient
 import com.example.core.gemini.RateLimiter
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import io.mockk.Runs
@@ -67,7 +70,7 @@ class HolidayWishWorkerTest {
 
         every { prefs.getGeminiApiKey() } returns "test_api_key"
         every { prefs.isAiWishGenerationEnabled() } returns true
-        every { prefs.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        every { prefs.getGlobalApprovalMode() } returns ApprovalMode.SMART_APPROVE
         every { prefs.getQuietHoursStart() } returns 0
         every { prefs.getQuietHoursEnd() } returns 0
         every { prefs.getBlackoutDates() } returns "[]"
@@ -99,7 +102,7 @@ class HolidayWishWorkerTest {
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("HOLIDAY_NEW_YEAR_c1_2027", pendingSlot.captured.eventId)
         assertEquals("FULLY_AUTO", pendingSlot.captured.approvalMode)
-        assertEquals("APPROVED", pendingSlot.captured.status)
+        assertEquals(MessageStatus.APPROVED.raw, pendingSlot.captured.status)
         assertEquals(100, pendingSlot.captured.qualityScore)
         assertEquals(2027, pendingSlot.captured.scheduledYear)
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
@@ -120,7 +123,7 @@ class HolidayWishWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
-        assertEquals("PENDING", pendingSlot.captured.status)
+        assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertEquals(true, pendingSlot.captured.isUsingFallback)
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
@@ -141,8 +144,8 @@ class HolidayWishWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
-        assertEquals("PENDING", pendingSlot.captured.status)
-        assertEquals("SMS", pendingSlot.captured.channel)
+        assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
+        assertEquals(MessageChannel.SMS.raw, pendingSlot.captured.channel)
         verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
         verify { NotificationHelper.showApprovalNotification(any(), contact, any(), any(), pendingSlot.captured.id) }
     }
@@ -160,7 +163,7 @@ class HolidayWishWorkerTest {
             formalVariant = "Already queued",
             funnyVariant = "Already queued",
             emotionalVariant = "Already queued",
-            channel = "SMS",
+            channel = MessageChannel.SMS.raw,
             scheduledForMs = nowMs,
             approvalMode = "SMART_APPROVE",
         )
@@ -207,7 +210,7 @@ class HolidayWishWorkerTest {
             name = "Amit Shah",
             relationshipType = "FRIEND",
             primaryPhone = primaryPhone,
-            preferredChannel = "SMS",
+            preferredChannel = MessageChannel.SMS.raw,
             automationMode = automationMode,
             interestsJson = "[\"cricket\",\"coffee\"]",
         )

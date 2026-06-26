@@ -84,6 +84,8 @@ import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
 import com.example.ui.feedback.asString
 import com.example.ui.viewmodel.SettingsViewModel
 
@@ -380,10 +382,10 @@ fun SettingsScreen(
                             onDismissRequest = { showModeMenu = false },
                         ) {
                             listOf(
-                                "FULLY_AUTO" to stringResource(R.string.automation_mode_fully_auto),
-                                "SMART_APPROVE" to stringResource(R.string.automation_mode_smart_approve_default),
-                                "VIP_APPROVE" to stringResource(R.string.automation_mode_vip_approve),
-                                "ALWAYS_ASK" to stringResource(R.string.automation_mode_always_ask),
+                                ApprovalMode.FULLY_AUTO to stringResource(R.string.automation_mode_fully_auto),
+                                ApprovalMode.SMART_APPROVE to stringResource(R.string.automation_mode_smart_approve_default),
+                                ApprovalMode.VIP_APPROVE to stringResource(R.string.automation_mode_vip_approve),
+                                ApprovalMode.ALWAYS_ASK to stringResource(R.string.automation_mode_always_ask),
                             ).forEach { (mode, label) ->
                                 DropdownMenuItem(
                                     text = { Text(label) },
@@ -408,9 +410,9 @@ fun SettingsScreen(
                         smsDisabled = state.channelBlackoutSms,
                         whatsAppDisabled = state.channelBlackoutWhatsApp,
                         emailDisabled = state.channelBlackoutEmail,
-                        onSmsChange = { viewModel.toggleChannelBlackout("SMS", it) },
-                        onWhatsAppChange = { viewModel.toggleChannelBlackout("WHATSAPP", it) },
-                        onEmailChange = { viewModel.toggleChannelBlackout("EMAIL", it) },
+                        onSmsChange = { viewModel.toggleChannelBlackout(MessageChannel.SMS, it) },
+                        onWhatsAppChange = { viewModel.toggleChannelBlackout(MessageChannel.WHATSAPP, it) },
+                        onEmailChange = { viewModel.toggleChannelBlackout(MessageChannel.EMAIL, it) },
                     )
                 }
             }
@@ -676,13 +678,14 @@ private fun ChannelBlackoutRow(
 }
 
 @Composable
-private fun String.automationModeLabel(): String {
+private fun ApprovalMode.automationModeLabel(): String {
     return when (this) {
-        "FULLY_AUTO" -> stringResource(R.string.automation_mode_fully_auto)
-        "SMART_APPROVE" -> stringResource(R.string.automation_mode_smart_approve_default)
-        "VIP_APPROVE" -> stringResource(R.string.automation_mode_vip_approve)
-        "ALWAYS_ASK" -> stringResource(R.string.automation_mode_always_ask)
-        else -> replace("_", " ")
+        ApprovalMode.FULLY_AUTO -> stringResource(R.string.automation_mode_fully_auto)
+        ApprovalMode.SMART_APPROVE -> stringResource(R.string.automation_mode_smart_approve_default)
+        ApprovalMode.VIP_APPROVE -> stringResource(R.string.automation_mode_vip_approve)
+        ApprovalMode.ALWAYS_ASK -> stringResource(R.string.automation_mode_always_ask)
+        ApprovalMode.DEFAULT,
+        ApprovalMode.UNKNOWN -> stringResource(R.string.automation_mode_default)
     }
 }
 

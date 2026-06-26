@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.domain.model.MessageStatus
 
 @Entity(
     tableName = "pending_messages",
@@ -36,7 +37,7 @@ data class PendingMessageEntity(
     val channel: String,
     val scheduledForMs: Long,
     val approvalMode: String,
-    val status: String = "PENDING",
+    val status: String = MessageStatus.PENDING.raw,
     val aiModel: String = "flash",
     val generatedAtMs: Long = System.currentTimeMillis(),
     val editedByUser: Boolean = false,

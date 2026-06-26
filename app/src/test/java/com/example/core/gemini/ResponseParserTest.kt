@@ -1,5 +1,7 @@
 package com.example.core.gemini
 
+import com.example.core.resilience.LogLevel
+import com.example.core.resilience.StructuredLogger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -18,8 +20,8 @@ class ResponseParserTest {
     fun `parseContactClassification returns expected fields`() {
         val json = """
             {
-                "type": "FRIEND",
-                "subtype": "CLOSE",
+                "relationship_type": "FRIEND",
+                "relationship_subtype": "CLOSE",
                 "confidence": 0.95,
                 "language": "en",
                 "formality": "CASUAL",
@@ -35,6 +37,72 @@ class ResponseParserTest {
         assertEquals("en", result.language)
         assertEquals("CASUAL", result.formality)
         assertEquals("WARM", result.communicationStyle)
+    }
+
+    @Test
+    fun `parseContactClassification normalizes canonical enum fields`() {
+        val json = """
+            {
+                "relationship_type": "best friend",
+                "confidence": 0.88,
+                "language": "HI",
+                "formality": "semi-formal",
+                "communication_style": "professional"
+            }
+        """.trimIndent()
+
+        val result = ResponseParser.parseContactClassification(json)
+
+        assertEquals("BEST_FRIEND", result.type)
+        assertEquals(0.88, result.confidence, 0.001)
+        assertEquals("hi", result.language)
+        assertEquals("SEMI_FORMAL", result.formality)
+        assertEquals("PROFESSIONAL", result.communicationStyle)
+    }
+
+    @Test
+    fun `parseContactClassification accepts legacy type and communication style fields`() {
+        val json = """
+            {
+                "type": "colleague",
+                "subtype": "school",
+                "communicationStyle": "funny"
+            }
+        """.trimIndent()
+
+        val result = ResponseParser.parseContactClassification(json)
+
+        assertEquals("COLLEAGUE", result.type)
+        assertEquals("school", result.subtype)
+        assertEquals("FUNNY", result.communicationStyle)
+    }
+
+    @Test
+    fun `parseContactClassification defaults missing style with telemetry`() {
+        StructuredLogger.clearForTests()
+        val json = """{"relationship_type": "FRIEND"}""".trimIndent()
+
+        val result = ResponseParser.parseContactClassification(json)
+
+        assertEquals("WARM", result.communicationStyle)
+        val entry = StructuredLogger.getRecent(1).single()
+        assertEquals(LogLevel.INFO, entry.level)
+        assertEquals("Classification response missing communication style; using default", entry.message)
+        assertEquals("WARM", entry.extras["default"])
+    }
+
+    @Test
+    fun `parseContactClassification defaults unsupported style with telemetry`() {
+        StructuredLogger.clearForTests()
+        val json = """{"relationship_type": "FRIEND", "communication_style": "EXPRESSIVE"}""".trimIndent()
+
+        val result = ResponseParser.parseContactClassification(json)
+
+        assertEquals("WARM", result.communicationStyle)
+        val entry = StructuredLogger.getRecent(1).single()
+        assertEquals(LogLevel.WARN, entry.level)
+        assertEquals("Classification response had unsupported communication style; using default", entry.message)
+        assertEquals("WARM", entry.extras["default"])
     }
 
     @Test
@@ -102,6 +170,8 @@ class ResponseParserTest {
         assertEquals("You're not old!", variants.funny)
         assertEquals("You mean so much to me", variants.emotional)
         assertEquals("standard", variants.recommended)
+        assertEquals(MessageVariantParseStatus.SUCCESS, variants.parseMetadata.status)
+        assertEquals(MessageVariantFallbackReason.NONE, variants.parseMetadata.fallbackReason)
     }
 
     @Test
@@ -111,6 +181,8 @@ class ResponseParserTest {
         assertEquals("Wishing you a very happy birthday! Hope you have a wonderful day!", variants.short)
         assertEquals("standard", variants.recommended)
         assertTrue(variants.isUsingFallback)
+        assertEquals(MessageVariantParseStatus.FALLBACK, variants.parseMetadata.status)
+        assertEquals(MessageVariantFallbackReason.MALFORMED_JSON, variants.parseMetadata.fallbackReason)
     }
 
     @Test
@@ -194,6 +266,7 @@ class ResponseParserTest {
         assertEquals("standard", variants.recommended)
         assertTrue(variants.isUsingFallback)
         assertEquals("Wishing you a very happy birthday! Hope you have a wonderful day!", variants.standard)
+        assertEquals(MessageVariantFallbackReason.ERROR_PAYLOAD, variants.parseMetadata.fallbackReason)
     }
 
     @Test
@@ -253,5 +326,7 @@ class ResponseParserTest {
         assertEquals("hello", variants.funny)
         assertEquals("hello", variants.emotional)
         assertEquals("standard", variants.recommended)
+        assertEquals(MessageVariantParseStatus.FALLBACK, variants.parseMetadata.status)
+        assertEquals(MessageVariantFallbackReason.MALFORMED_JSON, variants.parseMetadata.fallbackReason)
     }
 }

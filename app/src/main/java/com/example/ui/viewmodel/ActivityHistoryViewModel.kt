@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.core.db.entities.ActivityLogEntity
+import com.example.domain.model.ActivityLogStatus
+import com.example.domain.model.ActivityLogType
 import com.example.domain.repository.ActivityLogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,12 +17,14 @@ import javax.inject.Inject
 
 enum class ActivityLogTypeFilter {
     ALL,
+    DISPATCH,
+    AI,
+    SYNC,
+    BACKUP,
+    SETTINGS,
     MESSAGE,
     EVENT,
-    SYNC,
     ANALYTICS,
-    SETTINGS,
-    AI,
 }
 
 enum class ActivityLogDateFilter {
@@ -97,12 +101,11 @@ class ActivityHistoryViewModel @Inject constructor(
         val filtered = allEntries
             .asSequence()
             .filter { entry ->
-                selectedTypeFilter == ActivityLogTypeFilter.ALL ||
-                    entry.type.equals(selectedTypeFilter.name, ignoreCase = true)
+                selectedTypeFilter.matches(entry)
             }
             .filter { entry ->
                 selectedStatusFilter == ActivityLogStatusFilter.ALL ||
-                    entry.status.equals(selectedStatusFilter.name, ignoreCase = true)
+                    ActivityLogStatus.fromRaw(entry.status).raw == selectedStatusFilter.name
             }
             .filter { entry -> cutoffMs == null || entry.createdAtMs >= cutoffMs }
             .filter { entry ->
@@ -117,6 +120,26 @@ class ActivityHistoryViewModel @Inject constructor(
             .sortedByDescending { it.createdAtMs }
             .toList()
         return copy(entries = filtered)
+    }
+
+    private fun ActivityLogTypeFilter.matches(entry: ActivityLogEntity): Boolean {
+        if (this == ActivityLogTypeFilter.ALL) return true
+        val type = ActivityLogType.fromRaw(entry.type)
+        return when (this) {
+            ActivityLogTypeFilter.ALL -> true
+            ActivityLogTypeFilter.DISPATCH -> type == ActivityLogType.DISPATCH ||
+                (type == ActivityLogType.MESSAGE && entry.metadataJson.contains("\"decision\"", ignoreCase = true))
+            ActivityLogTypeFilter.BACKUP -> type == ActivityLogType.BACKUP ||
+                entry.title.containsBackupKeyword() ||
+                entry.detail.containsBackupKeyword() ||
+                entry.actionRoute.orEmpty().containsBackupKeyword()
+            else -> type.raw == name
+        }
+    }
+
+    private fun String.containsBackupKeyword(): Boolean {
+        return contains("backup", ignoreCase = true) ||
+            contains("restore", ignoreCase = true)
     }
 
     private fun ActivityLogDateFilter.cutoffMs(): Long? {

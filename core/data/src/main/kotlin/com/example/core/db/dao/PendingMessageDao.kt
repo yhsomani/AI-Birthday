@@ -46,6 +46,9 @@ interface PendingMessageDao {
     @Query("SELECT * FROM pending_messages")
     suspend fun getAllSync(): List<PendingMessageEntity>
 
+    @Query("DELETE FROM pending_messages")
+    suspend fun deleteAll()
+
     @Query("UPDATE pending_messages SET isUsingFallback = :isUsingFallback WHERE id = :messageId")
     suspend fun setFallbackFlag(messageId: String, isUsingFallback: Boolean)
 

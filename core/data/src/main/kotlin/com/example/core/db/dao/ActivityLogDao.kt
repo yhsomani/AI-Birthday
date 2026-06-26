@@ -31,6 +31,12 @@ interface ActivityLogDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entry: ActivityLogEntity)
 
+    @Query("SELECT * FROM activity_logs ORDER BY createdAtMs DESC")
+    suspend fun getAllSync(): List<ActivityLogEntity>
+
+    @Query("DELETE FROM activity_logs")
+    suspend fun deleteAll()
+
     @Query("DELETE FROM activity_logs WHERE createdAtMs < :cutoffMs")
     suspend fun deleteOlderThan(cutoffMs: Long)
 }

@@ -3,6 +3,7 @@ package com.example.ui.screens.chat
 import androidx.lifecycle.SavedStateHandle
 import com.example.R
 import com.example.core.db.entities.SentMessageEntity
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.MessageRepository
 import io.mockk.coEvery
 import io.mockk.impl.annotations.RelaxedMockK
@@ -78,7 +79,7 @@ class ChatHistoryViewModelTest {
         eventType = "BIRTHDAY",
         eventYear = 2026,
         messageText = "Happy birthday!",
-        channel = "WHATSAPP",
+        channel = MessageChannel.WHATSAPP.raw,
         sentAtMs = 1_700_000_000_000L,
         deliveryStatus = "SENT",
     )

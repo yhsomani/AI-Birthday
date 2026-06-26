@@ -5,18 +5,17 @@ import com.example.domain.model.ApprovalMode
 object ApprovalModeResolver {
     fun resolve(
         relationship: String?,
-        contactOverride: String?,
-        globalMode: String?,
+        contactOverride: ApprovalMode,
+        globalMode: ApprovalMode,
         skipAutoWish: Boolean = false,
     ): ApprovalMode {
         if (skipAutoWish) return ApprovalMode.ALWAYS_ASK
 
-        val overrideMode = ApprovalMode.fromRaw(contactOverride)
-        if (overrideMode.isExplicitAutomationMode()) {
-            return overrideMode
+        if (contactOverride.isExplicitAutomationMode()) {
+            return contactOverride
         }
 
-        val global = ApprovalMode.fromRaw(globalMode)
+        val global = globalMode
             .takeIf { it.isExplicitAutomationMode() }
             ?: ApprovalMode.SMART_APPROVE
 

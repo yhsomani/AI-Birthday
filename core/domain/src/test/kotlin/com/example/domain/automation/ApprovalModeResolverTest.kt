@@ -12,19 +12,19 @@ class ApprovalModeResolverTest {
     fun `resolve uses explicit contact override before global mode`() {
         val result = ApprovalModeResolver.resolve(
             relationship = "FRIEND",
-            contactOverride = "FULLY_AUTO",
-            globalMode = "ALWAYS_ASK",
+            contactOverride = ApprovalMode.FULLY_AUTO,
+            globalMode = ApprovalMode.ALWAYS_ASK,
         )
 
         assertEquals(ApprovalMode.FULLY_AUTO, result)
     }
 
     @Test
-    fun `resolve falls back from invalid legacy modes to smart approve`() {
+    fun `resolve falls back from unknown modes to smart approve`() {
         val result = ApprovalModeResolver.resolve(
             relationship = "FRIEND",
-            contactOverride = "MANUAL",
-            globalMode = "MANUAL",
+            contactOverride = ApprovalMode.UNKNOWN,
+            globalMode = ApprovalMode.UNKNOWN,
         )
 
         assertEquals(ApprovalMode.SMART_APPROVE, result)
@@ -34,8 +34,8 @@ class ApprovalModeResolverTest {
     fun `resolve protects family contacts from global fully auto`() {
         val result = ApprovalModeResolver.resolve(
             relationship = "FAMILY",
-            contactOverride = "DEFAULT",
-            globalMode = "FULLY_AUTO",
+            contactOverride = ApprovalMode.DEFAULT,
+            globalMode = ApprovalMode.FULLY_AUTO,
         )
 
         assertEquals(ApprovalMode.VIP_APPROVE, result)
@@ -45,13 +45,13 @@ class ApprovalModeResolverTest {
     fun `resolve keeps close contacts in reviewable smart approval unless global always asks`() {
         val smartResult = ApprovalModeResolver.resolve(
             relationship = "CLOSE_FRIEND",
-            contactOverride = "DEFAULT",
-            globalMode = "FULLY_AUTO",
+            contactOverride = ApprovalMode.DEFAULT,
+            globalMode = ApprovalMode.FULLY_AUTO,
         )
         val alwaysAskResult = ApprovalModeResolver.resolve(
             relationship = "RELATIVE",
-            contactOverride = "DEFAULT",
-            globalMode = "ALWAYS_ASK",
+            contactOverride = ApprovalMode.DEFAULT,
+            globalMode = ApprovalMode.ALWAYS_ASK,
         )
 
         assertEquals(ApprovalMode.SMART_APPROVE, smartResult)
@@ -62,8 +62,8 @@ class ApprovalModeResolverTest {
     fun `resolve forces manual approval when contact skipped automatic wishes`() {
         val result = ApprovalModeResolver.resolve(
             relationship = "FRIEND",
-            contactOverride = "FULLY_AUTO",
-            globalMode = "FULLY_AUTO",
+            contactOverride = ApprovalMode.FULLY_AUTO,
+            globalMode = ApprovalMode.FULLY_AUTO,
             skipAutoWish = true,
         )
 

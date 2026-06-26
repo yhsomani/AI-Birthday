@@ -15,6 +15,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.MessageChannel
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -99,7 +100,7 @@ class ChatHistoryScreenInteractionTest {
         eventType = "BIRTHDAY",
         eventYear = 2026,
         messageText = "Happy birthday!",
-        channel = "WHATSAPP",
+        channel = MessageChannel.WHATSAPP.raw,
         sentAtMs = 1_700_000_000_000L,
         deliveryStatus = "SENT",
     )

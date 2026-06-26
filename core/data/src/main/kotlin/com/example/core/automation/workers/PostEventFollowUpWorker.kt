@@ -25,6 +25,8 @@ import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.domain.model.ApprovalMode
+import com.example.domain.model.EventType
+import com.example.domain.model.MessageStatus
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.Calendar
@@ -95,8 +97,8 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                     val suggestion = sanitizeSuggestion(gemini.generate(prompt), contact.name)
                     val requestedApprovalMode = ApprovalModeResolver.resolve(
                         relationship = contact.relationshipType,
-                        contactOverride = contact.automationMode,
-                        globalMode = prefs.getGlobalAutomationMode(),
+                        contactOverride = ApprovalMode.fromRaw(contact.automationMode),
+                        globalMode = prefs.getGlobalApprovalMode(),
                     )
                     val qualityDecision = AiAutoSendQualityGate.evaluate(
                         requestedMode = requestedApprovalMode,
@@ -124,6 +126,12 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                         ApprovalMode.ALWAYS_ASK
                     }
 
+                    val status = if (approvalMode == ApprovalMode.FULLY_AUTO) {
+                        MessageStatus.APPROVED
+                    } else {
+                        MessageStatus.PENDING
+                    }
+
                     val pending = PendingMessageEntity(
                         id = UUID.randomUUID().toString(),
                         contactId = contact.id,
@@ -136,10 +144,10 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                         emotionalVariant = suggestion.text,
                         selectedVariant = "standard",
                         selectedVariantText = suggestion.text,
-                        channel = channelSelection.channel,
+                        channel = channelSelection.channel.raw,
                         scheduledForMs = scheduledMs,
                         approvalMode = approvalMode.raw,
-                        status = if (approvalMode.raw == "FULLY_AUTO") "APPROVED" else "PENDING",
+                        status = status.raw,
                         qualityScore = qualityDecision.qualityScore,
                         scheduledYear = Calendar.getInstance().get(Calendar.YEAR),
                         isUsingFallback = suggestion.isFallback,
@@ -202,7 +210,7 @@ class PostEventFollowUpWorker @AssistedInject constructor(
         return EventEntity(
             id = eventId,
             contactId = contact.id,
-            type = "FOLLOW_UP",
+            type = EventType.FOLLOW_UP.raw,
             label = "Follow-up",
             dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH),
             month = calendar.get(Calendar.MONTH) + 1,

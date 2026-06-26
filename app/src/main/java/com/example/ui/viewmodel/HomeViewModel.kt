@@ -1,15 +1,20 @@
 package com.example.ui.viewmodel
 
+import android.content.Context
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.example.core.auth.AuthManager
 import com.example.core.db.entities.EventEntity
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.EventType
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.usecase.GetDashboardMetricsUseCase
 import com.example.domain.usecase.SyncContactsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +35,36 @@ data class RelationshipPlannerItem(
     val actionTarget: HomeActionTarget,
 )
 
+enum class BackupFreshnessStatus {
+    NEVER_BACKED_UP,
+    STALE,
+}
+
+data class BackupFreshnessPrompt(
+    val status: BackupFreshnessStatus,
+    val daysSinceBackup: Long? = null,
+)
+
+enum class HomeNextActionKind {
+    SYNC_CONTACTS,
+    FIX_CONTACT_SYNC,
+    CONNECT_AI,
+    ENABLE_AI_GENERATION,
+    REVIEW_PENDING,
+    CREATE_BACKUP,
+    REFRESH_BACKUP,
+    RECONNECT_CONTACT,
+}
+
+data class HomeNextAction(
+    val kind: HomeNextActionKind,
+    val actionTarget: HomeActionTarget,
+    val count: Int = 0,
+    val daysSinceBackup: Long? = null,
+    val contactName: String? = null,
+    val healthScore: Int? = null,
+)
+
 sealed interface HomeActionTarget {
     data object AutomationSetup : HomeActionTarget
     data object BackupRestore : HomeActionTarget
@@ -38,7 +73,7 @@ sealed interface HomeActionTarget {
 }
 
 data class HomeUiState(
-    val userName: String = "User",
+    val userName: String = "",
     val userEmail: String = "",
     val userPhotoUrl: String? = null,
     val healthScore: Int = 0,
@@ -54,10 +89,14 @@ data class HomeUiState(
     val readinessAction: HomeActionTarget? = null,
     val setupProgress: SetupProgressSummary = SetupProgressSummary(),
     val plannerItems: List<RelationshipPlannerItem> = emptyList(),
+    val backupPrompt: BackupFreshnessPrompt? = null,
+    val primaryAction: HomeNextAction? = null,
+    val supportingActions: List<HomeNextAction> = emptyList(),
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    @param:ApplicationContext private val appContext: Context,
     private val getDashboardMetricsUseCase: GetDashboardMetricsUseCase,
     private val authManager: AuthManager,
     private val contactRepository: ContactRepository,
@@ -67,6 +106,8 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
     private companion object {
         const val TAG = "HomeViewModel"
+        const val STALE_BACKUP_DAYS = 30L
+        const val DAY_MS = 24L * 60 * 60 * 1000L
     }
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -102,7 +143,7 @@ class HomeViewModel @Inject constructor(
                 val events = eventRepository.getUpcoming(30)
                 val atRiskContacts = contactRepository.getBottomByHealthScore(3)
                     .filter { it.healthScore < 50 }
-                val birthdayEvents = events.filter { it.type == "BIRTHDAY" }
+                val birthdayEvents = events.filter { EventType.fromRaw(it.type) == EventType.BIRTHDAY }
                     .sortedBy { it.daysUntil }
                 val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
                 val birthdays = birthdayEvents.map { event ->
@@ -113,15 +154,27 @@ class HomeViewModel @Inject constructor(
                 }
                 val profile = authManager.userProfile.value
                 val freshError = preferencesRepository.getLastSyncError()
+                val aiGenerationEnabled = readBooleanPreference {
+                    preferencesRepository.isAiWishGenerationEnabled()
+                }
                 val hasAiAccess = readStringPreference { preferencesRepository.getGeminiApiKey() }.isNotBlank()
+                val lastBackupMs = readLongPreference { preferencesRepository.getLastBackupMs() }
                 val setupProgress = buildHomeSetupProgressSummary(
                     contactCount = metrics.contactCount,
                     syncError = freshError ?: lastError,
-                    aiGenerationEnabled = readBooleanPreference {
-                        preferencesRepository.isAiWishGenerationEnabled()
-                    },
+                    aiGenerationEnabled = aiGenerationEnabled,
                     hasAiAccess = hasAiAccess,
                     pendingCount = metrics.pendingCount,
+                )
+                val backupPrompt = buildBackupFreshnessPrompt(lastBackupMs)
+                val rankedActions = buildRankedNextActions(
+                    contactCount = metrics.contactCount,
+                    syncError = freshError ?: lastError,
+                    aiGenerationEnabled = aiGenerationEnabled,
+                    hasAiAccess = hasAiAccess,
+                    pendingCount = metrics.pendingCount,
+                    backupPrompt = backupPrompt,
+                    atRiskContacts = atRiskContacts,
                 )
                 _uiState.value = HomeUiState(
                     userName = profile.displayName,
@@ -133,10 +186,16 @@ class HomeViewModel @Inject constructor(
                     contactCount = metrics.contactCount,
                     sentCount = metrics.sentCount,
                     upcomingBirthdays = birthdays,
-                    plannerItems = buildPlannerItems(atRiskContacts, metrics.pendingCount, events),
+                    plannerItems = buildPlannerItems(
+                        atRiskContacts = atRiskContacts.drop(1),
+                        upcomingEvents = events,
+                    ),
                     isLoading = false,
                     syncError = freshError ?: lastError,
                     setupProgress = setupProgress,
+                    backupPrompt = backupPrompt,
+                    primaryAction = rankedActions.firstOrNull(),
+                    supportingActions = rankedActions.drop(1).take(3),
                 ).withReadiness()
             } catch (e: Exception) {
                 StructuredLogger.e(TAG, "Dashboard metrics load failed", e)
@@ -148,49 +207,126 @@ class HomeViewModel @Inject constructor(
 
     private fun buildPlannerItems(
         atRiskContacts: List<com.example.core.db.entities.ContactEntity>,
-        pendingCount: Int,
         upcomingEvents: List<EventEntity>,
     ): List<RelationshipPlannerItem> {
         val items = mutableListOf<RelationshipPlannerItem>()
-        if (pendingCount > 0) {
-            items += RelationshipPlannerItem(
-                title = "Review pending wishes",
-                detail = "$pendingCount approval(s) are waiting before send time.",
-                actionTarget = HomeActionTarget.Messages,
-            )
-        }
         atRiskContacts.forEach { contact ->
             items += RelationshipPlannerItem(
-                title = "Reconnect with ${contact.name}",
-                detail = "Relationship health is ${contact.healthScore}. Add a memory or generate a warm check-in.",
+                title = string(R.string.home_next_action_reconnect_title, contact.name),
+                detail = string(R.string.home_planner_reconnect_detail, contact.healthScore),
                 actionTarget = HomeActionTarget.ContactDetail(contact.id),
             )
         }
         upcomingEvents.take(2).forEach { event ->
             items += RelationshipPlannerItem(
-                title = event.label ?: event.type.replace("_", " "),
-                detail = "Upcoming in ${event.daysUntil} day(s). Check personalization before the wish is generated.",
+                title = event.label ?: event.type.toDisplayLabel(),
+                detail = string(R.string.home_planner_upcoming_detail, event.daysUntil),
                 actionTarget = HomeActionTarget.ContactDetail(event.contactId),
             )
         }
         return items.take(5)
     }
 
+    private fun buildBackupFreshnessPrompt(lastBackupMs: Long): BackupFreshnessPrompt? {
+        if (lastBackupMs <= 0L) {
+            return BackupFreshnessPrompt(status = BackupFreshnessStatus.NEVER_BACKED_UP)
+        }
+        val daysSinceBackup = ((System.currentTimeMillis() - lastBackupMs).coerceAtLeast(0L)) / DAY_MS
+        return if (daysSinceBackup >= STALE_BACKUP_DAYS) {
+            BackupFreshnessPrompt(
+                status = BackupFreshnessStatus.STALE,
+                daysSinceBackup = daysSinceBackup,
+            )
+        } else {
+            null
+        }
+    }
+
+    private fun buildRankedNextActions(
+        contactCount: Int,
+        syncError: String?,
+        aiGenerationEnabled: Boolean,
+        hasAiAccess: Boolean,
+        pendingCount: Int,
+        backupPrompt: BackupFreshnessPrompt?,
+        atRiskContacts: List<com.example.core.db.entities.ContactEntity>,
+    ): List<HomeNextAction> {
+        val rankedActions = mutableListOf<Pair<Int, HomeNextAction>>()
+        val contactSetupAction = when {
+            syncError != null -> HomeNextAction(
+                kind = HomeNextActionKind.FIX_CONTACT_SYNC,
+                actionTarget = HomeActionTarget.AutomationSetup,
+            )
+            contactCount == 0 -> HomeNextAction(
+                kind = HomeNextActionKind.SYNC_CONTACTS,
+                actionTarget = HomeActionTarget.AutomationSetup,
+            )
+            else -> null
+        }
+        contactSetupAction?.let { rankedActions += 100 to it }
+        if (pendingCount > 0) {
+            rankedActions += 90 to HomeNextAction(
+                kind = HomeNextActionKind.REVIEW_PENDING,
+                actionTarget = HomeActionTarget.Messages,
+                count = pendingCount,
+            )
+        }
+        if (!hasAiAccess) {
+            rankedActions += 80 to HomeNextAction(
+                kind = HomeNextActionKind.CONNECT_AI,
+                actionTarget = HomeActionTarget.AutomationSetup,
+            )
+        }
+        if (!aiGenerationEnabled) {
+            rankedActions += 75 to HomeNextAction(
+                kind = HomeNextActionKind.ENABLE_AI_GENERATION,
+                actionTarget = HomeActionTarget.AutomationSetup,
+            )
+        }
+        when (backupPrompt?.status) {
+            BackupFreshnessStatus.NEVER_BACKED_UP -> {
+                rankedActions += 70 to HomeNextAction(
+                    kind = HomeNextActionKind.CREATE_BACKUP,
+                    actionTarget = HomeActionTarget.BackupRestore,
+                )
+            }
+            BackupFreshnessStatus.STALE -> {
+                rankedActions += 60 to HomeNextAction(
+                    kind = HomeNextActionKind.REFRESH_BACKUP,
+                    actionTarget = HomeActionTarget.BackupRestore,
+                    daysSinceBackup = backupPrompt.daysSinceBackup,
+                )
+            }
+            null -> Unit
+        }
+        atRiskContacts.firstOrNull()?.let { contact ->
+            rankedActions += 50 to HomeNextAction(
+                kind = HomeNextActionKind.RECONNECT_CONTACT,
+                actionTarget = HomeActionTarget.ContactDetail(contact.id),
+                contactName = contact.name,
+                healthScore = contact.healthScore,
+            )
+        }
+        return rankedActions
+            .sortedByDescending { it.first }
+            .map { it.second }
+    }
+
     private fun HomeUiState.withReadiness(): HomeUiState {
         return when {
             syncError != null -> copy(
-                readinessTitle = "Setup needs attention",
-                readinessDetail = "Contact sync is reporting an issue. Open AI Doctor for the exact fix.",
+                readinessTitle = string(R.string.home_readiness_setup_attention_title),
+                readinessDetail = string(R.string.home_next_action_fix_contact_sync_detail),
                 readinessAction = HomeActionTarget.AutomationSetup,
             )
             contactCount == 0 -> copy(
-                readinessTitle = "Sync contacts to start",
-                readinessDetail = "RelateAI needs contacts before it can discover events or personalize wishes.",
+                readinessTitle = string(R.string.home_next_action_sync_contacts_title),
+                readinessDetail = string(R.string.home_next_action_sync_contacts_detail),
                 readinessAction = HomeActionTarget.AutomationSetup,
             )
             pendingCount > 0 -> copy(
-                readinessTitle = "Approvals waiting",
-                readinessDetail = "$pendingCount message(s) need review before they can send.",
+                readinessTitle = string(R.string.home_readiness_approvals_waiting_title),
+                readinessDetail = string(R.string.home_next_action_review_pending_detail, pendingCount),
                 readinessAction = HomeActionTarget.Messages,
             )
             else -> copy(
@@ -223,4 +359,20 @@ class HomeViewModel @Inject constructor(
     private fun readStringPreference(read: () -> String): String = readPreference("", read)
 
     private fun readBooleanPreference(read: () -> Boolean): Boolean = readPreference(false, read)
+
+    private fun readLongPreference(read: () -> Long): Long = readPreference(0L, read)
+
+    private fun String.toDisplayLabel(): String {
+        return when (EventType.fromRaw(this)) {
+            EventType.BIRTHDAY -> string(R.string.event_type_birthday)
+            EventType.ANNIVERSARY -> string(R.string.event_type_anniversary)
+            EventType.WORK_ANNIVERSARY -> string(R.string.event_type_work_anniversary)
+            EventType.CUSTOM -> string(R.string.event_type_custom)
+            else -> replace("_", " ").lowercase().replaceFirstChar { it.titlecase() }
+        }
+    }
+
+    private fun string(@StringRes resId: Int, vararg args: Any): String {
+        return appContext.getString(resId, *args)
+    }
 }

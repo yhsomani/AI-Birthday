@@ -57,6 +57,7 @@ import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSuccess
 import com.example.core.ui.theme.RelateWarning
 import com.example.ui.viewmodel.AiDoctorAction
+import com.example.ui.viewmodel.AiDoctorRecommendedFix
 import com.example.ui.viewmodel.AiDoctorSummary
 import com.example.ui.viewmodel.AutomationSetupViewModel
 import com.example.ui.viewmodel.ReadinessGroup
@@ -102,6 +103,7 @@ fun AutomationSetupScreen(
             ReadinessDashboard(
                 summary = state.summary,
                 setupProgress = state.setupProgress,
+                recommendedFix = state.recommendedFix,
                 checks = state.checks,
                 isRefreshing = state.isRefreshing,
                 isSyncingContacts = state.isSyncingContacts,
@@ -172,6 +174,7 @@ fun AutomationSetupScreen(
 private fun ReadinessDashboard(
     summary: AiDoctorSummary,
     setupProgress: SetupProgressSummary,
+    recommendedFix: AiDoctorRecommendedFix?,
     checks: List<ReadinessCheck>,
     isRefreshing: Boolean,
     isSyncingContacts: Boolean,
@@ -213,6 +216,13 @@ private fun ReadinessDashboard(
             )
 
             SetupProgressStrip(summary = setupProgress)
+
+            recommendedFix?.let { fix ->
+                RecommendedFixSection(
+                    fix = fix,
+                    onAction = onAction,
+                )
+            }
 
             readinessGroupOrder.forEach { group ->
                 val groupChecks = checks.filter { it.group == group }
@@ -373,6 +383,57 @@ private fun SetupProgressStrip(summary: SetupProgressSummary) {
             style = MaterialTheme.typography.bodySmall,
             color = RelateOnSurfaceVariant,
         )
+    }
+}
+
+@Composable
+private fun RecommendedFixSection(
+    fix: AiDoctorRecommendedFix,
+    onAction: (AiDoctorAction) -> Unit,
+) {
+    val color = fix.status.statusColors().content
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector = fix.status.statusIcon(),
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(20.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.automation_setup_recommended_fix),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = color,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = fix.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = fix.detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RelateOnSurfaceVariant,
+                )
+            }
+        }
+        Button(
+            onClick = { onAction(fix.action) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+        ) {
+            Text(
+                text = fix.actionLabel,
+                color = RelateDarkBackground,
+            )
+        }
     }
 }
 

@@ -2,6 +2,7 @@ package com.example.domain.usecase
 
 import com.example.domain.repository.ContactRepository
 import com.example.domain.service.AiService
+import com.example.domain.service.ContactClassificationContract
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,17 +28,18 @@ class ClassifyContactUseCase @Inject constructor(
         }
 
         val result = aiService.classifyContact(contact)
+        val normalizedType = ContactClassificationContract.normalizeRelationshipType(result.type)
 
         contactRepository.updateClassification(
             id = contact.id,
-            type = result.type,
+            type = normalizedType,
             subtype = result.subtype,
-            lang = result.language,
-            formality = result.formality,
-            style = result.communicationStyle
+            lang = ContactClassificationContract.normalizeLanguage(result.language),
+            formality = ContactClassificationContract.normalizeFormality(result.formality),
+            style = ContactClassificationContract.normalizeCommunicationStyle(result.communicationStyle)
         )
 
-        return ClassificationOutcome.Classified(result.type, result.confidence)
+        return ClassificationOutcome.Classified(normalizedType, result.confidence)
     }
 
     sealed class ClassificationOutcome {

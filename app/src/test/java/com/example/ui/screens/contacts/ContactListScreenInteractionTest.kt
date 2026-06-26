@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -18,6 +19,8 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.ui.theme.RelateAITheme
 import com.example.ui.viewmodel.ContactFilter
 import com.example.ui.viewmodel.ContactListUiState
+import com.example.ui.viewmodel.ContactQualityState
+import com.example.ui.viewmodel.ContactQualityStatus
 import com.example.ui.viewmodel.ContactSort
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -105,11 +108,83 @@ class ContactListScreenInteractionTest {
         assertEquals(listOf("refresh", "dismiss"), actions)
     }
 
+    @Test
+    fun actionFilterChips_areLabeledAndDispatchCallbacks() {
+        val actions = mutableListOf<String>()
+        val actionFilters = listOf(
+            ContactFilter.MISSING_RELATIONSHIP to R.string.contact_filter_missing_relationship,
+            ContactFilter.MISSING_CHANNEL to R.string.contact_filter_missing_channel,
+            ContactFilter.LOW_HEALTH to R.string.contact_filter_low_health,
+            ContactFilter.VIP to R.string.contact_filter_vip,
+        )
+
+        composeRule.setContent {
+            RelateAITheme {
+                ContactListContent(
+                    state = contactListState(),
+                    onFilterSelected = { actions += it.name },
+                )
+            }
+        }
+
+        actionFilters.forEach { (filter, labelRes) ->
+            composeRule.onNodeWithTag(ContactListTestTags.FILTER_PREFIX + filter.name)
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeRule.onNodeWithText(context.getString(labelRes))
+                .assertIsDisplayed()
+            composeRule.onNodeWithTag(ContactListTestTags.FILTER_PREFIX + filter.name)
+                .performClick()
+        }
+
+        assertEquals(actionFilters.map { it.first.name }, actions)
+    }
+
+    @Test
+    fun qualityBadges_areDisplayedForRows() {
+        composeRule.setContent {
+            RelateAITheme {
+                ContactListContent(
+                    state = contactListState(
+                        contactQuality = mapOf(
+                            "c1" to ContactQualityState(
+                                status = ContactQualityStatus.READY,
+                                hasKnownEvent = true,
+                                hasReachableChannel = true,
+                                hasPersonalizationContext = true,
+                            ),
+                            "c2" to ContactQualityState(
+                                status = ContactQualityStatus.MISSING_CHANNEL,
+                                hasKnownEvent = true,
+                                hasReachableChannel = false,
+                                hasPersonalizationContext = true,
+                            ),
+                        ),
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(ContactListTestTags.QUALITY_PREFIX + "c1", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.contact_quality_ready))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(ContactListTestTags.ROW_PREFIX + "c2")
+            .performScrollTo()
+        composeRule.onNodeWithTag(ContactListTestTags.QUALITY_PREFIX + "c2", useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.contact_quality_missing_channel))
+            .assertIsDisplayed()
+    }
+
     private fun clickTaggedItem(tag: String) {
         composeRule.onNodeWithTag(tag).assertIsDisplayed().performClick()
     }
 
-    private fun contactListState(syncError: String? = null): ContactListUiState {
+    private fun contactListState(
+        syncError: String? = null,
+        contactQuality: Map<String, ContactQualityState> = emptyMap(),
+    ): ContactListUiState {
         val contacts = listOf(
             ContactEntity(
                 id = "c1",
@@ -129,6 +204,7 @@ class ContactListScreenInteractionTest {
         return ContactListUiState(
             allContacts = contacts,
             contacts = contacts,
+            contactQuality = contactQuality,
             isLoading = false,
             syncError = syncError,
         )

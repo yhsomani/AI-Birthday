@@ -5,7 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -17,6 +19,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.MessageChannel
 import com.example.ui.viewmodel.MessageChannelFilter
 import com.example.ui.viewmodel.MessageReadiness
 import com.example.ui.viewmodel.MessageSort
@@ -67,8 +70,13 @@ class MessagesScreenInteractionTest {
             .assertIsDisplayed()
             .performClick()
 
-        assertMessageCardVisible(MessagesTestTags.PENDING_CARD_PREFIX + PENDING_ID, tabIndex = 1)
-        assertMessageCardVisible(MessagesTestTags.APPROVED_CARD_PREFIX + APPROVED_ID, tabIndex = 2)
+        composeRule.onNodeWithText("Needs review (1)").assertIsDisplayed()
+        composeRule.onNodeWithText("Scheduled (1)").assertIsDisplayed()
+        composeRule.onNodeWithText("Blocked (1)").assertIsDisplayed()
+
+        assertMessageCardVisible(MessagesTestTags.PENDING_CARD_PREFIX + TODAY_ID, tabIndex = 0)
+        assertMessageCardVisible(MessagesTestTags.APPROVED_CARD_PREFIX + APPROVED_ID, tabIndex = 1)
+        assertMessageCardVisible(MessagesTestTags.BLOCKED_CARD_PREFIX + BLOCKED_ID, tabIndex = 2)
         assertMessageCardVisible(MessagesTestTags.SENT_CARD_PREFIX + SENT_ID, tabIndex = 3)
         assertMessageCardVisible(MessagesTestTags.FAILED_CARD_PREFIX + FAILED_ID, tabIndex = 4)
 
@@ -153,7 +161,7 @@ class MessagesScreenInteractionTest {
         composeRule.onNodeWithTag(MessagesTestTags.BULK_CLEAR)
             .performClick()
 
-        assertMessageCardVisible(MessagesTestTags.APPROVED_CARD_PREFIX + APPROVED_ID, tabIndex = 2)
+        assertMessageCardVisible(MessagesTestTags.APPROVED_CARD_PREFIX + APPROVED_ID, tabIndex = 1)
         clickScrollableTag(MessagesTestTags.APPROVED_EDIT_PREFIX + APPROVED_ID)
         clickScrollableTag(MessagesTestTags.APPROVED_REVOKE_PREFIX + APPROVED_ID)
         clickScrollableTag(MessagesTestTags.APPROVED_REJECT_PREFIX + APPROVED_ID)
@@ -196,6 +204,55 @@ class MessagesScreenInteractionTest {
     }
 
     @Test
+    fun blockedTabShowsFixableDraftsWithoutApproveAction() {
+        composeRule.setMessagesContent(
+            state = { messagesState() },
+            initialPage = 2,
+        )
+
+        composeRule.onNodeWithTag(MessagesTestTags.BLOCKED_CARD_PREFIX + BLOCKED_ID)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(MessagesTestTags.READINESS_PREFIX + BLOCKED_ID)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Email address missing")
+            .assertIsDisplayed()
+        composeRule.onAllNodesWithTag(MessagesTestTags.PENDING_APPROVE_PREFIX + BLOCKED_ID)
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun messageCards_renderChannelLabelsThroughMessageChannelParser() {
+        composeRule.setMessagesContent(
+            state = {
+                messagesState().copy(
+                    needsReviewMessages = listOf(
+                        pendingItem(
+                            TODAY_ID,
+                            "contact-today",
+                            "Tara",
+                            " ${MessageChannel.WHATSAPP.raw.lowercase()} ",
+                            "BIRTHDAY",
+                        ),
+                    ),
+                    sentMessages = listOf(
+                        sentItem(channel = " ${MessageChannel.EMAIL.raw.lowercase()} "),
+                    ),
+                )
+            },
+        )
+
+        composeRule.onNodeWithTag(MessagesTestTags.CHANNEL_PREFIX + TODAY_ID)
+            .assertIsDisplayed()
+            .assertTextEquals("WhatsApp")
+
+        assertMessageCardVisible(MessagesTestTags.SENT_CARD_PREFIX + SENT_ID, tabIndex = 3)
+        composeRule.onNodeWithTag(MessagesTestTags.CHANNEL_PREFIX + SENT_ID)
+            .assertIsDisplayed()
+            .assertTextEquals("Channel: Email")
+    }
+
+    @Test
     fun failedRecoveryAssistant_opensAutomationSetup() {
         val actions = mutableListOf<String>()
 
@@ -232,7 +289,7 @@ class MessagesScreenInteractionTest {
         composeRule.onNodeWithText("Ready for review")
             .assertIsDisplayed()
 
-        assertMessageCardVisible(MessagesTestTags.APPROVED_CARD_PREFIX + APPROVED_ID, tabIndex = 2)
+        assertMessageCardVisible(MessagesTestTags.APPROVED_CARD_PREFIX + APPROVED_ID, tabIndex = 1)
         composeRule.onNodeWithTag(MessagesTestTags.READINESS_PREFIX + APPROVED_ID)
             .performScrollTo()
             .assertIsDisplayed()
@@ -291,6 +348,7 @@ class MessagesScreenInteractionTest {
 
     private fun assertMessageCardVisible(tag: String, tabIndex: Int) {
         composeRule.onNodeWithTag(MessagesTestTags.TAB_PREFIX + tabIndex)
+            .performScrollTo()
             .assertIsDisplayed()
             .performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -310,17 +368,28 @@ class MessagesScreenInteractionTest {
     }
 
     private fun messagesState(): MessagesUiState = MessagesUiState(
-        todayMessages = listOf(pendingItem(TODAY_ID, "contact-today", "Tara", "SMS", "BIRTHDAY")),
-        pendingMessages = listOf(pendingItem(PENDING_ID, "contact-pending", "Alice", "EMAIL", "ANNIVERSARY")),
-        approvedMessages = listOf(
+        needsReviewMessages = listOf(
+            pendingItem(TODAY_ID, "contact-today", "Tara", MessageChannel.SMS.raw, "BIRTHDAY"),
+        ),
+        scheduledMessages = listOf(
             pendingItem(
                 APPROVED_ID,
                 "contact-approved",
                 "Dev",
-                "WHATSAPP",
+                MessageChannel.WHATSAPP.raw,
                 "WORK_ANNIVERSARY",
                 status = "APPROVED",
                 readiness = MessageReadiness.APPROVED_SCHEDULED,
+            ),
+        ),
+        blockedMessages = listOf(
+            pendingItem(
+                BLOCKED_ID,
+                "contact-blocked",
+                "Blake",
+                MessageChannel.EMAIL.raw,
+                "ANNIVERSARY",
+                readiness = MessageReadiness.MISSING_EMAIL,
             ),
         ),
         sentMessages = listOf(sentItem()),
@@ -329,7 +398,7 @@ class MessagesScreenInteractionTest {
                 FAILED_ID,
                 "contact-failed",
                 "Faye",
-                "SMS",
+                MessageChannel.SMS.raw,
                 "BIRTHDAY",
                 status = "FAILED",
                 readiness = MessageReadiness.FAILED_CHECK_SETUP,
@@ -369,14 +438,14 @@ class MessagesScreenInteractionTest {
         readiness = readiness,
     )
 
-    private fun sentItem() = SentMessageItem(
+    private fun sentItem(channel: String = MessageChannel.EMAIL.raw) = SentMessageItem(
         entity = SentMessageEntity(
             id = SENT_ID,
             contactId = "contact-sent",
             eventType = "BIRTHDAY",
             eventYear = 2026,
             messageText = "Sent message",
-            channel = "EMAIL",
+            channel = channel,
             sentAtMs = 1_800_000_000_000L,
             deliveryStatus = "SENT",
         ),
@@ -385,7 +454,7 @@ class MessagesScreenInteractionTest {
 
     private companion object {
         const val TODAY_ID = "today-1"
-        const val PENDING_ID = "pending-1"
+        const val BLOCKED_ID = "blocked-1"
         const val APPROVED_ID = "approved-1"
         const val SENT_ID = "sent-1"
         const val FAILED_ID = "failed-1"

@@ -10,4 +10,6 @@ interface NotificationService {
         variants: MessageVariantsResult,
         messageId: String
     )
+
+    fun showAiFallbackAlert()
 }

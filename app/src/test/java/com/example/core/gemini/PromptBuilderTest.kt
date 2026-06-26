@@ -4,6 +4,7 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.db.entities.StyleProfileEntity
+import com.example.domain.model.MessageChannel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -39,6 +40,9 @@ class PromptBuilderTest {
 
         val prompt = builder.buildClassificationPrompt(contact)
 
+        assertTrue(prompt.contains("\"relationship_type\""))
+        assertTrue(prompt.contains("\"relationship_subtype\""))
+        assertFalse(prompt.contains("\"type\":"))
         assertTrue(prompt.contains("\"communication_style\""))
         assertTrue(prompt.contains("WARM|FUNNY|PROFESSIONAL|EMOTIONAL"))
     }
@@ -133,7 +137,7 @@ class PromptBuilderTest {
                 eventType = "4_birthday",
                 eventYear = 2025,
                 messageText = "Happy birthday!",
-                channel = "SMS",
+                channel = MessageChannel.SMS.raw,
                 sentAtMs = 1704067200000L,
                 deliveryStatus = "SENT"
             ),
@@ -143,7 +147,7 @@ class PromptBuilderTest {
                 eventType = "4_birthday",
                 eventYear = 2024,
                 messageText = "Have a great year!",
-                channel = "SMS",
+                channel = MessageChannel.SMS.raw,
                 sentAtMs = 1672531200000L,
                 deliveryStatus = "SENT"
             )
@@ -174,6 +178,48 @@ class PromptBuilderTest {
     }
 
     @Test
+    fun `buildContactContext maps preferred channel to typed prompt context`() {
+        val contact = ContactEntity(
+            id = "channel_email",
+            name = "Emma",
+            preferredChannel = MessageChannel.EMAIL.raw.lowercase(),
+        )
+        val event = EventEntity(
+            id = "channel_email_birthday",
+            contactId = "channel_email",
+            type = "BIRTHDAY",
+            dayOfMonth = 5,
+            month = 5,
+            nextOccurrenceMs = System.currentTimeMillis() + 86400000,
+        )
+
+        val ctx = builder.buildContactContext(contact, event, null, emptyList())
+
+        assertEquals(MessageChannel.EMAIL, ctx.preferredChannel)
+    }
+
+    @Test
+    fun `buildContactContext falls back unsupported prompt channel to sms`() {
+        val contact = ContactEntity(
+            id = "channel_legacy",
+            name = "Finn",
+            preferredChannel = "LEGACY_CHANNEL",
+        )
+        val event = EventEntity(
+            id = "channel_legacy_birthday",
+            contactId = "channel_legacy",
+            type = "BIRTHDAY",
+            dayOfMonth = 5,
+            month = 5,
+            nextOccurrenceMs = System.currentTimeMillis() + 86400000,
+        )
+
+        val ctx = builder.buildContactContext(contact, event, null, emptyList())
+
+        assertEquals(MessageChannel.SMS, ctx.preferredChannel)
+    }
+
+    @Test
     fun `buildMessageGenerationPrompt includes context`() {
         val ctx = ContactContextObject(
             firstName = "Grace", nickname = "Gra",
@@ -190,7 +236,8 @@ class PromptBuilderTest {
             avgMessageLength = 80,
             commonPhrases = listOf("Love you"),
             previousWishes = listOf("Happy birthday last year"),
-            formalityLevel = "CASUAL"
+            formalityLevel = "CASUAL",
+            preferredChannel = MessageChannel.WHATSAPP,
         )
         val prompt = builder.buildMessageGenerationPrompt(ctx)
 
@@ -199,6 +246,7 @@ class PromptBuilderTest {
         assertTrue(prompt.contains("SISTER"))
         assertTrue(prompt.contains("photography"))
         assertTrue(prompt.contains("Paris trip"))
+        assertTrue(prompt.contains("- Preferred send channel: ${MessageChannel.WHATSAPP.raw}"))
         assertTrue(prompt.contains("JSON"))
     }
 

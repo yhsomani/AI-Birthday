@@ -76,7 +76,10 @@ class ActivityHistoryScreenInteractionTest {
         composeRule.onNodeWithTag(ActivityHistoryTestTags.SEARCH_FIELD)
             .assertIsDisplayed()
             .performTextInput("error")
-        composeRule.onNodeWithTag(ActivityHistoryTestTags.TYPE_FILTER_PREFIX + ActivityLogTypeFilter.MESSAGE.name)
+        composeRule.onNodeWithTag(ActivityHistoryTestTags.TYPE_FILTER_PREFIX + ActivityLogTypeFilter.DISPATCH.name)
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag(ActivityHistoryTestTags.TYPE_FILTER_PREFIX + ActivityLogTypeFilter.BACKUP.name)
             .performScrollTo()
             .performClick()
         composeRule.onNodeWithTag(ActivityHistoryTestTags.DATE_FILTER_PREFIX + ActivityLogDateFilter.LAST_7_DAYS.name)
@@ -97,7 +100,8 @@ class ActivityHistoryScreenInteractionTest {
             listOf(
                 "back",
                 "search:error",
-                "type:MESSAGE",
+                "type:DISPATCH",
+                "type:BACKUP",
                 "date:LAST_7_DAYS",
                 "status:RESOLVED",
                 "route:messages/today",

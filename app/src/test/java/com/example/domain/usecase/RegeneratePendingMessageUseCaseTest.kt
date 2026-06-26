@@ -3,6 +3,8 @@ package com.example.domain.usecase
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.PendingMessageEntity
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.GiftHistoryRepository
@@ -50,7 +52,7 @@ class RegeneratePendingMessageUseCaseTest {
     private fun pending(
         approvalMode: String = "SMART_APPROVE",
         status: String = "PENDING",
-        channel: String = "SMS",
+        channel: String = MessageChannel.SMS.raw,
         editedByUser: Boolean = false,
         userEditedText: String? = null,
     ) = PendingMessageEntity(
@@ -110,7 +112,7 @@ class RegeneratePendingMessageUseCaseTest {
         val saved = slot<PendingMessageEntity>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
-        every { preferencesRepository.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.SMART_APPROVE
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
@@ -167,7 +169,7 @@ class RegeneratePendingMessageUseCaseTest {
         )
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
-        every { preferencesRepository.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.SMART_APPROVE
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
@@ -238,7 +240,7 @@ class RegeneratePendingMessageUseCaseTest {
         val saved = slot<PendingMessageEntity>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
-        every { preferencesRepository.getGlobalAutomationMode() } returns "FULLY_AUTO"
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.FULLY_AUTO
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
@@ -270,7 +272,7 @@ class RegeneratePendingMessageUseCaseTest {
             id = "c_1",
             name = "Riya",
             automationMode = "FULLY_AUTO",
-            preferredChannel = "SMS",
+            preferredChannel = MessageChannel.SMS.raw,
         )
         val event = EventEntity(
             id = "e_1",
@@ -294,7 +296,7 @@ class RegeneratePendingMessageUseCaseTest {
         val saved = slot<PendingMessageEntity>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
-        every { preferencesRepository.getGlobalAutomationMode() } returns "FULLY_AUTO"
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.FULLY_AUTO
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
@@ -314,7 +316,7 @@ class RegeneratePendingMessageUseCaseTest {
         coVerify { messageRepository.insertPending(capture(saved)) }
         assertEquals("ALWAYS_ASK", saved.captured.approvalMode)
         assertEquals("PENDING", saved.captured.status)
-        assertEquals("SMS", saved.captured.channel)
+        assertEquals(MessageChannel.SMS.raw, saved.captured.channel)
         verify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
     }
 
@@ -344,7 +346,7 @@ class RegeneratePendingMessageUseCaseTest {
         val saved = slot<PendingMessageEntity>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
-        every { preferencesRepository.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.SMART_APPROVE
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
@@ -393,7 +395,7 @@ class RegeneratePendingMessageUseCaseTest {
         val saved = slot<PendingMessageEntity>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
-        every { preferencesRepository.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.SMART_APPROVE
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
@@ -442,7 +444,7 @@ class RegeneratePendingMessageUseCaseTest {
         val saved = slot<PendingMessageEntity>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
-        every { preferencesRepository.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.SMART_APPROVE
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""

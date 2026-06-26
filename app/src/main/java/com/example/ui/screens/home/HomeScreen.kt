@@ -61,6 +61,8 @@ import com.example.core.ui.theme.RelateSuccess
 import com.example.core.ui.theme.RelateWarning
 import com.example.ui.components.SyncErrorCard
 import com.example.ui.viewmodel.HomeActionTarget
+import com.example.ui.viewmodel.HomeNextAction
+import com.example.ui.viewmodel.HomeNextActionKind
 import com.example.ui.viewmodel.HomeUiState
 import com.example.ui.viewmodel.HomeViewModel
 import com.example.ui.viewmodel.RelationshipPlannerItem
@@ -68,8 +70,9 @@ import com.example.ui.viewmodel.SetupProgressSummary
 
 internal object HomeScreenTestTags {
     const val SYNC_ERROR_CARD = "home_sync_error_card"
-    const val READINESS_BANNER = "home_readiness_banner"
     const val SETUP_PROGRESS_CARD = "home_setup_progress_card"
+    const val PRIMARY_ACTION_CARD = "home_primary_action_card"
+    const val SUPPORTING_ACTION_PREFIX = "home_supporting_action_"
     const val QUICK_ACTION_ANALYTICS = "home_quick_action_analytics"
     const val QUICK_ACTION_ACTIVITY_HISTORY = "home_quick_action_activity_history"
     const val QUICK_ACTION_STYLE_COACH = "home_quick_action_style_coach"
@@ -128,6 +131,7 @@ internal fun HomeContent(
             HomeActionTarget.Messages -> onNavigateToMessages()
         }
     }
+    val displayUserName = state.userName.ifBlank { stringResource(R.string.home_default_user) }
 
     LazyColumn(
         modifier = Modifier
@@ -155,7 +159,7 @@ internal fun HomeContent(
                         Spacer(modifier = Modifier.width(12.dp))
                     }
                     Text(
-                        text = stringResource(R.string.home_greeting, state.userName),
+                        text = stringResource(R.string.home_greeting, displayUserName),
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -184,22 +188,6 @@ internal fun HomeContent(
             }
         }
 
-        val readinessTitle = state.readinessTitle
-        val readinessDetail = state.readinessDetail
-        if (readinessTitle != null && readinessDetail != null) {
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                ReadinessBanner(
-                    title = readinessTitle,
-                    detail = readinessDetail,
-                    onClick = {
-                        state.readinessAction?.let(navigateToAction) ?: onNavigateToAutomationSetup()
-                    },
-                    modifier = Modifier.testTag(HomeScreenTestTags.READINESS_BANNER),
-                )
-            }
-        }
-
         if (state.isLoading) {
             item {
                 Box(
@@ -214,6 +202,14 @@ internal fun HomeContent(
         } else {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
+                state.primaryAction?.let { action ->
+                    NextActionSection(
+                        primaryAction = action,
+                        supportingActions = state.supportingActions,
+                        onActionClick = navigateToAction,
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
                 if (state.setupProgress.totalSteps > 0) {
                     SetupProgressCard(
                         summary = state.setupProgress,
@@ -372,6 +368,146 @@ private fun HomeActionTarget.testKey(): String {
         HomeActionTarget.BackupRestore -> "backup_restore"
         is HomeActionTarget.ContactDetail -> contactId
         HomeActionTarget.Messages -> "messages"
+    }
+}
+
+@Composable
+private fun NextActionSection(
+    primaryAction: HomeNextAction,
+    supportingActions: List<HomeNextAction>,
+    onActionClick: (HomeActionTarget) -> Unit,
+) {
+    SectionHeader(title = stringResource(R.string.home_next_action_section))
+    Spacer(modifier = Modifier.height(8.dp))
+    NextActionCard(
+        action = primaryAction,
+        onClick = { onActionClick(primaryAction.actionTarget) },
+        modifier = Modifier.testTag(HomeScreenTestTags.PRIMARY_ACTION_CARD),
+        isPrimary = true,
+    )
+    if (supportingActions.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = stringResource(R.string.home_supporting_actions_section),
+            style = MaterialTheme.typography.labelMedium,
+            color = RelateOnSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            supportingActions.forEach { action ->
+                NextActionCard(
+                    action = action,
+                    onClick = { onActionClick(action.actionTarget) },
+                    modifier = Modifier.testTag(
+                        HomeScreenTestTags.SUPPORTING_ACTION_PREFIX + action.kind.name.lowercase()
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NextActionCard(
+    action: HomeNextAction,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isPrimary: Boolean = false,
+) {
+    val icon = when (action.kind) {
+        HomeNextActionKind.SYNC_CONTACTS,
+        HomeNextActionKind.FIX_CONTACT_SYNC,
+        HomeNextActionKind.CONNECT_AI,
+        HomeNextActionKind.ENABLE_AI_GENERATION -> Icons.Filled.Settings
+        HomeNextActionKind.REVIEW_PENDING -> Icons.Filled.MailOutline
+        HomeNextActionKind.CREATE_BACKUP,
+        HomeNextActionKind.REFRESH_BACKUP -> Icons.Filled.Storage
+        HomeNextActionKind.RECONNECT_CONTACT -> Icons.Filled.Favorite
+    }
+    val tint = when (action.kind) {
+        HomeNextActionKind.SYNC_CONTACTS,
+        HomeNextActionKind.FIX_CONTACT_SYNC,
+        HomeNextActionKind.CONNECT_AI,
+        HomeNextActionKind.ENABLE_AI_GENERATION -> MaterialTheme.colorScheme.error
+        HomeNextActionKind.REVIEW_PENDING -> RelatePrimary
+        HomeNextActionKind.CREATE_BACKUP,
+        HomeNextActionKind.REFRESH_BACKUP -> RelateWarning
+        HomeNextActionKind.RECONNECT_CONTACT -> RelatePrimary
+    }
+    RelateGlassCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(if (isPrimary) 16.dp else 14.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(if (isPrimary) 24.dp else 20.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = action.titleText(),
+                    style = if (isPrimary) {
+                        MaterialTheme.typography.titleMedium
+                    } else {
+                        MaterialTheme.typography.titleSmall
+                    },
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                )
+                Text(
+                    text = action.detailText(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RelateOnSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeNextAction.titleText(): String {
+    return when (kind) {
+        HomeNextActionKind.SYNC_CONTACTS -> stringResource(R.string.home_next_action_sync_contacts_title)
+        HomeNextActionKind.FIX_CONTACT_SYNC -> stringResource(R.string.home_next_action_fix_contact_sync_title)
+        HomeNextActionKind.CONNECT_AI -> stringResource(R.string.home_next_action_connect_ai_title)
+        HomeNextActionKind.ENABLE_AI_GENERATION -> stringResource(R.string.home_next_action_enable_ai_title)
+        HomeNextActionKind.REVIEW_PENDING -> stringResource(R.string.home_next_action_review_pending_title)
+        HomeNextActionKind.CREATE_BACKUP -> stringResource(R.string.home_backup_never_title)
+        HomeNextActionKind.REFRESH_BACKUP -> stringResource(R.string.home_backup_stale_title)
+        HomeNextActionKind.RECONNECT_CONTACT -> stringResource(
+            R.string.home_next_action_reconnect_title,
+            contactName.orEmpty(),
+        )
+    }
+}
+
+@Composable
+private fun HomeNextAction.detailText(): String {
+    return when (kind) {
+        HomeNextActionKind.SYNC_CONTACTS -> stringResource(R.string.home_next_action_sync_contacts_detail)
+        HomeNextActionKind.FIX_CONTACT_SYNC -> stringResource(R.string.home_next_action_fix_contact_sync_detail)
+        HomeNextActionKind.CONNECT_AI -> stringResource(R.string.home_next_action_connect_ai_detail)
+        HomeNextActionKind.ENABLE_AI_GENERATION -> stringResource(R.string.home_next_action_enable_ai_detail)
+        HomeNextActionKind.REVIEW_PENDING -> stringResource(
+            R.string.home_next_action_review_pending_detail,
+            count,
+        )
+        HomeNextActionKind.CREATE_BACKUP -> stringResource(R.string.home_backup_never_detail)
+        HomeNextActionKind.REFRESH_BACKUP -> stringResource(
+            R.string.home_backup_stale_detail,
+            daysSinceBackup ?: 0L,
+        )
+        HomeNextActionKind.RECONNECT_CONTACT -> stringResource(
+            R.string.home_next_action_reconnect_detail,
+            healthScore ?: 0,
+        )
     }
 }
 

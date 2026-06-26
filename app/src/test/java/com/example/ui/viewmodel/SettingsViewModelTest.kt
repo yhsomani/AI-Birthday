@@ -4,6 +4,8 @@ import com.example.R
 import com.example.core.auth.AuthManager
 import com.example.core.auth.UserProfile
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
 import com.example.domain.usecase.SyncContactsUseCase
 import io.mockk.coEvery
@@ -51,7 +53,7 @@ class SettingsViewModelTest {
         every { securePrefs.getGeminiApiKey() } returns ""
         every { securePrefs.getSenderEmail() } returns ""
         every { securePrefs.getSenderEmailPassword() } returns ""
-        every { securePrefs.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.SMART_APPROVE
         every { securePrefs.getQuietHoursStart() } returns 22
         every { securePrefs.getQuietHoursEnd() } returns 8
         every { securePrefs.getChannelBlackout() } returns "[]"
@@ -91,6 +93,76 @@ class SettingsViewModelTest {
         viewModel.toggleAiWishGeneration(false)
         assertFalse(viewModel.uiState.value.aiWishGeneration)
         verify { securePrefs.setAiWishGenerationEnabled(false) }
+    }
+
+    @Test
+    fun `init reads typed global automation mode from secure prefs`() = runTest(testDispatcher) {
+        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.VIP_APPROVE
+
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+
+        assertEquals(ApprovalMode.VIP_APPROVE, viewModel.uiState.value.automationMode)
+    }
+
+    @Test
+    fun `init uses secure prefs fallback global automation mode`() = runTest(testDispatcher) {
+        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.SMART_APPROVE
+
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+
+        assertEquals(ApprovalMode.SMART_APPROVE, viewModel.uiState.value.automationMode)
+    }
+
+    @Test
+    fun `setAutomationMode stores typed value and updates typed state`() = runTest(testDispatcher) {
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+
+        viewModel.setAutomationMode(ApprovalMode.ALWAYS_ASK)
+
+        assertEquals(ApprovalMode.ALWAYS_ASK, viewModel.uiState.value.automationMode)
+        verify { securePrefs.setGlobalApprovalMode(ApprovalMode.ALWAYS_ASK) }
+    }
+
+    @Test
+    fun `init maps channel blackout storage to typed settings state`() = runTest(testDispatcher) {
+        every { securePrefs.getChannelBlackout() } returns
+            """["${MessageChannel.SMS.raw.lowercase()}","LEGACY_CHANNEL","${MessageChannel.EMAIL.raw}"]"""
+
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+
+        assertTrue(viewModel.uiState.value.channelBlackoutSms)
+        assertFalse(viewModel.uiState.value.channelBlackoutWhatsApp)
+        assertTrue(viewModel.uiState.value.channelBlackoutEmail)
+    }
+
+    @Test
+    fun `toggleChannelBlackout stores typed channel raw values`() = runTest(testDispatcher) {
+        every { securePrefs.getChannelBlackout() } returns
+            """["${MessageChannel.SMS.raw.lowercase()}","LEGACY_CHANNEL","${MessageChannel.EMAIL.raw}"]"""
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+
+        viewModel.toggleChannelBlackout(MessageChannel.WHATSAPP, true)
+
+        assertTrue(viewModel.uiState.value.channelBlackoutSms)
+        assertTrue(viewModel.uiState.value.channelBlackoutWhatsApp)
+        assertTrue(viewModel.uiState.value.channelBlackoutEmail)
+        verify {
+            securePrefs.setChannelBlackout(
+                """["${MessageChannel.EMAIL.raw}","${MessageChannel.SMS.raw}","${MessageChannel.WHATSAPP.raw}"]"""
+            )
+        }
+    }
+
+    @Test
+    fun `toggleChannelBlackout ignores unknown channel`() = runTest(testDispatcher) {
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+
+        viewModel.toggleChannelBlackout(MessageChannel.UNKNOWN, true)
+
+        assertFalse(viewModel.uiState.value.channelBlackoutSms)
+        assertFalse(viewModel.uiState.value.channelBlackoutWhatsApp)
+        assertFalse(viewModel.uiState.value.channelBlackoutEmail)
+        verify(exactly = 0) { securePrefs.setChannelBlackout(any()) }
     }
 
     @Test

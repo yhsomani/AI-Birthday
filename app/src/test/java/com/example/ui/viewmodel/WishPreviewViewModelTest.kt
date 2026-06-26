@@ -1,13 +1,18 @@
 package com.example.ui.viewmodel
 
 import com.example.R
+import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.PendingMessageEntity
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
+import com.example.domain.repository.EventRepository
 import com.example.domain.repository.GiftHistoryRepository
 import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.repository.MessageFeedbackRepository
 import com.example.domain.repository.MessageRepository
+import com.example.domain.model.MessageStatus
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RegeneratePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
@@ -44,6 +49,9 @@ class WishPreviewViewModelTest {
     private lateinit var contactRepository: ContactRepository
 
     @RelaxedMockK
+    private lateinit var eventRepository: EventRepository
+
+    @RelaxedMockK
     private lateinit var memoryNoteRepository: MemoryNoteRepository
 
     @RelaxedMockK
@@ -71,6 +79,7 @@ class WishPreviewViewModelTest {
         coEvery { giftHistoryRepository.getByContact(any()) } returns emptyList()
         coEvery { messageRepository.getSentByContact(any(), any()) } returns emptyList()
         every { messageRepository.getAllPending() } returns flowOf(emptyList())
+        every { eventRepository.getAll() } returns flowOf(emptyList())
         coEvery { messageFeedbackRepository.getLatestForPendingMessage(any()) } returns null
         coEvery { testSendUseCase(any()) } returns TestSendUseCase.Outcome.Sent
     }
@@ -92,10 +101,10 @@ class WishPreviewViewModelTest {
         emotionalVariant = "You mean the world to me. Happy birthday!",
         selectedVariant = "standard",
         selectedVariantText = "Wishing you a happy birthday!",
-        channel = "SMS",
+        channel = MessageChannel.SMS.raw,
         scheduledForMs = 1_700_000_000_000L,
         approvalMode = "VIP_APPROVE",
-        status = "PENDING"
+        status = MessageStatus.PENDING.raw
     )
 
     private fun createViewModel() = WishPreviewViewModel(
@@ -103,6 +112,7 @@ class WishPreviewViewModelTest {
         activityLogRepository = activityLogRepository,
         messageFeedbackRepository = messageFeedbackRepository,
         contactRepository = contactRepository,
+        eventRepository = eventRepository,
         memoryNoteRepository = memoryNoteRepository,
         giftHistoryRepository = giftHistoryRepository,
         approvePendingMessageUseCase = approvePendingMessageUseCase,
@@ -128,6 +138,37 @@ class WishPreviewViewModelTest {
     }
 
     @Test
+    fun `loadPending exposes approval plan summary`() = runTest(testDispatcher) {
+        coEvery { messageRepository.getPendingById("pm_1") } returns samplePending().copy(
+            channel = MessageChannel.EMAIL.raw,
+            approvalMode = "SMART_APPROVE",
+            isUsingFallback = true,
+        )
+        every { eventRepository.getAll() } returns flowOf(
+            listOf(
+                EventEntity(
+                    id = "e_1",
+                    contactId = "c_1",
+                    type = "ANNIVERSARY",
+                    dayOfMonth = 1,
+                    month = 1,
+                    nextOccurrenceMs = 1_700_000_000_000L,
+                ),
+            ),
+        )
+
+        val viewModel = createViewModel()
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        val summary = viewModel.uiState.value.sendSummary
+        assertEquals("ANNIVERSARY", summary?.eventType)
+        assertEquals(MessageChannel.EMAIL.raw, summary?.channel)
+        assertEquals("SMART_APPROVE", summary?.approvalMode)
+        assertEquals(true, summary?.usesFallback)
+    }
+
+    @Test
     fun `loadPending exposes next pending review target`() = runTest(testDispatcher) {
         val current = samplePending().copy(
             id = "pm_1",
@@ -145,7 +186,7 @@ class WishPreviewViewModelTest {
             contactId = "c_3",
             eventId = "e_3",
             scheduledForMs = 1_700_000_050_000L,
-            status = "APPROVED",
+            status = MessageStatus.APPROVED.raw,
         )
         coEvery { messageRepository.getPendingById("pm_1") } returns current
         every { messageRepository.getAllPending() } returns flowOf(listOf(current, ignoredApproved, next))
@@ -210,6 +251,25 @@ class WishPreviewViewModelTest {
 
         viewModel.updateEditedText("Custom draft text")
         assertEquals("Custom draft text", viewModel.uiState.value.editedText)
+        assertEquals(WishDraftReadiness.EDITED_READY, viewModel.uiState.value.draftReadiness)
+    }
+
+    @Test
+    fun `blank edit recalculates readiness and blocks approval`() = runTest(testDispatcher) {
+        coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
+
+        val viewModel = createViewModel()
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        viewModel.updateEditedText("   ")
+        viewModel.approve()
+        advanceUntilIdle()
+
+        assertEquals(WishDraftReadiness.BLANK, viewModel.uiState.value.draftReadiness)
+        assertEquals(R.string.wish_preview_readiness_blank, viewModel.uiState.value.errorMessageRes)
+        assertEquals(false, viewModel.uiState.value.approved)
+        coVerify(exactly = 0) { approvePendingMessageUseCase(any(), any()) }
     }
 
     @Test
@@ -301,7 +361,8 @@ class WishPreviewViewModelTest {
     @Test
     fun `approve invokes use case and flips approved flag on success`() = runTest(testDispatcher) {
         coEvery { messageRepository.getPendingById("pm_1") } returns samplePending()
-        coEvery { approvePendingMessageUseCase("pm_1", any()) } returns ApprovePendingMessageUseCase.ApprovalOutcome.Approved("pm_1", "VIP_APPROVE")
+        coEvery { approvePendingMessageUseCase("pm_1", any()) } returns
+            ApprovePendingMessageUseCase.ApprovalOutcome.Approved("pm_1", ApprovalMode.VIP_APPROVE)
 
         val viewModel = createViewModel()
         viewModel.loadPending("pm_1")

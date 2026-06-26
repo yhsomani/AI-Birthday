@@ -6,6 +6,9 @@ import com.example.core.db.entities.GiftHistoryEntity
 import com.example.core.db.entities.MemoryNoteEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.db.entities.StyleProfileEntity
+import com.example.domain.model.EventType
+import com.example.domain.model.MessageChannel
+import com.example.domain.service.ContactClassificationContract
 import org.json.JSONArray
 
 data class ContactContextObject(
@@ -30,7 +33,7 @@ data class ContactContextObject(
     val giftHistory: List<String> = emptyList(),
     val sensitiveTopics: List<String> = emptyList(),
     val currentLifePhase: String? = null,
-    val preferredChannel: String = "SMS",
+    val preferredChannel: MessageChannel = MessageChannel.SMS,
 )
 
 class PromptBuilder {
@@ -61,11 +64,12 @@ class PromptBuilder {
             appendLine()
             appendLine("Return ONLY valid JSON, no explanation, no markdown:")
             appendLine("{")
-            appendLine("  \"type\": \"FAMILY|BEST_FRIEND|CLOSE_FRIEND|FRIEND|RELATIVE|COLLEAGUE|CLIENT|MANAGER|MENTOR|ALUMNI|VENDOR|UNKNOWN\",")
-            appendLine("  \"confidence\": 0.0,")
-            appendLine("  \"language\": \"en|hi|mr|gu|ta|te|bn|pa\",")
-            appendLine("  \"formality\": \"CASUAL|SEMI_FORMAL|FORMAL\",")
-            appendLine("  \"communication_style\": \"WARM|FUNNY|PROFESSIONAL|EMOTIONAL\"")
+            appendLine("  \"${ContactClassificationContract.Fields.RELATIONSHIP_TYPE}\": \"${ContactClassificationContract.promptValues(ContactClassificationContract.relationshipTypes)}\",")
+            appendLine("  \"${ContactClassificationContract.Fields.RELATIONSHIP_SUBTYPE}\": null,")
+            appendLine("  \"${ContactClassificationContract.Fields.CONFIDENCE}\": 0.0,")
+            appendLine("  \"${ContactClassificationContract.Fields.LANGUAGE}\": \"${ContactClassificationContract.promptValues(ContactClassificationContract.languageCodes)}\",")
+            appendLine("  \"${ContactClassificationContract.Fields.FORMALITY}\": \"${ContactClassificationContract.promptValues(ContactClassificationContract.formalityLevels)}\",")
+            appendLine("  \"${ContactClassificationContract.Fields.COMMUNICATION_STYLE}\": \"${ContactClassificationContract.promptValues(ContactClassificationContract.communicationStyles)}\"")
             append("}")
         }
     }
@@ -121,7 +125,7 @@ class PromptBuilder {
 
         val birthdayYear = contact.birthdayYear
         val eventYear = event.year
-        val ageTurning = if (event.type == "BIRTHDAY" && birthdayYear != null && eventYear != null) {
+        val ageTurning = if (EventType.fromRaw(event.type) == EventType.BIRTHDAY && birthdayYear != null && eventYear != null) {
             eventYear - birthdayYear
         } else null
 
@@ -147,7 +151,7 @@ class PromptBuilder {
             giftHistory = giftSummaries,
             sensitiveTopics = parsedSensitiveTopics,
             currentLifePhase = lifePhase,
-            preferredChannel = contact.preferredChannel,
+            preferredChannel = contact.preferredChannel.toSupportedMessageChannel(),
         )
     }
 
@@ -179,7 +183,7 @@ class PromptBuilder {
             appendLine("- Interests: ${context.interests.joinToString(", ")}")
             appendLine("- Shared memories: ${context.sharedHistory.joinToString("; ")}")
             appendLine("- Last spoke: ${context.daysSinceLastContact} days ago")
-            appendLine("- Preferred send channel: ${context.preferredChannel}")
+            appendLine("- Preferred send channel: ${context.preferredChannel.raw}")
             if (!context.currentLifePhase.isNullOrBlank()) {
                 appendLine("- Current life phase: ${context.currentLifePhase}")
             }
@@ -225,6 +229,12 @@ class PromptBuilder {
                 append("For formal contexts in Indian languages: use respectful honorifics appropriate to the relationship.")
             }
         }
+    }
+
+    private fun String.toSupportedMessageChannel(): MessageChannel {
+        return MessageChannel.fromRaw(this)
+            .takeIf { it != MessageChannel.UNKNOWN }
+            ?: MessageChannel.SMS
     }
 
     fun buildReconnectPrompt(contact: ContactEntity, daysSince: Int): String {

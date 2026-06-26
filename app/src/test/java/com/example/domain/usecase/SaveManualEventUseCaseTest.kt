@@ -2,6 +2,7 @@ package com.example.domain.usecase
 
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
@@ -83,6 +84,7 @@ class SaveManualEventUseCaseTest {
         coVerify { eventReminderSchedulerService.scheduleReminder(any()) }
         assertTrue(contactSlot.captured.id.startsWith("manual_"))
         assertEquals("Priya", contactSlot.captured.name)
+        assertEquals(MessageChannel.SMS.raw, contactSlot.captured.preferredChannel)
         assertEquals(contactSlot.captured.id, eventSlot.captured.contactId)
         assertEquals("Wedding anniversary", eventSlot.captured.label)
     }
@@ -98,6 +100,10 @@ class SaveManualEventUseCaseTest {
         )
 
         assertTrue(outcome is SaveManualEventUseCase.Outcome.InvalidInput)
+        assertEquals(
+            SaveManualEventUseCase.InvalidInputReason.INVALID_DATE,
+            (outcome as SaveManualEventUseCase.Outcome.InvalidInput).reason,
+        )
         coVerify(exactly = 0) { contactRepository.upsert(any()) }
         coVerify(exactly = 0) { eventRepository.upsert(any()) }
         coVerify(exactly = 0) { eventReminderSchedulerService.scheduleReminder(any()) }

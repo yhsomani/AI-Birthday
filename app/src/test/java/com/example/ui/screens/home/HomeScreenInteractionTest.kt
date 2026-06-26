@@ -14,7 +14,10 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.ui.theme.RelateAITheme
+import com.example.ui.viewmodel.BackupFreshnessPrompt
 import com.example.ui.viewmodel.HomeActionTarget
+import com.example.ui.viewmodel.HomeNextAction
+import com.example.ui.viewmodel.HomeNextActionKind
 import com.example.ui.viewmodel.HomeUiState
 import com.example.ui.viewmodel.RelationshipPlannerItem
 import com.example.ui.viewmodel.SetupProgressSummary
@@ -43,8 +46,10 @@ class HomeScreenInteractionTest {
             actions = actions,
             state = populatedHomeState(
                 syncError = "Google sync failed",
-                readinessTitle = "Setup needs attention",
-                readinessDetail = "Open AI Doctor to fix contact sync.",
+                primaryAction = HomeNextAction(
+                    kind = HomeNextActionKind.FIX_CONTACT_SYNC,
+                    actionTarget = HomeActionTarget.AutomationSetup,
+                ),
             ),
         )
 
@@ -52,7 +57,7 @@ class HomeScreenInteractionTest {
             .assertIsDisplayed()
             .performClick()
 
-        clickTaggedCard(HomeScreenTestTags.READINESS_BANNER)
+        clickTaggedCard(HomeScreenTestTags.PRIMARY_ACTION_CARD)
         clickTaggedCard(HomeScreenTestTags.QUICK_ACTION_ANALYTICS)
         clickTaggedCard(HomeScreenTestTags.QUICK_ACTION_ACTIVITY_HISTORY)
         clickTaggedCard(HomeScreenTestTags.QUICK_ACTION_STYLE_COACH)
@@ -101,9 +106,11 @@ class HomeScreenInteractionTest {
         setHomeContent(
             actions = actions,
             state = populatedHomeState(
-                readinessTitle = "Approvals waiting",
-                readinessDetail = "2 message(s) need review before they can send.",
-                readinessAction = HomeActionTarget.Messages,
+                primaryAction = HomeNextAction(
+                    kind = HomeNextActionKind.REVIEW_PENDING,
+                    actionTarget = HomeActionTarget.Messages,
+                    count = 2,
+                ),
                 plannerItems = listOf(
                     RelationshipPlannerItem(
                         title = "Review pending wishes",
@@ -114,26 +121,29 @@ class HomeScreenInteractionTest {
             ),
         )
 
-        clickTaggedCard(HomeScreenTestTags.READINESS_BANNER)
+        clickTaggedCard(HomeScreenTestTags.PRIMARY_ACTION_CARD)
         clickTaggedCard(HomeScreenTestTags.PLANNER_ITEM_PREFIX + "messages")
 
         assertEquals(listOf("messages", "messages"), actions)
     }
 
     @Test
-    fun setupReadiness_stillOpensAutomationDoctor() {
+    fun primarySetupAction_opensAutomationDoctor() {
         val actions = mutableListOf<String>()
 
         setHomeContent(
             actions = actions,
             state = populatedHomeState(
-                readinessTitle = "Setup needs attention",
-                readinessDetail = "Contact sync is reporting an issue.",
-                readinessAction = HomeActionTarget.AutomationSetup,
+                primaryAction = HomeNextAction(
+                    kind = HomeNextActionKind.CONNECT_AI,
+                    actionTarget = HomeActionTarget.AutomationSetup,
+                ),
             ),
         )
 
-        clickTaggedCard(HomeScreenTestTags.READINESS_BANNER)
+        composeRule.onNodeWithText(context.getString(R.string.home_next_action_connect_ai_title))
+            .assertIsDisplayed()
+        clickTaggedCard(HomeScreenTestTags.PRIMARY_ACTION_CARD)
 
         assertEquals(listOf("automation"), actions)
     }
@@ -156,6 +166,93 @@ class HomeScreenInteractionTest {
         clickTaggedCard(HomeScreenTestTags.SETUP_PROGRESS_CARD)
 
         assertEquals(listOf("automation"), actions)
+    }
+
+    @Test
+    fun staleBackupPrompt_opensBackupRestore() {
+        val actions = mutableListOf<String>()
+
+        setHomeContent(
+            actions = actions,
+            state = populatedHomeState(
+                primaryAction = HomeNextAction(
+                    kind = HomeNextActionKind.REFRESH_BACKUP,
+                    actionTarget = HomeActionTarget.BackupRestore,
+                    daysSinceBackup = 45,
+                ),
+            ),
+        )
+
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasTestTag(HomeScreenTestTags.PRIMARY_ACTION_CARD))
+        composeRule.onNodeWithText(context.getString(R.string.home_backup_stale_title))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.home_backup_stale_detail, 45L))
+            .assertIsDisplayed()
+        clickTaggedCard(HomeScreenTestTags.PRIMARY_ACTION_CARD)
+
+        assertEquals(listOf("backup"), actions)
+    }
+
+    @Test
+    fun lowHealthRelationshipAction_opensContactDetail() {
+        val actions = mutableListOf<String>()
+
+        setHomeContent(
+            actions = actions,
+            state = populatedHomeState(
+                primaryAction = HomeNextAction(
+                    kind = HomeNextActionKind.RECONNECT_CONTACT,
+                    actionTarget = HomeActionTarget.ContactDetail("contact-1"),
+                    contactName = "Asha",
+                    healthScore = 32,
+                ),
+            ),
+        )
+
+        composeRule.onNode(hasScrollAction())
+            .performScrollToNode(hasTestTag(HomeScreenTestTags.PRIMARY_ACTION_CARD))
+        composeRule.onNodeWithText(context.getString(R.string.home_next_action_reconnect_title, "Asha"))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.home_next_action_reconnect_detail, 32))
+            .assertIsDisplayed()
+        clickTaggedCard(HomeScreenTestTags.PRIMARY_ACTION_CARD)
+
+        assertEquals(listOf("contact:contact-1"), actions)
+    }
+
+    @Test
+    fun supportingActions_routeThroughTypedTargets() {
+        val actions = mutableListOf<String>()
+
+        setHomeContent(
+            actions = actions,
+            state = populatedHomeState(
+                primaryAction = HomeNextAction(
+                    kind = HomeNextActionKind.REVIEW_PENDING,
+                    actionTarget = HomeActionTarget.Messages,
+                    count = 2,
+                ),
+                supportingActions = listOf(
+                    HomeNextAction(
+                        kind = HomeNextActionKind.REFRESH_BACKUP,
+                        actionTarget = HomeActionTarget.BackupRestore,
+                        daysSinceBackup = 35,
+                    ),
+                    HomeNextAction(
+                        kind = HomeNextActionKind.CONNECT_AI,
+                        actionTarget = HomeActionTarget.AutomationSetup,
+                    ),
+                ),
+            ),
+        )
+
+        composeRule.onNodeWithText(context.getString(R.string.home_next_action_section))
+            .assertIsDisplayed()
+        clickTaggedCard(HomeScreenTestTags.SUPPORTING_ACTION_PREFIX + "refresh_backup")
+        clickTaggedCard(HomeScreenTestTags.SUPPORTING_ACTION_PREFIX + "connect_ai")
+
+        assertEquals(listOf("backup", "automation"), actions)
     }
 
     @Test
@@ -230,6 +327,9 @@ class HomeScreenInteractionTest {
             totalSteps = 3,
             warningCount = 1,
         ),
+        backupPrompt: BackupFreshnessPrompt? = null,
+        primaryAction: HomeNextAction? = null,
+        supportingActions: List<HomeNextAction> = emptyList(),
         plannerItems: List<RelationshipPlannerItem> = listOf(
             RelationshipPlannerItem(
                 title = "Reconnect with Asha",
@@ -251,6 +351,9 @@ class HomeScreenInteractionTest {
         readinessDetail = readinessDetail,
         readinessAction = readinessAction,
         setupProgress = setupProgress,
+        backupPrompt = backupPrompt,
+        primaryAction = primaryAction,
+        supportingActions = supportingActions,
         plannerItems = plannerItems,
     )
 }

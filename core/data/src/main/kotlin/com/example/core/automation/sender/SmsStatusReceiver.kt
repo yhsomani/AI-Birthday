@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.MessageDeliveryStatus
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -37,12 +38,20 @@ class SmsStatusReceiver : BroadcastReceiver() {
             try {
                 when (action) {
                     "com.example.SMS_SENT" -> {
-                        val status = if (code == android.app.Activity.RESULT_OK) "SENT" else "FAILED"
+                        val status = if (code == android.app.Activity.RESULT_OK) {
+                            MessageDeliveryStatus.SENT.raw
+                        } else {
+                            MessageDeliveryStatus.FAILED.raw
+                        }
                         sentMessageDao.updateDeliveryStatus(sentMessageId, status)
                         StructuredLogger.i(TAG, "SMS sent status updated to $status for message $sentMessageId")
                     }
                     "com.example.SMS_DELIVERED" -> {
-                        val status = if (code == android.app.Activity.RESULT_OK) "DELIVERED" else "FAILED"
+                        val status = if (code == android.app.Activity.RESULT_OK) {
+                            MessageDeliveryStatus.DELIVERED.raw
+                        } else {
+                            MessageDeliveryStatus.FAILED.raw
+                        }
                         sentMessageDao.updateDeliveryStatus(sentMessageId, status)
                         StructuredLogger.i(TAG, "SMS delivery status updated to $status for message $sentMessageId")
                     }

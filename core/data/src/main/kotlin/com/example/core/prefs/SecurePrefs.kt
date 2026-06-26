@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.example.domain.model.ApprovalMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -107,7 +108,15 @@ class SecurePrefs(context: Context) {
     fun getSenderEmailPassword(): String = configPrefs.getString("sender_email_pw", "") ?: ""
 
     fun setGlobalAutomationMode(mode: String) = configPrefs.edit().putString("global_automation_mode", mode).apply()
-    fun getGlobalAutomationMode(): String = configPrefs.getString("global_automation_mode", "SMART_APPROVE") ?: "SMART_APPROVE"
+    fun getGlobalAutomationMode(): String =
+        configPrefs.getString("global_automation_mode", ApprovalMode.SMART_APPROVE.raw)
+            ?: ApprovalMode.SMART_APPROVE.raw
+    fun setGlobalApprovalMode(mode: ApprovalMode) = setGlobalAutomationMode(
+        GlobalAutomationModePrefsMapper.toSupportedRaw(mode)
+    )
+    fun getGlobalApprovalMode(): ApprovalMode = GlobalAutomationModePrefsMapper.toSupportedApprovalMode(
+        getGlobalAutomationMode()
+    )
 
     fun setThemeMode(mode: String) = configPrefs.edit().putString("theme_mode", mode).apply()
     fun getThemeMode(): String = configPrefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM"
@@ -159,6 +168,10 @@ class SecurePrefs(context: Context) {
 
     fun setLastBackupMs(ms: Long) = configPrefs.edit().putLong("last_backup_ms", ms).apply()
     fun getLastBackupMs(): Long = configPrefs.getLong("last_backup_ms", 0L)
+
+    fun setLastBackupReminderMs(ms: Long) =
+        configPrefs.edit().putLong("last_backup_reminder_ms", ms).apply()
+    fun getLastBackupReminderMs(): Long = configPrefs.getLong("last_backup_reminder_ms", 0L)
 
     fun setLastSyncError(error: String?) = configPrefs.edit().putString("last_sync_error", error).apply()
     fun getLastSyncError(): String? = configPrefs.getString("last_sync_error", null)

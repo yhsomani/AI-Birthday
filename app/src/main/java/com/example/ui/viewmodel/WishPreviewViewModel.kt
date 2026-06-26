@@ -8,10 +8,16 @@ import com.example.core.db.entities.MessageFeedbackEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
+import com.example.domain.repository.EventRepository
 import com.example.domain.repository.GiftHistoryRepository
 import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.repository.MessageFeedbackRepository
 import com.example.domain.repository.MessageRepository
+import com.example.domain.model.ActivityLogSeverity
+import com.example.domain.model.ActivityLogStatus
+import com.example.domain.model.ActivityLogType
+import com.example.domain.model.EventType
+import com.example.domain.model.MessageStatus
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RegeneratePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
@@ -43,6 +49,21 @@ data class ReviewNextTarget(
     val contactId: String,
     val messageRef: String,
 )
+
+data class WishPreviewSendSummary(
+    val eventType: String,
+    val channel: String,
+    val scheduledForMs: Long,
+    val approvalMode: String,
+    val usesFallback: Boolean,
+)
+
+enum class WishDraftReadiness {
+    READY,
+    EDITED_READY,
+    TOO_SHORT,
+    BLANK,
+}
 
 private val aiFeedbackOptions = listOf(
     AiFeedbackOption(
@@ -100,6 +121,8 @@ data class WishPreviewUiState(
     val whySignals: List<WhySignal> = emptyList(),
     val nextReviewTarget: ReviewNextTarget? = null,
     val remainingReviewCount: Int = 0,
+    val sendSummary: WishPreviewSendSummary? = null,
+    val draftReadiness: WishDraftReadiness = WishDraftReadiness.READY,
 )
 
 @HiltViewModel
@@ -108,6 +131,7 @@ class WishPreviewViewModel @Inject constructor(
     private val activityLogRepository: ActivityLogRepository,
     private val messageFeedbackRepository: MessageFeedbackRepository,
     private val contactRepository: ContactRepository,
+    private val eventRepository: EventRepository,
     private val memoryNoteRepository: MemoryNoteRepository,
     private val giftHistoryRepository: GiftHistoryRepository,
     private val approvePendingMessageUseCase: ApprovePendingMessageUseCase,
@@ -126,6 +150,7 @@ class WishPreviewViewModel @Inject constructor(
                     ?: messageRepository.getPendingByEventId(messageRef)
                 if (pending != null) {
                     val whySignals = buildWhySignals(pending)
+                    val sendSummary = buildSendSummary(pending)
                     val reviewQueueState = buildReviewQueueState(pending)
                     _uiState.value = WishPreviewUiState(
                         pendingMessage = pending,
@@ -134,6 +159,8 @@ class WishPreviewViewModel @Inject constructor(
                         isLoading = false,
                         usedFallback = pending.isUsingFallback,
                         whySignals = whySignals,
+                        sendSummary = sendSummary,
+                        draftReadiness = pending.evaluateDraftReadiness(pending.selectedVariantText, pending.selectedVariant),
                         nextReviewTarget = reviewQueueState.nextTarget,
                         remainingReviewCount = reviewQueueState.remainingReviewCount,
                         qualityMessageRes = if (pending.isUsingFallback) {
@@ -171,6 +198,7 @@ class WishPreviewViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             selectedVariant = variant,
             editedText = text,
+            draftReadiness = msg.evaluateDraftReadiness(text, variant),
         )
     }
 
@@ -258,6 +286,11 @@ class WishPreviewViewModel @Inject constructor(
                             isRegenerating = false,
                             usedFallback = result.usedFallback,
                             whySignals = buildWhySignals(updated),
+                            sendSummary = buildSendSummary(updated),
+                            draftReadiness = updated.evaluateDraftReadiness(
+                                updated.selectedVariantText,
+                                updated.selectedVariant,
+                            ),
                             qualityMessageRes = if (result.usedFallback) {
                                 R.string.wish_preview_quality_template_used
                             } else if (feedback != null) {
@@ -303,14 +336,14 @@ class WishPreviewViewModel @Inject constructor(
                 activityLogRepository.record(
                     ActivityLogEntity(
                         id = UUID.randomUUID().toString(),
-                        type = "AI",
+                        type = ActivityLogType.AI.raw,
                         title = "AI feedback saved",
                         detail = option.instruction,
                         contactId = pending.contactId,
                         eventId = pending.eventId,
                         messageId = pending.id,
-                        severity = "INFO",
-                        status = "OPEN",
+                        severity = ActivityLogSeverity.INFO.raw,
+                        status = ActivityLogStatus.OPEN.raw,
                         actionRoute = "wish/${pending.contactId}/${pending.id}",
                         metadataJson = "{\"feedback\":\"${option.key}\"}",
                     )
@@ -320,11 +353,26 @@ class WishPreviewViewModel @Inject constructor(
     }
 
     fun updateEditedText(text: String) {
-        _uiState.value = _uiState.value.copy(editedText = text)
+        val pending = _uiState.value.pendingMessage
+        _uiState.value = _uiState.value.copy(
+            editedText = text,
+            draftReadiness = pending?.evaluateDraftReadiness(text, _uiState.value.selectedVariant)
+                ?: text.evaluateDraftReadinessAgainst(""),
+        )
     }
 
     fun approve() {
         val pendingId = _uiState.value.pendingMessage?.id ?: return
+        val draftReadiness = _uiState.value.pendingMessage
+            ?.evaluateDraftReadiness(_uiState.value.editedText, _uiState.value.selectedVariant)
+            ?: _uiState.value.editedText.evaluateDraftReadinessAgainst("")
+        if (draftReadiness == WishDraftReadiness.BLANK) {
+            _uiState.value = _uiState.value.copy(
+                draftReadiness = draftReadiness,
+                errorMessageRes = R.string.wish_preview_readiness_blank,
+            )
+            return
+        }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isApproving = true, errorMessageRes = null)
             val finalText = _uiState.value.editedText
@@ -375,7 +423,7 @@ class WishPreviewViewModel @Inject constructor(
         val reviewableMessages = runCatching {
             messageRepository.getAllPending()
                 .first()
-                .filter { it.status.equals("PENDING", ignoreCase = true) }
+                .filter { MessageStatus.fromRaw(it.status) == MessageStatus.PENDING }
                 .sortedWith(compareBy<PendingMessageEntity> { it.scheduledForMs }.thenBy { it.id })
         }.getOrElse {
             emptyList()
@@ -414,8 +462,56 @@ class WishPreviewViewModel @Inject constructor(
         )
     }
 
+    private suspend fun buildSendSummary(pending: PendingMessageEntity): WishPreviewSendSummary {
+        val eventType = eventRepository.getAll()
+            .first()
+            .firstOrNull { it.id == pending.eventId }
+            ?.type
+            ?: EventType.BIRTHDAY.raw
+        return WishPreviewSendSummary(
+            eventType = eventType,
+            channel = pending.channel,
+            scheduledForMs = pending.scheduledForMs,
+            approvalMode = pending.approvalMode,
+            usesFallback = pending.isUsingFallback,
+        )
+    }
+
+    private fun PendingMessageEntity.evaluateDraftReadiness(
+        draft: String,
+        variant: String,
+    ): WishDraftReadiness {
+        return draft.evaluateDraftReadinessAgainst(variantText(variant))
+    }
+
+    private fun String.evaluateDraftReadinessAgainst(sourceText: String): WishDraftReadiness {
+        val trimmed = trim()
+        return when {
+            trimmed.isBlank() -> WishDraftReadiness.BLANK
+            trimmed.length < MIN_REVIEWED_DRAFT_LENGTH -> WishDraftReadiness.TOO_SHORT
+            this != sourceText -> WishDraftReadiness.EDITED_READY
+            else -> WishDraftReadiness.READY
+        }
+    }
+
+    private fun PendingMessageEntity.variantText(variant: String): String {
+        return when (variant) {
+            "short" -> shortVariant
+            "standard" -> standardVariant
+            "long" -> longVariant
+            "formal" -> formalVariant
+            "funny" -> funnyVariant
+            "emotional" -> emotionalVariant
+            else -> standardVariant
+        }
+    }
+
     private data class ReviewQueueState(
         val nextTarget: ReviewNextTarget? = null,
         val remainingReviewCount: Int = 0,
     )
+
+    private companion object {
+        const val MIN_REVIEWED_DRAFT_LENGTH = 12
+    }
 }

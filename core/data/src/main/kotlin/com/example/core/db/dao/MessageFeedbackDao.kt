@@ -21,6 +21,12 @@ interface MessageFeedbackDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(feedback: MessageFeedbackEntity)
 
+    @Query("SELECT * FROM message_feedback ORDER BY createdAtMs DESC")
+    suspend fun getAllSync(): List<MessageFeedbackEntity>
+
+    @Query("DELETE FROM message_feedback")
+    suspend fun deleteAll()
+
     @Query("UPDATE message_feedback SET appliedToRegeneration = 1 WHERE id = :id")
     suspend fun markApplied(id: String)
 }

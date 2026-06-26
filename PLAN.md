@@ -19,14 +19,14 @@ The repo is close to a full product, but it has several production blockers:
 
 | Priority | Finding | Evidence | Required resolution |
 | --- | --- | --- | --- |
-| P0 | 🐛 BUG: approved messages can send early when exact alarm permission is missing | `DailyScheduler` immediately enqueues WorkManager fallback at [core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt:56](core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt:56), while `MessageDispatchWorker` sends any `APPROVED` message without checking `scheduledForMs` at [core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt:67](core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt:67) | Worker must defer all messages until `scheduledForMs`; WorkManager fallback must use initial delay |
-| P0 | ⚡ CONFLICT: dispatch approval semantics are split | `GenerateMessageUseCase` schedules `SMART_APPROVE` while storing it as `PENDING` at [core/domain/src/main/kotlin/com/example/domain/usecase/GenerateMessageUseCase.kt:133](core/domain/src/main/kotlin/com/example/domain/usecase/GenerateMessageUseCase.kt:133), worker auto-sends `SMART_APPROVE` after scheduled time at [core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt:89](core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt:89), but `DispatchMessageUseCase` rejects non-`APPROVED` drafts at [core/domain/src/main/kotlin/com/example/domain/usecase/DispatchMessageUseCase.kt:27](core/domain/src/main/kotlin/com/example/domain/usecase/DispatchMessageUseCase.kt:27) | Create one dispatch eligibility policy shared by worker and use case |
-| P0 | 🐛 BUG: non-birthday AI fallback copy can become birthday copy | `AiServiceImpl` calls `ResponseParser.parseMessageVariants(response)` without event type at [core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt:47](core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt:47), while parser defaults to `BIRTHDAY` at [core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt:59](core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt:59) | Always parse variants with event type |
-| P0 | 🐛 BUG: contact classification prompt and parser disagree | Prompt asks for `type`, `confidence`, `language`, `formality` at [core/data/src/main/kotlin/com/example/core/gemini/PromptBuilder.kt:62](core/data/src/main/kotlin/com/example/core/gemini/PromptBuilder.kt:62); parser expects `communication_style` at [core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt:52](core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt:52) | Align JSON schema and add tests |
-| P1 | 🐛 BUG: manual birthdays can duplicate after discovery | Manual save writes a `manual_UUID` event and also mutates contact birthday fields at [core/domain/src/main/kotlin/com/example/domain/usecase/SaveManualEventUseCase.kt:56](core/domain/src/main/kotlin/com/example/domain/usecase/SaveManualEventUseCase.kt:56); discovery later creates `${contact.id}_birthday` at [core/domain/src/main/kotlin/com/example/domain/usecase/DiscoverEventsUseCase.kt:49](core/domain/src/main/kotlin/com/example/domain/usecase/DiscoverEventsUseCase.kt:49) | Stable event identity per contact/type/date or replace/upsert canonical event |
-| P1 | 🚧 INCOMPLETE: backup is not full app restore | Export covers contacts/events/pending/sent/style/memory/gifts at [core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt:168](core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt:168), but omits local preferences, activity logs, feedback, automation setup, sync metadata, and secret-handling rules | Define full backup contract and exclusion list |
+| Done | ✅ RESOLVED: early-send and dispatch policy split | [DispatchEligibilityPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/DispatchEligibilityPolicy.kt) is used by [MessageDispatchWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt), [DispatchMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/DispatchMessageUseCase.kt), and notification approval decisions; it now owns future-time, quiet-hour, and blackout-date send deferral. [DailyScheduler.kt](core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt) passes delayed WorkManager fallback requests; domain dispatch writes redacted activity logs | Continue with background-worker activity-log parity and failed-retry explanation follow-ups |
+| Done | ✅ RESOLVED: event-aware AI fallback | [AiServiceImpl.kt](core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt) passes event type to `ResponseParser.parseMessageVariants` in generation and regeneration; [ResponseParser.kt](core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt) returns structured parse metadata; malformed/error AI responses are logged as fallback reasons without raw response bodies | Continue with remaining worker reuse for holiday/revival/follow-up paths |
+| Done | ✅ RESOLVED: weekly generation worker use-case reuse | [MessageGenerationWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/MessageGenerationWorker.kt) now delegates each 7-day lookahead event to [GenerateMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/GenerateMessageUseCase.kt); failed occurrences can be regenerated through an explicit worker request while foreground generation still blocks duplicates | Continue with dispatch worker orchestration cleanup and other generator workers |
+| Done | ✅ RESOLVED: contact classification prompt/parser schema | [ContactClassificationContract.kt](core/domain/src/main/kotlin/com/example/domain/service/ContactClassificationContract.kt) defines canonical field names and accepted values; [PromptBuilder.kt](core/data/src/main/kotlin/com/example/core/gemini/PromptBuilder.kt), [ResponseParser.kt](core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt), and [ClassifyContactUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/ClassifyContactUseCase.kt) use it for prompt output, legacy parsing, enum normalization, default telemetry, and persisted style | Continue with classification rationale codes if product explanations require them |
+| Done | ✅ RESOLVED: event data integrity stabilization | Standard manual events use canonical contact/type identity through [EventIdentityPolicy.kt](core/domain/src/main/kotlin/com/example/domain/event/EventIdentityPolicy.kt); discovery and manual save share [EventDatePolicy.kt](core/domain/src/main/kotlin/com/example/domain/event/EventDatePolicy.kt); route and regeneration readiness are covered by targeted tests | Continue with product UX follow-up for merge/keep actions and richer readiness badges |
+| P1 | ⚠️ PARTIAL: backup v2 and replace restore exist, DB-key/security work remains | [BackupServiceImpl.kt](core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt) now exports a v2 manifest with counts/checksum, activity logs, message feedback, and non-secret preference subset while excluding credential keys; selected-URI exports clean up the internal encrypted copy; import preview shows version/app/counts before mutation; restore is explicit replace mode with merge deferred | Finish DB-key migration/security tasks |
 | P1 | ⚡ CONFLICT: active product docs disagree | Source app is RelateAI; `docs/startup-idea/product-requirements-document.md` describes LeadRescue AI at [docs/startup-idea/product-requirements-document.md:1](docs/startup-idea/product-requirements-document.md:1) | Move unrelated docs out of active product docs or mark archived |
-| P1 | ⚠️ UNVERIFIED: tests could not run in this shell | `./gradlew testDebugUnitTest --no-configuration-cache` failed before Gradle started: no Java runtime found | Install/configure JDK 21 and rerun test, lint, assemble |
+| P1 | ⚠️ PARTIAL: full release validation remains open | Targeted Gradle suites now run with `JAVA_HOME=/opt/homebrew/opt/openjdk@21`; full unit baseline, lint, assemble, and device/emulator validation are still separate P7 tasks | Run full unit, lint, assemble, and runtime validation before release |
 
 North-star architecture: a modular, local-first Android app with a single automation policy engine, typed domain models, typed AI contracts, encrypted persistence, clear review gates, explicit delivery route eligibility, and UI states backed by string resources instead of hardcoded strings.
 
@@ -220,14 +220,14 @@ Acceptance criteria:
 | --- | --- |
 | Files | [core/domain/src/main/kotlin/com/example/domain/usecase/SyncContactsUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/SyncContactsUseCase.kt), [core/data/src/main/kotlin/com/example/core/contacts/GoogleContactsSync.kt](core/data/src/main/kotlin/com/example/core/contacts/GoogleContactsSync.kt), [core/data/src/main/kotlin/com/example/core/contacts/DeviceContactsReader.kt](core/data/src/main/kotlin/com/example/core/contacts/DeviceContactsReader.kt) |
 | Intended behavior | Merge Google People API and local device contacts, preserve enrichment, discover events |
-| Current behavior | Google sync, device sync, merge by phone/email/name, then event discovery. Device reader returns empty when permission is denied |
-| Risks | 🚧 INCOMPLETE: permission failure can look like "no contacts"; Google sync builds raw People API requests and should encode tokens/page tokens |
+| Current behavior | Google sync, device sync, merge by phone/email/name, then event discovery. People API connection URLs are built with encoded query parameters, and device contacts permission denial returns a specific sync outcome instead of looking like an empty list |
+| Risks | 🚧 INCOMPLETE: richer Google error taxonomy and recovery for auth expiry/rate limits still need to be first-class UI states |
 | Rebuild spec | Sync pipeline returns typed outcomes: `Success`, `PartialSuccess`, `PermissionRequired`, `GoogleAuthRequired`, `RateLimited`, `NetworkFailure` |
 
 Acceptance criteria:
 
-- Google failure plus local contacts permission denial produces actionable UI, not a generic empty list.
-- Sync tokens are encoded and invalid token recovery is covered by tests.
+- Google failure plus local contacts permission denial produces actionable UI, not a generic empty list. Current stabilization covers device permission denial through `SyncOutcome.deviceContactsPermissionDenied`.
+- Sync tokens are encoded. Invalid-token recovery remains a future typed outcome.
 - Merge rules preserve user-edited names, event dates, preferences, memory notes, and relationship type.
 
 ### 2.4 Event Discovery and Manual Events
@@ -236,15 +236,17 @@ Acceptance criteria:
 | --- | --- |
 | Files | [core/domain/src/main/kotlin/com/example/domain/usecase/DiscoverEventsUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/DiscoverEventsUseCase.kt), [core/domain/src/main/kotlin/com/example/domain/usecase/SaveManualEventUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/SaveManualEventUseCase.kt), events UI |
 | Intended behavior | Discover birthdays, anniversaries, work anniversaries, and custom/manual dates |
-| Current behavior | Discovery creates canonical contact-derived ids like `${contact.id}_birthday`; manual save creates `manual_UUID` and also updates contact date fields |
-| Risks | 🐛 BUG: manual birthday can duplicate after discovery; 🐛 BUG: discovery date math uses lenient `Calendar` at [core/domain/src/main/kotlin/com/example/domain/usecase/DiscoverEventsUseCase.kt:107](core/domain/src/main/kotlin/com/example/domain/usecase/DiscoverEventsUseCase.kt:107) |
-| Rebuild spec | Events have canonical identity `(contactId, type, month, day, sourceKind)` with a merge policy and non-lenient date validation |
+| Current behavior | Standard manual events use canonical contact/type ids unless the user explicitly saves a separate duplicate. Discovery skips matching active manual/verified events, invalid dates are rejected by `EventDatePolicy`, same contact/type date conflicts return a visible conflict outcome before persistence, the Events list derives trust labels for source/verification/duplicate/date-conflict states, and conflict rows expose explicit merge or keep-separate actions |
+| Risks | 🚧 INCOMPLETE: source-history audit beyond current source/verification/conflict chips remains a product UX follow-up |
+| Rebuild spec | Events have canonical identity for standard contact events, non-lenient date validation, visible conflict state, and explicit user-controlled paths for merging into a selected event or keeping separate reminders |
 
 Acceptance criteria:
 
 - Saving a manual birthday then running discovery results in one birthday event.
 - Invalid imported dates are rejected or quarantined, never rolled into another month.
-- Event source and verification are visible in detail/debug views.
+- Same contact/type with a different date shows a conflict warning before mutation.
+- Event source, verification, duplicate, and date-conflict state are visible in the event list.
+- Event duplicates/conflicts can be resolved by explicitly merging into the selected row or keeping the active reminders separate.
 
 ### 2.5 AI Message Generation
 
@@ -252,14 +254,14 @@ Acceptance criteria:
 | --- | --- |
 | Files | [core/domain/src/main/kotlin/com/example/domain/usecase/GenerateMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/GenerateMessageUseCase.kt), [core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt](core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt), [core/data/src/main/kotlin/com/example/core/gemini/PromptBuilder.kt](core/data/src/main/kotlin/com/example/core/gemini/PromptBuilder.kt), [core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt](core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt) |
 | Intended behavior | Build personalized prompt from contact/event/style/history/memory/gifts, parse multiple variants, select quality-gated draft |
-| Current behavior | Prompting and parser exist; quality gate downgrades fully-auto fallback/generic drafts; worker path passes event type to parser, service path does not |
-| Risks | 🐛 BUG: non-birthday fallback copy may be wrong; parser silently falls back on malformed JSON; generation logic is duplicated between use case and worker |
-| Rebuild spec | AI gateway must use typed prompt contracts, typed parse results, event-aware fallbacks, and a single generation service used by both UI and workers |
+| Current behavior | Prompting and parser exist; quality gate downgrades fully-auto fallback/generic drafts; `AiServiceImpl` passes event type into the parser so fallback copy matches birthdays, anniversaries, work anniversaries, and revival contexts. Message variant parsing now returns structured metadata (`SUCCESS` or `FALLBACK`, plus `malformed_json` or `error_payload` reason) and service logging records fallback reason without raw AI response text. The weekly `MessageGenerationWorker` delegates prompt, AI, approval, quality, channel, persistence, scheduling, and notification behavior to `GenerateMessageUseCase` |
+| Risks | 🚧 INCOMPLETE: holiday, revival, and post-event generator workers still contain generation-policy logic that should move behind use cases/services |
+| Rebuild spec | AI gateway must use typed prompt contracts, typed parse results, event-aware fallbacks, redacted parse telemetry, and a single generation service used by both UI and workers |
 
 Acceptance criteria:
 
 - Anniversary, work anniversary, and revival fallback text always matches event type.
-- Malformed AI responses produce structured telemetry and `isUsingFallback = true`.
+- Malformed AI responses produce structured telemetry and `isUsingFallback = true` without logging raw AI response content.
 - No worker duplicates prompt, parsing, approval, or quality-gate logic.
 
 ### 2.6 Contact Classification
@@ -268,15 +270,15 @@ Acceptance criteria:
 | --- | --- |
 | Files | [core/domain/src/main/kotlin/com/example/domain/usecase/ClassifyContactUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/ClassifyContactUseCase.kt), [core/data/src/main/kotlin/com/example/core/gemini/PromptBuilder.kt](core/data/src/main/kotlin/com/example/core/gemini/PromptBuilder.kt), [core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt](core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt) |
 | Intended behavior | AI classifies relationship, language, formality, and communication style |
-| Current behavior | Classification only runs for unknown relationship types, but schema mismatch defaults communication style to `WARM` |
-| Risks | 🐛 BUG: communication style never reliably changes |
-| Rebuild spec | Define `ContactClassificationResponse` JSON schema with `relationship_type`, `confidence`, `language`, `formality`, `communication_style`, `rationale_code` |
+| Current behavior | Classification only runs for unknown relationship types. Prompt output uses canonical `relationship_type`, `relationship_subtype`, `confidence`, `language`, `formality`, and `communication_style` fields from `ContactClassificationContract`; parser accepts legacy `type`, `subtype`, `communicationStyle`, and `style`; enum-like values are normalized before persistence |
+| Risks | 🚧 INCOMPLETE: classification rationale codes remain a follow-up if product explanations need them |
+| Rebuild spec | Define `ContactClassificationResponse` JSON schema with `relationship_type`, optional `relationship_subtype`, `confidence`, `language`, `formality`, `communication_style`, and `rationale_code` |
 
 Acceptance criteria:
 
 - Prompt and parser field names are identical.
 - Invalid enum values are normalized or rejected.
-- Unit tests cover all expected style fields.
+- Unit tests cover canonical fields, legacy aliases, missing/invalid style defaults, and persisted normalized style.
 
 ### 2.7 Approval Modes and Dispatch
 
@@ -284,8 +286,8 @@ Acceptance criteria:
 | --- | --- |
 | Files | [core/domain/src/main/kotlin/com/example/domain/automation/ApprovalModeResolver.kt](core/domain/src/main/kotlin/com/example/domain/automation/ApprovalModeResolver.kt), [core/domain/src/main/kotlin/com/example/domain/usecase/DispatchMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/DispatchMessageUseCase.kt), [core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt) |
 | Intended behavior | Fully auto sends without review, smart approve gives a review window, VIP requires explicit approval or expires, always ask requires explicit approval |
-| Current behavior | `ApprovalModeResolver.schedulesAutomaticDispatch` returns true for `FULLY_AUTO` and `SMART_APPROVE` at [core/domain/src/main/kotlin/com/example/domain/automation/ApprovalModeResolver.kt:32](core/domain/src/main/kotlin/com/example/domain/automation/ApprovalModeResolver.kt:32); worker implements smart auto-send and VIP expiry; domain dispatch use case only allows `APPROVED` |
-| Risks | ⚡ CONFLICT: UI/manual dispatch and worker dispatch disagree; 🐛 BUG: approved future messages can send early |
+| Current behavior | `DispatchEligibilityPolicy` now governs worker dispatch, domain dispatch use-case paths, and notification approval decisions. The policy defers future approved messages, defers otherwise-sendable messages during quiet hours or blackout dates, sends due smart-approve messages, keeps VIP/always-ask review-gated, expires VIP after the window, and blocks handled states. `MessageDispatchWorker` injects `PreferencesRepository` and passes timing preferences into the policy instead of computing send timing locally. Domain dispatch records redacted activity logs for deferred, needs-approval, expired, blocked, contact-missing, and sent outcomes |
+| Risks | 🚧 INCOMPLETE: background-worker activity-log parity and failed-retry notification outcomes still need richer policy-detail coverage |
 | Rebuild spec | One `DispatchEligibilityPolicy.evaluate(message, now)` returns `SendNow`, `DeferUntil(ms)`, `NeedApproval`, `Expire`, `Reject`, or `NoRoute` |
 
 Acceptance criteria:
@@ -301,8 +303,8 @@ Acceptance criteria:
 | --- | --- |
 | Files | `core/data/src/main/kotlin/com/example/core/automation/sender/**`, [core/domain/src/main/kotlin/com/example/domain/automation/AutoSendChannelSelector.kt](core/domain/src/main/kotlin/com/example/domain/automation/AutoSendChannelSelector.kt), settings/setup UI |
 | Intended behavior | Choose eligible route among SMS, WhatsApp, Email based on contact data, history, preferences, blackout, and setup |
-| Current behavior | Runtime dispatcher has route resolver and fallback; generation selector returns a fallback SMS/preferred channel even when no channel is available at [core/domain/src/main/kotlin/com/example/domain/automation/AutoSendChannelSelector.kt:24](core/domain/src/main/kotlin/com/example/domain/automation/AutoSendChannelSelector.kt:24) |
-| Risks | 🐛 BUG: generated pending messages can store an unavailable channel instead of a no-route state |
+| Current behavior | Runtime dispatcher has route resolver and fallback. Generation, holiday, revival, post-event follow-up, and regeneration paths now call `AutoSendChannelSelector.selectRoute()`; no-route results force drafts to `ALWAYS_ASK`/`PENDING` and avoid automatic scheduling |
+| Risks | 🚧 INCOMPLETE: Messages now has initial task-state buckets and readiness badges; preview UI and direct fix actions still need richer route/readiness handling |
 | Rebuild spec | Channel selection returns `EligibleRoute(channel, reason)` list or `NoEligibleRoute(reasons)` |
 
 Acceptance criteria:
@@ -317,8 +319,8 @@ Acceptance criteria:
 | --- | --- |
 | Files | [app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt](app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt), [core/domain/src/main/kotlin/com/example/domain/usecase/RegeneratePendingMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/RegeneratePendingMessageUseCase.kt), messages UI |
 | Intended behavior | User reviews variants, edits text, approves/schedules/rejects, regenerates with feedback |
-| Current behavior | Review and regenerate exist; regenerate replaces variants but does not recompute channel, schedule, approval mode, or quality score at [core/domain/src/main/kotlin/com/example/domain/usecase/RegeneratePendingMessageUseCase.kt:57](core/domain/src/main/kotlin/com/example/domain/usecase/RegeneratePendingMessageUseCase.kt:57) |
-| Risks | 🚧 INCOMPLETE: regenerated drafts can retain stale automation eligibility |
+| Current behavior | Review and regenerate exist. Wish Preview shows an approval-plan summary for event type, route, schedule, approval mode, and AI/fallback quality before the editable draft. It now recalculates draft readiness after variant changes, edits, regeneration, and approval attempts; blank drafts disable approval and are blocked before mutation. Regeneration re-runs quality gating, recomputes route readiness, re-resolves approval mode, clears stale edited/approved state by default, and only preserves user edits or approval when explicitly requested |
+| Risks | 🚧 INCOMPLETE: preview still needs shared route/setup readiness from the same helper used by Messages, Dispatch, and AI Doctor |
 | Rebuild spec | Regeneration must re-run quality gate and dispatch readiness, while preserving user-approved status only when explicitly requested |
 
 Acceptance criteria:
@@ -381,8 +383,8 @@ Acceptance criteria:
 | --- | --- |
 | Files | analytics screen/viewmodel, activity history screen/viewmodel, activity log DAO/entity |
 | Intended behavior | Show relationship health, automation history, and action trails |
-| Current behavior | Screens and viewmodels exist, but backup export omits activity logs |
-| Risks | 🚧 INCOMPLETE: activity logs are not part of backup; event and dispatch telemetry should feed analytics consistently |
+| Current behavior | Screens and viewmodels exist. Backup v2 now includes activity logs in the encrypted payload, and Activity History has task filters for dispatch, AI, sync, backup, settings, messages, events, and analytics |
+| Risks | 🚧 INCOMPLETE: activity history still needs redaction review, common-entry task naming, and safe resolve/mark-reviewed actions |
 | Rebuild spec | Activity logging is a cross-cutting domain event sink used by sync, AI, review, dispatch, backup, and settings changes |
 
 Acceptance criteria:
@@ -397,15 +399,16 @@ Acceptance criteria:
 | --- | --- |
 | Files | [core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt](core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt), backup UI/viewmodel |
 | Intended behavior | Encrypted export/import for local relationship data |
-| Current behavior | AES/passphrase backup exists and exports core relational data |
-| Risks | 🚧 INCOMPLETE: scope is undefined; internal encrypted copy is created in `filesDir` at [core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt:181](core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt:181), even when exporting to URI |
-| Rebuild spec | Define backup manifest, version migrations, secret exclusions, import merge/replace modes, and cleanup policy for temporary files |
+| Current behavior | AES/passphrase backup exists and exports v2 payloads with manifest, app version, export timestamp, record counts, SHA-256 payload checksum, contacts, events, pending/sent messages, style profile, memory notes, gift history, activity logs, message feedback, and non-secret preferences. Import remains v1-compatible and rejects mismatched v2 manifest checksums. File selection previews backup version, app version, restore mode, and record count before the user confirms restore. Confirmed restore uses replace mode: existing restorable relationship data is cleared inside the same database transaction before backup rows are inserted, so invalid restores roll back without losing current local data. When the user exports to a selected URI, the internal encrypted copy is deleted after the copy attempt |
+| Risks | 🚧 INCOMPLETE: DB-key migration and deeper security validation remain open |
+| Rebuild spec | Keep backup manifest, version migrations, secret exclusions, explicit replace restore mode, future merge mode, and cleanup policy for temporary files |
 
 Acceptance criteria:
 
 - Backup includes user-generated local data: contacts, events, pending/sent, style profile, memory, gifts, feedback, activity logs, non-secret preferences.
 - Backup excludes OAuth tokens, API keys, email app passwords, cached DB keys, and device-specific identifiers.
 - Restore validates schema version and shows a preview before mutating DB.
+- Restore copy and service behavior agree: initial restore mode is replace, merge is deferred, and invalid restore attempts roll back all pre-insert deletes.
 
 ### 2.15 Settings and Localization
 
@@ -413,13 +416,14 @@ Acceptance criteria:
 | --- | --- |
 | Files | [app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt](app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt), [app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt](app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt), `strings.xml`, `values-hi/strings.xml` |
 | Intended behavior | Configure AI, automation, quiet hours, channel blackouts, email sender, backup reminders, biometrics, language |
-| Current behavior | Settings exist and use many string resources; several ViewModels and use cases still return hardcoded English errors |
-| Risks | 🚧 INCOMPLETE: hardcoded strings bypass localization and parity tests |
+| Current behavior | Settings exist and use many string resources; Home, Contact List, Contact Detail preference errors, Events, and Messages cleaned ViewModel copy now resolve through resources; manual-event and contact-preference validation use typed reasons; some domain-owned activity-log text remains to translate at the data-to-UI boundary |
+| Risks | 🚧 INCOMPLETE: remaining domain activity-log strings and any unscanned niche flows can bypass localization if not mapped before display |
 | Rebuild spec | All UI-facing text exits ViewModels as `UiText.StringResource` or typed domain error resolved by UI |
 
 Acceptance criteria:
 
-- No new user-facing string literals in ViewModels/use cases.
+- No new user-facing string literals in cleaned ViewModels/use cases.
+- Domain use cases return typed validation reasons when the UI needs localized copy.
 - English and Hindi resource parity tests cover app and data module strings.
 - Runtime language changes update top-level UI without process restart where feasible.
 
@@ -484,13 +488,14 @@ Acceptance criteria:
 
 ### CR-003: Event Identity
 
-Decision: contact-derived and manual events must merge by `(contactId, type, month, day)` unless the user explicitly creates a separate custom event.
+Decision: standard contact-derived and manual events use canonical contact/type identity. Exact same-date matches are treated as duplicates, same contact/type different-date matches are surfaced as conflicts before mutation, and explicit save-anyway creates a separate manual reminder.
 
 Acceptance criteria:
 
 - Manual birthday plus discovery yields one event.
-- Source history records `MANUAL`, `CONTACTS`, or `MERGED`.
-- User verification wins over imported data when dates conflict.
+- Source/verification state is visible in the event list.
+- User verification wins over imported data when dates match.
+- Date conflicts are visible and require explicit user choice before a separate reminder is saved.
 
 ### CR-004: Backup Scope
 
@@ -521,7 +526,57 @@ Acceptance criteria:
 
 Decision: use enum/value-class domain models, not parallel sealed classes and raw strings.
 
-Evidence: [core/domain/src/main/kotlin/com/example/domain/model/AutomationMode.kt](core/domain/src/main/kotlin/com/example/domain/model/AutomationMode.kt) defines sealed classes that are not the active approval model, while production code uses `ApprovalMode`, `MessageChannel`, and raw strings.
+Evidence: the removed `core/domain/src/main/kotlin/com/example/domain/model/AutomationMode.kt` file defined sealed classes that were not the active approval model, while production code uses `ApprovalMode`, `MessageChannel`, and persistence strings.
+
+Current progress:
+
+- Contact preference updates now cross the use-case boundary as `ApprovalMode`: [UpdateContactPreferencesUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/UpdateContactPreferencesUseCase.kt) accepts `Request.automationMode: ApprovalMode`, rejects `ApprovalMode.UNKNOWN`, and writes only `.raw` at the Room entity boundary.
+- Contact preference preferred-channel saves now cross the use-case boundary as `MessageChannel`: [UpdateContactPreferencesUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/UpdateContactPreferencesUseCase.kt) accepts `Request.preferredChannel: MessageChannel`, rejects unknown/unsupported channel values, and writes only `.raw` at the Room entity boundary.
+- [ContactDetailScreen.kt](app/src/main/java/com/example/ui/screens/contacts/ContactDetailScreen.kt) maps persisted/UI channel strings through `MessageChannel.fromRaw()` for quick actions, personalization quality checks, and preference saves; unsupported legacy channel values fall back to SMS in the picker before saving.
+- [ContactDetailScreen.kt](app/src/main/java/com/example/ui/screens/contacts/ContactDetailScreen.kt) maps persisted/UI automation strings through `ApprovalMode.fromRaw()` before saving preferences.
+- Settings channel blackout controls now pass `MessageChannel` values into [SettingsViewModel.kt](app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt); persisted blackout JSON is parsed/written only at the `SecurePrefs` edge, unknown legacy channel values are filtered, and `MessageChannel.UNKNOWN` cannot be saved.
+- `AutoSendChannelSelector` and `DeliveryChannelResolver` now return typed `MessageChannel` route decisions; generation, regeneration, holiday, follow-up, revival, and dispatch map raw persisted channel strings only at their storage/dispatch edges.
+- AI prompt contact context now stores `MessageChannel`; [PromptBuilder.kt](core/data/src/main/kotlin/com/example/core/gemini/PromptBuilder.kt) maps stored contact channel strings at the prompt edge and emits raw channel labels only when rendering the Gemini prompt.
+- `AutomationSchedulePolicy.isChannelBlocked()` now accepts `MessageChannel`; Messages readiness parses pending-message channel strings once at the read edge before evaluating blackout and route prerequisites.
+- Contact defaults and manual-event contact creation now derive the preferred-channel storage default from `MessageChannel.SMS.raw`.
+- Automation Setup email readiness now counts email-preferred contacts through `MessageChannel.fromRaw()` so legacy-cased stored channel values trigger the correct Gmail setup diagnostic.
+- Wish Preview and Messages review surfaces now render channel labels/icons through `MessageChannel.fromRaw()` so legacy-cased stored routes display as localized SMS, WhatsApp, and Email labels.
+- Auto-send route selector tests now derive supported contact, history, and blackout channel fixtures from `MessageChannel.raw`, leaving raw lower-case values only for explicit legacy normalization coverage.
+- Prompt-builder tests now derive supported previous-wish and prompt channel fixtures from `MessageChannel.raw`, leaving unsupported legacy channel fallback explicit.
+- Dispatch use-case tests now derive pending-message channel fixtures and dispatch outcome assertions from `MessageChannel.SMS.raw`.
+- Generation use-case tests now derive contact preferred-channel fixtures and pending-message channel assertions from `MessageChannel.raw`.
+- Regeneration use-case tests now derive pending-message helper defaults, no-route contact fixtures, and saved-channel assertions from `MessageChannel.SMS.raw`.
+- Approve, reject, and revoke use-case tests now derive review-action pending-message channel fixtures from `MessageChannel.SMS.raw`.
+- Wish Preview and Messages ViewModel tests now derive review-summary, channel-filter, readiness, and task-bucket channel fixtures from `MessageChannel.raw`.
+- Analytics report, backup, DAO, and pending-entity tests now derive persistence-shaped supported SMS channel fixtures from `MessageChannel.SMS.raw`.
+- Dispatch eligibility, revival cadence, notification approval action, SMS status receiver, and automation pipeline tests now derive supported route fixtures from `MessageChannel.SMS.raw`.
+- Dashboard metrics and style-analysis use-case tests now derive supported SMS route fixtures from `MessageChannel.SMS.raw`.
+- Contact Detail quality/body-section and Contact List tests now derive supported SMS/Email contact preference fixtures from `MessageChannel.raw`.
+- Chat History ViewModel and screen interaction tests now derive supported WhatsApp sent-message fixtures from `MessageChannel.WHATSAPP.raw`.
+- Wish Preview screen interaction tests now derive supported SMS review fixtures from `MessageChannel.SMS.raw`.
+- Messages screen interaction tests now derive supported SMS, WhatsApp, and Email queue fixtures from `MessageChannel.raw`.
+- Settings channel blackout tests now derive supported SMS, WhatsApp, and Email JSON tokens from `MessageChannel.raw`.
+- Automation Setup tests now derive SMS recommendation-title fixtures from `MessageChannel.SMS.raw`.
+- Final supported-channel literal sweep found no production/test supported raw channel fixtures outside `MessageChannel` and explicit legacy/casing parser coverage.
+- Holiday, post-event follow-up, and revival worker tests now derive background-generated draft channel fixtures and no-route assertions from `MessageChannel.SMS.raw`.
+- Message dispatch worker tests now derive scheduled dispatch, smart-approve, quiet-hours, failure, and double-send guard channel fixtures from `MessageChannel.SMS.raw`.
+- [ApprovalModeResolver.kt](core/domain/src/main/kotlin/com/example/domain/automation/ApprovalModeResolver.kt) now accepts typed `ApprovalMode` values; generation, regeneration, holiday, follow-up, and revival paths map persisted/preference strings at their edges before invoking the resolver.
+- [DispatchEligibilityPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/DispatchEligibilityPolicy.kt) now accepts typed `ApprovalMode` values; dispatch use case, dispatch worker, and notification approval action policy map persisted pending-message strings before invoking it.
+- Generation and approval use-case success outcomes now return typed `ApprovalMode` values instead of raw strings.
+- Messages, Wish Preview, Contact Detail quick actions, and Contacts VIP filtering now map approval-mode read models through `ApprovalMode.fromRaw()` before display/filter comparisons.
+- Settings global automation-mode UI state now uses `ApprovalMode`, mapping raw `SecurePrefs` values only at load/save boundaries.
+- `PreferencesRepository` now exposes global automation mode as `ApprovalMode`; `PreferencesRepositoryImpl` normalizes raw `SecurePrefs` storage values and writes raw strings only at the storage boundary.
+- `SecurePrefs` now exposes typed global approval-mode helpers; Settings, the repository adapter, and holiday/follow-up/revival workers consume typed values while backup/import still preserves raw storage payloads.
+- Contact Detail's personalization automation picker now stores typed `ApprovalMode` values, falls back unsupported legacy overrides to Default, and no longer exposes raw enum names in the field title.
+- Dead duplicate `AutomationMode`/`CommunicationChannel`/`RelationshipType` sealed taxonomy was removed, and ContactEntity/SecurePrefs/backup defaults now derive approval strings from `ApprovalMode.*.raw`.
+- Initial approved/pending status writes in holiday, follow-up, revival, approve, revoke, and retry paths now use `MessageStatus.*.raw`; revoke parses legacy status values with `MessageStatus.fromRaw()`.
+- Non-SQL pending-message status defaults, notification action writes, reject/dispatch/regeneration status transitions, the Wish Preview review queue, and the widget pending count now use `MessageStatus`.
+- Sent-message delivery status now uses `MessageDeliveryStatus` for route-history success checks, SMS dispatch writes, SMS callback updates, and Analytics reliability filtering.
+- Activity-log open/resolved status writes now use `ActivityLogStatus` in dispatch audit records, Wish Preview feedback logs, and entity defaults while preserving raw Room storage.
+- Dispatch audit metadata decision labels now use `DispatchActivityDecision` in dispatch activity recording while preserving the existing raw JSON payload values.
+- Activity-log severity writes and Activity History severity colors now use `ActivityLogSeverity` while preserving raw Room severity values.
+- Activity-log producers, Activity History type filters/icons, and status filtering now use `ActivityLogType`/`ActivityLogStatus` readers while preserving raw Room type/status values.
+- Broader approval-mode string cleanup remains open for Room SQL schema/query literals where Room requires raw text, serialized backup/import payload fields, legacy fixture JSON, and remaining persistence mapping paths.
 
 Acceptance criteria:
 
@@ -653,21 +708,24 @@ Backup data must be versioned independently from Room schema:
 ```json
 {
   "version": 2,
-  "createdAtMs": 0,
-  "appVersion": "x.y.z",
-  "counts": {},
-  "payload": {
-    "contacts": [],
-    "events": [],
-    "pendingMessages": [],
-    "sentMessages": [],
-    "activityLogs": [],
-    "messageFeedback": [],
-    "styleProfile": {},
-    "memoryNotes": [],
-    "giftHistory": [],
-    "preferences": {}
-  }
+  "timestampMs": 0,
+  "manifest": {
+    "backupVersion": 2,
+    "appVersion": "x.y.z",
+    "exportedAtMs": 0,
+    "counts": {},
+    "dataChecksumSha256": "..."
+  },
+  "contacts": [],
+  "events": [],
+  "pendingMessages": [],
+  "sentMessages": [],
+  "activityLogs": [],
+  "messageFeedback": [],
+  "styleProfile": {},
+  "memoryNotes": [],
+  "giftHistory": [],
+  "preferences": {}
 }
 ```
 
@@ -742,17 +800,17 @@ Acceptance criteria:
 | Splash | Exists | Keep routing deterministic and test onboarding/auth/home branches |
 | Onboarding | Exists | Ensure automation setup path is optional and localizable |
 | Auth | Exists | Clarify guest limitations |
-| Home | Exists, oversized | Split dashboard sections; show capability warnings compactly |
+| Home | Exists, oversized | Ranked primary/supporting actions, backup freshness, and setup progress implemented; split dashboard sections and keep capability warnings compact |
 | Contacts | Exists | Distinguish empty, permission denied, sync failed, and loading |
 | Contact Detail | Exists, oversized | Split preference editor, events, insights, actions |
 | Events | Exists, oversized | Make source/verification visible; prevent duplicates |
-| Messages | Exists, very oversized | Split tabs, row components, filters, readiness badges, dialogs |
-| Wish Preview | Exists, oversized | Recalculate readiness on edit/regenerate; surface fallback state |
+| Messages | Exists, very oversized | Task-state tabs and readiness badges implemented; split row components, filters, dialogs, and fix actions next |
+| Wish Preview | Exists, oversized | Approval-plan, fallback summary, and edit-readiness implemented; shared route/setup readiness and split action sections next |
 | Settings | Exists, oversized | Group sensitive settings, validate secrets, remove hardcoded errors |
 | Analytics | Exists | Ensure metrics are derived from restorable data |
-| Activity History | Exists | Include filters and redaction; add backup coverage |
-| Automation Setup | Exists, oversized | Make diagnostics share `CapabilityState` |
-| Backup Restore | Exists | Add manifest preview and temp-file cleanup |
+| Activity History | Exists | Dispatch/AI/sync/backup/settings filters implemented; add redaction and deeper backup coverage next |
+| Automation Setup | Exists, oversized | Ranked recommended fix, generic-message risk, and grouped diagnostics implemented; make diagnostics share `CapabilityState` next |
+| Backup Restore | Exists | Manifest preview, replace-mode warning, replace restore transaction, and temp-file cleanup implemented; DB-key/security work remains |
 | Memory Vault | Exists | Add sensitivity/prompt eligibility controls |
 | Gift Advisor | Exists | Improve suggestion validation and dedupe |
 | Style Coach | Exists | Add stronger enum validation |
@@ -765,7 +823,7 @@ Acceptance criteria:
 - Keep operational screens dense and scannable; avoid marketing-style hero layouts inside the app.
 - Every actionable row needs disabled/loading/error states.
 - Every dangerous action has confirmation and clear consequences.
-- Accessibility labels are required for icon-only actions.
+- Accessibility labels are required for icon-only actions; cleaned `IconButton`/FAB action surfaces now have a regression test that enforces non-null screen reader labels.
 - All user-facing copy must be in resources.
 - Hindi resource parity must remain tested.
 
@@ -855,13 +913,13 @@ Acceptance criteria:
 - Dispatch retries are bounded and recorded.
 - App cold start does not block main thread on DB or network work.
 
-⚠️ UNVERIFIED: no APK size, startup trace, memory profile, or runtime UI screenshot validation was executed during this plan generation because Java/Gradle execution is unavailable in the current shell.
+⚠️ UNVERIFIED: no APK size, startup trace, memory profile, or runtime UI screenshot validation has been executed. Targeted JVM unit suites have run with explicit `JAVA_HOME=/opt/homebrew/opt/openjdk@21`, but full release validation remains a P7 task.
 
 ## 12. Testing Strategy
 
 ### 12.1 Current Test Footprint
 
-The repository has 87 Kotlin test files across app/domain/data. Existing tests cover many domain policies, parsers, schedulers, backup pieces, localization parity, and dispatch components. Test execution could not be validated in this environment because no Java runtime was available.
+The repository has 87 Kotlin test files across app/domain/data. Existing tests cover many domain policies, parsers, schedulers, backup pieces, localization parity, and dispatch components. Targeted stabilization suites now run locally with `JAVA_HOME=/opt/homebrew/opt/openjdk@21`; full unit baseline, lint, debug assembly, emulator/device, and runtime smoke validation remain open.
 
 ### 12.2 Required P0 Tests
 
@@ -872,7 +930,7 @@ The repository has 87 Kotlin test files across app/domain/data. Existing tests c
 | `SMART_APPROVE` pending at scheduled time | Policy returns `SendNow` |
 | `VIP_APPROVE` pending after deadline | Policy returns `Expire`; no send |
 | AiService anniversary fallback | Fallback text is anniversary-specific |
-| Classification schema | Prompt includes `communication_style`; parser reads it |
+| Classification schema | Prompt emits canonical fields; parser reads canonical and legacy fields, normalizes style, and defaults unsupported style with telemetry |
 | Manual birthday then discovery | Exactly one birthday event remains |
 | Invalid discovered date | Rejected/quarantined; no lenient rollover |
 
@@ -889,7 +947,7 @@ The repository has 87 Kotlin test files across app/domain/data. Existing tests c
 
 ### 12.4 Commands
 
-Run locally after JDK 21 is installed/configured:
+Run locally with JDK 21 configured:
 
 ```bash
 ./gradlew testDebugUnitTest --no-configuration-cache
@@ -901,8 +959,8 @@ Run locally after JDK 21 is installed/configured:
 Current validation result:
 
 ```text
-./gradlew testDebugUnitTest --no-configuration-cache
-failed before Gradle started: Unable to locate a Java Runtime.
+Targeted stabilization unit suites: passed with JAVA_HOME=/opt/homebrew/opt/openjdk@21.
+Full unit baseline, lintDebug, assembleDebug, coverage, emulator, and device validation: not yet run.
 ```
 
 ## 13. Developer Experience
@@ -943,31 +1001,50 @@ For a production change:
 
 ### Phase 0: Safety Stabilization
 
-| Item | Owner area | Acceptance |
-| --- | --- | --- |
-| Fix early-send bug | automation scheduler/worker | Future approved sends are deferred under all scheduler paths |
-| Unify dispatch eligibility | domain/data | Worker and UI dispatch use same policy |
-| Fix event-aware AI fallback | AI service/parser | All event types receive correct fallback |
-| Fix classification schema | prompt/parser/tests | `communication_style` round trips |
-| Resolve product-doc conflict | docs | Active docs no longer describe LeadRescue AI as this product |
-| Configure Java runtime | dev environment | Gradle tests can run locally |
+| Item | Status | Owner area | Acceptance |
+| --- | --- | --- | --- |
+| Fix early-send bug | Implemented in stabilization slice | automation scheduler/worker | Future approved sends are deferred under scheduler, worker, and domain dispatch paths |
+| Unify dispatch eligibility | Implemented in stabilization slice | domain/data | Worker and UI dispatch use same policy |
+| Fix event-aware AI fallback | Implemented in stabilization slice | AI service/parser | All event types receive correct fallback |
+| Fix classification schema | Implemented in stabilization slice | prompt/parser/domain/tests | Canonical classification fields and legacy aliases normalize before persistence |
+| Resolve product-doc conflict | Open | docs | Active docs no longer describe LeadRescue AI as this product |
+| Configure Java runtime | Partial | dev environment | Targeted Gradle suites run with explicit JDK 21; full P7 validation remains open |
 
 ### Phase 1: Data Integrity and Recovery
 
-| Item | Acceptance |
-| --- | --- |
-| Canonical event merge | Manual/imported birthdays do not duplicate |
-| Non-lenient event dates | Invalid imported dates do not roll over |
-| Backup v2 | Includes restorable local data and excludes secrets |
-| DB key migration | Random key for new installs, migration for old installs |
-| Channel no-route state | Automation blocks with actionable reason |
+| Item | Status | Acceptance |
+| --- | --- | --- |
+| Canonical event merge | Implemented in stabilization slice | Manual/imported birthdays do not duplicate |
+| Event date conflicts | Implemented in stabilization slice | Same contact/type different-date conflicts are visible before mutation |
+| Non-lenient event dates | Implemented in stabilization slice | Invalid imported dates do not roll over |
+| Contact sync token/permission integrity | Implemented in stabilization slice | People API tokens are encoded; device contacts permission denial is actionable |
+| Regeneration readiness | Implemented in stabilization slice | Regeneration recomputes quality, approval, channel readiness, and stale edit/approval state |
+| Channel no-route state | Implemented in stabilization slice | Automation blocks with actionable reason |
+| Backup v2 foundation | Implemented in stabilization slice | Manifest, counts, checksum, activity logs, feedback, non-secret preferences, and secret-key exclusion tests exist |
+| Backup import preview | Implemented in stabilization slice | User sees backup version, app version, and restorable record count before mutation |
+| Backup replace restore mode | Implemented in stabilization slice | UI warns that restore replaces existing relationship data; service clears and inserts restorable rows in one rollback-safe transaction |
+| Home backup freshness | Implemented in stabilization slice | Never-backed-up and stale-backup prompts route to Backup/Restore without starting export automatically |
+| Home ranked next action | Implemented in stabilization slice | Home shows one primary action and supporting actions for setup, approval, and backup work |
+| Home setup blocker summary | Implemented in stabilization slice | Home names the top setup blocker for contact sync, AI access, or disabled AI generation before routing to AI Doctor |
+| Home low-health relationship action | Implemented in stabilization slice | Worst low-health contact can become the ranked action and routes to Contact Detail for user-controlled follow-up |
+| AI Doctor recommended fix and generic-message risk | Implemented in stabilization slice | AI Doctor ranks actionable setup problems and shows one deterministic recommended fix, plus warns when contact context can produce generic messages |
+| Contact quality state | Implemented in stabilization slice | Contacts compute and surface ready, missing-event, missing-channel, and missing-context labels |
+| Contact action filters | Implemented in stabilization slice | Contacts can filter missing relationship, missing channel, low-health, and VIP groups |
+| Contact Detail grouping | Implemented in stabilization slice | Contact Detail content is grouped into essentials, personalization, automation, and history sections |
+| Contact Detail quality impact | Implemented in stabilization slice | Personalization quality card explains how missing context affects AI wish specificity |
+| Event trust labels | Implemented in stabilization slice | Event rows explain source, verification, duplicate, and date-conflict trust state |
+| Event conflict resolution actions | Implemented in stabilization slice | Event rows expose explicit merge-here and keep-separate controls for duplicate/conflict families |
+| Messages task-state tabs | Implemented in stabilization slice | Messages tabs are Needs review, Scheduled, Blocked, Sent, and Failed, with blocked approval hidden |
+| Wish Preview approval plan | Implemented in stabilization slice | Preview shows event type, route, schedule, approval mode, and AI/fallback quality before approval |
+| Wish Preview edit readiness | Implemented in stabilization slice | Preview recalculates draft readiness after edits and blocks blank approval |
+| DB key migration | Open | Random key for new installs, migration for old installs |
 
 ### Phase 2: Architecture Cleanup
 
 | Item | Acceptance |
 | --- | --- |
-| Worker use-case reuse | No duplicated prompt/approval/dispatch rules in workers |
-| Domain model typing | Approval/channel/status/relationship raw strings isolated at persistence boundary |
+| Worker use-case reuse | Weekly message generation worker implemented; continue until no worker duplicates prompt/approval/dispatch rules |
+| Domain model typing | Contact preference approval/channel saves, Contact Detail automation/channel picker state and read checks, Settings global mode/channel-blackout state, channel blackout policy, generation-time/runtime delivery routing, AI prompt channel context, contact channel storage defaults, setup email readiness diagnostics, review-screen channel labels/icons, route-selector, prompt-builder, generation, regeneration, dispatch use-case, review-action, review read-model, persistence/reporting, automation policy, dashboard/style, contact UI, chat history, Wish Preview interaction, Messages interaction, Settings blackout JSON, Automation Setup display, message-dispatch-worker, background-worker channel fixtures, and the final supported-channel literal sweep now use typed models; SecurePrefs/PreferencesRepository global mode boundaries, approval-mode storage defaults, approval-mode resolver inputs, dispatch eligibility, generation/approval outcomes, worker global-mode reads, selected UI/read-model comparisons, non-SQL pending-message status transitions/defaults/read filters, delivery-status routing/analytics/callbacks, activity-log open/resolved statuses, dispatch audit metadata decisions, activity-log severity, activity-log types/filters, and dead duplicate taxonomy removal now use typed models; continue until approval/status/relationship raw strings are isolated at persistence boundaries |
 | Split oversized files | Largest files reduced below 300 lines or explicitly excepted |
 | Error model | Typed failures and localized UI text |
 | Sync client injection | People API client testable and encoded |
@@ -986,15 +1063,15 @@ For a production change:
 
 | ID | Marker | Priority | Debt | Evidence | Fix |
 | --- | --- | --- | --- | --- | --- |
-| D-001 | 🐛 BUG | P0 | Approved future sends can happen early | `DailyScheduler` fallback enqueue at [DailyScheduler.kt:62](core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt:62) and worker immediate approved send at [MessageDispatchWorker.kt:67](core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt:67) | Add schedule guard and delayed fallback |
-| D-002 | ⚡ CONFLICT | P0 | Dispatch status policy split | [DispatchMessageUseCase.kt:27](core/domain/src/main/kotlin/com/example/domain/usecase/DispatchMessageUseCase.kt:27) vs [MessageDispatchWorker.kt:89](core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt:89) | Shared policy |
-| D-003 | 🐛 BUG | P0 | Event fallback copy defaults to birthday | [AiServiceImpl.kt:47](core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt:47), [ResponseParser.kt:59](core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt:59) | Pass event type |
-| D-004 | 🐛 BUG | P0 | Classification schema mismatch | [PromptBuilder.kt:62](core/data/src/main/kotlin/com/example/core/gemini/PromptBuilder.kt:62), [ResponseParser.kt:52](core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt:52) | Align schema |
-| D-005 | 🐛 BUG | P1 | Manual/contact event duplicates | [SaveManualEventUseCase.kt:56](core/domain/src/main/kotlin/com/example/domain/usecase/SaveManualEventUseCase.kt:56), [DiscoverEventsUseCase.kt:49](core/domain/src/main/kotlin/com/example/domain/usecase/DiscoverEventsUseCase.kt:49) | Canonical merge |
-| D-006 | 🐛 BUG | P1 | Lenient discovered date math | [DiscoverEventsUseCase.kt:107](core/domain/src/main/kotlin/com/example/domain/usecase/DiscoverEventsUseCase.kt:107) | Non-lenient validation |
-| D-007 | 🚧 INCOMPLETE | P1 | Backup scope incomplete | [BackupServiceImpl.kt:168](core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt:168) | Backup v2 |
-| D-008 | 🐛 BUG | P1 | No-route channel selector still returns SMS/preferred | [AutoSendChannelSelector.kt:24](core/domain/src/main/kotlin/com/example/domain/automation/AutoSendChannelSelector.kt:24) | Return typed no-route |
-| D-009 | 🚧 INCOMPLETE | P1 | Regenerate does not re-run readiness/quality | [RegeneratePendingMessageUseCase.kt:57](core/domain/src/main/kotlin/com/example/domain/usecase/RegeneratePendingMessageUseCase.kt:57) | Recompute policy |
+| D-001 | ✅ RESOLVED | Done | Approved future sends can happen early | [DispatchEligibilityPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/DispatchEligibilityPolicy.kt), [DailyScheduler.kt](core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt), [MessageDispatchWorkerTest.kt](app/src/test/java/com/example/core/automation/workers/MessageDispatchWorkerTest.kt) | Shared schedule guard and delayed WorkManager fallback |
+| D-002 | ✅ RESOLVED | Done | Dispatch status policy split | [DispatchMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/DispatchMessageUseCase.kt), [MessageDispatchWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt), [DispatchEligibilityPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/DispatchEligibilityPolicyTest.kt) | Shared policy across worker and use-case dispatch |
+| D-003 | ✅ RESOLVED | Done | Event fallback copy defaults to birthday | [AiServiceImpl.kt](core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt), [ResponseParserTest.kt](app/src/test/java/com/example/core/gemini/ResponseParserTest.kt), [AiServiceImplTest.kt](app/src/test/java/com/example/core/gemini/AiServiceImplTest.kt) | Generation/regeneration parse with event type, structured fallback metadata, and redacted fallback logging |
+| D-004 | ✅ RESOLVED | Done | Classification schema mismatch | [ContactClassificationContract.kt](core/domain/src/main/kotlin/com/example/domain/service/ContactClassificationContract.kt), [PromptBuilder.kt](core/data/src/main/kotlin/com/example/core/gemini/PromptBuilder.kt), [ResponseParser.kt](core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt), [ClassifyContactUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/ClassifyContactUseCaseTest.kt) | Prompt/parser/use-case share canonical classification fields, legacy aliases, enum normalization, and persisted style coverage |
+| D-005 | ✅ RESOLVED | Done | Manual/contact event duplicates and same-type date conflicts | [EventIdentityPolicy.kt](core/domain/src/main/kotlin/com/example/domain/event/EventIdentityPolicy.kt), [EventResolutionPolicy.kt](core/domain/src/main/kotlin/com/example/domain/event/EventResolutionPolicy.kt), [SaveManualEventUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/SaveManualEventUseCaseTest.kt), [DiscoverEventsUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/DiscoverEventsUseCaseTest.kt), [ResolveEventConflictUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/ResolveEventConflictUseCaseTest.kt) | Canonical IDs, duplicate warning, conflict outcome, explicit separate-event override, row-level merge/keep-separate actions |
+| D-006 | ✅ RESOLVED | Done | Lenient discovered date math | [EventDatePolicy.kt](core/domain/src/main/kotlin/com/example/domain/event/EventDatePolicy.kt), [SaveManualEventUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/SaveManualEventUseCaseTest.kt), [DiscoverEventsUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/DiscoverEventsUseCaseTest.kt) | Shared non-lenient validation and leap-day tests |
+| D-007 | ⚠️ PARTIAL | P1 | Backup scope/security incomplete | [BackupServiceImpl.kt](core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt), [BackupServiceImplTest.kt](core/data/src/test/kotlin/com/example/core/backup/BackupServiceImplTest.kt), [BackupRestoreViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/BackupRestoreViewModelTest.kt), [BackupRestoreScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/backup/BackupRestoreScreenInteractionTest.kt) | V2 manifest/count/checksum, activity log, feedback, non-secret preference, secret-key exclusion, selected-URI temp cleanup, import preview, and replace restore mode implemented; DB-key migration/security remains |
+| D-008 | ✅ RESOLVED | Done | No-route channel selector still returns SMS/preferred | [AutoSendChannelSelector.kt](core/domain/src/main/kotlin/com/example/domain/automation/AutoSendChannelSelector.kt), [AutoSendChannelSelectorTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/AutoSendChannelSelectorTest.kt), generation worker tests | Typed no-route result forces review-only drafts and prevents no-route auto-scheduling |
+| D-009 | ✅ RESOLVED | Done | Regenerate does not re-run readiness/quality | [RegeneratePendingMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/RegeneratePendingMessageUseCase.kt), [RegeneratePendingMessageUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/RegeneratePendingMessageUseCaseTest.kt), [WishPreviewViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt) | Regeneration recomputes quality, route, approval mode, scheduling, and stale edit/approval state |
 | D-010 | ⚡ CONFLICT | P1 | RelateAI repo contains LeadRescue product docs | [product-requirements-document.md:1](docs/startup-idea/product-requirements-document.md:1) | Archive/replace docs |
 | D-011 | ⚠️ UNVERIFIED | P1 | Runtime/widget/UI not smoke-tested | No emulator/browser execution in this audit | Add instrumentation/smoke tests |
 | D-012 | 🚧 INCOMPLETE | P1 | READ_CONTACTS missing from core permission rationale | [MainActivity.kt:341](app/src/main/java/com/example/MainActivity.kt:341) | Central capability state |
@@ -1003,7 +1080,7 @@ For a production change:
 | D-015 | 🚧 INCOMPLETE | P2 | Oversized screens/viewmodels | [MessagesScreen.kt](app/src/main/java/com/example/ui/screens/messages/MessagesScreen.kt) and others | Split files |
 | D-016 | 🚧 INCOMPLETE | P2 | Dead/duplicate automation/channel taxonomy | [AutomationMode.kt:7](core/domain/src/main/kotlin/com/example/domain/model/AutomationMode.kt:7) | Remove/migrate |
 | D-017 | 🚧 INCOMPLETE | P2 | Domain depends on Room-shaped entities | Entities/DAOs live under domain module | Decide and document model boundary |
-| D-018 | ⚠️ UNVERIFIED | P2 | Gradle tests not executed | Missing Java runtime | Install JDK 21 and rerun |
+| D-018 | ⚠️ PARTIAL | P2 | Full release validation not executed | Targeted unit suites pass with explicit JDK 21; full unit baseline, lint, assemble, coverage, emulator, and device validation remain open | Run P7 validation matrix |
 
 ## 16. Acceptance Criteria for the Rebuild
 
@@ -1014,8 +1091,9 @@ The rebuild is production-ready only when all of the following are true:
 - No automatic send can occur before `scheduledForMs`.
 - AI generation and regeneration use event-aware parsing and typed fallback results.
 - Contact classification prompt/parser schemas match.
-- Manual and discovered events merge without duplicates.
-- Backup v2 has a documented include/exclude manifest and import preview.
+- Manual and discovered events merge without duplicates, invalid event dates do not roll, and same-type date conflicts are visible before mutation.
+- No-route drafts and regenerated drafts are downgraded to review when automatic delivery is not currently safe.
+- Backup v2 has a documented include/exclude manifest, import preview, and explicit replace restore mode.
 - Secrets are excluded from backup and redacted from logs.
 - Gradle unit tests, lint, and debug assembly pass on JDK 21.
 - Active product docs refer to RelateAI, not unrelated products.

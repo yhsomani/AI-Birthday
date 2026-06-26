@@ -1,5 +1,7 @@
 package com.example.domain.usecase
 
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageStatus
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.SchedulerService
 import javax.inject.Inject
@@ -20,13 +22,13 @@ class ApprovePendingMessageUseCase @Inject constructor(
 
         val updatedPending = if (finalEditedText != null && finalEditedText != pending.selectedVariantText) {
             pending.copy(
-                status = "APPROVED",
+                status = MessageStatus.APPROVED.raw,
                 editedByUser = true,
                 userEditedText = finalEditedText,
                 selectedVariantText = finalEditedText
             )
         } else {
-            pending.copy(status = "APPROVED")
+            pending.copy(status = MessageStatus.APPROVED.raw)
         }
 
         messageRepository.insertPending(updatedPending)
@@ -34,11 +36,14 @@ class ApprovePendingMessageUseCase @Inject constructor(
         // Always schedule exactly when approved from the UI
         schedulerService.scheduleExactSend(updatedPending.id)
 
-        return ApprovalOutcome.Approved(updatedPending.id, updatedPending.approvalMode)
+        return ApprovalOutcome.Approved(
+            id = updatedPending.id,
+            approvalMode = ApprovalMode.fromRaw(updatedPending.approvalMode),
+        )
     }
 
     sealed class ApprovalOutcome {
         data object PendingNotFound : ApprovalOutcome()
-        data class Approved(val id: String, val approvalMode: String) : ApprovalOutcome()
+        data class Approved(val id: String, val approvalMode: ApprovalMode) : ApprovalOutcome()
     }
 }

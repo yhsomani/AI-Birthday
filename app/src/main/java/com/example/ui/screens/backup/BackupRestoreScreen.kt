@@ -47,6 +47,7 @@ object BackupRestoreTestTags {
     const val IMPORT_PROGRESS = "backup_restore_import_progress"
     const val STATUS_CARD = "backup_restore_status_card"
     const val DISMISS_STATUS = "backup_restore_dismiss_status"
+    const val CONFIRM_IMPORT = "backup_restore_confirm_import"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +87,7 @@ fun BackupRestoreScreen(
         onImportRequested = {
             importLauncher.launch(arrayOf("application/octet-stream", "*/*"))
         },
+        onConfirmImport = viewModel::confirmImportBackup,
         onClearStatus = viewModel::clearStatus,
         onBack = onBack,
     )
@@ -100,6 +102,7 @@ fun BackupRestoreContent(
     onTogglePasswordVisibility: () -> Unit,
     onExportRequested: () -> Unit,
     onImportRequested: () -> Unit,
+    onConfirmImport: () -> Unit,
     onClearStatus: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -324,7 +327,12 @@ fun BackupRestoreContent(
             }
 
             // Status Card
-            if (uiState.exportSuccessFileName != null || uiState.importSuccessCount != null || uiState.errorMessage != null) {
+            if (
+                uiState.exportSuccessFileName != null ||
+                uiState.importPreview != null ||
+                uiState.importSuccessCount != null ||
+                uiState.errorMessage != null
+            ) {
                 RelateGlassCard {
                     Column(
                         modifier = Modifier
@@ -365,6 +373,39 @@ fun BackupRestoreContent(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                            }
+                            uiState.importPreview != null -> {
+                                val preview = uiState.importPreview
+                                Text(
+                                    stringResource(R.string.backup_import_preview_title),
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    stringResource(
+                                        R.string.backup_import_preview_details,
+                                        preview.backupVersion,
+                                        preview.appVersion,
+                                        preview.totalRecords,
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    stringResource(R.string.backup_import_replace_warning),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Button(
+                                    onClick = onConfirmImport,
+                                    enabled = !isBusy,
+                                    modifier = Modifier
+                                        .align(Alignment.End)
+                                        .testTag(BackupRestoreTestTags.CONFIRM_IMPORT)
+                                ) {
+                                    Text(stringResource(R.string.backup_import_confirm))
+                                }
                             }
                             uiState.errorMessage != null -> {
                                 Text(

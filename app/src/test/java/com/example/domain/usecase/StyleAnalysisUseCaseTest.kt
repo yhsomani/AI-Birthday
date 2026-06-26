@@ -2,6 +2,7 @@ package com.example.domain.usecase
 
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.db.entities.StyleProfileEntity
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.StyleProfileRepository
 import io.mockk.coEvery
@@ -43,7 +44,7 @@ class StyleAnalysisUseCaseTest {
                 eventType = "BIRTHDAY",
                 eventYear = 2026,
                 messageText = "Dear John, wishing you a very happy birthday. Warm regards.",
-                channel = "SMS",
+                channel = MessageChannel.SMS.raw,
                 sentAtMs = 1L,
                 deliveryStatus = "SENT",
             ),

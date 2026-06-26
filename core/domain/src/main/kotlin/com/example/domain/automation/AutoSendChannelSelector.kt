@@ -2,25 +2,23 @@ package com.example.domain.automation
 
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.SentMessageEntity
-import java.util.Locale
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageDeliveryStatus
 
 object AutoSendChannelSelector {
-    private val supportedChannels = setOf("SMS", "WHATSAPP", "EMAIL")
-    private val deliverySuccessStatuses = setOf("SENT", "DELIVERED", "PENDING_DELIVERY")
-
     sealed class ChannelSelection {
-        abstract val channel: String
+        abstract val channel: MessageChannel
         abstract val hasAvailableRoute: Boolean
 
         data class Selected(
-            override val channel: String,
-            val availableChannels: Set<String>,
+            override val channel: MessageChannel,
+            val availableChannels: Set<MessageChannel>,
         ) : ChannelSelection() {
             override val hasAvailableRoute: Boolean = true
         }
 
         data class NoAvailableRoute(
-            override val channel: String,
+            override val channel: MessageChannel,
             val reasons: Set<NoRouteReason>,
         ) : ChannelSelection() {
             override val hasAvailableRoute: Boolean = false
@@ -41,7 +39,7 @@ object AutoSendChannelSelector {
         channelBlackoutJson: String,
         senderEmail: String,
         senderEmailPassword: String,
-    ): String {
+    ): MessageChannel {
         return selectRoute(
             contact = contact,
             previousMessages = previousMessages,
@@ -76,16 +74,16 @@ object AutoSendChannelSelector {
             )
         }
 
-        val preferred = contact.preferredChannel.normalizedChannel()
+        val preferred = MessageChannel.fromRaw(contact.preferredChannel)
         val bestHistorical = previousMessages
             .asSequence()
-            .filter { it.deliveryStatus.normalizedStatus() in deliverySuccessStatuses }
-            .map { it.channel.normalizedChannel() }
+            .filter { MessageDeliveryStatus.fromRaw(it.deliveryStatus).isSuccessfulForRouting }
+            .map { MessageChannel.fromRaw(it.channel) }
             .filter { it in availableChannels }
             .groupingBy { it }
             .eachCount()
             .maxWithOrNull(
-                compareBy<Map.Entry<String, Int>> { it.value }
+                compareBy<Map.Entry<MessageChannel, Int>> { it.value }
                     .thenByDescending { preferredTieBreakRank(it.key, preferred) }
             )
             ?.key
@@ -106,16 +104,17 @@ object AutoSendChannelSelector {
         channelBlackoutJson: String,
         senderEmail: String,
         senderEmailPassword: String,
-    ): Set<String> {
+    ): Set<MessageChannel> {
         val blocked = channelBlackoutJson.toChannelSet()
         return defaultOrder.filterNot { it in blocked }
             .filter {
                 when (it) {
-                    "SMS", "WHATSAPP" -> !contact.primaryPhone.isNullOrBlank()
-                    "EMAIL" -> !contact.primaryEmail.isNullOrBlank() &&
+                    MessageChannel.SMS,
+                    MessageChannel.WHATSAPP -> !contact.primaryPhone.isNullOrBlank()
+                    MessageChannel.EMAIL -> !contact.primaryEmail.isNullOrBlank() &&
                         senderEmail.isNotBlank() &&
                         senderEmailPassword.isNotBlank()
-                    else -> false
+                    MessageChannel.UNKNOWN -> false
                 }
             }
             .toSet()
@@ -136,12 +135,13 @@ object AutoSendChannelSelector {
                 return@forEach
             }
             when (channel) {
-                "SMS", "WHATSAPP" -> {
+                MessageChannel.SMS,
+                MessageChannel.WHATSAPP -> {
                     if (contact.primaryPhone.isNullOrBlank()) {
                         reasons += NoRouteReason.MISSING_PHONE
                     }
                 }
-                "EMAIL" -> {
+                MessageChannel.EMAIL -> {
                     if (contact.primaryEmail.isNullOrBlank()) {
                         reasons += NoRouteReason.MISSING_EMAIL
                     }
@@ -149,33 +149,32 @@ object AutoSendChannelSelector {
                         reasons += NoRouteReason.EMAIL_SENDER_NOT_CONFIGURED
                     }
                 }
+                MessageChannel.UNKNOWN -> Unit
             }
         }
 
         return reasons.ifEmpty { setOf(NoRouteReason.NO_SUPPORTED_CONTACT_CHANNEL) }
     }
 
-    private fun fallbackChannel(contact: ContactEntity): String {
-        return contact.preferredChannel.normalizedChannel().takeIf { it in supportedChannels } ?: "SMS"
+    private fun fallbackChannel(contact: ContactEntity): MessageChannel {
+        return MessageChannel.fromRaw(contact.preferredChannel)
+            .takeIf { it != MessageChannel.UNKNOWN }
+            ?: MessageChannel.SMS
     }
 
-    private fun preferredTieBreakRank(channel: String, preferred: String): Int {
+    private fun preferredTieBreakRank(channel: MessageChannel, preferred: MessageChannel): Int {
         if (channel == preferred) return 100
         val index = defaultOrder.indexOf(channel).takeIf { it >= 0 } ?: defaultOrder.size
         return defaultOrder.size - index
     }
 
-    private fun String.normalizedChannel(): String = trim().uppercase(Locale.US)
-
-    private fun String.normalizedStatus(): String = trim().uppercase(Locale.US)
-
-    private fun String.toChannelSet(): Set<String> {
+    private fun String.toChannelSet(): Set<MessageChannel> {
         return CHANNEL_PATTERN.findAll(this)
-            .map { it.groupValues[1].uppercase(Locale.US) }
-            .filter { it in supportedChannels }
+            .map { MessageChannel.fromRaw(it.groupValues[1]) }
+            .filter { it != MessageChannel.UNKNOWN }
             .toSet()
     }
 
-    private val defaultOrder = listOf("SMS", "WHATSAPP", "EMAIL")
+    private val defaultOrder = listOf(MessageChannel.SMS, MessageChannel.WHATSAPP, MessageChannel.EMAIL)
     private val CHANNEL_PATTERN = Regex("\"([A-Za-z_]+)\"")
 }

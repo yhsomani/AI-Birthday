@@ -7,6 +7,8 @@ import com.example.core.auth.AuthManager
 import com.example.core.db.DatabaseKeyDerivation
 import com.example.core.prefs.SecurePrefs
 import com.example.R
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
 import com.example.domain.usecase.SyncContactsUseCase
 import com.example.ui.feedback.FeedbackEvent
@@ -37,7 +39,7 @@ data class SettingsUiState(
     val senderEmail: String = "",
     val senderEmailPassword: String = "",
     val senderEmailSaved: Boolean = false,
-    val automationMode: String = "SMART_APPROVE",
+    val automationMode: ApprovalMode = ApprovalMode.SMART_APPROVE,
     val quietHoursStart: String = "22",
     val quietHoursEnd: String = "8",
     val biometricLockEnabled: Boolean = false,
@@ -67,7 +69,7 @@ class SettingsViewModel @Inject constructor(
             geminiApiKey = securePrefs.getGeminiApiKey(),
             senderEmail = securePrefs.getSenderEmail(),
             senderEmailPassword = securePrefs.getSenderEmailPassword(),
-            automationMode = securePrefs.getGlobalAutomationMode(),
+            automationMode = securePrefs.getGlobalApprovalMode(),
             lastSyncTimestamp = appContext.getString(R.string.settings_last_sync_never),
             lastBackupTimestamp = formatLastBackupTimestamp(securePrefs.getLastBackupMs()),
             quietHoursStart = securePrefs.getQuietHoursStart().toString(),
@@ -75,9 +77,9 @@ class SettingsViewModel @Inject constructor(
             biometricLockEnabled = securePrefs.isBiometricLockEnabled(),
             birthdayReminders = securePrefs.isBirthdayRemindersEnabled(),
             aiWishGeneration = securePrefs.isAiWishGenerationEnabled(),
-            channelBlackoutSms = securePrefs.isChannelBlacklisted("SMS"),
-            channelBlackoutWhatsApp = securePrefs.isChannelBlacklisted("WHATSAPP"),
-            channelBlackoutEmail = securePrefs.isChannelBlacklisted("EMAIL"),
+            channelBlackoutSms = securePrefs.isChannelBlacklisted(MessageChannel.SMS),
+            channelBlackoutWhatsApp = securePrefs.isChannelBlacklisted(MessageChannel.WHATSAPP),
+            channelBlackoutEmail = securePrefs.isChannelBlacklisted(MessageChannel.EMAIL),
             showLegacyDbNotice = securePrefs.wasLegacyUnencryptedDbQuarantined(),
         )
         viewModelScope.launch {
@@ -150,8 +152,8 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
-    fun setAutomationMode(mode: String) {
-        securePrefs.setGlobalAutomationMode(mode)
+    fun setAutomationMode(mode: ApprovalMode) {
+        securePrefs.setGlobalApprovalMode(mode)
         _uiState.value = _uiState.value.copy(automationMode = mode)
     }
 
@@ -198,15 +200,17 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
-    fun toggleChannelBlackout(channel: String, disabled: Boolean) {
+    fun toggleChannelBlackout(channel: MessageChannel, disabled: Boolean) {
+        if (channel == MessageChannel.UNKNOWN) return
+
         val next = securePrefs.getChannelBlackout().toMutableChannelSet().apply {
             if (disabled) add(channel) else remove(channel)
         }
         securePrefs.setChannelBlackout(next.toJsonArray())
         _uiState.value = _uiState.value.copy(
-            channelBlackoutSms = "SMS" in next,
-            channelBlackoutWhatsApp = "WHATSAPP" in next,
-            channelBlackoutEmail = "EMAIL" in next,
+            channelBlackoutSms = MessageChannel.SMS in next,
+            channelBlackoutWhatsApp = MessageChannel.WHATSAPP in next,
+            channelBlackoutEmail = MessageChannel.EMAIL in next,
             feedbackEvent = FeedbackEvent(
                 message = UiText.Resource(R.string.settings_channel_blackout_saved),
                 type = FeedbackType.SUCCESS,
@@ -270,23 +274,21 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private fun SecurePrefs.isChannelBlacklisted(channel: String): Boolean {
+    private fun SecurePrefs.isChannelBlacklisted(channel: MessageChannel): Boolean {
         return channel in getChannelBlackout().toMutableChannelSet()
     }
 
-    private fun String.toMutableChannelSet(): MutableSet<String> {
-        return try {
-            val array = org.json.JSONArray(this)
-            MutableList(array.length()) { index -> array.optString(index).uppercase() }
-                .filter { it in setOf("SMS", "WHATSAPP", "EMAIL") }
-                .toMutableSet()
-        } catch (_: Exception) {
-            mutableSetOf()
-        }
+    private fun String.toMutableChannelSet(): MutableSet<MessageChannel> {
+        return CHANNEL_TOKEN_PATTERN.findAll(this)
+            .map { match -> MessageChannel.fromRaw(match.groupValues[1]) }
+            .filter { it != MessageChannel.UNKNOWN }
+            .toMutableSet()
     }
 
-    private fun Set<String>.toJsonArray(): String {
-        return org.json.JSONArray(toList().sorted()).toString()
+    private fun Set<MessageChannel>.toJsonArray(): String {
+        return map { it.raw }
+            .sorted()
+            .joinToString(separator = ",", prefix = "[", postfix = "]") { channel -> "\"$channel\"" }
     }
 
     private fun formatLastBackupTimestamp(timestampMs: Long): String {
@@ -301,5 +303,9 @@ class SettingsViewModel @Inject constructor(
             ageDays == 1L -> appContext.getString(R.string.settings_last_backup_yesterday)
             else -> appContext.getString(R.string.settings_last_backup_days_ago, ageDays)
         }
+    }
+
+    private companion object {
+        val CHANNEL_TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")
     }
 }

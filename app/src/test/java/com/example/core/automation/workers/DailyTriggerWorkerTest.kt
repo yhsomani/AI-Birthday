@@ -44,7 +44,44 @@ class DailyTriggerWorkerTest {
 
     @Test
     fun `doWork schedules daily chain and returns success`() = runTest {
-        val worker = TestListenableWorkerBuilder<DailyTriggerWorker>(context)
+        val worker = dailyTriggerWorker()
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        verify { WorkerScheduler.scheduleDailyAutomationChain(any()) }
+        verify { eventReminderSchedulerService.rescheduleAll() }
+    }
+
+    @Test
+    fun `doWork keeps never backed up state separate from reminder baseline`() = runTest {
+        every { prefs.getLastBackupMs() } returns 0L
+        every { prefs.getLastBackupReminderMs() } returns 0L
+        val worker = dailyTriggerWorker()
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        verify(exactly = 0) { prefs.setLastBackupMs(any()) }
+        verify { prefs.setLastBackupReminderMs(any()) }
+        verify(exactly = 0) { NotificationHelper.showSystemAlert(any(), any(), any()) }
+    }
+
+    @Test
+    fun `doWork shows backup reminder when exported backup is stale`() = runTest {
+        every { prefs.getLastBackupMs() } returns System.currentTimeMillis() - 31L * DAY_MS
+        every { prefs.getLastBackupReminderMs() } returns 0L
+        val worker = dailyTriggerWorker()
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        verify { NotificationHelper.showSystemAlert(any(), any(), any()) }
+        verify { prefs.setLastBackupReminderMs(any()) }
+    }
+
+    private fun dailyTriggerWorker(): DailyTriggerWorker {
+        return TestListenableWorkerBuilder<DailyTriggerWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(
                     appContext: Context,
@@ -60,11 +97,9 @@ class DailyTriggerWorkerTest {
                 }
             })
             .build()
+    }
 
-        val result = worker.doWork()
-
-        assertEquals(ListenableWorker.Result.success(), result)
-        verify { WorkerScheduler.scheduleDailyAutomationChain(any()) }
-        verify { eventReminderSchedulerService.rescheduleAll() }
+    private companion object {
+        const val DAY_MS = 24L * 60 * 60 * 1000L
     }
 }

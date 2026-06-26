@@ -45,12 +45,24 @@ class GenerateMessageUseCase @Inject constructor(
     private val notificationService: NotificationService
 ) {
     suspend operator fun invoke(eventId: String): GenerationOutcome {
-        val event = eventRepository.getEventsBefore(Long.MAX_VALUE).firstOrNull { it.id == eventId }
+        return invoke(Request(eventId = eventId))
+    }
+
+    suspend operator fun invoke(request: Request): GenerationOutcome {
+        val event = eventRepository.getEventsBefore(Long.MAX_VALUE).firstOrNull { it.id == request.eventId }
             ?: return GenerationOutcome.EventNotFound
 
         val scheduledYear = scheduledYearFor(event.nextOccurrenceMs)
-        if (messageRepository.pendingExistsForEventOccurrence(event.contactId, event.id, scheduledYear)) {
-            return GenerationOutcome.AlreadyExists
+        val existingPending = messageRepository.getPendingForEventOccurrence(
+            event.contactId,
+            event.id,
+            scheduledYear
+        )
+        val pendingId = when {
+            existingPending == null -> UUID.randomUUID().toString()
+            request.regenerateFailedOccurrence &&
+                MessageStatus.fromRaw(existingPending.status) == MessageStatus.FAILED -> existingPending.id
+            else -> return GenerationOutcome.AlreadyExists
         }
 
         val contact = contactRepository.getById(event.contactId) ?: return GenerationOutcome.ContactNotFound
@@ -84,11 +96,14 @@ class GenerateMessageUseCase @Inject constructor(
             )
             retries++
         }
+        if (variants.isUsingFallback) {
+            notificationService.showAiFallbackAlert()
+        }
 
         val globalMode = preferencesRepository.getGlobalAutomationMode()
         val requestedApprovalMode = ApprovalModeResolver.resolve(
             relationship = contact.relationshipType,
-            contactOverride = contact.automationMode,
+            contactOverride = ApprovalMode.fromRaw(contact.automationMode),
             globalMode = globalMode,
             skipAutoWish = contact.skipAutoWish,
         )
@@ -120,7 +135,7 @@ class GenerateMessageUseCase @Inject constructor(
         )
 
         val pending = PendingMessageEntity(
-            id = UUID.randomUUID().toString(),
+            id = pendingId,
             contactId = contact.id,
             eventId = event.id,
             shortVariant = variants.short,
@@ -131,7 +146,7 @@ class GenerateMessageUseCase @Inject constructor(
             emotionalVariant = variants.emotional,
             selectedVariant = variants.recommended,
             selectedVariantText = selectedVariantText,
-            channel = channelSelection.channel,
+            channel = channelSelection.channel.raw,
             scheduledForMs = scheduledForMs,
             approvalMode = approvalMode.raw,
             status = if (approvalMode == ApprovalMode.FULLY_AUTO) MessageStatus.APPROVED.raw else MessageStatus.PENDING.raw,
@@ -148,8 +163,13 @@ class GenerateMessageUseCase @Inject constructor(
             notificationService.showApprovalNotification(contact, event, variants, pending.id)
         }
 
-        return GenerationOutcome.Generated(pending.id, approvalMode.raw, retries)
+        return GenerationOutcome.Generated(pending.id, approvalMode, retries)
     }
+
+    data class Request(
+        val eventId: String,
+        val regenerateFailedOccurrence: Boolean = false
+    )
 
     private fun isPreviouslyUsed(newMessage: String, previous: List<SentMessageEntity>): Boolean {
         val newWords = newMessage.lowercase().split(" ").toSet()
@@ -170,6 +190,6 @@ class GenerateMessageUseCase @Inject constructor(
         data object ContactNotFound : GenerationOutcome()
         data object AlreadyExists : GenerationOutcome()
         data object AiDisabled : GenerationOutcome()
-        data class Generated(val pendingId: String, val approvalMode: String, val retries: Int) : GenerationOutcome()
+        data class Generated(val pendingId: String, val approvalMode: ApprovalMode, val retries: Int) : GenerationOutcome()
     }
 }

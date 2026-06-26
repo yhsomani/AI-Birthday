@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -64,12 +65,21 @@ import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.core.db.entities.ContactEntity
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
 import com.example.domain.usecase.UpdateContactPreferencesUseCase
 import com.example.ui.viewmodel.ContactDetailViewModel
 import com.example.ui.viewmodel.MemoryNoteCategorySummary
 
 internal object ContactDetailTestTags {
     const val PERSONALIZATION_ADD_MEMORY = "contact_detail_personalization_add_memory"
+    const val SECTION_ESSENTIALS = "contact_detail_section_essentials"
+    const val SECTION_PERSONALIZATION = "contact_detail_section_personalization"
+    const val SECTION_AUTOMATION = "contact_detail_section_automation"
+    const val SECTION_HISTORY = "contact_detail_section_history"
+    const val ACTION_ADD_MEMORY = "contact_detail_action_add_memory"
+    const val ACTION_ADD_GIFT = "contact_detail_action_add_gift"
+    const val ACTION_EDIT_PREFERENCES = "contact_detail_action_edit_preferences"
 }
 
 @Composable
@@ -174,181 +184,39 @@ fun ContactDetailScreen(
                     color = RelateOnSurfaceVariant,
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Button(
-                        onClick = { onNavigateToMemoryVault(contactId) },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.contact_detail_memory_vault),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    Button(
-                        onClick = { onNavigateToGiftAdvisor(contactId) },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.contact_detail_gift_advisor),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { onNavigateToChatHistory(contactId) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant)
-                ) {
-                    Icon(
-                        Icons.Filled.History,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.contact_detail_chat_history),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { showPreferencesEditor = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant)
-                ) {
-                    Icon(
-                        Icons.Filled.Edit,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.contact_detail_edit_preferences),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                contact?.let {
-                    QuickPersonalizationCard(
-                        contact = it,
-                        onAddMemory = { onNavigateToMemoryVault(contactId) },
-                        onAddGift = { onNavigateToGiftAdvisor(contactId) },
-                        onMarkVip = {
-                            viewModel.savePreferences(it.toPreferenceRequest().copy(automationMode = "VIP_APPROVE"))
-                        },
-                        onSetWhatsApp = {
-                            viewModel.savePreferences(it.toPreferenceRequest().copy(preferredChannel = "WHATSAPP"))
-                        },
-                        onSetSms = {
-                            viewModel.savePreferences(it.toPreferenceRequest().copy(preferredChannel = "SMS"))
-                        },
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    PersonalizationQualityCard(
-                        contact = it,
+                contact?.let { currentContact ->
+                    Spacer(modifier = Modifier.height(24.dp))
+                    ContactDetailBodySections(
+                        contactId = contactId,
+                        contact = currentContact,
                         memoryNoteCount = state.memoryNoteCount,
                         memoryNoteCategorySummary = state.memoryNoteCategorySummary,
-                        onAddMemory = { onNavigateToMemoryVault(contactId) },
+                        upcomingBirthdayDaysLeft = state.upcomingBirthdayDaysLeft,
+                        isGenerating = state.isGenerating,
+                        generationErrorRes = state.generationErrorRes,
+                        preferenceMessageRes = state.preferenceMessageRes,
+                        preferenceErrorRes = state.preferenceErrorRes,
+                        onNavigateToMemoryVault = onNavigateToMemoryVault,
+                        onNavigateToGiftAdvisor = onNavigateToGiftAdvisor,
+                        onNavigateToChatHistory = onNavigateToChatHistory,
+                        onEditPreferences = { showPreferencesEditor = true },
+                        onGenerateWish = { viewModel.generateWish() },
+                        onMarkVip = {
+                            viewModel.savePreferences(
+                                currentContact.toPreferenceRequest().copy(automationMode = ApprovalMode.VIP_APPROVE),
+                            )
+                        },
+                        onSetWhatsApp = {
+                            viewModel.savePreferences(
+                                currentContact.toPreferenceRequest().copy(preferredChannel = MessageChannel.WHATSAPP),
+                            )
+                        },
+                        onSetSms = {
+                            viewModel.savePreferences(
+                                currentContact.toPreferenceRequest().copy(preferredChannel = MessageChannel.SMS),
+                            )
+                        },
                     )
-                }
-
-                state.preferenceMessageRes?.let { messageRes ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(messageRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RelatePrimary,
-                    )
-                }
-                state.preferenceError?.let { error ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = error,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                SectionHeader(title = stringResource(R.string.contact_detail_contact_info))
-                RelateGlassCard {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        contact?.primaryPhone?.let {
-                            InfoRow(Icons.Filled.Phone, it)
-                            Spacer(modifier = Modifier.height(12.dp))
-                        }
-                        contact?.primaryEmail?.let {
-                            InfoRow(Icons.Filled.Email, it)
-                            Spacer(modifier = Modifier.height(12.dp))
-                        }
-                        val birthdayMonth = contact?.birthdayMonth
-                        val birthdayDay = contact?.birthdayDay
-                        val birthday = if (birthdayMonth != null && birthdayDay != null) {
-                            stringResource(R.string.contact_detail_birthday_date_format, birthdayMonth, birthdayDay)
-                        } else {
-                            stringResource(R.string.contact_detail_unknown)
-                        }
-                        InfoRow(
-                            Icons.Filled.CalendarMonth,
-                            stringResource(R.string.contact_detail_birthday_format, birthday),
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                SectionHeader(title = stringResource(R.string.contact_detail_next_birthday))
-                RelateGlassCard {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Filled.CalendarMonth,
-                                contentDescription = null,
-                                tint = RelatePrimary,
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            val daysText = state.upcomingBirthdayDaysLeft?.let {
-                                stringResource(R.string.contact_detail_days_left_format, it)
-                            } ?: stringResource(R.string.contact_detail_no_upcoming_event)
-                            Text(
-                                text = daysText,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = RelatePrimary,
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        if (state.isGenerating) {
-                            Box(
-                                modifier = Modifier.fillMaxWidth(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                CircularProgressIndicator(color = RelatePrimary)
-                            }
-                        } else {
-                            RelatePrimaryButton(
-                                text = stringResource(R.string.contact_detail_generate_ai_wish),
-                                onClick = { viewModel.generateWish() },
-                            )
-                        }
-                        state.generationErrorRes?.let { errorRes ->
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = stringResource(errorRes),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = RelateOnSurfaceVariant,
-                            )
-                        }
-                    }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -366,6 +234,121 @@ fun ContactDetailScreen(
                 viewModel.savePreferences(request)
             },
         )
+    }
+}
+
+@Composable
+internal fun ContactDetailBodySections(
+    contactId: String,
+    contact: ContactEntity,
+    memoryNoteCount: Int = 0,
+    memoryNoteCategorySummary: List<MemoryNoteCategorySummary> = emptyList(),
+    upcomingBirthdayDaysLeft: Int? = null,
+    isGenerating: Boolean = false,
+    generationErrorRes: Int? = null,
+    preferenceMessageRes: Int? = null,
+    preferenceErrorRes: Int? = null,
+    onNavigateToMemoryVault: (String) -> Unit = {},
+    onNavigateToGiftAdvisor: (String) -> Unit = {},
+    onNavigateToChatHistory: (String) -> Unit = {},
+    onEditPreferences: () -> Unit = {},
+    onGenerateWish: () -> Unit = {},
+    onMarkVip: () -> Unit = {},
+    onSetWhatsApp: () -> Unit = {},
+    onSetSms: () -> Unit = {},
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        ContactDetailSection(
+            titleRes = R.string.contact_detail_section_essentials,
+            testTag = ContactDetailTestTags.SECTION_ESSENTIALS,
+        ) {
+            ContactInfoCard(contact = contact)
+            Spacer(modifier = Modifier.height(12.dp))
+            UpcomingWishCard(
+                upcomingBirthdayDaysLeft = upcomingBirthdayDaysLeft,
+                isGenerating = isGenerating,
+                generationErrorRes = generationErrorRes,
+                onGenerateWish = onGenerateWish,
+            )
+        }
+
+        ContactDetailSection(
+            titleRes = R.string.contact_detail_section_personalization,
+            testTag = ContactDetailTestTags.SECTION_PERSONALIZATION,
+        ) {
+            PersonalizationQualityCard(
+                contact = contact,
+                memoryNoteCount = memoryNoteCount,
+                memoryNoteCategorySummary = memoryNoteCategorySummary,
+                onAddMemory = { onNavigateToMemoryVault(contactId) },
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            PersonalizationActionsCard(
+                onAddMemory = { onNavigateToMemoryVault(contactId) },
+                onAddGift = { onNavigateToGiftAdvisor(contactId) },
+                onEditPreferences = onEditPreferences,
+            )
+            preferenceMessageRes?.let { messageRes ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(messageRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RelatePrimary,
+                )
+            }
+            preferenceErrorRes?.let { errorRes ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(errorRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+
+        ContactDetailSection(
+            titleRes = R.string.contact_detail_section_automation,
+            testTag = ContactDetailTestTags.SECTION_AUTOMATION,
+        ) {
+            AutomationActionsCard(
+                contact = contact,
+                onMarkVip = onMarkVip,
+                onSetWhatsApp = onSetWhatsApp,
+                onSetSms = onSetSms,
+            )
+        }
+
+        ContactDetailSection(
+            titleRes = R.string.contact_detail_section_history,
+            testTag = ContactDetailTestTags.SECTION_HISTORY,
+        ) {
+            HistoryActionsCard(
+                contactId = contactId,
+                onNavigateToMemoryVault = onNavigateToMemoryVault,
+                onNavigateToGiftAdvisor = onNavigateToGiftAdvisor,
+                onNavigateToChatHistory = onNavigateToChatHistory,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContactDetailSection(
+    titleRes: Int,
+    testTag: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(testTag),
+    ) {
+        SectionHeader(title = stringResource(titleRes))
+        Spacer(modifier = Modifier.height(8.dp))
+        content()
     }
 }
 
@@ -395,12 +378,17 @@ internal fun PersonalizationQualityCard(
         PersonalizationQualityItem(
             labelRes = R.string.personalization_quality_channel,
             promptRes = R.string.personalization_quality_choose_channel,
-            isComplete = contact.preferredChannel in setOf("SMS", "WHATSAPP", "EMAIL"),
+            isComplete = MessageChannel.fromRaw(contact.preferredChannel) != MessageChannel.UNKNOWN,
         ),
     )
     val complete = checklist.count { it.isComplete }
     val score = (complete * 100) / checklist.size
     val nextPromptRes = checklist.firstOrNull { !it.isComplete }?.promptRes
+    val impactRes = when {
+        nextPromptRes == null -> R.string.personalization_quality_impact_ready
+        score < 50 -> R.string.personalization_quality_impact_low
+        else -> R.string.personalization_quality_impact_partial
+    }
 
     RelateGlassCard {
         Column(
@@ -419,6 +407,11 @@ internal fun PersonalizationQualityCard(
                 } else {
                     stringResource(R.string.personalization_quality_next_step, stringResource(nextPromptRes))
                 },
+                style = MaterialTheme.typography.bodySmall,
+                color = RelateOnSurfaceVariant,
+            )
+            Text(
+                text = stringResource(impactRes),
                 style = MaterialTheme.typography.bodySmall,
                 color = RelateOnSurfaceVariant,
             )
@@ -497,10 +490,146 @@ private data class PersonalizationQualityItem(
 )
 
 @Composable
-private fun QuickPersonalizationCard(
-    contact: ContactEntity,
+private fun ContactInfoCard(contact: ContactEntity) {
+    RelateGlassCard {
+        Column(modifier = Modifier.padding(16.dp)) {
+            contact.primaryPhone?.let {
+                InfoRow(Icons.Filled.Phone, it)
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            contact.primaryEmail?.let {
+                InfoRow(Icons.Filled.Email, it)
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            val birthdayMonth = contact.birthdayMonth
+            val birthdayDay = contact.birthdayDay
+            val birthday = if (birthdayMonth != null && birthdayDay != null) {
+                stringResource(R.string.contact_detail_birthday_date_format, birthdayMonth, birthdayDay)
+            } else {
+                stringResource(R.string.contact_detail_unknown)
+            }
+            InfoRow(
+                Icons.Filled.CalendarMonth,
+                stringResource(R.string.contact_detail_birthday_format, birthday),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UpcomingWishCard(
+    upcomingBirthdayDaysLeft: Int?,
+    isGenerating: Boolean,
+    generationErrorRes: Int?,
+    onGenerateWish: () -> Unit,
+) {
+    RelateGlassCard {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.CalendarMonth,
+                    contentDescription = null,
+                    tint = RelatePrimary,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                val daysText = upcomingBirthdayDaysLeft?.let {
+                    stringResource(R.string.contact_detail_days_left_format, it)
+                } ?: stringResource(R.string.contact_detail_no_upcoming_event)
+                Text(
+                    text = daysText,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = RelatePrimary,
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            if (isGenerating) {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = RelatePrimary)
+                }
+            } else {
+                RelatePrimaryButton(
+                    text = stringResource(R.string.contact_detail_generate_ai_wish),
+                    onClick = onGenerateWish,
+                )
+            }
+            generationErrorRes?.let { errorRes ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(errorRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RelateOnSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersonalizationActionsCard(
     onAddMemory: () -> Unit,
     onAddGift: () -> Unit,
+    onEditPreferences: () -> Unit,
+) {
+    RelateGlassCard {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.contact_detail_personalization_actions),
+                style = MaterialTheme.typography.titleSmall,
+                color = RelatePrimary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = onAddMemory,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag(ContactDetailTestTags.ACTION_ADD_MEMORY),
+                    colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                ) {
+                    Text(stringResource(R.string.contact_detail_add_memory), color = MaterialTheme.colorScheme.onSurface)
+                }
+                Button(
+                    onClick = onAddGift,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag(ContactDetailTestTags.ACTION_ADD_GIFT),
+                    colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                ) {
+                    Text(stringResource(R.string.contact_detail_add_gift), color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+            Button(
+                onClick = onEditPreferences,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(ContactDetailTestTags.ACTION_EDIT_PREFERENCES),
+                colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+            ) {
+                Icon(
+                    Icons.Filled.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.contact_detail_edit_preferences),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutomationActionsCard(
+    contact: ContactEntity,
     onMarkVip: () -> Unit,
     onSetWhatsApp: () -> Unit,
     onSetSms: () -> Unit,
@@ -511,27 +640,34 @@ private fun QuickPersonalizationCard(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = stringResource(R.string.contact_detail_quick_enrichment),
+                text = stringResource(R.string.contact_detail_automation_actions),
                 style = MaterialTheme.typography.titleSmall,
                 color = RelatePrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = onAddMemory, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant)) {
-                    Text(stringResource(R.string.contact_detail_add_memory), color = MaterialTheme.colorScheme.onSurface)
-                }
-                Button(onClick = onAddGift, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant)) {
-                    Text(stringResource(R.string.contact_detail_add_gift), color = MaterialTheme.colorScheme.onSurface)
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = onMarkVip, modifier = Modifier.weight(1f), enabled = contact.automationMode != "VIP_APPROVE", colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant)) {
+                Button(
+                    onClick = onMarkVip,
+                    modifier = Modifier.weight(1f),
+                    enabled = ApprovalMode.fromRaw(contact.automationMode) != ApprovalMode.VIP_APPROVE,
+                    colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                ) {
                     Text(stringResource(R.string.contact_detail_mark_vip), color = MaterialTheme.colorScheme.onSurface)
                 }
-                Button(onClick = onSetWhatsApp, modifier = Modifier.weight(1f), enabled = contact.preferredChannel != "WHATSAPP", colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant)) {
+                Button(
+                    onClick = onSetWhatsApp,
+                    modifier = Modifier.weight(1f),
+                    enabled = MessageChannel.fromRaw(contact.preferredChannel) != MessageChannel.WHATSAPP,
+                    colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                ) {
                     Text(stringResource(R.string.contact_detail_set_whatsapp), color = MaterialTheme.colorScheme.onSurface)
                 }
-                Button(onClick = onSetSms, modifier = Modifier.weight(1f), enabled = contact.preferredChannel != "SMS", colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant)) {
+                Button(
+                    onClick = onSetSms,
+                    modifier = Modifier.weight(1f),
+                    enabled = MessageChannel.fromRaw(contact.preferredChannel) != MessageChannel.SMS,
+                    colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                ) {
                     Text(stringResource(R.string.contact_detail_set_sms), color = MaterialTheme.colorScheme.onSurface)
                 }
             }
@@ -540,7 +676,65 @@ private fun QuickPersonalizationCard(
 }
 
 @Composable
-private fun ContactPreferencesDialog(
+private fun HistoryActionsCard(
+    contactId: String,
+    onNavigateToMemoryVault: (String) -> Unit,
+    onNavigateToGiftAdvisor: (String) -> Unit,
+    onNavigateToChatHistory: (String) -> Unit,
+) {
+    RelateGlassCard {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Button(
+                    onClick = { onNavigateToMemoryVault(contactId) },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                ) {
+                    Text(
+                        text = stringResource(R.string.contact_detail_memory_vault),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Button(
+                    onClick = { onNavigateToGiftAdvisor(contactId) },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                ) {
+                    Text(
+                        text = stringResource(R.string.contact_detail_gift_advisor),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+            Button(
+                onClick = { onNavigateToChatHistory(contactId) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+            ) {
+                Icon(
+                    Icons.Filled.History,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.contact_detail_chat_history),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ContactPreferencesDialog(
     contact: ContactEntity,
     isSaving: Boolean,
     onDismiss: () -> Unit,
@@ -549,10 +743,10 @@ private fun ContactPreferencesDialog(
     var nickname by remember(contact.id) { mutableStateOf(contact.nickname.orEmpty()) }
     var relationshipType by remember(contact.id) { mutableStateOf(contact.relationshipType) }
     var language by remember(contact.id) { mutableStateOf(contact.preferredLanguage) }
-    var channel by remember(contact.id) { mutableStateOf(contact.preferredChannel) }
+    var channel by remember(contact.id) { mutableStateOf(contact.preferredChannel.toSupportedContactMessageChannel()) }
     var formality by remember(contact.id) { mutableStateOf(contact.formalityLevel) }
     var style by remember(contact.id) { mutableStateOf(contact.communicationStyle) }
-    var automationMode by remember(contact.id) { mutableStateOf(contact.automationMode) }
+    var automationMode by remember(contact.id) { mutableStateOf(contact.automationMode.toSupportedContactApprovalMode()) }
     var sendTime by remember(contact.id) {
         mutableStateOf(
             if (contact.customSendTimeHour != null && contact.customSendTimeMinute != null) {
@@ -596,9 +790,9 @@ private fun ContactPreferencesDialog(
                 ChoiceRow(
                     titleRes = R.string.contact_preferences_channel,
                     options = listOf(
-                        "SMS" to stringResource(R.string.channel_sms),
-                        "WHATSAPP" to stringResource(R.string.channel_whatsapp),
-                        "EMAIL" to stringResource(R.string.channel_email),
+                        MessageChannel.SMS to stringResource(R.string.channel_sms),
+                        MessageChannel.WHATSAPP to stringResource(R.string.channel_whatsapp),
+                        MessageChannel.EMAIL to stringResource(R.string.channel_email),
                     ),
                     selected = channel,
                     onSelect = { channel = it },
@@ -627,11 +821,11 @@ private fun ContactPreferencesDialog(
                 ChoiceRow(
                     titleRes = R.string.contact_preferences_automation_mode,
                     options = listOf(
-                        "DEFAULT" to stringResource(R.string.automation_mode_default),
-                        "SMART_APPROVE" to stringResource(R.string.automation_mode_smart_approve_default),
-                        "VIP_APPROVE" to stringResource(R.string.automation_mode_vip_approve),
-                        "FULLY_AUTO" to stringResource(R.string.automation_mode_fully_auto),
-                        "ALWAYS_ASK" to stringResource(R.string.automation_mode_always_ask),
+                        ApprovalMode.DEFAULT to stringResource(R.string.automation_mode_default),
+                        ApprovalMode.SMART_APPROVE to stringResource(R.string.automation_mode_smart_approve_default),
+                        ApprovalMode.VIP_APPROVE to stringResource(R.string.automation_mode_vip_approve),
+                        ApprovalMode.FULLY_AUTO to stringResource(R.string.automation_mode_fully_auto),
+                        ApprovalMode.ALWAYS_ASK to stringResource(R.string.automation_mode_always_ask),
                     ),
                     selected = automationMode,
                     onSelect = { automationMode = it },
@@ -704,6 +898,64 @@ private fun ContactPreferencesDialog(
 }
 
 @Composable
+private fun ChoiceRow(
+    titleRes: Int,
+    options: List<Pair<MessageChannel, String>>,
+    selected: MessageChannel,
+    onSelect: (MessageChannel) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = stringResource(titleRes),
+            style = MaterialTheme.typography.bodySmall,
+            color = RelateOnSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            options.forEach { (value, label) ->
+                FilterChip(
+                    label = label,
+                    isSelected = selected == value,
+                    onClick = { onSelect(value) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChoiceRow(
+    titleRes: Int,
+    options: List<Pair<ApprovalMode, String>>,
+    selected: ApprovalMode,
+    onSelect: (ApprovalMode) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = stringResource(titleRes),
+            style = MaterialTheme.typography.bodySmall,
+            color = RelateOnSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            options.forEach { (value, label) ->
+                FilterChip(
+                    label = label,
+                    isSelected = selected == value,
+                    onClick = { onSelect(value) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun PreferenceField(
     labelRes: Int,
     value: String,
@@ -755,10 +1007,10 @@ private fun ContactEntity.toPreferenceRequest(): UpdateContactPreferencesUseCase
         nickname = nickname.orEmpty(),
         relationshipType = relationshipType,
         preferredLanguage = preferredLanguage,
-        preferredChannel = preferredChannel,
+        preferredChannel = preferredChannel.toSupportedContactMessageChannel(),
         formalityLevel = formalityLevel,
         communicationStyle = communicationStyle,
-        automationMode = automationMode,
+        automationMode = automationMode.toSupportedContactApprovalMode(),
         customSendTimeHour = customSendTimeHour,
         customSendTimeMinute = customSendTimeMinute,
         giftBudgetInr = giftBudgetInr,
@@ -776,6 +1028,18 @@ private fun String.parseSendTime(): Pair<Int, Int>? {
     val hour = parts[0].toIntOrNull() ?: return null
     val minute = parts[1].toIntOrNull() ?: return null
     return hour to minute
+}
+
+private fun String.toSupportedContactApprovalMode(): ApprovalMode {
+    return ApprovalMode.fromRaw(this)
+        .takeIf { it != ApprovalMode.UNKNOWN }
+        ?: ApprovalMode.DEFAULT
+}
+
+private fun String.toSupportedContactMessageChannel(): MessageChannel {
+    return MessageChannel.fromRaw(this)
+        .takeIf { it != MessageChannel.UNKNOWN }
+        ?: MessageChannel.SMS
 }
 
 private fun String.toCsvList(): String {

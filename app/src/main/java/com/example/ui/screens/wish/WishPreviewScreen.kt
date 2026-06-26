@@ -53,11 +53,19 @@ import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.EventType
+import com.example.domain.model.MessageChannel
 import com.example.ui.feedback.asString
 import com.example.ui.viewmodel.ReviewNextTarget
+import com.example.ui.viewmodel.WishDraftReadiness
+import com.example.ui.viewmodel.WishPreviewSendSummary
 import com.example.ui.viewmodel.WishPreviewUiState
 import com.example.ui.viewmodel.WishPreviewViewModel
 import com.example.ui.viewmodel.WhySignal
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val variantOptions = listOf(
     "short" to R.string.wish_variant_short,
@@ -71,6 +79,8 @@ private val variantOptions = listOf(
 internal object WishPreviewTestTags {
     const val BACK_BUTTON = "wish_preview_back"
     const val MESSAGE_FIELD = "wish_preview_message_field"
+    const val DRAFT_READINESS = "wish_preview_draft_readiness"
+    const val SEND_SUMMARY = "wish_preview_send_summary"
     const val WHY_PANEL = "wish_preview_why_panel"
     const val REGENERATE_BUTTON = "wish_preview_regenerate"
     const val TEST_SEND_BUTTON = "wish_preview_test_send"
@@ -285,221 +295,359 @@ internal fun WishPreviewContent(
             }
         }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = stringResource(R.string.wish_preview_message_label),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = RelatePrimary,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                RelateGlassCard {
-                    OutlinedTextField(
-                        value = state.editedText,
-                        onValueChange = onEditedTextChange,
+        state.sendSummary?.let { summary ->
+            Spacer(modifier = Modifier.height(16.dp))
+            WishSendSummaryCard(
+                summary = summary,
+                modifier = Modifier.testTag(WishPreviewTestTags.SEND_SUMMARY),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.wish_preview_message_label),
+            style = MaterialTheme.typography.titleSmall,
+            color = RelatePrimary,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        RelateGlassCard {
+            OutlinedTextField(
+                value = state.editedText,
+                onValueChange = onEditedTextChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+                    .testTag(WishPreviewTestTags.MESSAGE_FIELD),
+                textStyle = MaterialTheme.typography.bodyLarge,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = RelatePrimary,
+                    unfocusedBorderColor = RelateSurfaceVariant,
+                    focusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
+                    unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
+                    focusedTextColor = RelateOnBackground,
+                    unfocusedTextColor = RelateOnBackground,
+                ),
+                minLines = 4,
+                maxLines = 8,
+            )
+        }
+        DraftReadinessMessage(
+            readiness = state.draftReadiness,
+            modifier = Modifier.testTag(WishPreviewTestTags.DRAFT_READINESS),
+        )
+
+        state.errorMessageRes?.let { errorRes ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(errorRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = RelateOnSurfaceVariant,
+            )
+        }
+
+        state.qualityMessageRes?.let { messageRes ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = messageResource(messageRes, state.qualityMessageArgRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = RelateOnSurfaceVariant,
+            )
+        }
+
+        if (state.whySignals.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            WhyThisMessagePanel(
+                signals = state.whySignals,
+                modifier = Modifier.testTag(WishPreviewTestTags.WHY_PANEL),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.wish_preview_feedback_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = RelatePrimary,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        state.feedbackOptions.chunked(2).forEach { rowOptions ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                rowOptions.forEach { option ->
+                    FeedbackChip(
+                        label = stringResource(option.labelRes),
+                        isSelected = state.selectedFeedbackKey == option.key,
+                        onClick = { onFeedbackSelected(option.key) },
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-                            .testTag(WishPreviewTestTags.MESSAGE_FIELD),
-                        textStyle = MaterialTheme.typography.bodyLarge,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = RelatePrimary,
-                            unfocusedBorderColor = RelateSurfaceVariant,
-                            focusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
-                            unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
-                            focusedTextColor = RelateOnBackground,
-                            unfocusedTextColor = RelateOnBackground,
-                        ),
-                        minLines = 4,
-                        maxLines = 8,
+                            .weight(1f)
+                            .testTag(WishPreviewTestTags.FEEDBACK_PREFIX + option.key),
                     )
                 }
-
-                state.errorMessageRes?.let { errorRes ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(errorRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RelateOnSurfaceVariant,
-                    )
+                if (rowOptions.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        state.feedbackMessageRes?.let { messageRes ->
+            Text(
+                text = stringResource(messageRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = RelateOnSurfaceVariant,
+            )
+        }
 
-                state.qualityMessageRes?.let { messageRes ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = messageResource(messageRes, state.qualityMessageArgRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RelateOnSurfaceVariant,
-                    )
-                }
-
-                if (state.whySignals.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    WhyThisMessagePanel(
-                        signals = state.whySignals,
-                        modifier = Modifier.testTag(WishPreviewTestTags.WHY_PANEL),
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = stringResource(R.string.wish_preview_feedback_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = RelatePrimary,
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = onRegenerate,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(WishPreviewTestTags.REGENERATE_BUTTON),
+            enabled = !state.isRegenerating && !state.isApproving && !state.isRejecting && !state.isTestingSend,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = RelateSurfaceVariant,
+            ),
+        ) {
+            if (state.isRegenerating) {
+                CircularProgressIndicator(
+                    color = RelateOnBackground,
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                state.feedbackOptions.chunked(2).forEach { rowOptions ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        rowOptions.forEach { option ->
-                            FeedbackChip(
-                                label = stringResource(option.labelRes),
-                                isSelected = state.selectedFeedbackKey == option.key,
-                                onClick = { onFeedbackSelected(option.key) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag(WishPreviewTestTags.FEEDBACK_PREFIX + option.key),
-                            )
-                        }
-                        if (rowOptions.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                state.feedbackMessageRes?.let { messageRes ->
-                    Text(
-                        text = stringResource(messageRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RelateOnSurfaceVariant,
-                    )
-                }
+            } else {
+                Icon(
+                    Icons.Filled.Refresh,
+                    contentDescription = null,
+                    tint = RelateOnBackground,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.wish_preview_regenerate),
+                    color = RelateOnBackground,
+                )
+            }
+        }
 
-                Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(
+            onClick = onSendTest,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(WishPreviewTestTags.TEST_SEND_BUTTON),
+            enabled = !state.isTestingSend && !state.isRegenerating && !state.isApproving && !state.isRejecting,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = RelateSurfaceVariant,
+            ),
+        ) {
+            if (state.isTestingSend) {
+                CircularProgressIndicator(
+                    color = RelateOnBackground,
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(
+                    text = stringResource(R.string.wish_preview_send_test),
+                    color = RelateOnBackground,
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        if (state.isApproving) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(color = RelatePrimary)
+            }
+        } else if (!state.approved && !state.rejected) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Button(
-                    onClick = onRegenerate,
+                    onClick = onReject,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(WishPreviewTestTags.REGENERATE_BUTTON),
-                    enabled = !state.isRegenerating && !state.isApproving && !state.isRejecting && !state.isTestingSend,
+                        .weight(1f)
+                        .height(52.dp)
+                        .testTag(WishPreviewTestTags.REJECT_BUTTON),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RelateSurfaceVariant,
                     ),
+                    enabled = !state.isRejecting,
                 ) {
-                    if (state.isRegenerating) {
+                    if (state.isRejecting) {
                         CircularProgressIndicator(
                             color = RelateOnBackground,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp,
                         )
                     } else {
-                        Icon(
-                            Icons.Filled.Refresh,
-                            contentDescription = null,
-                            tint = RelateOnBackground,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = stringResource(R.string.wish_preview_regenerate),
+                            text = stringResource(R.string.wish_preview_reject),
+                            style = MaterialTheme.typography.labelLarge,
                             color = RelateOnBackground,
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = onSendTest,
+                RelatePrimaryButton(
+                    text = stringResource(R.string.wish_preview_approve_schedule),
+                    onClick = onApprove,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(WishPreviewTestTags.TEST_SEND_BUTTON),
-                    enabled = !state.isTestingSend && !state.isRegenerating && !state.isApproving && !state.isRejecting,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = RelateSurfaceVariant,
-                    ),
-                ) {
-                    if (state.isTestingSend) {
-                        CircularProgressIndicator(
-                            color = RelateOnBackground,
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(R.string.wish_preview_send_test),
-                            color = RelateOnBackground,
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                if (state.isApproving) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator(color = RelatePrimary)
-                    }
-                } else if (!state.approved && !state.rejected) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Button(
-                            onClick = onReject,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp)
-                                .testTag(WishPreviewTestTags.REJECT_BUTTON),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = RelateSurfaceVariant,
-                            ),
-                            enabled = !state.isRejecting,
-                        ) {
-                            if (state.isRejecting) {
-                                CircularProgressIndicator(
-                                    color = RelateOnBackground,
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                            } else {
-                                Text(
-                                    text = stringResource(R.string.wish_preview_reject),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = RelateOnBackground,
-                                )
-                            }
-                        }
-                        RelatePrimaryButton(
-                            text = stringResource(R.string.wish_preview_approve_schedule),
-                            onClick = onApprove,
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag(WishPreviewTestTags.APPROVE_BUTTON),
-                        )
-                    }
-                } else if (state.approved) {
-                    ReviewResultPanel(
-                        message = stringResource(R.string.wish_preview_approved),
-                        messageTag = WishPreviewTestTags.APPROVED_MESSAGE,
-                        state = state,
-                        onReviewNext = onReviewNext,
-                    )
-                } else if (state.rejected) {
-                    ReviewResultPanel(
-                        message = stringResource(R.string.wish_preview_rejected),
-                        messageTag = WishPreviewTestTags.REJECTED_MESSAGE,
-                        state = state,
-                        onReviewNext = onReviewNext,
-                    )
-                }
+                        .weight(1f)
+                        .testTag(WishPreviewTestTags.APPROVE_BUTTON),
+                    enabled = !state.draftReadiness.blocksApproval(),
+                )
+            }
+        } else if (state.approved) {
+            ReviewResultPanel(
+                message = stringResource(R.string.wish_preview_approved),
+                messageTag = WishPreviewTestTags.APPROVED_MESSAGE,
+                state = state,
+                onReviewNext = onReviewNext,
+            )
+        } else if (state.rejected) {
+            ReviewResultPanel(
+                message = stringResource(R.string.wish_preview_rejected),
+                messageTag = WishPreviewTestTags.REJECTED_MESSAGE,
+                state = state,
+                onReviewNext = onReviewNext,
+            )
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
     }
+}
+
+@Composable
+private fun DraftReadinessMessage(
+    readiness: WishDraftReadiness,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = readiness.label(),
+        style = MaterialTheme.typography.bodySmall,
+        color = if (readiness == WishDraftReadiness.BLANK) {
+            MaterialTheme.colorScheme.error
+        } else {
+            RelateOnSurfaceVariant
+        },
+        modifier = modifier.padding(top = 8.dp),
+    )
+}
+
+@Composable
+private fun WishDraftReadiness.label(): String = when (this) {
+    WishDraftReadiness.READY -> stringResource(R.string.wish_preview_readiness_ready)
+    WishDraftReadiness.EDITED_READY -> stringResource(R.string.wish_preview_readiness_edited)
+    WishDraftReadiness.TOO_SHORT -> stringResource(R.string.wish_preview_readiness_short)
+    WishDraftReadiness.BLANK -> stringResource(R.string.wish_preview_readiness_blank)
+}
+
+private fun WishDraftReadiness.blocksApproval(): Boolean = this == WishDraftReadiness.BLANK
+
+@Composable
+private fun WishSendSummaryCard(
+    summary: WishPreviewSendSummary,
+    modifier: Modifier = Modifier,
+) {
+    val dateFormat = remember { SimpleDateFormat("MMM dd, h:mm a", Locale.getDefault()) }
+    RelateGlassCard(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.wish_preview_send_summary_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = RelatePrimary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            SendSummaryRow(
+                label = stringResource(R.string.wish_preview_summary_event),
+                value = eventTypeLabel(summary.eventType),
+            )
+            SendSummaryRow(
+                label = stringResource(R.string.wish_preview_summary_route),
+                value = channelLabel(summary.channel),
+            )
+            SendSummaryRow(
+                label = stringResource(R.string.wish_preview_summary_schedule),
+                value = dateFormat.format(Date(summary.scheduledForMs)),
+            )
+            SendSummaryRow(
+                label = stringResource(R.string.wish_preview_summary_approval),
+                value = approvalModeLabel(summary.approvalMode),
+            )
+            SendSummaryRow(
+                label = stringResource(R.string.wish_preview_summary_quality),
+                value = if (summary.usesFallback) {
+                    stringResource(R.string.wish_preview_summary_quality_fallback)
+                } else {
+                    stringResource(R.string.wish_preview_summary_quality_ai)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SendSummaryRow(
+    label: String,
+    value: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = RelateOnSurfaceVariant,
+            modifier = Modifier.weight(0.38f),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(0.62f),
+        )
+    }
+}
+
+@Composable
+private fun eventTypeLabel(eventType: String): String = when (EventType.fromRaw(eventType)) {
+    EventType.BIRTHDAY -> stringResource(R.string.event_type_birthday)
+    EventType.ANNIVERSARY -> stringResource(R.string.event_type_anniversary)
+    EventType.WORK_ANNIVERSARY -> stringResource(R.string.event_type_work_anniversary)
+    else -> stringResource(R.string.event_type_custom)
+}
+
+@Composable
+private fun channelLabel(channel: String): String = when (MessageChannel.fromRaw(channel)) {
+    MessageChannel.SMS -> stringResource(R.string.channel_sms)
+    MessageChannel.WHATSAPP -> stringResource(R.string.channel_whatsapp)
+    MessageChannel.EMAIL -> stringResource(R.string.channel_email)
+    MessageChannel.UNKNOWN -> channel
+}
+
+@Composable
+private fun approvalModeLabel(approvalMode: String): String = when (ApprovalMode.fromRaw(approvalMode)) {
+    ApprovalMode.FULLY_AUTO -> stringResource(R.string.automation_mode_fully_auto)
+    ApprovalMode.SMART_APPROVE -> stringResource(R.string.automation_mode_smart_approve_default)
+    ApprovalMode.VIP_APPROVE -> stringResource(R.string.automation_mode_vip_approve)
+    ApprovalMode.ALWAYS_ASK -> stringResource(R.string.automation_mode_always_ask)
+    ApprovalMode.DEFAULT,
+    ApprovalMode.UNKNOWN -> stringResource(R.string.automation_mode_default)
 }
 
 @Composable

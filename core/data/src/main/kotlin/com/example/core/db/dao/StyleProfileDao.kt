@@ -22,6 +22,12 @@ interface StyleProfileDao {
     @Query("SELECT * FROM style_profile_history ORDER BY savedAtMs DESC")
     suspend fun getHistory(): List<StyleProfileHistoryEntity>
 
+    @Query("DELETE FROM style_profile")
+    suspend fun deleteAll()
+
+    @Query("DELETE FROM style_profile_history")
+    suspend fun deleteAllHistory()
+
     @Query("DELETE FROM style_profile_history WHERE id NOT IN (SELECT id FROM style_profile_history ORDER BY savedAtMs DESC LIMIT 3)")
     suspend fun deleteOldHistory()
 

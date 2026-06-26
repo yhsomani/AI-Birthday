@@ -1,6 +1,8 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.PendingMessageEntity
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.SchedulerService
 import io.mockk.coEvery
@@ -33,7 +35,7 @@ class RejectPendingMessageUseCaseTest {
             shortVariant = "", standardVariant = "", longVariant = "",
             formalVariant = "", funnyVariant = "", emotionalVariant = "",
             selectedVariant = "standard", selectedVariantText = "",
-            channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL"
+            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "MANUAL"
         )
         coEvery { messageRepository.getPendingById("m1") } returns pendingMsg
 
@@ -42,7 +44,7 @@ class RejectPendingMessageUseCaseTest {
         assertTrue(result is RejectPendingMessageUseCase.RejectionOutcome.Rejected)
         assertEquals("m1", (result as RejectPendingMessageUseCase.RejectionOutcome.Rejected).id)
 
-        coVerify { messageRepository.updatePendingStatus("m1", "REJECTED") }
+        coVerify { messageRepository.updatePendingStatus("m1", MessageStatus.REJECTED.raw) }
     }
 
     @Test
@@ -52,8 +54,8 @@ class RejectPendingMessageUseCaseTest {
             shortVariant = "", standardVariant = "", longVariant = "",
             formalVariant = "", funnyVariant = "", emotionalVariant = "",
             selectedVariant = "standard", selectedVariantText = "",
-            channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL",
-            status = "APPROVED"
+            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "MANUAL",
+            status = " approved "
         )
         coEvery { messageRepository.getPendingById("m1") } returns pendingMsg
 

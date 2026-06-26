@@ -64,6 +64,8 @@ import com.example.ui.components.SyncErrorCard
 import com.example.ui.viewmodel.ContactFilter
 import com.example.ui.viewmodel.ContactListUiState
 import com.example.ui.viewmodel.ContactListViewModel
+import com.example.ui.viewmodel.ContactQualityState
+import com.example.ui.viewmodel.ContactQualityStatus
 import com.example.ui.viewmodel.ContactSort
 
 internal object ContactListTestTags {
@@ -72,6 +74,7 @@ internal object ContactListTestTags {
     const val FILTER_PREFIX = "contact_list_filter_"
     const val SORT_PREFIX = "contact_list_sort_"
     const val ROW_PREFIX = "contact_list_row_"
+    const val QUALITY_PREFIX = "contact_list_quality_"
 }
 
 private val filterOptions = listOf(
@@ -81,6 +84,10 @@ private val filterOptions = listOf(
     ContactFilter.WORK,
     ContactFilter.CLOSE_FRIENDS,
     ContactFilter.NEEDS_PERSONALIZATION,
+    ContactFilter.MISSING_RELATIONSHIP,
+    ContactFilter.MISSING_CHANNEL,
+    ContactFilter.LOW_HEALTH,
+    ContactFilter.VIP,
 )
 
 private val sortOptions = listOf(
@@ -262,6 +269,7 @@ internal fun ContactListContent(
                         items(state.contacts, key = { it.id }) { contact ->
                             ContactRow(
                                 contact = contact,
+                                quality = state.contactQuality[contact.id],
                                 onClick = { onContactClick(contact.id) },
                                 modifier = Modifier.testTag(ContactListTestTags.ROW_PREFIX + contact.id),
                             )
@@ -281,6 +289,10 @@ private fun ContactFilter.label(): String = when (this) {
     ContactFilter.WORK -> stringResource(R.string.contact_filter_work)
     ContactFilter.CLOSE_FRIENDS -> stringResource(R.string.contact_filter_close_friends)
     ContactFilter.NEEDS_PERSONALIZATION -> stringResource(R.string.contact_filter_needs_personalization)
+    ContactFilter.MISSING_RELATIONSHIP -> stringResource(R.string.contact_filter_missing_relationship)
+    ContactFilter.MISSING_CHANNEL -> stringResource(R.string.contact_filter_missing_channel)
+    ContactFilter.LOW_HEALTH -> stringResource(R.string.contact_filter_low_health)
+    ContactFilter.VIP -> stringResource(R.string.contact_filter_vip)
 }
 
 @Composable
@@ -293,6 +305,7 @@ private fun ContactSort.label(): String = when (this) {
 @Composable
 private fun ContactRow(
     contact: ContactEntity,
+    quality: ContactQualityState?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -334,6 +347,30 @@ private fun ContactRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = RelateOnSurfaceVariant,
             )
+            quality?.let {
+                Text(
+                    text = it.label(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = it.labelColor(),
+                    modifier = Modifier.testTag(ContactListTestTags.QUALITY_PREFIX + contact.id),
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun ContactQualityState.label(): String = when (status) {
+    ContactQualityStatus.READY -> stringResource(R.string.contact_quality_ready)
+    ContactQualityStatus.MISSING_EVENT -> stringResource(R.string.contact_quality_missing_event)
+    ContactQualityStatus.MISSING_CHANNEL -> stringResource(R.string.contact_quality_missing_channel)
+    ContactQualityStatus.MISSING_CONTEXT -> stringResource(R.string.contact_quality_missing_context)
+}
+
+@Composable
+private fun ContactQualityState.labelColor() = when (status) {
+    ContactQualityStatus.READY -> RelateOnSurfaceVariant
+    ContactQualityStatus.MISSING_EVENT,
+    ContactQualityStatus.MISSING_CHANNEL,
+    ContactQualityStatus.MISSING_CONTEXT -> MaterialTheme.colorScheme.error
 }

@@ -30,6 +30,9 @@ interface EventDao {
     @Query("SELECT * FROM events")
     suspend fun getAllSync(): List<EventEntity>
 
+    @Query("DELETE FROM events")
+    suspend fun deleteAll()
+
     @Delete
     suspend fun delete(event: EventEntity)
 }

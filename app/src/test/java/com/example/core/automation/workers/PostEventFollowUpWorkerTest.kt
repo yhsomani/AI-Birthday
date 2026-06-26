@@ -19,6 +19,9 @@ import com.example.core.db.entities.SentMessageEntity
 import com.example.core.gemini.GeminiClient
 import com.example.core.gemini.RateLimiter
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import io.mockk.Runs
@@ -68,7 +71,7 @@ class PostEventFollowUpWorkerTest {
 
         every { prefs.getGeminiApiKey() } returns "test_api_key"
         every { prefs.isAiWishGenerationEnabled() } returns true
-        every { prefs.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        every { prefs.getGlobalApprovalMode() } returns ApprovalMode.SMART_APPROVE
         every { prefs.getQuietHoursStart() } returns 0
         every { prefs.getQuietHoursEnd() } returns 0
         every { prefs.getBlackoutDates() } returns "[]"
@@ -93,7 +96,7 @@ class PostEventFollowUpWorkerTest {
             name = "Amit",
             relationshipType = "FRIEND",
             primaryPhone = "+15551234567",
-            preferredChannel = "SMS",
+            preferredChannel = MessageChannel.SMS.raw,
             automationMode = "FULLY_AUTO",
         )
         val event = EventEntity(id = "event1", contactId = "c1", type = "BIRTHDAY", label = "Birthday", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
@@ -111,7 +114,7 @@ class PostEventFollowUpWorkerTest {
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("FOLLOWUP_sent1", pendingSlot.captured.eventId)
         assertEquals("FULLY_AUTO", pendingSlot.captured.approvalMode)
-        assertEquals("APPROVED", pendingSlot.captured.status)
+        assertEquals(MessageStatus.APPROVED.raw, pendingSlot.captured.status)
         assertEquals(100, pendingSlot.captured.qualityScore)
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
         verify(exactly = 0) { NotificationHelper.showApprovalNotification(any(), any(), any(), any(), any()) }
@@ -124,7 +127,7 @@ class PostEventFollowUpWorkerTest {
             id = "c1",
             name = "Amit",
             relationshipType = "FRIEND",
-            preferredChannel = "SMS",
+            preferredChannel = MessageChannel.SMS.raw,
             automationMode = "FULLY_AUTO",
         )
         val pendingSlot = slot<PendingMessageEntity>()
@@ -140,8 +143,8 @@ class PostEventFollowUpWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
-        assertEquals("PENDING", pendingSlot.captured.status)
-        assertEquals("SMS", pendingSlot.captured.channel)
+        assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
+        assertEquals(MessageChannel.SMS.raw, pendingSlot.captured.channel)
         verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
         verify { NotificationHelper.showApprovalNotification(any(), contact, any(), any(), pendingSlot.captured.id) }
     }
@@ -154,7 +157,7 @@ class PostEventFollowUpWorkerTest {
             name = "Amit",
             relationshipType = "FRIEND",
             primaryPhone = "+15551234567",
-            preferredChannel = "SMS",
+            preferredChannel = MessageChannel.SMS.raw,
             automationMode = "FULLY_AUTO",
         )
         val pendingSlot = slot<PendingMessageEntity>()
@@ -170,7 +173,7 @@ class PostEventFollowUpWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
-        assertEquals("PENDING", pendingSlot.captured.status)
+        assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertEquals(true, pendingSlot.captured.isUsingFallback)
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
@@ -190,7 +193,7 @@ class PostEventFollowUpWorkerTest {
             formalVariant = "Already queued",
             funnyVariant = "Already queued",
             emotionalVariant = "Already queued",
-            channel = "SMS",
+            channel = MessageChannel.SMS.raw,
             scheduledForMs = 1000L,
             approvalMode = "SMART_APPROVE",
         )
@@ -235,7 +238,7 @@ class PostEventFollowUpWorkerTest {
             eventType = eventType,
             eventYear = 2026,
             messageText = "Happy birthday Amit, hope this year brings more cricket and good coffee.",
-            channel = "SMS",
+            channel = MessageChannel.SMS.raw,
             sentAtMs = System.currentTimeMillis() - 36L * 60 * 60 * 1000L,
             deliveryStatus = "SENT",
             aiGenerated = true,

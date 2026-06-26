@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
+import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.service.AnalyticsReport
 import com.example.domain.service.AnalyticsReportService
 import com.example.domain.usecase.GetAnalyticsUseCase
@@ -74,7 +75,7 @@ class AnalyticsViewModel @Inject constructor(
 
                 val sentThisYear = messageRepository.getSentSinceYearStart(yearStartMs)
                 val deliveredOrSent = sentThisYear.count {
-                    !it.deliveryStatus.equals("FAILED", ignoreCase = true)
+                    MessageDeliveryStatus.fromRaw(it.deliveryStatus) != MessageDeliveryStatus.FAILED
                 }
                 val replies = sentThisYear.count { it.replyReceived }
                 val personalizedContacts = allContacts.count {

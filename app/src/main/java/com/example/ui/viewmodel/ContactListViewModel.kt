@@ -1,17 +1,22 @@
 package com.example.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
+import com.example.domain.usecase.SyncContactsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import com.example.domain.usecase.SyncContactsUseCase
 import javax.inject.Inject
 
 enum class ContactFilter {
@@ -21,6 +26,10 @@ enum class ContactFilter {
     WORK,
     CLOSE_FRIENDS,
     NEEDS_PERSONALIZATION,
+    MISSING_RELATIONSHIP,
+    MISSING_CHANNEL,
+    LOW_HEALTH,
+    VIP,
 }
 
 enum class ContactSort {
@@ -29,9 +38,24 @@ enum class ContactSort {
     HEALTH_ASC,
 }
 
+enum class ContactQualityStatus {
+    READY,
+    MISSING_EVENT,
+    MISSING_CHANNEL,
+    MISSING_CONTEXT,
+}
+
+data class ContactQualityState(
+    val status: ContactQualityStatus,
+    val hasKnownEvent: Boolean,
+    val hasReachableChannel: Boolean,
+    val hasPersonalizationContext: Boolean,
+)
+
 data class ContactListUiState(
     val allContacts: List<ContactEntity> = emptyList(),
     val contacts: List<ContactEntity> = emptyList(),
+    val contactQuality: Map<String, ContactQualityState> = emptyMap(),
     val searchQuery: String = "",
     val selectedFilter: ContactFilter = ContactFilter.ALL,
     val selectedSort: ContactSort = ContactSort.NAME_ASC,
@@ -42,13 +66,15 @@ data class ContactListUiState(
 
 @HiltViewModel
 class ContactListViewModel @Inject constructor(
+    @param:ApplicationContext private val appContext: Context,
     private val contactRepository: ContactRepository,
     private val preferencesRepository: com.example.domain.service.PreferencesRepository,
     private val syncContactsUseCase: SyncContactsUseCase,
 ) : ViewModel() {
     private companion object {
         const val TAG = "ContactListViewModel"
-        const val SYNC_FAILED_MESSAGE = "Unable to sync contacts. Please try again."
+        const val PERSONALIZATION_CONFIDENCE_THRESHOLD = 0.6
+        const val LOW_HEALTH_THRESHOLD = 50
     }
 
     private val _uiState = MutableStateFlow(ContactListUiState())
@@ -97,7 +123,7 @@ class ContactListViewModel @Inject constructor(
                 val lastError = try { preferencesRepository.getLastSyncError() } catch(ex: Exception) { null }
                 _uiState.value = _uiState.value.copy(
                     isRefreshing = false,
-                    syncError = lastError ?: SYNC_FAILED_MESSAGE
+                    syncError = lastError ?: appContext.getString(R.string.contact_list_sync_failed)
                 )
             }
         }
@@ -134,6 +160,7 @@ class ContactListViewModel @Inject constructor(
     ): ContactListUiState {
         return copy(
             allContacts = allContacts,
+            contactQuality = allContacts.associate { contact -> contact.id to contact.qualityState() },
             isLoading = isLoading,
             isRefreshing = isRefreshing,
             syncError = syncError,
@@ -179,7 +206,15 @@ class ContactListViewModel @Inject constructor(
             ContactFilter.CLOSE_FRIENDS -> contactGroup.equals("Close Friends", ignoreCase = true) ||
                 relationshipType.equals("CLOSE_FRIEND", ignoreCase = true)
             ContactFilter.NEEDS_PERSONALIZATION -> needsPersonalization()
+            ContactFilter.MISSING_RELATIONSHIP -> missingRelationship()
+            ContactFilter.MISSING_CHANNEL -> !hasReachablePreferredChannel()
+            ContactFilter.LOW_HEALTH -> healthScore < LOW_HEALTH_THRESHOLD
+            ContactFilter.VIP -> ApprovalMode.fromRaw(automationMode) == ApprovalMode.VIP_APPROVE
         }
+    }
+
+    private fun ContactEntity.missingRelationship(): Boolean {
+        return relationshipType.isBlank() || relationshipType.equals("UNKNOWN", ignoreCase = true)
     }
 
     private fun ContactEntity.needsPersonalization(): Boolean {
@@ -187,7 +222,49 @@ class ContactListViewModel @Inject constructor(
             notesText.isBlank() &&
             !hasJsonArrayContent(interestsJson) &&
             !hasJsonArrayContent(sharedHistoryJson) &&
-            classificationConfidence < 0.6
+            classificationConfidence < PERSONALIZATION_CONFIDENCE_THRESHOLD
+    }
+
+    private fun ContactEntity.qualityState(): ContactQualityState {
+        val hasKnownEvent = hasDatedEvent()
+        val hasReachableChannel = hasReachablePreferredChannel()
+        val hasPersonalizationContext = !needsPersonalization()
+        val status = when {
+            !hasKnownEvent -> ContactQualityStatus.MISSING_EVENT
+            !hasReachableChannel -> ContactQualityStatus.MISSING_CHANNEL
+            !hasPersonalizationContext -> ContactQualityStatus.MISSING_CONTEXT
+            else -> ContactQualityStatus.READY
+        }
+
+        return ContactQualityState(
+            status = status,
+            hasKnownEvent = hasKnownEvent,
+            hasReachableChannel = hasReachableChannel,
+            hasPersonalizationContext = hasPersonalizationContext,
+        )
+    }
+
+    private fun ContactEntity.hasDatedEvent(): Boolean {
+        return hasCompleteDate(birthdayDay, birthdayMonth) ||
+            hasCompleteDate(anniversaryDay, anniversaryMonth) ||
+            hasCompleteDate(workStartDay, workStartMonth)
+    }
+
+    private fun hasCompleteDate(day: Int?, month: Int?): Boolean {
+        return day != null && month != null
+    }
+
+    private fun ContactEntity.hasReachablePreferredChannel(): Boolean {
+        return when (MessageChannel.fromRaw(preferredChannel)) {
+            MessageChannel.SMS,
+            MessageChannel.WHATSAPP -> hasPhone()
+            MessageChannel.EMAIL -> !primaryEmail.isNullOrBlank()
+            MessageChannel.UNKNOWN -> hasPhone() || !primaryEmail.isNullOrBlank()
+        }
+    }
+
+    private fun ContactEntity.hasPhone(): Boolean {
+        return !primaryPhone.isNullOrBlank() || !secondaryPhone.isNullOrBlank()
     }
 
     private fun hasJsonArrayContent(raw: String): Boolean {

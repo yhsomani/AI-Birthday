@@ -10,13 +10,13 @@ import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
-import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
-import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchDecision
 import com.example.domain.automation.DispatchEligibilityPolicy
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
+import com.example.domain.service.PreferencesRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import androidx.hilt.work.HiltWorker
@@ -29,6 +29,7 @@ class MessageDispatchWorker @AssistedInject constructor(
     private val sentMessageDao: SentMessageDao,
     private val contactDao: ContactDao,
     private val eventDao: EventDao,
+    private val preferencesRepository: PreferencesRepository,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -62,10 +63,17 @@ class MessageDispatchWorker @AssistedInject constructor(
         }
 
         val now = System.currentTimeMillis()
-        when (val decision = DispatchEligibilityPolicy.evaluate(pendingMsg, nowMs = now)) {
+        when (val decision = DispatchEligibilityPolicy.evaluate(
+            pending = pendingMsg,
+            approvalMode = ApprovalMode.fromRaw(pendingMsg.approvalMode),
+            nowMs = now,
+            quietHoursStart = preferencesRepository.getQuietHoursStart(),
+            quietHoursEnd = preferencesRepository.getQuietHoursEnd(),
+            blackoutDatesJson = preferencesRepository.getBlackoutDates(),
+        )) {
             DispatchDecision.SendNow -> Unit
             is DispatchDecision.DeferUntil -> {
-                StructuredLogger.i(TAG, "Deferring dispatch until scheduled time", mapOf(
+                StructuredLogger.i(TAG, "Deferring dispatch", mapOf(
                     "pendingMessageId" to pendingMsg.id,
                     "scheduledForMs" to decision.epochMs.toString(),
                     "reason" to decision.reason.name,
@@ -111,24 +119,6 @@ class MessageDispatchWorker @AssistedInject constructor(
                 }
                 return Result.success()
             }
-        }
-
-        val prefs = SecurePrefs(context)
-        val nextAllowedSendMs = AutomationSchedulePolicy.nextAllowedSendMs(
-            candidateMs = now,
-            quietHoursStart = prefs.getQuietHoursStart(),
-            quietHoursEnd = prefs.getQuietHoursEnd(),
-            blackoutDatesJson = prefs.getBlackoutDates(),
-            nowMs = now,
-        )
-        if (nextAllowedSendMs > now) {
-            StructuredLogger.i(TAG, "Deferring dispatch due to quiet hours or blackout date", mapOf(
-                "pendingMessageId" to pendingMsg.id,
-                "nextAllowedSendMs" to nextAllowedSendMs.toString(),
-            ))
-            pendingMessageDao.insert(pendingMsg.copy(scheduledForMs = nextAllowedSendMs))
-            DailyScheduler.scheduleExactSend(context, pendingMsg.id)
-            return Result.success()
         }
 
         // Idempotency: mark status as DISPATCHING immediately

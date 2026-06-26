@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.MessageChannel
 import com.example.ui.viewmodel.MemoryNoteCategorySummary
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -46,6 +47,9 @@ class ContactDetailPersonalizationQualityCardTest {
                 context.getString(R.string.personalization_quality_add_nickname),
             ),
         ).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            context.getString(R.string.personalization_quality_impact_low),
+        ).assertIsDisplayed()
     }
 
     @Test
@@ -57,7 +61,7 @@ class ContactDetailPersonalizationQualityCardTest {
                 nickname = "Ash",
                 interestsJson = """["music"]""",
                 notesText = "Met at college reunion.",
-                preferredChannel = "EMAIL",
+                preferredChannel = MessageChannel.EMAIL.raw,
             ),
             memoryNoteCount = 1,
             memoryNoteCategorySummary = listOf(
@@ -71,6 +75,28 @@ class ContactDetailPersonalizationQualityCardTest {
         composeRule.onNodeWithText(
             context.getString(R.string.personalization_quality_ready),
         ).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            context.getString(R.string.personalization_quality_impact_ready),
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun partialQualityContact_showsSpecificContextImpact() {
+        composeRule.setQualityCardContent(
+            contact = ContactEntity(
+                id = "contact_1",
+                name = "Asha",
+                nickname = "Ash",
+                preferredChannel = MessageChannel.SMS.raw,
+            ),
+        )
+
+        composeRule.onNodeWithText(
+            context.getString(R.string.personalization_quality_title, 50),
+        ).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            context.getString(R.string.personalization_quality_impact_partial),
+        ).assertIsDisplayed()
     }
 
     @Test
@@ -82,7 +108,7 @@ class ContactDetailPersonalizationQualityCardTest {
                 nickname = "Ash",
                 interestsJson = """["music"]""",
                 notesText = "",
-                preferredChannel = "SMS",
+                preferredChannel = MessageChannel.SMS.raw,
             ),
             memoryNoteCount = 2,
             memoryNoteCategorySummary = listOf(
@@ -115,7 +141,7 @@ class ContactDetailPersonalizationQualityCardTest {
                 name = "Asha",
                 nickname = "Ash",
                 interestsJson = """["music"]""",
-                preferredChannel = "SMS",
+                preferredChannel = MessageChannel.SMS.raw,
             ),
             onAddMemory = { actions += "add-memory" },
         )

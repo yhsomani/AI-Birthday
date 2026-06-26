@@ -1,14 +1,15 @@
 package com.example.domain.event
 
 import com.example.core.db.entities.EventEntity
+import com.example.domain.model.EventType
 import java.util.Locale
 
 object EventIdentityPolicy {
     fun canonicalId(contactId: String, eventType: String): String? {
-        return when (eventType.normalizedEventType()) {
-            "BIRTHDAY" -> "${contactId}_birthday"
-            "ANNIVERSARY" -> "${contactId}_anniversary"
-            "WORK_ANNIVERSARY" -> "${contactId}_work_anniversary"
+        return when (EventType.fromRaw(eventType)) {
+            EventType.BIRTHDAY -> "${contactId}_birthday"
+            EventType.ANNIVERSARY -> "${contactId}_anniversary"
+            EventType.WORK_ANNIVERSARY -> "${contactId}_work_anniversary"
             else -> null
         }
     }
@@ -71,7 +72,7 @@ object EventIdentityPolicy {
         existingLabel: String?,
         newLabel: String?,
     ): Boolean {
-        if (eventType != "CUSTOM") return true
+        if (EventType.fromRaw(eventType) != EventType.CUSTOM) return true
         val normalizedExisting = existingLabel.orEmpty().trim().lowercase(Locale.US)
         val normalizedNew = newLabel.orEmpty().trim().lowercase(Locale.US)
         return normalizedExisting.isBlank() ||

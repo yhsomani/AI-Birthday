@@ -1,6 +1,8 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.ContactEntity
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,10 +21,10 @@ class UpdateContactPreferencesUseCase @Inject constructor(
             nickname = request.nickname.trimToNull(),
             relationshipType = request.relationshipType.trim().uppercase(),
             preferredLanguage = request.preferredLanguage.trim().lowercase().ifBlank { "en" },
-            preferredChannel = request.preferredChannel.trim().uppercase(),
+            preferredChannel = request.preferredChannel.raw,
             formalityLevel = request.formalityLevel.trim().uppercase(),
             communicationStyle = request.communicationStyle.trim().uppercase(),
-            automationMode = request.automationMode.trim().uppercase(),
+            automationMode = request.automationMode.raw,
             giftBudgetInr = request.giftBudgetInr.coerceAtLeast(0),
             annualBudgetInr = request.annualBudgetInr.coerceAtLeast(0),
             skipAutoWish = request.skipAutoWish,
@@ -43,10 +45,10 @@ class UpdateContactPreferencesUseCase @Inject constructor(
         val nickname: String = "",
         val relationshipType: String = "UNKNOWN",
         val preferredLanguage: String = "en",
-        val preferredChannel: String = "SMS",
+        val preferredChannel: MessageChannel = MessageChannel.SMS,
         val formalityLevel: String = "CASUAL",
         val communicationStyle: String = "WARM",
-        val automationMode: String = "DEFAULT",
+        val automationMode: ApprovalMode = ApprovalMode.DEFAULT,
         val customSendTimeHour: Int? = null,
         val customSendTimeMinute: Int? = null,
         val giftBudgetInr: Int = 500,
@@ -60,29 +62,54 @@ class UpdateContactPreferencesUseCase @Inject constructor(
 
     sealed class Outcome {
         data object ContactNotFound : Outcome()
-        data class InvalidInput(val message: String) : Outcome()
+        data class InvalidInput(val reason: InvalidInputReason) : Outcome()
         data class Updated(val contact: ContactEntity) : Outcome()
     }
 
-    private fun Request.validationError(): String? {
-        if (relationshipType.isBlank()) return "Relationship type is required."
-        if (preferredLanguage.isBlank()) return "Preferred language is required."
-        if (preferredChannel.uppercase() !in setOf("SMS", "WHATSAPP", "EMAIL")) {
-            return "Choose SMS, WhatsApp, or Email as the preferred channel."
+    enum class InvalidInputReason {
+        MISSING_RELATIONSHIP_TYPE,
+        MISSING_PREFERRED_LANGUAGE,
+        UNSUPPORTED_PREFERRED_CHANNEL,
+        UNSUPPORTED_AUTOMATION_MODE,
+        INVALID_SEND_HOUR,
+        INVALID_SEND_MINUTE,
+        INCOMPLETE_CUSTOM_SEND_TIME,
+        NEGATIVE_BUDGET,
+    }
+
+    private fun Request.validationError(): InvalidInputReason? {
+        if (relationshipType.isBlank()) return InvalidInputReason.MISSING_RELATIONSHIP_TYPE
+        if (preferredLanguage.isBlank()) return InvalidInputReason.MISSING_PREFERRED_LANGUAGE
+        if (!preferredChannel.isSupportedContactPreferenceChannel()) {
+            return InvalidInputReason.UNSUPPORTED_PREFERRED_CHANNEL
         }
-        if (automationMode.uppercase() !in setOf("DEFAULT", "FULLY_AUTO", "SMART_APPROVE", "VIP_APPROVE", "ALWAYS_ASK")) {
-            return "Choose a supported automation mode."
+        if (!automationMode.isSupportedContactPreferenceMode()) {
+            return InvalidInputReason.UNSUPPORTED_AUTOMATION_MODE
         }
-        if (customSendTimeHour != null && customSendTimeHour !in 0..23) return "Send hour must be 0-23."
-        if (customSendTimeMinute != null && customSendTimeMinute !in 0..59) return "Send minute must be 0-59."
+        if (customSendTimeHour != null && customSendTimeHour !in 0..23) return InvalidInputReason.INVALID_SEND_HOUR
+        if (customSendTimeMinute != null && customSendTimeMinute !in 0..59) return InvalidInputReason.INVALID_SEND_MINUTE
         if ((customSendTimeHour == null) != (customSendTimeMinute == null)) {
-            return "Set both hour and minute for a custom send time."
+            return InvalidInputReason.INCOMPLETE_CUSTOM_SEND_TIME
         }
-        if (giftBudgetInr < 0 || annualBudgetInr < 0) return "Budgets cannot be negative."
+        if (giftBudgetInr < 0 || annualBudgetInr < 0) return InvalidInputReason.NEGATIVE_BUDGET
         return null
     }
 
     private fun String.trimToNull(): String? = trim().takeIf { it.isNotBlank() }
+
+    private fun ApprovalMode.isSupportedContactPreferenceMode(): Boolean {
+        return this == ApprovalMode.DEFAULT ||
+            this == ApprovalMode.FULLY_AUTO ||
+            this == ApprovalMode.SMART_APPROVE ||
+            this == ApprovalMode.VIP_APPROVE ||
+            this == ApprovalMode.ALWAYS_ASK
+    }
+
+    private fun MessageChannel.isSupportedContactPreferenceChannel(): Boolean {
+        return this == MessageChannel.SMS ||
+            this == MessageChannel.WHATSAPP ||
+            this == MessageChannel.EMAIL
+    }
 
     private fun String.toJsonArray(): String {
         val values = split(',')

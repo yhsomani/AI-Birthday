@@ -35,7 +35,7 @@ data class ContactDetailUiState(
     val generationResult: String? = null,
     val generationErrorRes: Int? = null,
     val preferenceMessageRes: Int? = null,
-    val preferenceError: String? = null,
+    val preferenceErrorRes: Int? = null,
 )
 
 @HiltViewModel
@@ -100,19 +100,19 @@ class ContactDetailViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 isSavingPreferences = true,
                 preferenceMessageRes = null,
-                preferenceError = null,
+                preferenceErrorRes = null,
             )
             when (val outcome = updateContactPreferencesUseCase(request.copy(contactId = contactId))) {
                 UpdateContactPreferencesUseCase.Outcome.ContactNotFound -> {
                     _uiState.value = _uiState.value.copy(
                         isSavingPreferences = false,
-                        preferenceError = "Contact not found.",
+                        preferenceErrorRes = R.string.contact_detail_preferences_contact_not_found,
                     )
                 }
                 is UpdateContactPreferencesUseCase.Outcome.InvalidInput -> {
                     _uiState.value = _uiState.value.copy(
                         isSavingPreferences = false,
-                        preferenceError = outcome.message,
+                        preferenceErrorRes = outcome.reason.messageRes(),
                     )
                 }
                 is UpdateContactPreferencesUseCase.Outcome.Updated -> {
@@ -120,7 +120,7 @@ class ContactDetailViewModel @Inject constructor(
                         contact = outcome.contact,
                         isSavingPreferences = false,
                         preferenceMessageRes = R.string.contact_detail_preferences_saved,
-                        preferenceError = null,
+                        preferenceErrorRes = null,
                     )
                     loadContact()
                 }
@@ -176,7 +176,36 @@ class ContactDetailViewModel @Inject constructor(
             generationResult = null,
             generationErrorRes = null,
             preferenceMessageRes = null,
-            preferenceError = null,
+            preferenceErrorRes = null,
         )
+    }
+
+    private fun UpdateContactPreferencesUseCase.InvalidInputReason.messageRes(): Int {
+        return when (this) {
+            UpdateContactPreferencesUseCase.InvalidInputReason.MISSING_RELATIONSHIP_TYPE -> {
+                R.string.contact_preferences_error_relationship_required
+            }
+            UpdateContactPreferencesUseCase.InvalidInputReason.MISSING_PREFERRED_LANGUAGE -> {
+                R.string.contact_preferences_error_language_required
+            }
+            UpdateContactPreferencesUseCase.InvalidInputReason.UNSUPPORTED_PREFERRED_CHANNEL -> {
+                R.string.contact_preferences_error_channel_unsupported
+            }
+            UpdateContactPreferencesUseCase.InvalidInputReason.UNSUPPORTED_AUTOMATION_MODE -> {
+                R.string.contact_preferences_error_automation_mode_unsupported
+            }
+            UpdateContactPreferencesUseCase.InvalidInputReason.INVALID_SEND_HOUR -> {
+                R.string.contact_preferences_error_send_hour
+            }
+            UpdateContactPreferencesUseCase.InvalidInputReason.INVALID_SEND_MINUTE -> {
+                R.string.contact_preferences_error_send_minute
+            }
+            UpdateContactPreferencesUseCase.InvalidInputReason.INCOMPLETE_CUSTOM_SEND_TIME -> {
+                R.string.contact_preferences_error_send_time_incomplete
+            }
+            UpdateContactPreferencesUseCase.InvalidInputReason.NEGATIVE_BUDGET -> {
+                R.string.contact_preferences_error_negative_budget
+            }
+        }
     }
 }

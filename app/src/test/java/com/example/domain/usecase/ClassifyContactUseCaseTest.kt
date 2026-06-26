@@ -51,11 +51,11 @@ class ClassifyContactUseCaseTest {
             relationshipType = "UNKNOWN"
         )
         val classificationResult = ContactClassificationResult(
-            type = "FRIEND",
+            type = "friend",
             subtype = "CLOSE",
-            language = "en",
-            formality = "CASUAL",
-            communicationStyle = "EXPRESSIVE",
+            language = "EN",
+            formality = "semi formal",
+            communicationStyle = "professional",
             confidence = 0.95
         )
         coEvery { contactRepository.getById("c1") } returns contact
@@ -74,8 +74,43 @@ class ClassifyContactUseCaseTest {
                 type = "FRIEND",
                 subtype = "CLOSE",
                 lang = "en",
+                formality = "SEMI_FORMAL",
+                style = "PROFESSIONAL"
+            )
+        }
+    }
+
+    @Test
+    fun `invoke defaults unsupported classification values before saving`() = runTest {
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John Doe",
+            relationshipType = "UNKNOWN"
+        )
+        val classificationResult = ContactClassificationResult(
+            type = "not_a_relationship",
+            subtype = null,
+            language = "xx",
+            formality = "very formal",
+            communicationStyle = "EXPRESSIVE",
+            confidence = 0.4
+        )
+        coEvery { contactRepository.getById("c1") } returns contact
+        coEvery { aiService.classifyContact(contact) } returns classificationResult
+
+        val result = useCase("c1")
+
+        assertTrue(result is ClassifyContactUseCase.ClassificationOutcome.Classified)
+        assertEquals("UNKNOWN", (result as ClassifyContactUseCase.ClassificationOutcome.Classified).type)
+
+        coVerify {
+            contactRepository.updateClassification(
+                id = "c1",
+                type = "UNKNOWN",
+                subtype = null,
+                lang = "en",
                 formality = "CASUAL",
-                style = "EXPRESSIVE"
+                style = "WARM"
             )
         }
     }

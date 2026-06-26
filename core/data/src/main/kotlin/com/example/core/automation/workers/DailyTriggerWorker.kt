@@ -24,15 +24,22 @@ class DailyTriggerWorker @AssistedInject constructor(
         val lastBackupMs = prefs.getLastBackupMs()
         val thirtyDaysMs = 30L * 24 * 60 * 60 * 1000L
         val now = System.currentTimeMillis()
-        
-        if (lastBackupMs == 0L) {
-            prefs.setLastBackupMs(now)
-        } else if (now - lastBackupMs > thirtyDaysMs) {
+        val lastReminderMs = prefs.getLastBackupReminderMs()
+        val backupReferenceMs = lastBackupMs.takeIf { it > 0L } ?: lastReminderMs
+
+        if (lastBackupMs == 0L && lastReminderMs == 0L) {
+            prefs.setLastBackupReminderMs(now)
+        } else if (
+            backupReferenceMs > 0L &&
+            now - backupReferenceMs > thirtyDaysMs &&
+            (lastReminderMs == 0L || now - lastReminderMs > thirtyDaysMs)
+        ) {
             NotificationHelper.showSystemAlert(
                 applicationContext,
                 applicationContext.getString(R.string.notification_backup_reminder_title),
                 applicationContext.getString(R.string.notification_backup_reminder_message),
             )
+            prefs.setLastBackupReminderMs(now)
         }
 
         WorkerScheduler.scheduleDailyAutomationChain(applicationContext)

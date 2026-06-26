@@ -2,6 +2,9 @@ package com.example.ui.viewmodel
 
 import com.example.core.db.entities.ActivityLogEntity
 import com.example.R
+import com.example.domain.model.ActivityLogSeverity
+import com.example.domain.model.ActivityLogStatus
+import com.example.domain.model.ActivityLogType
 import com.example.domain.repository.ActivityLogRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -41,14 +44,29 @@ class ActivityHistoryViewModelTest {
             listOf(
                 ActivityLogEntity(
                     id = "a1",
-                    type = "MESSAGE",
+                    type = ActivityLogType.MESSAGE.raw,
                     title = "Message approved",
                     detail = "A message was approved.",
                     createdAtMs = now,
                 ),
                 ActivityLogEntity(
                     id = "a2",
-                    type = "ANALYTICS",
+                    type = ActivityLogType.MESSAGE.raw,
+                    title = "Dispatch deferred",
+                    detail = "Message waits until scheduled time.",
+                    metadataJson = "{\"decision\":\"deferred\"}",
+                    createdAtMs = now - 1_000L,
+                ),
+                ActivityLogEntity(
+                    id = "a3",
+                    type = ActivityLogType.BACKUP.raw,
+                    title = "Backup exported",
+                    detail = "Encrypted backup created.",
+                    createdAtMs = now - 2_000L,
+                ),
+                ActivityLogEntity(
+                    id = "a4",
+                    type = ActivityLogType.ANALYTICS.raw,
                     title = "Report exported",
                     detail = "A report was generated.",
                     createdAtMs = now - 40 * 86_400_000L,
@@ -59,14 +77,20 @@ class ActivityHistoryViewModelTest {
         val viewModel = ActivityHistoryViewModel(activityLogRepository)
         advanceUntilIdle()
 
-        assertEquals(listOf("a1", "a2"), viewModel.uiState.value.entries.map { it.id })
+        assertEquals(listOf("a1", "a2", "a3", "a4"), viewModel.uiState.value.entries.map { it.id })
 
         viewModel.selectTypeFilter(ActivityLogTypeFilter.MESSAGE)
-        assertEquals(listOf("a1"), viewModel.uiState.value.entries.map { it.id })
+        assertEquals(listOf("a1", "a2"), viewModel.uiState.value.entries.map { it.id })
+
+        viewModel.selectTypeFilter(ActivityLogTypeFilter.DISPATCH)
+        assertEquals(listOf("a2"), viewModel.uiState.value.entries.map { it.id })
+
+        viewModel.selectTypeFilter(ActivityLogTypeFilter.BACKUP)
+        assertEquals(listOf("a3"), viewModel.uiState.value.entries.map { it.id })
 
         viewModel.selectTypeFilter(ActivityLogTypeFilter.ALL)
         viewModel.selectDateFilter(ActivityLogDateFilter.LAST_30_DAYS)
-        assertEquals(listOf("a1"), viewModel.uiState.value.entries.map { it.id })
+        assertEquals(listOf("a1", "a2", "a3"), viewModel.uiState.value.entries.map { it.id })
     }
 
     @Test
@@ -76,17 +100,17 @@ class ActivityHistoryViewModelTest {
             listOf(
                 ActivityLogEntity(
                     id = "a1",
-                    type = "SYNC",
+                    type = ActivityLogType.SYNC.raw,
                     title = "Contacts refreshed",
                     detail = "Background sync completed.",
-                    severity = "ERROR",
-                    status = "RESOLVED",
+                    severity = ActivityLogSeverity.ERROR.raw,
+                    status = ActivityLogStatus.RESOLVED.raw,
                     actionRoute = "settings",
                     createdAtMs = now,
                 ),
                 ActivityLogEntity(
                     id = "a2",
-                    type = "MESSAGE",
+                    type = ActivityLogType.MESSAGE.raw,
                     title = "Message approved",
                     detail = "Approval completed.",
                     createdAtMs = now - 1_000L,

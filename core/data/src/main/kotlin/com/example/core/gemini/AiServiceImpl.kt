@@ -45,6 +45,7 @@ class AiServiceImpl @Inject constructor(
         val prompt = prompter.buildMessageGenerationPrompt(contextObj)
         val response = geminiClient.generate(prompt)
         val variants = ResponseParser.parseMessageVariants(response, eventType = event.type)
+        logParseFallbackIfNeeded("generate", event, variants)
 
         StructuredLogger.d(TAG, "Message generated", mapOf(
             "recommended" to variants.recommended.take(50),
@@ -89,6 +90,7 @@ class AiServiceImpl @Inject constructor(
         val prompt = prompter.buildRegenerationPrompt(previousMessage, contextObj, feedbackInstruction)
         val response = geminiClient.generate(prompt)
         val variants = ResponseParser.parseMessageVariants(response, eventType = event.type)
+        logParseFallbackIfNeeded("regenerate", event, variants)
 
         return MessageVariantsResult(
             short = variants.short,
@@ -136,6 +138,25 @@ class AiServiceImpl @Inject constructor(
         val budget = (contact.giftBudgetInr.takeIf { it > 0 } ?: 500)
         val filtered = raw.filter { it.estimatedCostInr in 1..budget }
         return if (filtered.isNotEmpty()) filtered else raw
+    }
+
+    private fun logParseFallbackIfNeeded(
+        operation: String,
+        event: EventEntity,
+        variants: MessageVariants
+    ) {
+        if (!variants.isUsingFallback) return
+
+        StructuredLogger.w(
+            TAG,
+            "AI message response parsed with fallback",
+            extras = mapOf(
+                "operation" to operation,
+                "eventId" to event.id,
+                "eventType" to event.type,
+                "fallbackReason" to variants.parseMetadata.fallbackReason.code,
+            )
+        )
     }
 
     companion object {

@@ -1,7 +1,10 @@
 package com.example.ui.viewmodel
 
+import android.content.Context
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.PendingMessageEntity
@@ -9,6 +12,8 @@ import com.example.core.db.entities.SentMessageEntity
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.automation.AutomationSchedulePolicy
+import com.example.domain.model.ActivityLogType
+import com.example.domain.model.EventType
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageStatus
 import com.example.domain.repository.ActivityLogRepository
@@ -20,12 +25,12 @@ import com.example.domain.usecase.RejectPendingMessageUseCase
 import com.example.domain.usecase.RevokeApprovalUseCase
 import com.example.domain.service.SchedulerService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
-import java.util.Calendar
 import java.util.UUID
 import javax.inject.Inject
 
@@ -58,7 +63,7 @@ data class PendingMessageItem(
     val entity: PendingMessageEntity,
     val contactName: String,
     val contactAvatarUrl: String? = null,
-    val eventType: String = "BIRTHDAY",
+    val eventType: String = EventType.BIRTHDAY.raw,
     val readiness: MessageReadiness = MessageReadiness.READY_FOR_REVIEW,
 )
 
@@ -69,6 +74,12 @@ data class SentMessageItem(
 )
 
 data class MessagesUiState(
+    val allNeedsReviewMessages: List<PendingMessageItem> = emptyList(),
+    val needsReviewMessages: List<PendingMessageItem> = emptyList(),
+    val allScheduledMessages: List<PendingMessageItem> = emptyList(),
+    val scheduledMessages: List<PendingMessageItem> = emptyList(),
+    val allBlockedMessages: List<PendingMessageItem> = emptyList(),
+    val blockedMessages: List<PendingMessageItem> = emptyList(),
     val allTodayMessages: List<PendingMessageItem> = emptyList(),
     val todayMessages: List<PendingMessageItem> = emptyList(),
     val allPendingMessages: List<PendingMessageItem> = emptyList(),
@@ -94,6 +105,7 @@ data class MessagesUiState(
 
 @HiltViewModel
 class MessagesViewModel @Inject constructor(
+    @param:ApplicationContext private val appContext: Context,
     private val messageRepository: MessageRepository,
     private val contactRepository: ContactRepository,
     private val eventRepository: EventRepository,
@@ -106,14 +118,6 @@ class MessagesViewModel @Inject constructor(
 ) : ViewModel() {
     private companion object {
         const val TAG = "MessagesViewModel"
-        const val LOAD_FAILED_MESSAGE = "Unable to load messages. Please try again."
-        const val APPROVE_FAILED_MESSAGE = "Unable to approve the message. Please try again."
-        const val REJECT_FAILED_MESSAGE = "Unable to reject the message. Please try again."
-        const val RETRY_FAILED_MESSAGE = "Unable to retry the message. Please try again."
-        const val REVOKE_FAILED_MESSAGE = "Unable to revoke approval. Please try again."
-        const val BULK_APPROVE_FAILED_MESSAGE = "Unable to approve the selected messages. Please try again."
-        const val BULK_REJECT_FAILED_MESSAGE = "Unable to reject the selected messages. Please try again."
-        const val BULK_RETRY_FAILED_MESSAGE = "Unable to retry the selected messages. Please try again."
     }
 
     private val _uiState = MutableStateFlow(MessagesUiState())
@@ -137,74 +141,66 @@ class MessagesViewModel @Inject constructor(
                 ) { pending, sent, contacts, events ->
                     val contactMap = contacts.associateBy { it.id }
                     val eventMap = events.associateBy { it.id }
-    
-                    val calendar = Calendar.getInstance()
-                    calendar.set(Calendar.HOUR_OF_DAY, 23)
-                    calendar.set(Calendar.MINUTE, 59)
-                    calendar.set(Calendar.SECOND, 59)
-                    calendar.set(Calendar.MILLISECOND, 999)
-                    val endOfTodayMs = calendar.timeInMillis
-    
-                    val thirtyDaysCalendar = Calendar.getInstance()
-                    thirtyDaysCalendar.add(Calendar.DAY_OF_YEAR, 30)
-                    thirtyDaysCalendar.set(Calendar.HOUR_OF_DAY, 23)
-                    thirtyDaysCalendar.set(Calendar.MINUTE, 59)
-                    thirtyDaysCalendar.set(Calendar.SECOND, 59)
-                    thirtyDaysCalendar.set(Calendar.MILLISECOND, 999)
-                    val endOfThirtyDaysMs = thirtyDaysCalendar.timeInMillis
 
-                    val todayItems = mutableListOf<PendingMessageItem>()
-                    val pendingItems = mutableListOf<PendingMessageItem>()
+                    val needsReviewItems = mutableListOf<PendingMessageItem>()
+                    val scheduledItems = mutableListOf<PendingMessageItem>()
+                    val blockedItems = mutableListOf<PendingMessageItem>()
                     val failedItems = mutableListOf<PendingMessageItem>()
-                    val approvedItems = mutableListOf<PendingMessageItem>()
-    
+
                     pending.forEach { msg ->
                         val contact = contactMap[msg.contactId]
                         val event = eventMap[msg.eventId]
+                        val status = MessageStatus.fromRaw(msg.status)
                         val item = PendingMessageItem(
                             entity = msg,
                             contactName = contact?.name ?: msg.contactId,
                             contactAvatarUrl = contact?.profilePhotoUri,
-                            eventType = event?.type ?: "BIRTHDAY",
+                            eventType = event?.type ?: EventType.BIRTHDAY.raw,
                             readiness = msg.readinessFor(
                                 contact = contact,
-                                status = MessageStatus.fromRaw(msg.status),
+                                status = status,
                             ),
                         )
-    
-                        when (MessageStatus.fromRaw(msg.status)) {
+
+                        when (status) {
                             MessageStatus.FAILED -> failedItems.add(item)
-                            MessageStatus.APPROVED -> approvedItems.add(item)
+                            MessageStatus.APPROVED,
+                            MessageStatus.DISPATCHING -> {
+                                if (item.readiness.blocksTaskFlow()) {
+                                    blockedItems.add(item)
+                                } else {
+                                    scheduledItems.add(item)
+                                }
+                            }
                             MessageStatus.SENT,
                             MessageStatus.REJECTED,
                             MessageStatus.EXPIRED -> {
-                                // Do not show these in pending/today/failed lists
+                                // Do not show these in task-state pending lists.
                             }
                             MessageStatus.PENDING,
-                            MessageStatus.DISPATCHING,
                             MessageStatus.UNKNOWN -> {
-                                if (msg.scheduledForMs <= endOfTodayMs) {
-                                    todayItems.add(item)
-                                } else if (msg.scheduledForMs <= endOfThirtyDaysMs) {
-                                    pendingItems.add(item)
+                                if (item.readiness.blocksTaskFlow()) {
+                                    blockedItems.add(item)
+                                } else {
+                                    needsReviewItems.add(item)
                                 }
                             }
                         }
                     }
-    
+
                     val sentItems = sent.map { s ->
                         val contact = contactMap[s.contactId]
                         SentMessageItem(
                             entity = s,
-                            contactName = contact?.name ?: s.contactId ?: "Deleted Contact",
+                            contactName = contact?.name ?: s.contactId ?: string(R.string.messages_deleted_contact),
                             contactAvatarUrl = contact?.profilePhotoUri,
                         )
                     }
-    
+
                     _uiState.value.withMessages(
-                        todayMessages = todayItems,
-                        pendingMessages = pendingItems,
-                        approvedMessages = approvedItems,
+                        needsReviewMessages = needsReviewItems,
+                        scheduledMessages = scheduledItems,
+                        blockedMessages = blockedItems,
                         sentMessages = sentItems,
                         failedMessages = failedItems,
                         isLoading = false,
@@ -215,7 +211,7 @@ class MessagesViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 StructuredLogger.e(TAG, "Message collection failed", e)
-                _uiState.value = _uiState.value.copy(isLoading = false, error = LOAD_FAILED_MESSAGE)
+                _uiState.value = _uiState.value.copy(isLoading = false, error = string(R.string.messages_error_load))
             }
         }
     }
@@ -231,8 +227,8 @@ class MessagesViewModel @Inject constructor(
             try {
                 approvePendingMessageUseCase(messageId)
                 recordMessageActivity(
-                    title = "Message approved",
-                    detail = "A pending message was approved.",
+                    title = string(R.string.message_activity_approved_title),
+                    detail = string(R.string.message_activity_approved_detail),
                     messageId = messageId,
                 )
                 _uiState.value = _uiState.value.copy(approvingMessageId = null)
@@ -240,7 +236,7 @@ class MessagesViewModel @Inject constructor(
                 StructuredLogger.e(TAG, "Message approval failed", e, extras = mapOf("messageId" to messageId))
                 _uiState.value = _uiState.value.copy(
                     approvingMessageId = null,
-                    error = APPROVE_FAILED_MESSAGE,
+                    error = string(R.string.messages_error_approve),
                 )
             }
         }
@@ -252,8 +248,8 @@ class MessagesViewModel @Inject constructor(
             try {
                 rejectPendingMessageUseCase(messageId)
                 recordMessageActivity(
-                    title = "Message rejected",
-                    detail = "A pending message was rejected.",
+                    title = string(R.string.message_activity_rejected_title),
+                    detail = string(R.string.message_activity_rejected_detail),
                     messageId = messageId,
                 )
                 _uiState.value = _uiState.value.copy(rejectingMessageId = null)
@@ -261,7 +257,7 @@ class MessagesViewModel @Inject constructor(
                 StructuredLogger.e(TAG, "Message rejection failed", e, extras = mapOf("messageId" to messageId))
                 _uiState.value = _uiState.value.copy(
                     rejectingMessageId = null,
-                    error = REJECT_FAILED_MESSAGE,
+                    error = string(R.string.messages_error_reject),
                 )
             }
         }
@@ -275,14 +271,14 @@ class MessagesViewModel @Inject constructor(
                 if (pending != null) {
                     messageRepository.insertPending(
                         pending.copy(
-                            status = "APPROVED",
+                            status = MessageStatus.APPROVED.raw,
                             scheduledForMs = System.currentTimeMillis(),
                         )
                     )
                     schedulerService.scheduleExactSend(messageId)
                     recordMessageActivity(
-                        title = "Message retried",
-                        detail = "A failed message was queued for retry.",
+                        title = string(R.string.message_activity_retried_title),
+                        detail = string(R.string.message_activity_retried_detail),
                         messageId = messageId,
                     )
                 }
@@ -291,7 +287,7 @@ class MessagesViewModel @Inject constructor(
                 StructuredLogger.e(TAG, "Message retry failed", e, extras = mapOf("messageId" to messageId))
                 _uiState.value = _uiState.value.copy(
                     retryingMessageId = null,
-                    error = RETRY_FAILED_MESSAGE,
+                    error = string(R.string.messages_error_retry),
                 )
             }
         }
@@ -315,14 +311,14 @@ class MessagesViewModel @Inject constructor(
             try {
                 ids.forEach { approvePendingMessageUseCase(it) }
                 recordMessageActivity(
-                    title = "Messages approved",
-                    detail = "${ids.size} pending messages were approved.",
+                    title = string(R.string.message_activity_bulk_approved_title),
+                    detail = string(R.string.message_activity_bulk_approved_detail, ids.size),
                     messageId = null,
                 )
                 _uiState.value = _uiState.value.copy(selectedMessageIds = emptySet())
             } catch (e: Exception) {
                 StructuredLogger.e(TAG, "Bulk message approval failed", e, extras = mapOf("count" to ids.size.toString()))
-                _uiState.value = _uiState.value.copy(error = BULK_APPROVE_FAILED_MESSAGE)
+                _uiState.value = _uiState.value.copy(error = string(R.string.messages_error_bulk_approve))
             }
         }
     }
@@ -334,14 +330,14 @@ class MessagesViewModel @Inject constructor(
             try {
                 ids.forEach { rejectPendingMessageUseCase(it) }
                 recordMessageActivity(
-                    title = "Messages rejected",
-                    detail = "${ids.size} pending messages were rejected.",
+                    title = string(R.string.message_activity_bulk_rejected_title),
+                    detail = string(R.string.message_activity_bulk_rejected_detail, ids.size),
                     messageId = null,
                 )
                 _uiState.value = _uiState.value.copy(selectedMessageIds = emptySet())
             } catch (e: Exception) {
                 StructuredLogger.e(TAG, "Bulk message rejection failed", e, extras = mapOf("count" to ids.size.toString()))
-                _uiState.value = _uiState.value.copy(error = BULK_REJECT_FAILED_MESSAGE)
+                _uiState.value = _uiState.value.copy(error = string(R.string.messages_error_bulk_reject))
             }
         }
     }
@@ -355,20 +351,23 @@ class MessagesViewModel @Inject constructor(
                     val pending = messageRepository.getPendingById(id)
                     if (pending != null) {
                         messageRepository.insertPending(
-                            pending.copy(status = "APPROVED", scheduledForMs = System.currentTimeMillis())
+                            pending.copy(
+                                status = MessageStatus.APPROVED.raw,
+                                scheduledForMs = System.currentTimeMillis(),
+                            )
                         )
                         schedulerService.scheduleExactSend(id)
                     }
                 }
                 recordMessageActivity(
-                    title = "Messages retried",
-                    detail = "${ids.size} failed messages were queued for retry.",
+                    title = string(R.string.message_activity_bulk_retried_title),
+                    detail = string(R.string.message_activity_bulk_retried_detail, ids.size),
                     messageId = null,
                 )
                 _uiState.value = _uiState.value.copy(selectedMessageIds = emptySet())
             } catch (e: Exception) {
                 StructuredLogger.e(TAG, "Bulk message retry failed", e, extras = mapOf("count" to ids.size.toString()))
-                _uiState.value = _uiState.value.copy(error = BULK_RETRY_FAILED_MESSAGE)
+                _uiState.value = _uiState.value.copy(error = string(R.string.messages_error_bulk_retry))
             }
         }
     }
@@ -380,8 +379,8 @@ class MessagesViewModel @Inject constructor(
             try {
                 revokeApprovalUseCase(messageId)
                 recordMessageActivity(
-                    title = "Approval revoked",
-                    detail = "A message approval was revoked.",
+                    title = string(R.string.message_activity_approval_revoked_title),
+                    detail = string(R.string.message_activity_approval_revoked_detail),
                     messageId = messageId,
                 )
                 _uiState.value = _uiState.value.copy(revokingMessageId = null)
@@ -389,7 +388,7 @@ class MessagesViewModel @Inject constructor(
                 StructuredLogger.e(TAG, "Message approval revoke failed", e, extras = mapOf("messageId" to messageId))
                 _uiState.value = _uiState.value.copy(
                     revokingMessageId = null,
-                    error = REVOKE_FAILED_MESSAGE,
+                    error = string(R.string.messages_error_revoke),
                 )
             }
         }
@@ -412,18 +411,21 @@ class MessagesViewModel @Inject constructor(
     }
 
     private fun MessagesUiState.withMessages(
-        todayMessages: List<PendingMessageItem>,
-        pendingMessages: List<PendingMessageItem>,
-        approvedMessages: List<PendingMessageItem>,
+        needsReviewMessages: List<PendingMessageItem>,
+        scheduledMessages: List<PendingMessageItem>,
+        blockedMessages: List<PendingMessageItem>,
         sentMessages: List<SentMessageItem>,
         failedMessages: List<PendingMessageItem>,
         isLoading: Boolean,
         isRefreshing: Boolean,
     ): MessagesUiState {
         return copy(
-            allTodayMessages = todayMessages,
-            allPendingMessages = pendingMessages,
-            allApprovedMessages = approvedMessages,
+            allNeedsReviewMessages = needsReviewMessages,
+            allScheduledMessages = scheduledMessages,
+            allBlockedMessages = blockedMessages,
+            allTodayMessages = needsReviewMessages,
+            allPendingMessages = needsReviewMessages,
+            allApprovedMessages = scheduledMessages,
             allSentMessages = sentMessages,
             allFailedMessages = failedMessages,
             isLoading = isLoading,
@@ -433,10 +435,16 @@ class MessagesViewModel @Inject constructor(
 
     private fun MessagesUiState.withFilteredMessages(): MessagesUiState {
         val query = searchQuery.trim()
+        val filteredNeedsReview = allNeedsReviewMessages.filterPending(query, selectedChannelFilter).sortPending(selectedSort)
+        val filteredScheduled = allScheduledMessages.filterPending(query, selectedChannelFilter).sortPending(selectedSort)
+        val filteredBlocked = allBlockedMessages.filterPending(query, selectedChannelFilter).sortPending(selectedSort)
         return copy(
-            todayMessages = allTodayMessages.filterPending(query, selectedChannelFilter).sortPending(selectedSort),
-            pendingMessages = allPendingMessages.filterPending(query, selectedChannelFilter).sortPending(selectedSort),
-            approvedMessages = allApprovedMessages.filterPending(query, selectedChannelFilter).sortPending(selectedSort),
+            needsReviewMessages = filteredNeedsReview,
+            scheduledMessages = filteredScheduled,
+            blockedMessages = filteredBlocked,
+            todayMessages = filteredNeedsReview,
+            pendingMessages = filteredNeedsReview,
+            approvedMessages = filteredScheduled,
             sentMessages = allSentMessages.filterSent(query, selectedChannelFilter).sortSent(selectedSort),
             failedMessages = allFailedMessages.filterPending(query, selectedChannelFilter).sortPending(selectedSort),
         )
@@ -504,11 +512,12 @@ class MessagesViewModel @Inject constructor(
         status: MessageStatus,
     ): MessageReadiness {
         if (contact == null) return MessageReadiness.CONTACT_MISSING
-        if (AutomationSchedulePolicy.isChannelBlocked(channel, securePrefs.getChannelBlackout())) {
+        val messageChannel = MessageChannel.fromRaw(channel)
+        if (AutomationSchedulePolicy.isChannelBlocked(messageChannel, securePrefs.getChannelBlackout())) {
             return MessageReadiness.CHANNEL_DISABLED
         }
 
-        when (MessageChannel.fromRaw(channel)) {
+        when (messageChannel) {
             MessageChannel.SMS,
             MessageChannel.WHATSAPP -> {
                 if (contact.primaryPhone.isNullOrBlank()) return MessageReadiness.MISSING_PHONE
@@ -530,6 +539,18 @@ class MessagesViewModel @Inject constructor(
         }
     }
 
+    private fun MessageReadiness.blocksTaskFlow(): Boolean = when (this) {
+        MessageReadiness.CONTACT_MISSING,
+        MessageReadiness.CHANNEL_DISABLED,
+        MessageReadiness.MISSING_PHONE,
+        MessageReadiness.MISSING_EMAIL,
+        MessageReadiness.EMAIL_SETUP_MISSING -> true
+        MessageReadiness.READY_FOR_REVIEW,
+        MessageReadiness.APPROVED_SCHEDULED,
+        MessageReadiness.SENDING_NOW,
+        MessageReadiness.FAILED_CHECK_SETUP -> false
+    }
+
     private suspend fun recordMessageActivity(
         title: String,
         detail: String,
@@ -537,7 +558,7 @@ class MessagesViewModel @Inject constructor(
     ) {
         val entry = ActivityLogEntity(
             id = UUID.randomUUID().toString(),
-            type = "MESSAGE",
+            type = ActivityLogType.MESSAGE.raw,
             title = title,
             detail = detail,
             messageId = messageId,
@@ -547,5 +568,9 @@ class MessagesViewModel @Inject constructor(
         } catch (e: Exception) {
             StructuredLogger.w(TAG, "Activity log write failed", e, extras = mapOf("type" to entry.type))
         }
+    }
+
+    private fun string(@StringRes resId: Int, vararg args: Any): String {
+        return appContext.getString(resId, *args)
     }
 }

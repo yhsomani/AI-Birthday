@@ -5,6 +5,7 @@ import com.example.R
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.MemoryNoteEntity
+import com.example.domain.model.ApprovalMode
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MemoryNoteRepository
@@ -140,7 +141,7 @@ class ContactDetailViewModelTest {
         coEvery { mockContactRepo.getById("contact1") } returns contact
         coEvery { mockEventRepo.getUpcoming(365) } returns listOf(event)
         coEvery { mockGenerateUseCase("event1") } returns
-            GenerateMessageUseCase.GenerationOutcome.Generated("pending1", "SMART_APPROVE", 0)
+            GenerateMessageUseCase.GenerationOutcome.Generated("pending1", ApprovalMode.SMART_APPROVE, 0)
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact1"))
         val viewModel = ContactDetailViewModel(
@@ -233,5 +234,37 @@ class ContactDetailViewModelTest {
 
         assertNull(viewModel.uiState.value.generationResult)
         assertEquals(R.string.contact_detail_error_ai_disabled, viewModel.uiState.value.generationErrorRes)
+    }
+
+    @Test
+    fun `savePreferences maps invalid input reason to resource error`() = runTest(testDispatcher) {
+        coEvery { mockContactRepo.getById("contact1") } returns ContactEntity(id = "contact1", name = "Alice")
+        coEvery { mockEventRepo.getUpcoming(365) } returns emptyList()
+        coEvery { mockUpdateContactPreferencesUseCase(any()) } returns
+            UpdateContactPreferencesUseCase.Outcome.InvalidInput(
+                UpdateContactPreferencesUseCase.InvalidInputReason.NEGATIVE_BUDGET,
+            )
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact1"))
+        val viewModel = ContactDetailViewModel(
+            savedStateHandle = savedStateHandle,
+            contactRepository = mockContactRepo,
+            eventRepository = mockEventRepo,
+            memoryNoteRepository = mockMemoryNoteRepository,
+            generateMessageUseCase = mockGenerateUseCase,
+            updateContactPreferencesUseCase = mockUpdateContactPreferencesUseCase,
+        )
+        advanceUntilIdle()
+
+        viewModel.savePreferences(
+            UpdateContactPreferencesUseCase.Request(
+                contactId = "contact1",
+                annualBudgetInr = -1,
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(R.string.contact_preferences_error_negative_budget, viewModel.uiState.value.preferenceErrorRes)
+        assertEquals(false, viewModel.uiState.value.isSavingPreferences)
     }
 }

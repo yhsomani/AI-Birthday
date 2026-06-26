@@ -4,6 +4,8 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.GiftHistoryRepository
@@ -19,6 +21,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -53,6 +56,7 @@ class GenerateMessageUseCaseTest {
 
     init {
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.SMART_APPROVE
     }
 
     @Test
@@ -68,7 +72,7 @@ class GenerateMessageUseCaseTest {
     fun `invoke with existing pending message returns AlreadyExists`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns true
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns pendingMessage()
 
         val result = useCase("e1")
 
@@ -79,7 +83,7 @@ class GenerateMessageUseCaseTest {
     fun `invoke with missing contact returns ContactNotFound`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns null
         coEvery { contactRepository.getById("c1") } returns null
 
         val result = useCase("e1")
@@ -92,7 +96,7 @@ class GenerateMessageUseCaseTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         val contact = ContactEntity(id = "c1", name = "John")
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns null
         coEvery { contactRepository.getById("c1") } returns contact
         every { preferencesRepository.isAiWishGenerationEnabled() } returns false
 
@@ -104,33 +108,34 @@ class GenerateMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke with invalid manual legacy mode falls back to smart approval`() = runTest {
+    fun `invoke with unknown approval mode falls back to smart approval`() = runTest {
         val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         val contact = ContactEntity(
             id = "c1",
             name = "John",
             relationshipType = "FRIEND",
             primaryPhone = "+15551234567",
-            preferredChannel = "SMS",
+            preferredChannel = MessageChannel.SMS.raw,
             automationMode = "MANUAL",
         )
-        val variants = MessageVariantsResult("sh", "std", "lg", "fr", "fn", "em", "standard")
+        val draft = "Happy birthday John, hope the year ahead brings relaxed weekends, good coffee, and more time with friends."
+        val variants = MessageVariantsResult(draft, draft, draft, draft, draft, draft, "standard")
 
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns null
         coEvery { contactRepository.getById("c1") } returns contact
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
         coEvery { memoryNoteRepository.getByContact("c1") } returns emptyList()
         coEvery { giftHistoryRepository.getByContact("c1") } returns emptyList()
         coEvery { aiService.generateMessage(any(), any(), any(), any()) } returns variants
-        coEvery { preferencesRepository.getGlobalAutomationMode() } returns "MANUAL"
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.UNKNOWN
 
         val result = useCase("e1")
 
         assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
         val generated = result as GenerateMessageUseCase.GenerationOutcome.Generated
-        assertEquals("SMART_APPROVE", generated.approvalMode)
+        assertEquals(ApprovalMode.SMART_APPROVE, generated.approvalMode)
         assertEquals(0, generated.retries)
 
         coVerify { messageRepository.insertPending(any()) }
@@ -146,14 +151,14 @@ class GenerateMessageUseCaseTest {
             name = "John",
             relationshipType = "FRIEND",
             primaryPhone = "+15551234567",
-            preferredChannel = "SMS",
+            preferredChannel = MessageChannel.SMS.raw,
             automationMode = "FULLY_AUTO",
         )
         val draft = "Happy birthday John, hope the new year brings more weekend rides and good coffee catchups."
         val variants = MessageVariantsResult(draft, draft, draft, draft, draft, draft, "standard")
 
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns null
         coEvery { contactRepository.getById("c1") } returns contact
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
@@ -165,7 +170,7 @@ class GenerateMessageUseCaseTest {
 
         assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
         val generated = result as GenerateMessageUseCase.GenerationOutcome.Generated
-        assertEquals("FULLY_AUTO", generated.approvalMode)
+        assertEquals(ApprovalMode.FULLY_AUTO, generated.approvalMode)
 
         coVerify { messageRepository.insertPending(any()) }
         coVerify { schedulerService.scheduleExactSend(any()) }
@@ -179,7 +184,7 @@ class GenerateMessageUseCaseTest {
             id = "c1",
             name = "John",
             relationshipType = "FRIEND",
-            preferredChannel = "SMS",
+            preferredChannel = MessageChannel.SMS.raw,
             automationMode = "FULLY_AUTO",
         )
         val draft = "Happy birthday John, hope the day gives you time to relax and enjoy a great coffee."
@@ -187,7 +192,7 @@ class GenerateMessageUseCaseTest {
         val pendingSlot = slot<PendingMessageEntity>()
 
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns null
         coEvery { contactRepository.getById("c1") } returns contact
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
@@ -201,11 +206,11 @@ class GenerateMessageUseCaseTest {
         val result = useCase("e1")
 
         assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
-        assertEquals("ALWAYS_ASK", (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
+        assertEquals(ApprovalMode.ALWAYS_ASK, (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
         coVerify { messageRepository.insertPending(capture(pendingSlot)) }
         assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
         assertEquals("PENDING", pendingSlot.captured.status)
-        assertEquals("SMS", pendingSlot.captured.channel)
+        assertEquals(MessageChannel.SMS.raw, pendingSlot.captured.channel)
         coVerify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
         coVerify { notificationService.showApprovalNotification(contact, event, variants, pendingSlot.captured.id) }
     }
@@ -218,7 +223,7 @@ class GenerateMessageUseCaseTest {
             name = "John",
             relationshipType = "FRIEND",
             primaryPhone = "+15551234567",
-            preferredChannel = "SMS",
+            preferredChannel = MessageChannel.SMS.raw,
             automationMode = "FULLY_AUTO",
         )
         val variants = MessageVariantsResult(
@@ -234,7 +239,7 @@ class GenerateMessageUseCaseTest {
         val pendingSlot = slot<PendingMessageEntity>()
 
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns null
         coEvery { contactRepository.getById("c1") } returns contact
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
@@ -245,12 +250,13 @@ class GenerateMessageUseCaseTest {
         val result = useCase("e1")
 
         assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
-        assertEquals("SMART_APPROVE", (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
+        assertEquals(ApprovalMode.SMART_APPROVE, (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
         coVerify { messageRepository.insertPending(capture(pendingSlot)) }
         assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
         assertEquals("PENDING", pendingSlot.captured.status)
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertTrue(pendingSlot.captured.isUsingFallback)
+        verify { notificationService.showAiFallbackAlert() }
         coVerify { schedulerService.scheduleExactSend(any()) }
         coVerify { notificationService.showApprovalNotification(contact, event, variants, any()) }
     }
@@ -264,7 +270,7 @@ class GenerateMessageUseCaseTest {
             relationshipType = "FRIEND",
             primaryPhone = "+15551234567",
             primaryEmail = null,
-            preferredChannel = "EMAIL",
+            preferredChannel = MessageChannel.EMAIL.raw,
             automationMode = "SMART_APPROVE",
         )
         val draft = "Happy birthday John, hope you get a relaxed day and a good coffee catchup soon."
@@ -272,7 +278,7 @@ class GenerateMessageUseCaseTest {
         val pendingSlot = slot<PendingMessageEntity>()
 
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns null
         coEvery { contactRepository.getById("c1") } returns contact
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
@@ -286,7 +292,7 @@ class GenerateMessageUseCaseTest {
         useCase("e1")
 
         coVerify { messageRepository.insertPending(capture(pendingSlot)) }
-        assertEquals("SMS", pendingSlot.captured.channel)
+        assertEquals(MessageChannel.SMS.raw, pendingSlot.captured.channel)
     }
 
     @Test
@@ -302,16 +308,17 @@ class GenerateMessageUseCaseTest {
         val contact = ContactEntity(
             id = "c1",
             name = "John",
-            preferredChannel = "SMS",
+            preferredChannel = MessageChannel.SMS.raw,
             automationMode = "ALWAYS_ASK",
             customSendTimeHour = 14,
             customSendTimeMinute = 45,
         )
-        val variants = MessageVariantsResult("sh", "std", "lg", "fr", "fn", "em", "standard")
+        val draft = "Happy birthday John, hope the year ahead brings relaxed weekends, good coffee, and more time with friends."
+        val variants = MessageVariantsResult(draft, draft, draft, draft, draft, draft, "standard")
         val pendingSlot = slot<PendingMessageEntity>()
 
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns null
         coEvery { contactRepository.getById("c1") } returns contact
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
@@ -337,14 +344,14 @@ class GenerateMessageUseCaseTest {
             id = "c1",
             name = "John",
             relationshipType = "FRIEND",
-            preferredChannel = "SMS",
+            preferredChannel = MessageChannel.SMS.raw,
             automationMode = "FULLY_AUTO",
             skipAutoWish = true,
         )
         val variants = MessageVariantsResult("sh", "std", "lg", "fr", "fn", "em", "standard")
 
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", any()) } returns false
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns null
         coEvery { contactRepository.getById("c1") } returns contact
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
@@ -355,9 +362,67 @@ class GenerateMessageUseCaseTest {
         val result = useCase("e1")
 
         assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
-        assertEquals("ALWAYS_ASK", (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
+        assertEquals(ApprovalMode.ALWAYS_ASK, (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
         coVerify { notificationService.showApprovalNotification(contact, event, variants, any()) }
         coVerify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
+    }
+
+    @Test
+    fun `invoke does not replace failed pending message by default`() = runTest {
+        val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
+        coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns pendingMessage(
+            id = "failed_1",
+            status = "FAILED"
+        )
+
+        val result = useCase("e1")
+
+        assertEquals(GenerateMessageUseCase.GenerationOutcome.AlreadyExists, result)
+        coVerify(exactly = 0) { aiService.generateMessage(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { messageRepository.insertPending(any()) }
+    }
+
+    @Test
+    fun `invoke with worker retry request replaces failed occurrence`() = runTest {
+        val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
+        val contact = ContactEntity(
+            id = "c1",
+            name = "John",
+            relationshipType = "FRIEND",
+            primaryPhone = "+15551234567",
+            preferredChannel = MessageChannel.SMS.raw,
+            automationMode = "FULLY_AUTO",
+        )
+        val draft = "Happy birthday John, hope the year ahead brings relaxed weekends, good coffee, and more time with friends."
+        val variants = MessageVariantsResult(draft, draft, draft, draft, draft, draft, "standard")
+        val pendingSlot = slot<PendingMessageEntity>()
+
+        coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", any()) } returns pendingMessage(
+            id = "failed_1",
+            status = "FAILED"
+        )
+        coEvery { contactRepository.getById("c1") } returns contact
+        coEvery { styleProfileRepository.getProfileOnce() } returns null
+        coEvery { messageRepository.getSentByContact("c1", 10) } returns emptyList()
+        coEvery { memoryNoteRepository.getByContact("c1") } returns emptyList()
+        coEvery { giftHistoryRepository.getByContact("c1") } returns emptyList()
+        coEvery { aiService.generateMessage(any(), any(), any(), any()) } returns variants
+
+        val result = useCase(
+            GenerateMessageUseCase.Request(
+                eventId = "e1",
+                regenerateFailedOccurrence = true
+            )
+        )
+
+        assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
+        assertEquals("failed_1", (result as GenerateMessageUseCase.GenerationOutcome.Generated).pendingId)
+        coVerify { messageRepository.insertPending(capture(pendingSlot)) }
+        assertEquals("failed_1", pendingSlot.captured.id)
+        assertEquals("APPROVED", pendingSlot.captured.status)
+        coVerify { schedulerService.scheduleExactSend("failed_1") }
     }
 
     @Test
@@ -376,10 +441,39 @@ class GenerateMessageUseCaseTest {
             }.timeInMillis
         )
         coEvery { eventRepository.getEventsBefore(any()) } returns listOf(event)
-        coEvery { messageRepository.pendingExistsForEventOccurrence("c1", "e1", 2027) } returns true
+        coEvery { messageRepository.getPendingForEventOccurrence("c1", "e1", 2027) } returns pendingMessage(
+            scheduledYear = 2027
+        )
 
         val result = useCase("e1")
 
         assertEquals(GenerateMessageUseCase.GenerationOutcome.AlreadyExists, result)
+    }
+
+    private fun pendingMessage(
+        id: String = "pending_1",
+        contactId: String = "c1",
+        eventId: String = "e1",
+        scheduledYear: Int = 1970,
+        status: String = "PENDING"
+    ): PendingMessageEntity {
+        return PendingMessageEntity(
+            id = id,
+            contactId = contactId,
+            eventId = eventId,
+            shortVariant = "short",
+            standardVariant = "standard",
+            longVariant = "long",
+            formalVariant = "formal",
+            funnyVariant = "funny",
+            emotionalVariant = "emotional",
+            selectedVariant = "standard",
+            selectedVariantText = "standard",
+            channel = MessageChannel.SMS.raw,
+            scheduledForMs = 0L,
+            approvalMode = "SMART_APPROVE",
+            status = status,
+            scheduledYear = scheduledYear
+        )
     }
 }

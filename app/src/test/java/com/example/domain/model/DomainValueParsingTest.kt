@@ -33,7 +33,8 @@ class DomainValueParsingTest {
     fun `event type parser handles legacy casing and invalid values`() {
         assertEquals(EventType.BIRTHDAY, EventType.fromRaw("birthday"))
         assertEquals(EventType.WORK_ANNIVERSARY, EventType.fromRaw("WORK_ANNIVERSARY"))
-        assertEquals(EventType.UNKNOWN, EventType.fromRaw("holiday"))
+        assertEquals(EventType.HOLIDAY, EventType.fromRaw("holiday"))
+        assertEquals(EventType.FOLLOW_UP, EventType.fromRaw("follow_up"))
         assertEquals(EventType.UNKNOWN, EventType.fromRaw(null))
     }
 }

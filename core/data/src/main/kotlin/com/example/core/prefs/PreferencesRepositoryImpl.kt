@@ -1,5 +1,6 @@
 package com.example.core.prefs
 
+import com.example.domain.model.ApprovalMode
 import com.example.domain.service.PreferencesRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,8 +22,8 @@ class PreferencesRepositoryImpl @Inject constructor(
     override fun setSenderEmailPassword(pw: String) = securePrefs.setSenderEmailPassword(pw)
     override fun getSenderEmailPassword(): String = securePrefs.getSenderEmailPassword()
 
-    override fun setGlobalAutomationMode(mode: String) = securePrefs.setGlobalAutomationMode(mode)
-    override fun getGlobalAutomationMode(): String = securePrefs.getGlobalAutomationMode()
+    override fun setGlobalAutomationMode(mode: ApprovalMode) = securePrefs.setGlobalApprovalMode(mode)
+    override fun getGlobalAutomationMode(): ApprovalMode = securePrefs.getGlobalApprovalMode()
 
     override fun setThemeMode(mode: String) = securePrefs.setThemeMode(mode)
     override fun getThemeMode(): String = securePrefs.getThemeMode()
@@ -65,6 +66,8 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     override fun setLastSyncError(error: String?) = securePrefs.setLastSyncError(error)
     override fun getLastSyncError(): String? = securePrefs.getLastSyncError()
+
+    override fun getLastBackupMs(): Long = securePrefs.getLastBackupMs()
 
     override fun clearAll() = securePrefs.clearAll()
 }

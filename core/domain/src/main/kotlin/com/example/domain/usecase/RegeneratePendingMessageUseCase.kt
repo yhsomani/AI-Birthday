@@ -67,7 +67,7 @@ class RegeneratePendingMessageUseCase @Inject constructor(
         val selectedText = if (shouldPreserveUserEdit) currentDraft else regeneratedText
         val requestedApprovalMode = ApprovalModeResolver.resolve(
             relationship = contact.relationshipType,
-            contactOverride = contact.automationMode,
+            contactOverride = ApprovalMode.fromRaw(contact.automationMode),
             globalMode = preferencesRepository.getGlobalAutomationMode(),
             skipAutoWish = contact.skipAutoWish,
         )
@@ -103,7 +103,7 @@ class RegeneratePendingMessageUseCase @Inject constructor(
             emotionalVariant = variants.emotional,
             selectedVariant = variants.recommended,
             selectedVariantText = selectedText,
-            channel = channelSelection.channel,
+            channel = channelSelection.channel.raw,
             approvalMode = approvalMode.raw,
             status = status.raw,
             editedByUser = shouldPreserveUserEdit,
@@ -112,7 +112,10 @@ class RegeneratePendingMessageUseCase @Inject constructor(
             isUsingFallback = variants.isUsingFallback,
         )
         messageRepository.insertPending(updated)
-        if (updated.status == MessageStatus.APPROVED.raw || ApprovalModeResolver.schedulesAutomaticDispatch(approvalMode)) {
+        if (
+            MessageStatus.fromRaw(updated.status) == MessageStatus.APPROVED ||
+            ApprovalModeResolver.schedulesAutomaticDispatch(approvalMode)
+        ) {
             schedulerService.scheduleExactSend(updated.id)
         }
 

@@ -17,6 +17,9 @@ import com.example.core.gemini.GeminiClient
 import com.example.core.gemini.RateLimiter
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.automation.RevivalCadencePolicy
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import io.mockk.*
@@ -55,7 +58,7 @@ class RevivalWorkerTest {
 
         every { prefs.getGeminiApiKey() } returns "test_api_key"
         every { prefs.isAiWishGenerationEnabled() } returns true
-        every { prefs.getGlobalAutomationMode() } returns "SMART_APPROVE"
+        every { prefs.getGlobalApprovalMode() } returns ApprovalMode.SMART_APPROVE
         every { prefs.getQuietHoursStart() } returns 0
         every { prefs.getQuietHoursEnd() } returns 0
         every { prefs.getBlackoutDates() } returns "[]"
@@ -101,7 +104,7 @@ class RevivalWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
-        assertEquals("PENDING", pendingSlot.captured.status)
+        assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
         coVerify { contactDao.updateLastRevivalAttempt("c1", any()) }
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
         verify { NotificationHelper.showRevivalNotification(any(), "Priya", any(), any(), "c1") }
@@ -138,7 +141,7 @@ class RevivalWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("FULLY_AUTO", pendingSlot.captured.approvalMode)
-        assertEquals("APPROVED", pendingSlot.captured.status)
+        assertEquals(MessageStatus.APPROVED.raw, pendingSlot.captured.status)
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
         verify(exactly = 0) { NotificationHelper.showRevivalNotification(any(), any(), any(), any(), any()) }
     }
@@ -173,8 +176,8 @@ class RevivalWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
-        assertEquals("PENDING", pendingSlot.captured.status)
-        assertEquals("SMS", pendingSlot.captured.channel)
+        assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
+        assertEquals(MessageChannel.SMS.raw, pendingSlot.captured.channel)
         verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
         verify { NotificationHelper.showRevivalNotification(any(), "Priya", any(), pendingSlot.captured.selectedVariantText, "c1") }
     }
@@ -210,7 +213,7 @@ class RevivalWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
-        assertEquals("PENDING", pendingSlot.captured.status)
+        assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertEquals(true, pendingSlot.captured.isUsingFallback)
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
@@ -226,7 +229,9 @@ class RevivalWorkerTest {
             lastInteractionDate = System.currentTimeMillis() - 40L * 24 * 60 * 60 * 1000L,
         )
         coEvery { contactDao.getContactsForRevival(any()) } returns listOf(contact)
-        coEvery { pendingMessageDao.getPendingMessage(eq("c1"), eq(RevivalCadencePolicy.eventId("c1")), any()) } returns pendingRevival(status = "PENDING")
+        coEvery { pendingMessageDao.getPendingMessage(eq("c1"), eq(RevivalCadencePolicy.eventId("c1")), any()) } returns pendingRevival(
+            status = MessageStatus.PENDING.raw,
+        )
 
         val worker = TestListenableWorkerBuilder<RevivalWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
@@ -294,7 +299,7 @@ class RevivalWorkerTest {
             formalVariant = "Hi",
             funnyVariant = "Hi",
             emotionalVariant = "Hi",
-            channel = "SMS",
+            channel = MessageChannel.SMS.raw,
             scheduledForMs = System.currentTimeMillis(),
             approvalMode = "SMART_APPROVE",
             status = status,

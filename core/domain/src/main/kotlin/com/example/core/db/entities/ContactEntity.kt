@@ -3,6 +3,8 @@ package com.example.core.db.entities
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
 
 @Entity(
     tableName = "contacts",
@@ -46,7 +48,7 @@ data class ContactEntity(
     val relationshipType: String = "UNKNOWN",
     val relationshipSubtype: String? = null,   // e.g. "maternal_aunt", "college_roommate"
     val preferredLanguage: String = "en",
-    val preferredChannel: String = "SMS",
+    val preferredChannel: String = MessageChannel.SMS.raw,
     val formalityLevel: String = "CASUAL",
     val communicationStyle: String = "WARM",   // WARM, FUNNY, PROFESSIONAL, EMOTIONAL
 
@@ -63,7 +65,7 @@ data class ContactEntity(
     val lastRevivalAttemptMs: Long = 0L,
 
     // Automation
-    val automationMode: String = "DEFAULT",    // FULLY_AUTO, SMART_APPROVE, VIP_APPROVE, DEFAULT
+    val automationMode: String = ApprovalMode.DEFAULT.raw,
     val giftBudgetInr: Int = 500,
     val annualBudgetInr: Int = 0,
     val skipAutoWish: Boolean = false,

@@ -2,6 +2,7 @@ package com.example.domain.automation
 
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.PendingMessageEntity
+import com.example.domain.model.MessageChannel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -107,7 +108,7 @@ class RevivalCadencePolicyTest {
             formalVariant = "Hi",
             funnyVariant = "Hi",
             emotionalVariant = "Hi",
-            channel = "SMS",
+            channel = MessageChannel.SMS.raw,
             scheduledForMs = NOW,
             approvalMode = "SMART_APPROVE",
             status = status,

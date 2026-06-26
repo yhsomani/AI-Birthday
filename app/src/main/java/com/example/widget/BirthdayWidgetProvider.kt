@@ -6,6 +6,8 @@ import android.content.Context
 import android.widget.RemoteViews
 import com.example.R
 import com.example.core.db.AppDatabase
+import com.example.domain.model.EventType
+import com.example.domain.model.MessageStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CoroutineScope
@@ -26,14 +28,16 @@ class BirthdayWidgetProvider : AppWidgetProvider() {
                 val events = db.eventDao().getAll().first()
                 val contacts = db.contactDao().getAll().first()
                 val pendingApprovals = db.pendingMessageDao().getAllSync()
-                    .count { it.status == "PENDING" }
+                    .count { MessageStatus.fromRaw(it.status) == MessageStatus.PENDING }
 
                 val today = Calendar.getInstance()
                 val todayDay = today.get(Calendar.DAY_OF_MONTH)
                 val todayMonth = today.get(Calendar.MONTH) + 1
 
                 val todayBirthdays = events.filter {
-                    it.type == "BIRTHDAY" && it.dayOfMonth == todayDay && it.month == todayMonth
+                    EventType.fromRaw(it.type) == EventType.BIRTHDAY &&
+                        it.dayOfMonth == todayDay &&
+                        it.month == todayMonth
                 }
                 val contactNames = contacts.associate { it.id to it.name }
                 val nextEvents = events

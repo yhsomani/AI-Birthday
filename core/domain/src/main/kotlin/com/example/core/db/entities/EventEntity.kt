@@ -34,7 +34,7 @@ data class EventEntity(
     val nextOccurrenceMs: Long,
     val isActive: Boolean = true,
     val notifyDaysBefore: Int = 1,    // Can be 0 (day-of) or 1,2,3,7
-    val source: String = "CONTACTS",  // CONTACTS, CALENDAR, MANUAL, AI_INFERRED
+    val source: String = "CONTACTS",  // CONTACTS, CALENDAR, MANUAL, AI_INFERRED; *_SEPARATE means reviewed separately
     val confidenceScore: Int = 100,   // 0-100, events found in multiple sources get higher confidence
     val isVerified: Boolean = true    // Low-confidence events shown with "Verify?" badge
 ) {

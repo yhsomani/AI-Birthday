@@ -20,6 +20,9 @@ interface MemoryNoteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(note: MemoryNoteEntity)
 
+    @Query("DELETE FROM memory_notes")
+    suspend fun deleteAll()
+
     @Delete
     suspend fun delete(note: MemoryNoteEntity)
 }

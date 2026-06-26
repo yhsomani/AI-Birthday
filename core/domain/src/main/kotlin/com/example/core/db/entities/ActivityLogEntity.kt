@@ -4,6 +4,8 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.domain.model.ActivityLogSeverity
+import com.example.domain.model.ActivityLogStatus
 
 @Entity(
     tableName = "activity_logs",
@@ -25,8 +27,8 @@ data class ActivityLogEntity(
     val contactId: String? = null,
     val eventId: String? = null,
     val messageId: String? = null,
-    @ColumnInfo(defaultValue = "'INFO'") val severity: String = "INFO",
-    @ColumnInfo(defaultValue = "'OPEN'") val status: String = "OPEN",
+    @ColumnInfo(defaultValue = "'INFO'") val severity: String = ActivityLogSeverity.INFO.raw,
+    @ColumnInfo(defaultValue = "'OPEN'") val status: String = ActivityLogStatus.OPEN.raw,
     val actionRoute: String? = null,
     @ColumnInfo(defaultValue = "'{}'") val metadataJson: String = "{}",
     val createdAtMs: Long = System.currentTimeMillis(),

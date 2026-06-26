@@ -41,6 +41,23 @@ class NoHardcodedStringsRegressionTest {
         )
     }
 
+    @Test
+    fun cleanedViewModelsAndUseCases_doNotReintroduceKnownUserVisibleLiterals() {
+        val offenders = CLEANED_VIEWMODEL_AND_USECASE_SOURCES.flatMap { path ->
+            val file = sourceFile(path)
+            val text = file.readText()
+            KNOWN_CLEANED_USER_VISIBLE_LITERALS
+                .filter { literal -> text.contains(literal) }
+                .map { literal -> "${file.path}: contains \"$literal\"" }
+        }
+
+        assertTrue(
+            "Cleaned ViewModel/use case user-visible strings should use resources or typed reasons:\n" +
+                offenders.joinToString("\n"),
+            offenders.isEmpty(),
+        )
+    }
+
     private fun sourceFile(rootRelativePath: String): File {
         return listOf(
             File(rootRelativePath),
@@ -98,6 +115,58 @@ class NoHardcodedStringsRegressionTest {
         )
         val rawLiteralArgumentPattern = Regex(
             pattern = ",\\s*\"",
+        )
+
+        val CLEANED_VIEWMODEL_AND_USECASE_SOURCES = listOf(
+            "app/src/main/java/com/example/ui/viewmodel/ContactDetailViewModel.kt",
+            "app/src/main/java/com/example/ui/viewmodel/ContactListViewModel.kt",
+            "app/src/main/java/com/example/ui/viewmodel/EventsViewModel.kt",
+            "app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt",
+            "app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt",
+            "core/domain/src/main/kotlin/com/example/domain/usecase/SaveManualEventUseCase.kt",
+            "core/domain/src/main/kotlin/com/example/domain/usecase/UpdateContactPreferencesUseCase.kt",
+        )
+
+        val KNOWN_CLEANED_USER_VISIBLE_LITERALS = listOf(
+            "Unable to load events. Please try again.",
+            "Unable to refresh events. Please try again.",
+            "Unable to update this event conflict. Please try again.",
+            "Selected contact was not found.",
+            "Event was not found.",
+            "No event conflict remains.",
+            "Choose a contact or enter a new contact name.",
+            "Enter a valid date.",
+            " related event(s).",
+            "Unable to sync contacts. Please try again.",
+            "Contact not found.",
+            "Relationship type is required.",
+            "Preferred language is required.",
+            "Choose SMS, WhatsApp, or Email as the preferred channel.",
+            "Choose a supported automation mode.",
+            "Send hour must be 0-23.",
+            "Send minute must be 0-59.",
+            "Set both hour and minute for a custom send time.",
+            "Budgets cannot be negative.",
+            "Setup needs attention",
+            "Approvals waiting",
+            "Relationship health is ",
+            "Upcoming in ",
+            "Deleted Contact",
+            "Unable to load messages. Please try again.",
+            "Unable to approve the message. Please try again.",
+            "Unable to reject the message. Please try again.",
+            "Unable to retry the message. Please try again.",
+            "Unable to revoke approval. Please try again.",
+            "Unable to approve the selected messages. Please try again.",
+            "Unable to reject the selected messages. Please try again.",
+            "Unable to retry the selected messages. Please try again.",
+            "A pending message was approved.",
+            "A pending message was rejected.",
+            "A failed message was queued for retry.",
+            " pending messages were approved.",
+            " pending messages were rejected.",
+            " failed messages were queued for retry.",
+            "A message approval was revoked.",
         )
     }
 }

@@ -13,6 +13,9 @@ import com.example.core.resilience.DeadLetterEntry
 import com.example.core.resilience.DeadLetterQueue
 import com.example.core.resilience.HealthMonitor
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.MessageStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
@@ -48,10 +51,12 @@ class MessageDispatcher(
         var success = false
         val primaryPhone = contact.primaryPhone
         val primaryEmail = contact.primaryEmail
-        var finalChannel = message.channel
+        var finalChannel = MessageChannel.fromRaw(message.channel)
+            .takeIf { it != MessageChannel.UNKNOWN }
+            ?: MessageChannel.SMS
         val blockedChannels = prefs.getChannelBlackout().toChannelSet()
         val deliveryRoutes = DeliveryChannelResolver.resolveRoutes(
-            preferredChannel = message.channel,
+            preferredChannel = MessageChannel.fromRaw(message.channel),
             primaryPhone = primaryPhone,
             primaryEmail = primaryEmail,
             senderEmail = prefs.getSenderEmail(),
@@ -66,7 +71,7 @@ class MessageDispatcher(
                 extras = mapOf(
                     "messageId" to message.id,
                     "preferredChannel" to message.channel,
-                    "blockedChannels" to blockedChannels.joinToString(","),
+                    "blockedChannels" to blockedChannels.joinToString(",") { it.raw },
                     "hasPhone" to (!primaryPhone.isNullOrBlank()).toString(),
                     "hasEmail" to (!primaryEmail.isNullOrBlank()).toString(),
                 ),
@@ -76,7 +81,7 @@ class MessageDispatcher(
         for (route in deliveryRoutes) {
             finalChannel = route
             when (route) {
-                "WHATSAPP" -> {
+                MessageChannel.WHATSAPP -> {
                     if (primaryPhone != null) {
                         val waSender = WhatsAppSender(context)
                         success = waSender.send(primaryPhone, messageText, message.eventId)
@@ -85,7 +90,7 @@ class MessageDispatcher(
                         }
                     }
                 }
-                "SMS" -> {
+                MessageChannel.SMS -> {
                     if (primaryPhone != null) {
                         val smsSentMessageId = UUID.randomUUID().toString()
                         var smsAttemptInserted = false
@@ -96,9 +101,9 @@ class MessageDispatcher(
                                 eventType = message.eventId,
                                 eventYear = Calendar.getInstance().get(Calendar.YEAR),
                                 messageText = messageText,
-                                channel = "SMS",
+                                channel = MessageChannel.SMS.raw,
                                 sentAtMs = System.currentTimeMillis(),
-                                deliveryStatus = "PENDING_DELIVERY",
+                                deliveryStatus = MessageDeliveryStatus.PENDING_DELIVERY.raw,
                                 aiGenerated = true
                             ))
                             smsAttemptInserted = true
@@ -109,7 +114,7 @@ class MessageDispatcher(
                             success = true
                         } catch (e: SecurityException) {
                             if (smsAttemptInserted) {
-                                sentMessageDao.updateDeliveryStatus(smsSentMessageId, "FAILED")
+                                sentMessageDao.updateDeliveryStatus(smsSentMessageId, MessageDeliveryStatus.FAILED.raw)
                             }
                             StructuredLogger.e(TAG, "SMS permission not granted for message ${message.id}", e)
                             com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
@@ -119,13 +124,13 @@ class MessageDispatcher(
                             )
                         } catch (e: Exception) {
                             if (smsAttemptInserted) {
-                                sentMessageDao.updateDeliveryStatus(smsSentMessageId, "FAILED")
+                                sentMessageDao.updateDeliveryStatus(smsSentMessageId, MessageDeliveryStatus.FAILED.raw)
                             }
                             StructuredLogger.e(TAG, "SMS send failed for message ${message.id}", e)
                         }
                     }
                 }
-                "EMAIL" -> {
+                MessageChannel.EMAIL -> {
                     if (primaryEmail != null) {
                         try {
                             val event = eventDao?.getById(message.eventId)
@@ -143,6 +148,7 @@ class MessageDispatcher(
                         }
                     }
                 }
+                MessageChannel.UNKNOWN -> Unit
             }
             if (success) break
         }
@@ -150,9 +156,9 @@ class MessageDispatcher(
         if (success) {
             StructuredLogger.i(TAG, "Message dispatched successfully", mapOf(
                 "messageId" to message.id,
-                "channel" to finalChannel,
+                "channel" to finalChannel.raw,
             ))
-            pendingMessageDao.updateStatus(message.id, "SENT")
+            pendingMessageDao.updateStatus(message.id, MessageStatus.SENT.raw)
             if (!successfulSentMessageInserted) {
                 sentMessageDao.insert(SentMessageEntity(
                     id = UUID.randomUUID().toString(),
@@ -160,9 +166,9 @@ class MessageDispatcher(
                     eventType = message.eventId,
                     eventYear = Calendar.getInstance().get(Calendar.YEAR),
                     messageText = messageText,
-                    channel = finalChannel,
+                    channel = finalChannel.raw,
                     sentAtMs = System.currentTimeMillis(),
-                    deliveryStatus = "SENT",
+                    deliveryStatus = MessageDeliveryStatus.SENT.raw,
                     aiGenerated = true
                 ))
             }
@@ -172,7 +178,7 @@ class MessageDispatcher(
                 dao.updateHealthScoreDelta(contact.id, 5)
             }
         } else {
-            pendingMessageDao.updateStatus(message.id, "FAILED")
+            pendingMessageDao.updateStatus(message.id, MessageStatus.FAILED.raw)
             StructuredLogger.w(TAG, "Failed to dispatch message ${message.id} via ${message.channel}")
             HealthMonitor.recordError("MessageDispatcher.dispatch", "Failed to send ${message.id} via ${message.channel}")
             DeadLetterQueue.enqueue(DeadLetterEntry(
@@ -185,18 +191,15 @@ class MessageDispatcher(
         }
     }
 
-    companion object {
-        private const val TAG = "MessageDispatcher"
+    private fun String.toChannelSet(): Set<MessageChannel> {
+        return CHANNEL_TOKEN_PATTERN.findAll(this)
+            .map { MessageChannel.fromRaw(it.groupValues[1]) }
+            .filter { it != MessageChannel.UNKNOWN }
+            .toSet()
     }
 
-    private fun String.toChannelSet(): Set<String> {
-        return try {
-            val array = org.json.JSONArray(this)
-            List(array.length()) { index -> array.optString(index).uppercase() }
-                .filter { it in setOf("SMS", "WHATSAPP", "EMAIL") }
-                .toSet()
-        } catch (_: Exception) {
-            emptySet()
-        }
+    private companion object {
+        private const val TAG = "MessageDispatcher"
+        val CHANNEL_TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")
     }
 }

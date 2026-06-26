@@ -4,6 +4,8 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.domain.event.EventDatePolicy
 import com.example.domain.event.EventIdentityPolicy
+import com.example.domain.model.EventType
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
@@ -20,7 +22,8 @@ class SaveManualEventUseCase @Inject constructor(
     private val eventReminderSchedulerService: EventReminderSchedulerService,
 ) {
     suspend operator fun invoke(request: Request): Outcome {
-        val normalizedType = request.eventType.trim().uppercase(Locale.US).ifBlank { "BIRTHDAY" }
+        val normalizedType = request.eventType.normalizedEventTypeOrDefault(EventType.BIRTHDAY)
+        val eventType = EventType.fromRaw(normalizedType)
         val normalizedLabel = request.label?.trim()?.ifBlank { null }
         val contact = when {
             request.existingContactId != null -> {
@@ -32,13 +35,13 @@ class SaveManualEventUseCase @Inject constructor(
                 name = request.newContactName.trim(),
                 contactGroup = "Manual",
                 relationshipType = "UNKNOWN",
-                preferredChannel = "SMS",
+                preferredChannel = MessageChannel.SMS.raw,
             )
-            else -> return Outcome.InvalidInput("Choose a contact or enter a new contact name.")
+            else -> return Outcome.InvalidInput(InvalidInputReason.MISSING_CONTACT)
         }
 
         if (!EventDatePolicy.isValidDate(request.dayOfMonth, request.month, request.year)) {
-            return Outcome.InvalidInput("Enter a valid date.")
+            return Outcome.InvalidInput(InvalidInputReason.INVALID_DATE)
         }
 
         val existingEvents = existingEvents()
@@ -75,11 +78,11 @@ class SaveManualEventUseCase @Inject constructor(
         }
 
         val nextOccurrenceMs = EventDatePolicy.nextOccurrenceMs(request.dayOfMonth, request.month)
-            ?: return Outcome.InvalidInput("Enter a valid date.")
+            ?: return Outcome.InvalidInput(InvalidInputReason.INVALID_DATE)
         val shouldUpdateContactEventDate = existingConflict == null
         val updatedContact = if (shouldUpdateContactEventDate) {
             contact.withEventDate(
-                eventType = normalizedType,
+                eventType = eventType,
                 day = request.dayOfMonth,
                 month = request.month,
                 year = request.year,
@@ -116,24 +119,24 @@ class SaveManualEventUseCase @Inject constructor(
     }
 
     private fun ContactEntity.withEventDate(
-        eventType: String,
+        eventType: EventType,
         day: Int,
         month: Int,
         year: Int?,
     ): ContactEntity = when (eventType) {
-        "BIRTHDAY" -> copy(
+        EventType.BIRTHDAY -> copy(
             birthdayDay = day,
             birthdayMonth = month,
             birthdayYear = year,
             updatedAt = System.currentTimeMillis(),
         )
-        "ANNIVERSARY" -> copy(
+        EventType.ANNIVERSARY -> copy(
             anniversaryDay = day,
             anniversaryMonth = month,
             anniversaryYear = year,
             updatedAt = System.currentTimeMillis(),
         )
-        "WORK_ANNIVERSARY" -> copy(
+        EventType.WORK_ANNIVERSARY -> copy(
             workStartDay = day,
             workStartMonth = month,
             workStartYear = year,
@@ -145,7 +148,7 @@ class SaveManualEventUseCase @Inject constructor(
     data class Request(
         val existingContactId: String? = null,
         val newContactName: String? = null,
-        val eventType: String = "BIRTHDAY",
+        val eventType: String = EventType.BIRTHDAY.raw,
         val label: String? = null,
         val month: Int,
         val dayOfMonth: Int,
@@ -156,7 +159,7 @@ class SaveManualEventUseCase @Inject constructor(
 
     sealed class Outcome {
         data class Saved(val contact: ContactEntity, val event: EventEntity) : Outcome()
-        data class InvalidInput(val message: String) : Outcome()
+        data class InvalidInput(val reason: InvalidInputReason) : Outcome()
         data class DuplicateFound(val contact: ContactEntity, val existingEvent: EventEntity) : Outcome()
         data class ConflictFound(
             val contact: ContactEntity,
@@ -166,6 +169,11 @@ class SaveManualEventUseCase @Inject constructor(
             val requestedYear: Int?,
         ) : Outcome()
         data object ContactNotFound : Outcome()
+    }
+
+    enum class InvalidInputReason {
+        MISSING_CONTACT,
+        INVALID_DATE,
     }
 
     private suspend fun existingEvents(): List<EventEntity> {
@@ -190,5 +198,11 @@ class SaveManualEventUseCase @Inject constructor(
             return EventDatePolicy.nextOccurrenceMs(day, month, nowMs)
                 ?: throw IllegalArgumentException("Invalid event date")
         }
+    }
+
+    private fun String.normalizedEventTypeOrDefault(defaultType: EventType): String {
+        val normalized = trim().uppercase(Locale.US)
+        if (normalized.isBlank()) return defaultType.raw
+        return EventType.fromRaw(normalized).takeUnless { it == EventType.UNKNOWN }?.raw ?: normalized
     }
 }

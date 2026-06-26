@@ -1,5 +1,6 @@
 package com.example.domain.automation
 
+import com.example.domain.model.MessageChannel
 import java.util.Calendar
 import java.util.Locale
 
@@ -72,8 +73,8 @@ object AutomationSchedulePolicy {
             .coerceAtLeast(nowMs)
     }
 
-    fun isChannelBlocked(channel: String, channelBlackoutJson: String): Boolean {
-        return channel.uppercase(Locale.US) in channelBlackoutJson.toTokenSet()
+    fun isChannelBlocked(channel: MessageChannel, channelBlackoutJson: String): Boolean {
+        return channel != MessageChannel.UNKNOWN && channel in channelBlackoutJson.toChannelSet()
     }
 
     private fun adjustForQuietHours(
@@ -142,9 +143,10 @@ object AutomationSchedulePolicy {
             .toSet()
     }
 
-    private fun String.toTokenSet(): Set<String> {
+    private fun String.toChannelSet(): Set<MessageChannel> {
         return TOKEN_PATTERN.findAll(this)
-            .map { it.groupValues[1].uppercase(Locale.US) }
+            .map { MessageChannel.fromRaw(it.groupValues[1]) }
+            .filter { it != MessageChannel.UNKNOWN }
             .toSet()
     }
 

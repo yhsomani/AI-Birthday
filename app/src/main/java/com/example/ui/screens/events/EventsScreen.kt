@@ -73,21 +73,28 @@ import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.core.ui.theme.RelateWarning
+import com.example.domain.event.EventResolutionPolicy
+import com.example.domain.model.EventType
 import com.example.ui.viewmodel.EventHorizonFilter
+import com.example.ui.viewmodel.EventResolutionAction
+import com.example.ui.viewmodel.EventTrustConflictState
+import com.example.ui.viewmodel.EventTrustState
+import com.example.ui.viewmodel.EventVerificationState
 import com.example.ui.viewmodel.EventTypeFilter
 import com.example.ui.viewmodel.EventsViewModel
 import com.example.ui.viewmodel.ManualEventDuplicateWarning
 import com.example.ui.viewmodel.ManualEventWarningKind
+import com.example.ui.viewmodel.buildEventTrustStates
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 private val eventTypeOptions = listOf(
-    "BIRTHDAY",
-    "ANNIVERSARY",
-    "WORK_ANNIVERSARY",
-    "CUSTOM",
+    EventType.BIRTHDAY.raw,
+    EventType.ANNIVERSARY.raw,
+    EventType.WORK_ANNIVERSARY.raw,
+    EventType.CUSTOM.raw,
 )
 
 private val eventTypeFilters = listOf(
@@ -236,7 +243,17 @@ fun EventsScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    EventsList(events = state.events)
+                    EventsList(
+                        events = state.events,
+                        eventTrust = state.eventTrust,
+                        resolvingEventId = state.resolvingEventId,
+                        onMergeEvent = {
+                            viewModel.resolveEventConflict(it, EventResolutionAction.MERGE_KEEP_SELECTED)
+                        },
+                        onKeepSeparateEvent = {
+                            viewModel.resolveEventConflict(it, EventResolutionAction.KEEP_SEPARATE)
+                        },
+                    )
                 }
             }
         }
@@ -251,7 +268,18 @@ fun EventsScreen(
 }
 
 @Composable
-internal fun EventsList(events: List<EventEntity>) {
+internal fun EventsList(
+    events: List<EventEntity>,
+    eventTrust: Map<String, EventTrustState> = buildEventTrustStates(events),
+    resolvingEventId: String? = null,
+    onMergeEvent: (String) -> Unit = {},
+    onKeepSeparateEvent: (String) -> Unit = {},
+) {
+    val resolvedEventTrust = if (events.all { eventTrust.containsKey(it.id) }) {
+        eventTrust
+    } else {
+        buildEventTrustStates(events)
+    }
     val groupedEvents = events.groupBy {
         val cal = java.util.Calendar.getInstance()
         cal.timeInMillis = it.nextOccurrenceMs
@@ -268,7 +296,13 @@ internal fun EventsList(events: List<EventEntity>) {
             }
             monthEvents.forEach { event ->
                 item(key = event.id) {
-                    EventCard(event = event)
+                    EventCard(
+                        event = event,
+                        trustState = resolvedEventTrust.getValue(event.id),
+                        isResolving = resolvingEventId == event.id,
+                        onMerge = { onMergeEvent(event.id) },
+                        onKeepSeparate = { onKeepSeparateEvent(event.id) },
+                    )
                 }
             }
         }
@@ -298,7 +332,7 @@ private fun ManualEventDialog(
     var selectedContactId by remember { mutableStateOf(contacts.firstOrNull()?.id) }
     var contactMenuExpanded by remember { mutableStateOf(false) }
     var newContactName by remember { mutableStateOf("") }
-    var eventType by remember { mutableStateOf("BIRTHDAY") }
+    var eventType by remember { mutableStateOf(EventType.BIRTHDAY.raw) }
     var label by remember { mutableStateOf("") }
     var monthText by remember { mutableStateOf("") }
     var dayText by remember { mutableStateOf("") }
@@ -581,28 +615,32 @@ private fun EventHorizonFilter.label(): String = when (this) {
 }
 
 @Composable
-private fun eventTypeLabel(type: String): String = when (type) {
-    "BIRTHDAY" -> stringResource(R.string.event_type_birthday)
-    "ANNIVERSARY" -> stringResource(R.string.event_type_anniversary)
-    "WORK_ANNIVERSARY" -> stringResource(R.string.event_type_work_anniversary)
+private fun eventTypeLabel(type: String): String = when (EventType.fromRaw(type)) {
+    EventType.BIRTHDAY -> stringResource(R.string.event_type_birthday)
+    EventType.ANNIVERSARY -> stringResource(R.string.event_type_anniversary)
+    EventType.WORK_ANNIVERSARY -> stringResource(R.string.event_type_work_anniversary)
     else -> stringResource(R.string.event_type_custom)
 }
 
-private fun eventTypeIcon(type: String): ImageVector = when (type) {
-    "BIRTHDAY" -> Icons.Filled.Favorite
-    "ANNIVERSARY", "WORK_ANNIVERSARY" -> Icons.Filled.Star
+private fun eventTypeIcon(type: String): ImageVector = when (EventType.fromRaw(type)) {
+    EventType.BIRTHDAY -> Icons.Filled.Favorite
+    EventType.ANNIVERSARY,
+    EventType.WORK_ANNIVERSARY -> Icons.Filled.Star
     else -> Icons.Filled.CalendarMonth
 }
 
 @Composable
-private fun eventSourceLabel(source: String): String = when (source.trim().uppercase(Locale.US)) {
-    "CONTACTS" -> stringResource(R.string.event_source_contacts)
-    "MANUAL" -> stringResource(R.string.event_source_manual)
-    "CALENDAR" -> stringResource(R.string.event_source_calendar)
-    "AI_INFERRED" -> stringResource(R.string.event_source_ai_inferred)
-    "MERGED" -> stringResource(R.string.event_source_merged)
-    "CONFLICT" -> stringResource(R.string.event_source_conflict)
-    else -> source.toReadableEventSource()
+private fun eventSourceLabel(source: String): String {
+    val baseSource = EventResolutionPolicy.baseSource(source)
+    return when (baseSource.trim().uppercase(Locale.US)) {
+        "CONTACTS" -> stringResource(R.string.event_source_contacts)
+        "MANUAL" -> stringResource(R.string.event_source_manual)
+        "CALENDAR" -> stringResource(R.string.event_source_calendar)
+        "AI_INFERRED" -> stringResource(R.string.event_source_ai_inferred)
+        "MERGED" -> stringResource(R.string.event_source_merged)
+        "CONFLICT" -> stringResource(R.string.event_source_conflict)
+        else -> baseSource.toReadableEventSource()
+    }
 }
 
 private fun String.toReadableEventSource(): String {
@@ -618,30 +656,27 @@ private fun String.toReadableEventSource(): String {
 }
 
 @Composable
-private fun eventVerificationLabel(event: EventEntity): String {
-    return when {
-        event.source.equals("CONFLICT", ignoreCase = true) -> stringResource(R.string.event_verification_conflict)
-        event.isVerified -> stringResource(R.string.event_verification_verified)
-        else -> stringResource(R.string.event_verification_needs_review, event.confidenceScore)
-    }
-}
-
-@Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun EventCard(event: EventEntity) {
+private fun EventCard(
+    event: EventEntity,
+    trustState: EventTrustState,
+    isResolving: Boolean,
+    onMerge: () -> Unit,
+    onKeepSeparate: () -> Unit,
+) {
     val daysUntil = event.daysUntil
     val dateFormat = remember { SimpleDateFormat("MMM dd", Locale.getDefault()) }
-    val sourceLabel = eventSourceLabel(event.source).ifBlank { stringResource(R.string.event_source_unknown) }
-    val verificationLabel = eventVerificationLabel(event)
-    val sourceColor = when (event.source.trim().uppercase(Locale.US)) {
+    val sourceLabel = eventSourceLabel(trustState.source).ifBlank { stringResource(R.string.event_source_unknown) }
+    val verificationLabel = eventVerificationLabel(trustState)
+    val sourceColor = when (EventResolutionPolicy.baseSource(trustState.source).trim().uppercase(Locale.US)) {
         "MANUAL" -> RelatePrimary
         "CONFLICT" -> MaterialTheme.colorScheme.error
         else -> RelateOnSurfaceVariant
     }
-    val verificationColor = when {
-        event.source.equals("CONFLICT", ignoreCase = true) -> MaterialTheme.colorScheme.error
-        event.isVerified -> RelatePrimary
-        else -> RelateWarning
+    val verificationColor = when (trustState.verification) {
+        EventVerificationState.CONFLICT -> MaterialTheme.colorScheme.error
+        EventVerificationState.VERIFIED -> RelatePrimary
+        EventVerificationState.NEEDS_REVIEW -> RelateWarning
     }
 
     RelateGlassCard {
@@ -696,6 +731,42 @@ private fun EventCard(event: EventEntity) {
                         text = verificationLabel,
                         color = verificationColor,
                     )
+                    eventConflictLabel(trustState.conflict)?.let { conflictLabel ->
+                        EventMetadataChip(
+                            text = conflictLabel,
+                            color = if (trustState.conflict == EventTrustConflictState.DATE_CONFLICT) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                RelateWarning
+                            },
+                        )
+                    }
+                }
+                if (trustState.conflict != EventTrustConflictState.NONE) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        TextButton(
+                            enabled = !isResolving,
+                            onClick = onMerge,
+                        ) {
+                            Text(
+                                if (isResolving) {
+                                    stringResource(R.string.saving)
+                                } else {
+                                    stringResource(R.string.event_resolution_merge_here)
+                                }
+                            )
+                        }
+                        TextButton(
+                            enabled = !isResolving,
+                            onClick = onKeepSeparate,
+                        ) {
+                            Text(stringResource(R.string.event_resolution_keep_separate))
+                        }
+                    }
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -712,6 +783,27 @@ private fun EventCard(event: EventEntity) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun eventVerificationLabel(trustState: EventTrustState): String {
+    return when (trustState.verification) {
+        EventVerificationState.CONFLICT -> stringResource(R.string.event_verification_conflict)
+        EventVerificationState.VERIFIED -> stringResource(R.string.event_verification_verified)
+        EventVerificationState.NEEDS_REVIEW -> stringResource(
+            R.string.event_verification_needs_review,
+            trustState.confidenceScore,
+        )
+    }
+}
+
+@Composable
+private fun eventConflictLabel(conflict: EventTrustConflictState): String? {
+    return when (conflict) {
+        EventTrustConflictState.NONE -> null
+        EventTrustConflictState.DUPLICATE -> stringResource(R.string.event_conflict_duplicate)
+        EventTrustConflictState.DATE_CONFLICT -> stringResource(R.string.event_conflict_date)
     }
 }
 

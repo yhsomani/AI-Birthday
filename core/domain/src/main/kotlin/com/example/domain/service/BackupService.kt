@@ -9,7 +9,48 @@ data class BackupExportResult(
 
 data class BackupImportResult(
     val recordsRestored: Int,
+    val restoreMode: BackupRestoreMode = BackupRestoreMode.REPLACE,
 )
+
+data class BackupPreviewResult(
+    val backupVersion: Int,
+    val appVersion: String,
+    val exportedAtMs: Long,
+    val counts: BackupRecordCounts,
+    val restoreMode: BackupRestoreMode = BackupRestoreMode.REPLACE,
+) {
+    val totalRecords: Int
+        get() = counts.totalRecords
+}
+
+enum class BackupRestoreMode {
+    REPLACE
+}
+
+data class BackupRecordCounts(
+    val contacts: Int = 0,
+    val events: Int = 0,
+    val pendingMessages: Int = 0,
+    val sentMessages: Int = 0,
+    val styleProfiles: Int = 0,
+    val memoryNotes: Int = 0,
+    val giftHistory: Int = 0,
+    val activityLogs: Int = 0,
+    val messageFeedback: Int = 0,
+    val preferences: Int = 0,
+) {
+    val totalRecords: Int
+        get() = contacts +
+            events +
+            pendingMessages +
+            sentMessages +
+            styleProfiles +
+            memoryNotes +
+            giftHistory +
+            activityLogs +
+            messageFeedback +
+            preferences
+}
 
 enum class BackupFailureReason {
     BLANK_PASSPHRASE,
@@ -29,6 +70,8 @@ sealed class BackupOperationResult<out T> {
 
 interface BackupService {
     suspend fun exportBackup(outputUri: Uri?, passphrase: String): BackupOperationResult<BackupExportResult>
+
+    suspend fun previewBackup(inputUri: Uri, passphrase: String): BackupOperationResult<BackupPreviewResult>
 
     suspend fun importBackup(inputUri: Uri, passphrase: String): BackupOperationResult<BackupImportResult>
 }

@@ -4,6 +4,7 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.domain.event.EventDatePolicy
 import com.example.domain.event.EventIdentityPolicy
+import com.example.domain.model.EventType
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
@@ -52,7 +53,7 @@ class DiscoverEventsUseCase @Inject constructor(
                 buildContactEvent(
                     contact = contact,
                     existingEvents = existingEvents,
-                    type = "BIRTHDAY",
+                    type = EventType.BIRTHDAY,
                     day = day,
                     month = month,
                     year = contact.birthdayYear,
@@ -65,7 +66,7 @@ class DiscoverEventsUseCase @Inject constructor(
                 buildContactEvent(
                     contact = contact,
                     existingEvents = existingEvents,
-                    type = "ANNIVERSARY",
+                    type = EventType.ANNIVERSARY,
                     day = day,
                     month = month,
                     year = contact.anniversaryYear,
@@ -78,7 +79,7 @@ class DiscoverEventsUseCase @Inject constructor(
                 buildContactEvent(
                     contact = contact,
                     existingEvents = existingEvents,
-                    type = "WORK_ANNIVERSARY",
+                    type = EventType.WORK_ANNIVERSARY,
                     day = day,
                     month = month,
                     year = contact.workStartYear,
@@ -92,7 +93,7 @@ class DiscoverEventsUseCase @Inject constructor(
     private fun buildContactEvent(
         contact: ContactEntity,
         existingEvents: List<EventEntity>,
-        type: String,
+        type: EventType,
         day: Int,
         month: Int,
         year: Int?,
@@ -101,7 +102,7 @@ class DiscoverEventsUseCase @Inject constructor(
         val existingMatchingEvent = EventIdentityPolicy.findMatchingActiveEvent(
             events = existingEvents,
             contactId = contact.id,
-            eventType = type,
+            eventType = type.raw,
             month = month,
             dayOfMonth = day,
         )
@@ -110,10 +111,10 @@ class DiscoverEventsUseCase @Inject constructor(
         }
         val nextMs = EventDatePolicy.nextOccurrenceMs(day, month) ?: return null
         return EventEntity(
-            id = EventIdentityPolicy.canonicalId(contact.id, type)
+            id = EventIdentityPolicy.canonicalId(contact.id, type.raw)
                 ?: return null,
             contactId = contact.id,
-            type = type,
+            type = type.raw,
             label = contact.name,
             dayOfMonth = day,
             month = month,

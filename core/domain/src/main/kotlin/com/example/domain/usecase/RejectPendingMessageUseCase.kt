@@ -1,5 +1,6 @@
 package com.example.domain.usecase
 
+import com.example.domain.model.MessageStatus
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.SchedulerService
 import javax.inject.Inject
@@ -18,8 +19,8 @@ class RejectPendingMessageUseCase @Inject constructor(
         val pending = messageRepository.getPendingById(pendingMessageId)
             ?: return RejectionOutcome.PendingNotFound
 
-        messageRepository.updatePendingStatus(pendingMessageId, "REJECTED")
-        if (pending.status == "APPROVED") {
+        messageRepository.updatePendingStatus(pendingMessageId, MessageStatus.REJECTED.raw)
+        if (MessageStatus.fromRaw(pending.status) == MessageStatus.APPROVED) {
             schedulerService.cancelExactSend(pending.id)
         }
         return RejectionOutcome.Rejected(pendingMessageId)

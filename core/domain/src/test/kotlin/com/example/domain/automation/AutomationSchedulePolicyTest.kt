@@ -1,6 +1,8 @@
 package com.example.domain.automation
 
+import com.example.domain.model.MessageChannel
 import java.util.Calendar
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -87,7 +89,9 @@ class AutomationSchedulePolicyTest {
 
     @Test
     fun `isChannelBlocked reads json token list`() {
-        assertTrue(AutomationSchedulePolicy.isChannelBlocked("sms", "[\"SMS\",\"EMAIL\"]"))
+        assertTrue(AutomationSchedulePolicy.isChannelBlocked(MessageChannel.SMS, "[\"SMS\",\"EMAIL\"]"))
+        assertFalse(AutomationSchedulePolicy.isChannelBlocked(MessageChannel.WHATSAPP, "[\"SMS\",\"EMAIL\"]"))
+        assertFalse(AutomationSchedulePolicy.isChannelBlocked(MessageChannel.UNKNOWN, "[\"UNKNOWN\",\"SMS\"]"))
     }
 
     private fun fixedMs(

@@ -3,6 +3,7 @@ package com.example.domain.usecase
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.PendingMessageEntity
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
@@ -49,7 +50,7 @@ class GetDashboardMetricsUseCaseTest {
                 shortVariant = "", standardVariant = "", longVariant = "",
                 formalVariant = "", funnyVariant = "", emotionalVariant = "",
                 selectedVariant = "standard", selectedVariantText = "",
-                channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL"
+                channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "MANUAL"
             )
         )
         val events = listOf(

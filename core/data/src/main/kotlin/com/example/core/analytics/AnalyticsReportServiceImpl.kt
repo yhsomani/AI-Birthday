@@ -1,6 +1,7 @@
 package com.example.core.analytics
 
 import com.example.core.db.entities.ActivityLogEntity
+import com.example.domain.model.ActivityLogType
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
@@ -56,7 +57,7 @@ class AnalyticsReportServiceImpl @Inject constructor(
         activityLogRepository.record(
             ActivityLogEntity(
                 id = UUID.randomUUID().toString(),
-                type = "ANALYTICS",
+                type = ActivityLogType.ANALYTICS.raw,
                 title = "Analytics report exported",
                 detail = "Relationship report generated for sharing.",
                 createdAtMs = generatedAt,

@@ -8,6 +8,7 @@ import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.entities.EventEntity
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.EventType
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.Calendar
@@ -35,7 +36,7 @@ class EventDiscoveryWorker @AssistedInject constructor(
                     eventDao.upsert(EventEntity(
                         id = "${contact.id}_birthday",
                         contactId = contact.id,
-                        type = "BIRTHDAY",
+                        type = EventType.BIRTHDAY.raw,
                         label = contact.name,
                         dayOfMonth = bDay,
                         month = bMonth,
@@ -45,7 +46,7 @@ class EventDiscoveryWorker @AssistedInject constructor(
                     ))
                     eventCount++
                 } else {
-                    eventDao.deactivateEventsForContact(contact.id, "BIRTHDAY")
+                    eventDao.deactivateEventsForContact(contact.id, EventType.BIRTHDAY.raw)
                 }
 
                 // Anniversary
@@ -56,7 +57,7 @@ class EventDiscoveryWorker @AssistedInject constructor(
                     eventDao.upsert(EventEntity(
                         id = "${contact.id}_anniversary",
                         contactId = contact.id,
-                        type = "ANNIVERSARY",
+                        type = EventType.ANNIVERSARY.raw,
                         label = contact.name,
                         dayOfMonth = aDay,
                         month = aMonth,
@@ -66,7 +67,7 @@ class EventDiscoveryWorker @AssistedInject constructor(
                     ))
                     eventCount++
                 } else {
-                    eventDao.deactivateEventsForContact(contact.id, "ANNIVERSARY")
+                    eventDao.deactivateEventsForContact(contact.id, EventType.ANNIVERSARY.raw)
                 }
 
                 // Work Anniversary
@@ -77,7 +78,7 @@ class EventDiscoveryWorker @AssistedInject constructor(
                     eventDao.upsert(EventEntity(
                         id = "${contact.id}_work_anniversary",
                         contactId = contact.id,
-                        type = "WORK_ANNIVERSARY",
+                        type = EventType.WORK_ANNIVERSARY.raw,
                         label = contact.name,
                         dayOfMonth = wDay,
                         month = wMonth,
@@ -87,7 +88,7 @@ class EventDiscoveryWorker @AssistedInject constructor(
                     ))
                     eventCount++
                 } else {
-                    eventDao.deactivateEventsForContact(contact.id, "WORK_ANNIVERSARY")
+                    eventDao.deactivateEventsForContact(contact.id, EventType.WORK_ANNIVERSARY.raw)
                 }
             }
 

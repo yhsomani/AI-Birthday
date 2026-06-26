@@ -4,6 +4,8 @@ import com.example.core.db.dao.RelationshipTypeCount
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.SentMessageEntity
+import com.example.domain.model.ActivityLogType
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
@@ -55,7 +57,7 @@ class AnalyticsReportServiceImplTest {
         assertTrue(report.content.contains("summary,total_contacts,0"))
         assertTrue(report.content.contains("health,healthy_70_plus,0"))
         assertTrue(report.content.contains("messages,sent_this_year,0"))
-        coVerify { activityLogRepository.record(match { it.type == "ANALYTICS" }) }
+        coVerify { activityLogRepository.record(match { it.type == ActivityLogType.ANALYTICS.raw }) }
     }
 
     @Test
@@ -88,7 +90,7 @@ class AnalyticsReportServiceImplTest {
                     eventType = "BIRTHDAY",
                     eventYear = 2026,
                     messageText = "Happy birthday!",
-                    channel = "SMS",
+                    channel = MessageChannel.SMS.raw,
                     sentAtMs = 100L,
                     deliveryStatus = "SENT",
                 )

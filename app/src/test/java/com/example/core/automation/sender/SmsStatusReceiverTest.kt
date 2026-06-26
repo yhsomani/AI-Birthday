@@ -8,6 +8,8 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.core.db.AppDatabase
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.SentMessageEntity
+import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.MessageChannel
 import dagger.hilt.android.EntryPointAccessors
 import io.mockk.*
 import kotlinx.coroutines.flow.first
@@ -63,9 +65,9 @@ class SmsStatusReceiverTest {
             eventType = "BIRTHDAY",
             eventYear = 2026,
             messageText = "Happy Birthday",
-            channel = "SMS",
+            channel = MessageChannel.SMS.raw,
             sentAtMs = System.currentTimeMillis(),
-            deliveryStatus = "PENDING_DELIVERY",
+            deliveryStatus = MessageDeliveryStatus.PENDING_DELIVERY.raw,
             aiGenerated = true
         )
         sentMessageDao.insert(sentMessage)
@@ -84,12 +86,12 @@ class SmsStatusReceiverTest {
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < 2000) {
             updated = sentMessageDao.getAll().first().find { it.id == messageId }
-            if (updated?.deliveryStatus == "SENT") break
+            if (updated?.deliveryStatus == MessageDeliveryStatus.SENT.raw) break
             Thread.sleep(50)
         }
 
         assertNotNull(updated)
-        assertEquals("SENT", updated!!.deliveryStatus)
+        assertEquals(MessageDeliveryStatus.SENT.raw, updated!!.deliveryStatus)
     }
 
     @Test
@@ -101,9 +103,9 @@ class SmsStatusReceiverTest {
             eventType = "BIRTHDAY",
             eventYear = 2026,
             messageText = "Happy Birthday",
-            channel = "SMS",
+            channel = MessageChannel.SMS.raw,
             sentAtMs = System.currentTimeMillis(),
-            deliveryStatus = "PENDING_DELIVERY",
+            deliveryStatus = MessageDeliveryStatus.PENDING_DELIVERY.raw,
             aiGenerated = true
         )
         sentMessageDao.insert(sentMessage)
@@ -122,12 +124,12 @@ class SmsStatusReceiverTest {
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < 2000) {
             updated = sentMessageDao.getAll().first().find { it.id == messageId }
-            if (updated?.deliveryStatus == "FAILED") break
+            if (updated?.deliveryStatus == MessageDeliveryStatus.FAILED.raw) break
             Thread.sleep(50)
         }
 
         assertNotNull(updated)
-        assertEquals("FAILED", updated!!.deliveryStatus)
+        assertEquals(MessageDeliveryStatus.FAILED.raw, updated!!.deliveryStatus)
     }
 
     @Test
@@ -139,9 +141,9 @@ class SmsStatusReceiverTest {
             eventType = "BIRTHDAY",
             eventYear = 2026,
             messageText = "Happy Birthday",
-            channel = "SMS",
+            channel = MessageChannel.SMS.raw,
             sentAtMs = System.currentTimeMillis(),
-            deliveryStatus = "SENT",
+            deliveryStatus = MessageDeliveryStatus.SENT.raw,
             aiGenerated = true
         )
         sentMessageDao.insert(sentMessage)
@@ -160,11 +162,11 @@ class SmsStatusReceiverTest {
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < 2000) {
             updated = sentMessageDao.getAll().first().find { it.id == messageId }
-            if (updated?.deliveryStatus == "DELIVERED") break
+            if (updated?.deliveryStatus == MessageDeliveryStatus.DELIVERED.raw) break
             Thread.sleep(50)
         }
 
         assertNotNull(updated)
-        assertEquals("DELIVERED", updated!!.deliveryStatus)
+        assertEquals(MessageDeliveryStatus.DELIVERED.raw, updated!!.deliveryStatus)
     }
 }

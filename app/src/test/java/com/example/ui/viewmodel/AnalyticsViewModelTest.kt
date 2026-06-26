@@ -1,5 +1,8 @@
 package com.example.ui.viewmodel
 
+import com.example.core.db.entities.SentMessageEntity
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
@@ -91,6 +94,33 @@ class AnalyticsViewModelTest {
         assertEquals(false, viewModel.uiState.value.isExporting)
     }
 
+    @Test
+    fun `delivery reliability normalizes failed delivery status`() = runTest(dispatcher) {
+        every { messageRepository.countAllSent() } returns MutableStateFlow(2)
+        every { messageRepository.countPending() } returns MutableStateFlow(0)
+        every { contactRepository.countAll() } returns MutableStateFlow(0)
+        every { contactRepository.countByRelationshipType() } returns MutableStateFlow(emptyList())
+        coEvery { contactRepository.getTopByHealthScore(5) } returns emptyList()
+        coEvery { contactRepository.getBottomByHealthScore(5) } returns emptyList()
+        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { eventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { messageRepository.getSentSinceYearStart(any()) } returns listOf(
+            sentMessage(id = "sent_ok", deliveryStatus = MessageDeliveryStatus.SENT.raw),
+            sentMessage(id = "sent_failed", deliveryStatus = " ${MessageDeliveryStatus.FAILED.raw.lowercase()} "),
+        )
+
+        val viewModel = AnalyticsViewModel(
+            getAnalyticsUseCase = GetAnalyticsUseCase(contactRepository, messageRepository),
+            contactRepository = contactRepository,
+            eventRepository = eventRepository,
+            messageRepository = messageRepository,
+            analyticsReportService = analyticsReportService,
+        )
+        advanceUntilIdle()
+
+        assertEquals(50, viewModel.uiState.value.deliveryReliabilityPercent)
+    }
+
     private fun stubEmptyAnalytics() {
         every { messageRepository.countAllSent() } returns MutableStateFlow(0)
         every { messageRepository.countPending() } returns MutableStateFlow(0)
@@ -101,5 +131,18 @@ class AnalyticsViewModelTest {
         coEvery { contactRepository.getAllSync() } returns emptyList()
         coEvery { eventRepository.getUpcoming(30) } returns emptyList()
         coEvery { messageRepository.getSentSinceYearStart(any()) } returns emptyList()
+    }
+
+    private fun sentMessage(id: String, deliveryStatus: String): SentMessageEntity {
+        return SentMessageEntity(
+            id = id,
+            contactId = "contact_1",
+            eventType = "BIRTHDAY",
+            eventYear = 2026,
+            messageText = "Happy birthday",
+            channel = MessageChannel.SMS.raw,
+            sentAtMs = System.currentTimeMillis(),
+            deliveryStatus = deliveryStatus,
+        )
     }
 }

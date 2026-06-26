@@ -15,7 +15,8 @@ import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.PendingMessageEntity
-import com.example.core.prefs.SecurePrefs
+import com.example.domain.model.MessageChannel
+import com.example.domain.service.PreferencesRepository
 import io.mockk.*
 import java.util.Calendar
 import kotlinx.coroutines.test.runTest
@@ -36,18 +37,18 @@ class MessageDispatchWorkerTest {
     private val sentMessageDao: SentMessageDao = mockk(relaxed = true)
     private val contactDao: ContactDao = mockk(relaxed = true)
     private val eventDao: EventDao = mockk(relaxed = true)
+    private val preferencesRepository: PreferencesRepository = mockk(relaxed = true)
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         mockkConstructor(MessageDispatcher::class)
-        mockkConstructor(SecurePrefs::class)
         mockkObject(DailyScheduler)
         coEvery { anyConstructed<MessageDispatcher>().dispatch(any(), any()) } returns Unit
         every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
-        every { anyConstructed<SecurePrefs>().getQuietHoursStart() } returns 0
-        every { anyConstructed<SecurePrefs>().getQuietHoursEnd() } returns 0
-        every { anyConstructed<SecurePrefs>().getBlackoutDates() } returns "[]"
+        every { preferencesRepository.getQuietHoursStart() } returns 0
+        every { preferencesRepository.getQuietHoursEnd() } returns 0
+        every { preferencesRepository.getBlackoutDates() } returns "[]"
     }
 
     @After
@@ -62,7 +63,7 @@ class MessageDispatchWorkerTest {
             shortVariant = "", standardVariant = "", longVariant = "",
             formalVariant = "", funnyVariant = "", emotionalVariant = "",
             selectedVariant = "standard", selectedVariantText = "",
-            channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL",
+            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "MANUAL",
             status = "DISPATCHING"
         )
         val contact = ContactEntity(id = "c1", name = "Alice")
@@ -78,7 +79,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, preferencesRepository)
                 }
             })
             .build()
@@ -95,7 +96,7 @@ class MessageDispatchWorkerTest {
             shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
             formalVariant = "", funnyVariant = "", emotionalVariant = "",
             selectedVariant = "standard", selectedVariantText = "Happy Birthday",
-            channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL",
+            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "MANUAL",
             status = "APPROVED"
         )
         val contact = ContactEntity(id = "c1", name = "Alice")
@@ -111,7 +112,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, preferencesRepository)
                 }
             })
             .build()
@@ -131,7 +132,7 @@ class MessageDispatchWorkerTest {
             shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
             formalVariant = "", funnyVariant = "", emotionalVariant = "",
             selectedVariant = "standard", selectedVariantText = "Happy Birthday",
-            channel = "SMS", scheduledForMs = scheduledForMs, approvalMode = "FULLY_AUTO",
+            channel = MessageChannel.SMS.raw, scheduledForMs = scheduledForMs, approvalMode = "FULLY_AUTO",
             status = "APPROVED"
         )
         val contact = ContactEntity(id = "c1", name = "Alice")
@@ -156,7 +157,7 @@ class MessageDispatchWorkerTest {
             shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
             formalVariant = "", funnyVariant = "", emotionalVariant = "",
             selectedVariant = "standard", selectedVariantText = "Happy Birthday",
-            channel = "SMS", scheduledForMs = 0, approvalMode = "SMART_APPROVE",
+            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "SMART_APPROVE",
             status = "PENDING"
         )
         val contact = ContactEntity(id = "c1", name = "Alice")
@@ -180,7 +181,7 @@ class MessageDispatchWorkerTest {
             shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
             formalVariant = "", funnyVariant = "", emotionalVariant = "",
             selectedVariant = "standard", selectedVariantText = "Happy Birthday",
-            channel = "SMS",
+            channel = MessageChannel.SMS.raw,
             scheduledForMs = System.currentTimeMillis() - (3 * 60 * 60 * 1000L),
             approvalMode = "VIP_APPROVE",
             status = "PENDING"
@@ -206,7 +207,7 @@ class MessageDispatchWorkerTest {
             shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
             formalVariant = "", funnyVariant = "", emotionalVariant = "",
             selectedVariant = "standard", selectedVariantText = "Happy Birthday",
-            channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL",
+            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "MANUAL",
             status = "APPROVED"
         )
         val contact = ContactEntity(id = "c1", name = "Alice")
@@ -224,7 +225,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, preferencesRepository)
                 }
             })
             .build()
@@ -239,14 +240,14 @@ class MessageDispatchWorkerTest {
     @Test
     fun `doWork defers approved message during quiet hours`() = runTest {
         val nowHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        every { anyConstructed<SecurePrefs>().getQuietHoursStart() } returns nowHour
-        every { anyConstructed<SecurePrefs>().getQuietHoursEnd() } returns ((nowHour + 1) % 24)
+        every { preferencesRepository.getQuietHoursStart() } returns nowHour
+        every { preferencesRepository.getQuietHoursEnd() } returns ((nowHour + 1) % 24)
         val pendingMsg = PendingMessageEntity(
             id = "msg_1", contactId = "c1", eventId = "e1",
             shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
             formalVariant = "", funnyVariant = "", emotionalVariant = "",
             selectedVariant = "standard", selectedVariantText = "Happy Birthday",
-            channel = "SMS", scheduledForMs = 0, approvalMode = "MANUAL",
+            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "MANUAL",
             status = "APPROVED"
         )
         val contact = ContactEntity(id = "c1", name = "Alice")
@@ -262,7 +263,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, preferencesRepository)
                 }
             })
             .build()
@@ -285,7 +286,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, preferencesRepository)
                 }
             })
             .build()

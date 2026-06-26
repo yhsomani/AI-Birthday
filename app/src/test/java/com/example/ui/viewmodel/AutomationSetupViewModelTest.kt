@@ -3,8 +3,10 @@ package com.example.ui.viewmodel
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.R
+import com.example.core.db.entities.ContactEntity
 import com.example.core.gemini.GeminiClient
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.SyncContactsUseCase
@@ -143,6 +145,106 @@ class AutomationSetupViewModelTest {
             ReadinessGroup.RECOVERY,
             groupsByTitle[context.getString(R.string.automation_setup_check_recent_errors)],
         )
+    }
+
+    @Test
+    fun `buildChecksForTesting adds generic message risk diagnostic from personalization context`() = runTest(testDispatcher) {
+        coEvery { contactRepository.getAllSync() } returns listOf(
+            ContactEntity(
+                id = "ready",
+                name = "Ready Contact",
+                notesText = "College friend",
+            ),
+            ContactEntity(
+                id = "generic",
+                name = "Generic Contact",
+            ),
+        )
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val genericRisk = viewModel.buildChecksForTesting()
+            .first { it.title == context.getString(R.string.automation_setup_check_generic_messages) }
+
+        assertEquals(ReadinessStatus.WARNING, genericRisk.status)
+        assertEquals(AiDoctorAction.OPEN_CONTACTS, genericRisk.action)
+        assertEquals(context.getString(R.string.automation_setup_action_review_contacts), genericRisk.actionLabel)
+        assertEquals(
+            context.getString(R.string.automation_setup_generic_messages_low, 1, 2),
+            genericRisk.detail,
+        )
+    }
+
+    @Test
+    fun `buildChecksForTesting counts email preferred contacts through MessageChannel parser`() = runTest(testDispatcher) {
+        coEvery { contactRepository.getAllSync() } returns listOf(
+            ContactEntity(
+                id = "email",
+                name = "Email Contact",
+                preferredChannel = " ${MessageChannel.EMAIL.raw.lowercase()} ",
+            ),
+            ContactEntity(
+                id = "sms",
+                name = "SMS Contact",
+                preferredChannel = MessageChannel.SMS.raw,
+            ),
+            ContactEntity(
+                id = "legacy",
+                name = "Legacy Contact",
+                preferredChannel = "telegram",
+            ),
+        )
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val emailCheck = viewModel.buildChecksForTesting()
+            .first { it.title == context.getString(R.string.automation_setup_check_email) }
+
+        assertEquals(ReadinessStatus.ACTION_REQUIRED, emailCheck.status)
+        assertEquals(AiDoctorAction.OPEN_SETTINGS, emailCheck.action)
+        assertEquals(
+            context.getString(R.string.automation_setup_email_missing_for_contacts, 1),
+            emailCheck.detail,
+        )
+    }
+
+    @Test
+    fun `recommendedFixForTesting ranks required blockers before earlier warnings and quality fixes`() = runTest(testDispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val recommendedFix = viewModel.recommendedFixForTesting(
+            listOf(
+                ReadinessCheck(
+                    title = "Style Coach",
+                    detail = "No writing samples",
+                    status = ReadinessStatus.ACTION_REQUIRED,
+                    actionLabel = "Open Style Coach",
+                    action = AiDoctorAction.OPEN_STYLE_COACH,
+                    group = ReadinessGroup.QUALITY,
+                ),
+                ReadinessCheck(
+                    title = "Daily Automation",
+                    detail = "Daily work is missing",
+                    status = ReadinessStatus.WARNING,
+                    actionLabel = "Refresh",
+                    action = AiDoctorAction.REFRESH,
+                    group = ReadinessGroup.RELIABILITY,
+                ),
+                ReadinessCheck(
+                    title = MessageChannel.SMS.raw,
+                    detail = "SMS permission is missing",
+                    status = ReadinessStatus.ACTION_REQUIRED,
+                    actionLabel = "App Settings",
+                    action = AiDoctorAction.OPEN_APP_SETTINGS,
+                    group = ReadinessGroup.REQUIRED,
+                ),
+            ),
+        )
+
+        assertEquals(MessageChannel.SMS.raw, recommendedFix?.title)
+        assertEquals(AiDoctorAction.OPEN_APP_SETTINGS, recommendedFix?.action)
+        assertEquals(ReadinessGroup.REQUIRED, recommendedFix?.group)
     }
 
     @Test

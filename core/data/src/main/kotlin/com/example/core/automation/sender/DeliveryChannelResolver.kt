@@ -1,36 +1,36 @@
 package com.example.core.automation.sender
 
-internal object DeliveryChannelResolver {
-    private val supportedChannels = setOf("SMS", "WHATSAPP", "EMAIL")
+import com.example.domain.model.MessageChannel
 
+internal object DeliveryChannelResolver {
     fun resolveRoutes(
-        preferredChannel: String,
+        preferredChannel: MessageChannel,
         primaryPhone: String?,
         primaryEmail: String?,
         senderEmail: String,
         senderEmailPassword: String,
-        blockedChannels: Set<String>,
-    ): List<String> {
-        val normalizedBlockedChannels = blockedChannels.map { it.trim().uppercase() }.toSet()
+        blockedChannels: Set<MessageChannel>,
+    ): List<MessageChannel> {
         return candidateOrder(preferredChannel)
-            .filterNot { it in normalizedBlockedChannels }
+            .filterNot { it in blockedChannels }
             .filter {
                 when (it) {
-                    "SMS", "WHATSAPP" -> !primaryPhone.isNullOrBlank()
-                    "EMAIL" -> !primaryEmail.isNullOrBlank() &&
+                    MessageChannel.SMS,
+                    MessageChannel.WHATSAPP -> !primaryPhone.isNullOrBlank()
+                    MessageChannel.EMAIL -> !primaryEmail.isNullOrBlank() &&
                         senderEmail.isNotBlank() &&
                         senderEmailPassword.isNotBlank()
-                    else -> false
+                    MessageChannel.UNKNOWN -> false
                 }
             }
     }
 
-    private fun candidateOrder(preferredChannel: String): List<String> {
-        return when (preferredChannel.trim().uppercase()) {
-            "WHATSAPP" -> listOf("WHATSAPP", "SMS", "EMAIL")
-            "EMAIL" -> listOf("EMAIL", "SMS", "WHATSAPP")
-            "SMS" -> listOf("SMS", "WHATSAPP", "EMAIL")
-            else -> listOf("SMS", "WHATSAPP", "EMAIL")
-        }.filter { it in supportedChannels }
+    private fun candidateOrder(preferredChannel: MessageChannel): List<MessageChannel> {
+        return when (preferredChannel) {
+            MessageChannel.WHATSAPP -> listOf(MessageChannel.WHATSAPP, MessageChannel.SMS, MessageChannel.EMAIL)
+            MessageChannel.EMAIL -> listOf(MessageChannel.EMAIL, MessageChannel.SMS, MessageChannel.WHATSAPP)
+            MessageChannel.SMS,
+            MessageChannel.UNKNOWN -> listOf(MessageChannel.SMS, MessageChannel.WHATSAPP, MessageChannel.EMAIL)
+        }
     }
 }

@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.domain.service.BackupFailureReason
 import com.example.domain.service.BackupOperationResult
+import com.example.domain.service.BackupPreviewResult
+import com.example.domain.service.BackupRestoreMode
 import com.example.domain.service.BackupService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -23,8 +25,17 @@ data class BackupRestoreUiState(
     val isImporting: Boolean = false,
     val exportSuccessFileName: String? = null,
     val exportSuccessSizeBytes: Long = 0L,
+    val importPreview: BackupImportPreviewUiModel? = null,
     val importSuccessCount: Int? = null,
     val errorMessage: String? = null
+)
+
+data class BackupImportPreviewUiModel(
+    val backupVersion: Int,
+    val appVersion: String,
+    val exportedAtMs: Long,
+    val totalRecords: Int,
+    val restoreMode: BackupRestoreMode,
 )
 
 enum class PasswordStrength {
@@ -39,15 +50,18 @@ class BackupRestoreViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(BackupRestoreUiState())
     val uiState: StateFlow<BackupRestoreUiState> = _uiState.asStateFlow()
+    private var pendingImportUri: Uri? = null
 
     fun updatePassphrase(passphrase: String) {
         val strength = calculateStrength(passphrase)
+        pendingImportUri = null
         _uiState.value = _uiState.value.copy(
             passphrase = passphrase,
             passwordStrength = strength,
             errorMessage = null,
             exportSuccessFileName = null,
             exportSuccessSizeBytes = 0L,
+            importPreview = null,
             importSuccessCount = null
         )
     }
@@ -107,17 +121,63 @@ class BackupRestoreViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            pendingImportUri = null
+            _uiState.value = _uiState.value.copy(
+                isImporting = true,
+                errorMessage = null,
+                exportSuccessFileName = null,
+                exportSuccessSizeBytes = 0L,
+                importSuccessCount = null,
+                importPreview = null,
+            )
+            when (val result = backupService.previewBackup(uri, passphrase)) {
+                is BackupOperationResult.Success -> {
+                    pendingImportUri = uri
+                    _uiState.value = _uiState.value.copy(
+                        isImporting = false,
+                        importPreview = result.value.toUiModel(),
+                    )
+                }
+                is BackupOperationResult.Failure -> {
+                    pendingImportUri = null
+                    _uiState.value = _uiState.value.copy(
+                        isImporting = false,
+                        importPreview = null,
+                        errorMessage = result.reason.toErrorMessage(),
+                    )
+                }
+            }
+        }
+    }
+
+    fun confirmImportBackup() {
+        val uri = pendingImportUri
+        if (uri == null) {
+            _uiState.value = _uiState.value.copy(errorMessage = context.getString(R.string.backup_error_read_failed))
+            return
+        }
+        val passphrase = _uiState.value.passphrase
+        if (passphrase.isBlank()) {
+            _uiState.value = _uiState.value.copy(errorMessage = context.getString(R.string.backup_error_blank_passphrase))
+            return
+        }
+
+        viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isImporting = true, errorMessage = null)
             when (val result = backupService.importBackup(uri, passphrase)) {
                 is BackupOperationResult.Success -> {
+                    pendingImportUri = null
                     _uiState.value = _uiState.value.copy(
                         isImporting = false,
+                        importPreview = null,
                         importSuccessCount = result.value.recordsRestored,
                     )
                 }
                 is BackupOperationResult.Failure -> {
+                    pendingImportUri = null
                     _uiState.value = _uiState.value.copy(
                         isImporting = false,
+                        importPreview = null,
                         errorMessage = result.reason.toErrorMessage(),
                     )
                 }
@@ -126,9 +186,11 @@ class BackupRestoreViewModel @Inject constructor(
     }
 
     fun clearStatus() {
+        pendingImportUri = null
         _uiState.value = _uiState.value.copy(
             exportSuccessFileName = null,
             exportSuccessSizeBytes = 0L,
+            importPreview = null,
             importSuccessCount = null,
             errorMessage = null
         )
@@ -147,4 +209,12 @@ class BackupRestoreViewModel @Inject constructor(
         }
         return context.getString(resId)
     }
+
+    private fun BackupPreviewResult.toUiModel() = BackupImportPreviewUiModel(
+        backupVersion = backupVersion,
+        appVersion = appVersion,
+        exportedAtMs = exportedAtMs,
+        totalRecords = totalRecords,
+        restoreMode = restoreMode,
+    )
 }

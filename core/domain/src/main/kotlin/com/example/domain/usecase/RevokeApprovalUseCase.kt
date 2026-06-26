@@ -1,5 +1,6 @@
 package com.example.domain.usecase
 
+import com.example.domain.model.MessageStatus
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.SchedulerService
 import javax.inject.Inject
@@ -18,11 +19,11 @@ class RevokeApprovalUseCase @Inject constructor(
         val pending = messageRepository.getPendingById(pendingMessageId)
             ?: return RevokeOutcome.PendingNotFound
 
-        if (pending.status != "APPROVED") {
+        if (MessageStatus.fromRaw(pending.status) != MessageStatus.APPROVED) {
             return RevokeOutcome.NotApproved
         }
 
-        val updatedPending = pending.copy(status = "PENDING")
+        val updatedPending = pending.copy(status = MessageStatus.PENDING.raw)
         messageRepository.insertPending(updatedPending)
 
         schedulerService.cancelExactSend(updatedPending.id)

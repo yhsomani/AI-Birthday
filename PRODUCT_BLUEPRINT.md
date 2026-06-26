@@ -42,6 +42,7 @@ The product is not "AI sends messages for you." The product is "never lose a rel
 | Local-first by default | Relationship data lives on device; external APIs are explicit and explainable |
 | Recoverability matters | Encrypted backup/restore is part of the core product, not an advanced setting |
 | Operational clarity | AI Doctor, activity logs, and readiness states explain why something will or will not work |
+| Resource-backed language | User-facing errors, feedback, and guidance should resolve through localized resources rather than hardcoded ViewModel/domain strings |
 | Small daily actions | The app should surface a few high-value relationship actions instead of overwhelming the user |
 
 ## 5. Product Experience Model
@@ -113,22 +114,25 @@ Success state:
 
 1. Event discovery finds a birthday, anniversary, work anniversary, holiday, revival, or follow-up opportunity.
 2. Message generation builds a context-aware prompt from contact data, event type, style profile, memories, gifts, and prior messages.
-3. AI returns variants or app uses event-aware fallback copy.
-4. Quality gate checks fallback, generic text, length, personalization, route eligibility, and automation mode.
-5. App creates a pending message with explicit readiness.
+3. Foreground generation and the weekly background generation worker use the same domain generation path for prompt, AI, quality, approval, route-readiness, scheduling, and review notification behavior.
+4. AI returns variants or app uses event-aware fallback copy.
+5. Quality gate checks fallback, generic text, length, personalization, route eligibility, and automation mode.
+6. App creates a pending message with explicit readiness.
 
 Success state:
 
 - Draft is appropriate for event type and relationship.
 - Automation is downgraded when quality or route readiness is weak.
+- A failed generated occurrence can be retried by the worker without creating a duplicate pending row.
 
 ### Journey 5: Review and Approval
 
 1. User sees pending draft in Messages or notification.
 2. Wish Preview shows variants, selected channel, send time, why signals, fallback state, and risk labels.
-3. User edits, regenerates with feedback, rejects, approves, or schedules.
-4. App recalculates readiness after every edit or regeneration.
-5. Approved draft waits until scheduled time.
+3. The initial approval-plan card groups event type, delivery route, schedule, approval mode, and AI/fallback quality before the user approves.
+4. User edits, regenerates with feedback, rejects, approves, or schedules.
+5. App recalculates draft readiness after every edit or regeneration, shows the result inline, and blocks blank approval.
+6. Approved draft waits until scheduled time.
 
 Success state:
 
@@ -146,6 +150,7 @@ Success state:
 Success state:
 
 - Delivery is reliable and auditable.
+- Activity History can isolate dispatch, AI, sync, backup, and settings records when troubleshooting.
 - Failures become actionable setup or retry states.
 
 ### Journey 7: Recovery and Migration
@@ -174,13 +179,18 @@ Home should be the daily command center:
 - Needs backup: stale or never-backed-up data.
 
 Home should not be a generic dashboard with every metric. It should rank actions by urgency and user value.
+The initial implementation ranks concrete setup blockers, pending approval, backup work, and the lowest-health relationship into one primary action plus supporting actions; future scoring should add failed delivery and upcoming-event urgency.
 
 ### 7.2 Contacts as the Data Quality Engine
 
 Contacts should not only list people. It should help the user improve the system:
 
 - Quality chip: Ready, Needs event, Needs channel, Needs context, Needs backup-safe review.
+- Initial Contacts list implementation computes and shows Ready, Add event, Add channel, and Add context labels per contact.
 - Quick filters: upcoming event, needs review, low health, missing channel, missing relationship, VIP, automation enabled.
+- Initial Contacts list action filters cover missing relationship, missing channel, low health, and VIP.
+- Contact Detail is grouped into Essentials, Personalization, Automation, and History so high-control fields are easier to scan.
+- Contact Detail quality impact copy explains whether missing context will make AI wishes generic or more relationship-specific.
 - Bulk enrichment where safe: classify unknowns, set default channel, mark work contacts, create local-only contacts.
 
 ### 7.3 Events as the Moment Planner
@@ -189,6 +199,8 @@ Events should explain origin and certainty:
 
 - Source: Google, device, manual, merged, inferred.
 - Verification: verified, imported, conflict, invalid.
+- Initial Events list implementation shows source, verification/confidence, duplicate-reminder, and conflicting-date labels per row.
+- Duplicate/conflict rows expose explicit Merge here and Keep separate actions; merge keeps the selected row, while keep-separate preserves all active reminders.
 - Action: generate wish, set reminder, edit date, merge duplicate, dismiss this year.
 
 ### 7.4 Messages as the Control Room
@@ -201,6 +213,8 @@ Messages should be organized by state:
 - Sent.
 - Failed.
 - Expired/rejected.
+
+Initial implementation uses Needs review, Scheduled, Blocked, Sent, and Failed tabs. Blocked rows keep edit and reject available but do not offer approval until contact/channel/setup blockers are fixed.
 
 Each message row must show:
 
@@ -224,6 +238,13 @@ AI Doctor should answer:
 - What is the next setup fix?
 
 It should produce one ranked fix at a time, not a long undifferentiated checklist.
+
+Initial implementation:
+
+- AI Doctor now derives a single actionable recommended fix before the grouped diagnostics.
+- Ranking is deterministic: blockers before warnings, required setup before reliability before quality before recovery, then original check order.
+- AI Doctor also warns when contact context quality is likely to produce generic messages and routes users to Contacts cleanup.
+- The recommendation only launches the same explicit action as the matching checklist row.
 
 ## 8. Automation Policy in Product Language
 
@@ -305,6 +326,7 @@ Must have:
 
 - Contacts permission and sync states clear.
 - Backup v2 implemented.
+- Home shows stale or missing backup risk without starting backup automatically.
 - No-route and blocked-send states clear.
 - SMS/email tests only to tester-controlled recipients.
 - WhatsApp automation behind explicit setup and warning.
@@ -350,4 +372,3 @@ Avoid these until core reliability is proven:
 ## 15. North-Star Product Statement
 
 RelateAI becomes the best product when it is the trusted daily layer between contacts, calendar-like moments, personal memory, AI writing, and controlled delivery. It should make thoughtful communication easier while making risky automation harder to do accidentally.
-

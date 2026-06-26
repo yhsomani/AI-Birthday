@@ -31,7 +31,7 @@ data class SentMessageEntity(
     val messageText: String,
     val channel: String,
     val sentAtMs: Long,
-    val deliveryStatus: String,          // SENT, DELIVERED, FAILED
+    val deliveryStatus: String,          // MessageDeliveryStatus.raw persisted for Room compatibility
     val aiGenerated: Boolean = true,
     val geminiModel: String = "flash",
     val variantUsed: String = "standard",

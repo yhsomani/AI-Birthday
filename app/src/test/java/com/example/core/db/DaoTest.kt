@@ -12,6 +12,7 @@ import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
+import com.example.domain.model.MessageChannel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -83,7 +84,7 @@ class DaoTest {
         formalVariant = "Respected Sir/Madam",
         funnyVariant = "LOL happy birthday!",
         emotionalVariant = "You mean so much to me",
-        channel = "SMS",
+        channel = MessageChannel.SMS.raw,
         scheduledForMs = System.currentTimeMillis(),
         approvalMode = "SMART_APPROVE"
     )
@@ -93,7 +94,7 @@ class DaoTest {
         eventType = "BIRTHDAY",
         eventYear = 2025,
         messageText = "Happy Birthday!",
-        channel = "SMS",
+        channel = MessageChannel.SMS.raw,
         sentAtMs = System.currentTimeMillis(),
         deliveryStatus = "SENT"
     )

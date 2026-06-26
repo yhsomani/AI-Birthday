@@ -2,14 +2,21 @@ package com.example.ui.screens.events
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.db.entities.EventEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.ui.viewmodel.EventTrustConflictState
+import com.example.ui.viewmodel.EventTrustState
+import com.example.ui.viewmodel.EventVerificationState
 import java.util.Calendar
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,8 +70,114 @@ class EventsScreenInteractionTest {
         composeRule.onNodeWithText(context.getString(R.string.event_verification_conflict)).assertIsDisplayed()
     }
 
+    @Test
+    fun eventRowsShowDerivedDateConflictStateForSeparateActiveEvents() {
+        composeRule.setContent {
+            RelateAITheme {
+                EventsList(
+                    events = listOf(
+                        event(
+                            id = "imported",
+                            contactId = "c1",
+                            month = 6,
+                            dayOfMonth = 12,
+                            source = "CONTACTS",
+                            isVerified = true,
+                        ),
+                        event(
+                            id = "manual",
+                            contactId = "c1",
+                            month = 7,
+                            dayOfMonth = 1,
+                            source = "MANUAL",
+                            isVerified = true,
+                        ),
+                    ),
+                )
+            }
+        }
+
+        composeRule
+            .onAllNodesWithText(context.getString(R.string.event_verification_conflict))
+            .assertCountEquals(2)
+        composeRule
+            .onAllNodesWithText(context.getString(R.string.event_conflict_date))
+            .assertCountEquals(2)
+    }
+
+    @Test
+    fun eventRowsShowDerivedDuplicateConflictStateForSameDateEvents() {
+        composeRule.setContent {
+            RelateAITheme {
+                EventsList(
+                    events = listOf(
+                        event(
+                            id = "first",
+                            contactId = "c1",
+                            source = "CONTACTS",
+                            isVerified = true,
+                        ),
+                        event(
+                            id = "second",
+                            contactId = "c1",
+                            source = "MANUAL",
+                            isVerified = true,
+                        ),
+                    ),
+                )
+            }
+        }
+
+        composeRule
+            .onAllNodesWithText(context.getString(R.string.event_verification_conflict))
+            .assertCountEquals(2)
+        composeRule
+            .onAllNodesWithText(context.getString(R.string.event_conflict_duplicate))
+            .assertCountEquals(2)
+    }
+
+    @Test
+    fun eventRowsExposeMergeAndKeepSeparateActionsForConflicts() {
+        var mergedEventId: String? = null
+        var keptEventId: String? = null
+        val event = event(id = "manual", source = "MANUAL", isVerified = true)
+
+        composeRule.setContent {
+            RelateAITheme {
+                EventsList(
+                    events = listOf(event),
+                    eventTrust = mapOf(
+                        event.id to EventTrustState(
+                            source = event.source,
+                            verification = EventVerificationState.CONFLICT,
+                            confidenceScore = 100,
+                            conflict = EventTrustConflictState.DATE_CONFLICT,
+                        )
+                    ),
+                    onMergeEvent = { mergedEventId = it },
+                    onKeepSeparateEvent = { keptEventId = it },
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithText(context.getString(R.string.event_resolution_merge_here))
+            .assertIsDisplayed()
+            .performClick()
+        composeRule
+            .onNodeWithText(context.getString(R.string.event_resolution_keep_separate))
+            .assertIsDisplayed()
+            .performClick()
+
+        assertEquals(event.id, mergedEventId)
+        assertEquals(event.id, keptEventId)
+    }
+
     private fun event(
         id: String,
+        contactId: String = "contact_$id",
+        month: Int = 1,
+        dayOfMonth: Int = 1,
         source: String,
         isVerified: Boolean,
         confidenceScore: Int = 100,
@@ -75,11 +188,11 @@ class EventsScreenInteractionTest {
 
         return EventEntity(
             id = id,
-            contactId = "contact_$id",
+            contactId = contactId,
             type = "BIRTHDAY",
             label = "Birthday $id",
-            dayOfMonth = 1,
-            month = 1,
+            dayOfMonth = dayOfMonth,
+            month = month,
             nextOccurrenceMs = nextOccurrenceMs,
             source = source,
             confidenceScore = confidenceScore,

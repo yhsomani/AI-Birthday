@@ -1,16 +1,25 @@
 package com.example.ui.viewmodel
 
+import android.content.Context
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.event.EventConflictKind
+import com.example.domain.event.EventResolutionPolicy
+import com.example.domain.model.ActivityLogType
+import com.example.domain.model.EventType
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
+import com.example.domain.usecase.ResolveEventConflictUseCase
 import com.example.domain.usecase.SaveManualEventUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +49,30 @@ enum class ManualEventWarningKind {
     DATE_CONFLICT,
 }
 
+enum class EventVerificationState {
+    VERIFIED,
+    NEEDS_REVIEW,
+    CONFLICT,
+}
+
+enum class EventTrustConflictState {
+    NONE,
+    DUPLICATE,
+    DATE_CONFLICT,
+}
+
+enum class EventResolutionAction {
+    MERGE_KEEP_SELECTED,
+    KEEP_SEPARATE,
+}
+
+data class EventTrustState(
+    val source: String,
+    val verification: EventVerificationState,
+    val confidenceScore: Int,
+    val conflict: EventTrustConflictState = EventTrustConflictState.NONE,
+)
+
 data class ManualEventDuplicateWarning(
     val contactName: String,
     val eventType: String,
@@ -57,6 +90,8 @@ data class EventsUiState(
     val searchQuery: String = "",
     val selectedTypeFilter: EventTypeFilter = EventTypeFilter.ALL,
     val selectedHorizonFilter: EventHorizonFilter = EventHorizonFilter.ALL,
+    val eventTrust: Map<String, EventTrustState> = emptyMap(),
+    val resolvingEventId: String? = null,
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val isSavingManualEvent: Boolean = false,
@@ -67,15 +102,15 @@ data class EventsUiState(
 
 @HiltViewModel
 class EventsViewModel @Inject constructor(
+    @param:ApplicationContext private val appContext: Context,
     private val eventRepository: EventRepository,
     private val contactRepository: ContactRepository,
     private val saveManualEventUseCase: SaveManualEventUseCase,
+    private val resolveEventConflictUseCase: ResolveEventConflictUseCase,
     private val activityLogRepository: ActivityLogRepository,
 ) : ViewModel() {
     private companion object {
         const val TAG = "EventsViewModel"
-        const val LOAD_FAILED_MESSAGE = "Unable to load events. Please try again."
-        const val REFRESH_FAILED_MESSAGE = "Unable to refresh events. Please try again."
     }
 
     private val _uiState = MutableStateFlow(EventsUiState())
@@ -103,7 +138,7 @@ class EventsViewModel @Inject constructor(
                 StructuredLogger.e(TAG, "Event collection failed", e)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = LOAD_FAILED_MESSAGE,
+                    error = string(R.string.events_error_load),
                 )
             }
         }
@@ -140,19 +175,20 @@ class EventsViewModel @Inject constructor(
             )
             _uiState.value = when (outcome) {
                 is SaveManualEventUseCase.Outcome.Saved -> {
+                    val eventTypeLabel = eventTypeLabel(outcome.event.type)
                     recordActivity(
                         ActivityLogEntity(
                             id = UUID.randomUUID().toString(),
-                            type = "EVENT",
-                            title = "Event saved",
-                            detail = "${outcome.event.type} reminder saved.",
+                            type = ActivityLogType.EVENT.raw,
+                            title = string(R.string.events_saved_activity_title),
+                            detail = string(R.string.events_saved_activity_detail, eventTypeLabel),
                             contactId = outcome.contact.id,
                             eventId = outcome.event.id,
                         )
                     )
                     _uiState.value.copy(
                         isSavingManualEvent = false,
-                        saveMessage = "${outcome.event.type.replace("_", " ")} saved for ${outcome.contact.name}.",
+                        saveMessage = string(R.string.events_saved_message, eventTypeLabel, outcome.contact.name),
                         error = null,
                     )
                 }
@@ -181,11 +217,11 @@ class EventsViewModel @Inject constructor(
                 )
                 SaveManualEventUseCase.Outcome.ContactNotFound -> _uiState.value.copy(
                     isSavingManualEvent = false,
-                    error = "Selected contact was not found.",
+                    error = string(R.string.events_error_selected_contact_not_found),
                 )
                 is SaveManualEventUseCase.Outcome.InvalidInput -> _uiState.value.copy(
                     isSavingManualEvent = false,
-                    error = outcome.message,
+                    error = outcome.reason.message(),
                 )
             }
         }
@@ -212,7 +248,7 @@ class EventsViewModel @Inject constructor(
                 StructuredLogger.e(TAG, "Event refresh failed", e)
                 _uiState.value = _uiState.value.copy(
                     isRefreshing = false,
-                    error = REFRESH_FAILED_MESSAGE,
+                    error = string(R.string.events_error_refresh),
                 )
             }
         }
@@ -234,6 +270,54 @@ class EventsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(selectedHorizonFilter = filter).withFilteredEvents()
     }
 
+    fun resolveEventConflict(eventId: String, action: EventResolutionAction) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                resolvingEventId = eventId,
+                saveMessage = null,
+                error = null,
+            )
+            try {
+                val outcome = resolveEventConflictUseCase(
+                    ResolveEventConflictUseCase.Request(
+                        eventId = eventId,
+                        action = action.toUseCaseAction(),
+                    )
+                )
+                _uiState.value = when (outcome) {
+                    is ResolveEventConflictUseCase.Outcome.Resolved -> {
+                        recordEventResolution(outcome)
+                        _uiState.value.copy(
+                            resolvingEventId = null,
+                            saveMessage = when (action) {
+                                EventResolutionAction.MERGE_KEEP_SELECTED -> {
+                                    string(R.string.event_resolution_merged_message)
+                                }
+                                EventResolutionAction.KEEP_SEPARATE -> {
+                                    string(R.string.event_resolution_keep_separate_message)
+                                }
+                            },
+                        )
+                    }
+                    ResolveEventConflictUseCase.Outcome.EventNotFound -> _uiState.value.copy(
+                        resolvingEventId = null,
+                        error = string(R.string.events_error_event_not_found),
+                    )
+                    is ResolveEventConflictUseCase.Outcome.NoConflict -> _uiState.value.copy(
+                        resolvingEventId = null,
+                        saveMessage = string(R.string.event_resolution_no_conflict_message),
+                    )
+                }
+            } catch (e: Exception) {
+                StructuredLogger.e(TAG, "Event conflict resolution failed", e)
+                _uiState.value = _uiState.value.copy(
+                    resolvingEventId = null,
+                    error = string(R.string.events_error_resolution),
+                )
+            }
+        }
+    }
+
     private fun EventsUiState.withEvents(
         allEvents: List<EventEntity>,
         contacts: List<ContactEntity>,
@@ -243,6 +327,7 @@ class EventsViewModel @Inject constructor(
         return copy(
             allEvents = allEvents,
             contacts = contacts.sortedBy { it.name.lowercase() },
+            eventTrust = buildEventTrustStates(allEvents),
             isLoading = isLoading,
             isRefreshing = isRefreshing,
         ).withFilteredEvents()
@@ -269,12 +354,13 @@ class EventsViewModel @Inject constructor(
     }
 
     private fun EventEntity.matchesTypeFilter(filter: EventTypeFilter): Boolean {
+        val eventType = EventType.fromRaw(type)
         return when (filter) {
             EventTypeFilter.ALL -> true
-            EventTypeFilter.BIRTHDAY -> type == "BIRTHDAY"
-            EventTypeFilter.ANNIVERSARY -> type == "ANNIVERSARY"
-            EventTypeFilter.WORK -> type == "WORK_ANNIVERSARY"
-            EventTypeFilter.CUSTOM -> type == "CUSTOM"
+            EventTypeFilter.BIRTHDAY -> eventType == EventType.BIRTHDAY
+            EventTypeFilter.ANNIVERSARY -> eventType == EventType.ANNIVERSARY
+            EventTypeFilter.WORK -> eventType == EventType.WORK_ANNIVERSARY
+            EventTypeFilter.CUSTOM -> eventType == EventType.CUSTOM
         }
     }
 
@@ -294,5 +380,84 @@ class EventsViewModel @Inject constructor(
         } catch (e: Exception) {
             StructuredLogger.w(TAG, "Activity log write failed", e, extras = mapOf("type" to entry.type))
         }
+    }
+
+    private suspend fun recordEventResolution(outcome: ResolveEventConflictUseCase.Outcome.Resolved) {
+        recordActivity(
+            ActivityLogEntity(
+                id = UUID.randomUUID().toString(),
+                type = ActivityLogType.EVENT.raw,
+                title = when (outcome.action) {
+                    ResolveEventConflictUseCase.Action.MERGE_KEEP_SELECTED -> {
+                        string(R.string.event_resolution_merged_activity_title)
+                    }
+                    ResolveEventConflictUseCase.Action.KEEP_SEPARATE -> {
+                        string(R.string.event_resolution_keep_separate_activity_title)
+                    }
+                },
+                detail = string(R.string.event_resolution_activity_detail, outcome.affectedEventIds.size),
+                contactId = outcome.keptEvent.contactId,
+                eventId = outcome.keptEvent.id,
+            )
+        )
+    }
+
+    private fun SaveManualEventUseCase.InvalidInputReason.message(): String {
+        return when (this) {
+            SaveManualEventUseCase.InvalidInputReason.MISSING_CONTACT -> string(R.string.events_error_missing_contact)
+            SaveManualEventUseCase.InvalidInputReason.INVALID_DATE -> string(R.string.events_error_invalid_date)
+        }
+    }
+
+    private fun eventTypeLabel(rawType: String): String {
+        return when (EventType.fromRaw(rawType)) {
+            EventType.BIRTHDAY -> string(R.string.event_type_birthday)
+            EventType.ANNIVERSARY -> string(R.string.event_type_anniversary)
+            EventType.WORK_ANNIVERSARY -> string(R.string.event_type_work_anniversary)
+            EventType.CUSTOM -> string(R.string.event_type_custom)
+            else -> rawType.replace("_", " ").lowercase().replaceFirstChar { it.titlecase() }
+        }
+    }
+
+    private fun string(@StringRes resId: Int, vararg args: Any): String {
+        return appContext.getString(resId, *args)
+    }
+}
+
+internal fun buildEventTrustStates(events: List<EventEntity>): Map<String, EventTrustState> {
+    val conflicts = EventResolutionPolicy.conflictStates(events)
+    return events.associate { event ->
+        val conflict = (conflicts[event.id] ?: if (EventResolutionPolicy.isSourceConflict(event)) {
+            EventConflictKind.DATE_CONFLICT
+        } else {
+            EventConflictKind.NONE
+        }).toTrustConflictState()
+        val verification = when {
+            conflict != EventTrustConflictState.NONE -> EventVerificationState.CONFLICT
+            event.isVerified -> EventVerificationState.VERIFIED
+            else -> EventVerificationState.NEEDS_REVIEW
+        }
+
+        event.id to EventTrustState(
+            source = event.source,
+            verification = verification,
+            confidenceScore = event.confidenceScore.coerceIn(0, 100),
+            conflict = conflict,
+        )
+    }
+}
+
+private fun EventConflictKind.toTrustConflictState(): EventTrustConflictState {
+    return when (this) {
+        EventConflictKind.NONE -> EventTrustConflictState.NONE
+        EventConflictKind.DUPLICATE -> EventTrustConflictState.DUPLICATE
+        EventConflictKind.DATE_CONFLICT -> EventTrustConflictState.DATE_CONFLICT
+    }
+}
+
+private fun EventResolutionAction.toUseCaseAction(): ResolveEventConflictUseCase.Action {
+    return when (this) {
+        EventResolutionAction.MERGE_KEEP_SELECTED -> ResolveEventConflictUseCase.Action.MERGE_KEEP_SELECTED
+        EventResolutionAction.KEEP_SEPARATE -> ResolveEventConflictUseCase.Action.KEEP_SEPARATE
     }
 }

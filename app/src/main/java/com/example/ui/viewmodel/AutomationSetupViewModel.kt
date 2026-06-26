@@ -21,6 +21,7 @@ import com.example.core.resilience.DeadLetterQueue
 import com.example.core.resilience.HealthMonitor
 import com.example.core.resilience.SensitiveLogRedactor
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.SyncContactsUseCase
@@ -75,9 +76,19 @@ data class ReadinessCheck(
     val group: ReadinessGroup = ReadinessGroup.REQUIRED,
 )
 
+data class AiDoctorRecommendedFix(
+    val title: String,
+    val detail: String,
+    val actionLabel: String,
+    val action: AiDoctorAction,
+    val status: ReadinessStatus,
+    val group: ReadinessGroup,
+)
+
 data class AutomationSetupUiState(
     val checks: List<ReadinessCheck> = emptyList(),
     val summary: AiDoctorSummary = AiDoctorSummary(),
+    val recommendedFix: AiDoctorRecommendedFix? = null,
     val setupProgress: SetupProgressSummary = SetupProgressSummary(),
     val isRefreshing: Boolean = false,
     val isSyncingContacts: Boolean = false,
@@ -89,6 +100,7 @@ data class AutomationSetupUiState(
 private data class AiDoctorReport(
     val summary: AiDoctorSummary,
     val checks: List<ReadinessCheck>,
+    val recommendedFix: AiDoctorRecommendedFix?,
     val setupProgress: SetupProgressSummary,
 )
 
@@ -102,6 +114,9 @@ class AutomationSetupViewModel @Inject constructor(
     private val styleProfileRepository: StyleProfileRepository,
     private val testSendUseCase: TestSendUseCase,
 ) : ViewModel() {
+    private companion object {
+        const val PERSONALIZATION_CONFIDENCE_THRESHOLD = 0.6
+    }
 
     private val _uiState = MutableStateFlow(AutomationSetupUiState())
     val uiState: StateFlow<AutomationSetupUiState> = _uiState.asStateFlow()
@@ -125,6 +140,7 @@ class AutomationSetupViewModel @Inject constructor(
                 isRefreshing = false,
                 checks = report.checks,
                 summary = report.summary,
+                recommendedFix = report.recommendedFix,
                 setupProgress = report.setupProgress,
             )
         }
@@ -152,11 +168,16 @@ class AutomationSetupViewModel @Inject constructor(
     fun runSafeGenerationCheck() {
         val ready = securePrefs.isAiWishGenerationEnabled() &&
             (securePrefs.getGeminiApiKey().isNotBlank() || currentFirebaseUserOrNull() != null)
-        val firstBlocker = _uiState.value.checks.firstOrNull { it.status == ReadinessStatus.ACTION_REQUIRED }
+        val rankedBlocker = _uiState.value.recommendedFix
+            ?.takeIf { it.status == ReadinessStatus.ACTION_REQUIRED }
+            ?.let { it.title to it.detail }
+        val firstBlocker = rankedBlocker ?: _uiState.value.checks
+            .firstOrNull { it.status == ReadinessStatus.ACTION_REQUIRED }
+            ?.let { it.title to it.detail }
         _uiState.value = _uiState.value.copy(
             operationMessage = if (ready) {
-                firstBlocker?.let {
-                    text(R.string.automation_setup_dry_run_blocker, it.title, it.detail)
+                firstBlocker?.let { (title, detail) ->
+                    text(R.string.automation_setup_dry_run_blocker, title, detail)
                 } ?: text(R.string.automation_setup_dry_run_ready)
             } else {
                 text(R.string.automation_setup_dry_run_missing_ai)
@@ -243,7 +264,7 @@ class AutomationSetupViewModel @Inject constructor(
         val senderEmailReady = securePrefs.getSenderEmail().isNotBlank() &&
             securePrefs.getSenderEmailPassword().isNotBlank()
         val emailPreferredContacts = contacts.count {
-            it.preferredChannel.equals("EMAIL", ignoreCase = true)
+            MessageChannel.fromRaw(it.preferredChannel) == MessageChannel.EMAIL
         }
 
         val checks = listOf(
@@ -296,6 +317,7 @@ class AutomationSetupViewModel @Inject constructor(
                 group = ReadinessGroup.QUALITY,
             ),
             personalizationCheck(contacts),
+            genericMessagesCheck(contacts),
             ReadinessCheck(
                 text(R.string.automation_setup_check_gemini_circuit),
                 health.circuitBreakerStates["gemini"]?.let { state ->
@@ -397,6 +419,7 @@ class AutomationSetupViewModel @Inject constructor(
         return AiDoctorReport(
             summary = checks.toSummary(),
             checks = checks,
+            recommendedFix = checks.toRecommendedFix(),
             setupProgress = checks.toSetupProgressSummary(),
         )
     }
@@ -425,6 +448,33 @@ class AutomationSetupViewModel @Inject constructor(
             status = if (percentage >= 50) ReadinessStatus.OK else ReadinessStatus.WARNING,
             actionLabel = if (percentage >= 50) null else text(R.string.automation_setup_action_review_contacts),
             action = if (percentage >= 50) AiDoctorAction.NONE else AiDoctorAction.OPEN_CONTACTS,
+            group = ReadinessGroup.QUALITY,
+        )
+    }
+
+    private fun genericMessagesCheck(contacts: List<ContactEntity>): ReadinessCheck {
+        if (contacts.isEmpty()) {
+            return ReadinessCheck(
+                title = text(R.string.automation_setup_check_generic_messages),
+                detail = text(R.string.automation_setup_generic_messages_empty),
+                status = ReadinessStatus.WARNING,
+                actionLabel = text(R.string.automation_setup_action_sync_contacts),
+                action = AiDoctorAction.SYNC_CONTACTS,
+                group = ReadinessGroup.QUALITY,
+            )
+        }
+
+        val genericRiskCount = contacts.count { !it.hasPersonalizationContextForAi() }
+        return ReadinessCheck(
+            title = text(R.string.automation_setup_check_generic_messages),
+            detail = if (genericRiskCount == 0) {
+                text(R.string.automation_setup_generic_messages_ok)
+            } else {
+                text(R.string.automation_setup_generic_messages_low, genericRiskCount, contacts.size)
+            },
+            status = if (genericRiskCount == 0) ReadinessStatus.OK else ReadinessStatus.WARNING,
+            actionLabel = if (genericRiskCount == 0) null else text(R.string.automation_setup_action_review_contacts),
+            action = if (genericRiskCount == 0) AiDoctorAction.NONE else AiDoctorAction.OPEN_CONTACTS,
             group = ReadinessGroup.QUALITY,
         )
     }
@@ -458,11 +508,53 @@ class AutomationSetupViewModel @Inject constructor(
         }
     }
 
+    private fun List<ReadinessCheck>.toRecommendedFix(): AiDoctorRecommendedFix? {
+        return withIndex()
+            .filter { (_, check) ->
+                check.status != ReadinessStatus.OK &&
+                    check.action != AiDoctorAction.NONE &&
+                    !check.actionLabel.isNullOrBlank()
+            }
+            .minWithOrNull(
+                compareBy<IndexedValue<ReadinessCheck>> { it.value.status.recommendedFixRank() }
+                    .thenBy { it.value.group.recommendedFixRank() }
+                    .thenBy { it.index },
+            )
+            ?.value
+            ?.let { check ->
+                AiDoctorRecommendedFix(
+                    title = check.title,
+                    detail = check.detail,
+                    actionLabel = check.actionLabel.orEmpty(),
+                    action = check.action,
+                    status = check.status,
+                    group = check.group,
+                )
+            }
+    }
+
+    private fun ReadinessStatus.recommendedFixRank(): Int = when (this) {
+        ReadinessStatus.ACTION_REQUIRED -> 0
+        ReadinessStatus.WARNING -> 1
+        ReadinessStatus.OK -> 2
+    }
+
+    private fun ReadinessGroup.recommendedFixRank(): Int = when (this) {
+        ReadinessGroup.REQUIRED -> 0
+        ReadinessGroup.RELIABILITY -> 1
+        ReadinessGroup.QUALITY -> 2
+        ReadinessGroup.RECOVERY -> 3
+    }
+
     private fun ContactEntity.hasPersonalizationData(): Boolean {
         return !nickname.isNullOrBlank() ||
             notesText.isNotBlank() ||
             hasJsonArrayContent(interestsJson) ||
             hasJsonArrayContent(sharedHistoryJson)
+    }
+
+    private fun ContactEntity.hasPersonalizationContextForAi(): Boolean {
+        return hasPersonalizationData() || classificationConfidence >= PERSONALIZATION_CONFIDENCE_THRESHOLD
     }
 
     private fun hasJsonArrayContent(raw: String): Boolean {
@@ -504,6 +596,9 @@ class AutomationSetupViewModel @Inject constructor(
 
     internal fun setupProgressForTesting(checks: List<ReadinessCheck>): SetupProgressSummary =
         checks.toSetupProgressSummary()
+
+    internal fun recommendedFixForTesting(checks: List<ReadinessCheck>): AiDoctorRecommendedFix? =
+        checks.toRecommendedFix()
 
     internal suspend fun buildChecksForTesting(): List<ReadinessCheck> = buildReport().checks
 
