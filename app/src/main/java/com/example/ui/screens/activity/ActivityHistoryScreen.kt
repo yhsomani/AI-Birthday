@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -27,6 +28,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -115,6 +117,17 @@ internal fun ActivityHistoryContent(
             singleLine = true,
             leadingIcon = {
                 Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.search))
+            },
+            trailingIcon = {
+                if (state.searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { onSearchQueryChange("") }) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = stringResource(R.string.clear_search),
+                            tint = RelateOnSurfaceVariant
+                        )
+                    }
+                }
             },
             placeholder = { Text(stringResource(R.string.activity_history_search_placeholder)) },
         )
