@@ -34,13 +34,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextAlign
 import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateCard
 import com.example.core.ui.theme.RelateCardBorder
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateError
+import com.example.core.ui.theme.RelateFraction
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
@@ -136,7 +137,7 @@ fun RelateGlassCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, RelateCardBorder, RoundedCornerShape(RelateRadius.card)),
+            .border(RelateSize.outlineStroke, RelateCardBorder, RoundedCornerShape(RelateRadius.card)),
         shape = RoundedCornerShape(RelateRadius.card),
         colors = CardDefaults.cardColors(containerColor = RelateCard),
         content = content,
@@ -218,11 +219,11 @@ fun RelateStatusBanner(
 fun RelateAvatar(
     name: String,
     modifier: Modifier = Modifier,
-    size: Int = 44,
+    size: Dp = RelateSize.avatar,
 ) {
     Box(
         modifier = modifier
-            .size(size.dp)
+            .size(size)
             .clip(CircleShape)
             .background(RelateSurfaceVariant),
         contentAlignment = Alignment.Center,
@@ -289,15 +290,15 @@ fun StatCard(
 fun HealthIndicatorDot(
     health: Float,
     modifier: Modifier = Modifier,
-    size: Int = 10,
+    size: Dp = RelateSize.indicatorDot,
 ) {
-    val color = if (health > 0.7f) RelateSuccess
-    else if (health > 0.4f) RelateWarning
+    val color = if (health > RelateFraction.healthStrongThreshold) RelateSuccess
+    else if (health > RelateFraction.healthAttentionThreshold) RelateWarning
     else RelateError
 
     Box(
         modifier = modifier
-            .size(size.dp)
+            .size(size)
             .clip(CircleShape)
             .background(color)
     )

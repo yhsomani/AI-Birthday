@@ -13,15 +13,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSurfaceVariant
 
 @Composable
 fun ShimmerItem(modifier: Modifier = Modifier) {
     val shimmerColors = listOf(
-        Color.LightGray.copy(alpha = 0.6f),
-        Color.LightGray.copy(alpha = 0.2f),
-        Color.LightGray.copy(alpha = 0.6f),
+        RelateSurfaceVariant.copy(alpha = RelateAlpha.shimmerHigh),
+        RelateSurfaceVariant.copy(alpha = RelateAlpha.shimmerLow),
+        RelateSurfaceVariant.copy(alpha = RelateAlpha.shimmerHigh),
     )
 
     val transition = rememberInfiniteTransition()

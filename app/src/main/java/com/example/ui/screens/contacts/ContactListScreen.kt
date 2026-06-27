@@ -45,7 +45,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -54,10 +53,15 @@ import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.HealthIndicatorDot
 import com.example.core.ui.components.ShimmerItem
+import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateFraction
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.domain.model.contact.ContactListItem
 import com.example.ui.components.SyncErrorCard
@@ -148,15 +152,15 @@ internal fun ContactListContent(
         modifier = Modifier
             .fillMaxSize()
             .background(RelateDarkBackground)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = RelateSpacing.screenHorizontal),
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(RelateSize.minTouchTarget))
         Text(
             text = stringResource(R.string.nav_contacts),
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.lg))
         OutlinedTextField(
             value = state.searchQuery,
             onValueChange = onSearchQueryChange,
@@ -176,23 +180,23 @@ internal fun ContactListContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(ContactListTestTags.SEARCH_FIELD),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(RelateRadius.control),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = RelatePrimary,
                 unfocusedBorderColor = RelateSurfaceVariant,
-                focusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.3f),
-                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.3f),
+                focusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
                 focusedTextColor = RelateOnBackground,
                 unfocusedTextColor = RelateOnBackground,
             ),
             singleLine = true,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.md))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             filterOptions.forEach { filter ->
                 FilterChip(
@@ -203,12 +207,12 @@ internal fun ContactListContent(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             sortOptions.forEach { sort ->
                 FilterChip(
@@ -219,7 +223,7 @@ internal fun ContactListContent(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
 
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
@@ -234,7 +238,7 @@ internal fun ContactListContent(
                         onDismiss = onDismissSyncError,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 12.dp)
+                            .padding(bottom = RelateSpacing.md)
                             .testTag(ContactListTestTags.SYNC_ERROR_CARD),
                     )
                 }
@@ -242,17 +246,17 @@ internal fun ContactListContent(
                 if (state.isLoading && state.contacts.isEmpty()) {
                     LazyColumn(
                         modifier = Modifier.weight(1f).fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp)
+                        verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
+                        contentPadding = PaddingValues(vertical = RelateSpacing.md)
                     ) {
                         items(10) {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                ShimmerItem(modifier = Modifier.size(48.dp).clip(CircleShape))
-                                Spacer(modifier = Modifier.width(12.dp))
+                                ShimmerItem(modifier = Modifier.size(RelateSize.minTouchTarget).clip(CircleShape))
+                                Spacer(modifier = Modifier.width(RelateSpacing.md))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    ShimmerItem(modifier = Modifier.fillMaxWidth(0.5f).height(16.dp))
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    ShimmerItem(modifier = Modifier.fillMaxWidth(0.3f).height(12.dp))
+                                    ShimmerItem(modifier = Modifier.fillMaxWidth(RelateFraction.skeletonTitle).height(RelateSpacing.lg))
+                                    Spacer(modifier = Modifier.height(RelateSpacing.sm))
+                                    ShimmerItem(modifier = Modifier.fillMaxWidth(RelateFraction.skeletonSubtitle).height(RelateSpacing.md))
                                 }
                             }
                         }
@@ -313,12 +317,12 @@ private fun ContactRow(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(vertical = RelateSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(RelateSize.minTouchTarget)
                 .clip(CircleShape)
                 .background(RelateSurfaceVariant),
             contentAlignment = Alignment.Center,
@@ -330,7 +334,7 @@ private fun ContactRow(
                 style = MaterialTheme.typography.titleLarge,
             )
         }
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(RelateSpacing.md))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -338,7 +342,7 @@ private fun ContactRow(
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.sm))
                 HealthIndicatorDot(health = contact.healthScore / 100f)
             }
             val group = contact.contactGroup ?: contact.relationshipType

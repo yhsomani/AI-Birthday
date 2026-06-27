@@ -39,7 +39,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
@@ -50,6 +49,8 @@ import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSpacing
+import com.example.core.ui.theme.RelateWarning
 import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogType
 import com.example.ui.viewmodel.ActivityHistoryUiState
@@ -121,7 +122,7 @@ internal fun ActivityHistoryContent(
             },
             placeholder = { Text(stringResource(R.string.activity_history_search_placeholder)) },
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         FilterRow(
             filters = ActivityLogTypeFilter.entries,
             selected = state.selectedTypeFilter,
@@ -129,7 +130,7 @@ internal fun ActivityHistoryContent(
             tag = { ActivityHistoryTestTags.TYPE_FILTER_PREFIX + it.name },
             onSelected = onTypeFilterSelected,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         FilterRow(
             filters = ActivityLogDateFilter.entries,
             selected = state.selectedDateFilter,
@@ -137,7 +138,7 @@ internal fun ActivityHistoryContent(
             tag = { ActivityHistoryTestTags.DATE_FILTER_PREFIX + it.name },
             onSelected = onDateFilterSelected,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.md))
         FilterRow(
             filters = ActivityLogStatusFilter.entries,
             selected = state.selectedStatusFilter,
@@ -145,7 +146,7 @@ internal fun ActivityHistoryContent(
             tag = { ActivityHistoryTestTags.STATUS_FILTER_PREFIX + it.name },
             onSelected = onStatusFilterSelected,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.md))
 
         if (state.isLoading) {
             Column(
@@ -175,8 +176,8 @@ internal fun ActivityHistoryContent(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+                contentPadding = PaddingValues(bottom = RelateSpacing.xl),
             ) {
                 items(state.entries, key = { it.id }) { entry ->
                     ActivityLogCard(entry = entry, onOpenRoute = onOpenRoute)
@@ -198,7 +199,7 @@ private fun <T> FilterRow(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
     ) {
         filters.forEach { filter ->
             FilterChip(
@@ -221,9 +222,9 @@ private fun ActivityLogCard(
         modifier = Modifier.testTag(ActivityHistoryTestTags.LOG_CARD_PREFIX + entry.id),
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(RelateSpacing.md),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Icon(
                 imageVector = entry.type.icon(),
@@ -242,8 +243,8 @@ private fun ActivityLogCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = RelateOnSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(modifier = Modifier.height(RelateSpacing.xs))
+                Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
                     Text(
                         text = entry.severity,
                         style = MaterialTheme.typography.labelSmall,
@@ -255,14 +256,14 @@ private fun ActivityLogCard(
                         color = RelateOnSurfaceVariant,
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.xs))
                 Text(
                     text = dateFormat.format(Date(entry.createdAtMs)),
                     style = MaterialTheme.typography.labelSmall,
                     color = RelateOnSurfaceVariant,
                 )
                 entry.actionRoute?.let { route ->
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(RelateSpacing.sm))
                     Button(
                         onClick = { onOpenRoute(route) },
                         modifier = Modifier.testTag(ActivityHistoryTestTags.OPEN_ROUTE_PREFIX + entry.id),
@@ -323,6 +324,6 @@ private fun String.icon(): ImageVector = when (ActivityLogType.fromRaw(this)) {
 @Composable
 private fun String.severityColor() = when (ActivityLogSeverity.fromRaw(this)) {
     ActivityLogSeverity.ERROR -> MaterialTheme.colorScheme.error
-    ActivityLogSeverity.WARNING -> androidx.compose.ui.graphics.Color(0xFFF59E0B)
+    ActivityLogSeverity.WARNING -> RelateWarning
     else -> RelatePrimary
 }

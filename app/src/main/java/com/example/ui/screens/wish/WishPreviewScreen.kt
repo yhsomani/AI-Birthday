@@ -49,6 +49,7 @@ import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelatePrimaryButton
 import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateFraction
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
@@ -616,7 +617,7 @@ private fun SendSummaryRow(
             text = label,
             style = MaterialTheme.typography.bodySmall,
             color = RelateOnSurfaceVariant,
-            modifier = Modifier.weight(0.38f),
+            modifier = Modifier.weight(RelateFraction.metadataLabel),
         )
         Text(
             text = value,
@@ -624,7 +625,7 @@ private fun SendSummaryRow(
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(0.62f),
+            modifier = Modifier.weight(RelateFraction.metadataValue),
         )
     }
 }
@@ -765,7 +766,7 @@ private fun WhyThisMessagePanel(
                         text = stringResource(signal.labelRes),
                         style = MaterialTheme.typography.bodySmall,
                         color = RelateOnSurfaceVariant,
-                        modifier = Modifier.weight(0.42f),
+                        modifier = Modifier.weight(RelateFraction.metadataLabel),
                     )
                     Text(
                         text = signal.value,
@@ -773,7 +774,7 @@ private fun WhyThisMessagePanel(
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(0.58f),
+                        modifier = Modifier.weight(RelateFraction.metadataValue),
                     )
                 }
             }

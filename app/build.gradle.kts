@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.google.services)
     alias(libs.plugins.baselineprofile)
+    alias(libs.plugins.roborazzi)
 }
 
 fun releaseSigningIssues(): List<String> = buildList {
@@ -128,10 +129,23 @@ android {
         }
     }
 
-    testOptions { unitTests { isIncludeAndroidResources = true } }
-
     baselineProfile {
         mergeIntoMain = true
+    }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            all {
+                it.useJUnit {
+                    if (project.hasProperty("screenshot")) {
+                        includeCategories("com.example.ui.screenshots.ScreenshotTests")
+                    } else {
+                        excludeCategories("com.example.ui.screenshots.ScreenshotTests")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -214,6 +228,8 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.androidx.work.testing)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

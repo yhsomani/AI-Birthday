@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,7 +58,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
@@ -65,10 +65,16 @@ import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
 import com.example.core.ui.components.StatCard
+import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateCard
 import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateElevation
+import com.example.core.ui.theme.RelateError
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
+import com.example.core.ui.theme.RelateSuccess
 import com.example.domain.model.gift.GiftHistoryRecord
 import com.example.domain.service.GiftSuggestion
 import com.example.ui.viewmodel.GiftAdvisorUiState
@@ -226,7 +232,7 @@ internal fun GiftAdvisorContent(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(RelateElevation.appBar),
                 ),
             )
         },
@@ -255,7 +261,7 @@ internal fun GiftAdvisorContent(
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
                 ) {
                     CircularProgressIndicator(color = RelatePrimary)
                     Text(
@@ -271,8 +277,8 @@ internal fun GiftAdvisorContent(
                     .fillMaxSize()
                     .background(RelateDarkBackground)
                     .padding(paddingValues)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(RelateSpacing.screenHorizontal),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
             ) {
                 item {
                     BudgetStats(
@@ -305,7 +311,7 @@ internal fun GiftAdvisorContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag(GiftAdvisorTestTags.EMPTY_HISTORY)
-                                .height(150.dp),
+                                .height(RelateSize.actionCardMinHeight),
                         )
                     }
                 } else {
@@ -358,7 +364,7 @@ private fun BudgetStats(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
     ) {
         StatCard(
             label = stringResource(R.string.gift_stat_annual_budget),
@@ -388,8 +394,8 @@ private fun GiftSuggestionsPanel(
 ) {
     RelateGlassCard {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -412,10 +418,10 @@ private fun GiftSuggestionsPanel(
                     if (uiState.isGeneratingSuggestions) {
                         CircularProgressIndicator(
                             modifier = Modifier
-                                .size(18.dp)
+                                .size(RelateSize.iconSm)
                                 .testTag(GiftAdvisorTestTags.SUGGESTIONS_PROGRESS),
                             color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp,
+                            strokeWidth = RelateSize.progressStroke,
                         )
                     } else {
                         Text(text = stringResource(R.string.gift_ask_ai))
@@ -437,7 +443,7 @@ private fun GiftSuggestionsPanel(
                     modifier = Modifier.testTag(GiftAdvisorTestTags.SUGGESTIONS_EMPTY),
                 )
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
                     uiState.suggestions.forEachIndexed { index, suggestion ->
                         GiftSuggestionCard(
                             suggestion = suggestion,
@@ -458,10 +464,10 @@ private fun GiftSuggestionCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
         ),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(RelateSpacing.compactCardContent)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -475,14 +481,14 @@ private fun GiftSuggestionCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.md))
                 Text(
                     text = stringResource(R.string.gift_currency_inr_format, suggestion.estimatedCostInr),
                     color = RelatePrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xs))
             Text(
                 text = suggestion.reason,
                 style = MaterialTheme.typography.bodySmall,
@@ -502,7 +508,7 @@ private fun GiftHistoryCard(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = RelateCard),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -510,7 +516,7 @@ private fun GiftHistoryCard(
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(RelateSpacing.xxs),
                 ) {
                     Text(
                         text = gift.giftName,
@@ -538,7 +544,7 @@ private fun GiftHistoryCard(
                         text = stringResource(R.string.gift_currency_inr_format, gift.approxCostInr),
                         style = MaterialTheme.typography.titleMedium,
                         color = RelatePrimary,
-                        modifier = Modifier.padding(horizontal = 8.dp),
+                        modifier = Modifier.padding(horizontal = RelateSpacing.sm),
                     )
                     GiftFeedbackIcon(receivedWell = gift.receivedWell)
                     IconButton(
@@ -548,13 +554,13 @@ private fun GiftHistoryCard(
                         Icon(
                             imageVector = Icons.Filled.Delete,
                             contentDescription = stringResource(R.string.gift_delete_record, gift.giftName),
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = RelateAlpha.subtle),
                         )
                     }
                 }
             }
             if (gift.notes.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.sm))
                 Text(
                     text = stringResource(R.string.gift_notes_format, gift.notes),
                     style = MaterialTheme.typography.bodyMedium,
@@ -571,19 +577,19 @@ private fun GiftFeedbackIcon(receivedWell: Boolean?) {
         true -> Icon(
             imageVector = Icons.Filled.ThumbUp,
             contentDescription = stringResource(R.string.gift_feedback_liked),
-            tint = Color(0xFF10B981),
+            tint = RelateSuccess,
         )
 
         false -> Icon(
             imageVector = Icons.Filled.ThumbDown,
             contentDescription = stringResource(R.string.gift_feedback_disliked),
-            tint = Color(0xFFEF4444),
+            tint = RelateError,
         )
 
         null -> Icon(
             imageVector = Icons.Filled.Info,
             contentDescription = stringResource(R.string.gift_feedback_unknown),
-            tint = Color.Gray,
+            tint = RelateOnSurfaceVariant,
         )
     }
 }
@@ -618,9 +624,10 @@ private fun AddGiftDialog(
         title = { Text(text = stringResource(R.string.gift_record_history_title)) },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = RelateSize.dialogContentMaxHeight)
                     .verticalScroll(rememberScrollState()),
             ) {
                 errorMessageRes?.let { errorRes ->
@@ -674,12 +681,12 @@ private fun AddGiftDialog(
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
                 ) {
                     FeedbackButton(
                         selected = receivedWellState == true,
                         onClick = { onReceivedWellChange(true) },
-                        selectedColor = Color(0xFF10B981),
+                        selectedColor = RelateSuccess,
                         icon = {
                             Icon(
                                 imageVector = Icons.Filled.ThumbUp,
@@ -693,7 +700,7 @@ private fun AddGiftDialog(
                     FeedbackButton(
                         selected = receivedWellState == false,
                         onClick = { onReceivedWellChange(false) },
-                        selectedColor = Color(0xFFEF4444),
+                        selectedColor = RelateError,
                         icon = {
                             Icon(
                                 imageVector = Icons.Filled.ThumbDown,
@@ -707,7 +714,7 @@ private fun AddGiftDialog(
                     FeedbackButton(
                         selected = receivedWellState == null,
                         onClick = { onReceivedWellChange(null) },
-                        selectedColor = Color.Gray,
+                        selectedColor = RelateOnSurfaceVariant,
                         icon = {
                             Text(text = stringResource(R.string.gift_feedback_unknown_short))
                         },
@@ -790,7 +797,7 @@ private fun FeedbackButton(
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(
             containerColor = if (selected) selectedColor else MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
+            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
         ),
         modifier = modifier,
     ) {
@@ -810,7 +817,7 @@ private fun GiftAdvisorErrorCard(message: String) {
     ) {
         Text(
             text = message,
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(RelateSpacing.compactCardContent),
             color = MaterialTheme.colorScheme.onErrorContainer,
             style = MaterialTheme.typography.bodyMedium,
         )

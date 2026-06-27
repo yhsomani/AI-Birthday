@@ -221,10 +221,10 @@ fun BackupRestoreContent(
                             PasswordStrength.VERY_STRONG -> RelateSuccess
                         }
                         val progress = when (uiState.passwordStrength) {
-                            PasswordStrength.WEAK -> 0.25f
-                            PasswordStrength.FAIR -> 0.5f
-                            PasswordStrength.STRONG -> 0.75f
-                            PasswordStrength.VERY_STRONG -> 1.0f
+                            PasswordStrength.WEAK -> RelateFraction.strengthWeak
+                            PasswordStrength.FAIR -> RelateFraction.strengthFair
+                            PasswordStrength.STRONG -> RelateFraction.strengthStrong
+                            PasswordStrength.VERY_STRONG -> RelateFraction.strengthFull
                         }
 
                         Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs)) {

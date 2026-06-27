@@ -42,17 +42,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.db.entities.StyleProfileHistoryEntity
+import com.example.core.ui.theme.RelateAlpha
+import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateElevation
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
+import com.example.core.ui.theme.RelateSuccess
 import com.example.ui.viewmodel.StyleCoachUiState
 import com.example.ui.viewmodel.StyleCoachViewModel
 import java.text.SimpleDateFormat
@@ -122,7 +126,7 @@ internal fun StyleCoachContent(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(RelateElevation.appBar),
                 ),
             )
         },
@@ -131,16 +135,9 @@ internal fun StyleCoachContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surface,
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        ),
-                    ),
-                )
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .background(RelateDarkBackground)
+                .padding(RelateSpacing.screenHorizontal),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
         ) {
             item {
                 StyleTrainingCard(
@@ -215,23 +212,23 @@ private fun StyleTrainingCard(
     val busy = isTraining || isAutoAnalyzing
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(RelateRadius.card),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
         ),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Filled.Psychology,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(RelateSize.iconLg),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.sm))
                 Text(
                     text = stringResource(R.string.style_coach_train_title),
                     style = MaterialTheme.typography.titleLarge,
@@ -270,12 +267,12 @@ private fun StyleTrainingCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag(StyleCoachTestTags.MANUAL_ANALYZE_BUTTON),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(RelateRadius.control),
             ) {
                 if (isTraining) {
                     CircularProgressIndicator(
                         modifier = Modifier
-                            .size(24.dp)
+                            .size(RelateSize.iconLg)
                             .testTag(StyleCoachTestTags.MANUAL_PROGRESS),
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
@@ -290,14 +287,14 @@ private fun StyleTrainingCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag(StyleCoachTestTags.AUTO_ANALYZE_BUTTON),
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(RelateRadius.control),
             ) {
                 if (isAutoAnalyzing) {
                     CircularProgressIndicator(
                         modifier = Modifier
-                            .size(20.dp)
+                            .size(RelateSize.iconSm)
                             .testTag(StyleCoachTestTags.AUTO_PROGRESS),
-                        strokeWidth = 2.dp,
+                        strokeWidth = RelateSize.progressStroke,
                     )
                 } else {
                     Text(stringResource(R.string.style_coach_auto_analyze))
@@ -312,10 +309,10 @@ private fun StatusMessage(
     message: String,
     isError: Boolean,
 ) {
-    val color = if (isError) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
+    val color = if (isError) MaterialTheme.colorScheme.error else RelateSuccess
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         modifier = Modifier
             .fillMaxWidth()
             .testTag(StyleCoachTestTags.STATUS_MESSAGE),
@@ -340,13 +337,13 @@ private fun LearnedProfileCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(RelateRadius.card),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp),
+        elevation = CardDefaults.cardElevation(RelateElevation.card),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -436,7 +433,7 @@ private fun ProfileListBlock(
     emptyText: String,
     expressive: Boolean = false,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs)) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
@@ -461,7 +458,7 @@ private fun EmptyHistoryRow() {
         modifier = Modifier
             .fillMaxWidth()
             .testTag(StyleCoachTestTags.EMPTY_HISTORY)
-            .padding(vertical = 16.dp),
+            .padding(vertical = RelateSpacing.cardContent),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -470,7 +467,7 @@ private fun EmptyHistoryRow() {
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(RelateSpacing.sm))
         Text(
             text = stringResource(R.string.style_coach_history_empty),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -489,12 +486,12 @@ private fun HistorySnapshotCard(
     }
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(RelateRadius.card),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
         ),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(RelateSpacing.compactCardContent)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -513,7 +510,7 @@ private fun HistorySnapshotCard(
                 )
             }
             snapshotObj?.let { obj ->
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.xs))
                 Text(
                     text = stringResource(
                         R.string.style_coach_history_summary,

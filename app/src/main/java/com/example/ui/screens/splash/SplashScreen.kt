@@ -22,18 +22,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.R
+import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.ui.viewmodel.SplashDestination
 import com.example.ui.viewmodel.SplashViewModel
 import kotlinx.coroutines.delay
+
+internal object SplashScreenTestTags {
+    const val PROGRESS = "splash_progress"
+}
 
 @Composable
 fun SplashScreen(
@@ -48,6 +54,8 @@ fun SplashScreen(
         animationSpec = tween(durationMillis = 1000),
     )
 
+    SplashContent(alpha = alphaAnim)
+
     LaunchedEffect(Unit) {
         startAnimation = true
         delay(2000)
@@ -57,7 +65,10 @@ fun SplashScreen(
             SplashDestination.ONBOARDING -> onNavigateToOnboarding()
         }
     }
+}
 
+@Composable
+internal fun SplashContent(alpha: Float) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -65,7 +76,7 @@ fun SplashScreen(
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.alpha(alphaAnim),
+            modifier = Modifier.alpha(alpha),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -73,21 +84,22 @@ fun SplashScreen(
                 text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    fontSize = 42.sp,
                 ),
                 color = RelatePrimary,
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Text(
                 text = stringResource(R.string.auth_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
-                color = RelateOnBackground.copy(alpha = 0.7f),
+                color = RelateOnBackground.copy(alpha = RelateAlpha.muted),
             )
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xxxl))
             CircularProgressIndicator(
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier
+                    .size(RelateSize.progressIndicator)
+                    .testTag(SplashScreenTestTags.PROGRESS),
                 color = RelatePrimary,
-                strokeWidth = 3.dp,
+                strokeWidth = RelateSize.progressStroke,
             )
         }
     }

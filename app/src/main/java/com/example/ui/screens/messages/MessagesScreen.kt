@@ -1,6 +1,7 @@
 package com.example.ui.screens.messages
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.SecondaryIndicator
@@ -21,13 +23,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -204,26 +205,26 @@ internal fun MessagesContent(
         modifier = Modifier
             .fillMaxSize()
             .background(RelateDarkBackground)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = RelateSpacing.screenHorizontal),
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.screenTop))
         Text(
             text = stringResource(R.string.messages_inbox_title),
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.lg))
 
         ScrollableTabRow(
             selectedTabIndex = pagerState.currentPage,
             containerColor = RelateDarkBackground,
             contentColor = RelatePrimary,
-            edgePadding = 0.dp,
+            edgePadding = RelateSpacing.none,
             indicator = { tabPositions ->
                 SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
-                    height = 3.dp,
+                    height = RelateSize.progressStroke,
                     color = RelatePrimary,
                 )
             },
@@ -242,7 +243,7 @@ internal fun MessagesContent(
                             text = title,
                             color = if (pagerState.currentPage == index) RelatePrimary else RelateOnSurfaceVariant,
                             fontWeight = if (pagerState.currentPage == index) FontWeight.SemiBold else FontWeight.Normal,
-                            fontSize = 13.sp,
+                            style = MaterialTheme.typography.labelSmall,
                             maxLines = 1,
                         )
                     },
@@ -250,7 +251,7 @@ internal fun MessagesContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.md))
 
         OutlinedTextField(
             value = state.searchQuery,
@@ -265,14 +266,14 @@ internal fun MessagesContent(
             },
             singleLine = true,
             colors = relateTextFieldColors(),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(RelateRadius.control),
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             channelFilters.forEach { filter ->
                 FilterChip(
@@ -283,12 +284,12 @@ internal fun MessagesContent(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             messageSortOptions.forEach { sort ->
                 FilterChip(
@@ -299,7 +300,7 @@ internal fun MessagesContent(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.md))
 
         if (state.selectedMessageIds.isNotEmpty()) {
             BulkActionBar(
@@ -312,7 +313,7 @@ internal fun MessagesContent(
                 onClear = onClearSelection,
                 modifier = Modifier.testTag(MessagesTestTags.BULK_BAR),
             )
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
         }
 
         PullToRefreshBox(
@@ -395,9 +396,9 @@ private fun BulkActionBar(
 ) {
     RelateGlassCard(modifier = modifier) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = RelateSpacing.md, vertical = RelateSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             Text(
                 text = stringResource(R.string.messages_selected_count, selectedCount),
@@ -408,35 +409,43 @@ private fun BulkActionBar(
             if (showApprove) {
                 Button(
                     onClick = onApprove,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.testTag(MessagesTestTags.BULK_APPROVE),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary, contentColor = Color.Black),
+                    contentPadding = PaddingValues(horizontal = RelateSpacing.md, vertical = RelateSpacing.xs),
+                    modifier = Modifier
+                        .heightIn(min = RelateSize.compactButtonHeight)
+                        .testTag(MessagesTestTags.BULK_APPROVE),
+                    shape = RoundedCornerShape(RelateRadius.control),
+                    colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary, contentColor = RelateOnPrimary),
                 ) {
-                    Text(stringResource(R.string.approve), fontSize = 12.sp)
+                    Text(stringResource(R.string.approve), style = MaterialTheme.typography.labelSmall)
                 }
             }
             if (showRetry) {
                 Button(
                     onClick = onRetry,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.testTag(MessagesTestTags.BULK_RETRY),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary, contentColor = Color.Black),
+                    contentPadding = PaddingValues(horizontal = RelateSpacing.md, vertical = RelateSpacing.xs),
+                    modifier = Modifier
+                        .heightIn(min = RelateSize.compactButtonHeight)
+                        .testTag(MessagesTestTags.BULK_RETRY),
+                    shape = RoundedCornerShape(RelateRadius.control),
+                    colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary, contentColor = RelateOnPrimary),
                 ) {
-                    Text(stringResource(R.string.retry), fontSize = 12.sp)
+                    Text(stringResource(R.string.retry), style = MaterialTheme.typography.labelSmall)
                 }
             }
             TextButton(
                 modifier = Modifier.testTag(MessagesTestTags.BULK_REJECT),
                 onClick = onReject,
             ) {
-                Text(stringResource(R.string.reject), color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                Text(
+                    stringResource(R.string.reject),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelSmall,
+                )
             }
             IconButton(
                 onClick = onClear,
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(RelateSize.compactButtonHeight)
                     .testTag(MessagesTestTags.BULK_CLEAR),
             ) {
                 Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.messages_clear_selection), tint = RelateOnSurfaceVariant)
@@ -462,8 +471,8 @@ private fun PendingMessagesList(
         EmptyState(message = emptyText)
     } else {
         LazyColumn(
-            contentPadding = PaddingValues(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            contentPadding = PaddingValues(bottom = RelateSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)
         ) {
             items(messages, key = { it.id }) { item ->
                 PendingMessageCard(
@@ -488,8 +497,8 @@ private fun SentMessagesList(messages: List<SentMessageItem>) {
         EmptyState(message = stringResource(R.string.messages_empty_sent))
     } else {
         LazyColumn(
-            contentPadding = PaddingValues(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            contentPadding = PaddingValues(bottom = RelateSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)
         ) {
             items(messages, key = { it.id }) { item ->
                 SentMessageCard(
@@ -514,8 +523,8 @@ private fun FailedMessagesList(
         EmptyState(message = stringResource(R.string.messages_empty_failed))
     } else {
         LazyColumn(
-            contentPadding = PaddingValues(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            contentPadding = PaddingValues(bottom = RelateSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)
         ) {
             items(messages, key = { it.id }) { item ->
                 FailedMessageCard(
@@ -553,18 +562,18 @@ internal fun FailedRecoveryAssistant(
 
     RelateGlassCard(modifier = modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(RelateSpacing.compactCardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Build,
                     contentDescription = null,
                     tint = RelatePrimary,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(RelateSize.iconMd),
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -628,10 +637,10 @@ private fun PendingMessageCard(
 ) {
     val eventType = OccasionType.fromRaw(item.eventType)
     val eventTypeColor = when (eventType) {
-        OccasionType.BIRTHDAY -> Color(0xFF8B5CF6) // NeonViolet
-        OccasionType.ANNIVERSARY -> Color(0xFFF43F5E) // CyberRose
-        OccasionType.WORK_ANNIVERSARY -> Color(0xFF06B6D4) // ElectricCyan
-        else -> Color.Gray
+        OccasionType.BIRTHDAY -> RelatePrimary
+        OccasionType.ANNIVERSARY -> RelateTertiary
+        OccasionType.WORK_ANNIVERSARY -> RelateSecondary
+        else -> RelateOnSurfaceVariant
     }
 
     val eventIcon = when (eventType) {
@@ -646,7 +655,7 @@ private fun PendingMessageCard(
         MessageChannel.WHATSAPP -> Icons.Filled.Phone
         MessageChannel.EMAIL -> Icons.Filled.Email
         MessageChannel.SMS,
-        MessageChannel.UNKNOWN -> Icons.Filled.Message
+        MessageChannel.UNKNOWN -> Icons.AutoMirrored.Filled.Message
     }
     val channelText = channelLabel(item.channel.raw)
 
@@ -656,7 +665,7 @@ private fun PendingMessageCard(
     }
 
     RelateGlassCard(modifier = modifier) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -671,14 +680,14 @@ private fun PendingMessageCard(
                         model = item.contactAvatarUrl,
                         contentDescription = stringResource(R.string.avatar),
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(RelateSize.avatar)
                             .clip(CircleShape),
                         contentScale = ContentScale.Crop,
                     )
                 } else {
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(RelateSize.avatar)
                             .clip(CircleShape)
                             .background(RelateSurfaceVariant),
                         contentAlignment = Alignment.Center,
@@ -690,7 +699,7 @@ private fun PendingMessageCard(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.contactName,
@@ -698,27 +707,27 @@ private fun PendingMessageCard(
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(RelateSpacing.xxs))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.xs),
                     ) {
                         // Event type badge
                         Surface(
-                            color = eventTypeColor.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(4.dp),
+                            color = eventTypeColor.copy(alpha = RelateAlpha.feedbackContainer),
+                            shape = RoundedCornerShape(RelateRadius.sm),
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier.padding(horizontal = RelateSpacing.xs, vertical = RelateSpacing.xxs),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
                                     imageVector = eventIcon,
                                     contentDescription = null,
                                     tint = eventTypeColor,
-                                    modifier = Modifier.size(10.dp),
+                                    modifier = Modifier.size(RelateSize.iconXs),
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(RelateSpacing.xs))
                                 Text(
                                     text = item.eventType,
                                     style = MaterialTheme.typography.labelSmall,
@@ -730,20 +739,20 @@ private fun PendingMessageCard(
 
                         // Channel badge
                         Surface(
-                            color = RelateSurfaceVariant.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(4.dp),
+                            color = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                            shape = RoundedCornerShape(RelateRadius.sm),
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier.padding(horizontal = RelateSpacing.xs, vertical = RelateSpacing.xxs),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
                                     imageVector = channelIcon,
                                     contentDescription = null,
                                     tint = RelateOnSurfaceVariant,
-                                    modifier = Modifier.size(10.dp),
+                                    modifier = Modifier.size(RelateSize.iconXs),
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(RelateSpacing.xs))
                                 Text(
                                     text = channelText,
                                     style = MaterialTheme.typography.labelSmall,
@@ -764,7 +773,7 @@ private fun PendingMessageCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
 
             Text(
                 text = previewText,
@@ -774,13 +783,13 @@ private fun PendingMessageCard(
                 overflow = TextOverflow.Ellipsis,
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             MessageReadinessBadge(
                 readiness = item.readiness,
                 modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + item.id),
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -790,7 +799,7 @@ private fun PendingMessageCard(
                 // Approval Mode and Smart Approve countdown
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.xs)
                 ) {
                     val approvalMode = item.approvalMode
                     val modeColor = approvalModeColor(approvalMode)
@@ -808,7 +817,7 @@ private fun PendingMessageCard(
                             Text(
                                 text = stringResource(R.string.messages_auto_sends_minutes, minutesLeft),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.Red,
+                                color = RelateError,
                                 fontWeight = FontWeight.Bold,
                             )
                         } else if (minutesLeft > 30) {
@@ -823,64 +832,70 @@ private fun PendingMessageCard(
 
                 // Action buttons
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
                 ) {
                     OutlinedButton(
                         onClick = { onReject(item.id) },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = RelateSpacing.md, vertical = RelateSpacing.xs),
                         modifier = Modifier
-                            .height(32.dp)
+                            .heightIn(min = RelateSize.compactButtonHeight)
                             .testTag(MessagesTestTags.PENDING_REJECT_PREFIX + item.id),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.error,
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                        shape = RoundedCornerShape(RelateRadius.control),
+                        border = BorderStroke(
+                            width = RelateSize.outlineStroke,
+                            brush = SolidColor(MaterialTheme.colorScheme.error.copy(alpha = RelateAlpha.outline)),
                         )
                     ) {
-                        Text(stringResource(R.string.reject), fontSize = 11.sp)
+                        Text(stringResource(R.string.reject), style = MaterialTheme.typography.labelSmall)
                     }
 
                     OutlinedButton(
                         onClick = { onEdit(item.contactId, item.id) },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = RelateSpacing.md, vertical = RelateSpacing.xs),
                         modifier = Modifier
-                            .height(32.dp)
+                            .heightIn(min = RelateSize.compactButtonHeight)
                             .testTag(MessagesTestTags.PENDING_EDIT_PREFIX + item.id),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = RelatePrimary,
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            brush = androidx.compose.ui.graphics.SolidColor(RelatePrimary.copy(alpha = 0.5f))
+                        shape = RoundedCornerShape(RelateRadius.control),
+                        border = BorderStroke(
+                            width = RelateSize.outlineStroke,
+                            brush = SolidColor(RelatePrimary.copy(alpha = RelateAlpha.outline)),
                         )
                     ) {
-                        Text(stringResource(R.string.edit_contact), fontSize = 11.sp)
+                        Text(stringResource(R.string.edit_contact), style = MaterialTheme.typography.labelSmall)
                     }
 
                     if (showApproveAction) {
                         Button(
                             onClick = { onApprove(item.id) },
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            contentPadding = PaddingValues(horizontal = RelateSpacing.md, vertical = RelateSpacing.xs),
                             modifier = Modifier
-                                .height(32.dp)
+                                .heightIn(min = RelateSize.compactButtonHeight)
                                 .testTag(MessagesTestTags.PENDING_APPROVE_PREFIX + item.id),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = RelatePrimary,
-                                contentColor = Color.Black,
+                                contentColor = RelateOnPrimary,
                             ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(RelateRadius.control),
                             enabled = !isApproving,
                         ) {
                             if (isApproving) {
                                 CircularProgressIndicator(
-                                    color = Color.Black,
-                                    modifier = Modifier.size(14.dp),
-                                    strokeWidth = 2.dp,
+                                    color = RelateOnPrimary,
+                                    modifier = Modifier.size(RelateSize.iconSm),
+                                    strokeWidth = RelateSpacing.xxs,
                                 )
                             } else {
-                                Text(stringResource(R.string.approve), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    stringResource(R.string.approve),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                )
                             }
                         }
                     }
@@ -897,7 +912,7 @@ private fun SentMessageCard(
 ) {
     RelateGlassCard(modifier = modifier) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (item.contactAvatarUrl != null) {
@@ -905,14 +920,14 @@ private fun SentMessageCard(
                     model = item.contactAvatarUrl,
                     contentDescription = stringResource(R.string.avatar),
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(RelateSize.avatar)
                         .clip(CircleShape),
                     contentScale = ContentScale.Crop,
                 )
             } else {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(RelateSize.avatar)
                         .clip(CircleShape)
                         .background(RelateSurfaceVariant),
                     contentAlignment = Alignment.Center,
@@ -924,7 +939,7 @@ private fun SentMessageCard(
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(RelateSpacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -943,15 +958,15 @@ private fun SentMessageCard(
                         color = RelateOnSurfaceVariant,
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.xs))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Filled.CheckCircle,
                         contentDescription = null,
-                        tint = Color(0xFF10B981),
-                        modifier = Modifier.size(14.dp),
+                        tint = RelateSuccess,
+                        modifier = Modifier.size(RelateSize.iconSm),
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(RelateSpacing.xs))
                     Text(
                         text = item.messageText,
                         style = MaterialTheme.typography.bodyMedium,
@@ -960,11 +975,11 @@ private fun SentMessageCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.xxs))
                 Text(
                     text = stringResource(R.string.messages_channel_format, channelLabel(item.channel.raw)),
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant.copy(alpha = 0.8f),
+                    color = RelateOnSurfaceVariant.copy(alpha = RelateAlpha.subtle),
                     modifier = Modifier.testTag(MessagesTestTags.CHANNEL_PREFIX + item.id),
                 )
             }
@@ -983,7 +998,7 @@ private fun FailedMessageCard(
 ) {
     val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
     RelateGlassCard(modifier = modifier) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -998,14 +1013,14 @@ private fun FailedMessageCard(
                         model = item.contactAvatarUrl,
                         contentDescription = stringResource(R.string.avatar),
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(RelateSize.avatar)
                             .clip(CircleShape),
                         contentScale = ContentScale.Crop,
                     )
                 } else {
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(RelateSize.avatar)
                             .clip(CircleShape)
                             .background(RelateSurfaceVariant),
                         contentAlignment = Alignment.Center,
@@ -1017,7 +1032,7 @@ private fun FailedMessageCard(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.contactName,
@@ -1025,7 +1040,7 @@ private fun FailedMessageCard(
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(RelateSpacing.xxs))
                     Text(
                         text = stringResource(R.string.messages_scheduled_format, dateFormat.format(Date(item.scheduledForMs))),
                         style = MaterialTheme.typography.bodySmall,
@@ -1036,10 +1051,10 @@ private fun FailedMessageCard(
                     imageVector = Icons.Filled.Error,
                     contentDescription = stringResource(R.string.messages_status_failed),
                     tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(RelateSize.iconLg)
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Text(
                 text = item.messageText,
                 style = MaterialTheme.typography.bodyMedium,
@@ -1047,38 +1062,42 @@ private fun FailedMessageCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             MessageReadinessBadge(
                 readiness = item.readiness,
                 modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + item.id),
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
                 Button(
                     onClick = { onRetry(item.id) },
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                    contentPadding = PaddingValues(horizontal = RelateSpacing.lg, vertical = RelateSpacing.xs),
                     modifier = Modifier
-                        .height(36.dp)
+                        .heightIn(min = RelateSize.compactButtonHeight)
                         .testTag(MessagesTestTags.FAILED_RETRY_PREFIX + item.id),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RelatePrimary,
-                        contentColor = Color.Black,
+                        contentColor = RelateOnPrimary,
                     ),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(RelateRadius.control),
                     enabled = !isRetrying,
                 ) {
                     if (isRetrying) {
                         CircularProgressIndicator(
-                            color = Color.Black,
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
+                            color = RelateOnPrimary,
+                            modifier = Modifier.size(RelateSize.iconSm),
+                            strokeWidth = RelateSpacing.xxs,
                         )
                     } else {
-                        Text(stringResource(R.string.messages_retry_send), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            stringResource(R.string.messages_retry_send),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }
@@ -1103,8 +1122,8 @@ private fun ApprovedMessagesList(
         EmptyState(message = emptyText)
     } else {
         LazyColumn(
-            contentPadding = PaddingValues(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            contentPadding = PaddingValues(bottom = RelateSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)
         ) {
             items(messages, key = { it.id }) { item ->
                 ApprovedMessageCard(
@@ -1135,7 +1154,7 @@ private fun ApprovedMessageCard(
 ) {
     val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
     RelateGlassCard(modifier = modifier) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1150,14 +1169,14 @@ private fun ApprovedMessageCard(
                         model = item.contactAvatarUrl,
                         contentDescription = stringResource(R.string.avatar),
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(RelateSize.avatar)
                             .clip(CircleShape),
                         contentScale = ContentScale.Crop,
                     )
                 } else {
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(RelateSize.avatar)
                             .clip(CircleShape)
                             .background(RelateSurfaceVariant),
                         contentAlignment = Alignment.Center,
@@ -1169,7 +1188,7 @@ private fun ApprovedMessageCard(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.contactName,
@@ -1177,7 +1196,7 @@ private fun ApprovedMessageCard(
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(RelateSpacing.xxs))
                     Text(
                         text = stringResource(R.string.messages_scheduled_format, dateFormat.format(Date(item.scheduledForMs))),
                         style = MaterialTheme.typography.bodySmall,
@@ -1188,10 +1207,10 @@ private fun ApprovedMessageCard(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = stringResource(R.string.messages_status_approved),
                     tint = RelatePrimary,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(RelateSize.iconLg)
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Text(
                 text = item.messageText,
                 style = MaterialTheme.typography.bodyMedium,
@@ -1199,75 +1218,81 @@ private fun ApprovedMessageCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             MessageReadinessBadge(
                 readiness = item.readiness,
                 modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + item.id),
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
                 ) {
                     OutlinedButton(
                         onClick = { onReject(item.id) },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = RelateSpacing.md, vertical = RelateSpacing.xs),
                         modifier = Modifier
-                            .height(32.dp)
+                            .heightIn(min = RelateSize.compactButtonHeight)
                             .testTag(MessagesTestTags.APPROVED_REJECT_PREFIX + item.id),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.error,
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                        shape = RoundedCornerShape(RelateRadius.control),
+                        border = BorderStroke(
+                            width = RelateSize.outlineStroke,
+                            brush = SolidColor(MaterialTheme.colorScheme.error.copy(alpha = RelateAlpha.outline)),
                         )
                     ) {
-                        Text(stringResource(R.string.reject), fontSize = 11.sp)
+                        Text(stringResource(R.string.reject), style = MaterialTheme.typography.labelSmall)
                     }
 
                     OutlinedButton(
                         onClick = { onEdit(item.contactId, item.id) },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = RelateSpacing.md, vertical = RelateSpacing.xs),
                         modifier = Modifier
-                            .height(32.dp)
+                            .heightIn(min = RelateSize.compactButtonHeight)
                             .testTag(MessagesTestTags.APPROVED_EDIT_PREFIX + item.id),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = RelatePrimary,
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            brush = androidx.compose.ui.graphics.SolidColor(RelatePrimary.copy(alpha = 0.5f))
+                        shape = RoundedCornerShape(RelateRadius.control),
+                        border = BorderStroke(
+                            width = RelateSize.outlineStroke,
+                            brush = SolidColor(RelatePrimary.copy(alpha = RelateAlpha.outline)),
                         )
                     ) {
-                        Text(stringResource(R.string.edit_contact), fontSize = 11.sp)
+                        Text(stringResource(R.string.edit_contact), style = MaterialTheme.typography.labelSmall)
                     }
 
                     Button(
                         onClick = { onRevoke(item.id) },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = RelateSpacing.md, vertical = RelateSpacing.xs),
                         modifier = Modifier
-                            .height(32.dp)
+                            .heightIn(min = RelateSize.compactButtonHeight)
                             .testTag(MessagesTestTags.APPROVED_REVOKE_PREFIX + item.id),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = RelateOnSurfaceVariant,
                         ),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(RelateRadius.control),
                         enabled = !isRevoking,
                     ) {
                         if (isRevoking) {
                             CircularProgressIndicator(
                                 color = RelateOnSurfaceVariant,
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(RelateSize.iconSm),
+                                strokeWidth = RelateSpacing.xxs,
                             )
                         } else {
-                            Text(stringResource(R.string.messages_revoke), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                stringResource(R.string.messages_revoke),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
                         }
                     }
                 }
@@ -1287,12 +1312,12 @@ private fun approvalModeLabel(approvalMode: ApprovalMode): String = when (approv
 }
 
 private fun approvalModeColor(approvalMode: ApprovalMode): Color = when (approvalMode) {
-    ApprovalMode.FULLY_AUTO -> Color(0xFF10B981)
-    ApprovalMode.SMART_APPROVE -> Color(0xFFFBBF24)
-    ApprovalMode.VIP_APPROVE -> Color(0xFFEF4444)
-    ApprovalMode.ALWAYS_ASK -> Color(0xFF94A3B8)
+    ApprovalMode.FULLY_AUTO -> RelateSuccess
+    ApprovalMode.SMART_APPROVE -> RelateWarning
+    ApprovalMode.VIP_APPROVE -> RelateError
+    ApprovalMode.ALWAYS_ASK -> RelateOnSurfaceVariant
     ApprovalMode.DEFAULT,
-    ApprovalMode.UNKNOWN -> Color.Gray
+    ApprovalMode.UNKNOWN -> RelateOnSurfaceVariant
 }
 
 @Composable
@@ -1304,8 +1329,8 @@ private fun MessageReadinessBadge(
     val color = when (readiness) {
         MessageReadiness.READY_FOR_REVIEW,
         MessageReadiness.APPROVED_SCHEDULED,
-        MessageReadiness.SENDING_NOW -> Color(0xFF10B981)
-        MessageReadiness.FAILED_CHECK_SETUP -> Color(0xFFFBBF24)
+        MessageReadiness.SENDING_NOW -> RelateSuccess
+        MessageReadiness.FAILED_CHECK_SETUP -> RelateWarning
         MessageReadiness.CONTACT_MISSING,
         MessageReadiness.CHANNEL_DISABLED,
         MessageReadiness.MISSING_PHONE,
@@ -1326,19 +1351,19 @@ private fun MessageReadinessBadge(
 
     Surface(
         modifier = modifier,
-        color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(6.dp),
+        color = color.copy(alpha = RelateAlpha.feedbackContainer),
+        shape = RoundedCornerShape(RelateRadius.md),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = RelateSpacing.sm, vertical = RelateSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.xs),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = color,
-                modifier = Modifier.size(13.dp),
+                modifier = Modifier.size(RelateSize.iconXs),
             )
             Text(
                 text = label,

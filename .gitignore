@@ -72,3 +72,7 @@ google-services.json
 app_logs*.txt
 logcat*.txt
 lint_baseline_pre_fixes.txt
+
+# Approved UI screenshot baselines
+!/app/src/test/screenshots/baseline/
+!/app/src/test/screenshots/baseline/*.png

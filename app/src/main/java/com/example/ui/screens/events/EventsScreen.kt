@@ -56,7 +56,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
@@ -69,6 +68,10 @@ import com.example.core.ui.components.relateTextFieldColors
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateAlpha
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.core.ui.theme.RelateWarning
 import com.example.domain.event.EventResolutionPolicy
@@ -192,12 +195,12 @@ fun EventsScreen(
                 singleLine = true,
                 colors = relateTextFieldColors(),
             )
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
             ) {
                 eventTypeFilters.forEach { filter ->
                     FilterChip(
@@ -207,12 +210,12 @@ fun EventsScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
             ) {
                 eventHorizonFilters.forEach { filter ->
                     FilterChip(
@@ -222,7 +225,7 @@ fun EventsScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             PullToRefreshBox(
                 isRefreshing = state.isRefreshing,
                 onRefresh = { viewModel.refresh() },
@@ -262,7 +265,7 @@ fun EventsScreen(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(16.dp),
+                .padding(RelateSpacing.screenHorizontal),
         )
     }
 }
@@ -288,7 +291,7 @@ internal fun EventsList(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
     ) {
         groupedEvents.entries.forEach { (month, monthEvents) ->
             item(key = month) {
@@ -306,10 +309,11 @@ internal fun EventsList(
                 }
             }
         }
-        item { Spacer(modifier = Modifier.height(24.dp)) }
+        item { Spacer(modifier = Modifier.height(RelateSpacing.xl)) }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ManualEventDialog(
     contacts: List<ContactPickerItem>,
@@ -347,8 +351,11 @@ private fun ManualEventDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.events_add_event), color = MaterialTheme.colorScheme.onSurface) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+                ) {
                     FilterChip(
                         label = stringResource(R.string.events_existing_contact),
                         isSelected = useExistingContact,
@@ -357,7 +364,6 @@ private fun ManualEventDialog(
                             useExistingContact = true
                             selectedContactId = selectedContactId ?: contacts.firstOrNull()?.id?.value
                         },
-                        modifier = Modifier.weight(1f),
                     )
                     FilterChip(
                         label = stringResource(R.string.events_new_contact),
@@ -366,7 +372,6 @@ private fun ManualEventDialog(
                             onInputChanged()
                             useExistingContact = false
                         },
-                        modifier = Modifier.weight(1f),
                     )
                 }
 
@@ -423,32 +428,19 @@ private fun ManualEventDialog(
                     )
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        eventTypeOptions.take(2).forEach { value ->
-                            FilterChip(
-                                label = eventTypeLabel(value),
-                                isSelected = eventType == value,
-                                onClick = {
-                                    onInputChanged()
-                                    eventType = value
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        eventTypeOptions.drop(2).forEach { value ->
-                            FilterChip(
-                                label = eventTypeLabel(value),
-                                isSelected = eventType == value,
-                                onClick = {
-                                    onInputChanged()
-                                    eventType = value
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+                ) {
+                    eventTypeOptions.forEach { value ->
+                        FilterChip(
+                            label = eventTypeLabel(value),
+                            isSelected = eventType == value,
+                            onClick = {
+                                onInputChanged()
+                                eventType = value
+                            },
+                        )
                     }
                 }
 
@@ -465,7 +457,7 @@ private fun ManualEventDialog(
                     colors = relateTextFieldColors(),
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
                     OutlinedTextField(
                         value = monthText,
                         onValueChange = {
@@ -531,7 +523,7 @@ private fun ManualEventDialog(
                             warning.requestedDayOfMonth ?: warning.dayOfMonth,
                         )
                     }
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs)) {
                         Text(
                             text = stringResource(
                                 when (warning.kind) {
@@ -682,15 +674,15 @@ private fun EventCard(
 
     RelateGlassCard {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(RelateSize.minTouchTarget)
+                    .clip(RoundedCornerShape(RelateRadius.control))
                     .background(
-                        if (daysUntil <= 14) RelatePrimary.copy(alpha = 0.2f)
+                        if (daysUntil <= 14) RelatePrimary.copy(alpha = RelateAlpha.feedbackContainer)
                         else RelateSurfaceVariant
                     ),
                 contentAlignment = Alignment.Center,
@@ -699,10 +691,10 @@ private fun EventCard(
                     eventTypeIcon(event.type.raw),
                     contentDescription = null,
                     tint = if (daysUntil <= 14) RelatePrimary else RelateOnSurfaceVariant,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(RelateSize.iconLg),
                 )
             }
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(RelateSpacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = event.label ?: eventTypeLabel(event.type.raw),
@@ -719,10 +711,10 @@ private fun EventCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = RelateOnSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.sm))
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs),
                 ) {
                     EventMetadataChip(
                         text = sourceLabel,
@@ -744,10 +736,10 @@ private fun EventCard(
                     }
                 }
                 if (trustState.conflict != EventTrustConflictState.NONE) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(RelateSpacing.xs))
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs),
                     ) {
                         TextButton(
                             enabled = !isResolving,
@@ -818,9 +810,9 @@ private fun EventMetadataChip(
         style = MaterialTheme.typography.labelSmall,
         color = color,
         modifier = Modifier
-            .sizeIn(minHeight = 24.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(color.copy(alpha = 0.12f))
-            .padding(horizontal = 8.dp, vertical = 5.dp),
+            .sizeIn(minHeight = RelateSize.chipMinHeight)
+            .clip(RoundedCornerShape(RelateRadius.control))
+            .background(color.copy(alpha = RelateAlpha.feedbackContainer))
+            .padding(horizontal = RelateSpacing.sm, vertical = RelateSpacing.xs),
     )
 }

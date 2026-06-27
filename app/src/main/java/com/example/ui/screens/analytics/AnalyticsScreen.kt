@@ -40,7 +40,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
@@ -48,9 +47,17 @@ import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
 import com.example.core.ui.components.StatCard
 import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateError
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSecondary
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
+import com.example.core.ui.theme.RelateSuccess
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.core.ui.theme.RelateTertiary
+import com.example.core.ui.theme.RelateWarning
 import com.example.ui.viewmodel.AnalyticsUiState
 import com.example.ui.viewmodel.AnalyticsViewModel
 
@@ -112,10 +119,10 @@ internal fun AnalyticsContent(
         modifier = Modifier
             .fillMaxSize()
             .background(RelateDarkBackground)
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = RelateSpacing.screenHorizontal)
             .verticalScroll(rememberScrollState()),
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(RelateSize.minTouchTarget))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -155,7 +162,7 @@ internal fun AnalyticsContent(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
+                    .height(RelateSize.loadingPanelHeight),
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(
@@ -164,29 +171,29 @@ internal fun AnalyticsContent(
                 )
             }
         } else {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
             ) {
                 StatCard(label = stringResource(R.string.dashboard_contacts), value = "${state.totalContacts}", icon = Icons.Filled.People, modifier = Modifier.weight(1f))
                 StatCard(label = stringResource(R.string.home_stat_wishes_sent), value = "${state.totalWishesSent}", icon = Icons.Filled.Star, modifier = Modifier.weight(1f))
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
             ) {
                 StatCard(label = stringResource(R.string.messages_pending), value = "${state.pendingApprovals}", icon = Icons.Filled.MailOutline, modifier = Modifier.weight(1f))
                 StatCard(label = stringResource(R.string.home_stat_upcoming), value = "${state.upcomingEventsCount}", icon = Icons.Filled.CalendarMonth, modifier = Modifier.weight(1f))
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
         SectionHeader(title = stringResource(R.string.analytics_monthly_wishes))
         RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.MONTHLY_SECTION)) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
                 if (state.monthlyCounts.isEmpty()) {
                     Text(
                         text = stringResource(R.string.analytics_no_wishes_this_year),
@@ -199,10 +206,10 @@ internal fun AnalyticsContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
         SectionHeader(title = stringResource(R.string.analytics_contact_distribution))
         RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.DISTRIBUTION_SECTION)) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
                 val family = state.relationshipCounts["FAMILY"] ?: 0
                 val friends = state.relationshipCounts["FRIEND"] ?: 0
                 val work = state.relationshipCounts["WORK"] ?: 0
@@ -210,43 +217,43 @@ internal fun AnalyticsContent(
                 val other = state.relationshipCounts.filterKeys { it !in listOf("FAMILY", "FRIEND", "WORK", "CLOSE_FRIEND") }.values.sum()
 
                 DistributionRow(stringResource(R.string.contact_filter_family), family, RelatePrimary)
-                DistributionRow(stringResource(R.string.contact_filter_friends), friends, Color(0xFF22D3EE))
-                DistributionRow(stringResource(R.string.contact_filter_work), work, Color(0xFFFB7185))
-                DistributionRow(stringResource(R.string.contact_filter_close_friends), closeFriends, Color(0xFFF59E0B))
+                DistributionRow(stringResource(R.string.contact_filter_friends), friends, RelateSecondary)
+                DistributionRow(stringResource(R.string.contact_filter_work), work, RelateTertiary)
+                DistributionRow(stringResource(R.string.contact_filter_close_friends), closeFriends, RelateWarning)
                 if (other > 0) {
                     DistributionRow(stringResource(R.string.analytics_others), other, RelateOnSurfaceVariant)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
         SectionHeader(title = stringResource(R.string.analytics_relationship_health))
         RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.HEALTH_SECTION)) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
                 val healthy = state.healthCounts["Healthy (70%+)"] ?: 0
                 val attention = state.healthCounts["Needs Attention"] ?: 0
                 val atRisk = state.healthCounts["At Risk"] ?: 0
 
-                HealthTrendRow(stringResource(R.string.analytics_health_healthy), healthy, Color(0xFF22C55E))
-                HealthTrendRow(stringResource(R.string.analytics_health_attention), attention, Color(0xFFF59E0B))
-                HealthTrendRow(stringResource(R.string.analytics_health_at_risk), atRisk, Color(0xFFEF4444))
+                HealthTrendRow(stringResource(R.string.analytics_health_healthy), healthy, RelateSuccess)
+                HealthTrendRow(stringResource(R.string.analytics_health_attention), attention, RelateWarning)
+                HealthTrendRow(stringResource(R.string.analytics_health_at_risk), atRisk, RelateError)
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
         SectionHeader(title = stringResource(R.string.analytics_growth_metrics))
         RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.GROWTH_SECTION)) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
                 DistributionRow(
                     stringResource(R.string.analytics_delivery_reliability),
                     state.deliveryReliabilityPercent,
-                    Color(0xFF22C55E),
+                    RelateSuccess,
                     suffix = "%",
                 )
                 DistributionRow(
                     stringResource(R.string.analytics_response_rate),
                     state.responseRatePercent,
-                    Color(0xFF22D3EE),
+                    RelateSecondary,
                     suffix = "%",
                 )
                 DistributionRow(
@@ -258,10 +265,10 @@ internal fun AnalyticsContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
         SectionHeader(title = stringResource(R.string.analytics_top_neglected))
         RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.NEGLECTED_SECTION)) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
                 if (state.topNeglectedContacts.isEmpty()) {
                     Text(
                         text = stringResource(R.string.analytics_no_neglected_contacts),
@@ -274,14 +281,14 @@ internal fun AnalyticsContent(
                             text = contact,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(vertical = 4.dp),
+                            modifier = Modifier.padding(vertical = RelateSpacing.xs),
                         )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
     }
 }
 
@@ -301,37 +308,37 @@ private fun BarChart(data: List<Pair<String, Float>>) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = RelateSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
                     color = RelateOnSurfaceVariant,
-                    modifier = Modifier.width(32.dp),
+                    modifier = Modifier.width(RelateSpacing.xxl),
                 )
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(20.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .height(RelateSize.chartBarHeight)
+                        .clip(RoundedCornerShape(RelateRadius.sm))
                         .background(RelateSurfaceVariant),
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(value / maxValue)
-                            .height(20.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .height(RelateSize.chartBarHeight)
+                            .clip(RoundedCornerShape(RelateRadius.sm))
                             .background(RelatePrimary),
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.sm))
                 Text(
                     text = value.toInt().toString(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.width(24.dp),
+                    modifier = Modifier.width(RelateSpacing.xl),
                 )
             }
         }
@@ -343,16 +350,16 @@ private fun DistributionRow(label: String, count: Int, color: Color, suffix: Str
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = RelateSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(10.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .size(RelateSize.indicatorDot)
+                .clip(RoundedCornerShape(RelateRadius.xs))
                 .background(color),
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(RelateSpacing.sm))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
@@ -372,16 +379,16 @@ private fun HealthTrendRow(label: String, count: Int, color: Color) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = RelateSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(10.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .size(RelateSize.indicatorDot)
+                .clip(RoundedCornerShape(RelateRadius.xs))
                 .background(color),
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(RelateSpacing.sm))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,

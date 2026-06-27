@@ -1,5 +1,6 @@
 package com.example.ui.screens.contacts
 
+import android.app.Application
 import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,11 +14,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.ui.theme.RelateAITheme
+import com.example.core.ui.theme.RelateSpacing
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.ContactId
@@ -30,7 +31,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [35])
+@Config(sdk = [35], application = Application::class)
 class ContactDetailBodySectionsTest {
 
     @get:Rule
@@ -49,7 +50,7 @@ class ContactDetailBodySectionsTest {
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
+                        .padding(RelateSpacing.screenHorizontal),
                 ) {
                     ContactDetailBodySections(
                         contactId = "contact_1",

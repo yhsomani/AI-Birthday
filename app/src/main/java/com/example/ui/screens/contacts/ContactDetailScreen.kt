@@ -5,11 +5,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,7 +53,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
@@ -63,6 +65,9 @@ import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
@@ -119,7 +124,7 @@ fun ContactDetailScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .padding(horizontal = RelateSpacing.sm, vertical = RelateSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
@@ -146,15 +151,15 @@ fun ContactDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = RelateSpacing.screenHorizontal),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.lg))
 
                 val displayName = contact?.displayName ?: contactId
                 Box(
                     modifier = Modifier
-                        .size(96.dp)
+                        .size(RelateSize.profileAvatar)
                         .clip(CircleShape)
                         .background(RelateSurfaceVariant),
                     contentAlignment = Alignment.Center,
@@ -166,12 +171,12 @@ fun ContactDetailScreen(
                         style = MaterialTheme.typography.displayMedium,
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.sm))
                 contact?.let {
-                    HealthIndicatorDot(health = it.healthScore / 100f, size = 14)
+                    HealthIndicatorDot(health = it.healthScore / 100f, size = RelateSize.indicatorDotLarge)
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.sm))
                 Text(
                     text = displayName,
                     style = MaterialTheme.typography.headlineMedium,
@@ -185,7 +190,7 @@ fun ContactDetailScreen(
                 )
 
                 contact?.let { currentContact ->
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(RelateSpacing.xl))
                     ContactDetailBodySections(
                         contactId = contactId,
                         contact = currentContact,
@@ -219,7 +224,7 @@ fun ContactDetailScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.xl))
             }
         }
     }
@@ -259,14 +264,14 @@ internal fun ContactDetailBodySections(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+        verticalArrangement = Arrangement.spacedBy(RelateSpacing.xl),
     ) {
         ContactDetailSection(
             titleRes = R.string.contact_detail_section_essentials,
             testTag = ContactDetailTestTags.SECTION_ESSENTIALS,
         ) {
             ContactInfoCard(contact = contact)
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             UpcomingWishCard(
                 upcomingEventDaysLeft = upcomingEventDaysLeft,
                 isGenerating = isGenerating,
@@ -285,14 +290,14 @@ internal fun ContactDetailBodySections(
                 memoryNoteCategorySummary = memoryNoteCategorySummary,
                 onAddMemory = { onNavigateToMemoryVault(contactId) },
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             PersonalizationActionsCard(
                 onAddMemory = { onNavigateToMemoryVault(contactId) },
                 onAddGift = { onNavigateToGiftAdvisor(contactId) },
                 onEditPreferences = onEditPreferences,
             )
             preferenceMessageRes?.let { messageRes ->
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.sm))
                 Text(
                     text = stringResource(messageRes),
                     style = MaterialTheme.typography.bodySmall,
@@ -300,7 +305,7 @@ internal fun ContactDetailBodySections(
                 )
             }
             preferenceErrorRes?.let { errorRes ->
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.sm))
                 Text(
                     text = stringResource(errorRes),
                     style = MaterialTheme.typography.bodySmall,
@@ -347,7 +352,7 @@ private fun ContactDetailSection(
             .testTag(testTag),
     ) {
         SectionHeader(title = stringResource(titleRes))
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         content()
     }
 }
@@ -392,8 +397,8 @@ internal fun PersonalizationQualityCard(
 
     RelateGlassCard {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             Text(
                 text = stringResource(R.string.personalization_quality_title, score),
@@ -430,8 +435,10 @@ internal fun PersonalizationQualityCard(
                     onClick = onAddMemory,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = RelateSize.compactButtonHeight)
                         .testTag(ContactDetailTestTags.PERSONALIZATION_ADD_MEMORY),
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                    shape = RoundedCornerShape(RelateRadius.control),
                 ) {
                     Text(
                         text = stringResource(R.string.personalization_quality_add_one_memory),
@@ -445,9 +452,9 @@ internal fun PersonalizationQualityCard(
                         imageVector = if (item.isComplete) Icons.Filled.CheckCircle else Icons.Filled.Warning,
                         contentDescription = null,
                         tint = if (item.isComplete) RelatePrimary else MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(RelateSize.iconSm),
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(RelateSpacing.sm))
                     Text(
                         text = stringResource(item.labelRes),
                         style = MaterialTheme.typography.bodySmall,
@@ -492,14 +499,14 @@ private data class PersonalizationQualityItem(
 @Composable
 private fun ContactInfoCard(contact: ContactDetailProfile) {
     RelateGlassCard {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
             contact.primaryPhone?.let {
                 InfoRow(Icons.Filled.Phone, it)
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.md))
             }
             contact.primaryEmail?.let {
                 InfoRow(Icons.Filled.Email, it)
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.md))
             }
             val birthdayMonth = contact.birthdayMonth
             val birthdayDay = contact.birthdayDay
@@ -524,14 +531,14 @@ private fun UpcomingWishCard(
     onGenerateWish: () -> Unit,
 ) {
     RelateGlassCard {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Filled.CalendarMonth,
                     contentDescription = null,
                     tint = RelatePrimary,
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.sm))
                 val daysText = upcomingEventDaysLeft?.let {
                     stringResource(R.string.contact_detail_days_left_format, it)
                 } ?: stringResource(R.string.contact_detail_no_upcoming_event)
@@ -541,7 +548,7 @@ private fun UpcomingWishCard(
                     color = RelatePrimary,
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.lg))
             if (isGenerating) {
                 Box(
                     modifier = Modifier.fillMaxWidth(),
@@ -556,7 +563,7 @@ private fun UpcomingWishCard(
                 )
             }
             generationErrorRes?.let { errorRes ->
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.sm))
                 Text(
                     text = stringResource(errorRes),
                     style = MaterialTheme.typography.bodySmall,
@@ -575,8 +582,8 @@ private fun PersonalizationActionsCard(
 ) {
     RelateGlassCard {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Text(
                 text = stringResource(R.string.contact_detail_personalization_actions),
@@ -584,13 +591,15 @@ private fun PersonalizationActionsCard(
                 color = RelatePrimary,
                 fontWeight = FontWeight.SemiBold,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm), modifier = Modifier.fillMaxWidth()) {
                 Button(
                     onClick = onAddMemory,
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = RelateSize.compactButtonHeight)
                         .testTag(ContactDetailTestTags.ACTION_ADD_MEMORY),
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                    shape = RoundedCornerShape(RelateRadius.control),
                 ) {
                     Text(stringResource(R.string.contact_detail_add_memory), color = MaterialTheme.colorScheme.onSurface)
                 }
@@ -598,8 +607,10 @@ private fun PersonalizationActionsCard(
                     onClick = onAddGift,
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = RelateSize.compactButtonHeight)
                         .testTag(ContactDetailTestTags.ACTION_ADD_GIFT),
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                    shape = RoundedCornerShape(RelateRadius.control),
                 ) {
                     Text(stringResource(R.string.contact_detail_add_gift), color = MaterialTheme.colorScheme.onSurface)
                 }
@@ -608,16 +619,18 @@ private fun PersonalizationActionsCard(
                 onClick = onEditPreferences,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = RelateSize.compactButtonHeight)
                     .testTag(ContactDetailTestTags.ACTION_EDIT_PREFERENCES),
                 colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                shape = RoundedCornerShape(RelateRadius.control),
             ) {
                 Icon(
                     Icons.Filled.Edit,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(RelateSize.iconSm),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.sm))
                 Text(
                     text = stringResource(R.string.contact_detail_edit_preferences),
                     color = MaterialTheme.colorScheme.onSurface,
@@ -636,8 +649,8 @@ private fun AutomationActionsCard(
 ) {
     RelateGlassCard {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Text(
                 text = stringResource(R.string.contact_detail_automation_actions),
@@ -645,28 +658,37 @@ private fun AutomationActionsCard(
                 color = RelatePrimary,
                 fontWeight = FontWeight.SemiBold,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm), modifier = Modifier.fillMaxWidth()) {
                 Button(
                     onClick = onMarkVip,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = RelateSize.compactButtonHeight),
                     enabled = contact.automationMode != ApprovalMode.VIP_APPROVE,
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                    shape = RoundedCornerShape(RelateRadius.control),
                 ) {
                     Text(stringResource(R.string.contact_detail_mark_vip), color = MaterialTheme.colorScheme.onSurface)
                 }
                 Button(
                     onClick = onSetWhatsApp,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = RelateSize.compactButtonHeight),
                     enabled = contact.preferredChannel != MessageChannel.WHATSAPP,
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                    shape = RoundedCornerShape(RelateRadius.control),
                 ) {
                     Text(stringResource(R.string.contact_detail_set_whatsapp), color = MaterialTheme.colorScheme.onSurface)
                 }
                 Button(
                     onClick = onSetSms,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = RelateSize.compactButtonHeight),
                     enabled = contact.preferredChannel != MessageChannel.SMS,
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                    shape = RoundedCornerShape(RelateRadius.control),
                 ) {
                     Text(stringResource(R.string.contact_detail_set_sms), color = MaterialTheme.colorScheme.onSurface)
                 }
@@ -684,17 +706,20 @@ private fun HistoryActionsCard(
 ) {
     RelateGlassCard {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
             ) {
                 Button(
                     onClick = { onNavigateToMemoryVault(contactId) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = RelateSize.compactButtonHeight),
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                    shape = RoundedCornerShape(RelateRadius.control),
                 ) {
                     Text(
                         text = stringResource(R.string.contact_detail_memory_vault),
@@ -703,8 +728,11 @@ private fun HistoryActionsCard(
                 }
                 Button(
                     onClick = { onNavigateToGiftAdvisor(contactId) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = RelateSize.compactButtonHeight),
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                    shape = RoundedCornerShape(RelateRadius.control),
                 ) {
                     Text(
                         text = stringResource(R.string.contact_detail_gift_advisor),
@@ -714,16 +742,19 @@ private fun HistoryActionsCard(
             }
             Button(
                 onClick = { onNavigateToChatHistory(contactId) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = RelateSize.compactButtonHeight),
                 colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                shape = RoundedCornerShape(RelateRadius.control),
             ) {
                 Icon(
                     Icons.Filled.History,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(RelateSize.iconSm),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.sm))
                 Text(
                     text = stringResource(R.string.contact_detail_chat_history),
                     color = MaterialTheme.colorScheme.onSurface,
@@ -772,9 +803,9 @@ internal fun ContactPreferencesDialog(
         text = {
             Column(
                 modifier = Modifier
-                    .height(460.dp)
+                    .height(RelateSize.dialogContentMaxHeight)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
             ) {
                 PreferenceField(R.string.contact_preferences_nickname, nickname) { nickname = it }
                 PreferenceField(R.string.contact_preferences_relationship_type, relationshipType) { relationshipType = it }
@@ -904,22 +935,18 @@ private fun ChoiceRow(
     selected: MessageChannel,
     onSelect: (MessageChannel) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs)) {
         Text(
             text = stringResource(titleRes),
             style = MaterialTheme.typography.bodySmall,
             color = RelateOnSurfaceVariant,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        PreferenceChoiceFlow {
             options.forEach { (value, label) ->
                 FilterChip(
                     label = label,
                     isSelected = selected == value,
                     onClick = { onSelect(value) },
-                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -933,22 +960,18 @@ private fun ChoiceRow(
     selected: ApprovalMode,
     onSelect: (ApprovalMode) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs)) {
         Text(
             text = stringResource(titleRes),
             style = MaterialTheme.typography.bodySmall,
             color = RelateOnSurfaceVariant,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        PreferenceChoiceFlow {
             options.forEach { (value, label) ->
                 FilterChip(
                     label = label,
                     isSelected = selected == value,
                     onClick = { onSelect(value) },
-                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -979,25 +1002,33 @@ private fun ChoiceRow(
     selected: String,
     onSelect: (String) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs)) {
         Text(
             text = stringResource(titleRes),
             style = MaterialTheme.typography.bodySmall,
             color = RelateOnSurfaceVariant,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        PreferenceChoiceFlow {
             options.forEach { (value, label) ->
                 FilterChip(
                     label = label,
                     isSelected = selected.equals(value, ignoreCase = true),
                     onClick = { onSelect(value) },
-                    modifier = Modifier.weight(1f),
                 )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PreferenceChoiceFlow(content: @Composable () -> Unit) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+    ) {
+        content()
     }
 }
 
@@ -1070,9 +1101,9 @@ private fun InfoRow(icon: ImageVector, text: String) {
             icon,
             contentDescription = null,
             tint = RelateOnSurfaceVariant,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(RelateSize.iconMd),
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(RelateSpacing.md))
         Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,

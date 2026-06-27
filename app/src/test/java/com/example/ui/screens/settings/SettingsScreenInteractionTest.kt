@@ -1,5 +1,6 @@
 package com.example.ui.screens.settings
 
+import android.app.Application
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -17,7 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [35])
+@Config(application = Application::class, sdk = [35])
 class SettingsScreenInteractionTest {
 
     @get:Rule

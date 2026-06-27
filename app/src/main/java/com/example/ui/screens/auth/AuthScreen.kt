@@ -23,11 +23,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.BuildConfig
 import com.example.R
@@ -35,8 +34,19 @@ import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.ui.viewmodel.AuthUiState
 import com.example.ui.viewmodel.AuthViewModel
+
+internal object AuthScreenTestTags {
+    const val SIGN_IN_BUTTON = "auth_sign_in_button"
+    const val DEV_BYPASS_BUTTON = "auth_dev_bypass_button"
+    const val LOADING = "auth_loading"
+    const val ERROR = "auth_error"
+}
 
 @Composable
 fun AuthScreen(
@@ -57,11 +67,26 @@ fun AuthScreen(
         }
     }
 
+    AuthContent(
+        state = state,
+        onSignIn = { viewModel.startGoogleSignIn { launcher.launch(it) } },
+        onDevBypass = viewModel::bypassSignIn,
+        showDevBypass = BuildConfig.DEBUG,
+    )
+}
+
+@Composable
+internal fun AuthContent(
+    state: AuthUiState,
+    onSignIn: () -> Unit,
+    onDevBypass: () -> Unit,
+    showDevBypass: Boolean,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(RelateDarkBackground)
-            .padding(24.dp),
+            .padding(RelateSpacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -69,27 +94,30 @@ fun AuthScreen(
             text = stringResource(R.string.app_name),
             style = MaterialTheme.typography.displayLarge.copy(
                 fontWeight = FontWeight.Bold,
-                fontSize = 42.sp,
             ),
             color = RelatePrimary,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Text(
             text = stringResource(R.string.auth_subtitle),
             style = MaterialTheme.typography.bodyLarge,
-            color = RelateOnBackground.copy(alpha = 0.7f),
+            color = RelateOnSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(64.dp))
+        Spacer(modifier = Modifier.height(RelateSize.heroIcon))
         if (state.isLoading) {
-            CircularProgressIndicator(color = RelatePrimary)
+            CircularProgressIndicator(
+                color = RelatePrimary,
+                modifier = Modifier.testTag(AuthScreenTestTags.LOADING),
+            )
         } else {
             Button(
-                onClick = { viewModel.startGoogleSignIn { launcher.launch(it) } },
+                onClick = onSignIn,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(12.dp),
+                    .height(RelateSize.primaryButtonHeight)
+                    .testTag(AuthScreenTestTags.SIGN_IN_BUTTON),
+                shape = RoundedCornerShape(RelateRadius.control),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = RelateSurfaceVariant,
                 ),
@@ -100,14 +128,15 @@ fun AuthScreen(
                     color = RelateOnBackground,
                 )
             }
-            if (BuildConfig.DEBUG) {
-                Spacer(modifier = Modifier.height(16.dp))
+            if (showDevBypass) {
+                Spacer(modifier = Modifier.height(RelateSpacing.lg))
                 Button(
-                    onClick = { viewModel.bypassSignIn() },
+                    onClick = onDevBypass,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(12.dp),
+                        .height(RelateSize.primaryButtonHeight)
+                        .testTag(AuthScreenTestTags.DEV_BYPASS_BUTTON),
+                    shape = RoundedCornerShape(RelateRadius.control),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RelatePrimary,
                     ),
@@ -121,15 +150,16 @@ fun AuthScreen(
             }
         }
         state.error?.let { error ->
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             Text(
                 text = error,
                 style = MaterialTheme.typography.bodySmall,
                 color = RelateOnSurfaceVariant,
                 textAlign = TextAlign.Center,
+                modifier = Modifier.testTag(AuthScreenTestTags.ERROR),
             )
         }
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(RelateSize.minTouchTarget))
         Text(
             text = stringResource(R.string.auth_legal_agreement),
             style = MaterialTheme.typography.bodySmall,

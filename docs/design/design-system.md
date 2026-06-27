@@ -24,6 +24,7 @@ Spacing uses a 4 dp grid:
 | `RelateSpacing.lg` | 16 dp | Screen horizontal padding and standard content padding. |
 | `RelateSpacing.xl` | 24 dp | Section separation. |
 | `RelateSpacing.xxl` | 32 dp | Large screen separation. |
+| `RelateSpacing.xxxl` | 48 dp | Hero-to-progress spacing and sparse startup/setup rhythm. |
 
 Radius:
 
@@ -43,22 +44,62 @@ Sizing:
 | `RelateSize.minTouchTarget` | 48 dp | Minimum tappable area target. |
 | `RelateSize.primaryButtonHeight` | 52 dp | Primary full-width commands. |
 | `RelateSize.compactButtonHeight` | 36 dp | Inline list actions. |
+| `RelateSize.chipMinHeight` | 24 dp | Metadata chips and compact labels. |
+| `RelateSize.outlineStroke` | 1 dp | Outlined button and chip borders. |
 | `RelateSize.statusDot` | 6 dp | Compact active/inactive markers. |
 | `RelateSize.iconSm` | 18 dp | Feedback/status icons. |
 | `RelateSize.iconMd` | 22 dp | Banner icons. |
 | `RelateSize.iconLg` | 24 dp | Navigation/stat icons. |
+| `RelateSize.progressIndicator` | 32 dp | Standard blocking progress indicator size. |
+| `RelateSize.setupStepIndex` | 34 dp | Number badges in onboarding/setup checklist rows. |
+| `RelateSize.chartBarHeight` | 20 dp | Compact bar-chart tracks in analytics/reporting surfaces. |
 | `RelateSize.avatar` | 44 dp | Contact avatars. |
+| `RelateSize.heroIcon` | 64 dp | Single symbolic hero icons on setup/auth-style screens. |
+| `RelateSize.profileAvatar` | 96 dp | Large profile avatars on detail screens. |
 | `RelateSize.loadingPanelHeight` | 200 dp | Reserved loading space for dashboard panels that would otherwise shift content. |
 | `RelateSize.actionCardMinHeight` | 148 dp | Responsive command cards with icon, title, and supporting copy. |
 | `RelateSize.actionGridBreakpoint` | 520 dp | Breakpoint for switching paired action cards from stacked to side-by-side. |
 | `RelateSize.progressTrack` | 4 dp | Health/progress bars. |
 | `RelateSize.progressStroke` | 3 dp | Circular progress indicators inside compact action surfaces. |
+| `RelateSize.indicatorDot` | 10 dp | Default health/status indicator dot. |
+| `RelateSize.indicatorDotLarge` | 14 dp | Larger profile/header health indicator dot. |
+| `RelateSize.dialogContentMaxHeight` | 460 dp | Scrollable dense forms inside dialogs. |
 
 Elevation:
 
 | Token | Value | Use |
 | --- | ---: | --- |
+| `RelateElevation.card` | 2 dp | Subtle separation for focused cards that need lift from the surrounding surface. |
 | `RelateElevation.appBar` | 3 dp | Subtle top app bar surface separation. |
+
+Alpha:
+
+| Token | Value | Use |
+| --- | ---: | --- |
+| `RelateAlpha.disabled` | 0.4 | Disabled icons and supporting UI. |
+| `RelateAlpha.divider` | 0.12 | Low-emphasis dividers inside grouped settings, lists, and dense panels. |
+| `RelateAlpha.muted` | 0.7 | Low-priority startup or explanatory text that should stay legible. |
+| `RelateAlpha.outline` | 0.5 | Subdued action borders and outlines. |
+| `RelateAlpha.shimmerHigh` | 0.6 | Leading/trailing shimmer band opacity. |
+| `RelateAlpha.shimmerLow` | 0.2 | Center shimmer band opacity. |
+| `RelateAlpha.subtle` | 0.82 | Secondary text or supporting UI that should remain readable. |
+| `RelateAlpha.feedbackContainer` | 0.15 | Status, warning, and feedback containers. |
+| `RelateAlpha.fieldContainer` | 0.22 | Input or badge containers. |
+
+Layout fractions:
+
+| Token | Value | Use |
+| --- | ---: | --- |
+| `RelateFraction.strengthWeak` | 0.25 | Weak password-strength progress. |
+| `RelateFraction.strengthFair` | 0.5 | Fair password-strength progress. |
+| `RelateFraction.strengthStrong` | 0.75 | Strong password-strength progress. |
+| `RelateFraction.strengthFull` | 1.0 | Complete progress for very strong password strength. |
+| `RelateFraction.healthStrongThreshold` | 0.7 | Health indicator threshold for healthy/strong state. |
+| `RelateFraction.healthAttentionThreshold` | 0.4 | Health indicator threshold for attention/warning state. |
+| `RelateFraction.metadataLabel` | 0.4 | Compact label column in summary/metadata rows. |
+| `RelateFraction.metadataValue` | 0.6 | Compact value column in summary/metadata rows. |
+| `RelateFraction.skeletonTitle` | 0.5 | Width for title-like list skeleton placeholders. |
+| `RelateFraction.skeletonSubtitle` | 0.3 | Width for subtitle-like list skeleton placeholders. |
 
 Color:
 
@@ -121,6 +162,12 @@ Typography:
 
 - Use where skeleton shape is known.
 - Prefer skeletons for list/card loading and progress indicators for one-off blocking work.
+- Shimmer colors and alpha values must use theme colors and `RelateAlpha` tokens, not raw grays.
+
+`RelateAvatar` and `HealthIndicatorDot`:
+
+- Use tokenized `Dp` sizes from `RelateSize`.
+- Health color thresholds are presentation thresholds in `RelateFraction`; domain health scoring remains outside shared UI.
 
 ## Navigation Patterns
 

@@ -33,10 +33,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
@@ -44,8 +44,16 @@ import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.viewmodel.OnboardingViewModel
+
+internal object OnboardingTestTags {
+    const val CONTINUE_BUTTON = "onboarding_continue_button"
+    const val SETUP_CHECKLIST_BUTTON = "onboarding_setup_checklist_button"
+}
 
 data class OnboardingStep(
     val icon: ImageVector,
@@ -97,23 +105,34 @@ fun OnboardingScreen(
         onOnboardingComplete()
     }
 
+    OnboardingContent(
+        onContinue = completeOnboarding,
+        onOpenAutomationSetup = onOpenAutomationSetup,
+    )
+}
+
+@Composable
+internal fun OnboardingContent(
+    onContinue: () -> Unit,
+    onOpenAutomationSetup: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(RelateDarkBackground)
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .padding(RelateSpacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(RelateSize.minTouchTarget))
 
         Icon(
             imageVector = Icons.Filled.Settings,
             contentDescription = null,
             tint = RelatePrimary,
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier.size(RelateSize.heroIcon),
         )
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.lg))
         Text(
             text = stringResource(R.string.onboarding_setup_title),
             style = MaterialTheme.typography.headlineMedium,
@@ -121,18 +140,18 @@ fun OnboardingScreen(
             textAlign = TextAlign.Center,
             fontWeight = FontWeight.SemiBold,
         )
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Text(
             text = stringResource(R.string.onboarding_setup_subtitle),
             style = MaterialTheme.typography.bodyLarge,
             color = RelateOnSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
 
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             onboardingSteps.forEachIndexed { index, step ->
                 SetupChecklistRow(
@@ -142,30 +161,34 @@ fun OnboardingScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
         Button(
-            onClick = completeOnboarding,
-            modifier = Modifier.fillMaxWidth(),
+            onClick = onContinue,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(OnboardingTestTags.CONTINUE_BUTTON),
             colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(RelateRadius.control),
         ) {
             Text(
                 text = stringResource(R.string.onboarding_continue_to_sign_in),
                 color = RelateDarkBackground,
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         OutlinedButton(
             onClick = onOpenAutomationSetup,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(OnboardingTestTags.SETUP_CHECKLIST_BUTTON),
+            shape = RoundedCornerShape(RelateRadius.control),
         ) {
             Text(
                 text = stringResource(R.string.onboarding_open_setup_checklist),
                 color = RelateOnBackground,
             )
         }
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.lg))
     }
 }
 
@@ -178,14 +201,14 @@ private fun SetupChecklistRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(RelateSpacing.md),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .background(RelateSurfaceVariant, RoundedCornerShape(8.dp)),
+                    .size(RelateSize.setupStepIndex)
+                    .background(RelateSurfaceVariant, RoundedCornerShape(RelateRadius.control)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -199,7 +222,7 @@ private fun SetupChecklistRow(
                 imageVector = step.icon,
                 contentDescription = null,
                 tint = RelatePrimary,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(RelateSize.iconLg),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -208,7 +231,7 @@ private fun SetupChecklistRow(
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.xs))
                 Text(
                     text = stringResource(step.descriptionRes),
                     style = MaterialTheme.typography.bodySmall,

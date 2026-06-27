@@ -59,7 +59,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -70,7 +69,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.ContextCompat
@@ -83,6 +81,10 @@ import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateAlpha
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
@@ -140,9 +142,9 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(RelateDarkBackground)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = RelateSpacing.screenHorizontal),
         ) {
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(RelateSize.minTouchTarget))
             Text(
                 text = stringResource(R.string.settings),
                 style = MaterialTheme.typography.headlineMedium,
@@ -154,12 +156,12 @@ fun SettingsScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.xl))
 
                 SettingsSection(stringResource(R.string.settings_account_section)) {
                     SettingsCard {
                         Row(
-                            modifier = Modifier.padding(16.dp),
+                            modifier = Modifier.padding(RelateSpacing.cardContent),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             if (state.userPhotoUrl != null) {
@@ -167,14 +169,14 @@ fun SettingsScreen(
                                     model = state.userPhotoUrl,
                                     contentDescription = stringResource(R.string.profile_photo),
                                     modifier = Modifier
-                                        .size(48.dp)
+                                        .size(RelateSize.minTouchTarget)
                                         .clip(CircleShape),
                                     contentScale = ContentScale.Crop,
                                 )
                             } else {
                                 Box(
                                     modifier = Modifier
-                                        .size(48.dp)
+                                        .size(RelateSize.minTouchTarget)
                                         .clip(CircleShape)
                                         .background(RelateSurfaceVariant),
                                     contentAlignment = Alignment.Center,
@@ -187,17 +189,17 @@ fun SettingsScreen(
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(RelateSpacing.md))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(state.userName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                                 Text(state.userEmail, style = MaterialTheme.typography.bodySmall, color = RelateOnSurfaceVariant)
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(RelateSpacing.sm))
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.xl))
                 SettingsSection(stringResource(R.string.settings_preferences_section)) {
                     SettingsCard {
                         SettingsToggle(
@@ -235,10 +237,10 @@ fun SettingsScreen(
                 }
 
                 // AI configuration and send readiness
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
             SettingsSection(stringResource(R.string.settings_ai_configuration_section)) {
                 SettingsCard {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
                         Text(
                             text = stringResource(R.string.settings_gemini_api_key),
                             style = MaterialTheme.typography.bodyLarge,
@@ -249,7 +251,7 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = RelateOnSurfaceVariant,
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(RelateSpacing.sm))
                         OutlinedTextField(
                             value = state.geminiApiKey,
                             onValueChange = viewModel::onGeminiApiKeyChange,
@@ -265,45 +267,45 @@ fun SettingsScreen(
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = RelatePrimary,
                                 unfocusedBorderColor = RelateSurfaceVariant,
-                                focusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
-                                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
+                                focusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
                                 focusedTextColor = RelateOnBackground,
                                 unfocusedTextColor = RelateOnBackground,
                             ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(RelateRadius.control),
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(RelateSpacing.sm))
                         Button(
                             onClick = {
                                 focusManager.clearFocus()
                                 viewModel.saveGeminiApiKey()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(RelateRadius.control),
                         ) {
                             if (state.geminiApiKeySaved) {
                                 Icon(
                                     Icons.Filled.Check,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(RelateSize.iconSm),
                                     tint = RelateDarkBackground,
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(RelateSpacing.xs))
                                 Text(stringResource(R.string.saved), color = RelateDarkBackground)
                             } else {
                                 Icon(
                                     Icons.Filled.Key,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(RelateSize.iconSm),
                                     tint = RelateDarkBackground,
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(RelateSpacing.xs))
                                 Text(stringResource(R.string.settings_save_api_key), color = RelateDarkBackground)
                             }
                         }
                     }
                     SettingsDivider()
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
                         Text(
                             text = stringResource(R.string.settings_email_sending_title),
                             style = MaterialTheme.typography.bodyLarge,
@@ -314,7 +316,7 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = RelateOnSurfaceVariant,
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(RelateSpacing.sm))
                         OutlinedTextField(
                             value = state.senderEmail,
                             onValueChange = viewModel::onSenderEmailChange,
@@ -324,14 +326,14 @@ fun SettingsScreen(
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = RelatePrimary,
                                 unfocusedBorderColor = RelateSurfaceVariant,
-                                focusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
-                                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
+                                focusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
                                 focusedTextColor = RelateOnBackground,
                                 unfocusedTextColor = RelateOnBackground,
                             ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(RelateRadius.control),
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(RelateSpacing.sm))
                         OutlinedTextField(
                             value = state.senderEmailPassword,
                             onValueChange = viewModel::onSenderEmailPasswordChange,
@@ -342,21 +344,21 @@ fun SettingsScreen(
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = RelatePrimary,
                                 unfocusedBorderColor = RelateSurfaceVariant,
-                                focusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
-                                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
+                                focusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
                                 focusedTextColor = RelateOnBackground,
                                 unfocusedTextColor = RelateOnBackground,
                             ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(RelateRadius.control),
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(RelateSpacing.sm))
                         Button(
                             onClick = {
                                 focusManager.clearFocus()
                                 viewModel.saveSenderEmailSettings()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(RelateRadius.control),
                         ) {
                             Text(
                                 text = if (state.senderEmailSaved) {
@@ -417,7 +419,7 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
             SettingsSection(stringResource(R.string.settings_data_sync_section)) {
                 SettingsCard {
                     if (state.showLegacyDbNotice) {
@@ -455,17 +457,17 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
             SettingsSection(stringResource(R.string.settings_about)) {
                 SettingsCard {
                     SettingsRow(Icons.Filled.Info, stringResource(R.string.app_version), subtitle = BuildConfig.VERSION_NAME)
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
             Text(
                 text = stringResource(R.string.sign_out),
-                color = Color(0xFFEF4444),
+                color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier
@@ -474,17 +476,17 @@ fun SettingsScreen(
                         showSignOutDialog = true
                     })
                     .testTag(SettingsScreenTestTags.SIGN_OUT_TRIGGER)
-                    .padding(vertical = 16.dp),
+                    .padding(vertical = RelateSpacing.cardContent),
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
         }
         }
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(16.dp),
+                .padding(RelateSpacing.cardContent),
         )
 
         if (showSignOutDialog) {
@@ -522,7 +524,7 @@ internal fun SignOutConfirmationDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
                 Text(
                     text = stringResource(R.string.settings_sign_out_body),
                     style = MaterialTheme.typography.bodyMedium,
@@ -556,14 +558,14 @@ internal fun SignOutConfirmationDialog(
 @Composable
 private fun SignOutChecklistItem(text: String) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         verticalAlignment = Alignment.Top,
     ) {
         Icon(
             imageVector = Icons.Filled.Check,
             contentDescription = null,
             tint = RelatePrimary,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(RelateSize.iconSm),
         )
         Text(
             text = text,
@@ -582,7 +584,7 @@ private fun QuietHoursEditor(
     onEndChange: (String) -> Unit,
     onSave: () -> Unit,
 ) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
         Text(
             text = stringResource(R.string.settings_quiet_hours_title),
             style = MaterialTheme.typography.bodyLarge,
@@ -593,8 +595,8 @@ private fun QuietHoursEditor(
             style = MaterialTheme.typography.bodySmall,
             color = RelateOnSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row {
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
+        Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
             OutlinedTextField(
                 value = start,
                 onValueChange = onStartChange,
@@ -603,7 +605,6 @@ private fun QuietHoursEditor(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.weight(1f),
             )
-            Spacer(modifier = Modifier.width(8.dp))
             OutlinedTextField(
                 value = end,
                 onValueChange = onEndChange,
@@ -613,7 +614,7 @@ private fun QuietHoursEditor(
                 modifier = Modifier.weight(1f),
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         TextButton(onClick = onSave, modifier = Modifier.align(Alignment.End)) {
             Text(stringResource(R.string.settings_save_quiet_hours))
         }
@@ -629,7 +630,7 @@ private fun ChannelBlackoutEditor(
     onWhatsAppChange: (Boolean) -> Unit,
     onEmailChange: (Boolean) -> Unit,
 ) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
         Text(
             text = stringResource(R.string.settings_channel_blackout_title),
             style = MaterialTheme.typography.bodyLarge,
@@ -655,7 +656,7 @@ private fun ChannelBlackoutRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp),
+            .padding(top = RelateSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -691,15 +692,15 @@ private fun ApprovalMode.automationModeLabel(): String {
 
 @Composable
 private fun LegacyDbNotice(onDismiss: () -> Unit) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
         Row(verticalAlignment = Alignment.Top) {
             Icon(
                 Icons.Filled.Warning,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(RelateSize.iconMd),
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(RelateSpacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.settings_legacy_db_notice_title),
@@ -707,7 +708,7 @@ private fun LegacyDbNotice(onDismiss: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.xs))
                 Text(
                     text = stringResource(R.string.settings_legacy_db_notice_body),
                     style = MaterialTheme.typography.bodySmall,
@@ -730,7 +731,7 @@ private fun SettingsSection(title: String, content: @Composable () -> Unit) {
         text = title,
         style = MaterialTheme.typography.titleSmall,
         color = RelatePrimary,
-        modifier = Modifier.padding(bottom = 8.dp),
+        modifier = Modifier.padding(bottom = RelateSpacing.sm),
     )
     content()
 }
@@ -748,16 +749,16 @@ private fun SettingsRow(icon: ImageVector, title: String, subtitle: String? = nu
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             icon,
             contentDescription = null,
             tint = RelateOnSurfaceVariant,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(RelateSize.iconMd),
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(RelateSpacing.md))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
@@ -780,16 +781,16 @@ private fun SettingsToggle(title: String, icon: ImageVector, checked: Boolean, o
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             icon,
             contentDescription = null,
             tint = RelateOnSurfaceVariant,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(RelateSize.iconMd),
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(RelateSpacing.md))
         Text(
             text = title,
             style = MaterialTheme.typography.bodyLarge,
@@ -812,7 +813,7 @@ private fun SettingsToggle(title: String, icon: ImageVector, checked: Boolean, o
 @Composable
 private fun SettingsDivider() {
     HorizontalDivider(
-        color = RelateOnSurfaceVariant.copy(alpha = 0.12f),
-        modifier = Modifier.padding(horizontal = 16.dp),
+        color = RelateOnSurfaceVariant.copy(alpha = RelateAlpha.divider),
+        modifier = Modifier.padding(horizontal = RelateSpacing.cardContent),
     )
 }

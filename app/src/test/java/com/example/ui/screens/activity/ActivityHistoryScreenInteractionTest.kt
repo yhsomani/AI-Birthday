@@ -1,5 +1,6 @@
 package com.example.ui.screens.activity
 
+import android.app.Application
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +30,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [35])
+@Config(application = Application::class, sdk = [35])
 class ActivityHistoryScreenInteractionTest {
 
     @get:Rule

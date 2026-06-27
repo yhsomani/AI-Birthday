@@ -44,7 +44,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
@@ -52,10 +51,14 @@ import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
+import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateCard
 import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateElevation
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.ui.viewmodel.MemoryVaultUiState
@@ -177,7 +180,7 @@ internal fun MemoryVaultContent(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(RelateElevation.appBar),
                 ),
             )
         },
@@ -198,8 +201,8 @@ internal fun MemoryVaultContent(
                     .fillMaxSize()
                     .background(RelateDarkBackground)
                     .padding(paddingValues)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(RelateSpacing.screenHorizontal),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
             ) {
                 item {
                     AddMemoryCard(
@@ -229,7 +232,7 @@ internal fun MemoryVaultContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag(MemoryVaultTestTags.EMPTY_STATE)
-                                .height(150.dp),
+                                .height(RelateSize.actionCardMinHeight),
                         )
                     }
                 } else {
@@ -262,8 +265,8 @@ private fun AddMemoryCard(
 
     RelateGlassCard {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Text(
                 text = stringResource(R.string.memory_vault_add_title),
@@ -278,8 +281,8 @@ private fun AddMemoryCard(
             )
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
             ) {
                 memoryPromptOptions.forEach { option ->
                     val promptText = stringResource(option.templateRes)
@@ -318,8 +321,8 @@ private fun AddMemoryCard(
 
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
             ) {
                 memoryCategoryOptions.forEach { option ->
                     FilterChip(
@@ -356,7 +359,7 @@ private fun ErrorCard(message: String) {
         Text(
             text = message,
             color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
         )
     }
 }
@@ -373,13 +376,13 @@ private fun MemoryNoteCard(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (note.isPinned) {
-                RelateSurfaceVariant.copy(alpha = 0.5f)
+                RelateSurfaceVariant.copy(alpha = RelateAlpha.outline)
             } else {
                 RelateCard
             },
         ),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -401,7 +404,7 @@ private fun MemoryNoteCard(
                             } else {
                                 stringResource(R.string.memory_vault_pin_note)
                             },
-                            tint = if (note.isPinned) RelatePrimary else RelateOnSurfaceVariant.copy(alpha = 0.4f),
+                            tint = if (note.isPinned) RelatePrimary else RelateOnSurfaceVariant.copy(alpha = RelateAlpha.disabled),
                         )
                     }
                     IconButton(
@@ -411,18 +414,18 @@ private fun MemoryNoteCard(
                         Icon(
                             imageVector = Icons.Filled.Delete,
                             contentDescription = stringResource(R.string.memory_vault_delete_note),
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = RelateAlpha.subtle),
                         )
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Text(
                 text = note.noteText,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             Text(
                 text = date,
                 style = MaterialTheme.typography.bodySmall,
