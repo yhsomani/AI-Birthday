@@ -7,9 +7,11 @@ import android.content.Intent
 import android.os.Build
 import com.example.core.automation.notifications.EventReminderReceiver
 import com.example.core.db.AppDatabase
-import com.example.core.db.entities.EventEntity
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.automation.AutomationSchedulePolicy
+import com.example.domain.event.toOccasion
+import com.example.domain.model.notification.EventReminderScheduleRequest
+import com.example.domain.notification.buildEventReminderScheduleRequest
 import com.example.domain.service.EventReminderSchedulerService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -22,29 +24,30 @@ object EventReminderScheduler {
     const val EXTRA_EVENT_ID = "event_id"
     const val EXTRA_CONTACT_ID = "contact_id"
 
-    fun schedule(context: Context, event: EventEntity) {
+    fun schedule(context: Context, request: EventReminderScheduleRequest) {
         val prefs = SecurePrefs(context)
-        if (!event.isActive || !prefs.isBirthdayRemindersEnabled()) {
-            cancel(context, event.id)
+        val eventId = request.eventId.value
+        if (!request.isActive || !prefs.isBirthdayRemindersEnabled()) {
+            cancel(context, eventId)
             return
         }
 
         val nowMs = System.currentTimeMillis()
-        if (event.nextOccurrenceMs < nowMs) {
-            cancel(context, event.id)
+        if (request.nextOccurrenceMs < nowMs) {
+            cancel(context, eventId)
             return
         }
 
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val triggerAtMs = AutomationSchedulePolicy.reminderTimeMs(
-            eventOccurrenceMs = event.nextOccurrenceMs,
-            notifyDaysBefore = event.notifyDaysBefore,
+            eventOccurrenceMs = request.nextOccurrenceMs,
+            notifyDaysBefore = request.notifyDaysBefore,
             nowMs = nowMs,
         )
         val pendingIntent = buildPendingIntent(
             context = context,
-            eventId = event.id,
-            contactId = event.contactId,
+            eventId = eventId,
+            contactId = request.contactId.value,
             flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         ) ?: return
 
@@ -79,8 +82,9 @@ object EventReminderScheduler {
         CoroutineScope(Dispatchers.IO).launch {
             val db = AppDatabase.getInstance(context)
             db.eventDao().getAllSync()
+                .map { it.toOccasion() }
                 .filter { it.isActive }
-                .forEach { event -> schedule(context, event) }
+                .forEach { occasion -> schedule(context, buildEventReminderScheduleRequest(occasion)) }
         }
     }
 
@@ -111,8 +115,8 @@ object EventReminderScheduler {
 class EventReminderSchedulerServiceImpl @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : EventReminderSchedulerService {
-    override fun scheduleReminder(event: EventEntity) {
-        EventReminderScheduler.schedule(context, event)
+    override fun scheduleReminder(request: EventReminderScheduleRequest) {
+        EventReminderScheduler.schedule(context, request)
     }
 
     override fun cancelReminder(eventId: String) {

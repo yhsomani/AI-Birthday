@@ -23,9 +23,11 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.MemoryNoteEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MemoryNoteId
+import com.example.domain.model.contact.ContactHeader
+import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.ui.viewmodel.MemoryVaultUiState
 import com.example.ui.viewmodel.MemoryVaultViewModel
 import org.junit.Assert.assertEquals
@@ -53,7 +55,7 @@ class MemoryVaultScreenInteractionTest {
         composeRule.setMemoryVaultContent(
             state = {
                 MemoryVaultUiState(
-                    contact = ContactEntity(id = "contact_1", name = "Asha"),
+                    contact = ContactHeader(id = ContactId("contact_1"), displayName = "Asha"),
                     notes = listOf(
                         memoryNote(
                             id = "note_pinned",
@@ -82,8 +84,8 @@ class MemoryVaultScreenInteractionTest {
                 noteText = ""
             },
             onBack = { actions += "back" },
-            onTogglePin = { actions += "pin:${it.id}:${it.isPinned}" },
-            onDelete = { actions += "delete:${it.id}" },
+            onTogglePin = { actions += "pin:${it.id.value}:${it.isPinned}" },
+            onDelete = { actions += "delete:${it.id.value}" },
         )
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.back))
@@ -235,8 +237,8 @@ class MemoryVaultScreenInteractionTest {
         onCategoryChange: (String) -> Unit = {},
         onAdd: () -> Unit = {},
         onBack: () -> Unit = {},
-        onTogglePin: (MemoryNoteEntity) -> Unit = {},
-        onDelete: (MemoryNoteEntity) -> Unit = {},
+        onTogglePin: (MemoryNoteRecord) -> Unit = {},
+        onDelete: (MemoryNoteRecord) -> Unit = {},
     ) {
         setContent {
             RelateAITheme {
@@ -272,9 +274,9 @@ class MemoryVaultScreenInteractionTest {
         noteText: String,
         category: String,
         isPinned: Boolean = false,
-    ) = MemoryNoteEntity(
-        id = id,
-        contactId = "contact_1",
+    ) = MemoryNoteRecord(
+        id = MemoryNoteId(id),
+        contactId = ContactId("contact_1"),
         noteText = noteText,
         category = category,
         dateMs = 1_700_000_000_000L,

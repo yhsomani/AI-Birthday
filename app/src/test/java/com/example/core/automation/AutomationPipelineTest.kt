@@ -27,7 +27,9 @@ import com.example.domain.service.MessageVariantsResult
 import com.example.domain.service.NotificationService
 import com.example.domain.service.PreferencesRepository
 import com.example.domain.service.SchedulerService
+import com.example.domain.service.EventReminderSchedulerService
 import com.example.domain.model.MessageChannel
+import com.example.domain.usecase.DiscoverEventsUseCase
 import com.example.domain.usecase.GenerateMessageUseCase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -84,7 +86,7 @@ class AutomationPipelineTest {
         every { anyConstructed<SecurePrefs>().getQuietHoursStart() } returns 0
         every { anyConstructed<SecurePrefs>().getQuietHoursEnd() } returns 0
         every { anyConstructed<SecurePrefs>().getBlackoutDates() } returns "[]"
-        coEvery { anyConstructed<MessageDispatcher>().dispatch(any(), any()) } returns Unit
+        coEvery { anyConstructed<MessageDispatcher>().dispatch(any()) } returns Unit
     }
 
     @After
@@ -116,7 +118,15 @@ class AutomationPipelineTest {
         val discoveryWorker = TestListenableWorkerBuilder<EventDiscoveryWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters): ListenableWorker {
-                    return EventDiscoveryWorker(appContext, workerParameters, db.contactDao(), db.eventDao())
+                    return EventDiscoveryWorker(
+                        appContext,
+                        workerParameters,
+                        DiscoverEventsUseCase(
+                            ContactRepositoryImpl(db.contactDao()),
+                            EventRepositoryImpl(db.eventDao()),
+                            eventReminderSchedulerService(),
+                        ),
+                    )
                 }
             })
             .build()
@@ -128,7 +138,7 @@ class AutomationPipelineTest {
         // 3. Generate message
         val draft = "Happy birthday Amit, hope this year brings more cricket nights and relaxed family time."
         val variants = MessageVariantsResult(draft, draft, draft, draft, draft, draft, "standard")
-        coEvery { aiService.generateMessage(any(), any(), any(), any(), any(), any()) } returns variants
+        coEvery { aiService.generateMessage(any()) } returns variants
 
         val genWorker = TestListenableWorkerBuilder<MessageGenerationWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
@@ -161,6 +171,7 @@ class AutomationPipelineTest {
                         db.sentMessageDao(),
                         db.contactDao(),
                         db.eventDao(),
+                        db.dispatchAttemptDao(),
                         preferencesRepository
                     )
                 }
@@ -168,7 +179,19 @@ class AutomationPipelineTest {
             .build()
         dispatchWorker.doWork()
 
-        coVerify { anyConstructed<MessageDispatcher>().dispatch(match { it.id == pending.id }, any()) }
+        coVerify { anyConstructed<MessageDispatcher>().dispatch(match { it.messageId.value == pending.id }) }
+        assertEquals(
+            1,
+            db.dispatchAttemptDao().getAllSync().count {
+                it.messageDraftId == pending.id &&
+                    it.eligibilityDecision == "SEND_NOW" &&
+                    it.result == "QUEUED"
+            },
+        )
+    }
+
+    private fun eventReminderSchedulerService(): EventReminderSchedulerService {
+        return mockk(relaxed = true)
     }
 
     private fun generateMessageUseCase(): GenerateMessageUseCase {

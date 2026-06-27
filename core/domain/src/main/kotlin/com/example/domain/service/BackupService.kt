@@ -37,6 +37,7 @@ data class BackupRecordCounts(
     val giftHistory: Int = 0,
     val activityLogs: Int = 0,
     val messageFeedback: Int = 0,
+    val dispatchAttempts: Int = 0,
     val preferences: Int = 0,
 ) {
     val totalRecords: Int
@@ -49,6 +50,7 @@ data class BackupRecordCounts(
             giftHistory +
             activityLogs +
             messageFeedback +
+            dispatchAttempts +
             preferences
 }
 

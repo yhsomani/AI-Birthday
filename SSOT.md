@@ -203,7 +203,7 @@ include(":core:ui")
 
 8. Add domain source:
 
-- Models: `AutomationMode`, `ApprovalMode`, `EventType`, `MessageChannel`, `MessageStatus`.
+- Models: `AutomationMode`, `ApprovalMode`, `OccasionType`, `MessageChannel`, `MessageStatus`.
 - Automation policy: `AutomationSchedulePolicy`.
 - Repository interfaces: contacts, events, messages, style profiles, message feedback, gifts, activity logs, memory notes.
 - Service interfaces: AI, contact sync, message dispatcher, scheduler, event reminder scheduler, notification, preferences, backup, analytics report, test send.

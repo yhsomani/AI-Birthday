@@ -27,6 +27,8 @@ android {
 }
 
 dependencies {
+    api(project(":core:model"))
+
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.paging.runtime)

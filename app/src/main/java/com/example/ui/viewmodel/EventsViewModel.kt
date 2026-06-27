@@ -6,13 +6,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.core.db.entities.ActivityLogEntity
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.event.EventConflictKind
 import com.example.domain.event.EventResolutionPolicy
+import com.example.domain.event.toOccasion
 import com.example.domain.model.ActivityLogType
-import com.example.domain.model.EventType
+import com.example.domain.model.contact.ContactPickerItem
+import com.example.domain.model.occasion.EventListItem
+import com.example.domain.model.occasion.OccasionType
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
@@ -84,9 +85,9 @@ data class ManualEventDuplicateWarning(
 )
 
 data class EventsUiState(
-    val allEvents: List<EventEntity> = emptyList(),
-    val events: List<EventEntity> = emptyList(),
-    val contacts: List<ContactEntity> = emptyList(),
+    val allEvents: List<EventListItem> = emptyList(),
+    val events: List<EventListItem> = emptyList(),
+    val contacts: List<ContactPickerItem> = emptyList(),
     val searchQuery: String = "",
     val selectedTypeFilter: EventTypeFilter = EventTypeFilter.ALL,
     val selectedHorizonFilter: EventHorizonFilter = EventHorizonFilter.ALL,
@@ -122,8 +123,8 @@ class EventsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 combine(
-                    eventRepository.getAll(),
-                    contactRepository.getAll(),
+                    eventRepository.getEventListItems(),
+                    contactRepository.getContactPickerItems(),
                 ) { events, contacts ->
                     _uiState.value.withEvents(
                         allEvents = events,
@@ -175,28 +176,28 @@ class EventsViewModel @Inject constructor(
             )
             _uiState.value = when (outcome) {
                 is SaveManualEventUseCase.Outcome.Saved -> {
-                    val eventTypeLabel = eventTypeLabel(outcome.event.type)
+                    val eventTypeLabel = eventTypeLabel(outcome.event.type.raw)
                     recordActivity(
                         ActivityLogEntity(
                             id = UUID.randomUUID().toString(),
                             type = ActivityLogType.EVENT.raw,
                             title = string(R.string.events_saved_activity_title),
                             detail = string(R.string.events_saved_activity_detail, eventTypeLabel),
-                            contactId = outcome.contact.id,
-                            eventId = outcome.event.id,
+                            contactId = outcome.contact.id.value,
+                            eventId = outcome.event.id.value,
                         )
                     )
                     _uiState.value.copy(
                         isSavingManualEvent = false,
-                        saveMessage = string(R.string.events_saved_message, eventTypeLabel, outcome.contact.name),
+                        saveMessage = string(R.string.events_saved_message, eventTypeLabel, outcome.contact.displayName),
                         error = null,
                     )
                 }
                 is SaveManualEventUseCase.Outcome.DuplicateFound -> _uiState.value.copy(
                     isSavingManualEvent = false,
                     duplicateWarning = ManualEventDuplicateWarning(
-                        contactName = outcome.contact.name,
-                        eventType = outcome.existingEvent.type,
+                        contactName = outcome.contact.displayName,
+                        eventType = outcome.existingEvent.type.raw,
                         month = outcome.existingEvent.month,
                         dayOfMonth = outcome.existingEvent.dayOfMonth,
                     ),
@@ -205,8 +206,8 @@ class EventsViewModel @Inject constructor(
                 is SaveManualEventUseCase.Outcome.ConflictFound -> _uiState.value.copy(
                     isSavingManualEvent = false,
                     duplicateWarning = ManualEventDuplicateWarning(
-                        contactName = outcome.contact.name,
-                        eventType = outcome.existingEvent.type,
+                        contactName = outcome.contact.displayName,
+                        eventType = outcome.existingEvent.type.raw,
                         month = outcome.existingEvent.month,
                         dayOfMonth = outcome.existingEvent.dayOfMonth,
                         kind = ManualEventWarningKind.DATE_CONFLICT,
@@ -236,7 +237,7 @@ class EventsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isRefreshing = true)
         refreshJob = viewModelScope.launch {
             try {
-                eventRepository.getAll().first().let { events ->
+                eventRepository.getEventListItems().first().let { events ->
                     _uiState.value = _uiState.value.withEvents(
                         allEvents = events,
                         contacts = _uiState.value.contacts,
@@ -319,14 +320,14 @@ class EventsViewModel @Inject constructor(
     }
 
     private fun EventsUiState.withEvents(
-        allEvents: List<EventEntity>,
-        contacts: List<ContactEntity>,
+        allEvents: List<EventListItem>,
+        contacts: List<ContactPickerItem>,
         isLoading: Boolean = this.isLoading,
         isRefreshing: Boolean = this.isRefreshing,
     ): EventsUiState {
         return copy(
             allEvents = allEvents,
-            contacts = contacts.sortedBy { it.name.lowercase() },
+            contacts = contacts.sortedBy { it.displayName.lowercase() },
             eventTrust = buildEventTrustStates(allEvents),
             isLoading = isLoading,
             isRefreshing = isRefreshing,
@@ -334,7 +335,7 @@ class EventsViewModel @Inject constructor(
     }
 
     private fun EventsUiState.withFilteredEvents(): EventsUiState {
-        val contactMap = contacts.associateBy { it.id }
+        val contactMap = contacts.associateBy { it.id.value }
         val normalizedQuery = searchQuery.trim()
         val nowMs = System.currentTimeMillis()
         val horizonEndMs = selectedHorizonFilter.endMs(nowMs)
@@ -342,9 +343,9 @@ class EventsViewModel @Inject constructor(
             .asSequence()
             .filter { event ->
                 normalizedQuery.isBlank() ||
-                    event.type.contains(normalizedQuery, ignoreCase = true) ||
+                    event.type.raw.contains(normalizedQuery, ignoreCase = true) ||
                     event.label?.contains(normalizedQuery, ignoreCase = true) == true ||
-                    contactMap[event.contactId]?.name?.contains(normalizedQuery, ignoreCase = true) == true
+                    contactMap[event.contactId.value]?.displayName?.contains(normalizedQuery, ignoreCase = true) == true
             }
             .filter { event -> event.matchesTypeFilter(selectedTypeFilter) }
             .filter { event -> horizonEndMs == null || event.nextOccurrenceMs <= horizonEndMs }
@@ -353,14 +354,13 @@ class EventsViewModel @Inject constructor(
         return copy(events = filtered)
     }
 
-    private fun EventEntity.matchesTypeFilter(filter: EventTypeFilter): Boolean {
-        val eventType = EventType.fromRaw(type)
+    private fun EventListItem.matchesTypeFilter(filter: EventTypeFilter): Boolean {
         return when (filter) {
             EventTypeFilter.ALL -> true
-            EventTypeFilter.BIRTHDAY -> eventType == EventType.BIRTHDAY
-            EventTypeFilter.ANNIVERSARY -> eventType == EventType.ANNIVERSARY
-            EventTypeFilter.WORK -> eventType == EventType.WORK_ANNIVERSARY
-            EventTypeFilter.CUSTOM -> eventType == EventType.CUSTOM
+            EventTypeFilter.BIRTHDAY -> type == OccasionType.BIRTHDAY
+            EventTypeFilter.ANNIVERSARY -> type == OccasionType.ANNIVERSARY
+            EventTypeFilter.WORK -> type == OccasionType.WORK_ANNIVERSARY
+            EventTypeFilter.CUSTOM -> type == OccasionType.CUSTOM
         }
     }
 
@@ -396,8 +396,8 @@ class EventsViewModel @Inject constructor(
                     }
                 },
                 detail = string(R.string.event_resolution_activity_detail, outcome.affectedEventIds.size),
-                contactId = outcome.keptEvent.contactId,
-                eventId = outcome.keptEvent.id,
+                contactId = outcome.keptEvent.contactId.value,
+                eventId = outcome.keptEvent.id.value,
             )
         )
     }
@@ -410,11 +410,11 @@ class EventsViewModel @Inject constructor(
     }
 
     private fun eventTypeLabel(rawType: String): String {
-        return when (EventType.fromRaw(rawType)) {
-            EventType.BIRTHDAY -> string(R.string.event_type_birthday)
-            EventType.ANNIVERSARY -> string(R.string.event_type_anniversary)
-            EventType.WORK_ANNIVERSARY -> string(R.string.event_type_work_anniversary)
-            EventType.CUSTOM -> string(R.string.event_type_custom)
+        return when (OccasionType.fromRaw(rawType)) {
+            OccasionType.BIRTHDAY -> string(R.string.event_type_birthday)
+            OccasionType.ANNIVERSARY -> string(R.string.event_type_anniversary)
+            OccasionType.WORK_ANNIVERSARY -> string(R.string.event_type_work_anniversary)
+            OccasionType.CUSTOM -> string(R.string.event_type_custom)
             else -> rawType.replace("_", " ").lowercase().replaceFirstChar { it.titlecase() }
         }
     }
@@ -424,10 +424,11 @@ class EventsViewModel @Inject constructor(
     }
 }
 
-internal fun buildEventTrustStates(events: List<EventEntity>): Map<String, EventTrustState> {
-    val conflicts = EventResolutionPolicy.conflictStates(events)
+internal fun buildEventTrustStates(events: List<EventListItem>): Map<String, EventTrustState> {
+    val conflicts = EventResolutionPolicy.conflictStates(events.map { it.toOccasion() })
     return events.associate { event ->
-        val conflict = (conflicts[event.id] ?: if (EventResolutionPolicy.isSourceConflict(event)) {
+        val eventId = event.id.value
+        val conflict = (conflicts[eventId] ?: if (EventResolutionPolicy.isSourceConflict(event.toOccasion())) {
             EventConflictKind.DATE_CONFLICT
         } else {
             EventConflictKind.NONE
@@ -438,7 +439,7 @@ internal fun buildEventTrustStates(events: List<EventEntity>): Map<String, Event
             else -> EventVerificationState.NEEDS_REVIEW
         }
 
-        event.id to EventTrustState(
+        eventId to EventTrustState(
             source = event.source,
             verification = verification,
             confidenceScore = event.confidenceScore.coerceIn(0, 100),

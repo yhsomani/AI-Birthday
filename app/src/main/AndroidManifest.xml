@@ -54,6 +54,12 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="relateai" android:host="settings" />
             </intent-filter>
+            <intent-filter android:label="backup_restore">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="relateai" android:host="backup-restore" />
+            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />

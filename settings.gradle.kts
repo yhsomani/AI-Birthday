@@ -24,6 +24,7 @@ dependencyResolutionManagement {
 rootProject.name = "RelateAI"
 
 include(":app")
+include(":core:model")
 include(":core:domain")
 include(":core:data")
 include(":core:ui")

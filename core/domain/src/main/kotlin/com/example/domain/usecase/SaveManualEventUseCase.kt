@@ -1,11 +1,19 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
+import com.example.domain.contact.toHeader
 import com.example.domain.event.EventDatePolicy
 import com.example.domain.event.EventIdentityPolicy
-import com.example.domain.model.EventType
+import com.example.domain.event.toEventListItem
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.contact.ContactHeader
+import com.example.domain.model.occasion.EventListItem
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.model.occasion.OccasionDate
+import com.example.domain.model.occasion.OccasionType
+import com.example.domain.notification.buildEventReminderScheduleRequest
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
@@ -22,8 +30,7 @@ class SaveManualEventUseCase @Inject constructor(
     private val eventReminderSchedulerService: EventReminderSchedulerService,
 ) {
     suspend operator fun invoke(request: Request): Outcome {
-        val normalizedType = request.eventType.normalizedEventTypeOrDefault(EventType.BIRTHDAY)
-        val eventType = EventType.fromRaw(normalizedType)
+        val eventType = request.eventType.normalizedOccasionTypeOrDefault(OccasionType.BIRTHDAY)
         val normalizedLabel = request.label?.trim()?.ifBlank { null }
         val contact = when {
             request.existingContactId != null -> {
@@ -44,32 +51,35 @@ class SaveManualEventUseCase @Inject constructor(
             return Outcome.InvalidInput(InvalidInputReason.INVALID_DATE)
         }
 
-        val existingEvents = existingEvents()
-        val existingConflict = EventIdentityPolicy.findConflictingActiveEvent(
-            events = existingEvents,
+        val existingOccasions = existingOccasions()
+        val existingConflict = EventIdentityPolicy.findConflictingActiveOccasion(
+            occasions = existingOccasions,
             contactId = contact.id,
-            eventType = normalizedType,
+            occasionType = eventType.raw,
             month = request.month,
             dayOfMonth = request.dayOfMonth,
             label = normalizedLabel,
         )
 
         if (!request.allowDuplicate) {
-            val existingDuplicate = EventIdentityPolicy.findMatchingActiveEvent(
-                events = existingEvents,
+            val existingDuplicate = EventIdentityPolicy.findMatchingActiveOccasion(
+                occasions = existingOccasions,
                 contactId = contact.id,
-                eventType = normalizedType,
+                occasionType = eventType.raw,
                 month = request.month,
                 dayOfMonth = request.dayOfMonth,
                 label = normalizedLabel,
             )
             if (existingDuplicate != null) {
-                return Outcome.DuplicateFound(contact = contact, existingEvent = existingDuplicate)
+                return Outcome.DuplicateFound(
+                    contact = contact.toHeader(),
+                    existingEvent = existingDuplicate.toEventListItem(),
+                )
             }
             if (existingConflict != null) {
                 return Outcome.ConflictFound(
-                    contact = contact,
-                    existingEvent = existingConflict,
+                    contact = contact.toHeader(),
+                    existingEvent = existingConflict.toEventListItem(),
                     requestedMonth = request.month,
                     requestedDayOfMonth = request.dayOfMonth,
                     requestedYear = request.year,
@@ -94,49 +104,57 @@ class SaveManualEventUseCase @Inject constructor(
             contactRepository.upsert(updatedContact)
         }
 
-        val event = EventEntity(
-            id = eventIdFor(
-                contact = updatedContact,
-                eventType = normalizedType,
-                allowDuplicate = request.allowDuplicate,
+        val event = Occasion(
+            id = OccasionId(
+                eventIdFor(
+                    contact = updatedContact,
+                    eventType = eventType.raw,
+                    allowDuplicate = request.allowDuplicate,
+                )
             ),
-            contactId = updatedContact.id,
-            type = normalizedType,
+            contactId = ContactId(updatedContact.id),
+            type = eventType,
             label = normalizedLabel ?: updatedContact.name,
-            dayOfMonth = request.dayOfMonth,
-            month = request.month,
-            year = request.year,
+            date = OccasionDate(
+                dayOfMonth = request.dayOfMonth,
+                month = request.month,
+                year = request.year,
+            ),
             nextOccurrenceMs = nextOccurrenceMs,
+            isActive = true,
             notifyDaysBefore = request.notifyDaysBefore.coerceIn(0, 30),
             source = "MANUAL",
             confidenceScore = 100,
             isVerified = true,
         )
-        eventRepository.upsert(event)
-        eventReminderSchedulerService.scheduleReminder(event)
+        eventRepository.upsertOccasion(event)
+        eventReminderSchedulerService.scheduleReminder(buildEventReminderScheduleRequest(event))
 
-        return Outcome.Saved(contact = updatedContact, event = event)
+        return Outcome.Saved(
+            contact = updatedContact.toHeader(),
+            event = event.toEventListItem(),
+        )
     }
 
     private fun ContactEntity.withEventDate(
-        eventType: EventType,
+        eventType: OccasionType,
         day: Int,
         month: Int,
         year: Int?,
     ): ContactEntity = when (eventType) {
-        EventType.BIRTHDAY -> copy(
+        OccasionType.BIRTHDAY -> copy(
             birthdayDay = day,
             birthdayMonth = month,
             birthdayYear = year,
             updatedAt = System.currentTimeMillis(),
         )
-        EventType.ANNIVERSARY -> copy(
+        OccasionType.ANNIVERSARY -> copy(
             anniversaryDay = day,
             anniversaryMonth = month,
             anniversaryYear = year,
             updatedAt = System.currentTimeMillis(),
         )
-        EventType.WORK_ANNIVERSARY -> copy(
+        OccasionType.WORK_ANNIVERSARY -> copy(
             workStartDay = day,
             workStartMonth = month,
             workStartYear = year,
@@ -148,7 +166,7 @@ class SaveManualEventUseCase @Inject constructor(
     data class Request(
         val existingContactId: String? = null,
         val newContactName: String? = null,
-        val eventType: String = EventType.BIRTHDAY.raw,
+        val eventType: String = OccasionType.BIRTHDAY.raw,
         val label: String? = null,
         val month: Int,
         val dayOfMonth: Int,
@@ -158,12 +176,12 @@ class SaveManualEventUseCase @Inject constructor(
     )
 
     sealed class Outcome {
-        data class Saved(val contact: ContactEntity, val event: EventEntity) : Outcome()
+        data class Saved(val contact: ContactHeader, val event: EventListItem) : Outcome()
         data class InvalidInput(val reason: InvalidInputReason) : Outcome()
-        data class DuplicateFound(val contact: ContactEntity, val existingEvent: EventEntity) : Outcome()
+        data class DuplicateFound(val contact: ContactHeader, val existingEvent: EventListItem) : Outcome()
         data class ConflictFound(
-            val contact: ContactEntity,
-            val existingEvent: EventEntity,
+            val contact: ContactHeader,
+            val existingEvent: EventListItem,
             val requestedMonth: Int,
             val requestedDayOfMonth: Int,
             val requestedYear: Int?,
@@ -176,8 +194,8 @@ class SaveManualEventUseCase @Inject constructor(
         INVALID_DATE,
     }
 
-    private suspend fun existingEvents(): List<EventEntity> {
-        return runCatching { eventRepository.getAll().first() }.getOrDefault(emptyList())
+    private suspend fun existingOccasions(): List<Occasion> {
+        return runCatching { eventRepository.getOccasions().first() }.getOrDefault(emptyList())
     }
 
     private fun eventIdFor(
@@ -200,9 +218,9 @@ class SaveManualEventUseCase @Inject constructor(
         }
     }
 
-    private fun String.normalizedEventTypeOrDefault(defaultType: EventType): String {
+    private fun String.normalizedOccasionTypeOrDefault(defaultType: OccasionType): OccasionType {
         val normalized = trim().uppercase(Locale.US)
-        if (normalized.isBlank()) return defaultType.raw
-        return EventType.fromRaw(normalized).takeUnless { it == EventType.UNKNOWN }?.raw ?: normalized
+        if (normalized.isBlank()) return defaultType
+        return OccasionType.fromRaw(normalized).takeUnless { it == OccasionType.UNKNOWN } ?: OccasionType.UNKNOWN
     }
 }

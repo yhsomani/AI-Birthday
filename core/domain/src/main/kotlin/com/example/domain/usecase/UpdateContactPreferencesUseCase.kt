@@ -1,8 +1,9 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ContactEntity
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.contact.ContactPreferences
 import com.example.domain.repository.ContactRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -12,19 +13,20 @@ class UpdateContactPreferencesUseCase @Inject constructor(
     private val contactRepository: ContactRepository,
 ) {
     suspend operator fun invoke(request: Request): Outcome {
-        val contact = contactRepository.getById(request.contactId) ?: return Outcome.ContactNotFound
+        if (!contactRepository.contactExists(request.contactId)) return Outcome.ContactNotFound
 
         val validationError = request.validationError()
         if (validationError != null) return Outcome.InvalidInput(validationError)
 
-        val updated = contact.copy(
+        val updated = ContactPreferences(
+            contactId = ContactId(request.contactId),
             nickname = request.nickname.trimToNull(),
             relationshipType = request.relationshipType.trim().uppercase(),
             preferredLanguage = request.preferredLanguage.trim().lowercase().ifBlank { "en" },
-            preferredChannel = request.preferredChannel.raw,
+            preferredChannel = request.preferredChannel,
             formalityLevel = request.formalityLevel.trim().uppercase(),
             communicationStyle = request.communicationStyle.trim().uppercase(),
-            automationMode = request.automationMode.raw,
+            automationMode = request.automationMode,
             giftBudgetInr = request.giftBudgetInr.coerceAtLeast(0),
             annualBudgetInr = request.annualBudgetInr.coerceAtLeast(0),
             skipAutoWish = request.skipAutoWish,
@@ -34,10 +36,13 @@ class UpdateContactPreferencesUseCase @Inject constructor(
             sensitiveTopicsJson = request.sensitiveTopics.toJsonArray(),
             currentLifePhaseJson = request.currentLifePhase.trim().toLifePhaseJson(),
             notesText = request.notes.trim(),
-            updatedAt = System.currentTimeMillis(),
+            updatedAtMs = System.currentTimeMillis(),
         )
-        contactRepository.update(updated)
-        return Outcome.Updated(updated)
+        return if (contactRepository.updatePreferences(updated)) {
+            Outcome.Updated(updated)
+        } else {
+            Outcome.ContactNotFound
+        }
     }
 
     data class Request(
@@ -63,7 +68,7 @@ class UpdateContactPreferencesUseCase @Inject constructor(
     sealed class Outcome {
         data object ContactNotFound : Outcome()
         data class InvalidInput(val reason: InvalidInputReason) : Outcome()
-        data class Updated(val contact: ContactEntity) : Outcome()
+        data class Updated(val preferences: ContactPreferences) : Outcome()
     }
 
     enum class InvalidInputReason {

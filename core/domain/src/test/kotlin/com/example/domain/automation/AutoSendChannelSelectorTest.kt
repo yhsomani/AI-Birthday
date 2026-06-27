@@ -1,10 +1,10 @@
 package com.example.domain.automation
 
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.automation.AutoSendChannelSelector.NoRouteReason
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.contact.ContactDeliveryRouteProfile
+import com.example.domain.model.message.DeliveryRouteHistoryRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -18,7 +18,7 @@ class AutoSendChannelSelectorTest {
 
         val result = AutoSendChannelSelector.select(
             contact = contact,
-            previousMessages = emptyList(),
+            routeHistory = emptyList(),
             channelBlackoutJson = blackoutJson(),
             senderEmail = "",
             senderEmailPassword = "",
@@ -37,7 +37,7 @@ class AutoSendChannelSelectorTest {
 
         val result = AutoSendChannelSelector.select(
             contact = contact,
-            previousMessages = emptyList(),
+            routeHistory = emptyList(),
             channelBlackoutJson = blackoutJson(MessageChannel.WHATSAPP),
             senderEmail = "me@example.com",
             senderEmailPassword = "app-password",
@@ -62,7 +62,7 @@ class AutoSendChannelSelectorTest {
 
         val result = AutoSendChannelSelector.select(
             contact = contact,
-            previousMessages = history,
+            routeHistory = history,
             channelBlackoutJson = blackoutJson(),
             senderEmail = "me@example.com",
             senderEmailPassword = "app-password",
@@ -85,7 +85,7 @@ class AutoSendChannelSelectorTest {
 
         val result = AutoSendChannelSelector.select(
             contact = contact,
-            previousMessages = history,
+            routeHistory = history,
             channelBlackoutJson = blackoutJson(),
             senderEmail = "",
             senderEmailPassword = "",
@@ -95,12 +95,12 @@ class AutoSendChannelSelectorTest {
     }
 
     @Test
-    fun `select returns normalized preferred channel when no automatic channel is available`() {
-        val contact = legacyContact(preferredChannel = MessageChannel.EMAIL.raw.lowercase())
+    fun `select returns preferred channel when no automatic channel is available`() {
+        val contact = contact(preferredChannel = MessageChannel.EMAIL)
 
         val result = AutoSendChannelSelector.select(
             contact = contact,
-            previousMessages = emptyList(),
+            routeHistory = emptyList(),
             channelBlackoutJson = blackoutJson(),
             senderEmail = "",
             senderEmailPassword = "",
@@ -111,11 +111,11 @@ class AutoSendChannelSelectorTest {
 
     @Test
     fun `selectRoute returns no available route with reasons when every channel is unsendable`() {
-        val contact = legacyContact(preferredChannel = MessageChannel.EMAIL.raw.lowercase())
+        val contact = contact(preferredChannel = MessageChannel.EMAIL)
 
         val result = AutoSendChannelSelector.selectRoute(
             contact = contact,
-            previousMessages = emptyList(),
+            routeHistory = emptyList(),
             channelBlackoutJson = blackoutJson(),
             senderEmail = "",
             senderEmailPassword = "",
@@ -145,7 +145,7 @@ class AutoSendChannelSelectorTest {
 
         val result = AutoSendChannelSelector.selectRoute(
             contact = contact,
-            previousMessages = emptyList(),
+            routeHistory = emptyList(),
             channelBlackoutJson = blackoutJson(
                 MessageChannel.SMS,
                 MessageChannel.WHATSAPP,
@@ -165,38 +165,18 @@ class AutoSendChannelSelectorTest {
         preferredChannel: MessageChannel,
         primaryPhone: String? = null,
         primaryEmail: String? = null,
-    ): ContactEntity {
-        return legacyContact(
-            preferredChannel = preferredChannel.raw,
-            primaryPhone = primaryPhone,
-            primaryEmail = primaryEmail,
-        )
-    }
-
-    private fun legacyContact(
-        preferredChannel: String,
-        primaryPhone: String? = null,
-        primaryEmail: String? = null,
-    ): ContactEntity {
-        return ContactEntity(
-            id = "c1",
-            name = "Alex",
+    ): ContactDeliveryRouteProfile {
+        return ContactDeliveryRouteProfile(
             preferredChannel = preferredChannel,
-            primaryPhone = primaryPhone,
-            primaryEmail = primaryEmail,
+            hasPrimaryPhone = !primaryPhone.isNullOrBlank(),
+            hasPrimaryEmail = !primaryEmail.isNullOrBlank(),
         )
     }
 
-    private fun sent(channel: MessageChannel, status: MessageDeliveryStatus): SentMessageEntity {
-        return SentMessageEntity(
-            id = "${channel.raw}-${status.raw}",
-            contactId = "c1",
-            eventType = "event1",
-            eventYear = 2026,
-            messageText = "Hi",
-            channel = channel.raw,
-            sentAtMs = 1000L,
-            deliveryStatus = status.raw,
+    private fun sent(channel: MessageChannel, status: MessageDeliveryStatus): DeliveryRouteHistoryRecord {
+        return DeliveryRouteHistoryRecord(
+            channel = channel,
+            deliveryStatus = status,
         )
     }
 

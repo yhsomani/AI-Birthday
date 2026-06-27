@@ -27,24 +27,24 @@ class AnalyticsReportServiceImpl @Inject constructor(
 
     override suspend fun buildRelationshipReport(): AnalyticsReport {
         val generatedAt = System.currentTimeMillis()
-        val contacts = contactRepository.getAllSync()
-        val relationshipCounts = contactRepository.countByRelationshipType().first()
+        val contactProfiles = contactRepository.getAnalyticsProfiles()
+        val relationshipCounts = contactRepository.getRelationshipAnalyticsCounts().first()
         val totalSent = messageRepository.countAllSent().first()
         val pendingApprovals = messageRepository.countPending().first()
-        val upcomingEvents = eventRepository.getUpcoming(30)
-        val sentThisYear = messageRepository.getSentSinceYearStart(yearStartMs())
+        val upcomingEventsCount = eventRepository.countUpcoming(30)
+        val sentThisYear = messageRepository.getSentAnalyticsRecordsSince(yearStartMs())
 
-        val healthyCount = contacts.count { it.healthScore >= 70 }
-        val attentionCount = contacts.count { it.healthScore in 30..69 }
-        val atRiskCount = contacts.count { it.healthScore < 30 }
+        val healthyCount = contactProfiles.count { it.healthScore >= 70 }
+        val attentionCount = contactProfiles.count { it.healthScore in 30..69 }
+        val atRiskCount = contactProfiles.count { it.healthScore < 30 }
 
         val content = buildString {
             appendLine("section,metric,value")
             appendCsv("summary", "generated_at", timestampFormat.format(Date(generatedAt)))
-            appendCsv("summary", "total_contacts", contacts.size.toString())
+            appendCsv("summary", "total_contacts", contactProfiles.size.toString())
             appendCsv("summary", "total_wishes_sent", totalSent.toString())
             appendCsv("summary", "pending_approvals", pendingApprovals.toString())
-            appendCsv("summary", "upcoming_events_30_days", upcomingEvents.size.toString())
+            appendCsv("summary", "upcoming_events_30_days", upcomingEventsCount.toString())
             appendCsv("health", "healthy_70_plus", healthyCount.toString())
             appendCsv("health", "needs_attention_30_to_69", attentionCount.toString())
             appendCsv("health", "at_risk_under_30", atRiskCount.toString())

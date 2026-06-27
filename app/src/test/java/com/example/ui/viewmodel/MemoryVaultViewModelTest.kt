@@ -2,8 +2,10 @@ package com.example.ui.viewmodel
 
 import androidx.lifecycle.SavedStateHandle
 import com.example.R
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.MemoryNoteEntity
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MemoryNoteId
+import com.example.domain.model.contact.ContactHeader
+import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.MemoryNoteRepository
 import io.mockk.coEvery
@@ -42,14 +44,14 @@ class MemoryVaultViewModelTest {
 
     @Test
     fun `loadData emits contact and notes`() = runTest(testDispatcher) {
-        val contact = ContactEntity(id = "contact_1", name = "John Doe")
+        val contact = ContactHeader(id = ContactId("contact_1"), displayName = "John Doe")
         val notes = listOf(
-            MemoryNoteEntity(id = "note_1", contactId = "contact_1", noteText = "First Note", isPinned = false),
-            MemoryNoteEntity(id = "note_2", contactId = "contact_1", noteText = "Pinned Note", isPinned = true)
+            memoryNote(id = "note_1", noteText = "First Note", isPinned = false),
+            memoryNote(id = "note_2", noteText = "Pinned Note", isPinned = true)
         )
 
-        coEvery { contactRepository.getById("contact_1") } returns contact
-        coEvery { memoryNoteRepository.getByContact("contact_1") } returns notes
+        coEvery { contactRepository.getHeader("contact_1") } returns contact
+        coEvery { memoryNoteRepository.getRecordsByContact("contact_1") } returns notes
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
@@ -58,14 +60,14 @@ class MemoryVaultViewModelTest {
         assertEquals(contact, viewModel.uiState.value.contact)
         assertEquals(2, viewModel.uiState.value.notes.size)
         // Check order: Pinned note should come first
-        assertEquals("note_2", viewModel.uiState.value.notes[0].id)
-        assertEquals("note_1", viewModel.uiState.value.notes[1].id)
+        assertEquals(MemoryNoteId("note_2"), viewModel.uiState.value.notes[0].id)
+        assertEquals(MemoryNoteId("note_1"), viewModel.uiState.value.notes[1].id)
         assertEquals(false, viewModel.uiState.value.isLoading)
     }
 
     @Test
     fun `loadData emits error when repository fails`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getById("contact_1") } throws IllegalStateException("boom")
+        coEvery { contactRepository.getHeader("contact_1") } throws IllegalStateException("boom")
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
@@ -77,8 +79,8 @@ class MemoryVaultViewModelTest {
 
     @Test
     fun `addNote trims note text and defaults unknown category`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
-        coEvery { memoryNoteRepository.getByContact("contact_1") } returns emptyList()
+        coEvery { contactRepository.getHeader("contact_1") } returns contactHeader()
+        coEvery { memoryNoteRepository.getRecordsByContact("contact_1") } returns emptyList()
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
@@ -88,9 +90,9 @@ class MemoryVaultViewModelTest {
         advanceUntilIdle()
 
         coVerify {
-            memoryNoteRepository.upsert(
+            memoryNoteRepository.upsertRecord(
                 match {
-                    it.contactId == "contact_1" &&
+                    it.contactId == ContactId("contact_1") &&
                         it.noteText == "Likes mango lassi" &&
                         it.category == MemoryVaultViewModel.CATEGORY_GENERAL
                 },
@@ -100,8 +102,8 @@ class MemoryVaultViewModelTest {
 
     @Test
     fun `addNote rejects blank note with validation error`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
-        coEvery { memoryNoteRepository.getByContact("contact_1") } returns emptyList()
+        coEvery { contactRepository.getHeader("contact_1") } returns contactHeader()
+        coEvery { memoryNoteRepository.getRecordsByContact("contact_1") } returns emptyList()
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
@@ -111,13 +113,13 @@ class MemoryVaultViewModelTest {
         advanceUntilIdle()
 
         assertEquals(R.string.memory_vault_error_blank_note, viewModel.uiState.value.errorMessageRes)
-        coVerify(exactly = 0) { memoryNoteRepository.upsert(any()) }
+        coVerify(exactly = 0) { memoryNoteRepository.upsertRecord(any()) }
     }
 
     @Test
     fun `addNote rejects notes over maximum length`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
-        coEvery { memoryNoteRepository.getByContact("contact_1") } returns emptyList()
+        coEvery { contactRepository.getHeader("contact_1") } returns contactHeader()
+        coEvery { memoryNoteRepository.getRecordsByContact("contact_1") } returns emptyList()
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
@@ -127,19 +129,18 @@ class MemoryVaultViewModelTest {
         advanceUntilIdle()
 
         assertEquals(R.string.memory_vault_error_note_too_long, viewModel.uiState.value.errorMessageRes)
-        coVerify(exactly = 0) { memoryNoteRepository.upsert(any()) }
+        coVerify(exactly = 0) { memoryNoteRepository.upsertRecord(any()) }
     }
 
     @Test
     fun `togglePin flips pinned state and reloads notes`() = runTest(testDispatcher) {
-        val note = MemoryNoteEntity(
+        val note = memoryNote(
             id = "note_1",
-            contactId = "contact_1",
             noteText = "Pinned later",
             isPinned = false,
         )
-        coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
-        coEvery { memoryNoteRepository.getByContact("contact_1") } returns listOf(note)
+        coEvery { contactRepository.getHeader("contact_1") } returns contactHeader()
+        coEvery { memoryNoteRepository.getRecordsByContact("contact_1") } returns listOf(note)
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
@@ -149,24 +150,23 @@ class MemoryVaultViewModelTest {
         advanceUntilIdle()
 
         coVerify {
-            memoryNoteRepository.upsert(
+            memoryNoteRepository.upsertRecord(
                 match {
-                    it.id == "note_1" && it.isPinned
+                    it.id == MemoryNoteId("note_1") && it.isPinned
                 },
             )
         }
-        coVerify(atLeast = 2) { memoryNoteRepository.getByContact("contact_1") }
+        coVerify(atLeast = 2) { memoryNoteRepository.getRecordsByContact("contact_1") }
     }
 
     @Test
     fun `deleteNote deletes note and reloads notes`() = runTest(testDispatcher) {
-        val note = MemoryNoteEntity(
+        val note = memoryNote(
             id = "note_1",
-            contactId = "contact_1",
             noteText = "Remove this",
         )
-        coEvery { contactRepository.getById("contact_1") } returns ContactEntity(id = "contact_1", name = "John Doe")
-        coEvery { memoryNoteRepository.getByContact("contact_1") } returns listOf(note)
+        coEvery { contactRepository.getHeader("contact_1") } returns contactHeader()
+        coEvery { memoryNoteRepository.getRecordsByContact("contact_1") } returns listOf(note)
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
@@ -175,7 +175,31 @@ class MemoryVaultViewModelTest {
         viewModel.deleteNote(note)
         advanceUntilIdle()
 
-        coVerify { memoryNoteRepository.delete(note) }
-        coVerify(atLeast = 2) { memoryNoteRepository.getByContact("contact_1") }
+        coVerify { memoryNoteRepository.deleteRecord(MemoryNoteId("note_1")) }
+        coVerify(atLeast = 2) { memoryNoteRepository.getRecordsByContact("contact_1") }
+    }
+
+    private fun memoryNote(
+        id: String,
+        noteText: String,
+        category: String = MemoryVaultViewModel.CATEGORY_GENERAL,
+        dateMs: Long = 1_700_000_000_000L,
+        isPinned: Boolean = false,
+    ): MemoryNoteRecord {
+        return MemoryNoteRecord(
+            id = MemoryNoteId(id),
+            contactId = ContactId("contact_1"),
+            noteText = noteText,
+            category = category,
+            dateMs = dateMs,
+            isPinned = isPinned,
+        )
+    }
+
+    private fun contactHeader(): ContactHeader {
+        return ContactHeader(
+            id = ContactId("contact_1"),
+            displayName = "John Doe",
+        )
     }
 }

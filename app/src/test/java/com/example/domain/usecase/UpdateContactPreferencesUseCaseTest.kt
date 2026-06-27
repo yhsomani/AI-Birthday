@@ -1,8 +1,8 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ContactEntity
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.ContactId
 import com.example.domain.repository.ContactRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -19,7 +19,8 @@ class UpdateContactPreferencesUseCaseTest {
 
     @Test
     fun `invoke persists typed automation mode as raw storage value`() = runTest {
-        coEvery { contactRepository.getById("c1") } returns ContactEntity(id = "c1", name = "Alice")
+        coEvery { contactRepository.contactExists("c1") } returns true
+        coEvery { contactRepository.updatePreferences(any()) } returns true
 
         val result = useCase(
             UpdateContactPreferencesUseCase.Request(
@@ -30,17 +31,20 @@ class UpdateContactPreferencesUseCaseTest {
 
         assertTrue(result is UpdateContactPreferencesUseCase.Outcome.Updated)
         assertEquals(
-            ApprovalMode.VIP_APPROVE.raw,
-            (result as UpdateContactPreferencesUseCase.Outcome.Updated).contact.automationMode,
+            ApprovalMode.VIP_APPROVE,
+            (result as UpdateContactPreferencesUseCase.Outcome.Updated).preferences.automationMode,
         )
         coVerify {
-            contactRepository.update(match { it.id == "c1" && it.automationMode == ApprovalMode.VIP_APPROVE.raw })
+            contactRepository.updatePreferences(match {
+                it.contactId == ContactId("c1") && it.automationMode == ApprovalMode.VIP_APPROVE
+            })
         }
     }
 
     @Test
     fun `invoke persists typed preferred channel as raw storage value`() = runTest {
-        coEvery { contactRepository.getById("c1") } returns ContactEntity(id = "c1", name = "Alice")
+        coEvery { contactRepository.contactExists("c1") } returns true
+        coEvery { contactRepository.updatePreferences(any()) } returns true
 
         val result = useCase(
             UpdateContactPreferencesUseCase.Request(
@@ -51,17 +55,19 @@ class UpdateContactPreferencesUseCaseTest {
 
         assertTrue(result is UpdateContactPreferencesUseCase.Outcome.Updated)
         assertEquals(
-            MessageChannel.EMAIL.raw,
-            (result as UpdateContactPreferencesUseCase.Outcome.Updated).contact.preferredChannel,
+            MessageChannel.EMAIL,
+            (result as UpdateContactPreferencesUseCase.Outcome.Updated).preferences.preferredChannel,
         )
         coVerify {
-            contactRepository.update(match { it.id == "c1" && it.preferredChannel == MessageChannel.EMAIL.raw })
+            contactRepository.updatePreferences(match {
+                it.contactId == ContactId("c1") && it.preferredChannel == MessageChannel.EMAIL
+            })
         }
     }
 
     @Test
     fun `invoke rejects unknown preferred channel before persistence`() = runTest {
-        coEvery { contactRepository.getById("c1") } returns ContactEntity(id = "c1", name = "Alice")
+        coEvery { contactRepository.contactExists("c1") } returns true
 
         val result = useCase(
             UpdateContactPreferencesUseCase.Request(
@@ -76,12 +82,12 @@ class UpdateContactPreferencesUseCaseTest {
             ),
             result,
         )
-        coVerify(exactly = 0) { contactRepository.update(any()) }
+        coVerify(exactly = 0) { contactRepository.updatePreferences(any()) }
     }
 
     @Test
     fun `invoke rejects unknown automation mode before persistence`() = runTest {
-        coEvery { contactRepository.getById("c1") } returns ContactEntity(id = "c1", name = "Alice")
+        coEvery { contactRepository.contactExists("c1") } returns true
 
         val result = useCase(
             UpdateContactPreferencesUseCase.Request(
@@ -96,6 +102,21 @@ class UpdateContactPreferencesUseCaseTest {
             ),
             result,
         )
-        coVerify(exactly = 0) { contactRepository.update(any()) }
+        coVerify(exactly = 0) { contactRepository.updatePreferences(any()) }
+    }
+
+    @Test
+    fun `invoke returns contact not found before validation when contact is missing`() = runTest {
+        coEvery { contactRepository.contactExists("missing") } returns false
+
+        val result = useCase(
+            UpdateContactPreferencesUseCase.Request(
+                contactId = "missing",
+                preferredChannel = MessageChannel.UNKNOWN,
+            )
+        )
+
+        assertEquals(UpdateContactPreferencesUseCase.Outcome.ContactNotFound, result)
+        coVerify(exactly = 0) { contactRepository.updatePreferences(any()) }
     }
 }

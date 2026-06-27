@@ -16,10 +16,17 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.example.core.db.entities.PendingMessageEntity
-import com.example.core.db.entities.SentMessageEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.common.SentMessageId
+import com.example.domain.model.message.PendingMessageListItem
+import com.example.domain.model.message.SentMessageListItem
 import com.example.ui.viewmodel.MessageChannelFilter
 import com.example.ui.viewmodel.MessageReadiness
 import com.example.ui.viewmodel.MessageSort
@@ -416,22 +423,18 @@ class MessagesScreenInteractionTest {
         status: String = "PENDING",
         readiness: MessageReadiness = MessageReadiness.READY_FOR_REVIEW,
     ) = PendingMessageItem(
-        entity = PendingMessageEntity(
-            id = id,
-            contactId = contactId,
-            eventId = "event-$id",
-            shortVariant = "short $id",
-            standardVariant = "standard $id",
-            longVariant = "long $id",
-            formalVariant = "formal $id",
-            funnyVariant = "funny $id",
-            emotionalVariant = "emotional $id",
-            selectedVariant = "standard",
+        message = PendingMessageListItem(
+            id = MessageDraftId(id),
+            contactId = ContactId(contactId),
+            occasionId = OccasionId("event-$id"),
             selectedVariantText = "standard $id",
-            channel = channel,
+            standardVariant = "standard $id",
+            channel = MessageChannel.fromRaw(channel),
             scheduledForMs = 1_800_000_000_000L,
-            approvalMode = "MANUAL",
-            status = status,
+            approvalMode = ApprovalMode.UNKNOWN,
+            status = MessageStatus.fromRaw(status),
+            editedByUser = false,
+            userEditedText = null,
         ),
         contactName = contactName,
         eventType = eventType,
@@ -439,15 +442,14 @@ class MessagesScreenInteractionTest {
     )
 
     private fun sentItem(channel: String = MessageChannel.EMAIL.raw) = SentMessageItem(
-        entity = SentMessageEntity(
-            id = SENT_ID,
-            contactId = "contact-sent",
-            eventType = "BIRTHDAY",
-            eventYear = 2026,
+        message = SentMessageListItem(
+            id = SentMessageId(SENT_ID),
+            contactId = ContactId("contact-sent"),
+            occasionType = "BIRTHDAY",
             messageText = "Sent message",
-            channel = channel,
+            channel = MessageChannel.fromRaw(channel),
             sentAtMs = 1_800_000_000_000L,
-            deliveryStatus = "SENT",
+            deliveryStatus = MessageDeliveryStatus.SENT,
         ),
         contactName = "Sam",
     )

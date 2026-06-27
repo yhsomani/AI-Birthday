@@ -9,10 +9,12 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.ContactEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
-import com.example.ui.viewmodel.MemoryNoteCategorySummary
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.contact.ContactDetailProfile
+import com.example.domain.model.memory.MemoryNoteCategoryCount
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -32,10 +34,7 @@ class ContactDetailPersonalizationQualityCardTest {
     @Test
     fun lowQualityContact_showsNextMissingDetailPrompt() {
         composeRule.setQualityCardContent(
-            contact = ContactEntity(
-                id = "contact_1",
-                name = "Asha",
-            ),
+            contact = contactProfile(),
         )
 
         composeRule.onNodeWithText(
@@ -55,17 +54,15 @@ class ContactDetailPersonalizationQualityCardTest {
     @Test
     fun completeContact_showsReadyPrompt() {
         composeRule.setQualityCardContent(
-            contact = ContactEntity(
-                id = "contact_1",
-                name = "Asha",
+            contact = contactProfile(
                 nickname = "Ash",
                 interestsJson = """["music"]""",
                 notesText = "Met at college reunion.",
-                preferredChannel = MessageChannel.EMAIL.raw,
+                preferredChannel = MessageChannel.EMAIL,
             ),
             memoryNoteCount = 1,
             memoryNoteCategorySummary = listOf(
-                MemoryNoteCategorySummary(category = "GENERAL", count = 1),
+                MemoryNoteCategoryCount(category = "GENERAL", count = 1),
             ),
         )
 
@@ -83,11 +80,9 @@ class ContactDetailPersonalizationQualityCardTest {
     @Test
     fun partialQualityContact_showsSpecificContextImpact() {
         composeRule.setQualityCardContent(
-            contact = ContactEntity(
-                id = "contact_1",
-                name = "Asha",
+            contact = contactProfile(
                 nickname = "Ash",
-                preferredChannel = MessageChannel.SMS.raw,
+                preferredChannel = MessageChannel.SMS,
             ),
         )
 
@@ -102,18 +97,16 @@ class ContactDetailPersonalizationQualityCardTest {
     @Test
     fun memoryVaultNotesCompleteMemorySignal() {
         composeRule.setQualityCardContent(
-            contact = ContactEntity(
-                id = "contact_1",
-                name = "Asha",
+            contact = contactProfile(
                 nickname = "Ash",
                 interestsJson = """["music"]""",
                 notesText = "",
-                preferredChannel = MessageChannel.SMS.raw,
+                preferredChannel = MessageChannel.SMS,
             ),
             memoryNoteCount = 2,
             memoryNoteCategorySummary = listOf(
-                MemoryNoteCategorySummary(category = "GIFT", count = 1),
-                MemoryNoteCategorySummary(category = "PREFERENCE", count = 1),
+                MemoryNoteCategoryCount(category = "GIFT", count = 1),
+                MemoryNoteCategoryCount(category = "PREFERENCE", count = 1),
             ),
         )
 
@@ -136,12 +129,10 @@ class ContactDetailPersonalizationQualityCardTest {
     fun missingMemoryShowsClearAddMemoryAction() {
         val actions = mutableListOf<String>()
         composeRule.setQualityCardContent(
-            contact = ContactEntity(
-                id = "contact_1",
-                name = "Asha",
+            contact = contactProfile(
                 nickname = "Ash",
                 interestsJson = """["music"]""",
-                preferredChannel = MessageChannel.SMS.raw,
+                preferredChannel = MessageChannel.SMS,
             ),
             onAddMemory = { actions += "add-memory" },
         )
@@ -156,9 +147,9 @@ class ContactDetailPersonalizationQualityCardTest {
     }
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.setQualityCardContent(
-        contact: ContactEntity,
+        contact: ContactDetailProfile,
         memoryNoteCount: Int = 0,
-        memoryNoteCategorySummary: List<MemoryNoteCategorySummary> = emptyList(),
+        memoryNoteCategorySummary: List<MemoryNoteCategoryCount> = emptyList(),
         onAddMemory: () -> Unit = {},
     ) {
         setContent {
@@ -171,5 +162,39 @@ class ContactDetailPersonalizationQualityCardTest {
                 )
             }
         }
+    }
+
+    private fun contactProfile(
+        nickname: String? = null,
+        interestsJson: String = "[]",
+        notesText: String = "",
+        preferredChannel: MessageChannel = MessageChannel.SMS,
+    ): ContactDetailProfile {
+        return ContactDetailProfile(
+            id = ContactId("contact_1"),
+            displayName = "Asha",
+            contactGroup = null,
+            healthScore = 80,
+            nickname = nickname,
+            birthdayDay = null,
+            birthdayMonth = null,
+            primaryPhone = null,
+            primaryEmail = null,
+            relationshipType = "UNKNOWN",
+            preferredLanguage = "en",
+            preferredChannel = preferredChannel,
+            formalityLevel = "CASUAL",
+            communicationStyle = "WARM",
+            automationMode = ApprovalMode.DEFAULT,
+            customSendTimeHour = null,
+            customSendTimeMinute = null,
+            giftBudgetInr = 500,
+            annualBudgetInr = 0,
+            skipAutoWish = false,
+            interestsJson = interestsJson,
+            sensitiveTopicsJson = "[]",
+            currentLifePhaseJson = "{}",
+            notesText = notesText,
+        )
     }
 }

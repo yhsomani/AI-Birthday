@@ -22,9 +22,11 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.GiftHistoryEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.GiftHistoryId
+import com.example.domain.model.contact.ContactGiftAdvisorProfile
+import com.example.domain.model.gift.GiftHistoryRecord
 import com.example.domain.service.GiftSuggestion
 import com.example.ui.viewmodel.GiftAdvisorUiState
 import org.junit.Assert.assertEquals
@@ -97,7 +99,7 @@ class GiftAdvisorScreenInteractionTest {
                 actions += "save:$giftName|$giftCategory|$occasion|$cost|$receivedWell|$notes"
                 showDialog = false
             },
-            onDeleteGift = { actions += "delete:${it.id}" },
+            onDeleteGift = { actions += "delete:${it.id.value}" },
             onGenerateSuggestions = { actions += "suggest" },
         )
 
@@ -227,7 +229,7 @@ class GiftAdvisorScreenInteractionTest {
         onShowDialog: () -> Unit = {},
         onDismissDialog: () -> Unit = {},
         onSaveGift: () -> Unit = {},
-        onDeleteGift: (GiftHistoryEntity) -> Unit = {},
+        onDeleteGift: (GiftHistoryRecord) -> Unit = {},
         onGenerateSuggestions: () -> Unit = {},
     ) {
         setContent {
@@ -269,15 +271,18 @@ class GiftAdvisorScreenInteractionTest {
         onNodeWithTag(tag).performClick()
     }
 
-    private fun contact() = ContactEntity(
-        id = "contact_1",
-        name = "Riya",
+    private fun contact() = ContactGiftAdvisorProfile(
+        id = ContactId("contact_1"),
+        displayName = "Riya",
+        nickname = null,
+        relationshipType = "FRIEND",
+        interestsJson = "[]",
         giftBudgetInr = 5000,
     )
 
-    private fun giftRecord() = GiftHistoryEntity(
-        id = "gift_1",
-        contactId = "contact_1",
+    private fun giftRecord() = GiftHistoryRecord(
+        id = GiftHistoryId("gift_1"),
+        contactId = ContactId("contact_1"),
         giftName = "Notebook",
         giftCategory = "Stationery",
         occasionType = "Birthday",

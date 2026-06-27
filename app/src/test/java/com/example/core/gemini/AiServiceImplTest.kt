@@ -1,9 +1,11 @@
 package com.example.core.gemini
 
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
 import com.example.core.resilience.LogLevel
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.message.MessagePromptContext
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -27,12 +29,7 @@ class AiServiceImplTest {
         coEvery { geminiClient.generate(any()) } returns "not json"
 
         val result = service.generateMessage(
-            contact = contact(),
-            event = event(type = "ANNIVERSARY"),
-            styleProfile = null,
-            previousMessages = emptyList(),
-            memoryNotes = emptyList(),
-            giftHistory = emptyList(),
+            context = promptContext(eventType = "ANNIVERSARY"),
         )
 
         assertEquals("Happy Anniversary! Wishing you both a lifetime of love and happiness.", result.standard)
@@ -45,13 +42,8 @@ class AiServiceImplTest {
 
         val result = service.regenerateMessage(
             previousMessage = "old draft",
-            contact = contact(),
-            event = event(type = "WORK_ANNIVERSARY"),
-            styleProfile = null,
-            previousMessages = emptyList(),
+            context = promptContext(eventType = "WORK_ANNIVERSARY"),
             feedbackInstruction = "Make it warmer",
-            memoryNotes = emptyList(),
-            giftHistory = emptyList(),
         )
 
         assertEquals("Congratulations on your work anniversary! Thank you for your hard work and dedication.", result.standard)
@@ -65,12 +57,7 @@ class AiServiceImplTest {
             "not json: phone +91 98765 43210 email private@example.com"
 
         val result = service.generateMessage(
-            contact = contact(),
-            event = event(type = "BIRTHDAY"),
-            styleProfile = null,
-            previousMessages = emptyList(),
-            memoryNotes = emptyList(),
-            giftHistory = emptyList(),
+            context = promptContext(eventType = "BIRTHDAY"),
         )
 
         assertTrue(result.isUsingFallback)
@@ -89,17 +76,26 @@ class AiServiceImplTest {
         assertFalse(loggedText.contains("not json"))
     }
 
-    private fun contact() = ContactEntity(
-        id = "contact_1",
-        name = "Asha Rao",
-    )
-
-    private fun event(type: String) = EventEntity(
-        id = "event_1",
-        contactId = "contact_1",
-        type = type,
-        dayOfMonth = 1,
-        month = 1,
-        nextOccurrenceMs = System.currentTimeMillis() + 86_400_000L,
+    private fun promptContext(eventType: String) = MessagePromptContext(
+        contactId = ContactId("contact_1"),
+        eventId = OccasionId("event_1"),
+        firstName = "Asha",
+        nickname = null,
+        relationshipType = "FRIEND",
+        knownSince = null,
+        ageTurning = null,
+        interests = emptyList(),
+        sharedHistory = emptyList(),
+        daysSinceLastContact = 0,
+        eventType = eventType,
+        eventOccurrenceNumber = null,
+        preferredLanguage = "en",
+        userStyleSamples = emptyList(),
+        usesEmoji = true,
+        avgMessageLength = 120,
+        commonPhrases = emptyList(),
+        previousWishes = emptyList(),
+        formalityLevel = "CASUAL",
+        preferredChannel = MessageChannel.SMS,
     )
 }

@@ -12,6 +12,9 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): EventEntity?
 
+    @Query("SELECT type FROM events WHERE id = :id LIMIT 1")
+    suspend fun getTypeById(id: String): String?
+
     @Query("SELECT COUNT(*) FROM events WHERE isActive = 1")
     fun countAll(): Flow<Int>
 
@@ -21,8 +24,17 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE isActive = 1 AND nextOccurrenceMs >= :nowMs AND CAST((nextOccurrenceMs - :nowMs) / 86400000 AS INTEGER) <= :days ORDER BY nextOccurrenceMs ASC")
     suspend fun getUpcoming(days: Int, nowMs: Long): List<EventEntity>
 
+    @Query("SELECT * FROM events WHERE isActive = 1 AND contactId = :contactId AND nextOccurrenceMs >= :nowMs AND CAST((nextOccurrenceMs - :nowMs) / 86400000 AS INTEGER) <= :days ORDER BY nextOccurrenceMs ASC LIMIT 1")
+    suspend fun getNextUpcomingForContact(contactId: String, days: Int, nowMs: Long): EventEntity?
+
+    @Query("SELECT COUNT(*) FROM events WHERE isActive = 1 AND nextOccurrenceMs >= :nowMs AND CAST((nextOccurrenceMs - :nowMs) / 86400000 AS INTEGER) <= :days")
+    suspend fun countUpcoming(days: Int, nowMs: Long): Int
+
     @Query("UPDATE events SET isActive = 0 WHERE contactId = :contactId AND type = :type")
     suspend fun deactivateEventsForContact(contactId: String, type: String)
+
+    @Query("UPDATE events SET isActive = 0 WHERE contactId = :contactId AND type = :type AND source = 'CONTACTS'")
+    suspend fun deactivateContactDerivedEvent(contactId: String, type: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(event: EventEntity)

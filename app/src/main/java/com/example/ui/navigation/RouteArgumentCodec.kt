@@ -1,13 +1,12 @@
 package com.example.ui.navigation
 
+import com.example.domain.navigation.RelateDeepLinks
 import java.net.URLDecoder
-import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 internal object RouteArgumentCodec {
     fun encode(value: String): String {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8.name())
-            .replace("+", "%20")
+        return RelateDeepLinks.encodePathSegment(value)
     }
 
     fun decode(value: String?): String {

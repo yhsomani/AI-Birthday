@@ -1,9 +1,8 @@
 package com.example.domain.automation
 
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.model.MessageChannel
-import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.contact.ContactDeliveryRouteProfile
+import com.example.domain.model.message.DeliveryRouteHistoryRecord
 
 object AutoSendChannelSelector {
     sealed class ChannelSelection {
@@ -34,15 +33,15 @@ object AutoSendChannelSelector {
     }
 
     fun select(
-        contact: ContactEntity,
-        previousMessages: List<SentMessageEntity>,
+        contact: ContactDeliveryRouteProfile,
+        routeHistory: List<DeliveryRouteHistoryRecord>,
         channelBlackoutJson: String,
         senderEmail: String,
         senderEmailPassword: String,
     ): MessageChannel {
         return selectRoute(
             contact = contact,
-            previousMessages = previousMessages,
+            routeHistory = routeHistory,
             channelBlackoutJson = channelBlackoutJson,
             senderEmail = senderEmail,
             senderEmailPassword = senderEmailPassword,
@@ -50,8 +49,8 @@ object AutoSendChannelSelector {
     }
 
     fun selectRoute(
-        contact: ContactEntity,
-        previousMessages: List<SentMessageEntity>,
+        contact: ContactDeliveryRouteProfile,
+        routeHistory: List<DeliveryRouteHistoryRecord>,
         channelBlackoutJson: String,
         senderEmail: String,
         senderEmailPassword: String,
@@ -74,11 +73,11 @@ object AutoSendChannelSelector {
             )
         }
 
-        val preferred = MessageChannel.fromRaw(contact.preferredChannel)
-        val bestHistorical = previousMessages
+        val preferred = contact.preferredChannel
+        val bestHistorical = routeHistory
             .asSequence()
-            .filter { MessageDeliveryStatus.fromRaw(it.deliveryStatus).isSuccessfulForRouting }
-            .map { MessageChannel.fromRaw(it.channel) }
+            .filter { it.deliveryStatus.isSuccessfulForRouting }
+            .map { it.channel }
             .filter { it in availableChannels }
             .groupingBy { it }
             .eachCount()
@@ -100,7 +99,7 @@ object AutoSendChannelSelector {
     }
 
     private fun availableChannels(
-        contact: ContactEntity,
+        contact: ContactDeliveryRouteProfile,
         channelBlackoutJson: String,
         senderEmail: String,
         senderEmailPassword: String,
@@ -110,8 +109,8 @@ object AutoSendChannelSelector {
             .filter {
                 when (it) {
                     MessageChannel.SMS,
-                    MessageChannel.WHATSAPP -> !contact.primaryPhone.isNullOrBlank()
-                    MessageChannel.EMAIL -> !contact.primaryEmail.isNullOrBlank() &&
+                    MessageChannel.WHATSAPP -> contact.hasPrimaryPhone
+                    MessageChannel.EMAIL -> contact.hasPrimaryEmail &&
                         senderEmail.isNotBlank() &&
                         senderEmailPassword.isNotBlank()
                     MessageChannel.UNKNOWN -> false
@@ -121,7 +120,7 @@ object AutoSendChannelSelector {
     }
 
     private fun noRouteReasons(
-        contact: ContactEntity,
+        contact: ContactDeliveryRouteProfile,
         channelBlackoutJson: String,
         senderEmail: String,
         senderEmailPassword: String,
@@ -137,12 +136,12 @@ object AutoSendChannelSelector {
             when (channel) {
                 MessageChannel.SMS,
                 MessageChannel.WHATSAPP -> {
-                    if (contact.primaryPhone.isNullOrBlank()) {
+                    if (!contact.hasPrimaryPhone) {
                         reasons += NoRouteReason.MISSING_PHONE
                     }
                 }
                 MessageChannel.EMAIL -> {
-                    if (contact.primaryEmail.isNullOrBlank()) {
+                    if (!contact.hasPrimaryEmail) {
                         reasons += NoRouteReason.MISSING_EMAIL
                     }
                     if (senderEmail.isBlank() || senderEmailPassword.isBlank()) {
@@ -156,8 +155,8 @@ object AutoSendChannelSelector {
         return reasons.ifEmpty { setOf(NoRouteReason.NO_SUPPORTED_CONTACT_CHANNEL) }
     }
 
-    private fun fallbackChannel(contact: ContactEntity): MessageChannel {
-        return MessageChannel.fromRaw(contact.preferredChannel)
+    private fun fallbackChannel(contact: ContactDeliveryRouteProfile): MessageChannel {
+        return contact.preferredChannel
             .takeIf { it != MessageChannel.UNKNOWN }
             ?: MessageChannel.SMS
     }

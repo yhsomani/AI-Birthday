@@ -2,10 +2,15 @@ package com.example.ui.viewmodel
 
 import androidx.lifecycle.SavedStateHandle
 import com.example.R
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
-import com.example.core.db.entities.MemoryNoteEntity
 import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.contact.ContactDetailProfile
+import com.example.domain.model.memory.MemoryNoteCategoryCount
+import com.example.domain.model.memory.MemoryNoteSummary
+import com.example.domain.model.occasion.OccasionType
+import com.example.domain.model.occasion.UpcomingEventPreview
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MemoryNoteRepository
@@ -55,7 +60,7 @@ class ContactDetailViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        coEvery { mockMemoryNoteRepository.getByContact("contact1") } returns emptyList()
+        coEvery { mockMemoryNoteRepository.getSummaryForContact("contact1") } returns MemoryNoteSummary.EMPTY
     }
 
     @After
@@ -65,37 +70,16 @@ class ContactDetailViewModelTest {
 
     @Test
     fun `loadContact populates state with contact and upcoming birthday`() = runTest(testDispatcher) {
-        val contact = ContactEntity(
-            id = "contact1",
-            name = "Alice",
-            healthScore = 80,
-        )
-        val cal = java.util.Calendar.getInstance()
-        cal.add(java.util.Calendar.DAY_OF_MONTH, 7)
-        val event = EventEntity(
-            id = "event1",
-            contactId = "contact1",
-            type = "BIRTHDAY",
-            label = "Alice's Birthday",
-            dayOfMonth = cal.get(java.util.Calendar.DAY_OF_MONTH),
-            month = cal.get(java.util.Calendar.MONTH) + 1,
-            nextOccurrenceMs = cal.timeInMillis,
-        )
+        val contact = contactProfile(displayName = "Alice", healthScore = 80)
+        val event = upcomingEventPreview()
 
-        coEvery { mockContactRepo.getById("contact1") } returns contact
-        coEvery { mockEventRepo.getUpcoming(365) } returns listOf(event)
-        coEvery { mockMemoryNoteRepository.getByContact("contact1") } returns listOf(
-            MemoryNoteEntity(
-                id = "memory1",
-                contactId = "contact1",
-                noteText = "Met at college reunion.",
-                category = "EVENT",
-            ),
-            MemoryNoteEntity(
-                id = "memory2",
-                contactId = "contact1",
-                noteText = "Likes books.",
-                category = "GIFT",
+        coEvery { mockContactRepo.getDetailProfile("contact1") } returns contact
+        coEvery { mockEventRepo.getNextUpcomingPreviewForContact("contact1", 365) } returns event
+        coEvery { mockMemoryNoteRepository.getSummaryForContact("contact1") } returns MemoryNoteSummary(
+            totalCount = 2,
+            categoryCounts = listOf(
+                MemoryNoteCategoryCount(category = "EVENT", count = 1),
+                MemoryNoteCategoryCount(category = "GIFT", count = 1),
             ),
         )
 
@@ -110,12 +94,12 @@ class ContactDetailViewModelTest {
         )
         advanceUntilIdle()
 
-        assertEquals("Alice", viewModel.uiState.value.contact?.name)
+        assertEquals("Alice", viewModel.uiState.value.contact?.displayName)
         assertEquals(2, viewModel.uiState.value.memoryNoteCount)
         assertEquals(
             listOf(
-                MemoryNoteCategorySummary(category = "EVENT", count = 1),
-                MemoryNoteCategorySummary(category = "GIFT", count = 1),
+                MemoryNoteCategoryCount(category = "EVENT", count = 1),
+                MemoryNoteCategoryCount(category = "GIFT", count = 1),
             ),
             viewModel.uiState.value.memoryNoteCategorySummary,
         )
@@ -125,21 +109,11 @@ class ContactDetailViewModelTest {
 
     @Test
     fun `generateWish calls use case and emits result`() = runTest(testDispatcher) {
-        val contact = ContactEntity(id = "contact1", name = "Alice", healthScore = 80)
-        val cal = java.util.Calendar.getInstance()
-        cal.add(java.util.Calendar.DAY_OF_MONTH, 7)
-        val event = EventEntity(
-            id = "event1",
-            contactId = "contact1",
-            type = "BIRTHDAY",
-            label = "Alice's Birthday",
-            dayOfMonth = cal.get(java.util.Calendar.DAY_OF_MONTH),
-            month = cal.get(java.util.Calendar.MONTH) + 1,
-            nextOccurrenceMs = cal.timeInMillis,
-        )
+        val contact = contactProfile(displayName = "Alice", healthScore = 80)
+        val event = upcomingEventPreview()
 
-        coEvery { mockContactRepo.getById("contact1") } returns contact
-        coEvery { mockEventRepo.getUpcoming(365) } returns listOf(event)
+        coEvery { mockContactRepo.getDetailProfile("contact1") } returns contact
+        coEvery { mockEventRepo.getNextUpcomingPreviewForContact("contact1", 365) } returns event
         coEvery { mockGenerateUseCase("event1") } returns
             GenerateMessageUseCase.GenerationOutcome.Generated("pending1", ApprovalMode.SMART_APPROVE, 0)
 
@@ -163,20 +137,11 @@ class ContactDetailViewModelTest {
 
     @Test
     fun `generateWish shows error when use case fails`() = runTest(testDispatcher) {
-        val contact = ContactEntity(id = "contact1", name = "Alice", healthScore = 80)
-        val cal = java.util.Calendar.getInstance()
-        cal.add(java.util.Calendar.DAY_OF_MONTH, 7)
-        val event = EventEntity(
-            id = "event1",
-            contactId = "contact1",
-            type = "BIRTHDAY",
-            dayOfMonth = cal.get(java.util.Calendar.DAY_OF_MONTH),
-            month = cal.get(java.util.Calendar.MONTH) + 1,
-            nextOccurrenceMs = cal.timeInMillis,
-        )
+        val contact = contactProfile(displayName = "Alice", healthScore = 80)
+        val event = upcomingEventPreview(label = null)
 
-        coEvery { mockContactRepo.getById("contact1") } returns contact
-        coEvery { mockEventRepo.getUpcoming(365) } returns listOf(event)
+        coEvery { mockContactRepo.getDetailProfile("contact1") } returns contact
+        coEvery { mockEventRepo.getNextUpcomingPreviewForContact("contact1", 365) } returns event
         coEvery { mockGenerateUseCase("event1") } returns
             GenerateMessageUseCase.GenerationOutcome.ContactNotFound
 
@@ -201,20 +166,11 @@ class ContactDetailViewModelTest {
 
     @Test
     fun `generateWish shows settings error when AI generation is disabled`() = runTest(testDispatcher) {
-        val contact = ContactEntity(id = "contact1", name = "Alice", healthScore = 80)
-        val cal = java.util.Calendar.getInstance()
-        cal.add(java.util.Calendar.DAY_OF_MONTH, 7)
-        val event = EventEntity(
-            id = "event1",
-            contactId = "contact1",
-            type = "BIRTHDAY",
-            dayOfMonth = cal.get(java.util.Calendar.DAY_OF_MONTH),
-            month = cal.get(java.util.Calendar.MONTH) + 1,
-            nextOccurrenceMs = cal.timeInMillis,
-        )
+        val contact = contactProfile(displayName = "Alice", healthScore = 80)
+        val event = upcomingEventPreview(label = null)
 
-        coEvery { mockContactRepo.getById("contact1") } returns contact
-        coEvery { mockEventRepo.getUpcoming(365) } returns listOf(event)
+        coEvery { mockContactRepo.getDetailProfile("contact1") } returns contact
+        coEvery { mockEventRepo.getNextUpcomingPreviewForContact("contact1", 365) } returns event
         coEvery { mockGenerateUseCase("event1") } returns
             GenerateMessageUseCase.GenerationOutcome.AiDisabled
 
@@ -238,8 +194,8 @@ class ContactDetailViewModelTest {
 
     @Test
     fun `savePreferences maps invalid input reason to resource error`() = runTest(testDispatcher) {
-        coEvery { mockContactRepo.getById("contact1") } returns ContactEntity(id = "contact1", name = "Alice")
-        coEvery { mockEventRepo.getUpcoming(365) } returns emptyList()
+        coEvery { mockContactRepo.getDetailProfile("contact1") } returns contactProfile(displayName = "Alice")
+        coEvery { mockEventRepo.getNextUpcomingPreviewForContact("contact1", 365) } returns null
         coEvery { mockUpdateContactPreferencesUseCase(any()) } returns
             UpdateContactPreferencesUseCase.Outcome.InvalidInput(
                 UpdateContactPreferencesUseCase.InvalidInputReason.NEGATIVE_BUDGET,
@@ -266,5 +222,58 @@ class ContactDetailViewModelTest {
 
         assertEquals(R.string.contact_preferences_error_negative_budget, viewModel.uiState.value.preferenceErrorRes)
         assertEquals(false, viewModel.uiState.value.isSavingPreferences)
+    }
+
+    private fun contactProfile(
+        id: String = "contact1",
+        displayName: String = "Alice",
+        healthScore: Int = 80,
+    ): ContactDetailProfile {
+        return ContactDetailProfile(
+            id = ContactId(id),
+            displayName = displayName,
+            contactGroup = null,
+            healthScore = healthScore,
+            nickname = null,
+            birthdayDay = null,
+            birthdayMonth = null,
+            primaryPhone = null,
+            primaryEmail = null,
+            relationshipType = "UNKNOWN",
+            preferredLanguage = "en",
+            preferredChannel = MessageChannel.SMS,
+            formalityLevel = "CASUAL",
+            communicationStyle = "WARM",
+            automationMode = ApprovalMode.DEFAULT,
+            customSendTimeHour = null,
+            customSendTimeMinute = null,
+            giftBudgetInr = 500,
+            annualBudgetInr = 0,
+            skipAutoWish = false,
+            interestsJson = "[]",
+            sensitiveTopicsJson = "[]",
+            currentLifePhaseJson = "{}",
+            notesText = "",
+        )
+    }
+
+    private fun upcomingEventPreview(
+        id: String = "event1",
+        contactId: String = "contact1",
+        type: OccasionType = OccasionType.BIRTHDAY,
+        label: String? = "Alice's Birthday",
+        daysFromNow: Int = 7,
+    ): UpcomingEventPreview {
+        return UpcomingEventPreview(
+            id = OccasionId(id),
+            contactId = ContactId(contactId),
+            type = type,
+            label = label,
+            nextOccurrenceMs = System.currentTimeMillis() + daysFromNow * DAY_MS,
+        )
+    }
+
+    private companion object {
+        const val DAY_MS = 86_400_000L
     }
 }

@@ -5,24 +5,13 @@ import android.database.sqlite.SQLiteConstraintException
 import android.net.Uri
 import androidx.room.withTransaction
 import com.example.core.db.AppDatabase
-import com.example.core.db.entities.ActivityLogEntity
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
-import com.example.core.db.entities.GiftHistoryEntity
-import com.example.core.db.entities.MemoryNoteEntity
-import com.example.core.db.entities.MessageFeedbackEntity
-import com.example.core.db.entities.PendingMessageEntity
-import com.example.core.db.entities.SentMessageEntity
-import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
-import com.example.domain.model.ApprovalMode
 import com.example.domain.service.BackupExportResult
 import com.example.domain.service.BackupFailureReason
 import com.example.domain.service.BackupImportResult
 import com.example.domain.service.BackupOperationResult
 import com.example.domain.service.BackupPreviewResult
-import com.example.domain.service.BackupRecordCounts
 import com.example.domain.service.BackupRestoreMode
 import com.example.domain.service.BackupService
 import com.squareup.moshi.JsonDataException
@@ -56,10 +45,10 @@ class BackupServiceImpl @Inject constructor(
         .build()
 
     private val adapter = moshi
-        .adapter(BackupData::class.java)
+        .adapter(BackupPayloadDto::class.java)
         .indent("  ")
     private val recordSnapshotAdapter = moshi
-        .adapter(BackupRecordSnapshot::class.java)
+        .adapter(BackupRecordSnapshotDto::class.java)
         .indent("  ")
 
     override suspend fun exportBackup(
@@ -133,15 +122,16 @@ class BackupServiceImpl @Inject constructor(
             val count = database.withTransaction {
                 var restored = 0
                 replaceExistingRestorableData()
-                backup.contacts.forEach { database.contactDao().upsert(it); restored++ }
-                backup.events.forEach { database.eventDao().upsert(it); restored++ }
-                backup.pendingMessages.forEach { database.pendingMessageDao().insert(it); restored++ }
-                backup.sentMessages.forEach { database.sentMessageDao().insert(it); restored++ }
-                backup.styleProfile?.let { database.styleProfileDao().upsert(it); restored++ }
-                backup.memoryNotes.forEach { database.memoryNoteDao().upsert(it); restored++ }
-                backup.giftHistory.forEach { database.giftHistoryDao().upsert(it); restored++ }
-                backup.activityLogs.forEach { database.activityLogDao().insert(it); restored++ }
-                backup.messageFeedback.forEach { database.messageFeedbackDao().insert(it); restored++ }
+                backup.contacts.forEach { database.contactDao().upsert(it.toEntity()); restored++ }
+                backup.events.forEach { database.eventDao().upsert(it.toEntity()); restored++ }
+                backup.pendingMessages.forEach { database.pendingMessageDao().insert(it.toEntity()); restored++ }
+                backup.sentMessages.forEach { database.sentMessageDao().insert(it.toEntity()); restored++ }
+                backup.styleProfile?.let { database.styleProfileDao().upsert(it.toEntity()); restored++ }
+                backup.memoryNotes.forEach { database.memoryNoteDao().upsert(it.toEntity()); restored++ }
+                backup.giftHistory.forEach { database.giftHistoryDao().upsert(it.toEntity()); restored++ }
+                backup.activityLogs.forEach { database.activityLogDao().insert(it.toEntity()); restored++ }
+                backup.messageFeedback.forEach { database.messageFeedbackDao().insert(it.toEntity()); restored++ }
+                backup.dispatchAttempts.forEach { database.dispatchAttemptDao().upsert(it.toEntity()); restored++ }
                 restored
             }
             backup.preferences?.let { restorePreferences(it) }
@@ -162,6 +152,7 @@ class BackupServiceImpl @Inject constructor(
     }
 
     private suspend fun replaceExistingRestorableData() {
+        database.dispatchAttemptDao().deleteAll()
         database.messageFeedbackDao().deleteAll()
         database.activityLogDao().deleteAll()
         database.pendingMessageDao().deleteAll()
@@ -191,7 +182,7 @@ class BackupServiceImpl @Inject constructor(
     private fun readValidatedBackup(
         inputUri: Uri,
         passphrase: String,
-    ): BackupOperationResult<BackupData> {
+    ): BackupOperationResult<BackupPayloadDto> {
         val encryptedJson = try {
             context.contentResolver.openInputStream(inputUri)?.use { inputStream ->
                 readUtf8TextWithLimit(inputStream)
@@ -251,22 +242,23 @@ class BackupServiceImpl @Inject constructor(
     private suspend fun createEncryptedBackupFile(passphrase: String): File {
         val timestampMs = System.currentTimeMillis()
         val preferences = capturePreferences()
-        val recordSnapshot = BackupRecordSnapshot(
-            contacts = database.contactDao().getAllSync(),
-            events = database.eventDao().getAllSync(),
-            pendingMessages = database.pendingMessageDao().getAllSync(),
-            sentMessages = database.sentMessageDao().getAllSync(),
-            styleProfile = database.styleProfileDao().get(),
-            memoryNotes = database.memoryNoteDao().getAllSync(),
-            giftHistory = database.giftHistoryDao().getAllSync(),
-            activityLogs = database.activityLogDao().getAllSync(),
-            messageFeedback = database.messageFeedbackDao().getAllSync(),
+        val recordSnapshot = BackupRecordSnapshotDto(
+            contacts = database.contactDao().getAllSync().map { it.toBackupDto() },
+            events = database.eventDao().getAllSync().map { it.toBackupDto() },
+            pendingMessages = database.pendingMessageDao().getAllSync().map { it.toBackupDto() },
+            sentMessages = database.sentMessageDao().getAllSync().map { it.toBackupDto() },
+            styleProfile = database.styleProfileDao().get()?.toBackupDto(),
+            memoryNotes = database.memoryNoteDao().getAllSync().map { it.toBackupDto() },
+            giftHistory = database.giftHistoryDao().getAllSync().map { it.toBackupDto() },
+            activityLogs = database.activityLogDao().getAllSync().map { it.toBackupDto() },
+            messageFeedback = database.messageFeedbackDao().getAllSync().map { it.toBackupDto() },
+            dispatchAttempts = database.dispatchAttemptDao().getAllSync().map { it.toBackupDto() },
             preferences = preferences,
         )
-        val backup = BackupData(
+        val backup = BackupPayloadDto(
             version = CURRENT_BACKUP_VERSION,
             timestampMs = timestampMs,
-            manifest = BackupManifest(
+            manifest = BackupManifestDto(
                 backupVersion = CURRENT_BACKUP_VERSION,
                 appVersion = resolveAppVersionName(),
                 exportedAtMs = timestampMs,
@@ -282,6 +274,7 @@ class BackupServiceImpl @Inject constructor(
             giftHistory = recordSnapshot.giftHistory,
             activityLogs = recordSnapshot.activityLogs,
             messageFeedback = recordSnapshot.messageFeedback,
+            dispatchAttempts = recordSnapshot.dispatchAttempts,
             preferences = preferences,
         )
 
@@ -292,16 +285,16 @@ class BackupServiceImpl @Inject constructor(
         }
     }
 
-    private fun capturePreferences(): BackupPreferences {
+    private fun capturePreferences(): BackupPreferencesDto {
         return try {
-            BackupPreferences.from(securePrefs)
+            BackupPreferencesDto.from(securePrefs)
         } catch (e: Exception) {
             StructuredLogger.w(TAG, "Failed to read backup preferences; using defaults", e)
-            BackupPreferences.defaults()
+            BackupPreferencesDto.defaults()
         }
     }
 
-    private fun restorePreferences(preferences: BackupPreferences) {
+    private fun restorePreferences(preferences: BackupPreferencesDto) {
         try {
             preferences.restoreTo(securePrefs)
         } catch (e: Exception) {
@@ -309,13 +302,13 @@ class BackupServiceImpl @Inject constructor(
         }
     }
 
-    private fun checksumFor(snapshot: BackupRecordSnapshot): String {
+    private fun checksumFor(snapshot: BackupRecordSnapshotDto): String {
         val bytes = recordSnapshotAdapter.toJson(snapshot).toByteArray(Charsets.UTF_8)
         val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
         return digest.joinToString("") { "%02x".format(it) }
     }
 
-    private fun BackupData.hasValidManifestChecksum(): Boolean {
+    private fun BackupPayloadDto.hasValidManifestChecksum(): Boolean {
         val manifest = manifest ?: return true
         val expected = checksumFor(toRecordSnapshot())
         return manifest.dataChecksumSha256.equals(expected, ignoreCase = true)
@@ -334,129 +327,7 @@ class BackupServiceImpl @Inject constructor(
         }
     }
 
-    private data class BackupData(
-        val version: Int = CURRENT_BACKUP_VERSION,
-        val timestampMs: Long = System.currentTimeMillis(),
-        val manifest: BackupManifest? = null,
-        val contacts: List<ContactEntity> = emptyList(),
-        val events: List<EventEntity> = emptyList(),
-        val pendingMessages: List<PendingMessageEntity> = emptyList(),
-        val sentMessages: List<SentMessageEntity> = emptyList(),
-        val styleProfile: StyleProfileEntity? = null,
-        val memoryNotes: List<MemoryNoteEntity> = emptyList(),
-        val giftHistory: List<GiftHistoryEntity> = emptyList(),
-        val activityLogs: List<ActivityLogEntity> = emptyList(),
-        val messageFeedback: List<MessageFeedbackEntity> = emptyList(),
-        val preferences: BackupPreferences? = null,
-    ) {
-        fun toRecordSnapshot() = BackupRecordSnapshot(
-            contacts = contacts,
-            events = events,
-            pendingMessages = pendingMessages,
-            sentMessages = sentMessages,
-            styleProfile = styleProfile,
-            memoryNotes = memoryNotes,
-            giftHistory = giftHistory,
-            activityLogs = activityLogs,
-            messageFeedback = messageFeedback,
-            preferences = preferences,
-        )
-
-        fun toPreviewResult() = BackupPreviewResult(
-            backupVersion = manifest?.backupVersion ?: version,
-            appVersion = manifest?.appVersion ?: "unknown",
-            exportedAtMs = manifest?.exportedAtMs ?: timestampMs,
-            counts = manifest?.counts ?: toRecordSnapshot().counts(),
-            restoreMode = BackupRestoreMode.REPLACE,
-        )
-    }
-
-    private data class BackupManifest(
-        val backupVersion: Int,
-        val appVersion: String,
-        val exportedAtMs: Long,
-        val counts: BackupRecordCounts,
-        val dataChecksumSha256: String,
-    )
-
-    private data class BackupRecordSnapshot(
-        val contacts: List<ContactEntity> = emptyList(),
-        val events: List<EventEntity> = emptyList(),
-        val pendingMessages: List<PendingMessageEntity> = emptyList(),
-        val sentMessages: List<SentMessageEntity> = emptyList(),
-        val styleProfile: StyleProfileEntity? = null,
-        val memoryNotes: List<MemoryNoteEntity> = emptyList(),
-        val giftHistory: List<GiftHistoryEntity> = emptyList(),
-        val activityLogs: List<ActivityLogEntity> = emptyList(),
-        val messageFeedback: List<MessageFeedbackEntity> = emptyList(),
-        val preferences: BackupPreferences? = null,
-    ) {
-        fun counts() = BackupRecordCounts(
-            contacts = contacts.size,
-            events = events.size,
-            pendingMessages = pendingMessages.size,
-            sentMessages = sentMessages.size,
-            styleProfiles = if (styleProfile == null) 0 else 1,
-            memoryNotes = memoryNotes.size,
-            giftHistory = giftHistory.size,
-            activityLogs = activityLogs.size,
-            messageFeedback = messageFeedback.size,
-            preferences = if (preferences == null) 0 else 1,
-        )
-    }
-
-    private data class BackupPreferences(
-        val globalAutomationMode: String,
-        val themeMode: String,
-        val blackoutDatesJson: String,
-        val quietHoursStart: Int,
-        val quietHoursEnd: Int,
-        val channelBlackoutJson: String,
-        val biometricLockEnabled: Boolean,
-        val birthdayRemindersEnabled: Boolean,
-        val aiWishGenerationEnabled: Boolean,
-    ) {
-        fun restoreTo(securePrefs: SecurePrefs) {
-            securePrefs.setGlobalAutomationMode(globalAutomationMode)
-            securePrefs.setThemeMode(themeMode)
-            securePrefs.setBlackoutDates(blackoutDatesJson)
-            securePrefs.setQuietHoursStart(quietHoursStart)
-            securePrefs.setQuietHoursEnd(quietHoursEnd)
-            securePrefs.setChannelBlackout(channelBlackoutJson)
-            securePrefs.setBiometricLockEnabled(biometricLockEnabled)
-            securePrefs.setBirthdayRemindersEnabled(birthdayRemindersEnabled)
-            securePrefs.setAiWishGenerationEnabled(aiWishGenerationEnabled)
-        }
-
-        companion object {
-            fun defaults() = BackupPreferences(
-                globalAutomationMode = ApprovalMode.SMART_APPROVE.raw,
-                themeMode = "SYSTEM",
-                blackoutDatesJson = "[]",
-                quietHoursStart = 22,
-                quietHoursEnd = 8,
-                channelBlackoutJson = "[]",
-                biometricLockEnabled = false,
-                birthdayRemindersEnabled = true,
-                aiWishGenerationEnabled = true,
-            )
-
-            fun from(securePrefs: SecurePrefs) = BackupPreferences(
-                globalAutomationMode = securePrefs.getGlobalAutomationMode(),
-                themeMode = securePrefs.getThemeMode(),
-                blackoutDatesJson = securePrefs.getBlackoutDates(),
-                quietHoursStart = securePrefs.getQuietHoursStart(),
-                quietHoursEnd = securePrefs.getQuietHoursEnd(),
-                channelBlackoutJson = securePrefs.getChannelBlackout(),
-                biometricLockEnabled = securePrefs.isBiometricLockEnabled(),
-                birthdayRemindersEnabled = securePrefs.isBirthdayRemindersEnabled(),
-                aiWishGenerationEnabled = securePrefs.isAiWishGenerationEnabled(),
-            )
-        }
-    }
-
     private companion object {
-        const val CURRENT_BACKUP_VERSION = 2
         const val TAG = "BackupService"
     }
 }

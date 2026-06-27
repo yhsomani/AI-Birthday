@@ -1,11 +1,11 @@
 package com.example.core.analytics
 
-import com.example.core.db.dao.RelationshipTypeCount
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
-import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.model.ActivityLogType
-import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.contact.ContactAnalyticsProfile
+import com.example.domain.model.contact.RelationshipAnalyticsCount
+import com.example.domain.model.message.MessageAnalyticsRecord
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
@@ -42,9 +42,9 @@ class AnalyticsReportServiceImplTest {
     @Test
     fun `buildRelationshipReport emits zero state aggregate csv`() = runTest {
         stubReportInputs(
-            contacts = emptyList(),
+            contactProfiles = emptyList(),
             relationshipCounts = emptyList(),
-            upcomingEvents = emptyList(),
+            upcomingEventsCount = 0,
             sentThisYear = emptyList(),
             totalSent = 0,
             pending = 0,
@@ -63,36 +63,22 @@ class AnalyticsReportServiceImplTest {
     @Test
     fun `buildRelationshipReport emits populated aggregate csv without contact names`() = runTest {
         stubReportInputs(
-            contacts = listOf(
-                ContactEntity(id = "c1", name = "Alice", relationshipType = "FAMILY", healthScore = 90),
-                ContactEntity(id = "c2", name = "Bob", relationshipType = "FRIEND", healthScore = 50),
-                ContactEntity(id = "c3", name = "Cara", relationshipType = "WORK", healthScore = 20),
+            contactProfiles = listOf(
+                analyticsProfile(id = "c1", healthScore = 90),
+                analyticsProfile(id = "c2", healthScore = 50),
+                analyticsProfile(id = "c3", healthScore = 20),
             ),
             relationshipCounts = listOf(
-                RelationshipTypeCount("FAMILY", 1),
-                RelationshipTypeCount("FRIEND", 1),
-                RelationshipTypeCount("WORK", 1),
+                RelationshipAnalyticsCount("FAMILY", 1),
+                RelationshipAnalyticsCount("FRIEND", 1),
+                RelationshipAnalyticsCount("WORK", 1),
             ),
-            upcomingEvents = listOf(
-                EventEntity(
-                    id = "e1",
-                    contactId = "c1",
-                    type = "BIRTHDAY",
-                    dayOfMonth = 1,
-                    month = 1,
-                    nextOccurrenceMs = 200L,
-                )
-            ),
+            upcomingEventsCount = 1,
             sentThisYear = listOf(
-                SentMessageEntity(
-                    id = "s1",
-                    contactId = "c1",
-                    eventType = "BIRTHDAY",
-                    eventYear = 2026,
-                    messageText = "Happy birthday!",
-                    channel = MessageChannel.SMS.raw,
+                MessageAnalyticsRecord(
                     sentAtMs = 100L,
-                    deliveryStatus = "SENT",
+                    deliveryStatus = MessageDeliveryStatus.SENT,
+                    replyReceived = false,
                 )
             ),
             totalSent = 4,
@@ -113,19 +99,30 @@ class AnalyticsReportServiceImplTest {
         assertTrue(!report.content.contains("Happy birthday!"))
     }
 
+    private fun analyticsProfile(id: String, healthScore: Int): ContactAnalyticsProfile {
+        return ContactAnalyticsProfile(
+            id = ContactId(id),
+            healthScore = healthScore,
+            nickname = null,
+            notesText = "",
+            interestsJson = "[]",
+            sharedHistoryJson = "[]",
+        )
+    }
+
     private fun stubReportInputs(
-        contacts: List<ContactEntity>,
-        relationshipCounts: List<RelationshipTypeCount>,
-        upcomingEvents: List<EventEntity>,
-        sentThisYear: List<SentMessageEntity>,
+        contactProfiles: List<ContactAnalyticsProfile>,
+        relationshipCounts: List<RelationshipAnalyticsCount>,
+        upcomingEventsCount: Int,
+        sentThisYear: List<MessageAnalyticsRecord>,
         totalSent: Int,
         pending: Int,
     ) {
-        coEvery { contactRepository.getAllSync() } returns contacts
-        every { contactRepository.countByRelationshipType() } returns MutableStateFlow(relationshipCounts)
+        coEvery { contactRepository.getAnalyticsProfiles() } returns contactProfiles
+        every { contactRepository.getRelationshipAnalyticsCounts() } returns MutableStateFlow(relationshipCounts)
         every { messageRepository.countAllSent() } returns MutableStateFlow(totalSent)
         every { messageRepository.countPending() } returns MutableStateFlow(pending)
-        coEvery { eventRepository.getUpcoming(30) } returns upcomingEvents
-        coEvery { messageRepository.getSentSinceYearStart(any()) } returns sentThisYear
+        coEvery { eventRepository.countUpcoming(30) } returns upcomingEventsCount
+        coEvery { messageRepository.getSentAnalyticsRecordsSince(any()) } returns sentThisYear
     }
 }

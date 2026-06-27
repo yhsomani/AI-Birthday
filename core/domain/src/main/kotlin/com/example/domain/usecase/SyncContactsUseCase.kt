@@ -1,6 +1,8 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.ContactEntity
+import com.example.domain.contact.toEntities
+import com.example.domain.model.contact.ContactSyncRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.service.ContactSyncService
 import com.example.domain.service.DeviceContactsPermissionDeniedException
@@ -40,7 +42,7 @@ class SyncContactsUseCase @Inject constructor(
             }
         }
 
-        var googleContacts = emptyList<ContactEntity>()
+        var googleContacts = emptyList<ContactSyncRecord>()
         var googleError: String? = null
         try {
             googleContacts = contactSyncService.fetchGoogleContacts(forceRefresh)
@@ -51,7 +53,7 @@ class SyncContactsUseCase @Inject constructor(
             preferencesRepository.setLastSyncError(googleError)
         }
 
-        var deviceContacts = emptyList<ContactEntity>()
+        var deviceContacts = emptyList<ContactSyncRecord>()
         var deviceError: String? = null
         var deviceContactsPermissionDenied = false
         try {
@@ -78,7 +80,7 @@ class SyncContactsUseCase @Inject constructor(
             preferencesRepository.setLastSyncError(deviceError)
         }
 
-        var merged = mergeContacts(googleContacts, deviceContacts)
+        var merged = mergeContacts(googleContacts.toEntities(), deviceContacts.toEntities())
             .map { it.withRelationshipFromContactGroup() }
 
         if (merged.isEmpty() && isGuest) {

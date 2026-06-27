@@ -13,7 +13,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.R
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.example.core.db.entities.ContactEntity
 import com.example.core.gemini.GeminiClient
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.CircuitState
@@ -22,7 +21,10 @@ import com.example.core.resilience.HealthMonitor
 import com.example.core.resilience.SensitiveLogRedactor
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.contact.ContactAutomationReadinessProfile
+import com.example.domain.model.dispatch.DispatchAttempt
 import com.example.domain.repository.ContactRepository
+import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.SyncContactsUseCase
 import com.example.domain.usecase.TestSendUseCase
@@ -33,6 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -104,6 +107,13 @@ private data class AiDoctorReport(
     val setupProgress: SetupProgressSummary,
 )
 
+private data class DispatchRecoverySnapshot(
+    val persistedRecoveryCount: Int,
+    val persistedDeadLetterCount: Int,
+    val inMemoryDeadLetterCount: Int,
+    val latestPersistedAttempt: DispatchAttempt?,
+)
+
 @HiltViewModel
 class AutomationSetupViewModel @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
@@ -113,6 +123,7 @@ class AutomationSetupViewModel @Inject constructor(
     private val contactRepository: ContactRepository,
     private val styleProfileRepository: StyleProfileRepository,
     private val testSendUseCase: TestSendUseCase,
+    private val dispatchAttemptRepository: DispatchAttemptRepository,
 ) : ViewModel() {
     private companion object {
         const val PERSONALIZATION_CONFIDENCE_THRESHOLD = 0.6
@@ -245,7 +256,7 @@ class AutomationSetupViewModel @Inject constructor(
         val recentErrors = StructuredLogger.getErrors().takeLast(3)
         val currentUser = currentFirebaseUserOrNull()
         val alarmManager = appContext.getSystemService(AlarmManager::class.java)
-        val contacts = runCatching { contactRepository.getAllSync() }.getOrDefault(emptyList())
+        val contacts = runCatching { contactRepository.getAutomationReadinessProfiles() }.getOrDefault(emptyList())
         val styleProfile = runCatching { styleProfileRepository.getProfileOnce() }.getOrNull()
         val styleSampleCount = maxOf(
             styleProfile?.sampleCount ?: 0,
@@ -260,11 +271,11 @@ class AutomationSetupViewModel @Inject constructor(
         val exactSendsAllowed = runCatching {
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
         }.getOrDefault(false)
-        val deadLetterCount = DeadLetterQueue.count()
+        val dispatchRecovery = loadDispatchRecoverySnapshot()
         val senderEmailReady = securePrefs.getSenderEmail().isNotBlank() &&
             securePrefs.getSenderEmailPassword().isNotBlank()
         val emailPreferredContacts = contacts.count {
-            MessageChannel.fromRaw(it.preferredChannel) == MessageChannel.EMAIL
+            it.preferredChannel == MessageChannel.EMAIL
         }
 
         val checks = listOf(
@@ -409,10 +420,10 @@ class AutomationSetupViewModel @Inject constructor(
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_dead_letter),
-                text(R.string.automation_setup_dead_letter_count, deadLetterCount),
-                if (deadLetterCount == 0) ReadinessStatus.OK else ReadinessStatus.WARNING,
-                actionLabel = if (deadLetterCount == 0) null else text(R.string.automation_setup_action_view_activity),
-                action = if (deadLetterCount == 0) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACTIVITY_HISTORY,
+                dispatchRecovery.toReadinessDetail(),
+                if (dispatchRecovery.totalRecoveryCount == 0) ReadinessStatus.OK else ReadinessStatus.WARNING,
+                actionLabel = if (dispatchRecovery.totalRecoveryCount == 0) null else text(R.string.automation_setup_action_view_activity),
+                action = if (dispatchRecovery.totalRecoveryCount == 0) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACTIVITY_HISTORY,
                 group = ReadinessGroup.RECOVERY,
             ),
         )
@@ -424,7 +435,52 @@ class AutomationSetupViewModel @Inject constructor(
         )
     }
 
-    private fun personalizationCheck(contacts: List<ContactEntity>): ReadinessCheck {
+    private suspend fun loadDispatchRecoverySnapshot(): DispatchRecoverySnapshot {
+        val persistedRecoveryCount = runCatching {
+            dispatchAttemptRepository.countFailureRecoveryQueue().first()
+        }.getOrDefault(0)
+        val persistedDeadLetterCount = runCatching {
+            dispatchAttemptRepository.countDeadLettered().first()
+        }.getOrDefault(0)
+        val latestPersistedAttempt = runCatching {
+            dispatchAttemptRepository.getFailureRecoveryQueue(limit = 1).firstOrNull()
+        }.getOrNull()
+        return DispatchRecoverySnapshot(
+            persistedRecoveryCount = persistedRecoveryCount,
+            persistedDeadLetterCount = persistedDeadLetterCount,
+            inMemoryDeadLetterCount = DeadLetterQueue.count(),
+            latestPersistedAttempt = latestPersistedAttempt,
+        )
+    }
+
+    private val DispatchRecoverySnapshot.totalRecoveryCount: Int
+        get() = persistedRecoveryCount + inMemoryDeadLetterCount
+
+    private fun DispatchRecoverySnapshot.toReadinessDetail(): String {
+        val summary = when {
+            totalRecoveryCount == 0 -> text(R.string.automation_setup_dead_letter_none)
+            inMemoryDeadLetterCount > 0 -> text(
+                R.string.automation_setup_dead_letter_count_with_memory,
+                persistedRecoveryCount,
+                inMemoryDeadLetterCount,
+                persistedDeadLetterCount,
+            )
+            else -> text(
+                R.string.automation_setup_dead_letter_count,
+                persistedRecoveryCount,
+                persistedDeadLetterCount,
+            )
+        }
+        val latest = latestPersistedAttempt ?: return summary
+        return "$summary " + text(
+            R.string.automation_setup_dead_letter_latest,
+            latest.channel.raw,
+            latest.result.raw,
+            latest.messageDraftId.value,
+        )
+    }
+
+    private fun personalizationCheck(contacts: List<ContactAutomationReadinessProfile>): ReadinessCheck {
         if (contacts.isEmpty()) {
             return ReadinessCheck(
                 title = text(R.string.automation_setup_check_personalization),
@@ -436,7 +492,7 @@ class AutomationSetupViewModel @Inject constructor(
             )
         }
 
-        val enriched = contacts.count { it.hasPersonalizationData() }
+        val enriched = contacts.count { it.hasPersonalizationData }
         val percentage = (enriched * 100) / contacts.size
         return ReadinessCheck(
             title = text(R.string.automation_setup_check_personalization),
@@ -452,7 +508,7 @@ class AutomationSetupViewModel @Inject constructor(
         )
     }
 
-    private fun genericMessagesCheck(contacts: List<ContactEntity>): ReadinessCheck {
+    private fun genericMessagesCheck(contacts: List<ContactAutomationReadinessProfile>): ReadinessCheck {
         if (contacts.isEmpty()) {
             return ReadinessCheck(
                 title = text(R.string.automation_setup_check_generic_messages),
@@ -464,7 +520,9 @@ class AutomationSetupViewModel @Inject constructor(
             )
         }
 
-        val genericRiskCount = contacts.count { !it.hasPersonalizationContextForAi() }
+        val genericRiskCount = contacts.count {
+            !it.hasPersonalizationContextForAi(PERSONALIZATION_CONFIDENCE_THRESHOLD)
+        }
         return ReadinessCheck(
             title = text(R.string.automation_setup_check_generic_messages),
             detail = if (genericRiskCount == 0) {
@@ -544,21 +602,6 @@ class AutomationSetupViewModel @Inject constructor(
         ReadinessGroup.RELIABILITY -> 1
         ReadinessGroup.QUALITY -> 2
         ReadinessGroup.RECOVERY -> 3
-    }
-
-    private fun ContactEntity.hasPersonalizationData(): Boolean {
-        return !nickname.isNullOrBlank() ||
-            notesText.isNotBlank() ||
-            hasJsonArrayContent(interestsJson) ||
-            hasJsonArrayContent(sharedHistoryJson)
-    }
-
-    private fun ContactEntity.hasPersonalizationContextForAi(): Boolean {
-        return hasPersonalizationData() || classificationConfidence >= PERSONALIZATION_CONFIDENCE_THRESHOLD
-    }
-
-    private fun hasJsonArrayContent(raw: String): Boolean {
-        return raw.trim().let { it.isNotBlank() && it != "[]" }
     }
 
     private fun countJsonArrayItems(raw: String?): Int {

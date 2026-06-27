@@ -11,10 +11,11 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.ContactEntity
 import com.example.core.ui.theme.RelateAITheme
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.contact.ContactDetailProfile
 import com.example.domain.usecase.UpdateContactPreferencesUseCase
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -39,10 +40,8 @@ class ContactPreferencesDialogTest {
         composeRule.setContent {
             RelateAITheme {
                 ContactPreferencesDialog(
-                    contact = ContactEntity(
-                        id = "contact_1",
-                        name = "Asha",
-                        automationMode = ApprovalMode.DEFAULT.raw,
+                    contact = contactProfile(
+                        automationMode = ApprovalMode.DEFAULT,
                     ),
                     isSaving = false,
                     onDismiss = {},
@@ -73,10 +72,8 @@ class ContactPreferencesDialogTest {
         composeRule.setContent {
             RelateAITheme {
                 ContactPreferencesDialog(
-                    contact = ContactEntity(
-                        id = "contact_1",
-                        name = "Asha",
-                        preferredChannel = MessageChannel.SMS.raw,
+                    contact = contactProfile(
+                        preferredChannel = MessageChannel.SMS,
                     ),
                     isSaving = false,
                     onDismiss = {},
@@ -104,11 +101,7 @@ class ContactPreferencesDialogTest {
         composeRule.setContent {
             RelateAITheme {
                 ContactPreferencesDialog(
-                    contact = ContactEntity(
-                        id = "contact_1",
-                        name = "Asha",
-                        automationMode = "LEGACY_MODE",
-                    ),
+                    contact = contactProfile(automationMode = ApprovalMode.UNKNOWN),
                     isSaving = false,
                     onDismiss = {},
                     onSave = { savedRequest = it },
@@ -129,11 +122,7 @@ class ContactPreferencesDialogTest {
         composeRule.setContent {
             RelateAITheme {
                 ContactPreferencesDialog(
-                    contact = ContactEntity(
-                        id = "contact_1",
-                        name = "Asha",
-                        preferredChannel = "LEGACY_CHANNEL",
-                    ),
+                    contact = contactProfile(preferredChannel = MessageChannel.UNKNOWN),
                     isSaving = false,
                     onDismiss = {},
                     onSave = { savedRequest = it },
@@ -145,5 +134,37 @@ class ContactPreferencesDialogTest {
             .performClick()
 
         assertEquals(MessageChannel.SMS, savedRequest?.preferredChannel)
+    }
+
+    private fun contactProfile(
+        automationMode: ApprovalMode = ApprovalMode.DEFAULT,
+        preferredChannel: MessageChannel = MessageChannel.SMS,
+    ): ContactDetailProfile {
+        return ContactDetailProfile(
+            id = ContactId("contact_1"),
+            displayName = "Asha",
+            contactGroup = null,
+            healthScore = 80,
+            nickname = null,
+            birthdayDay = null,
+            birthdayMonth = null,
+            primaryPhone = null,
+            primaryEmail = null,
+            relationshipType = "UNKNOWN",
+            preferredLanguage = "en",
+            preferredChannel = preferredChannel,
+            formalityLevel = "CASUAL",
+            communicationStyle = "WARM",
+            automationMode = automationMode,
+            customSendTimeHour = null,
+            customSendTimeMinute = null,
+            giftBudgetInr = 500,
+            annualBudgetInr = 0,
+            skipAutoWish = false,
+            interestsJson = "[]",
+            sensitiveTopicsJson = "[]",
+            currentLifePhaseJson = "{}",
+            notesText = "",
+        )
     }
 }

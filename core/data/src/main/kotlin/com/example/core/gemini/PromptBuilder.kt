@@ -1,40 +1,12 @@
 package com.example.core.gemini
 
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
-import com.example.core.db.entities.GiftHistoryEntity
-import com.example.core.db.entities.MemoryNoteEntity
-import com.example.core.db.entities.SentMessageEntity
-import com.example.core.db.entities.StyleProfileEntity
-import com.example.domain.model.EventType
-import com.example.domain.model.MessageChannel
+import com.example.domain.model.contact.ContactClassificationPromptContext
+import com.example.domain.model.contact.ContactGiftAdvisorProfile
+import com.example.domain.model.contact.ContactRelationshipPromptContext
+import com.example.domain.model.gift.GiftHistoryRecord
+import com.example.domain.model.message.MessagePromptContext
 import com.example.domain.service.ContactClassificationContract
 import org.json.JSONArray
-
-data class ContactContextObject(
-    val firstName: String,
-    val nickname: String?,
-    val relationshipType: String,
-    val knownSince: String?,
-    val ageTurning: Int?,
-    val interests: List<String>,
-    val sharedHistory: List<String>,
-    val daysSinceLastContact: Int,
-    val eventType: String,
-    val eventOccurrenceNumber: Int?,
-    val preferredLanguage: String,
-    val userStyleSamples: List<String>,
-    val usesEmoji: Boolean,
-    val avgMessageLength: Int,
-    val commonPhrases: List<String>,
-    val previousWishes: List<String>,
-    val formalityLevel: String,
-    val memoryNotes: List<String> = emptyList(),
-    val giftHistory: List<String> = emptyList(),
-    val sensitiveTopics: List<String> = emptyList(),
-    val currentLifePhase: String? = null,
-    val preferredChannel: MessageChannel = MessageChannel.SMS,
-)
 
 class PromptBuilder {
     private fun getFirstName(fullName: String): String {
@@ -50,8 +22,8 @@ class PromptBuilder {
         return sanitized
     }
 
-    fun buildClassificationPrompt(contact: ContactEntity): String {
-        val firstName = getFirstName(contact.name)
+    fun buildClassificationPrompt(contact: ContactClassificationPromptContext): String {
+        val firstName = getFirstName(contact.displayName)
         val sanitizedNotes = sanitizeNotes(contact.notesText)
         return buildString {
             appendLine("You are a contact classification engine. Based on the contact data below, ")
@@ -74,88 +46,7 @@ class PromptBuilder {
         }
     }
 
-    fun buildContactContext(
-        contact: ContactEntity,
-        event: EventEntity,
-        styleProfile: StyleProfileEntity?,
-        previousMessages: List<SentMessageEntity>,
-        memoryNotes: List<MemoryNoteEntity> = emptyList(),
-        giftHistory: List<GiftHistoryEntity> = emptyList(),
-    ): ContactContextObject {
-        val lastInteraction = contact.lastInteractionDate
-        val daysSince = if (lastInteraction != null)
-            ((System.currentTimeMillis() - lastInteraction) / (1000 * 60 * 60 * 24)).toInt()
-        else 0
-        
-        val parsedInterests = try { 
-            val arr = JSONArray(contact.interestsJson); List(arr.length()) { arr.getString(it) } 
-        } catch(e: Exception) { emptyList() }
-        
-        val parsedHistory = try { 
-            val arr = JSONArray(contact.sharedHistoryJson); List(arr.length()) { arr.getString(it) } 
-        } catch(e: Exception) { emptyList() }
-        
-        val parsedSamples = try { 
-            val arr = JSONArray(styleProfile?.sampleMessagesJson ?: "[]"); List(arr.length()) { arr.getString(it) } 
-        } catch(e: Exception) { emptyList() }
-        
-        val parsedPhrases = try { 
-            val arr = JSONArray(styleProfile?.commonPhrasesJson ?: "[]"); List(arr.length()) { arr.getString(it) } 
-        } catch(e: Exception) { emptyList() }
-
-        val parsedSensitiveTopics = try {
-            val arr = JSONArray(contact.sensitiveTopicsJson)
-            List(arr.length()) { arr.getString(it) }
-        } catch(e: Exception) { emptyList() }
-
-        val lifePhase = try {
-            val phase = org.json.JSONObject(contact.currentLifePhaseJson).optString("phase")
-            phase.takeIf { it.isNotBlank() }
-        } catch(e: Exception) { null }
-
-        val memorySummaries = memoryNotes
-            .sortedWith(compareByDescending<MemoryNoteEntity> { it.isPinned }.thenByDescending { it.dateMs })
-            .take(6)
-            .map { "${it.category}: ${sanitizeNotes(it.noteText).take(180)}" }
-
-        val giftSummaries = giftHistory
-            .sortedByDescending { it.year }
-            .take(5)
-            .map { "${it.year}: ${it.giftName} (${it.giftCategory}, liked: ${it.receivedWell ?: "unknown"})" }
-
-        val birthdayYear = contact.birthdayYear
-        val eventYear = event.year
-        val ageTurning = if (EventType.fromRaw(event.type) == EventType.BIRTHDAY && birthdayYear != null && eventYear != null) {
-            eventYear - birthdayYear
-        } else null
-
-        return ContactContextObject(
-            firstName = getFirstName(contact.name),
-            nickname = contact.nickname,
-            relationshipType = contact.relationshipType,
-            knownSince = null,
-            ageTurning = ageTurning,
-            interests = parsedInterests,
-            sharedHistory = parsedHistory,
-            daysSinceLastContact = daysSince,
-            eventType = event.type,
-            eventOccurrenceNumber = ageTurning,
-            preferredLanguage = contact.preferredLanguage,
-            userStyleSamples = parsedSamples,
-            usesEmoji = styleProfile?.usesEmoji ?: true,
-            avgMessageLength = styleProfile?.avgMessageLength ?: 120,
-            commonPhrases = parsedPhrases,
-            previousWishes = previousMessages.map { it.messageText },
-            formalityLevel = contact.formalityLevel,
-            memoryNotes = memorySummaries,
-            giftHistory = giftSummaries,
-            sensitiveTopics = parsedSensitiveTopics,
-            currentLifePhase = lifePhase,
-            preferredChannel = contact.preferredChannel.toSupportedMessageChannel(),
-        )
-    }
-
-    fun buildMessageGenerationPrompt(context: ContactContextObject): String {
+    fun buildMessageGenerationPrompt(context: MessagePromptContext): String {
         val hasSpecificContext = context.interests.isNotEmpty() ||
             context.sharedHistory.isNotEmpty() ||
             context.memoryNotes.isNotEmpty() ||
@@ -231,14 +122,8 @@ class PromptBuilder {
         }
     }
 
-    private fun String.toSupportedMessageChannel(): MessageChannel {
-        return MessageChannel.fromRaw(this)
-            .takeIf { it != MessageChannel.UNKNOWN }
-            ?: MessageChannel.SMS
-    }
-
-    fun buildReconnectPrompt(contact: ContactEntity, daysSince: Int): String {
-        val firstName = getFirstName(contact.name)
+    fun buildReconnectPrompt(contact: ContactRelationshipPromptContext, daysSince: Int): String {
+        val firstName = getFirstName(contact.displayName)
         val interestsList = try {
             val arr = JSONArray(contact.interestsJson); List(arr.length()) { arr.getString(it) }
         } catch(e: Exception) { emptyList() }
@@ -290,12 +175,12 @@ class PromptBuilder {
     }
 
     fun buildPostEventFollowUpPrompt(
-        contact: ContactEntity,
+        contact: ContactRelationshipPromptContext,
         originalMessage: String,
         eventType: String?,
         eventLabel: String?,
     ): String {
-        val firstName = getFirstName(contact.name)
+        val firstName = getFirstName(contact.displayName)
         val interestsList = try {
             val arr = JSONArray(contact.interestsJson)
             List(arr.length()) { arr.getString(it) }
@@ -325,11 +210,11 @@ class PromptBuilder {
     }
 
     fun buildHolidayWishPrompt(
-        contact: ContactEntity,
+        contact: ContactRelationshipPromptContext,
         holidayName: String,
         holidayTone: String,
     ): String {
-        val firstName = getFirstName(contact.name)
+        val firstName = getFirstName(contact.displayName)
         val interestsList = try {
             val arr = JSONArray(contact.interestsJson)
             List(arr.length()) { arr.getString(it) }
@@ -364,7 +249,7 @@ class PromptBuilder {
 
     fun buildRegenerationPrompt(
         original: String,
-        context: ContactContextObject,
+        context: MessagePromptContext,
         feedbackInstruction: String? = null
     ): String = buildString {
         if (feedbackInstruction.isNullOrBlank()) {
@@ -383,8 +268,8 @@ class PromptBuilder {
         append(buildMessageGenerationPrompt(context))
     }
 
-    fun buildGiftSuggestionsPrompt(contact: ContactEntity, history: List<GiftHistoryEntity>): String {
-        val firstName = getFirstName(contact.name)
+    fun buildGiftSuggestionsPrompt(contact: ContactGiftAdvisorProfile, history: List<GiftHistoryRecord>): String {
+        val firstName = getFirstName(contact.displayName)
         val interestsList = try { 
             val arr = JSONArray(contact.interestsJson); List(arr.length()) { arr.getString(it) } 
         } catch(e: Exception) { emptyList() }

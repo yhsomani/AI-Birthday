@@ -8,8 +8,10 @@ import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.data.R
 import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
+import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.gemini.GeminiClient
 import com.example.core.gemini.PromptBuilder
@@ -21,8 +23,19 @@ import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.domain.automation.RevivalCadencePolicy
+import com.example.domain.contact.toAutomationProfile
+import com.example.domain.contact.toDeliveryRouteProfile
+import com.example.domain.contact.toRelationshipPromptContext
+import com.example.domain.event.toEventEntity
+import com.example.domain.message.toDeliveryRouteHistoryRecords
+import com.example.domain.message.toMessageDraft
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.model.occasion.OccasionDate
+import com.example.domain.model.occasion.OccasionType
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.Calendar
@@ -33,6 +46,7 @@ class RevivalWorker @AssistedInject constructor(
     @Assisted ctx: Context,
     @Assisted params: WorkerParameters,
     private val contactDao: ContactDao,
+    private val eventDao: EventDao,
     private val pendingMessageDao: PendingMessageDao,
     private val sentMessageDao: SentMessageDao,
     private val gemini: GeminiClient,
@@ -70,8 +84,8 @@ class RevivalWorker @AssistedInject constructor(
                 val revivalEventId = RevivalCadencePolicy.eventId(contact.id)
                 val existingRevival = pendingMessageDao.getPendingMessage(contact.id, revivalEventId, scheduledYear)
                 val cadenceDecision = RevivalCadencePolicy.evaluate(
-                    contact = contact,
-                    existingSameYearRevival = existingRevival,
+                    contact = contact.toAutomationProfile(),
+                    existingSameYearRevival = existingRevival?.toMessageDraft(),
                     nowMs = now,
                 )
                 if (!cadenceDecision.shouldCreate) {
@@ -89,7 +103,7 @@ class RevivalWorker @AssistedInject constructor(
                 }
 
                 RateLimiter.waitIfNeeded()
-                val prompt = prompter.buildReconnectPrompt(contact, days)
+                val prompt = prompter.buildReconnectPrompt(contact.toRelationshipPromptContext(), days)
                 val suggestion = sanitizeSuggestion(gemini.generate(prompt), contact.name)
 
                 val scheduledMs = AutomationSchedulePolicy.nextAllowedSendMs(
@@ -111,8 +125,8 @@ class RevivalWorker @AssistedInject constructor(
                 )
                 val previousMessages = sentMessageDao.getByContact(contact.id)
                 val channelSelection = AutoSendChannelSelector.selectRoute(
-                    contact = contact,
-                    previousMessages = previousMessages,
+                    contact = contact.toDeliveryRouteProfile(),
+                    routeHistory = previousMessages.toDeliveryRouteHistoryRecords(),
                     channelBlackoutJson = prefs.getChannelBlackout(),
                     senderEmail = prefs.getSenderEmail(),
                     senderEmailPassword = prefs.getSenderEmailPassword(),
@@ -128,6 +142,9 @@ class RevivalWorker @AssistedInject constructor(
                 } else {
                     MessageStatus.PENDING
                 }
+
+                val revivalEvent = revivalEvent(revivalEventId, contact, scheduledMs)
+                eventDao.upsert(revivalEvent.toEventEntity())
 
                 val pendingMsg = PendingMessageEntity(
                     id = UUID.randomUUID().toString(),
@@ -202,6 +219,27 @@ class RevivalWorker @AssistedInject constructor(
     private fun fallbackSuggestion(contactName: String): String {
         val firstName = contactName.trim().substringBefore(' ').ifBlank { "there" }
         return "Hey $firstName, it has been a while. Hope you are doing well. Want to catch up soon?"
+    }
+
+    private fun revivalEvent(eventId: String, contact: ContactEntity, occurrenceMs: Long): Occasion {
+        val calendar = Calendar.getInstance().apply { timeInMillis = occurrenceMs }
+        return Occasion(
+            id = OccasionId(eventId),
+            contactId = ContactId(contact.id),
+            type = OccasionType.REVIVAL,
+            label = "Revival",
+            date = OccasionDate(
+                dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH),
+                month = calendar.get(Calendar.MONTH) + 1,
+                year = calendar.get(Calendar.YEAR),
+            ),
+            nextOccurrenceMs = occurrenceMs,
+            isActive = true,
+            notifyDaysBefore = 0,
+            source = "AI_INFERRED",
+            confidenceScore = 100,
+            isVerified = true,
+        )
     }
 
     private data class RevivalSuggestion(

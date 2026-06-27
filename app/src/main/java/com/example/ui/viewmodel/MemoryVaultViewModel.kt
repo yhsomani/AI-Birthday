@@ -4,8 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.MemoryNoteEntity
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MemoryNoteId
+import com.example.domain.model.contact.ContactHeader
+import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.MemoryNoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,8 +19,8 @@ import java.util.UUID
 import javax.inject.Inject
 
 data class MemoryVaultUiState(
-    val contact: ContactEntity? = null,
-    val notes: List<MemoryNoteEntity> = emptyList(),
+    val contact: ContactHeader? = null,
+    val notes: List<MemoryNoteRecord> = emptyList(),
     val isLoading: Boolean = true,
     val errorMessageRes: Int? = null
 )
@@ -43,11 +45,11 @@ class MemoryVaultViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessageRes = null)
             try {
-                val contact = contactRepository.getById(contactId)
-                val notes = memoryNoteRepository.getByContact(contactId)
+                val contact = contactRepository.getHeader(contactId)
+                val notes = memoryNoteRepository.getRecordsByContact(contactId)
                 _uiState.value = MemoryVaultUiState(
                     contact = contact,
-                    notes = notes.sortedWith(compareByDescending<MemoryNoteEntity> { it.isPinned }.thenByDescending { it.dateMs }),
+                    notes = notes.sortedWith(compareByDescending<MemoryNoteRecord> { it.isPinned }.thenByDescending { it.dateMs }),
                     isLoading = false
                 )
             } catch (e: Exception) {
@@ -72,15 +74,15 @@ class MemoryVaultViewModel @Inject constructor(
         val safeCategory = category.takeIf { it in ALLOWED_CATEGORIES } ?: CATEGORY_GENERAL
         viewModelScope.launch {
             try {
-                val newNote = MemoryNoteEntity(
-                    id = UUID.randomUUID().toString(),
-                    contactId = contactId,
+                val newNote = MemoryNoteRecord(
+                    id = MemoryNoteId(UUID.randomUUID().toString()),
+                    contactId = ContactId(contactId),
                     noteText = cleanedText,
                     category = safeCategory,
                     dateMs = System.currentTimeMillis(),
                     isPinned = false
                 )
-                memoryNoteRepository.upsert(newNote)
+                memoryNoteRepository.upsertRecord(newNote)
                 loadData()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessageRes = R.string.memory_vault_error_add)
@@ -88,11 +90,11 @@ class MemoryVaultViewModel @Inject constructor(
         }
     }
 
-    fun togglePin(note: MemoryNoteEntity) {
+    fun togglePin(note: MemoryNoteRecord) {
         viewModelScope.launch {
             try {
                 val updatedNote = note.copy(isPinned = !note.isPinned)
-                memoryNoteRepository.upsert(updatedNote)
+                memoryNoteRepository.upsertRecord(updatedNote)
                 loadData()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessageRes = R.string.memory_vault_error_pin)
@@ -100,10 +102,10 @@ class MemoryVaultViewModel @Inject constructor(
         }
     }
 
-    fun deleteNote(note: MemoryNoteEntity) {
+    fun deleteNote(note: MemoryNoteRecord) {
         viewModelScope.launch {
             try {
-                memoryNoteRepository.delete(note)
+                memoryNoteRepository.deleteRecord(note.id)
                 loadData()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessageRes = R.string.memory_vault_error_delete)

@@ -1,8 +1,13 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
+import com.example.domain.event.toEventListItem
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.model.occasion.OccasionDate
+import com.example.domain.model.occasion.OccasionType
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
@@ -31,8 +36,9 @@ class SaveManualEventUseCaseTest {
     @Test
     fun `existing contact saves birthday event and updates contact birthday fields`() = runTest {
         val contact = ContactEntity(id = "c1", name = "Alice")
-        val eventSlot = slot<EventEntity>()
+        val eventSlot = slot<Occasion>()
         coEvery { contactRepository.getById("c1") } returns contact
+        every { eventRepository.getOccasions() } returns MutableStateFlow(emptyList())
 
         val outcome = useCase(
             SaveManualEventUseCase.Request(
@@ -55,18 +61,19 @@ class SaveManualEventUseCaseTest {
                 }
             )
         }
-        coVerify { eventRepository.upsert(capture(eventSlot)) }
+        coVerify { eventRepository.upsertOccasion(capture(eventSlot)) }
         coVerify { eventReminderSchedulerService.scheduleReminder(any()) }
-        assertEquals("c1", eventSlot.captured.contactId)
-        assertEquals("c1_birthday", eventSlot.captured.id)
-        assertEquals("BIRTHDAY", eventSlot.captured.type)
+        assertEquals(ContactId("c1"), eventSlot.captured.contactId)
+        assertEquals(OccasionId("c1_birthday"), eventSlot.captured.id)
+        assertEquals(OccasionType.BIRTHDAY, eventSlot.captured.type)
         assertEquals("MANUAL", eventSlot.captured.source)
     }
 
     @Test
     fun `new contact creates local manual contact before event`() = runTest {
         val contactSlot = slot<ContactEntity>()
-        val eventSlot = slot<EventEntity>()
+        val eventSlot = slot<Occasion>()
+        every { eventRepository.getOccasions() } returns MutableStateFlow(emptyList())
 
         val outcome = useCase(
             SaveManualEventUseCase.Request(
@@ -80,12 +87,12 @@ class SaveManualEventUseCaseTest {
 
         assertTrue(outcome is SaveManualEventUseCase.Outcome.Saved)
         coVerify { contactRepository.upsert(capture(contactSlot)) }
-        coVerify { eventRepository.upsert(capture(eventSlot)) }
+        coVerify { eventRepository.upsertOccasion(capture(eventSlot)) }
         coVerify { eventReminderSchedulerService.scheduleReminder(any()) }
         assertTrue(contactSlot.captured.id.startsWith("manual_"))
         assertEquals("Priya", contactSlot.captured.name)
         assertEquals(MessageChannel.SMS.raw, contactSlot.captured.preferredChannel)
-        assertEquals(contactSlot.captured.id, eventSlot.captured.contactId)
+        assertEquals(ContactId(contactSlot.captured.id), eventSlot.captured.contactId)
         assertEquals("Wedding anniversary", eventSlot.captured.label)
     }
 
@@ -105,24 +112,24 @@ class SaveManualEventUseCaseTest {
             (outcome as SaveManualEventUseCase.Outcome.InvalidInput).reason,
         )
         coVerify(exactly = 0) { contactRepository.upsert(any()) }
-        coVerify(exactly = 0) { eventRepository.upsert(any()) }
+        coVerify(exactly = 0) { eventRepository.upsertOccasion(any()) }
         coVerify(exactly = 0) { eventReminderSchedulerService.scheduleReminder(any()) }
     }
 
     @Test
     fun `duplicate existing event returns warning before persisting`() = runTest {
         val contact = ContactEntity(id = "c1", name = "Alice")
-        val existingEvent = EventEntity(
+        val existingEvent = event(
             id = "existing",
             contactId = "c1",
-            type = "BIRTHDAY",
+            type = OccasionType.BIRTHDAY,
             dayOfMonth = 12,
             month = 6,
             nextOccurrenceMs = 100L,
             source = "CONTACTS",
         )
         coEvery { contactRepository.getById("c1") } returns contact
-        every { eventRepository.getAll() } returns MutableStateFlow(listOf(existingEvent))
+        every { eventRepository.getOccasions() } returns MutableStateFlow(listOf(existingEvent))
 
         val outcome = useCase(
             SaveManualEventUseCase.Request(
@@ -134,26 +141,29 @@ class SaveManualEventUseCaseTest {
         )
 
         assertTrue(outcome is SaveManualEventUseCase.Outcome.DuplicateFound)
-        assertEquals(existingEvent, (outcome as SaveManualEventUseCase.Outcome.DuplicateFound).existingEvent)
+        assertEquals(
+            existingEvent.toEventListItem(),
+            (outcome as SaveManualEventUseCase.Outcome.DuplicateFound).existingEvent,
+        )
         coVerify(exactly = 0) { contactRepository.upsert(any()) }
-        coVerify(exactly = 0) { eventRepository.upsert(any()) }
+        coVerify(exactly = 0) { eventRepository.upsertOccasion(any()) }
         coVerify(exactly = 0) { eventReminderSchedulerService.scheduleReminder(any()) }
     }
 
     @Test
     fun `same event type with different date returns conflict before persisting`() = runTest {
         val contact = ContactEntity(id = "c1", name = "Alice")
-        val existingEvent = EventEntity(
+        val existingEvent = event(
             id = "c1_birthday",
             contactId = "c1",
-            type = "BIRTHDAY",
+            type = OccasionType.BIRTHDAY,
             dayOfMonth = 12,
             month = 6,
             nextOccurrenceMs = 100L,
             source = "CONTACTS",
         )
         coEvery { contactRepository.getById("c1") } returns contact
-        every { eventRepository.getAll() } returns MutableStateFlow(listOf(existingEvent))
+        every { eventRepository.getOccasions() } returns MutableStateFlow(listOf(existingEvent))
 
         val outcome = useCase(
             SaveManualEventUseCase.Request(
@@ -166,28 +176,28 @@ class SaveManualEventUseCaseTest {
 
         assertTrue(outcome is SaveManualEventUseCase.Outcome.ConflictFound)
         val conflict = outcome as SaveManualEventUseCase.Outcome.ConflictFound
-        assertEquals(existingEvent, conflict.existingEvent)
+        assertEquals(existingEvent.toEventListItem(), conflict.existingEvent)
         assertEquals(7, conflict.requestedMonth)
         assertEquals(1, conflict.requestedDayOfMonth)
         coVerify(exactly = 0) { contactRepository.upsert(any()) }
-        coVerify(exactly = 0) { eventRepository.upsert(any()) }
+        coVerify(exactly = 0) { eventRepository.upsertOccasion(any()) }
         coVerify(exactly = 0) { eventReminderSchedulerService.scheduleReminder(any()) }
     }
 
     @Test
     fun `allowDuplicate saves even when matching event exists`() = runTest {
         val contact = ContactEntity(id = "c1", name = "Alice")
-        val existingEvent = EventEntity(
+        val existingEvent = event(
             id = "existing",
             contactId = "c1",
-            type = "BIRTHDAY",
+            type = OccasionType.BIRTHDAY,
             dayOfMonth = 12,
             month = 6,
             nextOccurrenceMs = 100L,
             source = "CONTACTS",
         )
         coEvery { contactRepository.getById("c1") } returns contact
-        every { eventRepository.getAll() } returns MutableStateFlow(listOf(existingEvent))
+        every { eventRepository.getOccasions() } returns MutableStateFlow(listOf(existingEvent))
 
         val outcome = useCase(
             SaveManualEventUseCase.Request(
@@ -201,25 +211,25 @@ class SaveManualEventUseCaseTest {
 
         assertTrue(outcome is SaveManualEventUseCase.Outcome.Saved)
         coVerify { contactRepository.upsert(any()) }
-        coVerify { eventRepository.upsert(any()) }
+        coVerify { eventRepository.upsertOccasion(any()) }
         coVerify { eventReminderSchedulerService.scheduleReminder(any()) }
     }
 
     @Test
     fun `allowDuplicate uses manual id for intentional separate standard event`() = runTest {
         val contact = ContactEntity(id = "c1", name = "Alice")
-        val existingEvent = EventEntity(
+        val existingEvent = event(
             id = "existing",
             contactId = "c1",
-            type = "BIRTHDAY",
+            type = OccasionType.BIRTHDAY,
             dayOfMonth = 12,
             month = 6,
             nextOccurrenceMs = 100L,
             source = "CONTACTS",
         )
-        val eventSlot = slot<EventEntity>()
+        val eventSlot = slot<Occasion>()
         coEvery { contactRepository.getById("c1") } returns contact
-        every { eventRepository.getAll() } returns MutableStateFlow(listOf(existingEvent))
+        every { eventRepository.getOccasions() } returns MutableStateFlow(listOf(existingEvent))
 
         val outcome = useCase(
             SaveManualEventUseCase.Request(
@@ -232,8 +242,8 @@ class SaveManualEventUseCaseTest {
         )
 
         assertTrue(outcome is SaveManualEventUseCase.Outcome.Saved)
-        coVerify { eventRepository.upsert(capture(eventSlot)) }
-        assertTrue(eventSlot.captured.id.startsWith("manual_"))
+        coVerify { eventRepository.upsertOccasion(capture(eventSlot)) }
+        assertTrue(eventSlot.captured.id.value.startsWith("manual_"))
     }
 
     @Test
@@ -244,18 +254,18 @@ class SaveManualEventUseCaseTest {
             birthdayDay = 12,
             birthdayMonth = 6,
         )
-        val existingEvent = EventEntity(
+        val existingEvent = event(
             id = "c1_birthday",
             contactId = "c1",
-            type = "BIRTHDAY",
+            type = OccasionType.BIRTHDAY,
             dayOfMonth = 12,
             month = 6,
             nextOccurrenceMs = 100L,
             source = "CONTACTS",
         )
-        val eventSlot = slot<EventEntity>()
+        val eventSlot = slot<Occasion>()
         coEvery { contactRepository.getById("c1") } returns contact
-        every { eventRepository.getAll() } returns MutableStateFlow(listOf(existingEvent))
+        every { eventRepository.getOccasions() } returns MutableStateFlow(listOf(existingEvent))
 
         val outcome = useCase(
             SaveManualEventUseCase.Request(
@@ -269,14 +279,14 @@ class SaveManualEventUseCaseTest {
 
         assertTrue(outcome is SaveManualEventUseCase.Outcome.Saved)
         val saved = outcome as SaveManualEventUseCase.Outcome.Saved
-        assertEquals(6, saved.contact.birthdayMonth)
-        assertEquals(12, saved.contact.birthdayDay)
+        assertEquals("c1", saved.contact.id.value)
+        assertEquals("Alice", saved.contact.displayName)
         coVerify(exactly = 0) { contactRepository.upsert(any()) }
-        coVerify { eventRepository.upsert(capture(eventSlot)) }
+        coVerify { eventRepository.upsertOccasion(capture(eventSlot)) }
         coVerify { eventReminderSchedulerService.scheduleReminder(any()) }
-        assertTrue(eventSlot.captured.id.startsWith("manual_"))
-        assertEquals(7, eventSlot.captured.month)
-        assertEquals(1, eventSlot.captured.dayOfMonth)
+        assertTrue(eventSlot.captured.id.value.startsWith("manual_"))
+        assertEquals(7, eventSlot.captured.date.month)
+        assertEquals(1, eventSlot.captured.date.dayOfMonth)
     }
 
     @Test
@@ -312,4 +322,31 @@ class SaveManualEventUseCaseTest {
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
     }
+
+    private fun event(
+        id: String,
+        contactId: String,
+        type: OccasionType,
+        dayOfMonth: Int,
+        month: Int,
+        year: Int? = null,
+        nextOccurrenceMs: Long = 100L,
+        source: String = "CONTACTS",
+    ) = Occasion(
+        id = OccasionId(id),
+        contactId = ContactId(contactId),
+        type = type,
+        label = null,
+        date = OccasionDate(
+            dayOfMonth = dayOfMonth,
+            month = month,
+            year = year,
+        ),
+        nextOccurrenceMs = nextOccurrenceMs,
+        isActive = true,
+        notifyDaysBefore = 1,
+        source = source,
+        confidenceScore = 100,
+        isVerified = true,
+    )
 }

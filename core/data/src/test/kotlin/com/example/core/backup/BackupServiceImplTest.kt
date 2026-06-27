@@ -8,14 +8,19 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.core.db.AppDatabase
 import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.db.entities.ContactEntity
+import com.example.core.db.entities.DispatchAttemptEntity
 import com.example.core.db.entities.MessageFeedbackEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.service.BackupFailureReason
 import com.example.domain.service.BackupOperationResult
 import com.example.domain.service.BackupRestoreMode
+import com.example.domain.model.dispatch.DispatchAttemptCreator
+import com.example.domain.model.dispatch.DispatchAttemptResult
+import com.example.domain.model.dispatch.DispatchEligibilityRecord
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -58,7 +63,7 @@ class BackupServiceImplTest {
 
     @Test
     fun importBackup_unsupportedVersionReturnsStableFailure() = runTest {
-        val uri = encryptedFixture("""{"version":3}""")
+        val uri = encryptedFixture("""{"version":4}""")
 
         val result = service.importBackup(uri, PASSPHRASE)
 
@@ -175,14 +180,15 @@ class BackupServiceImplTest {
         val counts = manifest.getJSONObject("counts")
         val preferences = json.getJSONObject("preferences")
 
-        assertEquals(2, json.getInt("version"))
-        assertEquals(2, manifest.getInt("backupVersion"))
+        assertEquals(3, json.getInt("version"))
+        assertEquals(3, manifest.getInt("backupVersion"))
         assertTrue(manifest.getLong("exportedAtMs") > 0L)
         assertTrue(Regex("[0-9a-f]{64}").matches(manifest.getString("dataChecksumSha256")))
         assertEquals(1, counts.getInt("contacts"))
         assertEquals(1, counts.getInt("pendingMessages"))
         assertEquals(1, counts.getInt("activityLogs"))
         assertEquals(1, counts.getInt("messageFeedback"))
+        assertEquals(1, counts.getInt("dispatchAttempts"))
         assertEquals(1, counts.getInt("preferences"))
         assertTrue(preferences.has("quietHoursStart"))
         assertTrue(preferences.has("quietHoursEnd"))
@@ -269,6 +275,7 @@ class BackupServiceImplTest {
         assertEquals("Alice", database.contactDao().getById("contact_1")?.name)
         assertEquals("Dispatch deferred", database.activityLogDao().getAllSync().single().title)
         assertEquals("Make it warmer", database.messageFeedbackDao().getAllSync().single().instruction)
+        assertEquals("attempt_1", database.dispatchAttemptDao().getAllSync().single().id)
     }
 
     @Test
@@ -289,11 +296,12 @@ class BackupServiceImplTest {
 
         assertTrue(previewResult is BackupOperationResult.Success)
         val preview = (previewResult as BackupOperationResult.Success).value
-        assertEquals(2, preview.backupVersion)
+        assertEquals(3, preview.backupVersion)
         assertEquals(1, preview.counts.contacts)
         assertEquals(1, preview.counts.pendingMessages)
         assertEquals(1, preview.counts.activityLogs)
         assertEquals(1, preview.counts.messageFeedback)
+        assertEquals(1, preview.counts.dispatchAttempts)
         assertEquals(BackupRestoreMode.REPLACE, preview.restoreMode)
         assertNull(database.contactDao().getById("contact_1"))
     }
@@ -378,6 +386,20 @@ class BackupServiceImplTest {
                 scheduledForMs = 1700000000000,
                 approvalMode = ApprovalMode.SMART_APPROVE.raw,
                 generatedAtMs = 1699999999000,
+            )
+        )
+        database.dispatchAttemptDao().upsert(
+            DispatchAttemptEntity(
+                id = "attempt_1",
+                messageDraftId = "pending_1",
+                contactId = "contact_1",
+                occasionId = null,
+                channel = MessageChannel.SMS.raw,
+                eligibilityDecision = DispatchEligibilityRecord.SEND_NOW.raw,
+                requestedAtMs = 1700000000000,
+                result = DispatchAttemptResult.QUEUED.raw,
+                deliveryStatus = MessageDeliveryStatus.PENDING_DELIVERY.raw,
+                createdBy = DispatchAttemptCreator.WORKER.raw,
             )
         )
         database.activityLogDao().insert(

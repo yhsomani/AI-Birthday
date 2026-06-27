@@ -61,7 +61,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
-import com.example.core.db.entities.GiftHistoryEntity
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
@@ -70,6 +69,7 @@ import com.example.core.ui.theme.RelateCard
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.domain.model.gift.GiftHistoryRecord
 import com.example.domain.service.GiftSuggestion
 import com.example.ui.viewmodel.GiftAdvisorUiState
 import com.example.ui.viewmodel.GiftAdvisorViewModel
@@ -203,7 +203,7 @@ internal fun GiftAdvisorContent(
     onShowAddDialog: () -> Unit,
     onDismissDialog: () -> Unit,
     onSaveGift: () -> Unit,
-    onDeleteGift: (GiftHistoryEntity) -> Unit,
+    onDeleteGift: (GiftHistoryRecord) -> Unit,
     onGenerateSuggestions: () -> Unit,
 ) {
     Scaffold(
@@ -211,7 +211,7 @@ internal fun GiftAdvisorContent(
             TopAppBar(
                 title = {
                     Text(
-                        text = uiState.contact?.name?.let {
+                        text = uiState.contact?.displayName?.let {
                             stringResource(R.string.gift_advisor_title_with_contact, it)
                         } ?: stringResource(R.string.gift_advisor_title),
                         fontWeight = FontWeight.Bold,
@@ -309,11 +309,11 @@ internal fun GiftAdvisorContent(
                         )
                     }
                 } else {
-                    items(uiState.giftHistory, key = { it.id }) { gift ->
+                    items(uiState.giftHistory, key = { it.id.value }) { gift ->
                         GiftHistoryCard(
                             gift = gift,
                             onDelete = { onDeleteGift(gift) },
-                            modifier = Modifier.testTag(GiftAdvisorTestTags.HISTORY_CARD_PREFIX + gift.id),
+                            modifier = Modifier.testTag(GiftAdvisorTestTags.HISTORY_CARD_PREFIX + gift.id.value),
                         )
                     }
                 }
@@ -494,7 +494,7 @@ private fun GiftSuggestionCard(
 
 @Composable
 private fun GiftHistoryCard(
-    gift: GiftHistoryEntity,
+    gift: GiftHistoryRecord,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -543,7 +543,7 @@ private fun GiftHistoryCard(
                     GiftFeedbackIcon(receivedWell = gift.receivedWell)
                     IconButton(
                         onClick = onDelete,
-                        modifier = Modifier.testTag(GiftAdvisorTestTags.DELETE_BUTTON_PREFIX + gift.id),
+                        modifier = Modifier.testTag(GiftAdvisorTestTags.DELETE_BUTTON_PREFIX + gift.id.value),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Delete,

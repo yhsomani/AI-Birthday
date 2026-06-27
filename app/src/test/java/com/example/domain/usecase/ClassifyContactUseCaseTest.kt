@@ -1,6 +1,7 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.ContactEntity
+import com.example.domain.model.common.ContactId
 import com.example.domain.repository.ContactRepository
 import com.example.domain.service.AiService
 import com.example.domain.service.ContactClassificationResult
@@ -59,7 +60,7 @@ class ClassifyContactUseCaseTest {
             confidence = 0.95
         )
         coEvery { contactRepository.getById("c1") } returns contact
-        coEvery { aiService.classifyContact(contact) } returns classificationResult
+        coEvery { aiService.classifyContact(any()) } returns classificationResult
 
         val result = useCase("c1")
 
@@ -69,13 +70,24 @@ class ClassifyContactUseCaseTest {
         assertEquals(0.95, classified.confidence, 0.001)
 
         coVerify {
+            aiService.classifyContact(
+                match {
+                    it.id == ContactId("c1") &&
+                        it.displayName == "John Doe" &&
+                        it.interactionFrequencyPerMonth == 0f
+                },
+            )
+        }
+
+        coVerify {
             contactRepository.updateClassification(
                 id = "c1",
                 type = "FRIEND",
                 subtype = "CLOSE",
                 lang = "en",
                 formality = "SEMI_FORMAL",
-                style = "PROFESSIONAL"
+                style = "PROFESSIONAL",
+                confidence = 0.95,
             )
         }
     }
@@ -96,7 +108,7 @@ class ClassifyContactUseCaseTest {
             confidence = 0.4
         )
         coEvery { contactRepository.getById("c1") } returns contact
-        coEvery { aiService.classifyContact(contact) } returns classificationResult
+        coEvery { aiService.classifyContact(any()) } returns classificationResult
 
         val result = useCase("c1")
 
@@ -110,7 +122,8 @@ class ClassifyContactUseCaseTest {
                 subtype = null,
                 lang = "en",
                 formality = "CASUAL",
-                style = "WARM"
+                style = "WARM",
+                confidence = 0.4,
             )
         }
     }

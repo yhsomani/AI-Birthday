@@ -7,6 +7,7 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -26,38 +27,62 @@ class MigrationTest {
 
     @Test
     @Throws(IOException::class)
-    fun migrate4To11_preservesRepresentativeData() {
+    fun migrate4To14_preservesRepresentativeData() {
         migrateAndAssertPreservesRepresentativeData(4)
     }
 
     @Test
     @Throws(IOException::class)
-    fun migrate5To11_preservesRepresentativeData() {
+    fun migrate5To14_preservesRepresentativeData() {
         migrateAndAssertPreservesRepresentativeData(5)
     }
 
     @Test
     @Throws(IOException::class)
-    fun migrate6To11_preservesRepresentativeData() {
+    fun migrate6To14_preservesRepresentativeData() {
         migrateAndAssertPreservesRepresentativeData(6)
     }
 
     @Test
     @Throws(IOException::class)
-    fun migrate9To11_preservesRepresentativeData() {
+    fun migrate9To14_preservesRepresentativeData() {
         migrateAndAssertPreservesRepresentativeData(9)
     }
 
     @Test
     @Throws(IOException::class)
-    fun migrate10To13_preservesRepresentativeData() {
+    fun migrate10To14_preservesRepresentativeData() {
         migrateAndAssertPreservesRepresentativeData(10)
     }
 
     @Test
     @Throws(IOException::class)
-    fun migrate11To13_preservesRepresentativeData() {
+    fun migrate11To14_preservesRepresentativeData() {
         migrateAndAssertPreservesRepresentativeData(11)
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrate13To15_preservesRepresentativeData() {
+        val dbName = "migration-13-to-15"
+        var db = helper.createDatabase(dbName, 13)
+        insertRepresentativeRows(db, 13)
+        db.close()
+
+        db = helper.runMigrationsAndValidate(
+            dbName,
+            15,
+            true,
+            AppDatabase.MIGRATION_13_14,
+            AppDatabase.MIGRATION_14_15,
+        )
+
+        assertRepresentativeRows(db, 13)
+        db.query("SELECT COUNT(*) FROM dispatch_attempts").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+        db.close()
     }
 
     @Test
@@ -89,6 +114,93 @@ class MigrationTest {
         }
         db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'message_feedback'").use { cursor ->
             assertTrue(cursor.moveToFirst())
+        }
+        db.close()
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrate13To14_splitsSentMessageOccasionFields() {
+        val dbName = "migration-13-to-14-sent-message-occasion"
+        var db = helper.createDatabase(dbName, 13)
+        insertContact(db, 13)
+        insertEvent(db, 13)
+        db.execSQL("""
+            INSERT INTO sent_messages (
+                id, contactId, eventType, eventYear, messageText, channel, sentAtMs,
+                deliveryStatus, aiGenerated, geminiModel, variantUsed, replyReceived,
+                replyAtMs, isContactDeleted
+            ) VALUES
+                ('sent_event_ref', 'contact_1', 'event_1', 2026, 'Happy birthday', 'SMS', 1700000000000, 'SENT', 1, 'flash', 'standard', 0, NULL, 0),
+                ('sent_semantic', 'contact_1', 'ANNIVERSARY', 2026, 'Happy anniversary', 'SMS', 1700000000001, 'SENT', 1, 'flash', 'standard', 0, NULL, 0),
+                ('sent_followup', 'contact_1', 'FOLLOWUP_sent_1', 2026, 'How was it?', 'SMS', 1700000000002, 'SENT', 1, 'flash', 'standard', 0, NULL, 0),
+                ('sent_revival', 'contact_1', 'REVIVAL_contact_1', 2026, 'Been a while', 'SMS', 1700000000003, 'SENT', 1, 'flash', 'standard', 0, NULL, 0)
+        """.trimIndent())
+        db.close()
+
+        db = helper.runMigrationsAndValidate(
+            dbName,
+            14,
+            true,
+            AppDatabase.MIGRATION_13_14,
+        )
+
+        assertSentOccasion(db, "sent_event_ref", "BIRTHDAY", "event_1", "BIRTHDAY", "Birthday")
+        assertSentOccasion(db, "sent_semantic", "ANNIVERSARY", null, "ANNIVERSARY", null)
+        assertSentOccasion(db, "sent_followup", "FOLLOW_UP", null, "FOLLOW_UP", null)
+        assertSentOccasion(db, "sent_revival", "REVIVAL", null, "REVIVAL", null)
+        db.close()
+    }
+
+    @Test
+    @Throws(IOException::class)
+    fun migrate14To15_addsDispatchAttemptsTable() {
+        val dbName = "migration-14-to-15-dispatch-attempts"
+        var db = helper.createDatabase(dbName, 14)
+        insertContact(db, 14)
+        insertEvent(db, 14)
+        insertPendingMessage(db, 14)
+        db.close()
+
+        db = helper.runMigrationsAndValidate(
+            dbName,
+            15,
+            true,
+            AppDatabase.MIGRATION_14_15,
+        )
+        db.execSQL("PRAGMA foreign_keys=ON")
+
+        db.execSQL("""
+            INSERT INTO dispatch_attempts (
+                id, messageDraftId, contactId, occasionId, channel,
+                eligibilityDecision, requestedAtMs, result, deliveryStatus, createdBy
+            ) VALUES (
+                'attempt_1', 'pending_1', 'contact_1', 'event_1', 'SMS',
+                'SEND_NOW', 1700000000000, 'QUEUED', 'PENDING_DELIVERY', 'WORKER'
+            )
+        """.trimIndent())
+
+        db.query("""
+            SELECT routeRank, retryCount, metadataJson
+            FROM dispatch_attempts
+            WHERE id = 'attempt_1'
+        """.trimIndent()).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+            assertEquals(0, cursor.getInt(1))
+            assertEquals("{}", cursor.getString(2))
+        }
+
+        db.execSQL("DELETE FROM events WHERE id = 'event_1'")
+        db.query("SELECT occasionId FROM dispatch_attempts WHERE id = 'attempt_1'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertNull(cursor.getString(0))
+        }
+
+        db.execSQL("DELETE FROM pending_messages WHERE id = 'pending_1'")
+        db.query("SELECT COUNT(*) FROM dispatch_attempts").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
         }
         db.close()
     }
@@ -163,14 +275,14 @@ class MigrationTest {
     }
 
     private fun migrateAndAssertPreservesRepresentativeData(startVersion: Int) {
-        val dbName = "migration-$startVersion-to-13"
+        val dbName = "migration-$startVersion-to-14"
         var db = helper.createDatabase(dbName, startVersion)
         insertRepresentativeRows(db, startVersion)
         db.close()
 
         db = helper.runMigrationsAndValidate(
             dbName,
-            13,
+            14,
             true,
             *migrationsFrom(startVersion),
         )
@@ -191,6 +303,7 @@ class MigrationTest {
                 AppDatabase.MIGRATION_10_11,
                 AppDatabase.MIGRATION_11_12,
                 AppDatabase.MIGRATION_12_13,
+                AppDatabase.MIGRATION_13_14,
             )
             5 -> arrayOf(
                 AppDatabase.MIGRATION_5_6,
@@ -201,6 +314,7 @@ class MigrationTest {
                 AppDatabase.MIGRATION_10_11,
                 AppDatabase.MIGRATION_11_12,
                 AppDatabase.MIGRATION_12_13,
+                AppDatabase.MIGRATION_13_14,
             )
             6 -> arrayOf(
                 AppDatabase.MIGRATION_6_7,
@@ -210,10 +324,27 @@ class MigrationTest {
                 AppDatabase.MIGRATION_10_11,
                 AppDatabase.MIGRATION_11_12,
                 AppDatabase.MIGRATION_12_13,
+                AppDatabase.MIGRATION_13_14,
             )
-            9 -> arrayOf(AppDatabase.MIGRATION_9_10, AppDatabase.MIGRATION_10_11, AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13)
-            10 -> arrayOf(AppDatabase.MIGRATION_10_11, AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13)
-            11 -> arrayOf(AppDatabase.MIGRATION_11_12, AppDatabase.MIGRATION_12_13)
+            9 -> arrayOf(
+                AppDatabase.MIGRATION_9_10,
+                AppDatabase.MIGRATION_10_11,
+                AppDatabase.MIGRATION_11_12,
+                AppDatabase.MIGRATION_12_13,
+                AppDatabase.MIGRATION_13_14,
+            )
+            10 -> arrayOf(
+                AppDatabase.MIGRATION_10_11,
+                AppDatabase.MIGRATION_11_12,
+                AppDatabase.MIGRATION_12_13,
+                AppDatabase.MIGRATION_13_14,
+            )
+            11 -> arrayOf(
+                AppDatabase.MIGRATION_11_12,
+                AppDatabase.MIGRATION_12_13,
+                AppDatabase.MIGRATION_13_14,
+            )
+            13 -> arrayOf(AppDatabase.MIGRATION_13_14)
             else -> error("Unsupported migration start version: $startVersion")
         }
     }
@@ -322,7 +453,7 @@ class MigrationTest {
                     'Important note', 'NEUTRAL', '[]', '{}', 1500000000000, 1700000000000, 0
                 )
             """.trimIndent())
-            10, 11 -> db.execSQL("""
+            10, 11, 13, 14 -> db.execSQL("""
                 INSERT INTO contacts (
                     id, googleContactId, name, nickname, birthdayDay, birthdayMonth, birthdayYear,
                     anniversaryDay, anniversaryMonth, anniversaryYear, workStartDay, workStartMonth,
@@ -369,7 +500,7 @@ class MigrationTest {
                     1800000000000, 1, 'CONTACTS', 100, 1
                 )
             """.trimIndent()
-            10, 11 -> """
+            10, 11, 13, 14 -> """
                 INSERT INTO events (
                     id, contactId, type, label, dayOfMonth, month, year, nextOccurrenceMs,
                     isActive, notifyDaysBefore, source, confidenceScore, isVerified
@@ -384,7 +515,7 @@ class MigrationTest {
     }
 
     private fun insertPendingMessage(db: SupportSQLiteDatabase, version: Int) {
-        val sql = if (version in setOf(10, 11)) {
+        val sql = if (version in setOf(10, 11, 13, 14)) {
             """
                 INSERT INTO pending_messages (
                     id, contactId, eventId, shortVariant, standardVariant, longVariant,
@@ -474,7 +605,7 @@ class MigrationTest {
             assertTrue(cursor.moveToFirst())
             assertEquals("John Doe", cursor.getString(0))
             assertEquals(0, cursor.getInt(1))
-            assertEquals(if (sourceVersion in setOf(10, 11)) 1200 else 0, cursor.getInt(2))
+            assertEquals(if (sourceVersion in setOf(10, 11, 13, 14)) 1200 else 0, cursor.getInt(2))
             assertTrue(cursor.getString(3).isNotBlank())
         }
 
@@ -487,8 +618,8 @@ class MigrationTest {
         db.query("SELECT standardVariant, scheduledYear, isUsingFallback FROM pending_messages WHERE id = 'pending_1'").use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals("Standard", cursor.getString(0))
-            assertEquals(if (sourceVersion in setOf(10, 11)) 2027 else 0, cursor.getInt(1))
-            assertEquals(if (sourceVersion in setOf(10, 11)) 1 else 0, cursor.getInt(2))
+            assertEquals(if (sourceVersion in setOf(10, 11, 13, 14)) 2027 else 0, cursor.getInt(1))
+            assertEquals(if (sourceVersion in setOf(10, 11, 13, 14)) 1 else 0, cursor.getInt(2))
         }
 
         db.query("SELECT messageText, replyReceived, isContactDeleted FROM sent_messages WHERE id = 'sent_1'").use { cursor ->
@@ -508,6 +639,31 @@ class MigrationTest {
         db.query("SELECT COUNT(*) FROM $table").use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals("Unexpected row count for $table", 1, cursor.getInt(0))
+        }
+    }
+
+    private fun assertSentOccasion(
+        db: SupportSQLiteDatabase,
+        id: String,
+        expectedLegacyEventType: String,
+        expectedEventId: String?,
+        expectedOccasionType: String,
+        expectedOccasionLabel: String?,
+    ) {
+        db.query("SELECT eventType, eventId, occasionType, occasionLabel FROM sent_messages WHERE id = '$id'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(expectedLegacyEventType, cursor.getString(0))
+            if (expectedEventId == null) {
+                assertNull(cursor.getString(1))
+            } else {
+                assertEquals(expectedEventId, cursor.getString(1))
+            }
+            assertEquals(expectedOccasionType, cursor.getString(2))
+            if (expectedOccasionLabel == null) {
+                assertNull(cursor.getString(3))
+            } else {
+                assertEquals(expectedOccasionLabel, cursor.getString(3))
+            }
         }
     }
 }

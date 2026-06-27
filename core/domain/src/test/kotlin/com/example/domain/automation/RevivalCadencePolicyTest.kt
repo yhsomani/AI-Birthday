@@ -1,8 +1,13 @@
 package com.example.domain.automation
 
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.PendingMessageEntity
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.contact.ContactAutomationProfile
+import com.example.domain.model.message.MessageDraft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -86,33 +91,29 @@ class RevivalCadencePolicyTest {
         healthScore: Int = 30,
         interactionFrequencyPerMonth: Float = 0f,
         lastRevivalAttemptMs: Long = 0L,
-    ): ContactEntity {
-        return ContactEntity(
-            id = "c1",
-            name = "Priya",
+    ): ContactAutomationProfile {
+        return ContactAutomationProfile(
+            id = ContactId("c1"),
             relationshipType = relationshipType,
             healthScore = healthScore,
             interactionFrequencyPerMonth = interactionFrequencyPerMonth,
             lastRevivalAttemptMs = lastRevivalAttemptMs,
+            skipAutoWish = false,
         )
     }
 
-    private fun pending(status: String): PendingMessageEntity {
-        return PendingMessageEntity(
-            id = "p1",
-            contactId = "c1",
-            eventId = RevivalCadencePolicy.eventId("c1"),
-            shortVariant = "Hi",
-            standardVariant = "Hi",
-            longVariant = "Hi",
-            formalVariant = "Hi",
-            funnyVariant = "Hi",
-            emotionalVariant = "Hi",
-            channel = MessageChannel.SMS.raw,
+    private fun pending(status: String): MessageDraft {
+        return MessageDraft(
+            id = MessageDraftId("p1"),
+            contactId = ContactId("c1"),
+            occasionId = OccasionId(RevivalCadencePolicy.eventId("c1")),
             scheduledForMs = NOW,
-            approvalMode = "SMART_APPROVE",
-            status = status,
+            approvalMode = ApprovalMode.SMART_APPROVE,
+            status = MessageStatus.fromRaw(status),
+            channel = MessageChannel.SMS,
             scheduledYear = 2026,
+            qualityScore = 80,
+            isUsingFallback = false,
         )
     }
 

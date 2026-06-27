@@ -4,10 +4,10 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
-import com.example.core.db.entities.ContactEntity
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.contact.ContactListItem
 import com.example.domain.repository.ContactRepository
 import com.example.domain.usecase.SyncContactsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -53,8 +53,8 @@ data class ContactQualityState(
 )
 
 data class ContactListUiState(
-    val allContacts: List<ContactEntity> = emptyList(),
-    val contacts: List<ContactEntity> = emptyList(),
+    val allContacts: List<ContactListItem> = emptyList(),
+    val contacts: List<ContactListItem> = emptyList(),
     val contactQuality: Map<String, ContactQualityState> = emptyMap(),
     val searchQuery: String = "",
     val selectedFilter: ContactFilter = ContactFilter.ALL,
@@ -85,7 +85,7 @@ class ContactListViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             try {
-                contactRepository.getAll().collect { contacts ->
+                contactRepository.getContactListItems().collect { contacts ->
                     val lastError = try { preferencesRepository.getLastSyncError() } catch(ex: Exception) { null }
                     _uiState.value = _uiState.value.withContacts(
                         allContacts = contacts,
@@ -109,7 +109,7 @@ class ContactListViewModel @Inject constructor(
                 // Perform contact synchronization with Google Contacts
                 syncContactsUseCase(forceRefresh = true)
                 
-                contactRepository.getAll().first().let { contacts ->
+                contactRepository.getContactListItems().first().let { contacts ->
                     val lastError = try { preferencesRepository.getLastSyncError() } catch(ex: Exception) { null }
                     _uiState.value = _uiState.value.withContacts(
                         allContacts = contacts,
@@ -153,14 +153,14 @@ class ContactListViewModel @Inject constructor(
     }
 
     private fun ContactListUiState.withContacts(
-        allContacts: List<ContactEntity>,
+        allContacts: List<ContactListItem>,
         isLoading: Boolean = this.isLoading,
         isRefreshing: Boolean = this.isRefreshing,
         syncError: String? = this.syncError,
     ): ContactListUiState {
         return copy(
             allContacts = allContacts,
-            contactQuality = allContacts.associate { contact -> contact.id to contact.qualityState() },
+            contactQuality = allContacts.associate { contact -> contact.id.value to contact.qualityState() },
             isLoading = isLoading,
             isRefreshing = isRefreshing,
             syncError = syncError,
@@ -173,7 +173,7 @@ class ContactListViewModel @Inject constructor(
             .asSequence()
             .filter { contact ->
                 normalizedQuery.isBlank() ||
-                    contact.name.contains(normalizedQuery, ignoreCase = true) ||
+                    contact.displayName.contains(normalizedQuery, ignoreCase = true) ||
                     contact.nickname?.contains(normalizedQuery, ignoreCase = true) == true ||
                     contact.company?.contains(normalizedQuery, ignoreCase = true) == true ||
                     contact.relationshipType.contains(normalizedQuery, ignoreCase = true)
@@ -181,12 +181,12 @@ class ContactListViewModel @Inject constructor(
             .filter { contact -> contact.matchesFilter(selectedFilter) }
             .let { sequence ->
                 when (selectedSort) {
-                    ContactSort.NAME_ASC -> sequence.sortedBy { it.name.lowercase() }
+                    ContactSort.NAME_ASC -> sequence.sortedBy { it.displayName.lowercase() }
                     ContactSort.HEALTH_DESC -> sequence.sortedWith(
-                        compareByDescending<ContactEntity> { it.healthScore }.thenBy { it.name.lowercase() }
+                        compareByDescending<ContactListItem> { it.healthScore }.thenBy { it.displayName.lowercase() }
                     )
                     ContactSort.HEALTH_ASC -> sequence.sortedWith(
-                        compareBy<ContactEntity> { it.healthScore }.thenBy { it.name.lowercase() }
+                        compareBy<ContactListItem> { it.healthScore }.thenBy { it.displayName.lowercase() }
                     )
                 }
             }
@@ -194,7 +194,7 @@ class ContactListViewModel @Inject constructor(
         return copy(contacts = filtered)
     }
 
-    private fun ContactEntity.matchesFilter(filter: ContactFilter): Boolean {
+    private fun ContactListItem.matchesFilter(filter: ContactFilter): Boolean {
         return when (filter) {
             ContactFilter.ALL -> true
             ContactFilter.FAMILY -> contactGroup.equals("Family", ignoreCase = true) ||
@@ -209,15 +209,15 @@ class ContactListViewModel @Inject constructor(
             ContactFilter.MISSING_RELATIONSHIP -> missingRelationship()
             ContactFilter.MISSING_CHANNEL -> !hasReachablePreferredChannel()
             ContactFilter.LOW_HEALTH -> healthScore < LOW_HEALTH_THRESHOLD
-            ContactFilter.VIP -> ApprovalMode.fromRaw(automationMode) == ApprovalMode.VIP_APPROVE
+            ContactFilter.VIP -> automationMode == ApprovalMode.VIP_APPROVE
         }
     }
 
-    private fun ContactEntity.missingRelationship(): Boolean {
+    private fun ContactListItem.missingRelationship(): Boolean {
         return relationshipType.isBlank() || relationshipType.equals("UNKNOWN", ignoreCase = true)
     }
 
-    private fun ContactEntity.needsPersonalization(): Boolean {
+    private fun ContactListItem.needsPersonalization(): Boolean {
         return nickname.isNullOrBlank() &&
             notesText.isBlank() &&
             !hasJsonArrayContent(interestsJson) &&
@@ -225,7 +225,7 @@ class ContactListViewModel @Inject constructor(
             classificationConfidence < PERSONALIZATION_CONFIDENCE_THRESHOLD
     }
 
-    private fun ContactEntity.qualityState(): ContactQualityState {
+    private fun ContactListItem.qualityState(): ContactQualityState {
         val hasKnownEvent = hasDatedEvent()
         val hasReachableChannel = hasReachablePreferredChannel()
         val hasPersonalizationContext = !needsPersonalization()
@@ -244,7 +244,7 @@ class ContactListViewModel @Inject constructor(
         )
     }
 
-    private fun ContactEntity.hasDatedEvent(): Boolean {
+    private fun ContactListItem.hasDatedEvent(): Boolean {
         return hasCompleteDate(birthdayDay, birthdayMonth) ||
             hasCompleteDate(anniversaryDay, anniversaryMonth) ||
             hasCompleteDate(workStartDay, workStartMonth)
@@ -254,8 +254,8 @@ class ContactListViewModel @Inject constructor(
         return day != null && month != null
     }
 
-    private fun ContactEntity.hasReachablePreferredChannel(): Boolean {
-        return when (MessageChannel.fromRaw(preferredChannel)) {
+    private fun ContactListItem.hasReachablePreferredChannel(): Boolean {
+        return when (preferredChannel) {
             MessageChannel.SMS,
             MessageChannel.WHATSAPP -> hasPhone()
             MessageChannel.EMAIL -> !primaryEmail.isNullOrBlank()
@@ -263,7 +263,7 @@ class ContactListViewModel @Inject constructor(
         }
     }
 
-    private fun ContactEntity.hasPhone(): Boolean {
+    private fun ContactListItem.hasPhone(): Boolean {
         return !primaryPhone.isNullOrBlank() || !secondaryPhone.isNullOrBlank()
     }
 

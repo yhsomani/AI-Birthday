@@ -11,6 +11,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import androidx.navigation.navDeepLink
+import com.example.domain.navigation.RelateDeepLinks
 import com.example.ui.screens.splash.SplashScreen
 import com.example.ui.screens.onboarding.OnboardingScreen
 import com.example.ui.screens.auth.AuthScreen
@@ -156,8 +158,8 @@ fun RelateNavGraph(
             route = Screen.ContactDetail.route,
             arguments = listOf(navArgument("contactId") { type = NavType.StringType }),
             deepLinks = listOf(
-                androidx.navigation.navDeepLink {
-                    uriPattern = "relateai://contact/{contactId}"
+                navDeepLink {
+                    uriPattern = RelateDeepLinks.Contact.pattern
                 }
             )
         ) { backStackEntry ->
@@ -186,8 +188,8 @@ fun RelateNavGraph(
                 navArgument("messageRef") { type = NavType.StringType },
             ),
             deepLinks = listOf(
-                androidx.navigation.navDeepLink {
-                    uriPattern = "relateai://wish/{contactId}/{messageRef}"
+                navDeepLink {
+                    uriPattern = RelateDeepLinks.Wish.pattern
                 }
             )
         ) { backStackEntry ->
@@ -224,8 +226,8 @@ fun RelateNavGraph(
         composable(
             route = Screen.Settings.route,
             deepLinks = listOf(
-                androidx.navigation.navDeepLink {
-                    uriPattern = "relateai://settings"
+                navDeepLink {
+                    uriPattern = RelateDeepLinks.Settings.pattern
                 }
             )
         ) {
@@ -267,7 +269,14 @@ fun RelateNavGraph(
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(Screen.BackupRestore.route) {
+        composable(
+            route = Screen.BackupRestore.route,
+            deepLinks = listOf(
+                navDeepLink {
+                    uriPattern = RelateDeepLinks.BackupRestore.pattern
+                }
+            )
+        ) {
             BackupRestoreScreen(
                 onBack = { navController.popBackStack() }
             )

@@ -1,9 +1,9 @@
 package com.example.domain.service
 
-import com.example.core.db.entities.EventEntity
+import com.example.domain.model.notification.EventReminderScheduleRequest
 
 interface EventReminderSchedulerService {
-    fun scheduleReminder(event: EventEntity)
+    fun scheduleReminder(request: EventReminderScheduleRequest)
     fun cancelReminder(eventId: String)
     fun rescheduleAll()
 }

@@ -32,16 +32,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.R
-import com.example.core.db.entities.PendingMessageEntity
-import com.example.core.db.entities.SentMessageEntity
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.relateTextFieldColors
 import com.example.core.ui.theme.*
 import com.example.domain.model.ApprovalMode
-import com.example.domain.model.EventType
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.occasion.OccasionType
 import com.example.ui.viewmodel.MessageChannelFilter
 import com.example.ui.viewmodel.MessageReadiness
 import com.example.ui.viewmodel.MessageSort
@@ -467,17 +465,17 @@ private fun PendingMessagesList(
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(messages, key = { it.entity.id }) { item ->
+            items(messages, key = { it.id }) { item ->
                 PendingMessageCard(
                     item = item,
                     onApprove = onApprove,
                     onReject = onReject,
                     onEdit = onEdit,
-                    isApproving = approvingMessageId == item.entity.id,
-                    selected = item.entity.id in selectedMessageIds,
+                    isApproving = approvingMessageId == item.id,
+                    selected = item.id in selectedMessageIds,
                     onToggleSelection = onToggleSelection,
                     showApproveAction = showApproveAction,
-                    modifier = Modifier.testTag(cardTagPrefix + item.entity.id),
+                    modifier = Modifier.testTag(cardTagPrefix + item.id),
                 )
             }
         }
@@ -493,10 +491,10 @@ private fun SentMessagesList(messages: List<SentMessageItem>) {
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(messages, key = { it.entity.id }) { item ->
+            items(messages, key = { it.id }) { item ->
                 SentMessageCard(
                     item = item,
-                    modifier = Modifier.testTag(MessagesTestTags.SENT_CARD_PREFIX + item.entity.id),
+                    modifier = Modifier.testTag(MessagesTestTags.SENT_CARD_PREFIX + item.id),
                 )
             }
         }
@@ -519,14 +517,14 @@ private fun FailedMessagesList(
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(messages, key = { it.entity.id }) { item ->
+            items(messages, key = { it.id }) { item ->
                 FailedMessageCard(
                     item = item,
                     onRetry = onRetry,
-                    isRetrying = retryingMessageId == item.entity.id,
-                    selected = item.entity.id in selectedMessageIds,
+                    isRetrying = retryingMessageId == item.id,
+                    selected = item.id in selectedMessageIds,
                     onToggleSelection = onToggleSelection,
-                    modifier = Modifier.testTag(MessagesTestTags.FAILED_CARD_PREFIX + item.entity.id),
+                    modifier = Modifier.testTag(MessagesTestTags.FAILED_CARD_PREFIX + item.id),
                 )
             }
             item(key = "failed_recovery_assistant") {
@@ -628,33 +626,32 @@ private fun PendingMessageCard(
     showApproveAction: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val message = item.entity
-    val eventType = EventType.fromRaw(item.eventType)
+    val eventType = OccasionType.fromRaw(item.eventType)
     val eventTypeColor = when (eventType) {
-        EventType.BIRTHDAY -> Color(0xFF8B5CF6) // NeonViolet
-        EventType.ANNIVERSARY -> Color(0xFFF43F5E) // CyberRose
-        EventType.WORK_ANNIVERSARY -> Color(0xFF06B6D4) // ElectricCyan
+        OccasionType.BIRTHDAY -> Color(0xFF8B5CF6) // NeonViolet
+        OccasionType.ANNIVERSARY -> Color(0xFFF43F5E) // CyberRose
+        OccasionType.WORK_ANNIVERSARY -> Color(0xFF06B6D4) // ElectricCyan
         else -> Color.Gray
     }
 
     val eventIcon = when (eventType) {
-        EventType.BIRTHDAY -> Icons.Filled.Cake
-        EventType.ANNIVERSARY -> Icons.Filled.Favorite
-        EventType.WORK_ANNIVERSARY -> Icons.Filled.Work
+        OccasionType.BIRTHDAY -> Icons.Filled.Cake
+        OccasionType.ANNIVERSARY -> Icons.Filled.Favorite
+        OccasionType.WORK_ANNIVERSARY -> Icons.Filled.Work
         else -> Icons.Filled.Info
     }
 
-    val messageChannel = MessageChannel.fromRaw(message.channel)
+    val messageChannel = item.channel
     val channelIcon = when (messageChannel) {
         MessageChannel.WHATSAPP -> Icons.Filled.Phone
         MessageChannel.EMAIL -> Icons.Filled.Email
         MessageChannel.SMS,
         MessageChannel.UNKNOWN -> Icons.Filled.Message
     }
-    val channelText = channelLabel(message.channel)
+    val channelText = channelLabel(item.channel.raw)
 
-    val previewText = remember(message) {
-        val raw = if (message.editedByUser) message.userEditedText ?: message.selectedVariantText else message.selectedVariantText
+    val previewText = remember(item.reviewPreviewText) {
+        val raw = item.reviewPreviewText
         if (raw.length > 80) raw.take(80) + "..." else raw
     }
 
@@ -665,8 +662,8 @@ private fun PendingMessageCard(
             ) {
                 Checkbox(
                     checked = selected,
-                    onCheckedChange = { onToggleSelection(message.id) },
-                    modifier = Modifier.testTag(MessagesTestTags.SELECT_PREFIX + message.id),
+                    onCheckedChange = { onToggleSelection(item.id) },
+                    modifier = Modifier.testTag(MessagesTestTags.SELECT_PREFIX + item.id),
                     colors = CheckboxDefaults.colors(checkedColor = RelatePrimary),
                 )
                 if (item.contactAvatarUrl != null) {
@@ -751,7 +748,7 @@ private fun PendingMessageCard(
                                     text = channelText,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = RelateOnSurfaceVariant,
-                                    modifier = Modifier.testTag(MessagesTestTags.CHANNEL_PREFIX + message.id),
+                                    modifier = Modifier.testTag(MessagesTestTags.CHANNEL_PREFIX + item.id),
                                 )
                             }
                         }
@@ -760,7 +757,7 @@ private fun PendingMessageCard(
 
                 val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
                 Text(
-                    text = dateFormat.format(Date(message.scheduledForMs)),
+                    text = dateFormat.format(Date(item.scheduledForMs)),
                     style = MaterialTheme.typography.bodySmall,
                     color = RelateOnSurfaceVariant,
                     modifier = Modifier.align(Alignment.Top),
@@ -780,7 +777,7 @@ private fun PendingMessageCard(
             Spacer(modifier = Modifier.height(12.dp))
             MessageReadinessBadge(
                 readiness = item.readiness,
-                modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + message.id),
+                modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + item.id),
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -795,7 +792,7 @@ private fun PendingMessageCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    val approvalMode = ApprovalMode.fromRaw(message.approvalMode)
+                    val approvalMode = item.approvalMode
                     val modeColor = approvalModeColor(approvalMode)
                     Text(
                         text = approvalModeLabel(approvalMode),
@@ -805,7 +802,7 @@ private fun PendingMessageCard(
                     )
 
                     if (approvalMode == ApprovalMode.SMART_APPROVE) {
-                        val timeDiff = message.scheduledForMs - System.currentTimeMillis()
+                        val timeDiff = item.scheduledForMs - System.currentTimeMillis()
                         val minutesLeft = (timeDiff / (1000 * 60)).toInt()
                         if (minutesLeft in 0..30) {
                             Text(
@@ -829,11 +826,11 @@ private fun PendingMessageCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OutlinedButton(
-                        onClick = { onReject(message.id) },
+                        onClick = { onReject(item.id) },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         modifier = Modifier
                             .height(32.dp)
-                            .testTag(MessagesTestTags.PENDING_REJECT_PREFIX + message.id),
+                            .testTag(MessagesTestTags.PENDING_REJECT_PREFIX + item.id),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.error,
                         ),
@@ -846,11 +843,11 @@ private fun PendingMessageCard(
                     }
 
                     OutlinedButton(
-                        onClick = { onEdit(message.contactId, message.id) },
+                        onClick = { onEdit(item.contactId, item.id) },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         modifier = Modifier
                             .height(32.dp)
-                            .testTag(MessagesTestTags.PENDING_EDIT_PREFIX + message.id),
+                            .testTag(MessagesTestTags.PENDING_EDIT_PREFIX + item.id),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = RelatePrimary,
                         ),
@@ -864,11 +861,11 @@ private fun PendingMessageCard(
 
                     if (showApproveAction) {
                         Button(
-                            onClick = { onApprove(message.id) },
+                            onClick = { onApprove(item.id) },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                             modifier = Modifier
                                 .height(32.dp)
-                                .testTag(MessagesTestTags.PENDING_APPROVE_PREFIX + message.id),
+                                .testTag(MessagesTestTags.PENDING_APPROVE_PREFIX + item.id),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = RelatePrimary,
                                 contentColor = Color.Black,
@@ -898,7 +895,6 @@ private fun SentMessageCard(
     item: SentMessageItem,
     modifier: Modifier = Modifier,
 ) {
-    val message = item.entity
     RelateGlassCard(modifier = modifier) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -942,7 +938,7 @@ private fun SentMessageCard(
                     )
                     val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
                     Text(
-                        text = dateFormat.format(Date(message.sentAtMs)),
+                        text = dateFormat.format(Date(item.sentAtMs)),
                         style = MaterialTheme.typography.bodySmall,
                         color = RelateOnSurfaceVariant,
                     )
@@ -957,7 +953,7 @@ private fun SentMessageCard(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = message.messageText,
+                        text = item.messageText,
                         style = MaterialTheme.typography.bodyMedium,
                         color = RelateOnSurfaceVariant,
                         maxLines = 2,
@@ -966,10 +962,10 @@ private fun SentMessageCard(
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = stringResource(R.string.messages_channel_format, channelLabel(message.channel)),
+                    text = stringResource(R.string.messages_channel_format, channelLabel(item.channel.raw)),
                     style = MaterialTheme.typography.bodySmall,
                     color = RelateOnSurfaceVariant.copy(alpha = 0.8f),
-                    modifier = Modifier.testTag(MessagesTestTags.CHANNEL_PREFIX + message.id),
+                    modifier = Modifier.testTag(MessagesTestTags.CHANNEL_PREFIX + item.id),
                 )
             }
         }
@@ -985,7 +981,6 @@ private fun FailedMessageCard(
     onToggleSelection: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val message = item.entity
     val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
     RelateGlassCard(modifier = modifier) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -994,8 +989,8 @@ private fun FailedMessageCard(
             ) {
                 Checkbox(
                     checked = selected,
-                    onCheckedChange = { onToggleSelection(message.id) },
-                    modifier = Modifier.testTag(MessagesTestTags.SELECT_PREFIX + message.id),
+                    onCheckedChange = { onToggleSelection(item.id) },
+                    modifier = Modifier.testTag(MessagesTestTags.SELECT_PREFIX + item.id),
                     colors = CheckboxDefaults.colors(checkedColor = RelatePrimary),
                 )
                 if (item.contactAvatarUrl != null) {
@@ -1032,7 +1027,7 @@ private fun FailedMessageCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = stringResource(R.string.messages_scheduled_format, dateFormat.format(Date(message.scheduledForMs))),
+                        text = stringResource(R.string.messages_scheduled_format, dateFormat.format(Date(item.scheduledForMs))),
                         style = MaterialTheme.typography.bodySmall,
                         color = RelateOnSurfaceVariant,
                     )
@@ -1046,7 +1041,7 @@ private fun FailedMessageCard(
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = message.selectedVariantText.ifBlank { message.standardVariant },
+                text = item.messageText,
                 style = MaterialTheme.typography.bodyMedium,
                 color = RelateOnSurfaceVariant,
                 maxLines = 2,
@@ -1055,7 +1050,7 @@ private fun FailedMessageCard(
             Spacer(modifier = Modifier.height(12.dp))
             MessageReadinessBadge(
                 readiness = item.readiness,
-                modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + message.id),
+                modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + item.id),
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -1064,11 +1059,11 @@ private fun FailedMessageCard(
                 horizontalArrangement = Arrangement.End,
             ) {
                 Button(
-                    onClick = { onRetry(message.id) },
+                    onClick = { onRetry(item.id) },
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                     modifier = Modifier
                         .height(36.dp)
-                        .testTag(MessagesTestTags.FAILED_RETRY_PREFIX + message.id),
+                        .testTag(MessagesTestTags.FAILED_RETRY_PREFIX + item.id),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RelatePrimary,
                         contentColor = Color.Black,
@@ -1111,16 +1106,16 @@ private fun ApprovedMessagesList(
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(messages, key = { it.entity.id }) { item ->
+            items(messages, key = { it.id }) { item ->
                 ApprovedMessageCard(
                     item = item,
                     onRevoke = onRevoke,
                     onReject = onReject,
                     onEdit = onEdit,
-                    isRevoking = revokingMessageId == item.entity.id,
-                    selected = item.entity.id in selectedMessageIds,
+                    isRevoking = revokingMessageId == item.id,
+                    selected = item.id in selectedMessageIds,
                     onToggleSelection = onToggleSelection,
-                    modifier = Modifier.testTag(MessagesTestTags.APPROVED_CARD_PREFIX + item.entity.id),
+                    modifier = Modifier.testTag(MessagesTestTags.APPROVED_CARD_PREFIX + item.id),
                 )
             }
         }
@@ -1138,7 +1133,6 @@ private fun ApprovedMessageCard(
     onToggleSelection: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val message = item.entity
     val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
     RelateGlassCard(modifier = modifier) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -1147,8 +1141,8 @@ private fun ApprovedMessageCard(
             ) {
                 Checkbox(
                     checked = selected,
-                    onCheckedChange = { onToggleSelection(message.id) },
-                    modifier = Modifier.testTag(MessagesTestTags.SELECT_PREFIX + message.id),
+                    onCheckedChange = { onToggleSelection(item.id) },
+                    modifier = Modifier.testTag(MessagesTestTags.SELECT_PREFIX + item.id),
                     colors = CheckboxDefaults.colors(checkedColor = RelatePrimary),
                 )
                 if (item.contactAvatarUrl != null) {
@@ -1185,7 +1179,7 @@ private fun ApprovedMessageCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = stringResource(R.string.messages_scheduled_format, dateFormat.format(Date(message.scheduledForMs))),
+                        text = stringResource(R.string.messages_scheduled_format, dateFormat.format(Date(item.scheduledForMs))),
                         style = MaterialTheme.typography.bodySmall,
                         color = RelateOnSurfaceVariant,
                     )
@@ -1199,7 +1193,7 @@ private fun ApprovedMessageCard(
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = message.selectedVariantText.ifBlank { message.standardVariant },
+                text = item.messageText,
                 style = MaterialTheme.typography.bodyMedium,
                 color = RelateOnSurfaceVariant,
                 maxLines = 2,
@@ -1208,7 +1202,7 @@ private fun ApprovedMessageCard(
             Spacer(modifier = Modifier.height(12.dp))
             MessageReadinessBadge(
                 readiness = item.readiness,
-                modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + message.id),
+                modifier = Modifier.testTag(MessagesTestTags.READINESS_PREFIX + item.id),
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -1220,11 +1214,11 @@ private fun ApprovedMessageCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OutlinedButton(
-                        onClick = { onReject(message.id) },
+                        onClick = { onReject(item.id) },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         modifier = Modifier
                             .height(32.dp)
-                            .testTag(MessagesTestTags.APPROVED_REJECT_PREFIX + message.id),
+                            .testTag(MessagesTestTags.APPROVED_REJECT_PREFIX + item.id),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.error,
                         ),
@@ -1237,11 +1231,11 @@ private fun ApprovedMessageCard(
                     }
 
                     OutlinedButton(
-                        onClick = { onEdit(message.contactId, message.id) },
+                        onClick = { onEdit(item.contactId, item.id) },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         modifier = Modifier
                             .height(32.dp)
-                            .testTag(MessagesTestTags.APPROVED_EDIT_PREFIX + message.id),
+                            .testTag(MessagesTestTags.APPROVED_EDIT_PREFIX + item.id),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = RelatePrimary,
                         ),
@@ -1254,11 +1248,11 @@ private fun ApprovedMessageCard(
                     }
 
                     Button(
-                        onClick = { onRevoke(message.id) },
+                        onClick = { onRevoke(item.id) },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         modifier = Modifier
                             .height(32.dp)
-                            .testTag(MessagesTestTags.APPROVED_REVOKE_PREFIX + message.id),
+                            .testTag(MessagesTestTags.APPROVED_REVOKE_PREFIX + item.id),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = RelateOnSurfaceVariant,

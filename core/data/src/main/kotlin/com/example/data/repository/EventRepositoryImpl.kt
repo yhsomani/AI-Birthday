@@ -1,9 +1,20 @@
 package com.example.data.repository
 
 import com.example.core.db.dao.EventDao
-import com.example.core.db.entities.EventEntity
+import com.example.domain.event.toEventListItems
+import com.example.domain.event.toEventEntity
+import com.example.domain.event.toOccasion
+import com.example.domain.event.toOccasions
+import com.example.domain.event.toUpcomingEventPreview
+import com.example.domain.event.toUpcomingEventPreviews
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.occasion.EventListItem
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.model.occasion.OccasionType
+import com.example.domain.model.occasion.UpcomingEventPreview
 import com.example.domain.repository.EventRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -12,13 +23,43 @@ class EventRepositoryImpl @Inject constructor(
     private val eventDao: EventDao
 ) : EventRepository {
 
-    override fun getAll(): Flow<List<EventEntity>> = eventDao.getAll()
+    override fun getOccasions(): Flow<List<Occasion>> {
+        return eventDao.getAll().map { events -> events.toOccasions() }
+    }
 
-    override suspend fun getEventsBefore(timeMs: Long): List<EventEntity> = eventDao.getEventsBefore(timeMs)
+    override fun getEventListItems(): Flow<List<EventListItem>> {
+        return eventDao.getAll().map { events -> events.toEventListItems() }
+    }
 
-    override suspend fun getUpcoming(days: Int): List<EventEntity> = eventDao.getUpcoming(days, System.currentTimeMillis())
+    override suspend fun getOccasionsBefore(timeMs: Long): List<Occasion> {
+        return eventDao.getEventsBefore(timeMs).toOccasions()
+    }
 
-    override suspend fun upsert(event: EventEntity) = eventDao.upsert(event)
+    override suspend fun countUpcoming(days: Int): Int = eventDao.countUpcoming(days, System.currentTimeMillis())
 
-    override suspend fun delete(event: EventEntity) = eventDao.delete(event)
+    override suspend fun getOccasionById(eventId: String): Occasion? {
+        return eventDao.getById(eventId)?.toOccasion()
+    }
+
+    override suspend fun getOccasionTypeById(eventId: String): OccasionType? {
+        return eventDao.getTypeById(eventId)?.let { OccasionType.fromRaw(it) }
+    }
+
+    override suspend fun getUpcomingPreviews(days: Int): List<UpcomingEventPreview> {
+        return eventDao.getUpcoming(days, System.currentTimeMillis()).toUpcomingEventPreviews()
+    }
+
+    override suspend fun getNextUpcomingPreviewForContact(
+        contactId: String,
+        days: Int,
+    ): UpcomingEventPreview? {
+        return eventDao
+            .getNextUpcomingForContact(contactId, days, System.currentTimeMillis())
+            ?.toUpcomingEventPreview()
+    }
+
+    override suspend fun upsertOccasion(occasion: Occasion) = eventDao.upsert(occasion.toEventEntity())
+
+    override suspend fun deactivateContactDerivedOccasion(contactId: ContactId, type: OccasionType) =
+        eventDao.deactivateContactDerivedEvent(contactId.value, type.raw)
 }

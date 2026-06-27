@@ -1,6 +1,7 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ContactEntity
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.contact.ContactHealthProfile
 import com.example.domain.repository.ContactRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -16,7 +17,7 @@ class RefreshHealthScoresUseCaseTest {
 
     @Test
     fun `invoke with no contacts scans and updates nothing`() = runTest {
-        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getHealthProfiles() } returns emptyList()
 
         val outcome = useCase()
 
@@ -27,16 +28,15 @@ class RefreshHealthScoresUseCaseTest {
 
     @Test
     fun `invoke computes baseline health score of 50 for quiet contact`() = runTest {
-        val contact = ContactEntity(
-            id = "c1",
-            name = "Jane",
-            healthScore = 80, // Needs update to 50
+        val contact = ContactHealthProfile(
+            id = ContactId("c1"),
+            currentHealthScore = 80,
             interactionFrequencyPerMonth = 0f,
-            lastInteractionDate = null,
+            lastInteractionAtMs = null,
             consecutiveYearsWished = 0,
-            lastWishedDate = System.currentTimeMillis() // Prevents penalty
+            lastWishedAtMs = System.currentTimeMillis(),
         )
-        coEvery { contactRepository.getAllSync() } returns listOf(contact)
+        coEvery { contactRepository.getHealthProfiles() } returns listOf(contact)
 
         val outcome = useCase()
 
@@ -48,17 +48,15 @@ class RefreshHealthScoresUseCaseTest {
     @Test
     fun `invoke computes high score for active contact with bonuses`() = runTest {
         val now = System.currentTimeMillis()
-        val contact = ContactEntity(
-            id = "c1",
-            name = "Active",
-            healthScore = 50, // Needs update
-            interactionFrequencyPerMonth = 5f, // +40 max
-            lastInteractionDate = now - 5 * 24 * 3600 * 1000L, // < 7 days: +20 and +10
-            consecutiveYearsWished = 3, // +15
-            lastWishedDate = now
+        val contact = ContactHealthProfile(
+            id = ContactId("c1"),
+            currentHealthScore = 50,
+            interactionFrequencyPerMonth = 5f,
+            lastInteractionAtMs = now - 5 * 24 * 3600 * 1000L,
+            consecutiveYearsWished = 3,
+            lastWishedAtMs = now,
         )
-        // Expected score: 50 + 40 (freq) + 20 (<30 days) + 10 (<7 days) + 15 (years) = 135 -> capped at 100
-        coEvery { contactRepository.getAllSync() } returns listOf(contact)
+        coEvery { contactRepository.getHealthProfiles() } returns listOf(contact)
 
         val outcome = useCase()
 
@@ -70,17 +68,15 @@ class RefreshHealthScoresUseCaseTest {
     @Test
     fun `invoke penalizes quiet contact with no history`() = runTest {
         val now = System.currentTimeMillis()
-        val contact = ContactEntity(
-            id = "c1",
-            name = "Penalized",
-            healthScore = 50, // Needs update
+        val contact = ContactHealthProfile(
+            id = ContactId("c1"),
+            currentHealthScore = 50,
             interactionFrequencyPerMonth = 0f,
-            lastInteractionDate = now - 200 * 24 * 3600 * 1000L, // > 180 days
+            lastInteractionAtMs = now - 200 * 24 * 3600 * 1000L,
             consecutiveYearsWished = 0,
-            lastWishedDate = null // Triggers penalty -20
+            lastWishedAtMs = null,
         )
-        // Expected score: 50 + 0 (freq) + 0 (recent) + 0 (years) - 20 (penalty) = 30
-        coEvery { contactRepository.getAllSync() } returns listOf(contact)
+        coEvery { contactRepository.getHealthProfiles() } returns listOf(contact)
 
         val outcome = useCase()
 

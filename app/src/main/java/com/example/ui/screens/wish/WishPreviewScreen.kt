@@ -54,8 +54,8 @@ import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.domain.model.ApprovalMode
-import com.example.domain.model.EventType
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.occasion.OccasionType
 import com.example.ui.feedback.asString
 import com.example.ui.viewmodel.ReviewNextTarget
 import com.example.ui.viewmodel.WishDraftReadiness
@@ -207,7 +207,7 @@ internal fun WishPreviewScreenContent(
                 ) {
                     CircularProgressIndicator(color = RelatePrimary)
                 }
-            } else if (state.errorMessageRes != null && state.pendingMessage == null) {
+            } else if (state.errorMessageRes != null && state.previewDraft == null) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
@@ -533,7 +533,7 @@ private fun DraftReadinessMessage(
     Text(
         text = readiness.label(),
         style = MaterialTheme.typography.bodySmall,
-        color = if (readiness == WishDraftReadiness.BLANK) {
+        color = if (readiness.blocksApproval()) {
             MaterialTheme.colorScheme.error
         } else {
             RelateOnSurfaceVariant
@@ -550,7 +550,9 @@ private fun WishDraftReadiness.label(): String = when (this) {
     WishDraftReadiness.BLANK -> stringResource(R.string.wish_preview_readiness_blank)
 }
 
-private fun WishDraftReadiness.blocksApproval(): Boolean = this == WishDraftReadiness.BLANK
+private fun WishDraftReadiness.blocksApproval(): Boolean {
+    return this == WishDraftReadiness.BLANK || this == WishDraftReadiness.TOO_SHORT
+}
 
 @Composable
 private fun WishSendSummaryCard(
@@ -625,10 +627,10 @@ private fun SendSummaryRow(
 }
 
 @Composable
-private fun eventTypeLabel(eventType: String): String = when (EventType.fromRaw(eventType)) {
-    EventType.BIRTHDAY -> stringResource(R.string.event_type_birthday)
-    EventType.ANNIVERSARY -> stringResource(R.string.event_type_anniversary)
-    EventType.WORK_ANNIVERSARY -> stringResource(R.string.event_type_work_anniversary)
+private fun eventTypeLabel(eventType: String): String = when (OccasionType.fromRaw(eventType)) {
+    OccasionType.BIRTHDAY -> stringResource(R.string.event_type_birthday)
+    OccasionType.ANNIVERSARY -> stringResource(R.string.event_type_anniversary)
+    OccasionType.WORK_ANNIVERSARY -> stringResource(R.string.event_type_work_anniversary)
     else -> stringResource(R.string.event_type_custom)
 }
 

@@ -3,6 +3,7 @@ package com.example.di
 import android.content.Context
 import com.example.core.db.AppDatabase
 import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.prefs.SecurePrefs
@@ -12,12 +13,14 @@ import com.google.firebase.vertexai.FirebaseVertexAI
 import com.google.firebase.vertexai.GenerativeModel
 import com.example.data.repository.ContactRepositoryImpl
 import com.example.data.repository.ActivityLogRepositoryImpl
+import com.example.data.repository.DispatchAttemptRepositoryImpl
 import com.example.data.repository.EventRepositoryImpl
 import com.example.data.repository.MessageRepositoryImpl
 import com.example.data.repository.MessageFeedbackRepositoryImpl
 import com.example.data.repository.StyleProfileRepositoryImpl
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.ActivityLogRepository
+import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.MessageFeedbackRepository
@@ -72,6 +75,10 @@ abstract class AppModuleBinds {
     @Binds
     @Singleton
     abstract fun bindMessageFeedbackRepository(impl: MessageFeedbackRepositoryImpl): MessageFeedbackRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDispatchAttemptRepository(impl: DispatchAttemptRepositoryImpl): DispatchAttemptRepository
 }
 
 @Module
@@ -121,6 +128,10 @@ object AppModule {
     @Singleton
     fun provideMessageFeedbackDao(database: AppDatabase): com.example.core.db.dao.MessageFeedbackDao =
         database.messageFeedbackDao()
+
+    @Provides
+    @Singleton
+    fun provideDispatchAttemptDao(database: AppDatabase): DispatchAttemptDao = database.dispatchAttemptDao()
 
     @Provides
     @Singleton

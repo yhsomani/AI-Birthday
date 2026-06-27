@@ -17,10 +17,12 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.ContactEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
-import com.example.ui.viewmodel.MemoryNoteCategorySummary
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.contact.ContactDetailProfile
+import com.example.domain.model.memory.MemoryNoteCategoryCount
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -51,18 +53,16 @@ class ContactDetailBodySectionsTest {
                 ) {
                     ContactDetailBodySections(
                         contactId = "contact_1",
-                        contact = ContactEntity(
-                            id = "contact_1",
-                            name = "Asha",
+                        contact = contactProfile(
                             birthdayDay = 10,
                             birthdayMonth = 4,
                             primaryPhone = "+15550001",
                             primaryEmail = "asha@example.com",
-                            preferredChannel = MessageChannel.EMAIL.raw,
+                            preferredChannel = MessageChannel.EMAIL,
                         ),
                         memoryNoteCount = 1,
                         memoryNoteCategorySummary = listOf(
-                            MemoryNoteCategorySummary(category = "GENERAL", count = 1),
+                            MemoryNoteCategoryCount(category = "GENERAL", count = 1),
                         ),
                         upcomingBirthdayDaysLeft = 5,
                         onNavigateToMemoryVault = { actions += "memory:$it" },
@@ -143,5 +143,40 @@ class ContactDetailBodySectionsTest {
             .performScrollTo()
         composeRule.onNodeWithText(context.getString(titleRes))
             .assertIsDisplayed()
+    }
+
+    private fun contactProfile(
+        birthdayDay: Int? = null,
+        birthdayMonth: Int? = null,
+        primaryPhone: String? = null,
+        primaryEmail: String? = null,
+        preferredChannel: MessageChannel = MessageChannel.SMS,
+    ): ContactDetailProfile {
+        return ContactDetailProfile(
+            id = ContactId("contact_1"),
+            displayName = "Asha",
+            contactGroup = null,
+            healthScore = 80,
+            nickname = "Ash",
+            birthdayDay = birthdayDay,
+            birthdayMonth = birthdayMonth,
+            primaryPhone = primaryPhone,
+            primaryEmail = primaryEmail,
+            relationshipType = "UNKNOWN",
+            preferredLanguage = "en",
+            preferredChannel = preferredChannel,
+            formalityLevel = "CASUAL",
+            communicationStyle = "WARM",
+            automationMode = ApprovalMode.DEFAULT,
+            customSendTimeHour = null,
+            customSendTimeMinute = null,
+            giftBudgetInr = 500,
+            annualBudgetInr = 0,
+            skipAutoWish = false,
+            interestsJson = "[]",
+            sensitiveTopicsJson = "[]",
+            currentLifePhaseJson = "{}",
+            notesText = "",
+        )
     }
 }

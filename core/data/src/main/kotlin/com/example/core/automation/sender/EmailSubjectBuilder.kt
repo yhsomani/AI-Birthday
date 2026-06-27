@@ -1,6 +1,6 @@
 package com.example.core.automation.sender
 
-import com.example.domain.model.EventType
+import com.example.domain.model.occasion.OccasionType
 
 object EmailSubjectBuilder {
     fun build(
@@ -11,12 +11,12 @@ object EmailSubjectBuilder {
         val name = contactName.trim().ifBlank { "there" }
         val label = eventLabel?.trim()?.takeIf { it.isNotBlank() }
 
-        return when (EventType.fromRaw(eventType)) {
-            EventType.BIRTHDAY -> "Happy birthday, $name!"
-            EventType.ANNIVERSARY -> "Happy anniversary, $name!"
-            EventType.WORK_ANNIVERSARY -> "Congratulations on your work anniversary, $name!"
-            EventType.GRADUATION -> "Congratulations, $name!"
-            EventType.CUSTOM -> label?.let { "$it for $name" } ?: "A note for $name"
+        return when (OccasionType.fromRaw(eventType)) {
+            OccasionType.BIRTHDAY -> "Happy birthday, $name!"
+            OccasionType.ANNIVERSARY -> "Happy anniversary, $name!"
+            OccasionType.WORK_ANNIVERSARY -> "Congratulations on your work anniversary, $name!"
+            OccasionType.GRADUATION -> "Congratulations, $name!"
+            OccasionType.CUSTOM -> label?.let { "$it for $name" } ?: "A note for $name"
             else -> label?.let { "$it for $name" } ?: "A note for $name"
         }
     }

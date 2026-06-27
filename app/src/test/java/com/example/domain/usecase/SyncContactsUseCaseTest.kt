@@ -1,6 +1,7 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.ContactEntity
+import com.example.domain.model.contact.ContactSyncRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.service.ContactSyncService
 import com.example.domain.service.DeviceContactsPermissionDeniedException
@@ -49,7 +50,12 @@ class SyncContactsUseCaseTest {
 
     @Test
     fun `invoke processes google contacts and deletes mock contacts if not in guest mode`() = runTest {
-        val googleContact = ContactEntity(id = "g1", name = "Alice", googleContactId = "google_1", primaryEmail = "alice@gmail.com")
+        val googleContact = ContactSyncRecord(
+            id = "g1",
+            displayName = "Alice",
+            googleContactId = "google_1",
+            primaryEmail = "alice@gmail.com",
+        )
         val existingMock = ContactEntity(id = "mock_amit", name = "Amit")
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
@@ -70,9 +76,9 @@ class SyncContactsUseCaseTest {
 
     @Test
     fun `invoke imports device contacts when Google has no contacts`() = runTest {
-        val deviceContact = ContactEntity(
+        val deviceContact = ContactSyncRecord(
             id = "device_1",
-            name = "Devika Rao",
+            displayName = "Devika Rao",
             primaryPhone = "+91 99999 00000",
             contactGroup = "Device",
         )
@@ -93,9 +99,9 @@ class SyncContactsUseCaseTest {
 
     @Test
     fun `invoke keeps device contacts when Google sync fails`() = runTest {
-        val deviceContact = ContactEntity(
+        val deviceContact = ContactSyncRecord(
             id = "device_2",
-            name = "Rohan Mehta",
+            displayName = "Rohan Mehta",
             primaryEmail = "rohan@example.com",
         )
 
@@ -116,9 +122,9 @@ class SyncContactsUseCaseTest {
 
     @Test
     fun `invoke returns device permission outcome when phone contacts permission is denied`() = runTest {
-        val googleContact = ContactEntity(
+        val googleContact = ContactSyncRecord(
             id = "google_1",
-            name = "Anaya Shah",
+            displayName = "Anaya Shah",
             googleContactId = "people/c1",
         )
 
@@ -141,15 +147,15 @@ class SyncContactsUseCaseTest {
 
     @Test
     fun `invoke merges duplicate Google and device contacts while keeping Google identity`() = runTest {
-        val googleContact = ContactEntity(
+        val googleContact = ContactSyncRecord(
             id = "google_1",
-            name = "Anaya Shah",
+            displayName = "Anaya Shah",
             googleContactId = "people/c1",
             primaryEmail = "anaya@example.com",
         )
-        val deviceContact = ContactEntity(
+        val deviceContact = ContactSyncRecord(
             id = "device_1",
-            name = "Anaya Shah",
+            displayName = "Anaya Shah",
             primaryEmail = "ANAYA@example.com",
             primaryPhone = "+91 88888 77777",
             birthdayDay = 9,
@@ -180,9 +186,9 @@ class SyncContactsUseCaseTest {
 
     @Test
     fun `invoke maps relationship from semantic contact group`() = runTest {
-        val googleContact = ContactEntity(
+        val googleContact = ContactSyncRecord(
             id = "google_2",
-            name = "Maya Nair",
+            displayName = "Maya Nair",
             relationshipType = "UNKNOWN",
             contactGroup = "College Friends",
         )
@@ -205,9 +211,9 @@ class SyncContactsUseCaseTest {
 
     @Test
     fun `invoke leaves generic device group unknown for AI classification`() = runTest {
-        val deviceContact = ContactEntity(
+        val deviceContact = ContactSyncRecord(
             id = "device_3",
-            name = "Ishaan Roy",
+            displayName = "Ishaan Roy",
             relationshipType = "UNKNOWN",
             contactGroup = "Device",
         )

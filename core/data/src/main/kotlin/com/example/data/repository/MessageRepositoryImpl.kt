@@ -4,8 +4,21 @@ import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
+import com.example.domain.message.toMessageAnalyticsRecord
+import com.example.domain.message.toMessageGenerationHistory
+import com.example.domain.message.toPendingMessageListItems
+import com.example.domain.message.toSentMessageListItems
+import com.example.domain.message.toWishPreviewDraft
+import com.example.domain.message.toWishPreviewReviewItem
+import com.example.domain.model.message.MessageAnalyticsRecord
+import com.example.domain.model.message.MessageGenerationHistory
+import com.example.domain.model.message.PendingMessageListItem
+import com.example.domain.model.message.SentMessageListItem
+import com.example.domain.model.message.WishPreviewDraft
+import com.example.domain.model.message.WishPreviewReviewItem
 import com.example.domain.repository.MessageRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,11 +30,31 @@ class MessageRepositoryImpl @Inject constructor(
 
     override fun getAllPending(): Flow<List<PendingMessageEntity>> = pendingMessageDao.getAll()
 
+    override fun getPendingListItems(): Flow<List<PendingMessageListItem>> {
+        return pendingMessageDao.getAll().map { messages ->
+            messages.toPendingMessageListItems()
+        }
+    }
+
+    override fun getWishPreviewReviewQueue(): Flow<List<WishPreviewReviewItem>> {
+        return pendingMessageDao.getAll().map { messages ->
+            messages.map { it.toWishPreviewReviewItem() }
+        }
+    }
+
     override suspend fun getAllApproved(): List<PendingMessageEntity> = pendingMessageDao.getAllApproved()
 
     override suspend fun getPendingById(id: String): PendingMessageEntity? = pendingMessageDao.getById(id)
 
     override suspend fun getPendingByEventId(eventId: String): PendingMessageEntity? = pendingMessageDao.getByEventId(eventId)
+
+    override suspend fun getWishPreviewDraftById(id: String): WishPreviewDraft? {
+        return pendingMessageDao.getById(id)?.toWishPreviewDraft()
+    }
+
+    override suspend fun getWishPreviewDraftByEventId(eventId: String): WishPreviewDraft? {
+        return pendingMessageDao.getByEventId(eventId)?.toWishPreviewDraft()
+    }
 
     override suspend fun getPendingForEventOccurrence(
         contactId: String,
@@ -45,11 +78,25 @@ class MessageRepositoryImpl @Inject constructor(
 
     override fun getAllSent(): Flow<List<SentMessageEntity>> = sentMessageDao.getAll()
 
+    override fun getSentListItems(): Flow<List<SentMessageListItem>> {
+        return sentMessageDao.getAll().map { messages ->
+            messages.toSentMessageListItems()
+        }
+    }
+
     override suspend fun getSentByContact(contactId: String, limit: Int): List<SentMessageEntity> = sentMessageDao.getByContact(contactId, limit)
+
+    override suspend fun getGenerationHistoryByContact(contactId: String, limit: Int): MessageGenerationHistory {
+        return sentMessageDao.getByContact(contactId, limit).toMessageGenerationHistory()
+    }
 
     override suspend fun getRecentForStyleAnalysis(sinceMs: Long, limit: Int): List<SentMessageEntity> = sentMessageDao.getRecentForStyleAnalysis(sinceMs, limit)
 
     override suspend fun getSentSinceYearStart(yearStartMs: Long): List<SentMessageEntity> = sentMessageDao.getSentSinceYearStart(yearStartMs)
+
+    override suspend fun getSentAnalyticsRecordsSince(sinceMs: Long): List<MessageAnalyticsRecord> {
+        return sentMessageDao.getSentSinceYearStart(sinceMs).map { it.toMessageAnalyticsRecord() }
+    }
 
     override fun countAllSent(): Flow<Int> = sentMessageDao.countAll()
 

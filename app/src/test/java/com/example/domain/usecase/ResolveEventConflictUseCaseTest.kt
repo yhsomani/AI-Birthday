@@ -1,7 +1,11 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.EventEntity
 import com.example.domain.event.EventResolutionPolicy
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.model.occasion.OccasionDate
+import com.example.domain.model.occasion.OccasionType
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
 import io.mockk.coEvery
@@ -39,24 +43,24 @@ class ResolveEventConflictUseCaseTest {
             month = 7,
             dayOfMonth = 1,
         )
-        val upserts = mutableListOf<EventEntity>()
-        every { eventRepository.getAll() } returns MutableStateFlow(listOf(imported, manual))
-        coEvery { eventRepository.upsert(capture(upserts)) } returns Unit
+        val upserts = mutableListOf<Occasion>()
+        every { eventRepository.getOccasions() } returns MutableStateFlow(listOf(imported, manual))
+        coEvery { eventRepository.upsertOccasion(capture(upserts)) } returns Unit
 
         val outcome = useCase(
             ResolveEventConflictUseCase.Request(
-                eventId = manual.id,
+                eventId = manual.id.value,
                 action = ResolveEventConflictUseCase.Action.MERGE_KEEP_SELECTED,
             )
         )
 
         assertTrue(outcome is ResolveEventConflictUseCase.Outcome.Resolved)
-        assertEquals(manual.id, (outcome as ResolveEventConflictUseCase.Outcome.Resolved).keptEvent.id)
-        assertEquals(listOf(imported.id), outcome.affectedEventIds)
+        assertEquals(manual.id.value, (outcome as ResolveEventConflictUseCase.Outcome.Resolved).keptEvent.id.value)
+        assertEquals(listOf(imported.id.value), outcome.affectedEventIds)
         assertTrue(upserts.any { it.id == manual.id && it.isActive && it.source == "MANUAL" && it.isVerified })
         assertTrue(upserts.any { it.id == imported.id && !it.isActive })
-        verify { eventReminderSchedulerService.scheduleReminder(match { it.id == manual.id }) }
-        verify { eventReminderSchedulerService.cancelReminder(imported.id) }
+        verify { eventReminderSchedulerService.scheduleReminder(match { it.eventId == manual.id }) }
+        verify { eventReminderSchedulerService.cancelReminder(imported.id.value) }
     }
 
     @Test
@@ -74,13 +78,13 @@ class ResolveEventConflictUseCaseTest {
             month = 7,
             dayOfMonth = 1,
         )
-        val upserts = mutableListOf<EventEntity>()
-        every { eventRepository.getAll() } returns MutableStateFlow(listOf(imported, manual))
-        coEvery { eventRepository.upsert(capture(upserts)) } returns Unit
+        val upserts = mutableListOf<Occasion>()
+        every { eventRepository.getOccasions() } returns MutableStateFlow(listOf(imported, manual))
+        coEvery { eventRepository.upsertOccasion(capture(upserts)) } returns Unit
 
         val outcome = useCase(
             ResolveEventConflictUseCase.Request(
-                eventId = manual.id,
+                eventId = manual.id.value,
                 action = ResolveEventConflictUseCase.Action.KEEP_SEPARATE,
             )
         )
@@ -93,7 +97,6 @@ class ResolveEventConflictUseCaseTest {
         assertTrue(EventResolutionPolicy.conflictStates(upserts).isEmpty())
         verify(exactly = 0) { eventReminderSchedulerService.cancelReminder(any()) }
         verify(exactly = 0) { eventReminderSchedulerService.scheduleReminder(any()) }
-        coVerify(exactly = 0) { eventRepository.delete(any()) }
     }
 
     private fun event(
@@ -102,16 +105,21 @@ class ResolveEventConflictUseCaseTest {
         month: Int,
         dayOfMonth: Int,
         isVerified: Boolean = true,
-    ): EventEntity {
-        return EventEntity(
-            id = id,
-            contactId = "contact_1",
-            type = "BIRTHDAY",
+    ): Occasion {
+        return Occasion(
+            id = OccasionId(id),
+            contactId = ContactId("contact_1"),
+            type = OccasionType.BIRTHDAY,
             label = "Birthday",
-            dayOfMonth = dayOfMonth,
-            month = month,
+            date = OccasionDate(
+                dayOfMonth = dayOfMonth,
+                month = month,
+            ),
             nextOccurrenceMs = 1_800_000_000_000,
+            isActive = true,
+            notifyDaysBefore = 1,
             source = source,
+            confidenceScore = 100,
             isVerified = isVerified,
         )
     }

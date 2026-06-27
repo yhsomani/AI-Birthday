@@ -15,9 +15,15 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.message.WishPreviewDraft
+import com.example.domain.model.message.WishPreviewVariants
 import com.example.ui.viewmodel.ReviewNextTarget
 import com.example.ui.viewmodel.WishDraftReadiness
 import com.example.ui.viewmodel.WishPreviewSendSummary
@@ -152,6 +158,27 @@ class WishPreviewScreenInteractionTest {
     }
 
     @Test
+    fun shortDraftReadinessDisablesApprovalAction() {
+        composeRule.setWishPreviewContent(
+            state = {
+                wishState().copy(
+                    editedText = "Too short",
+                    draftReadiness = WishDraftReadiness.TOO_SHORT,
+                )
+            },
+        )
+
+        composeRule.onNodeWithTag(WishPreviewTestTags.DRAFT_READINESS)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Write a longer message before approval.")
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(WishPreviewTestTags.APPROVE_BUTTON)
+            .performScrollTo()
+            .assertIsNotEnabled()
+    }
+
+    @Test
     fun approvedAndErrorStates_renderExpectedContent() {
         var state by mutableStateOf(wishState().copy(approved = true))
 
@@ -163,7 +190,7 @@ class WishPreviewScreenInteractionTest {
 
         state = WishPreviewUiState(
             isLoading = false,
-            pendingMessage = null,
+            previewDraft = null,
             errorMessageRes = R.string.wish_preview_error_message_not_found,
         )
 
@@ -240,7 +267,7 @@ class WishPreviewScreenInteractionTest {
     }
 
     private fun wishState() = WishPreviewUiState(
-        pendingMessage = pendingMessage(),
+        previewDraft = previewDraft(),
         selectedVariant = "standard",
         editedText = "Standard birthday draft",
         isLoading = false,
@@ -258,21 +285,24 @@ class WishPreviewScreenInteractionTest {
         draftReadiness = WishDraftReadiness.READY,
     )
 
-    private fun pendingMessage() = PendingMessageEntity(
-        id = "pm_1",
-        contactId = "contact_1",
-        eventId = "event_1",
-        shortVariant = "Short birthday draft",
-        standardVariant = "Standard birthday draft",
-        longVariant = "Long birthday draft",
-        formalVariant = "Formal birthday draft",
-        funnyVariant = "Funny birthday draft",
-        emotionalVariant = "Emotional birthday draft",
+    private fun previewDraft() = WishPreviewDraft(
+        id = MessageDraftId("pm_1"),
+        contactId = ContactId("contact_1"),
+        occasionId = OccasionId("event_1"),
+        variants = WishPreviewVariants(
+            short = "Short birthday draft",
+            standard = "Standard birthday draft",
+            long = "Long birthday draft",
+            formal = "Formal birthday draft",
+            funny = "Funny birthday draft",
+            emotional = "Emotional birthday draft",
+        ),
         selectedVariant = "standard",
         selectedVariantText = "Standard birthday draft",
-        channel = MessageChannel.SMS.raw,
+        channel = MessageChannel.SMS,
         scheduledForMs = 1_800_000_000_000L,
-        approvalMode = "VIP_APPROVE",
-        status = "PENDING",
+        approvalMode = ApprovalMode.VIP_APPROVE,
+        status = MessageStatus.PENDING,
+        isUsingFallback = false,
     )
 }

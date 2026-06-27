@@ -1,5 +1,6 @@
 package com.example.ui.navigation
 
+import com.example.domain.navigation.RelateDeepLinks
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -40,5 +41,20 @@ class RouteArgumentCodecTest {
     fun decode_preservesAlreadyDecodedPlusAndInvalidPercentInput() {
         assertEquals("A+B", RouteArgumentCodec.decode("A+B"))
         assertEquals("100% match", RouteArgumentCodec.decode("100% match"))
+    }
+
+    @Test
+    fun appRoutesAndExternalDeepLinksSharePathEncoding() {
+        val contactId = "people/c123 + 100%"
+        val messageRef = "pending/message #1"
+
+        assertEquals(
+            "wish/people%2Fc123%20%2B%20100%25/pending%2Fmessage%20%231",
+            Screen.WishPreview.createRoute(contactId, messageRef),
+        )
+        assertEquals(
+            "relateai://wish/people%2Fc123%20%2B%20100%25/pending%2Fmessage%20%231",
+            RelateDeepLinks.Wish.uri(contactId, messageRef),
+        )
     }
 }

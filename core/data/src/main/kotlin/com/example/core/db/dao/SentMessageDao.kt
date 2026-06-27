@@ -12,7 +12,16 @@ interface SentMessageDao {
     @Query("SELECT * FROM sent_messages WHERE contactId = :contactId ORDER BY sentAtMs DESC LIMIT :limit")
     suspend fun getByContact(contactId: String, limit: Int = 100): List<SentMessageEntity>
 
-    @Query("SELECT EXISTS(SELECT 1 FROM sent_messages WHERE contactId = :contactId AND eventType = :eventType AND (sentAtMs > :oneYearAgo))")
+    @Query(
+        """
+        SELECT EXISTS(
+            SELECT 1 FROM sent_messages
+            WHERE contactId = :contactId
+              AND UPPER(occasionType) = UPPER(:eventType)
+              AND sentAtMs > :oneYearAgo
+        )
+        """
+    )
     suspend fun wasWishedThisYear(contactId: String, eventType: String, oneYearAgo: Long = System.currentTimeMillis() - 365L * 24 * 60 * 60 * 1000): Boolean
 
     @Query("SELECT m.* FROM sent_messages m INNER JOIN contacts c ON c.id = m.contactId WHERE c.primaryPhone = :phone OR c.secondaryPhone = :phone ORDER BY m.sentAtMs DESC LIMIT 1")
@@ -53,8 +62,7 @@ interface SentMessageDao {
           AND replyReceived = 0
           AND deliveryStatus IN ('SENT', 'DELIVERED')
           AND sentAtMs BETWEEN :windowStartMs AND :windowEndMs
-          AND eventType NOT LIKE 'FOLLOWUP%'
-          AND eventType NOT LIKE 'REVIVAL%'
+          AND UPPER(occasionType) NOT IN ('FOLLOW_UP', 'REVIVAL')
         ORDER BY sentAtMs ASC
         LIMIT :limit
         """

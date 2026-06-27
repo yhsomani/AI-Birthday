@@ -12,7 +12,6 @@ import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.gemini.GeminiClient
 import com.example.core.gemini.MessageVariants
@@ -24,9 +23,20 @@ import com.example.domain.automation.AiAutoSendQualityGate
 import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutomationSchedulePolicy
+import com.example.domain.contact.toDeliveryRouteProfile
+import com.example.domain.contact.toHeader
+import com.example.domain.contact.toRelationshipPromptContext
+import com.example.domain.event.toEventEntity
+import com.example.domain.event.toOccasion
+import com.example.domain.message.toDeliveryRouteHistoryRecords
+import com.example.domain.notification.buildApprovalNotificationRequest
 import com.example.domain.model.ApprovalMode
-import com.example.domain.model.EventType
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.model.occasion.OccasionDate
+import com.example.domain.model.occasion.OccasionType
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.Calendar
@@ -86,13 +96,13 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                         return@forEach
                     }
 
-                    val originalEvent = eventDao.getById(sent.eventType)
+                    val originalOccasion = sent.eventId?.let { eventDao.getById(it)?.toOccasion() }
                     RateLimiter.waitIfNeeded()
                     val prompt = prompter.buildPostEventFollowUpPrompt(
-                        contact = contact,
+                        contact = contact.toRelationshipPromptContext(),
                         originalMessage = sent.messageText,
-                        eventType = originalEvent?.type,
-                        eventLabel = originalEvent?.label,
+                        eventType = originalOccasion?.type?.raw ?: sent.occasionType,
+                        eventLabel = originalOccasion?.label ?: sent.occasionLabel,
                     )
                     val suggestion = sanitizeSuggestion(gemini.generate(prompt), contact.name)
                     val requestedApprovalMode = ApprovalModeResolver.resolve(
@@ -114,8 +124,8 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                     )
                     val previousMessages = sentMessageDao.getByContact(contact.id)
                     val channelSelection = AutoSendChannelSelector.selectRoute(
-                        contact = contact,
-                        previousMessages = previousMessages,
+                        contact = contact.toDeliveryRouteProfile(),
+                        routeHistory = previousMessages.toDeliveryRouteHistoryRecords(),
                         channelBlackoutJson = prefs.getChannelBlackout(),
                         senderEmail = prefs.getSenderEmail(),
                         senderEmailPassword = prefs.getSenderEmailPassword(),
@@ -131,6 +141,9 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                     } else {
                         MessageStatus.PENDING
                     }
+
+                    val followUpEvent = followUpOccasion(followUpEventId, contact, now)
+                    eventDao.upsert(followUpEvent.toEventEntity())
 
                     val pending = PendingMessageEntity(
                         id = UUID.randomUUID().toString(),
@@ -161,10 +174,8 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                     if (ApprovalModeResolver.needsReviewNotification(approvalMode)) {
                         NotificationHelper.showApprovalNotification(
                             context = applicationContext,
-                            contact = contact,
-                            event = notificationEvent(followUpEventId, contact, now),
+                            request = buildApprovalNotificationRequest(contact.toHeader(), followUpEvent, pending.id),
                             variants = suggestion.toVariants(),
-                            messageId = pending.id,
                         )
                     }
                 } catch (e: Exception) {
@@ -205,18 +216,24 @@ class PostEventFollowUpWorker @AssistedInject constructor(
 
     private fun followUpEventId(sentMessageId: String): String = "FOLLOWUP_$sentMessageId"
 
-    private fun notificationEvent(eventId: String, contact: ContactEntity, nowMs: Long): EventEntity {
+    private fun followUpOccasion(eventId: String, contact: ContactEntity, nowMs: Long): Occasion {
         val calendar = Calendar.getInstance().apply { timeInMillis = nowMs }
-        return EventEntity(
-            id = eventId,
-            contactId = contact.id,
-            type = EventType.FOLLOW_UP.raw,
+        return Occasion(
+            id = OccasionId(eventId),
+            contactId = ContactId(contact.id),
+            type = OccasionType.FOLLOW_UP,
             label = "Follow-up",
-            dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH),
-            month = calendar.get(Calendar.MONTH) + 1,
-            year = calendar.get(Calendar.YEAR),
+            date = OccasionDate(
+                dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH),
+                month = calendar.get(Calendar.MONTH) + 1,
+                year = calendar.get(Calendar.YEAR),
+            ),
             nextOccurrenceMs = nowMs,
+            isActive = true,
+            notifyDaysBefore = 0,
             source = "AI_INFERRED",
+            confidenceScore = 100,
+            isVerified = true,
         )
     }
 

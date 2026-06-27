@@ -1,7 +1,7 @@
 package com.example.core.gemini
 
 import com.example.core.resilience.StructuredLogger
-import com.example.domain.model.EventType
+import com.example.domain.model.occasion.OccasionType
 import com.example.domain.service.ContactClassificationContract
 import org.json.JSONObject
 
@@ -129,7 +129,7 @@ object ResponseParser {
 
     fun parseMessageVariants(
         jsonString: String,
-        eventType: String = EventType.BIRTHDAY.raw
+        eventType: String = OccasionType.BIRTHDAY.raw
     ): MessageVariants {
         return try {
             val json = JSONObject(cleanJson(jsonString))
@@ -187,9 +187,9 @@ object ResponseParser {
         if (eventType.equals("REVIVAL", ignoreCase = true)) {
             return "Hey! It's been a while since we caught up. Hope you're doing great! Let's connect soon."
         }
-        return when (EventType.fromRaw(eventType)) {
-            EventType.ANNIVERSARY -> "Happy Anniversary! Wishing you both a lifetime of love and happiness."
-            EventType.WORK_ANNIVERSARY -> "Congratulations on your work anniversary! Thank you for your hard work and dedication."
+        return when (OccasionType.fromRaw(eventType)) {
+            OccasionType.ANNIVERSARY -> "Happy Anniversary! Wishing you both a lifetime of love and happiness."
+            OccasionType.WORK_ANNIVERSARY -> "Congratulations on your work anniversary! Thank you for your hard work and dedication."
             else -> "Wishing you a very happy birthday! Hope you have a wonderful day!"
         }
     }

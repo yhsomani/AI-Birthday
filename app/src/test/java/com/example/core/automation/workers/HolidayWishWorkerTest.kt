@@ -10,6 +10,7 @@ import androidx.work.workDataOf
 import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
@@ -20,6 +21,8 @@ import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.notification.ApprovalNotificationRequest
+import com.example.domain.model.occasion.OccasionType
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import io.mockk.Runs
@@ -49,6 +52,7 @@ class HolidayWishWorkerTest {
 
     private lateinit var context: Context
     private val contactDao: ContactDao = mockk(relaxed = true)
+    private val eventDao: EventDao = mockk(relaxed = true)
     private val pendingMessageDao: PendingMessageDao = mockk(relaxed = true)
     private val sentMessageDao: SentMessageDao = mockk(relaxed = true)
     private val geminiClient: GeminiClient = mockk(relaxed = true)
@@ -78,7 +82,7 @@ class HolidayWishWorkerTest {
         coEvery { RateLimiter.waitIfNeeded() } returns Unit
         coEvery { sentMessageDao.getByContact(any()) } returns emptyList()
         every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
-        every { NotificationHelper.showApprovalNotification(any(), any(), any(), any(), any()) } just Runs
+        every { NotificationHelper.showApprovalNotification(any(), any(), any()) } just Runs
         every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
     }
 
@@ -105,8 +109,16 @@ class HolidayWishWorkerTest {
         assertEquals(MessageStatus.APPROVED.raw, pendingSlot.captured.status)
         assertEquals(100, pendingSlot.captured.qualityScore)
         assertEquals(2027, pendingSlot.captured.scheduledYear)
+        coVerify {
+            eventDao.upsert(match {
+                it.id == "HOLIDAY_NEW_YEAR_c1_2027" &&
+                    it.type == OccasionType.HOLIDAY.raw &&
+                    it.label == "New Year" &&
+                    it.source == "AI_INFERRED"
+            })
+        }
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
-        verify(exactly = 0) { NotificationHelper.showApprovalNotification(any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { NotificationHelper.showApprovalNotification(any(), any(), any()) }
     }
 
     @Test
@@ -127,7 +139,17 @@ class HolidayWishWorkerTest {
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertEquals(true, pendingSlot.captured.isUsingFallback)
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
-        verify { NotificationHelper.showApprovalNotification(any(), contact, any(), any(), pendingSlot.captured.id) }
+        verify {
+            NotificationHelper.showApprovalNotification(
+                any(),
+                match<ApprovalNotificationRequest> {
+                    it.contactId.value == contact.id &&
+                        it.eventId.value == "HOLIDAY_NEW_YEAR_c1_2027" &&
+                        it.messageId.value == pendingSlot.captured.id
+                },
+                any(),
+            )
+        }
     }
 
     @Test
@@ -147,7 +169,17 @@ class HolidayWishWorkerTest {
         assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
         assertEquals(MessageChannel.SMS.raw, pendingSlot.captured.channel)
         verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
-        verify { NotificationHelper.showApprovalNotification(any(), contact, any(), any(), pendingSlot.captured.id) }
+        verify {
+            NotificationHelper.showApprovalNotification(
+                any(),
+                match<ApprovalNotificationRequest> {
+                    it.contactId.value == contact.id &&
+                        it.eventId.value == "HOLIDAY_NEW_YEAR_c1_2027" &&
+                        it.messageId.value == pendingSlot.captured.id
+                },
+                any(),
+            )
+        }
     }
 
     @Test
@@ -175,6 +207,7 @@ class HolidayWishWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify(exactly = 0) { geminiClient.generate(any()) }
+        coVerify(exactly = 0) { eventDao.upsert(any()) }
         coVerify(exactly = 0) { pendingMessageDao.insert(any()) }
     }
 
@@ -191,6 +224,7 @@ class HolidayWishWorkerTest {
                         appContext,
                         workerParameters,
                         contactDao,
+                        eventDao,
                         pendingMessageDao,
                         sentMessageDao,
                         geminiClient,

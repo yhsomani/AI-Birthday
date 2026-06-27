@@ -5,8 +5,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.core.auth.AuthManager
 import com.example.core.auth.UserProfile
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.contact.ContactAnalyticsSummary
+import com.example.domain.model.occasion.OccasionType
+import com.example.domain.model.occasion.UpcomingEventPreview
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.usecase.GetDashboardMetricsUseCase
@@ -71,7 +74,7 @@ class HomeViewModelTest {
         every { mockPreferencesRepository.getGeminiApiKey() } returns "gemini-key"
         every { mockPreferencesRepository.isAiWishGenerationEnabled() } returns true
         every { mockPreferencesRepository.getLastBackupMs() } returns System.currentTimeMillis()
-        coEvery { mockContactRepository.getBottomByHealthScore(3) } returns emptyList()
+        coEvery { mockContactRepository.getBottomHealthSummaries(3) } returns emptyList()
         every { mockAuthManager.userProfile } returns MutableStateFlow(
             UserProfile(displayName = "TestUser", email = "test@example.com")
         )
@@ -92,7 +95,7 @@ class HomeViewModelTest {
             contactCount = 10,
             sentCount = 2,
         )
-        coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         val viewModel = newViewModel()
         advanceUntilIdle()
 
@@ -117,7 +120,7 @@ class HomeViewModelTest {
     @Test
     fun `loadMetrics handles exception gracefully`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } throws RuntimeException("Simulated failure")
-        coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         val viewModel = newViewModel()
         advanceUntilIdle()
 
@@ -128,7 +131,7 @@ class HomeViewModelTest {
     @Test
     fun `never backed up surfaces backup prompt on Home`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getLastBackupMs() } returns 0L
 
         val viewModel = newViewModel()
@@ -142,7 +145,7 @@ class HomeViewModelTest {
     @Test
     fun `stale backup surfaces backup prompt on Home`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getLastBackupMs() } returns System.currentTimeMillis() - 31L * DAY_MS
 
         val viewModel = newViewModel()
@@ -157,7 +160,7 @@ class HomeViewModelTest {
     @Test
     fun `recent backup does not surface backup prompt on Home`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getLastBackupMs() } returns System.currentTimeMillis() - 2L * DAY_MS
 
         val viewModel = newViewModel()
@@ -170,7 +173,7 @@ class HomeViewModelTest {
     @Test
     fun `pending reviews rank above stale backup on Home`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } returns dashboardMetrics(pendingCount = 2)
-        coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getLastBackupMs() } returns System.currentTimeMillis() - 31L * DAY_MS
 
         val viewModel = newViewModel()
@@ -183,7 +186,7 @@ class HomeViewModelTest {
     @Test
     fun `contact sync error becomes top setup blocker on Home`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getLastSyncError() } returns "Sync failed"
 
         val viewModel = newViewModel()
@@ -196,7 +199,7 @@ class HomeViewModelTest {
     @Test
     fun `missing ai access becomes setup action on Home`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getGeminiApiKey() } returns ""
 
         val viewModel = newViewModel()
@@ -209,7 +212,7 @@ class HomeViewModelTest {
     @Test
     fun `disabled ai generation becomes setup action on Home`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.isAiWishGenerationEnabled() } returns false
 
         val viewModel = newViewModel()
@@ -222,10 +225,10 @@ class HomeViewModelTest {
     @Test
     fun `low health contact becomes relationship action when operational work is clear`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
-        coEvery { mockContactRepository.getBottomByHealthScore(3) } returns listOf(
-            ContactEntity(id = "c_low", name = "Asha", healthScore = 32),
-            ContactEntity(id = "c_next", name = "Ravi", healthScore = 45),
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
+        coEvery { mockContactRepository.getBottomHealthSummaries(3) } returns listOf(
+            contactSummary(id = "c_low", displayName = "Asha", healthScore = 32),
+            contactSummary(id = "c_next", displayName = "Ravi", healthScore = 45),
         )
 
         val viewModel = newViewModel()
@@ -241,10 +244,10 @@ class HomeViewModelTest {
     @Test
     fun `backup risk ranks above low health relationship action`() = runTest(testDispatcher) {
         coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcoming(30) } returns emptyList()
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getLastBackupMs() } returns System.currentTimeMillis() - 31L * DAY_MS
-        coEvery { mockContactRepository.getBottomByHealthScore(3) } returns listOf(
-            ContactEntity(id = "c_low", name = "Asha", healthScore = 32),
+        coEvery { mockContactRepository.getBottomHealthSummaries(3) } returns listOf(
+            contactSummary(id = "c_low", displayName = "Asha", healthScore = 32),
         )
 
         val viewModel = newViewModel()
@@ -252,6 +255,37 @@ class HomeViewModelTest {
 
         assertEquals(HomeNextActionKind.REFRESH_BACKUP, viewModel.uiState.value.primaryAction?.kind)
         assertEquals(HomeNextActionKind.RECONNECT_CONTACT, viewModel.uiState.value.supportingActions.firstOrNull()?.kind)
+    }
+
+    @Test
+    fun `upcoming event previews populate birthdays and planner items`() = runTest(testDispatcher) {
+        coEvery { mockUseCase() } returns dashboardMetrics()
+        val nextBirthdayMs = System.currentTimeMillis() + 7L * DAY_MS
+        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns listOf(
+            eventPreview(
+                id = "event_birthday",
+                contactId = "contact_birthday",
+                type = OccasionType.BIRTHDAY,
+                label = "Asha's Birthday",
+                nextOccurrenceMs = nextBirthdayMs,
+            ),
+            eventPreview(
+                id = "event_custom",
+                contactId = "contact_custom",
+                type = OccasionType.CUSTOM,
+                label = "Coffee catch-up",
+                nextOccurrenceMs = nextBirthdayMs + DAY_MS,
+            ),
+        )
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        assertEquals("Asha's Birthday", viewModel.uiState.value.upcomingBirthdays.single().name)
+        assertEquals("Asha's Birthday", viewModel.uiState.value.plannerItems[0].title)
+        assertEquals(HomeActionTarget.ContactDetail("contact_birthday"), viewModel.uiState.value.plannerItems[0].actionTarget)
+        assertEquals("Coffee catch-up", viewModel.uiState.value.plannerItems[1].title)
+        assertEquals(HomeActionTarget.ContactDetail("contact_custom"), viewModel.uiState.value.plannerItems[1].actionTarget)
     }
 
     private fun dashboardMetrics(
@@ -264,6 +298,35 @@ class HomeViewModelTest {
         contactCount = contactCount,
         sentCount = 2,
     )
+
+    private fun contactSummary(
+        id: String,
+        displayName: String,
+        healthScore: Int,
+    ): ContactAnalyticsSummary {
+        return ContactAnalyticsSummary(
+            id = ContactId(id),
+            displayName = displayName,
+            healthScore = healthScore,
+            relationshipType = "FRIEND",
+        )
+    }
+
+    private fun eventPreview(
+        id: String,
+        contactId: String,
+        type: OccasionType,
+        label: String?,
+        nextOccurrenceMs: Long,
+    ): UpcomingEventPreview {
+        return UpcomingEventPreview(
+            id = OccasionId(id),
+            contactId = ContactId(contactId),
+            type = type,
+            label = label,
+            nextOccurrenceMs = nextOccurrenceMs,
+        )
+    }
 
     private fun newViewModel(): HomeViewModel {
         return HomeViewModel(

@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
-import com.example.core.db.entities.MemoryNoteEntity
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.RelateGlassCard
@@ -58,6 +57,7 @@ import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.ui.viewmodel.MemoryVaultUiState
 import com.example.ui.viewmodel.MemoryVaultViewModel
 import java.text.SimpleDateFormat
@@ -152,8 +152,8 @@ internal fun MemoryVaultContent(
     onCategoryChange: (String) -> Unit,
     onAdd: () -> Unit,
     onBack: () -> Unit,
-    onTogglePin: (MemoryNoteEntity) -> Unit,
-    onDelete: (MemoryNoteEntity) -> Unit,
+    onTogglePin: (MemoryNoteRecord) -> Unit,
+    onDelete: (MemoryNoteRecord) -> Unit,
 ) {
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
 
@@ -162,7 +162,7 @@ internal fun MemoryVaultContent(
             TopAppBar(
                 title = {
                     Text(
-                        text = uiState.contact?.name?.let {
+                        text = uiState.contact?.displayName?.let {
                             stringResource(R.string.memory_vault_title_with_contact, it)
                         } ?: stringResource(R.string.memory_vault_title),
                         fontWeight = FontWeight.Bold,
@@ -233,13 +233,13 @@ internal fun MemoryVaultContent(
                         )
                     }
                 } else {
-                    items(uiState.notes, key = { it.id }) { note ->
+                    items(uiState.notes, key = { it.id.value }) { note ->
                         MemoryNoteCard(
                             note = note,
                             date = dateFormat.format(Date(note.dateMs)),
                             onTogglePin = { onTogglePin(note) },
                             onDelete = { onDelete(note) },
-                            modifier = Modifier.testTag(MemoryVaultTestTags.NOTE_CARD_PREFIX + note.id),
+                            modifier = Modifier.testTag(MemoryVaultTestTags.NOTE_CARD_PREFIX + note.id.value),
                         )
                     }
                 }
@@ -363,7 +363,7 @@ private fun ErrorCard(message: String) {
 
 @Composable
 private fun MemoryNoteCard(
-    note: MemoryNoteEntity,
+    note: MemoryNoteRecord,
     date: String,
     onTogglePin: () -> Unit,
     onDelete: () -> Unit,
@@ -392,7 +392,7 @@ private fun MemoryNoteCard(
                 Row {
                     IconButton(
                         onClick = onTogglePin,
-                        modifier = Modifier.testTag(MemoryVaultTestTags.PIN_BUTTON_PREFIX + note.id),
+                        modifier = Modifier.testTag(MemoryVaultTestTags.PIN_BUTTON_PREFIX + note.id.value),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.PushPin,
@@ -406,7 +406,7 @@ private fun MemoryNoteCard(
                     }
                     IconButton(
                         onClick = onDelete,
-                        modifier = Modifier.testTag(MemoryVaultTestTags.DELETE_BUTTON_PREFIX + note.id),
+                        modifier = Modifier.testTag(MemoryVaultTestTags.DELETE_BUTTON_PREFIX + note.id.value),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Delete,

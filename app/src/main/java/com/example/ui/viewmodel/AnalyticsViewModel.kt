@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
-import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.service.AnalyticsReport
 import com.example.domain.service.AnalyticsReportService
 import com.example.domain.usecase.GetAnalyticsUseCase
@@ -53,15 +52,12 @@ class AnalyticsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            getAnalyticsUseCase(
-                topHealthContactsProvider = { contactRepository.getTopByHealthScore(5) },
-                neglectedContactsProvider = { contactRepository.getBottomByHealthScore(5) },
-            ).collect { snapshot ->
-                val allContacts = contactRepository.getAllSync()
-                val healthyCount  = allContacts.count { it.healthScore >= 70 }
-                val attentionCount = allContacts.count { it.healthScore in 30..69 }
-                val atRiskCount   = allContacts.count { it.healthScore < 30 }
-                val upcomingCount = eventRepository.getUpcoming(30).size
+            getAnalyticsUseCase().collect { snapshot ->
+                val contactProfiles = contactRepository.getAnalyticsProfiles()
+                val healthyCount = contactProfiles.count { it.healthScore >= 70 }
+                val attentionCount = contactProfiles.count { it.healthScore in 30..69 }
+                val atRiskCount = contactProfiles.count { it.healthScore < 30 }
+                val upcomingCount = eventRepository.countUpcoming(30)
 
                 // Monthly chart: group sent messages by month for current year
                 val yearStartMs = Calendar.getInstance().apply {
@@ -73,18 +69,10 @@ class AnalyticsViewModel @Inject constructor(
                     set(Calendar.MILLISECOND, 0)
                 }.timeInMillis
 
-                val sentThisYear = messageRepository.getSentSinceYearStart(yearStartMs)
-                val deliveredOrSent = sentThisYear.count {
-                    MessageDeliveryStatus.fromRaw(it.deliveryStatus) != MessageDeliveryStatus.FAILED
-                }
+                val sentThisYear = messageRepository.getSentAnalyticsRecordsSince(yearStartMs)
+                val deliveredOrSent = sentThisYear.count { it.countsAsNonFailedDelivery }
                 val replies = sentThisYear.count { it.replyReceived }
-                val personalizedContacts = allContacts.count {
-                    !it.nickname.isNullOrBlank() ||
-                        it.notesText.isNotBlank() ||
-                        it.interestsJson.trim().let { raw -> raw.isNotBlank() && raw != "[]" } ||
-                        it.sharedHistoryJson.trim().let { raw -> raw.isNotBlank() && raw != "[]" }
-                }
-                val neglectedContacts = contactRepository.getBottomByHealthScore(5)
+                val personalizedContacts = contactProfiles.count { it.hasPersonalizationSignals }
                 val countsByMonth = IntArray(12)
                 sentThisYear.forEach { msg ->
                     val cal = Calendar.getInstance().apply { timeInMillis = msg.sentAtMs }
@@ -116,8 +104,10 @@ class AnalyticsViewModel @Inject constructor(
                     monthlyCounts = monthlyCounts,
                     deliveryReliabilityPercent = percent(deliveredOrSent, sentThisYear.size),
                     responseRatePercent = percent(replies, sentThisYear.size),
-                    personalizationCoveragePercent = percent(personalizedContacts, allContacts.size),
-                    topNeglectedContacts = neglectedContacts.map { "${it.name} (${it.healthScore})" },
+                    personalizationCoveragePercent = percent(personalizedContacts, contactProfiles.size),
+                    topNeglectedContacts = snapshot.neglectedContacts.map {
+                        "${it.displayName} (${it.healthScore})"
+                    },
                     isLoading = false,
                 )
             }

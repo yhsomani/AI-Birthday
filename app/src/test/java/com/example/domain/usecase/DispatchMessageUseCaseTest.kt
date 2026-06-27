@@ -6,8 +6,11 @@ import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.DispatchActivityDecision
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.dispatch.DispatchAttemptResult
+import com.example.domain.model.dispatch.DispatchEligibilityRecord
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
+import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.MessageDispatcherService
 import io.mockk.coEvery
@@ -24,11 +27,13 @@ class DispatchMessageUseCaseTest {
     private val contactRepository: ContactRepository = mockk(relaxed = true)
     private val messageDispatcherService: MessageDispatcherService = mockk(relaxed = true)
     private val activityLogRepository: ActivityLogRepository = mockk(relaxed = true)
+    private val dispatchAttemptRepository: DispatchAttemptRepository = mockk(relaxed = true)
     private val useCase = DispatchMessageUseCase(
         messageRepository,
         contactRepository,
         messageDispatcherService,
         activityLogRepository,
+        dispatchAttemptRepository,
     )
 
     @Test
@@ -61,6 +66,14 @@ class DispatchMessageUseCaseTest {
         assertTrue(result is DispatchMessageUseCase.DispatchOutcome.NotApproved)
         assertEquals("PENDING", (result as DispatchMessageUseCase.DispatchOutcome.NotApproved).status)
         coVerify {
+            dispatchAttemptRepository.upsert(match {
+                    it.messageDraftId.value == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.NEEDS_APPROVAL &&
+                    it.result == DispatchAttemptResult.NEEDS_APPROVAL &&
+                    it.blockOrDeferReason == "UNKNOWN"
+            })
+        }
+        coVerify {
             activityLogRepository.record(match {
                 it.title == "Dispatch waiting for approval" &&
                     it.messageId == "msg_1" &&
@@ -89,6 +102,14 @@ class DispatchMessageUseCaseTest {
         val result = useCase("e1")
 
         assertEquals(DispatchMessageUseCase.DispatchOutcome.ContactNotFound, result)
+        coVerify {
+            dispatchAttemptRepository.upsert(match {
+                it.messageDraftId.value == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.BLOCKED &&
+                    it.result == DispatchAttemptResult.BLOCKED &&
+                    it.blockOrDeferReason == "CONTACT_NOT_FOUND"
+            })
+        }
         coVerify {
             activityLogRepository.record(match {
                 it.title == "Dispatch blocked" &&
@@ -123,7 +144,21 @@ class DispatchMessageUseCaseTest {
         assertEquals("msg_1", sent.pendingId)
         assertEquals(MessageChannel.SMS.raw, sent.channel)
 
-        coVerify { messageDispatcherService.dispatch(pendingMsg, contact) }
+        coVerify {
+            dispatchAttemptRepository.upsert(match {
+                it.messageDraftId.value == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.SEND_NOW &&
+                    it.result == DispatchAttemptResult.QUEUED
+            })
+        }
+        coVerify {
+            messageDispatcherService.dispatch(match {
+                it.messageId.value == pendingMsg.id &&
+                    it.contactId.value == contact.id &&
+                    it.messageText == "hi" &&
+                    it.dispatchAttemptId != null
+            })
+        }
         coVerify {
             activityLogRepository.record(match {
                 it.title == "Dispatch sent" &&
@@ -156,7 +191,14 @@ class DispatchMessageUseCaseTest {
 
         assertTrue(result is DispatchMessageUseCase.DispatchOutcome.Deferred)
         assertEquals(scheduledForMs, (result as DispatchMessageUseCase.DispatchOutcome.Deferred).scheduledForMs)
-        coVerify(exactly = 0) { messageDispatcherService.dispatch(any(), any()) }
+        coVerify(exactly = 0) { messageDispatcherService.dispatch(any()) }
+        coVerify {
+            dispatchAttemptRepository.upsert(match {
+                it.messageDraftId.value == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.DEFERRED &&
+                    it.result == DispatchAttemptResult.DEFERRED
+            })
+        }
         coVerify {
             activityLogRepository.record(match {
                 it.title == "Dispatch deferred" &&
@@ -187,7 +229,14 @@ class DispatchMessageUseCaseTest {
         val result = useCase("msg_1")
 
         assertTrue(result is DispatchMessageUseCase.DispatchOutcome.Sent)
-        coVerify { messageDispatcherService.dispatch(pendingMsg, contact) }
+        coVerify {
+            messageDispatcherService.dispatch(match {
+                it.messageId.value == pendingMsg.id &&
+                    it.contactId.value == contact.id &&
+                    it.preferredChannel == MessageChannel.SMS &&
+                    it.dispatchAttemptId != null
+            })
+        }
         coVerify {
             activityLogRepository.record(match {
                 it.title == "Dispatch sent" &&
@@ -218,7 +267,14 @@ class DispatchMessageUseCaseTest {
 
         assertEquals(DispatchMessageUseCase.DispatchOutcome.Expired("msg_1"), result)
         coVerify { messageRepository.updatePendingStatus("msg_1", "EXPIRED") }
-        coVerify(exactly = 0) { messageDispatcherService.dispatch(any(), any()) }
+        coVerify(exactly = 0) { messageDispatcherService.dispatch(any()) }
+        coVerify {
+            dispatchAttemptRepository.upsert(match {
+                it.messageDraftId.value == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.EXPIRED &&
+                    it.result == DispatchAttemptResult.EXPIRED
+            })
+        }
         coVerify {
             activityLogRepository.record(match {
                 it.title == "Dispatch expired" &&
@@ -246,7 +302,15 @@ class DispatchMessageUseCaseTest {
         val result = useCase("msg_1")
 
         assertTrue(result is DispatchMessageUseCase.DispatchOutcome.NotApproved)
-        coVerify(exactly = 0) { messageDispatcherService.dispatch(any(), any()) }
+        coVerify(exactly = 0) { messageDispatcherService.dispatch(any()) }
+        coVerify {
+            dispatchAttemptRepository.upsert(match {
+                it.messageDraftId.value == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.BLOCKED &&
+                    it.result == DispatchAttemptResult.BLOCKED &&
+                    it.blockOrDeferReason == "ALREADY_HANDLED"
+            })
+        }
         coVerify {
             activityLogRepository.record(match {
                 it.title == "Dispatch blocked" &&

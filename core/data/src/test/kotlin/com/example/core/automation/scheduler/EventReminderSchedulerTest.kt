@@ -5,8 +5,10 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.automation.notifications.EventReminderReceiver
-import com.example.core.db.entities.EventEntity
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.notification.EventReminderScheduleRequest
 import io.mockk.*
 import java.util.Calendar
 import org.junit.After
@@ -38,22 +40,22 @@ class EventReminderSchedulerTest {
 
     @Test
     fun `schedule creates reminder pending intent when reminders are enabled`() {
-        EventReminderScheduler.schedule(context, event())
+        EventReminderScheduler.schedule(context, request())
 
         assertNotNull(existingPendingIntent())
     }
 
     @Test
     fun `schedule cancels reminder pending intent when reminders are disabled`() {
-        EventReminderScheduler.schedule(context, event())
+        EventReminderScheduler.schedule(context, request())
         every { anyConstructed<SecurePrefs>().isBirthdayRemindersEnabled() } returns false
 
-        EventReminderScheduler.schedule(context, event())
+        EventReminderScheduler.schedule(context, request())
 
         assertNull(existingPendingIntent())
     }
 
-    private fun event(): EventEntity {
+    private fun request(): EventReminderScheduleRequest {
         val nextWeek = Calendar.getInstance().apply {
             add(Calendar.DAY_OF_YEAR, 7)
             set(Calendar.HOUR_OF_DAY, 0)
@@ -61,14 +63,12 @@ class EventReminderSchedulerTest {
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
-        return EventEntity(
-            id = "event_1",
-            contactId = "contact_1",
-            type = "BIRTHDAY",
-            dayOfMonth = 1,
-            month = 1,
+        return EventReminderScheduleRequest(
+            eventId = OccasionId("event_1"),
+            contactId = ContactId("contact_1"),
             nextOccurrenceMs = nextWeek,
             notifyDaysBefore = 1,
+            isActive = true,
         )
     }
 

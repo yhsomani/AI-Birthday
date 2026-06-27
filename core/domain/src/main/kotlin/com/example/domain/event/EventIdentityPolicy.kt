@@ -1,69 +1,69 @@
 package com.example.domain.event
 
-import com.example.core.db.entities.EventEntity
-import com.example.domain.model.EventType
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.model.occasion.OccasionType
 import java.util.Locale
 
 object EventIdentityPolicy {
     fun canonicalId(contactId: String, eventType: String): String? {
-        return when (EventType.fromRaw(eventType)) {
-            EventType.BIRTHDAY -> "${contactId}_birthday"
-            EventType.ANNIVERSARY -> "${contactId}_anniversary"
-            EventType.WORK_ANNIVERSARY -> "${contactId}_work_anniversary"
+        return when (OccasionType.fromRaw(eventType)) {
+            OccasionType.BIRTHDAY -> "${contactId}_birthday"
+            OccasionType.ANNIVERSARY -> "${contactId}_anniversary"
+            OccasionType.WORK_ANNIVERSARY -> "${contactId}_work_anniversary"
             else -> null
         }
     }
 
-    fun hasMatchingActiveEvent(
-        events: List<EventEntity>,
+    fun hasMatchingActiveOccasion(
+        occasions: List<Occasion>,
         contactId: String,
-        eventType: String,
+        occasionType: String,
         month: Int,
         dayOfMonth: Int,
         label: String? = null,
-    ): Boolean = findMatchingActiveEvent(
-        events = events,
+    ): Boolean = findMatchingActiveOccasion(
+        occasions = occasions,
         contactId = contactId,
-        eventType = eventType,
+        occasionType = occasionType,
         month = month,
         dayOfMonth = dayOfMonth,
         label = label,
     ) != null
 
-    fun findMatchingActiveEvent(
-        events: List<EventEntity>,
+    fun findMatchingActiveOccasion(
+        occasions: List<Occasion>,
         contactId: String,
-        eventType: String,
+        occasionType: String,
         month: Int,
         dayOfMonth: Int,
         label: String? = null,
-    ): EventEntity? {
-        val normalizedType = eventType.normalizedEventType()
-        return events.firstOrNull { event ->
-            event.isActive &&
-                event.contactId == contactId &&
-                event.type.normalizedEventType() == normalizedType &&
-                event.month == month &&
-                event.dayOfMonth == dayOfMonth &&
-                labelsAreCompatibleForDuplicate(normalizedType, event.label, label)
+    ): Occasion? {
+        val normalizedType = occasionType.normalizedOccasionType()
+        return occasions.firstOrNull { occasion ->
+            occasion.isActive &&
+                occasion.contactId.value == contactId &&
+                occasion.type.raw == normalizedType &&
+                occasion.date.month == month &&
+                occasion.date.dayOfMonth == dayOfMonth &&
+                labelsAreCompatibleForDuplicate(normalizedType, occasion.label, label)
         }
     }
 
-    fun findConflictingActiveEvent(
-        events: List<EventEntity>,
+    fun findConflictingActiveOccasion(
+        occasions: List<Occasion>,
         contactId: String,
-        eventType: String,
+        occasionType: String,
         month: Int,
         dayOfMonth: Int,
         label: String? = null,
-    ): EventEntity? {
-        val normalizedType = eventType.normalizedEventType()
-        return events.firstOrNull { event ->
-            event.isActive &&
-                event.contactId == contactId &&
-                event.type.normalizedEventType() == normalizedType &&
-                (event.month != month || event.dayOfMonth != dayOfMonth) &&
-                labelsAreCompatibleForDuplicate(normalizedType, event.label, label)
+    ): Occasion? {
+        val normalizedType = occasionType.normalizedOccasionType()
+        return occasions.firstOrNull { occasion ->
+            occasion.isActive &&
+                occasion.contactId.value == contactId &&
+                occasion.type.raw == normalizedType &&
+                (occasion.date.month != month || occasion.date.dayOfMonth != dayOfMonth) &&
+                labelsAreCompatibleForDuplicate(normalizedType, occasion.label, label)
         }
     }
 
@@ -72,7 +72,7 @@ object EventIdentityPolicy {
         existingLabel: String?,
         newLabel: String?,
     ): Boolean {
-        if (EventType.fromRaw(eventType) != EventType.CUSTOM) return true
+        if (OccasionType.fromRaw(eventType) != OccasionType.CUSTOM) return true
         val normalizedExisting = existingLabel.orEmpty().trim().lowercase(Locale.US)
         val normalizedNew = newLabel.orEmpty().trim().lowercase(Locale.US)
         return normalizedExisting.isBlank() ||
@@ -80,5 +80,8 @@ object EventIdentityPolicy {
             normalizedExisting == normalizedNew
     }
 
-    private fun String.normalizedEventType(): String = trim().uppercase(Locale.US)
+    private fun String.normalizedOccasionType(): String {
+        val normalized = trim().uppercase(Locale.US)
+        return OccasionType.fromRaw(normalized).takeIf { it != OccasionType.UNKNOWN }?.raw ?: normalized
+    }
 }

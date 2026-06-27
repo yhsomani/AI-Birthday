@@ -1,12 +1,10 @@
 package com.example.core.gemini
 
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
-import com.example.core.db.entities.GiftHistoryEntity
-import com.example.core.db.entities.MemoryNoteEntity
-import com.example.core.db.entities.SentMessageEntity
-import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.contact.ContactClassificationPromptContext
+import com.example.domain.model.contact.ContactGiftAdvisorProfile
+import com.example.domain.model.gift.GiftHistoryRecord
+import com.example.domain.model.message.MessagePromptContext
 import com.example.domain.service.AiService
 import com.example.domain.service.ContactClassificationResult
 import com.example.domain.service.MessageVariantsResult
@@ -19,33 +17,20 @@ class AiServiceImpl @Inject constructor(
 ) : AiService {
 
     override suspend fun generateMessage(
-        contact: ContactEntity,
-        event: EventEntity,
-        styleProfile: StyleProfileEntity?,
-        previousMessages: List<SentMessageEntity>,
-        memoryNotes: List<MemoryNoteEntity>,
-        giftHistory: List<GiftHistoryEntity>,
+        context: MessagePromptContext,
     ): MessageVariantsResult {
         StructuredLogger.i(TAG, "Generating message", mapOf(
-            "contactId" to contact.id,
-            "eventId" to event.id,
-            "previousMessages" to previousMessages.size.toString(),
+            "contactId" to context.contactId.value,
+            "eventId" to context.eventId.value,
+            "previousMessages" to context.previousWishes.size.toString(),
         ))
         val prompter = PromptBuilder()
-        val contextObj = prompter.buildContactContext(
-            contact = contact,
-            event = event,
-            styleProfile = styleProfile,
-            previousMessages = previousMessages,
-            memoryNotes = memoryNotes,
-            giftHistory = giftHistory,
-        )
 
         RateLimiter.waitIfNeeded()
-        val prompt = prompter.buildMessageGenerationPrompt(contextObj)
+        val prompt = prompter.buildMessageGenerationPrompt(context)
         val response = geminiClient.generate(prompt)
-        val variants = ResponseParser.parseMessageVariants(response, eventType = event.type)
-        logParseFallbackIfNeeded("generate", event, variants)
+        val variants = ResponseParser.parseMessageVariants(response, eventType = context.eventType)
+        logParseFallbackIfNeeded("generate", context, variants)
 
         StructuredLogger.d(TAG, "Message generated", mapOf(
             "recommended" to variants.recommended.take(50),
@@ -64,33 +49,20 @@ class AiServiceImpl @Inject constructor(
 
     override suspend fun regenerateMessage(
         previousMessage: String,
-        contact: ContactEntity,
-        event: EventEntity,
-        styleProfile: StyleProfileEntity?,
-        previousMessages: List<SentMessageEntity>,
+        context: MessagePromptContext,
         feedbackInstruction: String?,
-        memoryNotes: List<MemoryNoteEntity>,
-        giftHistory: List<GiftHistoryEntity>,
     ): MessageVariantsResult {
         StructuredLogger.i(TAG, "Regenerating message", mapOf(
-            "contactId" to contact.id,
-            "eventId" to event.id,
+            "contactId" to context.contactId.value,
+            "eventId" to context.eventId.value,
         ))
         val prompter = PromptBuilder()
-        val contextObj = prompter.buildContactContext(
-            contact = contact,
-            event = event,
-            styleProfile = styleProfile,
-            previousMessages = previousMessages,
-            memoryNotes = memoryNotes,
-            giftHistory = giftHistory,
-        )
 
         RateLimiter.waitIfNeeded()
-        val prompt = prompter.buildRegenerationPrompt(previousMessage, contextObj, feedbackInstruction)
+        val prompt = prompter.buildRegenerationPrompt(previousMessage, context, feedbackInstruction)
         val response = geminiClient.generate(prompt)
-        val variants = ResponseParser.parseMessageVariants(response, eventType = event.type)
-        logParseFallbackIfNeeded("regenerate", event, variants)
+        val variants = ResponseParser.parseMessageVariants(response, eventType = context.eventType)
+        logParseFallbackIfNeeded("regenerate", context, variants)
 
         return MessageVariantsResult(
             short = variants.short,
@@ -104,10 +76,10 @@ class AiServiceImpl @Inject constructor(
         )
     }
 
-    override suspend fun classifyContact(contact: ContactEntity): ContactClassificationResult {
+    override suspend fun classifyContact(contact: ContactClassificationPromptContext): ContactClassificationResult {
         StructuredLogger.i(TAG, "Classifying contact", mapOf(
-            "contactId" to contact.id,
-            "name" to contact.name,
+            "contactId" to contact.id.value,
+            "name" to contact.displayName,
         ))
         val prompter = PromptBuilder()
         val prompt = prompter.buildClassificationPrompt(contact)
@@ -127,8 +99,8 @@ class AiServiceImpl @Inject constructor(
     }
 
     override suspend fun generateGiftSuggestions(
-        contact: ContactEntity,
-        history: List<GiftHistoryEntity>
+        contact: ContactGiftAdvisorProfile,
+        history: List<GiftHistoryRecord>
     ): List<com.example.domain.service.GiftSuggestion> {
         val prompter = PromptBuilder()
         val prompt = prompter.buildGiftSuggestionsPrompt(contact, history)
@@ -142,7 +114,7 @@ class AiServiceImpl @Inject constructor(
 
     private fun logParseFallbackIfNeeded(
         operation: String,
-        event: EventEntity,
+        context: MessagePromptContext,
         variants: MessageVariants
     ) {
         if (!variants.isUsingFallback) return
@@ -152,8 +124,8 @@ class AiServiceImpl @Inject constructor(
             "AI message response parsed with fallback",
             extras = mapOf(
                 "operation" to operation,
-                "eventId" to event.id,
-                "eventType" to event.type,
+                "eventId" to context.eventId.value,
+                "eventType" to context.eventType,
                 "fallbackReason" to variants.parseMetadata.fallbackReason.code,
             )
         )

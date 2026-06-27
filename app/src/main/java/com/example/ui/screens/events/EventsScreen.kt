@@ -60,8 +60,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.RelateGlassCard
@@ -74,7 +72,9 @@ import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.core.ui.theme.RelateWarning
 import com.example.domain.event.EventResolutionPolicy
-import com.example.domain.model.EventType
+import com.example.domain.model.contact.ContactPickerItem
+import com.example.domain.model.occasion.EventListItem
+import com.example.domain.model.occasion.OccasionType
 import com.example.ui.viewmodel.EventHorizonFilter
 import com.example.ui.viewmodel.EventResolutionAction
 import com.example.ui.viewmodel.EventTrustConflictState
@@ -91,10 +91,10 @@ import java.util.Date
 import java.util.Locale
 
 private val eventTypeOptions = listOf(
-    EventType.BIRTHDAY.raw,
-    EventType.ANNIVERSARY.raw,
-    EventType.WORK_ANNIVERSARY.raw,
-    EventType.CUSTOM.raw,
+    OccasionType.BIRTHDAY.raw,
+    OccasionType.ANNIVERSARY.raw,
+    OccasionType.WORK_ANNIVERSARY.raw,
+    OccasionType.CUSTOM.raw,
 )
 
 private val eventTypeFilters = listOf(
@@ -269,13 +269,13 @@ fun EventsScreen(
 
 @Composable
 internal fun EventsList(
-    events: List<EventEntity>,
+    events: List<EventListItem>,
     eventTrust: Map<String, EventTrustState> = buildEventTrustStates(events),
     resolvingEventId: String? = null,
     onMergeEvent: (String) -> Unit = {},
     onKeepSeparateEvent: (String) -> Unit = {},
 ) {
-    val resolvedEventTrust = if (events.all { eventTrust.containsKey(it.id) }) {
+    val resolvedEventTrust = if (events.all { eventTrust.containsKey(it.id.value) }) {
         eventTrust
     } else {
         buildEventTrustStates(events)
@@ -295,13 +295,13 @@ internal fun EventsList(
                 SectionHeader(title = month)
             }
             monthEvents.forEach { event ->
-                item(key = event.id) {
+                item(key = event.id.value) {
                     EventCard(
                         event = event,
-                        trustState = resolvedEventTrust.getValue(event.id),
-                        isResolving = resolvingEventId == event.id,
-                        onMerge = { onMergeEvent(event.id) },
-                        onKeepSeparate = { onKeepSeparateEvent(event.id) },
+                        trustState = resolvedEventTrust.getValue(event.id.value),
+                        isResolving = resolvingEventId == event.id.value,
+                        onMerge = { onMergeEvent(event.id.value) },
+                        onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
                     )
                 }
             }
@@ -312,7 +312,7 @@ internal fun EventsList(
 
 @Composable
 private fun ManualEventDialog(
-    contacts: List<ContactEntity>,
+    contacts: List<ContactPickerItem>,
     isSaving: Boolean,
     duplicateWarning: ManualEventDuplicateWarning?,
     onDismiss: () -> Unit,
@@ -329,10 +329,10 @@ private fun ManualEventDialog(
     ) -> Unit,
 ) {
     var useExistingContact by remember { mutableStateOf(contacts.isNotEmpty()) }
-    var selectedContactId by remember { mutableStateOf(contacts.firstOrNull()?.id) }
+    var selectedContactId by remember { mutableStateOf(contacts.firstOrNull()?.id?.value) }
     var contactMenuExpanded by remember { mutableStateOf(false) }
     var newContactName by remember { mutableStateOf("") }
-    var eventType by remember { mutableStateOf(EventType.BIRTHDAY.raw) }
+    var eventType by remember { mutableStateOf(OccasionType.BIRTHDAY.raw) }
     var label by remember { mutableStateOf("") }
     var monthText by remember { mutableStateOf("") }
     var dayText by remember { mutableStateOf("") }
@@ -341,6 +341,7 @@ private fun ManualEventDialog(
     val errorMonthDay = stringResource(R.string.events_error_month_day)
     val errorChooseContact = stringResource(R.string.events_error_choose_contact)
     val errorContactName = stringResource(R.string.events_error_contact_name)
+    val selectedContactName = contacts.firstOrNull { it.id.value == selectedContactId }?.displayName
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -354,7 +355,7 @@ private fun ManualEventDialog(
                         onClick = {
                             onInputChanged()
                             useExistingContact = true
-                            selectedContactId = selectedContactId ?: contacts.firstOrNull()?.id
+                            selectedContactId = selectedContactId ?: contacts.firstOrNull()?.id?.value
                         },
                         modifier = Modifier.weight(1f),
                     )
@@ -372,7 +373,7 @@ private fun ManualEventDialog(
                 if (useExistingContact) {
                     Box {
                         OutlinedTextField(
-                            value = contacts.firstOrNull { it.id == selectedContactId }?.name
+                            value = selectedContactName
                                 ?: stringResource(R.string.events_choose_contact),
                             onValueChange = {},
                             readOnly = true,
@@ -391,10 +392,10 @@ private fun ManualEventDialog(
                         ) {
                             contacts.forEach { contact ->
                                 DropdownMenuItem(
-                                    text = { Text(contact.name) },
+                                    text = { Text(contact.displayName) },
                                     onClick = {
                                         onInputChanged()
-                                        selectedContactId = contact.id
+                                        selectedContactId = contact.id.value
                                         contactMenuExpanded = false
                                     },
                                 )
@@ -615,17 +616,17 @@ private fun EventHorizonFilter.label(): String = when (this) {
 }
 
 @Composable
-private fun eventTypeLabel(type: String): String = when (EventType.fromRaw(type)) {
-    EventType.BIRTHDAY -> stringResource(R.string.event_type_birthday)
-    EventType.ANNIVERSARY -> stringResource(R.string.event_type_anniversary)
-    EventType.WORK_ANNIVERSARY -> stringResource(R.string.event_type_work_anniversary)
+private fun eventTypeLabel(type: String): String = when (OccasionType.fromRaw(type)) {
+    OccasionType.BIRTHDAY -> stringResource(R.string.event_type_birthday)
+    OccasionType.ANNIVERSARY -> stringResource(R.string.event_type_anniversary)
+    OccasionType.WORK_ANNIVERSARY -> stringResource(R.string.event_type_work_anniversary)
     else -> stringResource(R.string.event_type_custom)
 }
 
-private fun eventTypeIcon(type: String): ImageVector = when (EventType.fromRaw(type)) {
-    EventType.BIRTHDAY -> Icons.Filled.Favorite
-    EventType.ANNIVERSARY,
-    EventType.WORK_ANNIVERSARY -> Icons.Filled.Star
+private fun eventTypeIcon(type: String): ImageVector = when (OccasionType.fromRaw(type)) {
+    OccasionType.BIRTHDAY -> Icons.Filled.Favorite
+    OccasionType.ANNIVERSARY,
+    OccasionType.WORK_ANNIVERSARY -> Icons.Filled.Star
     else -> Icons.Filled.CalendarMonth
 }
 
@@ -658,7 +659,7 @@ private fun String.toReadableEventSource(): String {
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun EventCard(
-    event: EventEntity,
+    event: EventListItem,
     trustState: EventTrustState,
     isResolving: Boolean,
     onMerge: () -> Unit,
@@ -695,7 +696,7 @@ private fun EventCard(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    eventTypeIcon(event.type),
+                    eventTypeIcon(event.type.raw),
                     contentDescription = null,
                     tint = if (daysUntil <= 14) RelatePrimary else RelateOnSurfaceVariant,
                     modifier = Modifier.size(24.dp),
@@ -704,7 +705,7 @@ private fun EventCard(
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = event.label ?: eventTypeLabel(event.type),
+                    text = event.label ?: eventTypeLabel(event.type.raw),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
@@ -712,7 +713,7 @@ private fun EventCard(
                 Text(
                     text = stringResource(
                         R.string.events_card_subtitle,
-                        eventTypeLabel(event.type),
+                        eventTypeLabel(event.type.raw),
                         dateFormat.format(Date(event.nextOccurrenceMs)),
                     ),
                     style = MaterialTheme.typography.bodySmall,

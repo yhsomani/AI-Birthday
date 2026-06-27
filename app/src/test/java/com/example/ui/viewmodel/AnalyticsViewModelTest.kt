@@ -1,8 +1,10 @@
 package com.example.ui.viewmodel
 
-import com.example.core.db.entities.SentMessageEntity
-import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.contact.ContactAnalyticsProfile
+import com.example.domain.model.contact.ContactAnalyticsSummary
+import com.example.domain.model.message.MessageAnalyticsRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
@@ -48,12 +50,12 @@ class AnalyticsViewModelTest {
         every { messageRepository.countAllSent() } returns MutableStateFlow(0)
         every { messageRepository.countPending() } returns MutableStateFlow(0)
         every { contactRepository.countAll() } returns MutableStateFlow(0)
-        every { contactRepository.countByRelationshipType() } returns MutableStateFlow(emptyList())
-        coEvery { contactRepository.getTopByHealthScore(5) } returns emptyList()
-        coEvery { contactRepository.getBottomByHealthScore(5) } returns emptyList()
-        coEvery { contactRepository.getAllSync() } returns emptyList()
-        coEvery { eventRepository.getUpcoming(30) } returns emptyList()
-        coEvery { messageRepository.getSentSinceYearStart(any()) } returns emptyList()
+        every { contactRepository.getRelationshipAnalyticsCounts() } returns MutableStateFlow(emptyList())
+        coEvery { contactRepository.getTopHealthSummaries(5) } returns emptyList()
+        coEvery { contactRepository.getBottomHealthSummaries(5) } returns emptyList()
+        coEvery { contactRepository.getAnalyticsProfiles() } returns emptyList()
+        coEvery { eventRepository.countUpcoming(30) } returns 0
+        coEvery { messageRepository.getSentAnalyticsRecordsSince(any()) } returns emptyList()
 
         val viewModel = AnalyticsViewModel(
             getAnalyticsUseCase = GetAnalyticsUseCase(contactRepository, messageRepository),
@@ -95,18 +97,25 @@ class AnalyticsViewModelTest {
     }
 
     @Test
-    fun `delivery reliability normalizes failed delivery status`() = runTest(dispatcher) {
+    fun `delivery reliability excludes failed analytics records`() = runTest(dispatcher) {
         every { messageRepository.countAllSent() } returns MutableStateFlow(2)
         every { messageRepository.countPending() } returns MutableStateFlow(0)
         every { contactRepository.countAll() } returns MutableStateFlow(0)
-        every { contactRepository.countByRelationshipType() } returns MutableStateFlow(emptyList())
-        coEvery { contactRepository.getTopByHealthScore(5) } returns emptyList()
-        coEvery { contactRepository.getBottomByHealthScore(5) } returns emptyList()
-        coEvery { contactRepository.getAllSync() } returns emptyList()
-        coEvery { eventRepository.getUpcoming(30) } returns emptyList()
-        coEvery { messageRepository.getSentSinceYearStart(any()) } returns listOf(
-            sentMessage(id = "sent_ok", deliveryStatus = MessageDeliveryStatus.SENT.raw),
-            sentMessage(id = "sent_failed", deliveryStatus = " ${MessageDeliveryStatus.FAILED.raw.lowercase()} "),
+        every { contactRepository.getRelationshipAnalyticsCounts() } returns MutableStateFlow(emptyList())
+        coEvery { contactRepository.getTopHealthSummaries(5) } returns emptyList()
+        coEvery { contactRepository.getBottomHealthSummaries(5) } returns listOf(
+            ContactAnalyticsSummary(
+                id = ContactId("contact_low"),
+                displayName = "Neha",
+                healthScore = 18,
+                relationshipType = "FRIEND",
+            ),
+        )
+        coEvery { contactRepository.getAnalyticsProfiles() } returns emptyList()
+        coEvery { eventRepository.countUpcoming(30) } returns 0
+        coEvery { messageRepository.getSentAnalyticsRecordsSince(any()) } returns listOf(
+            sentMessageAnalyticsRecord(deliveryStatus = MessageDeliveryStatus.SENT),
+            sentMessageAnalyticsRecord(deliveryStatus = MessageDeliveryStatus.FAILED),
         )
 
         val viewModel = AnalyticsViewModel(
@@ -119,30 +128,79 @@ class AnalyticsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(50, viewModel.uiState.value.deliveryReliabilityPercent)
+        assertEquals(listOf("Neha (18)"), viewModel.uiState.value.topNeglectedContacts)
+    }
+
+    @Test
+    fun `analytics profiles drive health buckets and personalization coverage`() = runTest(dispatcher) {
+        every { messageRepository.countAllSent() } returns MutableStateFlow(0)
+        every { messageRepository.countPending() } returns MutableStateFlow(0)
+        every { contactRepository.countAll() } returns MutableStateFlow(3)
+        every { contactRepository.getRelationshipAnalyticsCounts() } returns MutableStateFlow(emptyList())
+        coEvery { contactRepository.getTopHealthSummaries(5) } returns emptyList()
+        coEvery { contactRepository.getBottomHealthSummaries(5) } returns emptyList()
+        coEvery { contactRepository.getAnalyticsProfiles() } returns listOf(
+            analyticsProfile(id = "healthy", healthScore = 80, nickname = "Ash"),
+            analyticsProfile(id = "attention", healthScore = 45, interestsJson = "[\"music\"]"),
+            analyticsProfile(id = "risk", healthScore = 15),
+        )
+        coEvery { eventRepository.countUpcoming(30) } returns 0
+        coEvery { messageRepository.getSentAnalyticsRecordsSince(any()) } returns emptyList()
+
+        val viewModel = AnalyticsViewModel(
+            getAnalyticsUseCase = GetAnalyticsUseCase(contactRepository, messageRepository),
+            contactRepository = contactRepository,
+            eventRepository = eventRepository,
+            messageRepository = messageRepository,
+            analyticsReportService = analyticsReportService,
+        )
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.healthCounts["Healthy (70%+)"])
+        assertEquals(1, viewModel.uiState.value.healthCounts["Needs Attention"])
+        assertEquals(1, viewModel.uiState.value.healthCounts["At Risk"])
+        assertEquals(66, viewModel.uiState.value.personalizationCoveragePercent)
     }
 
     private fun stubEmptyAnalytics() {
         every { messageRepository.countAllSent() } returns MutableStateFlow(0)
         every { messageRepository.countPending() } returns MutableStateFlow(0)
         every { contactRepository.countAll() } returns MutableStateFlow(0)
-        every { contactRepository.countByRelationshipType() } returns MutableStateFlow(emptyList())
-        coEvery { contactRepository.getTopByHealthScore(5) } returns emptyList()
-        coEvery { contactRepository.getBottomByHealthScore(5) } returns emptyList()
-        coEvery { contactRepository.getAllSync() } returns emptyList()
-        coEvery { eventRepository.getUpcoming(30) } returns emptyList()
-        coEvery { messageRepository.getSentSinceYearStart(any()) } returns emptyList()
+        every { contactRepository.getRelationshipAnalyticsCounts() } returns MutableStateFlow(emptyList())
+        coEvery { contactRepository.getTopHealthSummaries(5) } returns emptyList()
+        coEvery { contactRepository.getBottomHealthSummaries(5) } returns emptyList()
+        coEvery { contactRepository.getAnalyticsProfiles() } returns emptyList()
+        coEvery { eventRepository.countUpcoming(30) } returns 0
+        coEvery { messageRepository.getSentAnalyticsRecordsSince(any()) } returns emptyList()
     }
 
-    private fun sentMessage(id: String, deliveryStatus: String): SentMessageEntity {
-        return SentMessageEntity(
-            id = id,
-            contactId = "contact_1",
-            eventType = "BIRTHDAY",
-            eventYear = 2026,
-            messageText = "Happy birthday",
-            channel = MessageChannel.SMS.raw,
-            sentAtMs = System.currentTimeMillis(),
+    private fun analyticsProfile(
+        id: String,
+        healthScore: Int,
+        nickname: String? = null,
+        notesText: String = "",
+        interestsJson: String = "[]",
+        sharedHistoryJson: String = "[]",
+    ): ContactAnalyticsProfile {
+        return ContactAnalyticsProfile(
+            id = ContactId(id),
+            healthScore = healthScore,
+            nickname = nickname,
+            notesText = notesText,
+            interestsJson = interestsJson,
+            sharedHistoryJson = sharedHistoryJson,
+        )
+    }
+
+    private fun sentMessageAnalyticsRecord(
+        deliveryStatus: MessageDeliveryStatus,
+        replyReceived: Boolean = false,
+        sentAtMs: Long = System.currentTimeMillis(),
+    ): MessageAnalyticsRecord {
+        return MessageAnalyticsRecord(
+            sentAtMs = sentAtMs,
             deliveryStatus = deliveryStatus,
+            replyReceived = replyReceived,
         )
     }
 }

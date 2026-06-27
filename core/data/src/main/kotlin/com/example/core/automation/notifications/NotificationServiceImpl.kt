@@ -2,10 +2,9 @@ package com.example.core.automation.notifications
 
 import android.content.Context
 import com.example.core.data.R
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
 import com.example.core.gemini.MessageVariants
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.notification.ApprovalNotificationRequest
 import com.example.domain.service.MessageVariantsResult
 import com.example.domain.service.NotificationService
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -18,10 +17,8 @@ class NotificationServiceImpl @Inject constructor(
 ) : NotificationService {
 
     override fun showApprovalNotification(
-        contact: ContactEntity,
-        event: EventEntity,
+        request: ApprovalNotificationRequest,
         variants: MessageVariantsResult,
-        messageId: String
     ) {
         val mappedVariants = MessageVariants(
             short = variants.short,
@@ -32,7 +29,7 @@ class NotificationServiceImpl @Inject constructor(
             emotional = variants.emotional,
             recommended = variants.recommended
         )
-        NotificationHelper.showApprovalNotification(context, contact, event, mappedVariants, messageId)
+        NotificationHelper.showApprovalNotification(context, request, mappedVariants)
     }
 
     override fun showAiFallbackAlert() {

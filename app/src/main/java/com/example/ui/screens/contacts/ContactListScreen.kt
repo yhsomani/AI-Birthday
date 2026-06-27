@@ -50,7 +50,6 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
-import com.example.core.db.entities.ContactEntity
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.HealthIndicatorDot
@@ -60,6 +59,7 @@ import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.domain.model.contact.ContactListItem
 import com.example.ui.components.SyncErrorCard
 import com.example.ui.viewmodel.ContactFilter
 import com.example.ui.viewmodel.ContactListUiState
@@ -266,12 +266,12 @@ internal fun ContactListContent(
                     }
                 } else {
                     LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(state.contacts, key = { it.id }) { contact ->
+                        items(state.contacts, key = { it.id.value }) { contact ->
                             ContactRow(
                                 contact = contact,
-                                quality = state.contactQuality[contact.id],
-                                onClick = { onContactClick(contact.id) },
-                                modifier = Modifier.testTag(ContactListTestTags.ROW_PREFIX + contact.id),
+                                quality = state.contactQuality[contact.id.value],
+                                onClick = { onContactClick(contact.id.value) },
+                                modifier = Modifier.testTag(ContactListTestTags.ROW_PREFIX + contact.id.value),
                             )
                         }
                     }
@@ -304,7 +304,7 @@ private fun ContactSort.label(): String = when (this) {
 
 @Composable
 private fun ContactRow(
-    contact: ContactEntity,
+    contact: ContactListItem,
     quality: ContactQualityState?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -324,7 +324,7 @@ private fun ContactRow(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = contact.name.take(1),
+                text = contact.displayName.take(1),
                 color = RelateOnBackground,
                 fontWeight = FontWeight.Medium,
                 style = MaterialTheme.typography.titleLarge,
@@ -334,7 +334,7 @@ private fun ContactRow(
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = contact.name,
+                    text = contact.displayName,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -352,7 +352,7 @@ private fun ContactRow(
                     text = it.label(),
                     style = MaterialTheme.typography.labelSmall,
                     color = it.labelColor(),
-                    modifier = Modifier.testTag(ContactListTestTags.QUALITY_PREFIX + contact.id),
+                    modifier = Modifier.testTag(ContactListTestTags.QUALITY_PREFIX + contact.id.value),
                 )
             }
         }

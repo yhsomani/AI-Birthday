@@ -4,8 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.GiftHistoryEntity
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.GiftHistoryId
+import com.example.domain.model.contact.ContactGiftAdvisorProfile
+import com.example.domain.model.gift.GiftHistoryRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.GiftHistoryRepository
 import com.example.domain.service.AiService
@@ -21,8 +23,8 @@ import java.util.UUID
 import javax.inject.Inject
 
 data class GiftAdvisorUiState(
-    val contact: ContactEntity? = null,
-    val giftHistory: List<GiftHistoryEntity> = emptyList(),
+    val contact: ContactGiftAdvisorProfile? = null,
+    val giftHistory: List<GiftHistoryRecord> = emptyList(),
     val suggestions: List<GiftSuggestion> = emptyList(),
     val totalSpentThisYear: Int = 0,
     val remainingBudget: Int = 0,
@@ -52,8 +54,8 @@ class GiftAdvisorViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessageRes = null)
             try {
-                val contact = contactRepository.getById(contactId)
-                val history = giftHistoryRepository.getByContact(contactId)
+                val contact = contactRepository.getGiftAdvisorProfile(contactId)
+                val history = giftHistoryRepository.getRecordsByContact(contactId)
                 
                 val currentYear = Calendar.getInstance().get(Calendar.YEAR)
                 val spentThisYear = history.filter { it.year == currentYear }.sumOf { it.approxCostInr }
@@ -125,9 +127,9 @@ class GiftAdvisorViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val currentYear = Calendar.getInstance().get(Calendar.YEAR)
-                val newGift = GiftHistoryEntity(
-                    id = UUID.randomUUID().toString(),
-                    contactId = contactId,
+                val newGift = GiftHistoryRecord(
+                    id = GiftHistoryId(UUID.randomUUID().toString()),
+                    contactId = ContactId(contactId),
                     giftName = cleanedName,
                     giftCategory = cleanedCategory,
                     occasionType = cleanedOccasion,
@@ -136,7 +138,7 @@ class GiftAdvisorViewModel @Inject constructor(
                     receivedWell = liked,
                     notes = cleanedNotes
                 )
-                giftHistoryRepository.upsert(newGift)
+                giftHistoryRepository.upsertRecord(newGift)
                 loadData()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessageRes = R.string.gift_advisor_error_add)
@@ -145,10 +147,10 @@ class GiftAdvisorViewModel @Inject constructor(
         return true
     }
 
-    fun deleteGiftRecord(gift: GiftHistoryEntity) {
+    fun deleteGiftRecord(gift: GiftHistoryRecord) {
         viewModelScope.launch {
             try {
-                giftHistoryRepository.delete(gift)
+                giftHistoryRepository.deleteRecord(gift.id)
                 loadData()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessageRes = R.string.gift_advisor_error_delete)

@@ -64,12 +64,12 @@ import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSurfaceVariant
-import com.example.core.db.entities.ContactEntity
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.contact.ContactDetailProfile
+import com.example.domain.model.memory.MemoryNoteCategoryCount
 import com.example.domain.usecase.UpdateContactPreferencesUseCase
 import com.example.ui.viewmodel.ContactDetailViewModel
-import com.example.ui.viewmodel.MemoryNoteCategorySummary
 
 internal object ContactDetailTestTags {
     const val PERSONALIZATION_ADD_MEMORY = "contact_detail_personalization_add_memory"
@@ -151,7 +151,7 @@ fun ContactDetailScreen(
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                val displayName = contact?.name ?: contactId
+                val displayName = contact?.displayName ?: contactId
                 Box(
                     modifier = Modifier
                         .size(96.dp)
@@ -177,7 +177,7 @@ fun ContactDetailScreen(
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                val group = contact?.contactGroup ?: contact?.relationshipType ?: ""
+                val group = contact?.contactGroup ?: contact?.relationshipType.orEmpty()
                 Text(
                     text = group,
                     style = MaterialTheme.typography.bodyLarge,
@@ -240,9 +240,9 @@ fun ContactDetailScreen(
 @Composable
 internal fun ContactDetailBodySections(
     contactId: String,
-    contact: ContactEntity,
+    contact: ContactDetailProfile,
     memoryNoteCount: Int = 0,
-    memoryNoteCategorySummary: List<MemoryNoteCategorySummary> = emptyList(),
+    memoryNoteCategorySummary: List<MemoryNoteCategoryCount> = emptyList(),
     upcomingBirthdayDaysLeft: Int? = null,
     isGenerating: Boolean = false,
     generationErrorRes: Int? = null,
@@ -354,9 +354,9 @@ private fun ContactDetailSection(
 
 @Composable
 internal fun PersonalizationQualityCard(
-    contact: ContactEntity,
+    contact: ContactDetailProfile,
     memoryNoteCount: Int = 0,
-    memoryNoteCategorySummary: List<MemoryNoteCategorySummary> = emptyList(),
+    memoryNoteCategorySummary: List<MemoryNoteCategoryCount> = emptyList(),
     onAddMemory: () -> Unit = {},
 ) {
     val checklist = listOf(
@@ -378,7 +378,7 @@ internal fun PersonalizationQualityCard(
         PersonalizationQualityItem(
             labelRes = R.string.personalization_quality_channel,
             promptRes = R.string.personalization_quality_choose_channel,
-            isComplete = MessageChannel.fromRaw(contact.preferredChannel) != MessageChannel.UNKNOWN,
+            isComplete = contact.preferredChannel != MessageChannel.UNKNOWN,
         ),
     )
     val complete = checklist.count { it.isComplete }
@@ -461,7 +461,7 @@ internal fun PersonalizationQualityCard(
 
 @Composable
 private fun memoryNoteCategorySummaryText(
-    summary: List<MemoryNoteCategorySummary>,
+    summary: List<MemoryNoteCategoryCount>,
 ): String {
     if (summary.isEmpty()) return stringResource(R.string.memory_category_general)
     val parts = mutableListOf<String>()
@@ -490,7 +490,7 @@ private data class PersonalizationQualityItem(
 )
 
 @Composable
-private fun ContactInfoCard(contact: ContactEntity) {
+private fun ContactInfoCard(contact: ContactDetailProfile) {
     RelateGlassCard {
         Column(modifier = Modifier.padding(16.dp)) {
             contact.primaryPhone?.let {
@@ -629,7 +629,7 @@ private fun PersonalizationActionsCard(
 
 @Composable
 private fun AutomationActionsCard(
-    contact: ContactEntity,
+    contact: ContactDetailProfile,
     onMarkVip: () -> Unit,
     onSetWhatsApp: () -> Unit,
     onSetSms: () -> Unit,
@@ -649,7 +649,7 @@ private fun AutomationActionsCard(
                 Button(
                     onClick = onMarkVip,
                     modifier = Modifier.weight(1f),
-                    enabled = ApprovalMode.fromRaw(contact.automationMode) != ApprovalMode.VIP_APPROVE,
+                    enabled = contact.automationMode != ApprovalMode.VIP_APPROVE,
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
                 ) {
                     Text(stringResource(R.string.contact_detail_mark_vip), color = MaterialTheme.colorScheme.onSurface)
@@ -657,7 +657,7 @@ private fun AutomationActionsCard(
                 Button(
                     onClick = onSetWhatsApp,
                     modifier = Modifier.weight(1f),
-                    enabled = MessageChannel.fromRaw(contact.preferredChannel) != MessageChannel.WHATSAPP,
+                    enabled = contact.preferredChannel != MessageChannel.WHATSAPP,
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
                 ) {
                     Text(stringResource(R.string.contact_detail_set_whatsapp), color = MaterialTheme.colorScheme.onSurface)
@@ -665,7 +665,7 @@ private fun AutomationActionsCard(
                 Button(
                     onClick = onSetSms,
                     modifier = Modifier.weight(1f),
-                    enabled = MessageChannel.fromRaw(contact.preferredChannel) != MessageChannel.SMS,
+                    enabled = contact.preferredChannel != MessageChannel.SMS,
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
                 ) {
                     Text(stringResource(R.string.contact_detail_set_sms), color = MaterialTheme.colorScheme.onSurface)
@@ -735,19 +735,19 @@ private fun HistoryActionsCard(
 
 @Composable
 internal fun ContactPreferencesDialog(
-    contact: ContactEntity,
+    contact: ContactDetailProfile,
     isSaving: Boolean,
     onDismiss: () -> Unit,
     onSave: (UpdateContactPreferencesUseCase.Request) -> Unit,
 ) {
-    var nickname by remember(contact.id) { mutableStateOf(contact.nickname.orEmpty()) }
-    var relationshipType by remember(contact.id) { mutableStateOf(contact.relationshipType) }
-    var language by remember(contact.id) { mutableStateOf(contact.preferredLanguage) }
-    var channel by remember(contact.id) { mutableStateOf(contact.preferredChannel.toSupportedContactMessageChannel()) }
-    var formality by remember(contact.id) { mutableStateOf(contact.formalityLevel) }
-    var style by remember(contact.id) { mutableStateOf(contact.communicationStyle) }
-    var automationMode by remember(contact.id) { mutableStateOf(contact.automationMode.toSupportedContactApprovalMode()) }
-    var sendTime by remember(contact.id) {
+    var nickname by remember(contact.id.value) { mutableStateOf(contact.nickname.orEmpty()) }
+    var relationshipType by remember(contact.id.value) { mutableStateOf(contact.relationshipType) }
+    var language by remember(contact.id.value) { mutableStateOf(contact.preferredLanguage) }
+    var channel by remember(contact.id.value) { mutableStateOf(contact.preferredChannel.toSupportedContactMessageChannel()) }
+    var formality by remember(contact.id.value) { mutableStateOf(contact.formalityLevel) }
+    var style by remember(contact.id.value) { mutableStateOf(contact.communicationStyle) }
+    var automationMode by remember(contact.id.value) { mutableStateOf(contact.automationMode.toSupportedContactApprovalMode()) }
+    var sendTime by remember(contact.id.value) {
         mutableStateOf(
             if (contact.customSendTimeHour != null && contact.customSendTimeMinute != null) {
                 "%02d:%02d".format(contact.customSendTimeHour, contact.customSendTimeMinute)
@@ -756,14 +756,14 @@ internal fun ContactPreferencesDialog(
             }
         )
     }
-    var giftBudget by remember(contact.id) { mutableStateOf(contact.giftBudgetInr.toString()) }
-    var annualBudget by remember(contact.id) { mutableStateOf(contact.annualBudgetInr.toString()) }
-    var skipAutoWish by remember(contact.id) { mutableStateOf(contact.skipAutoWish) }
-    var interests by remember(contact.id) { mutableStateOf(contact.interestsJson.toCsvList()) }
-    var sensitiveTopics by remember(contact.id) { mutableStateOf(contact.sensitiveTopicsJson.toCsvList()) }
-    var lifePhase by remember(contact.id) { mutableStateOf(contact.currentLifePhaseJson.lifePhaseLabel()) }
-    var notes by remember(contact.id) { mutableStateOf(contact.notesText) }
-    var localError by remember(contact.id) { mutableStateOf<String?>(null) }
+    var giftBudget by remember(contact.id.value) { mutableStateOf(contact.giftBudgetInr.toString()) }
+    var annualBudget by remember(contact.id.value) { mutableStateOf(contact.annualBudgetInr.toString()) }
+    var skipAutoWish by remember(contact.id.value) { mutableStateOf(contact.skipAutoWish) }
+    var interests by remember(contact.id.value) { mutableStateOf(contact.interestsJson.toCsvList()) }
+    var sensitiveTopics by remember(contact.id.value) { mutableStateOf(contact.sensitiveTopicsJson.toCsvList()) }
+    var lifePhase by remember(contact.id.value) { mutableStateOf(contact.currentLifePhaseJson.lifePhaseLabel()) }
+    var notes by remember(contact.id.value) { mutableStateOf(contact.notesText) }
+    var localError by remember(contact.id.value) { mutableStateOf<String?>(null) }
     val invalidSendTime = stringResource(R.string.contact_preferences_invalid_send_time)
 
     AlertDialog(
@@ -1001,9 +1001,9 @@ private fun ChoiceRow(
     }
 }
 
-private fun ContactEntity.toPreferenceRequest(): UpdateContactPreferencesUseCase.Request =
+private fun ContactDetailProfile.toPreferenceRequest(): UpdateContactPreferencesUseCase.Request =
     UpdateContactPreferencesUseCase.Request(
-        contactId = id,
+        contactId = id.value,
         nickname = nickname.orEmpty(),
         relationshipType = relationshipType,
         preferredLanguage = preferredLanguage,
@@ -1030,16 +1030,12 @@ private fun String.parseSendTime(): Pair<Int, Int>? {
     return hour to minute
 }
 
-private fun String.toSupportedContactApprovalMode(): ApprovalMode {
-    return ApprovalMode.fromRaw(this)
-        .takeIf { it != ApprovalMode.UNKNOWN }
-        ?: ApprovalMode.DEFAULT
+private fun ApprovalMode.toSupportedContactApprovalMode(): ApprovalMode {
+    return takeIf { it != ApprovalMode.UNKNOWN } ?: ApprovalMode.DEFAULT
 }
 
-private fun String.toSupportedContactMessageChannel(): MessageChannel {
-    return MessageChannel.fromRaw(this)
-        .takeIf { it != MessageChannel.UNKNOWN }
-        ?: MessageChannel.SMS
+private fun MessageChannel.toSupportedContactMessageChannel(): MessageChannel {
+    return takeIf { it != MessageChannel.UNKNOWN } ?: MessageChannel.SMS
 }
 
 private fun String.toCsvList(): String {

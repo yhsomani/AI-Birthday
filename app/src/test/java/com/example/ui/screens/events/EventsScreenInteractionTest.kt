@@ -10,8 +10,11 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.EventEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.occasion.EventListItem
+import com.example.domain.model.occasion.OccasionType
 import com.example.ui.viewmodel.EventTrustConflictState
 import com.example.ui.viewmodel.EventTrustState
 import com.example.ui.viewmodel.EventVerificationState
@@ -147,7 +150,7 @@ class EventsScreenInteractionTest {
                 EventsList(
                     events = listOf(event),
                     eventTrust = mapOf(
-                        event.id to EventTrustState(
+                        event.id.value to EventTrustState(
                             source = event.source,
                             verification = EventVerificationState.CONFLICT,
                             confidenceScore = 100,
@@ -169,8 +172,8 @@ class EventsScreenInteractionTest {
             .assertIsDisplayed()
             .performClick()
 
-        assertEquals(event.id, mergedEventId)
-        assertEquals(event.id, keptEventId)
+        assertEquals(event.id.value, mergedEventId)
+        assertEquals(event.id.value, keptEventId)
     }
 
     private fun event(
@@ -181,19 +184,22 @@ class EventsScreenInteractionTest {
         source: String,
         isVerified: Boolean,
         confidenceScore: Int = 100,
-    ): EventEntity {
+    ): EventListItem {
         val nextOccurrenceMs = Calendar.getInstance().apply {
             add(Calendar.DAY_OF_YEAR, 10)
         }.timeInMillis
 
-        return EventEntity(
-            id = id,
-            contactId = contactId,
-            type = "BIRTHDAY",
+        return EventListItem(
+            id = OccasionId(id),
+            contactId = ContactId(contactId),
+            type = OccasionType.BIRTHDAY,
             label = "Birthday $id",
             dayOfMonth = dayOfMonth,
             month = month,
+            year = null,
             nextOccurrenceMs = nextOccurrenceMs,
+            isActive = true,
+            notifyDaysBefore = 1,
             source = source,
             confidenceScore = confidenceScore,
             isVerified = isVerified,

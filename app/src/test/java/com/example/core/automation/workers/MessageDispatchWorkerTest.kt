@@ -10,12 +10,15 @@ import androidx.work.workDataOf
 import com.example.core.automation.sender.MessageDispatcher
 import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.dispatch.DispatchAttemptResult
+import com.example.domain.model.dispatch.DispatchEligibilityRecord
 import com.example.domain.service.PreferencesRepository
 import io.mockk.*
 import java.util.Calendar
@@ -37,6 +40,7 @@ class MessageDispatchWorkerTest {
     private val sentMessageDao: SentMessageDao = mockk(relaxed = true)
     private val contactDao: ContactDao = mockk(relaxed = true)
     private val eventDao: EventDao = mockk(relaxed = true)
+    private val dispatchAttemptDao: DispatchAttemptDao = mockk(relaxed = true)
     private val preferencesRepository: PreferencesRepository = mockk(relaxed = true)
 
     @Before
@@ -44,7 +48,7 @@ class MessageDispatchWorkerTest {
         context = ApplicationProvider.getApplicationContext()
         mockkConstructor(MessageDispatcher::class)
         mockkObject(DailyScheduler)
-        coEvery { anyConstructed<MessageDispatcher>().dispatch(any(), any()) } returns Unit
+        coEvery { anyConstructed<MessageDispatcher>().dispatch(any()) } returns Unit
         every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
         every { preferencesRepository.getQuietHoursStart() } returns 0
         every { preferencesRepository.getQuietHoursEnd() } returns 0
@@ -79,7 +83,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, preferencesRepository)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, dispatchAttemptDao, preferencesRepository)
                 }
             })
             .build()
@@ -112,7 +116,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, preferencesRepository)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, dispatchAttemptDao, preferencesRepository)
                 }
             })
             .build()
@@ -121,7 +125,21 @@ class MessageDispatchWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
-        coVerify { anyConstructed<MessageDispatcher>().dispatch(pendingMsg, contact) }
+        coVerify {
+            anyConstructed<MessageDispatcher>().dispatch(match {
+                it.messageId.value == pendingMsg.id &&
+                    it.contactId.value == contact.id &&
+                    it.messageText == "Happy Birthday" &&
+                    it.dispatchAttemptId != null
+            })
+        }
+        coVerify {
+            dispatchAttemptDao.upsert(match {
+                it.messageDraftId == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.SEND_NOW.raw &&
+                    it.result == DispatchAttemptResult.QUEUED.raw
+            })
+        }
     }
 
     @Test
@@ -147,7 +165,14 @@ class MessageDispatchWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         verify { DailyScheduler.scheduleExactSend(any(), "msg_1") }
         coVerify(exactly = 0) { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
-        coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any(), any()) }
+        coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any()) }
+        coVerify {
+            dispatchAttemptDao.upsert(match {
+                it.messageDraftId == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.DEFERRED.raw &&
+                    it.result == DispatchAttemptResult.DEFERRED.raw
+            })
+        }
     }
 
     @Test
@@ -171,7 +196,13 @@ class MessageDispatchWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
-        coVerify { anyConstructed<MessageDispatcher>().dispatch(pendingMsg, contact) }
+        coVerify {
+            anyConstructed<MessageDispatcher>().dispatch(match {
+                it.messageId.value == pendingMsg.id &&
+                    it.contactId.value == contact.id &&
+                    it.dispatchAttemptId != null
+            })
+        }
     }
 
     @Test
@@ -197,7 +228,14 @@ class MessageDispatchWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.updateStatus("msg_1", "EXPIRED") }
-        coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any(), any()) }
+        coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any()) }
+        coVerify {
+            dispatchAttemptDao.upsert(match {
+                it.messageDraftId == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.EXPIRED.raw &&
+                    it.result == DispatchAttemptResult.EXPIRED.raw
+            })
+        }
     }
 
     @Test
@@ -214,7 +252,12 @@ class MessageDispatchWorkerTest {
 
         coEvery { pendingMessageDao.getById("msg_1") } returns pendingMsg
         coEvery { contactDao.getById("c1") } returns contact
-        coEvery { anyConstructed<MessageDispatcher>().dispatch(pendingMsg, contact) } throws
+        coEvery {
+            anyConstructed<MessageDispatcher>().dispatch(match {
+                it.messageId.value == pendingMsg.id &&
+                    it.contactId.value == contact.id
+            })
+        } throws
             IllegalStateException("dispatcher crashed")
 
         val worker = TestListenableWorkerBuilder<MessageDispatchWorker>(context)
@@ -225,7 +268,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, preferencesRepository)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, dispatchAttemptDao, preferencesRepository)
                 }
             })
             .build()
@@ -235,6 +278,23 @@ class MessageDispatchWorkerTest {
         assertEquals(ListenableWorker.Result.failure(), result)
         coVerify { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
         coVerify { pendingMessageDao.updateStatus("msg_1", "FAILED") }
+        coVerify {
+            dispatchAttemptDao.updateOutcome(
+                id = any(),
+                attemptedAtMs = any(),
+                resolvedAtMs = any(),
+                result = DispatchAttemptResult.FAILED_FINAL.raw,
+                channel = null,
+                deliveryStatus = "FAILED",
+                providerMessageId = null,
+                errorType = "IllegalStateException",
+                errorCode = null,
+                redactedErrorMessage = "Dispatcher failed before completing send.",
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = any(),
+            )
+        }
     }
 
     @Test
@@ -263,7 +323,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, preferencesRepository)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, dispatchAttemptDao, preferencesRepository)
                 }
             })
             .build()
@@ -274,7 +334,7 @@ class MessageDispatchWorkerTest {
         coVerify { pendingMessageDao.insert(match { it.id == "msg_1" && it.scheduledForMs > System.currentTimeMillis() }) }
         verify { DailyScheduler.scheduleExactSend(any(), "msg_1") }
         coVerify(exactly = 0) { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
-        coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any(), any()) }
+        coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any()) }
     }
 
     private fun buildWorker(pendingMessageId: String): MessageDispatchWorker {
@@ -286,7 +346,7 @@ class MessageDispatchWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, preferencesRepository)
+                    return MessageDispatchWorker(appContext, workerParameters, pendingMessageDao, sentMessageDao, contactDao, eventDao, dispatchAttemptDao, preferencesRepository)
                 }
             })
             .build()

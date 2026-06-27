@@ -5,14 +5,14 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.ContactsContract
 import androidx.core.content.ContextCompat
-import com.example.core.db.entities.ContactEntity
+import com.example.domain.model.contact.ContactSyncRecord
 import com.example.domain.service.DeviceContactsPermissionDeniedException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class DeviceContactsReader(private val context: Context) {
 
-    suspend fun readContacts(): List<ContactEntity> = withContext(Dispatchers.IO) {
+    suspend fun readContacts(): List<ContactSyncRecord> = withContext(Dispatchers.IO) {
         if (
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) !=
             PackageManager.PERMISSION_GRANTED
@@ -111,7 +111,7 @@ class DeviceContactsReader(private val context: Context) {
 
         rowsById.values
             .filter { it.name.isNotBlank() }
-            .map { it.toEntity() }
+            .map { it.toRecord() }
     }
 
     private data class MutableDeviceContact(
@@ -129,9 +129,9 @@ class DeviceContactsReader(private val context: Context) {
         var anniversaryMonth: Int? = null,
         var anniversaryYear: Int? = null,
     ) {
-        fun toEntity(): ContactEntity = ContactEntity(
+        fun toRecord(): ContactSyncRecord = ContactSyncRecord(
             id = id,
-            name = name,
+            displayName = name,
             primaryPhone = primaryPhone,
             primaryEmail = primaryEmail,
             company = company,

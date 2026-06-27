@@ -15,8 +15,11 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.ContactEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.contact.ContactListItem
 import com.example.ui.viewmodel.ContactFilter
 import com.example.ui.viewmodel.ContactListUiState
 import com.example.ui.viewmodel.ContactQualityState
@@ -186,16 +189,16 @@ class ContactListScreenInteractionTest {
         contactQuality: Map<String, ContactQualityState> = emptyMap(),
     ): ContactListUiState {
         val contacts = listOf(
-            ContactEntity(
+            contactListItem(
                 id = "c1",
-                name = "Alice",
+                displayName = "Alice",
                 relationshipType = "FAMILY",
                 contactGroup = "Family",
                 healthScore = 90,
             ),
-            ContactEntity(
+            contactListItem(
                 id = "c2",
-                name = "Bob",
+                displayName = "Bob",
                 relationshipType = "FRIEND",
                 contactGroup = "Friends",
                 healthScore = 55,
@@ -209,4 +212,35 @@ class ContactListScreenInteractionTest {
             syncError = syncError,
         )
     }
+
+    private fun contactListItem(
+        id: String,
+        displayName: String,
+        relationshipType: String,
+        contactGroup: String?,
+        healthScore: Int,
+    ) = ContactListItem(
+        id = ContactId(id),
+        displayName = displayName,
+        nickname = null,
+        company = null,
+        contactGroup = contactGroup,
+        relationshipType = relationshipType,
+        healthScore = healthScore,
+        automationMode = ApprovalMode.UNKNOWN,
+        preferredChannel = MessageChannel.UNKNOWN,
+        primaryPhone = null,
+        secondaryPhone = null,
+        primaryEmail = null,
+        birthdayDay = null,
+        birthdayMonth = null,
+        anniversaryDay = null,
+        anniversaryMonth = null,
+        workStartDay = null,
+        workStartMonth = null,
+        notesText = "",
+        interestsJson = "[]",
+        sharedHistoryJson = "[]",
+        classificationConfidence = 0.0,
+    )
 }

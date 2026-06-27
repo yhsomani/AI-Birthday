@@ -6,13 +6,11 @@ import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
-import com.example.core.db.dao.ContactDao
-import com.example.core.db.dao.EventDao
-import com.example.core.db.entities.ContactEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import com.example.domain.usecase.DiscoverEventsUseCase
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -25,8 +23,7 @@ import org.robolectric.annotation.Config
 class EventDiscoveryWorkerTest {
 
     private lateinit var context: Context
-    private val contactDao: ContactDao = mockk(relaxed = true)
-    private val eventDao: EventDao = mockk(relaxed = true)
+    private val discoverEventsUseCase: DiscoverEventsUseCase = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -34,15 +31,11 @@ class EventDiscoveryWorkerTest {
     }
 
     @Test
-    fun `doWork discovers events and updates database`() = runTest {
-        val contact = ContactEntity(
-            id = "c1",
-            name = "John",
-            birthdayDay = 15,
-            birthdayMonth = 5,
-            birthdayYear = 1990
+    fun `doWork delegates event discovery to shared use case`() = runTest {
+        coEvery { discoverEventsUseCase() } returns DiscoverEventsUseCase.DiscoveryOutcome(
+            contacts = 1,
+            events = 1,
         )
-        coEvery { contactDao.getAllSync() } returns listOf(contact)
 
         val worker = TestListenableWorkerBuilder<EventDiscoveryWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
@@ -51,7 +44,7 @@ class EventDiscoveryWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return EventDiscoveryWorker(appContext, workerParameters, contactDao, eventDao)
+                    return EventDiscoveryWorker(appContext, workerParameters, discoverEventsUseCase)
                 }
             })
             .build()
@@ -59,6 +52,28 @@ class EventDiscoveryWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
-        coVerify { eventDao.upsert(any()) }
+        coVerify(exactly = 1) { discoverEventsUseCase() }
+    }
+
+    @Test
+    fun `doWork retries when shared discovery use case fails`() = runTest {
+        coEvery { discoverEventsUseCase() } throws IllegalStateException("boom")
+
+        val worker = TestListenableWorkerBuilder<EventDiscoveryWorker>(context)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: Context,
+                    workerClassName: String,
+                    workerParameters: WorkerParameters
+                ): ListenableWorker {
+                    return EventDiscoveryWorker(appContext, workerParameters, discoverEventsUseCase)
+                }
+            })
+            .build()
+
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.retry(), result)
+        coVerify(exactly = 1) { discoverEventsUseCase() }
     }
 }

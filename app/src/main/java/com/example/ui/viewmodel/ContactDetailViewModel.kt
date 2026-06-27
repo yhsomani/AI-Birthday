@@ -4,8 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
+import com.example.domain.model.contact.ContactDetailProfile
+import com.example.domain.model.memory.MemoryNoteCategoryCount
+import com.example.domain.model.memory.MemoryNoteSummary
+import com.example.domain.model.occasion.UpcomingEventPreview
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MemoryNoteRepository
@@ -18,17 +20,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class MemoryNoteCategorySummary(
-    val category: String,
-    val count: Int,
-)
-
 data class ContactDetailUiState(
-    val contact: ContactEntity? = null,
+    val contact: ContactDetailProfile? = null,
     val memoryNoteCount: Int = 0,
-    val memoryNoteCategorySummary: List<MemoryNoteCategorySummary> = emptyList(),
+    val memoryNoteCategorySummary: List<MemoryNoteCategoryCount> = emptyList(),
     val upcomingBirthdayDaysLeft: Int? = null,
-    val upcomingEvent: EventEntity? = null,
+    val upcomingEvent: UpcomingEventPreview? = null,
     val isLoading: Boolean = true,
     val isGenerating: Boolean = false,
     val isSavingPreferences: Boolean = false,
@@ -60,33 +57,23 @@ class ContactDetailViewModel @Inject constructor(
     private fun loadContact() {
         viewModelScope.launch {
             try {
-                val contact = contactRepository.getById(contactId)
-                val events = eventRepository.getUpcoming(365)
-                val birthdayEvent = events.find {
-                    contact?.let { c -> it.contactId == c.id } == true
+                val contact = contactRepository.getDetailProfile(contactId)
+                val upcomingEvent = contact?.let { currentContact ->
+                    eventRepository.getNextUpcomingPreviewForContact(currentContact.id.value, 365)
                 }
-                val memoryNotes = contact?.let { currentContact ->
+                val memoryNoteSummary = contact?.let { currentContact ->
                     runCatching {
-                        memoryNoteRepository.getByContact(currentContact.id)
-                    }.getOrDefault(emptyList())
-                } ?: emptyList()
-                val memoryNoteCategorySummary = memoryNotes
-                    .groupingBy { it.category }
-                    .eachCount()
-                    .entries
-                    .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
-                    .map { MemoryNoteCategorySummary(category = it.key, count = it.value) }
-                val daysLeft = if (birthdayEvent != null) {
-                    val days = (birthdayEvent.nextOccurrenceMs - System.currentTimeMillis()) / 86400000
-                    days.toInt().coerceAtLeast(0)
-                } else null
+                        memoryNoteRepository.getSummaryForContact(currentContact.id.value)
+                    }.getOrDefault(MemoryNoteSummary.EMPTY)
+                } ?: MemoryNoteSummary.EMPTY
+                val daysLeft = upcomingEvent?.daysUntil
 
                 _uiState.value = ContactDetailUiState(
                     contact = contact,
-                    memoryNoteCount = memoryNotes.size,
-                    memoryNoteCategorySummary = memoryNoteCategorySummary,
+                    memoryNoteCount = memoryNoteSummary.totalCount,
+                    memoryNoteCategorySummary = memoryNoteSummary.categoryCounts,
                     upcomingBirthdayDaysLeft = daysLeft,
-                    upcomingEvent = birthdayEvent,
+                    upcomingEvent = upcomingEvent,
                     isLoading = false,
                 )
             } catch (e: Exception) {
@@ -117,7 +104,6 @@ class ContactDetailViewModel @Inject constructor(
                 }
                 is UpdateContactPreferencesUseCase.Outcome.Updated -> {
                     _uiState.value = _uiState.value.copy(
-                        contact = outcome.contact,
                         isSavingPreferences = false,
                         preferenceMessageRes = R.string.contact_detail_preferences_saved,
                         preferenceErrorRes = null,
@@ -136,7 +122,7 @@ class ContactDetailViewModel @Inject constructor(
         }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isGenerating = true, generationErrorRes = null)
-            when (val result = generateMessageUseCase(event.id)) {
+            when (val result = generateMessageUseCase(event.id.value)) {
                 is GenerateMessageUseCase.GenerationOutcome.Generated -> {
                     _uiState.value = _uiState.value.copy(
                         isGenerating = false,

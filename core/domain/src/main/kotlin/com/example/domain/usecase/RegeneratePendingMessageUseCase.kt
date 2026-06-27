@@ -9,6 +9,10 @@ import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.automation.AiAutoSendQualityGate
 import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutoSendChannelSelector
+import com.example.domain.contact.toDeliveryRouteProfile
+import com.example.domain.contact.toMessagePromptContact
+import com.example.domain.message.buildMessagePromptContext
+import com.example.domain.message.toStylePromptProfile
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
 import com.example.domain.service.AiService
@@ -44,23 +48,25 @@ class RegeneratePendingMessageUseCase @Inject constructor(
             ?: return Outcome.PendingNotFound
         val contact = contactRepository.getById(pending.contactId)
             ?: return Outcome.ContextNotFound
-        val event = eventRepository.getEventsBefore(Long.MAX_VALUE)
-            .firstOrNull { it.id == pending.eventId }
+        val event = eventRepository.getOccasionById(pending.eventId)
             ?: return Outcome.ContextNotFound
         val styleProfile = styleProfileRepository.getProfileOnce()
-        val previousMessages = messageRepository.getSentByContact(contact.id, 10)
-        val memoryNotes = memoryNoteRepository.getByContact(contact.id)
-        val giftHistory = giftHistoryRepository.getByContact(contact.id)
+        val generationHistory = messageRepository.getGenerationHistoryByContact(contact.id, 10)
+        val memoryNotes = memoryNoteRepository.getRecordsByContact(contact.id)
+        val giftHistory = giftHistoryRepository.getRecordsByContact(contact.id)
+        val promptContext = buildMessagePromptContext(
+            contact = contact.toMessagePromptContact(),
+            event = event,
+            styleProfile = styleProfile?.toStylePromptProfile(),
+            previousWishes = generationHistory.previousWishes,
+            memoryNotes = memoryNotes,
+            giftHistory = giftHistory,
+        )
 
         val variants = aiService.regenerateMessage(
             previousMessage = currentDraft.ifBlank { pending.selectedVariantText },
-            contact = contact,
-            event = event,
-            styleProfile = styleProfile,
-            previousMessages = previousMessages,
+            context = promptContext,
             feedbackInstruction = feedbackInstruction,
-            memoryNotes = memoryNotes,
-            giftHistory = giftHistory,
         )
         val regeneratedText = variants.get(variants.recommended)
         val shouldPreserveUserEdit = preserveUserEditedText && currentDraft.isNotBlank()
@@ -77,8 +83,8 @@ class RegeneratePendingMessageUseCase @Inject constructor(
             isUsingFallback = variants.isUsingFallback,
         )
         val channelSelection = AutoSendChannelSelector.selectRoute(
-            contact = contact,
-            previousMessages = previousMessages,
+            contact = contact.toDeliveryRouteProfile(),
+            routeHistory = generationHistory.routeHistory,
             channelBlackoutJson = preferencesRepository.getChannelBlackout(),
             senderEmail = preferencesRepository.getSenderEmail(),
             senderEmailPassword = preferencesRepository.getSenderEmailPassword(),

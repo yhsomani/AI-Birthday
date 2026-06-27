@@ -3,8 +3,10 @@ package com.example.ui.viewmodel
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.example.core.db.entities.ContactEntity
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.contact.ContactListItem
 import com.example.domain.repository.ContactRepository
 import com.example.domain.usecase.SyncContactsUseCase
 import io.mockk.every
@@ -57,10 +59,10 @@ class ContactListViewModelTest {
     @Test
     fun `init collects contacts and clears loading`() = runTest(testDispatcher) {
         val contacts = listOf(
-            ContactEntity(id = "c_1", name = "Alice"),
-            ContactEntity(id = "c_2", name = "Bob")
+            contactListItem(id = "c_1", displayName = "Alice"),
+            contactListItem(id = "c_2", displayName = "Bob")
         )
-        every { contactRepository.getAll() } returns flowOf(contacts)
+        every { contactRepository.getContactListItems() } returns flowOf(contacts)
 
         val viewModel = newViewModel()
         advanceUntilIdle()
@@ -71,7 +73,9 @@ class ContactListViewModelTest {
 
     @Test
     fun `refresh flips isRefreshing and settles back to false`() = runTest(testDispatcher) {
-        every { contactRepository.getAll() } returns flowOf(listOf(ContactEntity(id = "c_1", name = "Alice")))
+        every { contactRepository.getContactListItems() } returns flowOf(
+            listOf(contactListItem(id = "c_1", displayName = "Alice")),
+        )
 
         val viewModel = newViewModel()
         advanceUntilIdle()
@@ -85,11 +89,11 @@ class ContactListViewModelTest {
 
     @Test
     fun `search filter and sort are applied in viewmodel`() = runTest(testDispatcher) {
-        every { contactRepository.getAll() } returns flowOf(
+        every { contactRepository.getContactListItems() } returns flowOf(
             listOf(
-                ContactEntity(id = "c_1", name = "Alice", relationshipType = "FAMILY", healthScore = 90),
-                ContactEntity(id = "c_2", name = "Bob", relationshipType = "WORK", healthScore = 30),
-                ContactEntity(id = "c_3", name = "Cara", contactGroup = "Friends", healthScore = 55),
+                contactListItem(id = "c_1", displayName = "Alice", relationshipType = "FAMILY", healthScore = 90),
+                contactListItem(id = "c_2", displayName = "Bob", relationshipType = "WORK", healthScore = 30),
+                contactListItem(id = "c_3", displayName = "Cara", contactGroup = "Friends", healthScore = 55),
             )
         )
 
@@ -97,24 +101,24 @@ class ContactListViewModelTest {
         advanceUntilIdle()
 
         viewModel.selectFilter(ContactFilter.FRIENDS)
-        assertEquals(listOf("Cara"), viewModel.uiState.value.contacts.map { it.name })
+        assertEquals(listOf("Cara"), viewModel.uiState.value.contacts.map { it.displayName })
 
         viewModel.selectFilter(ContactFilter.ALL)
         viewModel.updateSearchQuery("bo")
-        assertEquals(listOf("Bob"), viewModel.uiState.value.contacts.map { it.name })
+        assertEquals(listOf("Bob"), viewModel.uiState.value.contacts.map { it.displayName })
 
         viewModel.updateSearchQuery("")
         viewModel.selectSort(ContactSort.HEALTH_ASC)
-        assertEquals(listOf("Bob", "Cara", "Alice"), viewModel.uiState.value.contacts.map { it.name })
+        assertEquals(listOf("Bob", "Cara", "Alice"), viewModel.uiState.value.contacts.map { it.displayName })
     }
 
     @Test
     fun `action filters target missing relationship channel low health and vip contacts`() = runTest(testDispatcher) {
-        every { contactRepository.getAll() } returns flowOf(
+        every { contactRepository.getContactListItems() } returns flowOf(
             listOf(
-                ContactEntity(
+                contactListItem(
                     id = "missing_relationship",
-                    name = "Unknown Riley",
+                    displayName = "Unknown Riley",
                     relationshipType = "UNKNOWN",
                     birthdayDay = 1,
                     birthdayMonth = 1,
@@ -122,19 +126,19 @@ class ContactListViewModelTest {
                     notesText = "Met at a conference",
                     healthScore = 80,
                 ),
-                ContactEntity(
+                contactListItem(
                     id = "missing_channel",
-                    name = "Email Missing",
+                    displayName = "Email Missing",
                     relationshipType = "FRIEND",
                     birthdayDay = 2,
                     birthdayMonth = 2,
-                    preferredChannel = MessageChannel.EMAIL.raw,
+                    preferredChannel = MessageChannel.EMAIL,
                     notesText = "Prefers email",
                     healthScore = 75,
                 ),
-                ContactEntity(
+                contactListItem(
                     id = "low_health",
-                    name = "Low Health",
+                    displayName = "Low Health",
                     relationshipType = "WORK",
                     birthdayDay = 3,
                     birthdayMonth = 3,
@@ -142,15 +146,15 @@ class ContactListViewModelTest {
                     notesText = "Former teammate",
                     healthScore = 32,
                 ),
-                ContactEntity(
+                contactListItem(
                     id = "vip",
-                    name = "Vip Maya",
+                    displayName = "Vip Maya",
                     relationshipType = "FAMILY",
                     birthdayDay = 4,
                     birthdayMonth = 4,
                     primaryPhone = "+15550004",
                     notesText = "Close family",
-                    automationMode = "VIP_APPROVE",
+                    automationMode = ApprovalMode.VIP_APPROVE,
                     healthScore = 92,
                 ),
             ),
@@ -160,47 +164,47 @@ class ContactListViewModelTest {
         advanceUntilIdle()
 
         viewModel.selectFilter(ContactFilter.MISSING_RELATIONSHIP)
-        assertEquals(listOf("Unknown Riley"), viewModel.uiState.value.contacts.map { it.name })
+        assertEquals(listOf("Unknown Riley"), viewModel.uiState.value.contacts.map { it.displayName })
 
         viewModel.selectFilter(ContactFilter.MISSING_CHANNEL)
-        assertEquals(listOf("Email Missing"), viewModel.uiState.value.contacts.map { it.name })
+        assertEquals(listOf("Email Missing"), viewModel.uiState.value.contacts.map { it.displayName })
 
         viewModel.selectFilter(ContactFilter.LOW_HEALTH)
-        assertEquals(listOf("Low Health"), viewModel.uiState.value.contacts.map { it.name })
+        assertEquals(listOf("Low Health"), viewModel.uiState.value.contacts.map { it.displayName })
 
         viewModel.selectFilter(ContactFilter.VIP)
-        assertEquals(listOf("Vip Maya"), viewModel.uiState.value.contacts.map { it.name })
+        assertEquals(listOf("Vip Maya"), viewModel.uiState.value.contacts.map { it.displayName })
     }
 
     @Test
     fun `contact quality state captures missing event channel context and ready contacts`() = runTest(testDispatcher) {
-        every { contactRepository.getAll() } returns flowOf(
+        every { contactRepository.getContactListItems() } returns flowOf(
             listOf(
-                ContactEntity(
+                contactListItem(
                     id = "ready",
-                    name = "Ready Contact",
+                    displayName = "Ready Contact",
                     birthdayDay = 10,
                     birthdayMonth = 4,
                     primaryPhone = "+15550001",
                     notesText = "College friend",
                 ),
-                ContactEntity(
+                contactListItem(
                     id = "missing_event",
-                    name = "Missing Event",
+                    displayName = "Missing Event",
                     primaryPhone = "+15550002",
                     notesText = "Works together",
                 ),
-                ContactEntity(
+                contactListItem(
                     id = "missing_channel",
-                    name = "Missing Channel",
+                    displayName = "Missing Channel",
                     birthdayDay = 12,
                     birthdayMonth = 5,
-                    preferredChannel = MessageChannel.EMAIL.raw,
+                    preferredChannel = MessageChannel.EMAIL,
                     notesText = "Prefers email",
                 ),
-                ContactEntity(
+                contactListItem(
                     id = "missing_context",
-                    name = "Missing Context",
+                    displayName = "Missing Context",
                     birthdayDay = 14,
                     birthdayMonth = 6,
                     primaryPhone = "+15550004",
@@ -226,6 +230,54 @@ class ContactListViewModelTest {
         assertEquals(ContactQualityStatus.MISSING_CONTEXT, quality.getValue("missing_context").status)
         assertFalse(quality.getValue("missing_context").hasPersonalizationContext)
     }
+
+    private fun contactListItem(
+        id: String,
+        displayName: String,
+        nickname: String? = null,
+        company: String? = null,
+        contactGroup: String? = null,
+        relationshipType: String = "UNKNOWN",
+        healthScore: Int = 80,
+        automationMode: ApprovalMode = ApprovalMode.UNKNOWN,
+        preferredChannel: MessageChannel = MessageChannel.UNKNOWN,
+        primaryPhone: String? = null,
+        secondaryPhone: String? = null,
+        primaryEmail: String? = null,
+        birthdayDay: Int? = null,
+        birthdayMonth: Int? = null,
+        anniversaryDay: Int? = null,
+        anniversaryMonth: Int? = null,
+        workStartDay: Int? = null,
+        workStartMonth: Int? = null,
+        notesText: String = "",
+        interestsJson: String = "[]",
+        sharedHistoryJson: String = "[]",
+        classificationConfidence: Double = 0.0,
+    ) = ContactListItem(
+        id = ContactId(id),
+        displayName = displayName,
+        nickname = nickname,
+        company = company,
+        contactGroup = contactGroup,
+        relationshipType = relationshipType,
+        healthScore = healthScore,
+        automationMode = automationMode,
+        preferredChannel = preferredChannel,
+        primaryPhone = primaryPhone,
+        secondaryPhone = secondaryPhone,
+        primaryEmail = primaryEmail,
+        birthdayDay = birthdayDay,
+        birthdayMonth = birthdayMonth,
+        anniversaryDay = anniversaryDay,
+        anniversaryMonth = anniversaryMonth,
+        workStartDay = workStartDay,
+        workStartMonth = workStartMonth,
+        notesText = notesText,
+        interestsJson = interestsJson,
+        sharedHistoryJson = sharedHistoryJson,
+        classificationConfidence = classificationConfidence,
+    )
 
     private fun newViewModel(): ContactListViewModel {
         return ContactListViewModel(

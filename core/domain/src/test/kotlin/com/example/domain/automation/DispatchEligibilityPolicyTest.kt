@@ -1,8 +1,12 @@
 package com.example.domain.automation
 
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.message.MessageDraft
 import java.util.Calendar
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -21,7 +25,7 @@ class DispatchEligibilityPolicyTest {
         )
 
         val decision = DispatchEligibilityPolicy.evaluate(
-            pending = pending,
+            draft = pending,
             approvalMode = ApprovalMode.FULLY_AUTO,
             nowMs = nowMs,
         )
@@ -40,7 +44,7 @@ class DispatchEligibilityPolicyTest {
         )
 
         val decision = DispatchEligibilityPolicy.evaluate(
-            pending = pending,
+            draft = pending,
             approvalMode = ApprovalMode.FULLY_AUTO,
             nowMs = nowMs,
         )
@@ -66,7 +70,7 @@ class DispatchEligibilityPolicyTest {
         )
 
         val decision = DispatchEligibilityPolicy.evaluate(
-            pending = pending,
+            draft = pending,
             approvalMode = ApprovalMode.FULLY_AUTO,
             nowMs = quietNowMs,
             quietHoursStart = 22,
@@ -91,7 +95,7 @@ class DispatchEligibilityPolicyTest {
         )
 
         val decision = DispatchEligibilityPolicy.evaluate(
-            pending = pending,
+            draft = pending,
             approvalMode = ApprovalMode.SMART_APPROVE,
             nowMs = nowMs,
         )
@@ -109,7 +113,7 @@ class DispatchEligibilityPolicyTest {
         )
 
         val decision = DispatchEligibilityPolicy.evaluate(
-            pending = pending,
+            draft = pending,
             approvalMode = ApprovalMode.SMART_APPROVE,
             nowMs = nowMs,
         )
@@ -126,7 +130,7 @@ class DispatchEligibilityPolicyTest {
         )
 
         val decision = DispatchEligibilityPolicy.evaluate(
-            pending = pending,
+            draft = pending,
             approvalMode = ApprovalMode.VIP_APPROVE,
             nowMs = nowMs,
         )
@@ -147,7 +151,7 @@ class DispatchEligibilityPolicyTest {
         )
 
         val decision = DispatchEligibilityPolicy.evaluate(
-            pending = pending,
+            draft = pending,
             approvalMode = ApprovalMode.ALWAYS_ASK,
             nowMs = nowMs,
         )
@@ -165,7 +169,7 @@ class DispatchEligibilityPolicyTest {
         )
 
         val decision = DispatchEligibilityPolicy.evaluate(
-            pending = pending,
+            draft = pending,
             approvalMode = ApprovalMode.FULLY_AUTO,
             nowMs = nowMs,
         )
@@ -178,21 +182,16 @@ class DispatchEligibilityPolicyTest {
         status: String,
         approvalMode: ApprovalMode,
         scheduledForMs: Long,
-    ) = PendingMessageEntity(
-        id = "msg_1",
-        contactId = "contact_1",
-        eventId = "event_1",
-        shortVariant = "Short",
-        standardVariant = "Standard",
-        longVariant = "Long",
-        formalVariant = "Formal",
-        funnyVariant = "Funny",
-        emotionalVariant = "Emotional",
-        selectedVariant = "standard",
-        selectedVariantText = "Standard",
-        channel = MessageChannel.SMS.raw,
+    ) = MessageDraft(
+        id = MessageDraftId("msg_1"),
+        contactId = ContactId("contact_1"),
+        occasionId = OccasionId("event_1"),
         scheduledForMs = scheduledForMs,
-        approvalMode = approvalMode.raw,
-        status = status,
+        approvalMode = approvalMode,
+        status = MessageStatus.fromRaw(status),
+        channel = MessageChannel.SMS,
+        scheduledYear = 2026,
+        qualityScore = 80,
+        isUsingFallback = false,
     )
 }

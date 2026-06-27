@@ -6,8 +6,12 @@ import android.content.Context
 import android.widget.RemoteViews
 import com.example.R
 import com.example.core.db.AppDatabase
-import com.example.domain.model.EventType
+import com.example.domain.contact.toHeader
+import com.example.domain.event.toOccasions
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.contact.ContactHeader
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.model.occasion.OccasionType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CoroutineScope
@@ -25,54 +29,40 @@ class BirthdayWidgetProvider : AppWidgetProvider() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val db = AppDatabase.getInstance(context)
-                val events = db.eventDao().getAll().first()
-                val contacts = db.contactDao().getAll().first()
+                val occasions = db.eventDao().getAll().first().toOccasions()
+                val contacts = db.contactDao().getAll().first().map { it.toHeader() }
                 val pendingApprovals = db.pendingMessageDao().getAllSync()
                     .count { MessageStatus.fromRaw(it.status) == MessageStatus.PENDING }
 
                 val today = Calendar.getInstance()
-                val todayDay = today.get(Calendar.DAY_OF_MONTH)
-                val todayMonth = today.get(Calendar.MONTH) + 1
-
-                val todayBirthdays = events.filter {
-                    EventType.fromRaw(it.type) == EventType.BIRTHDAY &&
-                        it.dayOfMonth == todayDay &&
-                        it.month == todayMonth
-                }
-                val contactNames = contacts.associate { it.id to it.name }
-                val nextEvents = events
-                    .filter { it.isActive }
-                    .sortedBy { it.nextOccurrenceMs }
-                    .take(3)
-                    .map { event ->
-                        val name = contactNames[event.contactId] ?: context.getString(R.string.widget_unknown_contact)
-                        val label = event.label ?: event.type.replace("_", " ")
-                        "$name: $label"
-                    }
+                val summary = buildBirthdayWidgetSummary(
+                    occasions = occasions,
+                    contacts = contacts,
+                    pendingApprovals = pendingApprovals,
+                    todayDay = today.get(Calendar.DAY_OF_MONTH),
+                    todayMonth = today.get(Calendar.MONTH) + 1,
+                    unknownContactLabel = context.getString(R.string.widget_unknown_contact),
+                )
 
                 for (appWidgetId in appWidgetIds) {
                     val views = RemoteViews(context.packageName, R.layout.widget_birthday)
-                    if (todayBirthdays.isEmpty()) {
+                    if (summary.todayBirthdayCount == 0) {
                         views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_no_birthdays_today))
                     } else {
-                        val names = todayBirthdays.mapNotNull { bday ->
-                            contactNames[bday.contactId] ?: context.getString(R.string.widget_unknown_contact)
-                        }.joinToString(", ")
-
                         views.setTextViewText(
                             R.id.widget_title,
-                            context.getString(R.string.widget_birthdays_today, todayBirthdays.size),
+                            context.getString(R.string.widget_birthdays_today, summary.todayBirthdayCount),
                         )
                     }
                     val subtitleParts = buildList {
-                        if (todayBirthdays.isNotEmpty()) {
-                            add(todayBirthdays.mapNotNull { contactNames[it.contactId] }.joinToString(", "))
+                        if (summary.todayBirthdayNames.isNotEmpty()) {
+                            add(summary.todayBirthdayNames.joinToString(", "))
                         }
-                        if (nextEvents.isNotEmpty()) {
-                            add(context.getString(R.string.widget_next_events, nextEvents.joinToString(" | ")))
+                        if (summary.nextEvents.isNotEmpty()) {
+                            add(context.getString(R.string.widget_next_events, summary.nextEvents.joinToString(" | ")))
                         }
-                        if (pendingApprovals > 0) {
-                            add(context.getString(R.string.widget_pending_approvals, pendingApprovals))
+                        if (summary.pendingApprovals > 0) {
+                            add(context.getString(R.string.widget_pending_approvals, summary.pendingApprovals))
                         }
                     }
                     views.setTextViewText(
@@ -90,4 +80,43 @@ class BirthdayWidgetProvider : AppWidgetProvider() {
             }
         }
     }
+}
+
+internal data class BirthdayWidgetSummary(
+    val todayBirthdayCount: Int,
+    val todayBirthdayNames: List<String>,
+    val nextEvents: List<String>,
+    val pendingApprovals: Int,
+)
+
+internal fun buildBirthdayWidgetSummary(
+    occasions: List<Occasion>,
+    contacts: List<ContactHeader>,
+    pendingApprovals: Int,
+    todayDay: Int,
+    todayMonth: Int,
+    unknownContactLabel: String,
+): BirthdayWidgetSummary {
+    val contactNames = contacts.associate { it.id to it.displayName }
+    val todayBirthdays = occasions.filter { occasion ->
+        occasion.type == OccasionType.BIRTHDAY &&
+            occasion.date.dayOfMonth == todayDay &&
+            occasion.date.month == todayMonth
+    }
+    val nextEvents = occasions
+        .filter { it.isActive }
+        .sortedBy { it.nextOccurrenceMs }
+        .take(3)
+        .map { occasion ->
+            val name = contactNames[occasion.contactId] ?: unknownContactLabel
+            val label = occasion.label ?: occasion.type.raw.replace("_", " ")
+            "$name: $label"
+        }
+
+    return BirthdayWidgetSummary(
+        todayBirthdayCount = todayBirthdays.size,
+        todayBirthdayNames = todayBirthdays.mapNotNull { contactNames[it.contactId] },
+        nextEvents = nextEvents,
+        pendingApprovals = pendingApprovals,
+    )
 }

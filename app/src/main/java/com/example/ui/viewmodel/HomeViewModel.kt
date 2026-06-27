@@ -6,9 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.core.auth.AuthManager
-import com.example.core.db.entities.EventEntity
 import com.example.core.resilience.StructuredLogger
-import com.example.domain.model.EventType
+import com.example.domain.model.contact.ContactAnalyticsSummary
+import com.example.domain.model.occasion.OccasionType
+import com.example.domain.model.occasion.UpcomingEventPreview
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.usecase.GetDashboardMetricsUseCase
@@ -140,15 +141,15 @@ class HomeViewModel @Inject constructor(
                         // Ignore sync failures during automatic launch
                     }
                 }
-                val events = eventRepository.getUpcoming(30)
-                val atRiskContacts = contactRepository.getBottomByHealthScore(3)
+                val events = eventRepository.getUpcomingPreviews(30)
+                val atRiskContacts = contactRepository.getBottomHealthSummaries(3)
                     .filter { it.healthScore < 50 }
-                val birthdayEvents = events.filter { EventType.fromRaw(it.type) == EventType.BIRTHDAY }
+                val birthdayEvents = events.filter { it.type == OccasionType.BIRTHDAY }
                     .sortedBy { it.daysUntil }
                 val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
                 val birthdays = birthdayEvents.map { event ->
                     UpcomingBirthday(
-                        name = event.label ?: event.contactId,
+                        name = event.label ?: event.contactId.value,
                         date = dateFormat.format(Date(event.nextOccurrenceMs)),
                     )
                 }
@@ -206,22 +207,22 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun buildPlannerItems(
-        atRiskContacts: List<com.example.core.db.entities.ContactEntity>,
-        upcomingEvents: List<EventEntity>,
+        atRiskContacts: List<ContactAnalyticsSummary>,
+        upcomingEvents: List<UpcomingEventPreview>,
     ): List<RelationshipPlannerItem> {
         val items = mutableListOf<RelationshipPlannerItem>()
         atRiskContacts.forEach { contact ->
             items += RelationshipPlannerItem(
-                title = string(R.string.home_next_action_reconnect_title, contact.name),
+                title = string(R.string.home_next_action_reconnect_title, contact.displayName),
                 detail = string(R.string.home_planner_reconnect_detail, contact.healthScore),
-                actionTarget = HomeActionTarget.ContactDetail(contact.id),
+                actionTarget = HomeActionTarget.ContactDetail(contact.id.value),
             )
         }
         upcomingEvents.take(2).forEach { event ->
             items += RelationshipPlannerItem(
                 title = event.label ?: event.type.toDisplayLabel(),
                 detail = string(R.string.home_planner_upcoming_detail, event.daysUntil),
-                actionTarget = HomeActionTarget.ContactDetail(event.contactId),
+                actionTarget = HomeActionTarget.ContactDetail(event.contactId.value),
             )
         }
         return items.take(5)
@@ -249,7 +250,7 @@ class HomeViewModel @Inject constructor(
         hasAiAccess: Boolean,
         pendingCount: Int,
         backupPrompt: BackupFreshnessPrompt?,
-        atRiskContacts: List<com.example.core.db.entities.ContactEntity>,
+        atRiskContacts: List<ContactAnalyticsSummary>,
     ): List<HomeNextAction> {
         val rankedActions = mutableListOf<Pair<Int, HomeNextAction>>()
         val contactSetupAction = when {
@@ -302,8 +303,8 @@ class HomeViewModel @Inject constructor(
         atRiskContacts.firstOrNull()?.let { contact ->
             rankedActions += 50 to HomeNextAction(
                 kind = HomeNextActionKind.RECONNECT_CONTACT,
-                actionTarget = HomeActionTarget.ContactDetail(contact.id),
-                contactName = contact.name,
+                actionTarget = HomeActionTarget.ContactDetail(contact.id.value),
+                contactName = contact.displayName,
                 healthScore = contact.healthScore,
             )
         }
@@ -362,13 +363,13 @@ class HomeViewModel @Inject constructor(
 
     private fun readLongPreference(read: () -> Long): Long = readPreference(0L, read)
 
-    private fun String.toDisplayLabel(): String {
-        return when (EventType.fromRaw(this)) {
-            EventType.BIRTHDAY -> string(R.string.event_type_birthday)
-            EventType.ANNIVERSARY -> string(R.string.event_type_anniversary)
-            EventType.WORK_ANNIVERSARY -> string(R.string.event_type_work_anniversary)
-            EventType.CUSTOM -> string(R.string.event_type_custom)
-            else -> replace("_", " ").lowercase().replaceFirstChar { it.titlecase() }
+    private fun OccasionType.toDisplayLabel(): String {
+        return when (this) {
+            OccasionType.BIRTHDAY -> string(R.string.event_type_birthday)
+            OccasionType.ANNIVERSARY -> string(R.string.event_type_anniversary)
+            OccasionType.WORK_ANNIVERSARY -> string(R.string.event_type_work_anniversary)
+            OccasionType.CUSTOM -> string(R.string.event_type_custom)
+            else -> raw.replace("_", " ").lowercase().replaceFirstChar { it.titlecase() }
         }
     }
 

@@ -20,13 +20,23 @@ import androidx.room.PrimaryKey
             value = ["contactId", "sentAtMs"],
             orders = [Index.Order.ASC, Index.Order.DESC],
             name = "idx_sent_messages_contactId_sentAtMs"
+        ),
+        Index(value = ["eventId"], name = "idx_sent_messages_eventId"),
+        Index(
+            value = ["contactId", "occasionType", "sentAtMs"],
+            orders = [Index.Order.ASC, Index.Order.ASC, Index.Order.DESC],
+            name = "idx_sent_messages_contactId_occasionType_sentAtMs"
         )
     ]
 )
 data class SentMessageEntity(
     @PrimaryKey val id: String,
     val contactId: String?,
+    // Compatibility alias retained for older UI/test call sites. New writes keep it equal to occasionType.
     val eventType: String,
+    val eventId: String? = null,
+    val occasionType: String = eventType,
+    val occasionLabel: String? = null,
     val eventYear: Int,
     val messageText: String,
     val channel: String,

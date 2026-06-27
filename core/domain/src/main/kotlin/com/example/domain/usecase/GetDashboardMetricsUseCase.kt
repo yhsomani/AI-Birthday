@@ -8,7 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Computes dashboard metrics: health score (average), pending message count, upcoming events.
+ * Computes dashboard metrics: health score (average), pending-review message count, upcoming events.
  * Returns a snapshot of the current dashboard state.
  */
 @Singleton
@@ -18,16 +18,20 @@ class GetDashboardMetricsUseCase @Inject constructor(
     private val messageRepository: MessageRepository
 ) {
     suspend operator fun invoke(): DashboardMetrics {
-        val contacts = contactRepository.getAllSync()
-        val pending = messageRepository.getAllPending().first()
-        val events = eventRepository.getUpcoming(30)
-        val healthScore = if (contacts.isEmpty()) 0 else contacts.map { it.healthScore }.average().toInt()
+        val contactProfiles = contactRepository.getHealthProfiles()
+        val pendingCount = messageRepository.countPending().first()
+        val upcomingEventsCount = eventRepository.countUpcoming(30)
+        val healthScore = if (contactProfiles.isEmpty()) {
+            0
+        } else {
+            contactProfiles.map { it.currentHealthScore }.average().toInt()
+        }
         val sentCount = messageRepository.countAllSent().first()
         return DashboardMetrics(
             healthScore = healthScore,
-            pendingCount = pending.size,
-            upcomingEventsCount = events.size,
-            contactCount = contacts.size,
+            pendingCount = pendingCount,
+            upcomingEventsCount = upcomingEventsCount,
+            contactCount = contactProfiles.size,
             sentCount = sentCount
         )
     }

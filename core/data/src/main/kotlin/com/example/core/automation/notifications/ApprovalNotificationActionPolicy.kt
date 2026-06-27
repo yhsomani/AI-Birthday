@@ -5,6 +5,7 @@ import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchDecision
 import com.example.domain.automation.DispatchEligibilityPolicy
 import com.example.domain.automation.DispatchExpireReason
+import com.example.domain.message.toMessageDraft
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
 
@@ -15,7 +16,7 @@ internal object ApprovalNotificationActionPolicy {
     ): ApprovalNotificationAction {
         val approvalMode = ApprovalMode.fromRaw(pending.approvalMode)
         return when (val currentDecision = DispatchEligibilityPolicy.evaluate(
-            pending = pending,
+            draft = pending.toMessageDraft(),
             approvalMode = approvalMode,
             nowMs = nowMs,
         )) {
@@ -34,7 +35,7 @@ internal object ApprovalNotificationActionPolicy {
     ): ApprovalNotificationAction {
         val approved = pending.copy(status = MessageStatus.APPROVED.raw)
         return when (val approvedDecision = DispatchEligibilityPolicy.evaluate(
-            pending = approved,
+            draft = approved.toMessageDraft(),
             approvalMode = approvalMode,
             nowMs = nowMs,
         )) {

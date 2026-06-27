@@ -3,11 +3,20 @@ package com.example.ui.viewmodel
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.R
-import com.example.core.db.entities.ContactEntity
 import com.example.core.gemini.GeminiClient
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.DispatchAttemptId
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.contact.ContactAutomationReadinessProfile
+import com.example.domain.model.dispatch.DispatchAttempt
+import com.example.domain.model.dispatch.DispatchAttemptCreator
+import com.example.domain.model.dispatch.DispatchAttemptResult
+import com.example.domain.model.dispatch.DispatchEligibilityRecord
 import com.example.domain.repository.ContactRepository
+import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.SyncContactsUseCase
 import com.example.domain.usecase.TestSendUseCase
@@ -22,6 +31,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.flow.flowOf
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -59,6 +69,9 @@ class AutomationSetupViewModelTest {
     @RelaxedMockK
     private lateinit var testSendUseCase: TestSendUseCase
 
+    @RelaxedMockK
+    private lateinit var dispatchAttemptRepository: DispatchAttemptRepository
+
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var context: Context
 
@@ -71,9 +84,12 @@ class AutomationSetupViewModelTest {
         every { securePrefs.getSenderEmail() } returns ""
         every { securePrefs.getSenderEmailPassword() } returns ""
         every { securePrefs.isAiWishGenerationEnabled() } returns true
-        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns emptyList()
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { testSendUseCase(any()) } returns TestSendUseCase.Outcome.MissingEmailSetup
+        every { dispatchAttemptRepository.countFailureRecoveryQueue() } returns flowOf(0)
+        every { dispatchAttemptRepository.countDeadLettered() } returns flowOf(0)
+        coEvery { dispatchAttemptRepository.getFailureRecoveryQueue(any()) } returns emptyList()
     }
 
     @After
@@ -149,15 +165,13 @@ class AutomationSetupViewModelTest {
 
     @Test
     fun `buildChecksForTesting adds generic message risk diagnostic from personalization context`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getAllSync() } returns listOf(
-            ContactEntity(
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            readinessProfile(
                 id = "ready",
-                name = "Ready Contact",
                 notesText = "College friend",
             ),
-            ContactEntity(
+            readinessProfile(
                 id = "generic",
-                name = "Generic Contact",
             ),
         )
         val viewModel = newViewModel()
@@ -176,22 +190,19 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `buildChecksForTesting counts email preferred contacts through MessageChannel parser`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getAllSync() } returns listOf(
-            ContactEntity(
+    fun `buildChecksForTesting counts email preferred contacts from readiness profiles`() = runTest(testDispatcher) {
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            readinessProfile(
                 id = "email",
-                name = "Email Contact",
-                preferredChannel = " ${MessageChannel.EMAIL.raw.lowercase()} ",
+                preferredChannel = MessageChannel.EMAIL,
             ),
-            ContactEntity(
+            readinessProfile(
                 id = "sms",
-                name = "SMS Contact",
-                preferredChannel = MessageChannel.SMS.raw,
+                preferredChannel = MessageChannel.SMS,
             ),
-            ContactEntity(
+            readinessProfile(
                 id = "legacy",
-                name = "Legacy Contact",
-                preferredChannel = "telegram",
+                preferredChannel = MessageChannel.UNKNOWN,
             ),
         )
         val viewModel = newViewModel()
@@ -206,6 +217,50 @@ class AutomationSetupViewModelTest {
             context.getString(R.string.automation_setup_email_missing_for_contacts, 1),
             emailCheck.detail,
         )
+    }
+
+    @Test
+    fun `buildChecksForTesting surfaces persisted dispatch recovery rows`() = runTest(testDispatcher) {
+        every { dispatchAttemptRepository.countFailureRecoveryQueue() } returns flowOf(2)
+        every { dispatchAttemptRepository.countDeadLettered() } returns flowOf(1)
+        coEvery { dispatchAttemptRepository.getFailureRecoveryQueue(1) } returns listOf(
+            DispatchAttempt(
+                id = DispatchAttemptId("attempt_1"),
+                messageDraftId = MessageDraftId("draft_1"),
+                contactId = null,
+                occasionId = null,
+                channel = MessageChannel.SMS,
+                routeRank = 0,
+                eligibilityDecision = DispatchEligibilityRecord.SEND_NOW,
+                blockOrDeferReason = null,
+                requestedAtMs = 1_700_000_000_000,
+                attemptedAtMs = 1_700_000_000_100,
+                resolvedAtMs = 1_700_000_000_200,
+                result = DispatchAttemptResult.FAILED_FINAL,
+                deliveryStatus = MessageDeliveryStatus.FAILED,
+                providerMessageId = null,
+                errorType = "NO_DELIVERY_ROUTE",
+                errorCode = null,
+                redactedErrorMessage = "All automatic delivery routes failed.",
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = 1_700_000_000_200,
+                createdBy = DispatchAttemptCreator.WORKER,
+            ),
+        )
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val recoveryCheck = viewModel.buildChecksForTesting()
+            .first { it.title == context.getString(R.string.automation_setup_check_dead_letter) }
+
+        assertEquals(ReadinessStatus.WARNING, recoveryCheck.status)
+        assertEquals(AiDoctorAction.OPEN_ACTIVITY_HISTORY, recoveryCheck.action)
+        assertEquals(context.getString(R.string.automation_setup_action_view_activity), recoveryCheck.actionLabel)
+        assertTrue(recoveryCheck.detail.contains("2 persisted dispatch recovery records"))
+        assertTrue(recoveryCheck.detail.contains("1 are dead-lettered"))
+        assertTrue(recoveryCheck.detail.contains("SMS FAILED_FINAL"))
+        assertTrue(recoveryCheck.detail.contains("draft_1"))
     }
 
     @Test
@@ -314,6 +369,27 @@ class AutomationSetupViewModelTest {
             contactRepository = contactRepository,
             styleProfileRepository = styleProfileRepository,
             testSendUseCase = testSendUseCase,
+            dispatchAttemptRepository = dispatchAttemptRepository,
+        )
+    }
+
+    private fun readinessProfile(
+        id: String,
+        preferredChannel: MessageChannel = MessageChannel.SMS,
+        nickname: String? = null,
+        notesText: String = "",
+        interestsJson: String = "[]",
+        sharedHistoryJson: String = "[]",
+        classificationConfidence: Double = 0.0,
+    ): ContactAutomationReadinessProfile {
+        return ContactAutomationReadinessProfile(
+            id = ContactId(id),
+            preferredChannel = preferredChannel,
+            nickname = nickname,
+            notesText = notesText,
+            interestsJson = interestsJson,
+            sharedHistoryJson = sharedHistoryJson,
+            classificationConfidence = classificationConfidence,
         )
     }
 }

@@ -48,34 +48,35 @@ class MessageGenerationWorker @AssistedInject constructor(
             // while exact dispatch still happens at each contact's scheduled send time.
             val lookaheadEndMs = System.currentTimeMillis() + MESSAGE_GENERATION_LOOKAHEAD_MS
 
-            val upcomingEvents = eventRepository.getEventsBefore(lookaheadEndMs)
+            val upcomingEvents = eventRepository.getOccasionsBefore(lookaheadEndMs)
             StructuredLogger.i(TAG, "Found ${upcomingEvents.size} upcoming events for generation")
 
             coroutineScope {
                 val deferredList = upcomingEvents.map { event ->
                     async {
+                        val eventId = event.id.value
                         try {
                             val outcome = generateMessageUseCase(
                                 GenerateMessageUseCase.Request(
-                                    eventId = event.id,
+                                    eventId = eventId,
                                     regenerateFailedOccurrence = true
                                 )
                             )
                             when (outcome) {
                                 GenerateMessageUseCase.GenerationOutcome.AiDisabled -> {
-                                    StructuredLogger.i(TAG, "AI wish generation disabled while processing event ${event.id}; skipping")
+                                    StructuredLogger.i(TAG, "AI wish generation disabled while processing event $eventId; skipping")
                                 }
                                 GenerateMessageUseCase.GenerationOutcome.AlreadyExists -> {
-                                    StructuredLogger.i(TAG, "Message already queued or processed for event ${event.id}; skipping")
+                                    StructuredLogger.i(TAG, "Message already queued or processed for event $eventId; skipping")
                                 }
                                 GenerateMessageUseCase.GenerationOutcome.ContactNotFound -> {
-                                    StructuredLogger.w(TAG, "Contact missing for event ${event.id}; skipping")
+                                    StructuredLogger.w(TAG, "Contact missing for event $eventId; skipping")
                                 }
                                 GenerateMessageUseCase.GenerationOutcome.EventNotFound -> {
-                                    StructuredLogger.w(TAG, "Event ${event.id} no longer exists; skipping")
+                                    StructuredLogger.w(TAG, "Event $eventId no longer exists; skipping")
                                 }
                                 is GenerateMessageUseCase.GenerationOutcome.Generated -> {
-                                    StructuredLogger.i(TAG, "Generated message for event ${event.id}", mapOf(
+                                    StructuredLogger.i(TAG, "Generated message for event $eventId", mapOf(
                                         "pendingId" to outcome.pendingId,
                                         "approvalMode" to outcome.approvalMode.raw,
                                         "retries" to outcome.retries.toString(),
@@ -83,7 +84,7 @@ class MessageGenerationWorker @AssistedInject constructor(
                                 }
                             }
                         } catch (e: Exception) {
-                            StructuredLogger.w(TAG, "Failed to generate message for event ${event.id}", e)
+                            StructuredLogger.w(TAG, "Failed to generate message for event $eventId", e)
                         }
                     }
                 }

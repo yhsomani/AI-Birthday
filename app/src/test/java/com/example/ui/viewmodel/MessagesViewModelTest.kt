@@ -3,25 +3,29 @@ package com.example.ui.viewmodel
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.contact.ContactMessageContext
+import com.example.domain.model.message.PendingMessageListItem
+import com.example.domain.model.occasion.EventListItem
+import com.example.domain.model.occasion.OccasionType
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
-import com.example.domain.model.MessageStatus
-import com.example.domain.service.SchedulerService
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
 import com.example.domain.usecase.RevokeApprovalUseCase
+import com.example.domain.usecase.RetryFailedMessageUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,7 +51,7 @@ class MessagesViewModelTest {
     private val approvePendingMessageUseCase: ApprovePendingMessageUseCase = mockk(relaxed = true)
     private val rejectPendingMessageUseCase: RejectPendingMessageUseCase = mockk(relaxed = true)
     private val revokeApprovalUseCase: RevokeApprovalUseCase = mockk(relaxed = true)
-    private val schedulerService: SchedulerService = mockk(relaxed = true)
+    private val retryFailedMessageUseCase: RetryFailedMessageUseCase = mockk(relaxed = true)
     private val activityLogRepository: ActivityLogRepository = mockk(relaxed = true)
     private val securePrefs: SecurePrefs = mockk(relaxed = true)
     private val dispatcher = StandardTestDispatcher()
@@ -57,10 +61,10 @@ class MessagesViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         context = ApplicationProvider.getApplicationContext()
-        every { messageRepository.getAllPending() } returns MutableStateFlow(emptyList())
-        every { messageRepository.getAllSent() } returns MutableStateFlow(emptyList())
-        every { contactRepository.getAll() } returns MutableStateFlow(emptyList())
-        every { eventRepository.getAll() } returns MutableStateFlow(emptyList())
+        every { messageRepository.getPendingListItems() } returns MutableStateFlow(emptyList())
+        every { messageRepository.getSentListItems() } returns MutableStateFlow(emptyList())
+        every { contactRepository.getMessageContexts() } returns MutableStateFlow(emptyList())
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(emptyList())
         every { securePrefs.getChannelBlackout() } returns "[]"
         every { securePrefs.getSenderEmail() } returns "sender@example.com"
         every { securePrefs.getSenderEmailPassword() } returns "app-password"
@@ -71,22 +75,18 @@ class MessagesViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun failedPending(id: String) = PendingMessageEntity(
-        id = id,
-        contactId = "c_1",
-        eventId = "e_1",
-        shortVariant = "short",
-        standardVariant = "standard",
-        longVariant = "long",
-        formalVariant = "formal",
-        funnyVariant = "funny",
-        emotionalVariant = "emotional",
-        selectedVariant = "standard",
+    private fun failedPending(id: String) = PendingMessageListItem(
+        id = MessageDraftId(id),
+        contactId = ContactId("c_1"),
+        occasionId = OccasionId("e_1"),
         selectedVariantText = "standard",
-        channel = MessageChannel.SMS.raw,
+        standardVariant = "standard",
+        channel = MessageChannel.SMS,
         scheduledForMs = 1_700_000_000_000L,
-        approvalMode = "MANUAL",
-        status = MessageStatus.FAILED.raw,
+        approvalMode = ApprovalMode.UNKNOWN,
+        status = MessageStatus.FAILED,
+        editedByUser = false,
+        userEditedText = null,
     )
 
     private fun pending(
@@ -96,28 +96,61 @@ class MessagesViewModelTest {
         channel: String,
         scheduledForMs: Long,
         status: String = MessageStatus.PENDING.raw,
-    ) = PendingMessageEntity(
-        id = id,
-        contactId = contactId,
-        eventId = eventId,
-        shortVariant = "short",
-        standardVariant = "standard $contactId",
-        longVariant = "long",
-        formalVariant = "formal",
-        funnyVariant = "funny",
-        emotionalVariant = "emotional",
-        selectedVariant = "standard",
+    ) = PendingMessageListItem(
+        id = MessageDraftId(id),
+        contactId = ContactId(contactId),
+        occasionId = OccasionId(eventId),
         selectedVariantText = "standard $contactId",
-        channel = channel,
+        standardVariant = "standard $contactId",
+        channel = MessageChannel.fromRaw(channel),
         scheduledForMs = scheduledForMs,
-        approvalMode = "MANUAL",
-        status = status,
+        approvalMode = ApprovalMode.UNKNOWN,
+        status = MessageStatus.fromRaw(status),
+        editedByUser = false,
+        userEditedText = null,
+    )
+
+    private fun contact(
+        id: String,
+        name: String,
+        primaryPhone: String? = null,
+        primaryEmail: String? = null,
+    ) = ContactMessageContext(
+        id = ContactId(id),
+        displayName = name,
+        avatarUrl = null,
+        primaryPhone = primaryPhone,
+        primaryEmail = primaryEmail,
+    )
+
+    private fun event(
+        id: String,
+        contactId: String,
+        type: OccasionType,
+        nextOccurrenceMs: Long,
+    ) = EventListItem(
+        id = OccasionId(id),
+        contactId = ContactId(contactId),
+        type = type,
+        label = null,
+        dayOfMonth = 1,
+        month = 1,
+        year = null,
+        nextOccurrenceMs = nextOccurrenceMs,
+        isActive = true,
+        notifyDaysBefore = 1,
+        source = "CONTACTS",
+        confidenceScore = 100,
+        isVerified = true,
     )
 
     @Test
-    fun `bulkRetrySelected approves failed messages and schedules by pending id`() = runTest(dispatcher) {
-        val failed = failedPending("pm_1")
-        coEvery { messageRepository.getPendingById("pm_1") } returns failed
+    fun `bulkRetrySelected queues selected failed messages through retry use case`() = runTest(dispatcher) {
+        coEvery { retryFailedMessageUseCase("pm_1") } returns RetryFailedMessageUseCase.RetryOutcome.RetryQueued(
+            pendingMessageId = "pm_1",
+            retryCount = 1,
+            previousAttempt = null,
+        )
 
         val viewModel = newViewModel()
         advanceUntilIdle()
@@ -126,52 +159,65 @@ class MessagesViewModelTest {
         viewModel.bulkRetrySelected()
         advanceUntilIdle()
 
-        coVerify {
-            messageRepository.insertPending(match {
-                it.id == "pm_1" && it.status == MessageStatus.APPROVED.raw
-            })
-        }
-        verify { schedulerService.scheduleExactSend("pm_1") }
+        coVerify { retryFailedMessageUseCase("pm_1") }
         assertEquals(emptySet<String>(), viewModel.uiState.value.selectedMessageIds)
+    }
+
+    @Test
+    fun `retryMessage surfaces error when retry use case rejects row`() = runTest(dispatcher) {
+        coEvery { retryFailedMessageUseCase("pm_1") } returns RetryFailedMessageUseCase.RetryOutcome.NotFailed(
+            pendingMessageId = "pm_1",
+            status = MessageStatus.APPROVED,
+        )
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.retryMessage("pm_1")
+        advanceUntilIdle()
+
+        coVerify { retryFailedMessageUseCase("pm_1") }
+        assertEquals(context.getString(com.example.R.string.messages_error_retry), viewModel.uiState.value.error)
+        assertEquals(null, viewModel.uiState.value.retryingMessageId)
     }
 
     @Test
     fun `search channel filter and sort are applied in viewmodel`() = runTest(dispatcher) {
         val now = System.currentTimeMillis()
-        every { messageRepository.getAllPending() } returns MutableStateFlow(
+        every { messageRepository.getPendingListItems() } returns MutableStateFlow(
             listOf(
                 pending("pm_1", "c_1", "e_1", MessageChannel.SMS.raw, now + 2 * 86_400_000L),
                 pending("pm_2", "c_2", "e_2", MessageChannel.EMAIL.raw, now + 3 * 86_400_000L),
             )
         )
-        every { contactRepository.getAll() } returns MutableStateFlow(
+        every { contactRepository.getMessageContexts() } returns MutableStateFlow(
             listOf(
-                ContactEntity(id = "c_1", name = "Alice", primaryPhone = "+919999900000"),
-                ContactEntity(id = "c_2", name = "Bob", primaryEmail = "bob@example.com"),
+                contact("c_1", "Alice", primaryPhone = "+919999900000"),
+                contact("c_2", "Bob", primaryEmail = "bob@example.com"),
             )
         )
-        every { eventRepository.getAll() } returns MutableStateFlow(
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(
             listOf(
-                EventEntity(id = "e_1", contactId = "c_1", type = "BIRTHDAY", dayOfMonth = 1, month = 1, nextOccurrenceMs = now),
-                EventEntity(id = "e_2", contactId = "c_2", type = "ANNIVERSARY", dayOfMonth = 2, month = 1, nextOccurrenceMs = now),
+                event("e_1", "c_1", OccasionType.BIRTHDAY, now),
+                event("e_2", "c_2", OccasionType.ANNIVERSARY, now),
             )
         )
 
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        assertEquals(listOf("pm_1", "pm_2"), viewModel.uiState.value.needsReviewMessages.map { it.entity.id })
+        assertEquals(listOf("pm_1", "pm_2"), viewModel.uiState.value.needsReviewMessages.map { it.id })
 
         viewModel.selectChannelFilter(MessageChannelFilter.EMAIL)
-        assertEquals(listOf("pm_2"), viewModel.uiState.value.needsReviewMessages.map { it.entity.id })
+        assertEquals(listOf("pm_2"), viewModel.uiState.value.needsReviewMessages.map { it.id })
 
         viewModel.selectChannelFilter(MessageChannelFilter.ALL)
         viewModel.updateSearchQuery("alice")
-        assertEquals(listOf("pm_1"), viewModel.uiState.value.needsReviewMessages.map { it.entity.id })
+        assertEquals(listOf("pm_1"), viewModel.uiState.value.needsReviewMessages.map { it.id })
 
         viewModel.updateSearchQuery("")
         viewModel.selectSort(MessageSort.SCHEDULED_DESC)
-        assertEquals(listOf("pm_2", "pm_1"), viewModel.uiState.value.needsReviewMessages.map { it.entity.id })
+        assertEquals(listOf("pm_2", "pm_1"), viewModel.uiState.value.needsReviewMessages.map { it.id })
     }
 
     @Test
@@ -180,25 +226,25 @@ class MessagesViewModelTest {
         every { securePrefs.getChannelBlackout() } returns "[\"WHATSAPP\"]"
         every { securePrefs.getSenderEmail() } returns ""
         every { securePrefs.getSenderEmailPassword() } returns ""
-        every { messageRepository.getAllPending() } returns MutableStateFlow(
+        every { messageRepository.getPendingListItems() } returns MutableStateFlow(
             listOf(
                 pending("pm_sms", "c_sms", "e_sms", MessageChannel.SMS.raw, now + 2 * 86_400_000L),
                 pending("pm_email", "c_email", "e_email", MessageChannel.EMAIL.raw, now + 3 * 86_400_000L),
                 pending("pm_whatsapp", "c_whatsapp", "e_whatsapp", MessageChannel.WHATSAPP.raw, now + 4 * 86_400_000L),
             )
         )
-        every { contactRepository.getAll() } returns MutableStateFlow(
+        every { contactRepository.getMessageContexts() } returns MutableStateFlow(
             listOf(
-                ContactEntity(id = "c_sms", name = "No Phone"),
-                ContactEntity(id = "c_email", name = "No Gmail", primaryEmail = "no-gmail@example.com"),
-                ContactEntity(id = "c_whatsapp", name = "Blocked WA", primaryPhone = "+919999900000"),
+                contact("c_sms", "No Phone"),
+                contact("c_email", "No Gmail", primaryEmail = "no-gmail@example.com"),
+                contact("c_whatsapp", "Blocked WA", primaryPhone = "+919999900000"),
             )
         )
-        every { eventRepository.getAll() } returns MutableStateFlow(
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(
             listOf(
-                EventEntity(id = "e_sms", contactId = "c_sms", type = "BIRTHDAY", dayOfMonth = 1, month = 1, nextOccurrenceMs = now),
-                EventEntity(id = "e_email", contactId = "c_email", type = "BIRTHDAY", dayOfMonth = 1, month = 1, nextOccurrenceMs = now),
-                EventEntity(id = "e_whatsapp", contactId = "c_whatsapp", type = "BIRTHDAY", dayOfMonth = 1, month = 1, nextOccurrenceMs = now),
+                event("e_sms", "c_sms", OccasionType.BIRTHDAY, now),
+                event("e_email", "c_email", OccasionType.BIRTHDAY, now),
+                event("e_whatsapp", "c_whatsapp", OccasionType.BIRTHDAY, now),
             )
         )
 
@@ -206,7 +252,7 @@ class MessagesViewModelTest {
         advanceUntilIdle()
 
         val readinessById = viewModel.uiState.value.blockedMessages.associate {
-            it.entity.id to it.readiness
+            it.id to it.readiness
         }
         assertEquals(MessageReadiness.MISSING_PHONE, readinessById["pm_sms"])
         assertEquals(MessageReadiness.EMAIL_SETUP_MISSING, readinessById["pm_email"])
@@ -216,7 +262,7 @@ class MessagesViewModelTest {
     @Test
     fun `messages are split into task-state buckets`() = runTest(dispatcher) {
         val now = System.currentTimeMillis()
-        every { messageRepository.getAllPending() } returns MutableStateFlow(
+        every { messageRepository.getPendingListItems() } returns MutableStateFlow(
             listOf(
                 pending("needs_review", "c_ready", "e_ready", MessageChannel.SMS.raw, now + 2 * 86_400_000L),
                 pending(
@@ -231,28 +277,29 @@ class MessagesViewModelTest {
                 failedPending("failed"),
             )
         )
-        every { contactRepository.getAll() } returns MutableStateFlow(
+        every { contactRepository.getMessageContexts() } returns MutableStateFlow(
             listOf(
-                ContactEntity(id = "c_ready", name = "Ready", primaryPhone = "+919999900000"),
-                ContactEntity(id = "c_blocked", name = "Blocked"),
+                contact("c_ready", "Ready", primaryPhone = "+919999900000"),
+                contact("c_blocked", "Blocked"),
+                contact("c_1", "Failed", primaryPhone = "+919999900000"),
             )
         )
-        every { eventRepository.getAll() } returns MutableStateFlow(
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(
             listOf(
-                EventEntity(id = "e_ready", contactId = "c_ready", type = "BIRTHDAY", dayOfMonth = 1, month = 1, nextOccurrenceMs = now),
-                EventEntity(id = "e_scheduled", contactId = "c_ready", type = "BIRTHDAY", dayOfMonth = 1, month = 1, nextOccurrenceMs = now),
-                EventEntity(id = "e_blocked", contactId = "c_blocked", type = "BIRTHDAY", dayOfMonth = 1, month = 1, nextOccurrenceMs = now),
-                EventEntity(id = "e_1", contactId = "c_1", type = "BIRTHDAY", dayOfMonth = 1, month = 1, nextOccurrenceMs = now),
+                event("e_ready", "c_ready", OccasionType.BIRTHDAY, now),
+                event("e_scheduled", "c_ready", OccasionType.BIRTHDAY, now),
+                event("e_blocked", "c_blocked", OccasionType.BIRTHDAY, now),
+                event("e_1", "c_1", OccasionType.BIRTHDAY, now),
             )
         )
 
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        assertEquals(listOf("needs_review"), viewModel.uiState.value.needsReviewMessages.map { it.entity.id })
-        assertEquals(listOf("scheduled"), viewModel.uiState.value.scheduledMessages.map { it.entity.id })
-        assertEquals(listOf("blocked"), viewModel.uiState.value.blockedMessages.map { it.entity.id })
-        assertEquals(listOf("failed"), viewModel.uiState.value.failedMessages.map { it.entity.id })
+        assertEquals(listOf("needs_review"), viewModel.uiState.value.needsReviewMessages.map { it.id })
+        assertEquals(listOf("scheduled"), viewModel.uiState.value.scheduledMessages.map { it.id })
+        assertEquals(listOf("blocked"), viewModel.uiState.value.blockedMessages.map { it.id })
+        assertEquals(listOf("failed"), viewModel.uiState.value.failedMessages.map { it.id })
     }
 
     private fun newViewModel(): MessagesViewModel {
@@ -264,7 +311,7 @@ class MessagesViewModelTest {
             approvePendingMessageUseCase = approvePendingMessageUseCase,
             rejectPendingMessageUseCase = rejectPendingMessageUseCase,
             revokeApprovalUseCase = revokeApprovalUseCase,
-            schedulerService = schedulerService,
+            retryFailedMessageUseCase = retryFailedMessageUseCase,
             activityLogRepository = activityLogRepository,
             securePrefs = securePrefs,
         )

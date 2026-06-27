@@ -1,33 +1,33 @@
 package com.example.domain.automation
 
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.model.ApprovalMode
+import com.example.domain.model.message.MessageDraft
 import com.example.domain.model.MessageStatus
 
 object DispatchEligibilityPolicy {
     const val DEFAULT_APPROVAL_WINDOW_MS: Long = 2 * 60 * 60 * 1000L
 
     fun evaluate(
-        pending: PendingMessageEntity,
-        approvalMode: ApprovalMode,
+        draft: MessageDraft,
+        approvalMode: ApprovalMode = draft.approvalMode,
         nowMs: Long = System.currentTimeMillis(),
         approvalWindowMs: Long = DEFAULT_APPROVAL_WINDOW_MS,
         quietHoursStart: Int? = null,
         quietHoursEnd: Int? = null,
         blackoutDatesJson: String? = null,
     ): DispatchDecision {
-        val status = MessageStatus.fromRaw(pending.status)
+        val status = draft.status
 
         return when (status) {
             MessageStatus.APPROVED -> approvedDecision(
-                pending = pending,
+                draft = draft,
                 nowMs = nowMs,
                 quietHoursStart = quietHoursStart,
                 quietHoursEnd = quietHoursEnd,
                 blackoutDatesJson = blackoutDatesJson,
             )
             MessageStatus.PENDING -> pendingDecision(
-                pending = pending,
+                draft = draft,
                 approvalMode = approvalMode,
                 nowMs = nowMs,
                 approvalWindowMs = approvalWindowMs,
@@ -45,15 +45,15 @@ object DispatchEligibilityPolicy {
     }
 
     private fun approvedDecision(
-        pending: PendingMessageEntity,
+        draft: MessageDraft,
         nowMs: Long,
         quietHoursStart: Int?,
         quietHoursEnd: Int?,
         blackoutDatesJson: String?,
     ): DispatchDecision {
-        return if (nowMs < pending.scheduledForMs) {
+        return if (nowMs < draft.scheduledForMs) {
             DispatchDecision.DeferUntil(
-                epochMs = pending.scheduledForMs,
+                epochMs = draft.scheduledForMs,
                 reason = DispatchDeferReason.BEFORE_SCHEDULED_TIME,
             )
         } else {
@@ -67,7 +67,7 @@ object DispatchEligibilityPolicy {
     }
 
     private fun pendingDecision(
-        pending: PendingMessageEntity,
+        draft: MessageDraft,
         approvalMode: ApprovalMode,
         nowMs: Long,
         approvalWindowMs: Long,
@@ -77,14 +77,14 @@ object DispatchEligibilityPolicy {
     ): DispatchDecision {
         return when (approvalMode) {
             ApprovalMode.FULLY_AUTO -> approvedDecision(
-                pending = pending,
+                draft = draft,
                 nowMs = nowMs,
                 quietHoursStart = quietHoursStart,
                 quietHoursEnd = quietHoursEnd,
                 blackoutDatesJson = blackoutDatesJson,
             )
             ApprovalMode.SMART_APPROVE -> {
-                if (nowMs < pending.scheduledForMs) {
+                if (nowMs < draft.scheduledForMs) {
                     DispatchDecision.NeedsApproval(approvalMode)
                 } else {
                     sendNowOrDeferForAllowedWindow(
@@ -96,7 +96,7 @@ object DispatchEligibilityPolicy {
                 }
             }
             ApprovalMode.VIP_APPROVE -> {
-                val approvalDeadlineMs = pending.scheduledForMs + approvalWindowMs
+                val approvalDeadlineMs = draft.scheduledForMs + approvalWindowMs
                 if (nowMs >= approvalDeadlineMs) {
                     DispatchDecision.Expire(DispatchExpireReason.APPROVAL_WINDOW_ELAPSED)
                 } else {

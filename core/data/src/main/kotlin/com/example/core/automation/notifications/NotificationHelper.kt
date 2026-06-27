@@ -10,9 +10,10 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.core.data.R
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
 import com.example.core.gemini.MessageVariants
+import com.example.domain.model.notification.ApprovalNotificationRequest
+import com.example.domain.model.notification.EventReminderNotificationRequest
+import com.example.domain.navigation.RelateDeepLinks
 
 object NotificationHelper {
     const val APPROVAL = "approval_required"
@@ -94,36 +95,40 @@ object NotificationHelper {
     @SuppressLint("MissingPermission")
     fun showApprovalNotification(
         context: Context,
-        contact: ContactEntity,
-        event: EventEntity,
+        request: ApprovalNotificationRequest,
         variants: MessageVariants,
-        messageId: String
     ) {
+        val contactId = request.contactId.value
+        val eventId = request.eventId.value
+        val messageId = request.messageId.value
         val approveIntent = PendingIntent.getBroadcast(
-            context, event.id.hashCode() + 1,
+            context, eventId.hashCode() + 1,
             Intent(context, ApprovalReceiver::class.java).apply {
                 action = "ACTION_APPROVE"
                 putExtra("action", "ACTION_APPROVE")
-                putExtra("event_id", event.id)
+                putExtra("event_id", eventId)
                 putExtra("message_id", messageId)
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
         val rejectIntent = PendingIntent.getBroadcast(
-            context, event.id.hashCode() + 2,
+            context, eventId.hashCode() + 2,
             Intent(context, ApprovalReceiver::class.java).apply {
                 action = "ACTION_REJECT"
                 putExtra("action", "ACTION_REJECT")
-                putExtra("event_id", event.id)
+                putExtra("event_id", eventId)
                 putExtra("message_id", messageId)
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
         val editIntent = PendingIntent.getActivity(
-            context, event.id.hashCode() + 3,
-            Intent(Intent.ACTION_VIEW, android.net.Uri.parse("relateai://wish/${contact.id}/$messageId")).apply {
+            context, eventId.hashCode() + 3,
+            Intent(
+                Intent.ACTION_VIEW,
+                android.net.Uri.parse(RelateDeepLinks.Wish.uri(contactId, messageId)),
+            ).apply {
                 setClassName(context, "com.example.MainActivity")
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -131,7 +136,7 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, APPROVAL)
             .setSmallIcon(android.R.drawable.ic_dialog_email)
-            .setContentTitle(context.getString(R.string.notification_approval_title, contact.name))
+            .setContentTitle(context.getString(R.string.notification_approval_title, request.contactDisplayName))
             .setContentText(variants.standard)
             .setStyle(NotificationCompat.BigTextStyle().bigText(variants.standard))
             .addAction(android.R.drawable.ic_input_add, context.getString(R.string.notification_action_approve), approveIntent)
@@ -205,12 +210,16 @@ object NotificationHelper {
     @SuppressLint("MissingPermission")
     fun showEventReminderNotification(
         context: Context,
-        contact: ContactEntity,
-        event: EventEntity
+        request: EventReminderNotificationRequest,
     ) {
+        val contactId = request.contactId.value
+        val eventId = request.eventId.value
         val appIntent = PendingIntent.getActivity(
-            context, event.id.hashCode() + 10,
-            Intent(Intent.ACTION_VIEW, android.net.Uri.parse("relateai://contact/${contact.id}")).apply {
+            context, eventId.hashCode() + 10,
+            Intent(
+                Intent.ACTION_VIEW,
+                android.net.Uri.parse(RelateDeepLinks.Contact.uri(contactId)),
+            ).apply {
                 setClassName(context, "com.example.MainActivity")
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -218,12 +227,12 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, EVENT_REMINDERS)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(context.getString(R.string.notification_event_reminder_title, contact.name))
+            .setContentTitle(context.getString(R.string.notification_event_reminder_title, request.contactDisplayName))
             .setContentText(
                 context.getString(
                     R.string.notification_event_reminder_text,
-                    contact.name,
-                    event.type.lowercase().replace('_', ' '),
+                    request.contactDisplayName,
+                    request.eventType.lowercase().replace('_', ' '),
                 )
             )
             .setContentIntent(appIntent)
@@ -232,7 +241,7 @@ object NotificationHelper {
             .build()
 
         try {
-            NotificationManagerCompat.from(context).notify(event.id.hashCode() + 10, notification)
+            NotificationManagerCompat.from(context).notify(eventId.hashCode() + 10, notification)
         } catch (e: SecurityException) {
             // Permission missing
         }
@@ -242,7 +251,10 @@ object NotificationHelper {
     fun showSystemAlert(context: Context, title: String, message: String) {
         val appIntent = PendingIntent.getActivity(
             context, 888,
-            Intent(Intent.ACTION_VIEW, android.net.Uri.parse("relateai://backup-restore")).apply {
+            Intent(
+                Intent.ACTION_VIEW,
+                android.net.Uri.parse(RelateDeepLinks.BackupRestore.uri),
+            ).apply {
                 setClassName(context, "com.example.MainActivity")
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT

@@ -1,10 +1,14 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.model.occasion.OccasionDate
+import com.example.domain.model.occasion.OccasionType
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.GiftHistoryRepository
@@ -76,6 +80,40 @@ class RegeneratePendingMessageUseCaseTest {
         qualityScore = 100,
     )
 
+    private fun occasion(
+        id: String = "e_1",
+        contactId: String = "c_1",
+        type: String = OccasionType.BIRTHDAY.raw,
+        label: String? = "Birthday",
+        dayOfMonth: Int = 4,
+        month: Int = 9,
+        year: Int? = null,
+        nextOccurrenceMs: Long = 1_700_000_000_000L,
+        isActive: Boolean = true,
+        notifyDaysBefore: Int = 1,
+        source: String = "MANUAL",
+        confidenceScore: Int = 100,
+        isVerified: Boolean = true,
+    ): Occasion {
+        return Occasion(
+            id = OccasionId(id),
+            contactId = ContactId(contactId),
+            type = OccasionType.fromRaw(type),
+            label = label,
+            date = OccasionDate(
+                dayOfMonth = dayOfMonth,
+                month = month,
+                year = year,
+            ),
+            nextOccurrenceMs = nextOccurrenceMs,
+            isActive = isActive,
+            notifyDaysBefore = notifyDaysBefore,
+            source = source,
+            confidenceScore = confidenceScore,
+            isVerified = isVerified,
+        )
+    }
+
     @Test
     fun `invoke returns AiDisabled before loading context when setting is off`() = runTest {
         every { preferencesRepository.isAiWishGenerationEnabled() } returns false
@@ -90,7 +128,7 @@ class RegeneratePendingMessageUseCaseTest {
     fun `invoke regenerates variants and saves same pending message`() = runTest {
         val pending = pending()
         val contact = ContactEntity(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
-        val event = EventEntity(
+        val event = occasion(
             id = "e_1",
             contactId = "c_1",
             type = "BIRTHDAY",
@@ -118,13 +156,13 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
         coEvery { contactRepository.getById("c_1") } returns contact
-        coEvery { eventRepository.getEventsBefore(Long.MAX_VALUE) } returns listOf(event)
+        coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
-        coEvery { messageRepository.getSentByContact("c_1", 10) } returns emptyList()
-        coEvery { memoryNoteRepository.getByContact("c_1") } returns emptyList()
-        coEvery { giftHistoryRepository.getByContact("c_1") } returns emptyList()
+        coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
+        coEvery { memoryNoteRepository.getRecordsByContact("c_1") } returns emptyList()
+        coEvery { giftHistoryRepository.getRecordsByContact("c_1") } returns emptyList()
         coEvery {
-            aiService.regenerateMessage("current draft", contact, event, null, emptyList(), null, emptyList(), emptyList())
+            aiService.regenerateMessage("current draft", any(), null)
         } returns variants
 
         val result = useCase("pm_1", "current draft")
@@ -148,7 +186,7 @@ class RegeneratePendingMessageUseCaseTest {
     fun `invoke forwards feedback instruction to AI regeneration`() = runTest {
         val pending = pending()
         val contact = ContactEntity(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
-        val event = EventEntity(
+        val event = occasion(
             id = "e_1",
             contactId = "c_1",
             type = "BIRTHDAY",
@@ -175,37 +213,19 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
         coEvery { contactRepository.getById("c_1") } returns contact
-        coEvery { eventRepository.getEventsBefore(Long.MAX_VALUE) } returns listOf(event)
+        coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
-        coEvery { messageRepository.getSentByContact("c_1", 10) } returns emptyList()
-        coEvery { memoryNoteRepository.getByContact("c_1") } returns emptyList()
-        coEvery { giftHistoryRepository.getByContact("c_1") } returns emptyList()
+        coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
+        coEvery { memoryNoteRepository.getRecordsByContact("c_1") } returns emptyList()
+        coEvery { giftHistoryRepository.getRecordsByContact("c_1") } returns emptyList()
         coEvery {
-            aiService.regenerateMessage(
-                "current draft",
-                contact,
-                event,
-                null,
-                emptyList(),
-                "Make it warmer",
-                emptyList(),
-                emptyList(),
-            )
+            aiService.regenerateMessage("current draft", any(), "Make it warmer")
         } returns variants
 
         useCase("pm_1", "current draft", "Make it warmer")
 
         coVerify {
-            aiService.regenerateMessage(
-                "current draft",
-                contact,
-                event,
-                null,
-                emptyList(),
-                "Make it warmer",
-                emptyList(),
-                emptyList(),
-            )
+            aiService.regenerateMessage("current draft", any(), "Make it warmer")
         }
     }
 
@@ -218,7 +238,7 @@ class RegeneratePendingMessageUseCaseTest {
             primaryPhone = "+15551234567",
             automationMode = "FULLY_AUTO",
         )
-        val event = EventEntity(
+        val event = occasion(
             id = "e_1",
             contactId = "c_1",
             type = "BIRTHDAY",
@@ -246,13 +266,13 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
         coEvery { contactRepository.getById("c_1") } returns contact
-        coEvery { eventRepository.getEventsBefore(Long.MAX_VALUE) } returns listOf(event)
+        coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
-        coEvery { messageRepository.getSentByContact("c_1", 10) } returns emptyList()
-        coEvery { memoryNoteRepository.getByContact("c_1") } returns emptyList()
-        coEvery { giftHistoryRepository.getByContact("c_1") } returns emptyList()
+        coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
+        coEvery { memoryNoteRepository.getRecordsByContact("c_1") } returns emptyList()
+        coEvery { giftHistoryRepository.getRecordsByContact("c_1") } returns emptyList()
         coEvery {
-            aiService.regenerateMessage("current draft", contact, event, null, emptyList(), null, emptyList(), emptyList())
+            aiService.regenerateMessage("current draft", any(), null)
         } returns variants
 
         useCase("pm_1", "current draft")
@@ -274,7 +294,7 @@ class RegeneratePendingMessageUseCaseTest {
             automationMode = "FULLY_AUTO",
             preferredChannel = MessageChannel.SMS.raw,
         )
-        val event = EventEntity(
+        val event = occasion(
             id = "e_1",
             contactId = "c_1",
             type = "BIRTHDAY",
@@ -302,13 +322,13 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
         coEvery { contactRepository.getById("c_1") } returns contact
-        coEvery { eventRepository.getEventsBefore(Long.MAX_VALUE) } returns listOf(event)
+        coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
-        coEvery { messageRepository.getSentByContact("c_1", 10) } returns emptyList()
-        coEvery { memoryNoteRepository.getByContact("c_1") } returns emptyList()
-        coEvery { giftHistoryRepository.getByContact("c_1") } returns emptyList()
+        coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
+        coEvery { memoryNoteRepository.getRecordsByContact("c_1") } returns emptyList()
+        coEvery { giftHistoryRepository.getRecordsByContact("c_1") } returns emptyList()
         coEvery {
-            aiService.regenerateMessage("current draft", contact, event, null, emptyList(), null, emptyList(), emptyList())
+            aiService.regenerateMessage("current draft", any(), null)
         } returns variants
 
         useCase("pm_1", "current draft")
@@ -324,7 +344,7 @@ class RegeneratePendingMessageUseCaseTest {
     fun `invoke clears stale user edited text by default`() = runTest {
         val pending = pending(editedByUser = true, userEditedText = "stale edited draft")
         val contact = ContactEntity(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
-        val event = EventEntity(
+        val event = occasion(
             id = "e_1",
             contactId = "c_1",
             type = "BIRTHDAY",
@@ -352,13 +372,13 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
         coEvery { contactRepository.getById("c_1") } returns contact
-        coEvery { eventRepository.getEventsBefore(Long.MAX_VALUE) } returns listOf(event)
+        coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
-        coEvery { messageRepository.getSentByContact("c_1", 10) } returns emptyList()
-        coEvery { memoryNoteRepository.getByContact("c_1") } returns emptyList()
-        coEvery { giftHistoryRepository.getByContact("c_1") } returns emptyList()
+        coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
+        coEvery { memoryNoteRepository.getRecordsByContact("c_1") } returns emptyList()
+        coEvery { giftHistoryRepository.getRecordsByContact("c_1") } returns emptyList()
         coEvery {
-            aiService.regenerateMessage("stale edited draft", contact, event, null, emptyList(), null, emptyList(), emptyList())
+            aiService.regenerateMessage("stale edited draft", any(), null)
         } returns variants
 
         useCase("pm_1", "stale edited draft")
@@ -373,7 +393,7 @@ class RegeneratePendingMessageUseCaseTest {
     fun `invoke preserves user edited text only when explicitly requested`() = runTest {
         val pending = pending(editedByUser = true, userEditedText = "keep this edit")
         val contact = ContactEntity(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
-        val event = EventEntity(
+        val event = occasion(
             id = "e_1",
             contactId = "c_1",
             type = "BIRTHDAY",
@@ -401,13 +421,13 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
         coEvery { contactRepository.getById("c_1") } returns contact
-        coEvery { eventRepository.getEventsBefore(Long.MAX_VALUE) } returns listOf(event)
+        coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
-        coEvery { messageRepository.getSentByContact("c_1", 10) } returns emptyList()
-        coEvery { memoryNoteRepository.getByContact("c_1") } returns emptyList()
-        coEvery { giftHistoryRepository.getByContact("c_1") } returns emptyList()
+        coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
+        coEvery { memoryNoteRepository.getRecordsByContact("c_1") } returns emptyList()
+        coEvery { giftHistoryRepository.getRecordsByContact("c_1") } returns emptyList()
         coEvery {
-            aiService.regenerateMessage("keep this edit", contact, event, null, emptyList(), null, emptyList(), emptyList())
+            aiService.regenerateMessage("keep this edit", any(), null)
         } returns variants
 
         useCase("pm_1", "keep this edit", preserveUserEditedText = true)
@@ -422,7 +442,7 @@ class RegeneratePendingMessageUseCaseTest {
     fun `invoke preserves approved status only when explicitly requested`() = runTest {
         val pending = pending(approvalMode = "SMART_APPROVE", status = "APPROVED")
         val contact = ContactEntity(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
-        val event = EventEntity(
+        val event = occasion(
             id = "e_1",
             contactId = "c_1",
             type = "BIRTHDAY",
@@ -450,13 +470,13 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
         coEvery { contactRepository.getById("c_1") } returns contact
-        coEvery { eventRepository.getEventsBefore(Long.MAX_VALUE) } returns listOf(event)
+        coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
-        coEvery { messageRepository.getSentByContact("c_1", 10) } returns emptyList()
-        coEvery { memoryNoteRepository.getByContact("c_1") } returns emptyList()
-        coEvery { giftHistoryRepository.getByContact("c_1") } returns emptyList()
+        coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
+        coEvery { memoryNoteRepository.getRecordsByContact("c_1") } returns emptyList()
+        coEvery { giftHistoryRepository.getRecordsByContact("c_1") } returns emptyList()
         coEvery {
-            aiService.regenerateMessage("approved draft", contact, event, null, emptyList(), null, emptyList(), emptyList())
+            aiService.regenerateMessage("approved draft", any(), null)
         } returns variants
 
         useCase("pm_1", "approved draft", preserveApprovedStatus = true)

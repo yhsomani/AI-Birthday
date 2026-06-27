@@ -1,8 +1,8 @@
 package com.example.domain.automation
 
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.contact.ContactAutomationProfile
+import com.example.domain.model.message.MessageDraft
 import java.util.Locale
 
 object RevivalCadencePolicy {
@@ -16,15 +16,15 @@ object RevivalCadencePolicy {
     fun eventId(contactId: String): String = "REVIVAL_$contactId"
 
     fun evaluate(
-        contact: ContactEntity,
-        existingSameYearRevival: PendingMessageEntity?,
+        contact: ContactAutomationProfile,
+        existingSameYearRevival: MessageDraft?,
         nowMs: Long,
     ): Decision {
         if (contact.skipAutoWish) {
             return Decision(false, "skip_auto_wish", cadenceDays(contact))
         }
 
-        val existingStatus = MessageStatus.fromRaw(existingSameYearRevival?.status)
+        val existingStatus = existingSameYearRevival?.status ?: MessageStatus.UNKNOWN
         if (existingStatus in blockingStatuses) {
             return Decision(false, "existing_same_year_revival", cadenceDays(contact))
         }
@@ -41,7 +41,7 @@ object RevivalCadencePolicy {
         return Decision(true, "eligible", cadenceDays)
     }
 
-    fun cadenceDays(contact: ContactEntity): Int {
+    fun cadenceDays(contact: ContactAutomationProfile): Int {
         val relationshipDays = when (contact.relationshipType.trim().uppercase(Locale.US)) {
             "FAMILY", "BEST_FRIEND", "CLOSE_FRIEND", "PARTNER" -> 30
             "FRIEND", "RELATIVE", "MENTOR", "ALUMNI" -> 45

@@ -6,16 +6,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.core.db.entities.ActivityLogEntity
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.PendingMessageEntity
-import com.example.core.db.entities.SentMessageEntity
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.domain.model.ActivityLogType
-import com.example.domain.model.EventType
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.contact.ContactMessageContext
+import com.example.domain.model.message.PendingMessageListItem
+import com.example.domain.model.message.SentMessageListItem
+import com.example.domain.model.occasion.OccasionType
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
@@ -23,7 +24,7 @@ import com.example.domain.repository.MessageRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
 import com.example.domain.usecase.RevokeApprovalUseCase
-import com.example.domain.service.SchedulerService
+import com.example.domain.usecase.RetryFailedMessageUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,18 +61,61 @@ enum class MessageReadiness {
 }
 
 data class PendingMessageItem(
-    val entity: PendingMessageEntity,
+    val message: PendingMessageListItem,
     val contactName: String,
     val contactAvatarUrl: String? = null,
-    val eventType: String = EventType.BIRTHDAY.raw,
+    val eventType: String = OccasionType.BIRTHDAY.raw,
     val readiness: MessageReadiness = MessageReadiness.READY_FOR_REVIEW,
-)
+) {
+    val id: String
+        get() = message.id.value
+
+    val contactId: String
+        get() = message.contactId.value
+
+    val scheduledForMs: Long
+        get() = message.scheduledForMs
+
+    val channel: MessageChannel
+        get() = message.channel
+
+    val approvalMode: ApprovalMode
+        get() = message.approvalMode
+
+    val selectedVariantText: String
+        get() = message.selectedVariantText
+
+    val standardVariant: String
+        get() = message.standardVariant
+
+    val reviewPreviewText: String
+        get() = if (message.editedByUser) {
+            message.userEditedText ?: message.selectedVariantText
+        } else {
+            message.selectedVariantText
+        }
+
+    val messageText: String
+        get() = message.selectedVariantText.ifBlank { message.standardVariant }
+}
 
 data class SentMessageItem(
-    val entity: SentMessageEntity,
+    val message: SentMessageListItem,
     val contactName: String,
     val contactAvatarUrl: String? = null,
-)
+) {
+    val id: String
+        get() = message.id.value
+
+    val channel: MessageChannel
+        get() = message.channel
+
+    val sentAtMs: Long
+        get() = message.sentAtMs
+
+    val messageText: String
+        get() = message.messageText
+}
 
 data class MessagesUiState(
     val allNeedsReviewMessages: List<PendingMessageItem> = emptyList(),
@@ -112,7 +156,7 @@ class MessagesViewModel @Inject constructor(
     private val approvePendingMessageUseCase: ApprovePendingMessageUseCase,
     private val rejectPendingMessageUseCase: RejectPendingMessageUseCase,
     private val revokeApprovalUseCase: RevokeApprovalUseCase,
-    private val schedulerService: SchedulerService,
+    private val retryFailedMessageUseCase: RetryFailedMessageUseCase,
     private val activityLogRepository: ActivityLogRepository,
     private val securePrefs: SecurePrefs,
 ) : ViewModel() {
@@ -134,13 +178,13 @@ class MessagesViewModel @Inject constructor(
         collectJob = viewModelScope.launch {
             try {
                 combine(
-                    messageRepository.getAllPending(),
-                    messageRepository.getAllSent(),
-                    contactRepository.getAll(),
-                    eventRepository.getAll(),
+                    messageRepository.getPendingListItems(),
+                    messageRepository.getSentListItems(),
+                    contactRepository.getMessageContexts(),
+                    eventRepository.getEventListItems(),
                 ) { pending, sent, contacts, events ->
-                    val contactMap = contacts.associateBy { it.id }
-                    val eventMap = events.associateBy { it.id }
+                    val contactMap = contacts.associateBy { it.id.value }
+                    val eventMap = events.associateBy { it.id.value }
 
                     val needsReviewItems = mutableListOf<PendingMessageItem>()
                     val scheduledItems = mutableListOf<PendingMessageItem>()
@@ -148,21 +192,19 @@ class MessagesViewModel @Inject constructor(
                     val failedItems = mutableListOf<PendingMessageItem>()
 
                     pending.forEach { msg ->
-                        val contact = contactMap[msg.contactId]
-                        val event = eventMap[msg.eventId]
-                        val status = MessageStatus.fromRaw(msg.status)
+                        val contact = contactMap[msg.contactId.value]
+                        val event = eventMap[msg.occasionId.value]
                         val item = PendingMessageItem(
-                            entity = msg,
-                            contactName = contact?.name ?: msg.contactId,
-                            contactAvatarUrl = contact?.profilePhotoUri,
-                            eventType = event?.type ?: EventType.BIRTHDAY.raw,
+                            message = msg,
+                            contactName = contact?.displayName ?: msg.contactId.value,
+                            contactAvatarUrl = contact?.avatarUrl,
+                            eventType = event?.type?.raw ?: OccasionType.BIRTHDAY.raw,
                             readiness = msg.readinessFor(
                                 contact = contact,
-                                status = status,
                             ),
                         )
 
-                        when (status) {
+                        when (msg.status) {
                             MessageStatus.FAILED -> failedItems.add(item)
                             MessageStatus.APPROVED,
                             MessageStatus.DISPATCHING -> {
@@ -189,11 +231,13 @@ class MessagesViewModel @Inject constructor(
                     }
 
                     val sentItems = sent.map { s ->
-                        val contact = contactMap[s.contactId]
+                        val contact = s.contactId?.value?.let { contactMap[it] }
                         SentMessageItem(
-                            entity = s,
-                            contactName = contact?.name ?: s.contactId ?: string(R.string.messages_deleted_contact),
-                            contactAvatarUrl = contact?.profilePhotoUri,
+                            message = s,
+                            contactName = contact?.displayName
+                                ?: s.contactId?.value
+                                ?: string(R.string.messages_deleted_contact),
+                            contactAvatarUrl = contact?.avatarUrl,
                         )
                     }
 
@@ -267,22 +311,23 @@ class MessagesViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(retryingMessageId = messageId)
             try {
-                val pending = messageRepository.getPendingById(messageId)
-                if (pending != null) {
-                    messageRepository.insertPending(
-                        pending.copy(
-                            status = MessageStatus.APPROVED.raw,
-                            scheduledForMs = System.currentTimeMillis(),
+                when (retryFailedMessageUseCase(messageId)) {
+                    is RetryFailedMessageUseCase.RetryOutcome.RetryQueued -> {
+                        recordMessageActivity(
+                            title = string(R.string.message_activity_retried_title),
+                            detail = string(R.string.message_activity_retried_detail),
+                            messageId = messageId,
                         )
-                    )
-                    schedulerService.scheduleExactSend(messageId)
-                    recordMessageActivity(
-                        title = string(R.string.message_activity_retried_title),
-                        detail = string(R.string.message_activity_retried_detail),
-                        messageId = messageId,
-                    )
+                        _uiState.value = _uiState.value.copy(retryingMessageId = null)
+                    }
+                    RetryFailedMessageUseCase.RetryOutcome.PendingNotFound,
+                    is RetryFailedMessageUseCase.RetryOutcome.NotFailed -> {
+                        _uiState.value = _uiState.value.copy(
+                            retryingMessageId = null,
+                            error = string(R.string.messages_error_retry),
+                        )
+                    }
                 }
-                _uiState.value = _uiState.value.copy(retryingMessageId = null)
             } catch (e: Exception) {
                 StructuredLogger.e(TAG, "Message retry failed", e, extras = mapOf("messageId" to messageId))
                 _uiState.value = _uiState.value.copy(
@@ -347,21 +392,16 @@ class MessagesViewModel @Inject constructor(
         if (ids.isEmpty()) return
         viewModelScope.launch {
             try {
-                ids.forEach { id ->
-                    val pending = messageRepository.getPendingById(id)
-                    if (pending != null) {
-                        messageRepository.insertPending(
-                            pending.copy(
-                                status = MessageStatus.APPROVED.raw,
-                                scheduledForMs = System.currentTimeMillis(),
-                            )
-                        )
-                        schedulerService.scheduleExactSend(id)
-                    }
+                val retriedCount = ids.count { id ->
+                    retryFailedMessageUseCase(id) is RetryFailedMessageUseCase.RetryOutcome.RetryQueued
+                }
+                if (retriedCount == 0) {
+                    _uiState.value = _uiState.value.copy(error = string(R.string.messages_error_bulk_retry))
+                    return@launch
                 }
                 recordMessageActivity(
                     title = string(R.string.message_activity_bulk_retried_title),
-                    detail = string(R.string.message_activity_bulk_retried_detail, ids.size),
+                    detail = string(R.string.message_activity_bulk_retried_detail, retriedCount),
                     messageId = null,
                 )
                 _uiState.value = _uiState.value.copy(selectedMessageIds = emptySet())
@@ -455,13 +495,13 @@ class MessagesViewModel @Inject constructor(
         channelFilter: MessageChannelFilter,
     ): List<PendingMessageItem> {
         return filter { item ->
-            channelFilter.matches(item.entity.channel) &&
+            channelFilter.matches(item.channel) &&
                 (query.isBlank() ||
                     item.contactName.contains(query, ignoreCase = true) ||
                     item.eventType.contains(query, ignoreCase = true) ||
-                    item.entity.channel.contains(query, ignoreCase = true) ||
-                    item.entity.selectedVariantText.contains(query, ignoreCase = true) ||
-                    item.entity.standardVariant.contains(query, ignoreCase = true))
+                    item.channel.raw.contains(query, ignoreCase = true) ||
+                    item.selectedVariantText.contains(query, ignoreCase = true) ||
+                    item.standardVariant.contains(query, ignoreCase = true))
         }
     }
 
@@ -470,54 +510,56 @@ class MessagesViewModel @Inject constructor(
         channelFilter: MessageChannelFilter,
     ): List<SentMessageItem> {
         return filter { item ->
-            channelFilter.matches(item.entity.channel) &&
+            channelFilter.matches(item.channel) &&
                 (query.isBlank() ||
                     item.contactName.contains(query, ignoreCase = true) ||
-                    item.entity.eventType.contains(query, ignoreCase = true) ||
-                    item.entity.channel.contains(query, ignoreCase = true) ||
-                    item.entity.deliveryStatus.contains(query, ignoreCase = true) ||
-                    item.entity.messageText.contains(query, ignoreCase = true))
+                    item.message.occasionType.contains(query, ignoreCase = true) ||
+                    item.channel.raw.contains(query, ignoreCase = true) ||
+                    item.message.deliveryStatus.raw.contains(query, ignoreCase = true) ||
+                    item.messageText.contains(query, ignoreCase = true))
         }
     }
 
     private fun List<PendingMessageItem>.sortPending(sort: MessageSort): List<PendingMessageItem> {
         return when (sort) {
-            MessageSort.SCHEDULED_ASC -> sortedBy { it.entity.scheduledForMs }
-            MessageSort.SCHEDULED_DESC -> sortedByDescending { it.entity.scheduledForMs }
+            MessageSort.SCHEDULED_ASC -> sortedBy { it.scheduledForMs }
+            MessageSort.SCHEDULED_DESC -> sortedByDescending { it.scheduledForMs }
             MessageSort.CONTACT_ASC -> sortedWith(compareBy<PendingMessageItem> { it.contactName.lowercase() }
-                .thenBy { it.entity.scheduledForMs })
+                .thenBy { it.scheduledForMs })
         }
     }
 
     private fun List<SentMessageItem>.sortSent(sort: MessageSort): List<SentMessageItem> {
         return when (sort) {
-            MessageSort.SCHEDULED_ASC -> sortedBy { it.entity.sentAtMs }
-            MessageSort.SCHEDULED_DESC -> sortedByDescending { it.entity.sentAtMs }
+            MessageSort.SCHEDULED_ASC -> sortedBy { it.sentAtMs }
+            MessageSort.SCHEDULED_DESC -> sortedByDescending { it.sentAtMs }
             MessageSort.CONTACT_ASC -> sortedWith(compareBy<SentMessageItem> { it.contactName.lowercase() }
-                .thenByDescending { it.entity.sentAtMs })
+                .thenByDescending { it.sentAtMs })
         }
     }
 
     private fun MessageChannelFilter.matches(channel: String): Boolean {
+        return matches(MessageChannel.fromRaw(channel))
+    }
+
+    private fun MessageChannelFilter.matches(channel: MessageChannel): Boolean {
         return when (this) {
             MessageChannelFilter.ALL -> true
-            MessageChannelFilter.SMS -> MessageChannel.fromRaw(channel) == MessageChannel.SMS
-            MessageChannelFilter.WHATSAPP -> MessageChannel.fromRaw(channel) == MessageChannel.WHATSAPP
-            MessageChannelFilter.EMAIL -> MessageChannel.fromRaw(channel) == MessageChannel.EMAIL
+            MessageChannelFilter.SMS -> channel == MessageChannel.SMS
+            MessageChannelFilter.WHATSAPP -> channel == MessageChannel.WHATSAPP
+            MessageChannelFilter.EMAIL -> channel == MessageChannel.EMAIL
         }
     }
 
-    private fun PendingMessageEntity.readinessFor(
-        contact: ContactEntity?,
-        status: MessageStatus,
+    private fun PendingMessageListItem.readinessFor(
+        contact: ContactMessageContext?,
     ): MessageReadiness {
         if (contact == null) return MessageReadiness.CONTACT_MISSING
-        val messageChannel = MessageChannel.fromRaw(channel)
-        if (AutomationSchedulePolicy.isChannelBlocked(messageChannel, securePrefs.getChannelBlackout())) {
+        if (AutomationSchedulePolicy.isChannelBlocked(channel, securePrefs.getChannelBlackout())) {
             return MessageReadiness.CHANNEL_DISABLED
         }
 
-        when (messageChannel) {
+        when (channel) {
             MessageChannel.SMS,
             MessageChannel.WHATSAPP -> {
                 if (contact.primaryPhone.isNullOrBlank()) return MessageReadiness.MISSING_PHONE

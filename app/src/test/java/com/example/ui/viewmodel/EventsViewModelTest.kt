@@ -4,8 +4,12 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.contact.ContactHeader
+import com.example.domain.model.contact.ContactPickerItem
+import com.example.domain.model.occasion.EventListItem
+import com.example.domain.model.occasion.OccasionType
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
@@ -64,6 +68,8 @@ class EventsViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         context = ApplicationProvider.getApplicationContext()
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(emptyList())
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(emptyList())
     }
 
     @After
@@ -73,11 +79,11 @@ class EventsViewModelTest {
 
     @Test
     fun `init collects events and contacts`() = runTest(testDispatcher) {
-        every { eventRepository.getAll() } returns MutableStateFlow(
-            listOf(EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", dayOfMonth = 5, month = 6, nextOccurrenceMs = 100L))
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(
+            listOf(eventListItem(id = "e1", contactId = "c1", type = OccasionType.BIRTHDAY, dayOfMonth = 5, month = 6, nextOccurrenceMs = 100L))
         )
-        every { contactRepository.getAll() } returns MutableStateFlow(
-            listOf(ContactEntity(id = "c1", name = "Alice"))
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(
+            listOf(contactPickerItem(id = "c1", displayName = "Alice"))
         )
 
         val viewModel = newViewModel()
@@ -91,30 +97,30 @@ class EventsViewModelTest {
     @Test
     fun `init derives event trust states from source verification and active conflicts`() = runTest(testDispatcher) {
         val events = listOf(
-            EventEntity(
+            eventListItem(
                 id = "imported",
                 contactId = "c1",
-                type = "BIRTHDAY",
+                type = OccasionType.BIRTHDAY,
                 dayOfMonth = 5,
                 month = 6,
                 nextOccurrenceMs = 100L,
                 source = "CONTACTS",
                 isVerified = true,
             ),
-            EventEntity(
+            eventListItem(
                 id = "manual_conflict",
                 contactId = "c1",
-                type = "BIRTHDAY",
+                type = OccasionType.BIRTHDAY,
                 dayOfMonth = 1,
                 month = 7,
                 nextOccurrenceMs = 200L,
                 source = "MANUAL",
                 isVerified = true,
             ),
-            EventEntity(
+            eventListItem(
                 id = "low_confidence",
                 contactId = "c2",
-                type = "ANNIVERSARY",
+                type = OccasionType.ANNIVERSARY,
                 dayOfMonth = 2,
                 month = 8,
                 nextOccurrenceMs = 300L,
@@ -123,11 +129,11 @@ class EventsViewModelTest {
                 isVerified = false,
             ),
         )
-        every { eventRepository.getAll() } returns MutableStateFlow(events)
-        every { contactRepository.getAll() } returns MutableStateFlow(
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(events)
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(
             listOf(
-                ContactEntity(id = "c1", name = "Alice"),
-                ContactEntity(id = "c2", name = "Bob"),
+                contactPickerItem(id = "c1", displayName = "Alice"),
+                contactPickerItem(id = "c2", displayName = "Bob"),
             )
         )
 
@@ -146,10 +152,10 @@ class EventsViewModelTest {
 
     @Test
     fun `saveManualEvent success exposes snackbar message`() = runTest(testDispatcher) {
-        val contact = ContactEntity(id = "c1", name = "Alice")
-        val event = EventEntity(id = "e1", contactId = "c1", type = "BIRTHDAY", dayOfMonth = 5, month = 6, nextOccurrenceMs = 100L)
-        every { eventRepository.getAll() } returns MutableStateFlow(emptyList())
-        every { contactRepository.getAll() } returns MutableStateFlow(listOf(contact))
+        val contact = contactHeader(id = "c1", displayName = "Alice")
+        val event = eventListItem(id = "e1", contactId = "c1", type = OccasionType.BIRTHDAY, dayOfMonth = 5, month = 6, nextOccurrenceMs = 100L)
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(emptyList())
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(listOf(contactPickerItem("c1", "Alice")))
         coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.Saved(contact, event)
 
         val viewModel = newViewModel()
@@ -163,8 +169,8 @@ class EventsViewModelTest {
 
     @Test
     fun `saveManualEvent invalid input exposes error`() = runTest(testDispatcher) {
-        every { eventRepository.getAll() } returns MutableStateFlow(emptyList())
-        every { contactRepository.getAll() } returns MutableStateFlow(emptyList())
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(emptyList())
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(emptyList())
         coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.InvalidInput(
             SaveManualEventUseCase.InvalidInputReason.INVALID_DATE,
         )
@@ -180,17 +186,17 @@ class EventsViewModelTest {
 
     @Test
     fun `saveManualEvent duplicate exposes warning without snackbar error`() = runTest(testDispatcher) {
-        val contact = ContactEntity(id = "c1", name = "Alice")
-        val event = EventEntity(
+        val contact = contactHeader(id = "c1", displayName = "Alice")
+        val event = eventListItem(
             id = "existing",
             contactId = "c1",
-            type = "BIRTHDAY",
+            type = OccasionType.BIRTHDAY,
             dayOfMonth = 5,
             month = 6,
             nextOccurrenceMs = 100L,
         )
-        every { eventRepository.getAll() } returns MutableStateFlow(listOf(event))
-        every { contactRepository.getAll() } returns MutableStateFlow(listOf(contact))
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(listOf(eventListItem(id = event.id.value, contactId = event.contactId.value)))
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(listOf(contactPickerItem("c1", "Alice")))
         coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.DuplicateFound(contact, event)
 
         val viewModel = newViewModel()
@@ -207,17 +213,17 @@ class EventsViewModelTest {
 
     @Test
     fun `saveManualEvent conflict exposes date conflict warning`() = runTest(testDispatcher) {
-        val contact = ContactEntity(id = "c1", name = "Alice")
-        val event = EventEntity(
+        val contact = contactHeader(id = "c1", displayName = "Alice")
+        val event = eventListItem(
             id = "c1_birthday",
             contactId = "c1",
-            type = "BIRTHDAY",
+            type = OccasionType.BIRTHDAY,
             dayOfMonth = 12,
             month = 6,
             nextOccurrenceMs = 100L,
         )
-        every { eventRepository.getAll() } returns MutableStateFlow(listOf(event))
-        every { contactRepository.getAll() } returns MutableStateFlow(listOf(contact))
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(listOf(eventListItem(id = event.id.value, contactId = event.contactId.value, dayOfMonth = event.dayOfMonth, month = event.month)))
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(listOf(contactPickerItem("c1", "Alice")))
         coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.ConflictFound(
             contact = contact,
             existingEvent = event,
@@ -244,17 +250,17 @@ class EventsViewModelTest {
 
     @Test
     fun `saveManualEvent override passes allowDuplicate to use case`() = runTest(testDispatcher) {
-        val contact = ContactEntity(id = "c1", name = "Alice")
-        val event = EventEntity(
+        val contact = contactHeader(id = "c1", displayName = "Alice")
+        val event = eventListItem(
             id = "manual",
             contactId = "c1",
-            type = "BIRTHDAY",
+            type = OccasionType.BIRTHDAY,
             dayOfMonth = 5,
             month = 6,
             nextOccurrenceMs = 100L,
         )
-        every { eventRepository.getAll() } returns MutableStateFlow(emptyList())
-        every { contactRepository.getAll() } returns MutableStateFlow(listOf(contact))
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(emptyList())
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(listOf(contactPickerItem("c1", "Alice")))
         coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.Saved(contact, event)
 
         val viewModel = newViewModel()
@@ -270,16 +276,16 @@ class EventsViewModelTest {
 
     @Test
     fun `resolveEventConflict keep separate delegates to use case and exposes feedback`() = runTest(testDispatcher) {
-        val event = EventEntity(
+        val event = eventListItem(
             id = "manual",
             contactId = "c1",
-            type = "BIRTHDAY",
+            type = OccasionType.BIRTHDAY,
             dayOfMonth = 5,
             month = 6,
             nextOccurrenceMs = 100L,
         )
-        every { eventRepository.getAll() } returns MutableStateFlow(emptyList())
-        every { contactRepository.getAll() } returns MutableStateFlow(emptyList())
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(emptyList())
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(emptyList())
         coEvery { resolveEventConflictUseCase(any()) } returns ResolveEventConflictUseCase.Outcome.Resolved(
             keptEvent = event,
             affectedEventIds = listOf("imported", "manual"),
@@ -288,19 +294,19 @@ class EventsViewModelTest {
 
         val viewModel = newViewModel()
         advanceUntilIdle()
-        viewModel.resolveEventConflict(event.id, EventResolutionAction.KEEP_SEPARATE)
+        viewModel.resolveEventConflict(event.id.value, EventResolutionAction.KEEP_SEPARATE)
         advanceUntilIdle()
 
         coVerify {
             resolveEventConflictUseCase(
                 match {
-                    it.eventId == event.id &&
+                    it.eventId == event.id.value &&
                         it.action == ResolveEventConflictUseCase.Action.KEEP_SEPARATE
                 }
             )
         }
         coVerify {
-            activityLogRepository.record(match { it.type == "EVENT" && it.eventId == event.id })
+            activityLogRepository.record(match { it.type == "EVENT" && it.eventId == event.id.value })
         }
         assertNull(viewModel.uiState.value.resolvingEventId)
         assertTrue(viewModel.uiState.value.saveMessage?.contains("separate", ignoreCase = true) == true)
@@ -310,44 +316,90 @@ class EventsViewModelTest {
     fun `search type and horizon filters are applied in viewmodel`() = runTest(testDispatcher) {
         val now = System.currentTimeMillis()
         val contacts = listOf(
-            ContactEntity(id = "c1", name = "Alice"),
-            ContactEntity(id = "c2", name = "Bob"),
+            contactPickerItem(id = "c1", displayName = "Alice"),
+            contactPickerItem(id = "c2", displayName = "Bob"),
         )
         val events = listOf(
-            EventEntity(
+            eventListItem(
                 id = "e1",
                 contactId = "c1",
-                type = "BIRTHDAY",
+                type = OccasionType.BIRTHDAY,
                 dayOfMonth = 1,
                 month = 1,
                 nextOccurrenceMs = now + 2 * 86_400_000L,
             ),
-            EventEntity(
+            eventListItem(
                 id = "e2",
                 contactId = "c2",
-                type = "ANNIVERSARY",
+                type = OccasionType.ANNIVERSARY,
                 dayOfMonth = 2,
                 month = 1,
                 nextOccurrenceMs = now + 20 * 86_400_000L,
             ),
         )
-        every { eventRepository.getAll() } returns MutableStateFlow(events)
-        every { contactRepository.getAll() } returns MutableStateFlow(contacts)
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(events)
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(contacts)
 
         val viewModel = newViewModel()
         advanceUntilIdle()
 
         viewModel.selectHorizonFilter(EventHorizonFilter.NEXT_7_DAYS)
-        assertEquals(listOf("e1"), viewModel.uiState.value.events.map { it.id })
+        assertEquals(listOf("e1"), viewModel.uiState.value.events.map { it.id.value })
 
         viewModel.selectHorizonFilter(EventHorizonFilter.ALL)
         viewModel.selectTypeFilter(EventTypeFilter.ANNIVERSARY)
-        assertEquals(listOf("e2"), viewModel.uiState.value.events.map { it.id })
+        assertEquals(listOf("e2"), viewModel.uiState.value.events.map { it.id.value })
 
         viewModel.selectTypeFilter(EventTypeFilter.ALL)
         viewModel.updateSearchQuery("alice")
-        assertEquals(listOf("e1"), viewModel.uiState.value.events.map { it.id })
+        assertEquals(listOf("e1"), viewModel.uiState.value.events.map { it.id.value })
     }
+
+    private fun eventListItem(
+        id: String,
+        contactId: String = "contact_$id",
+        type: OccasionType = OccasionType.BIRTHDAY,
+        label: String? = null,
+        dayOfMonth: Int = 1,
+        month: Int = 1,
+        year: Int? = null,
+        nextOccurrenceMs: Long = 100L,
+        isActive: Boolean = true,
+        notifyDaysBefore: Int = 1,
+        source: String = "CONTACTS",
+        confidenceScore: Int = 100,
+        isVerified: Boolean = true,
+    ) = EventListItem(
+        id = OccasionId(id),
+        contactId = ContactId(contactId),
+        type = type,
+        label = label,
+        dayOfMonth = dayOfMonth,
+        month = month,
+        year = year,
+        nextOccurrenceMs = nextOccurrenceMs,
+        isActive = isActive,
+        notifyDaysBefore = notifyDaysBefore,
+        source = source,
+        confidenceScore = confidenceScore,
+        isVerified = isVerified,
+    )
+
+    private fun contactPickerItem(
+        id: String,
+        displayName: String,
+    ) = ContactPickerItem(
+        id = ContactId(id),
+        displayName = displayName,
+    )
+
+    private fun contactHeader(
+        id: String,
+        displayName: String,
+    ) = ContactHeader(
+        id = ContactId(id),
+        displayName = displayName,
+    )
 
     private fun newViewModel(): EventsViewModel {
         return EventsViewModel(

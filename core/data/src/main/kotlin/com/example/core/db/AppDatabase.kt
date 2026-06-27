@@ -9,6 +9,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.core.db.dao.ActivityLogDao
 import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.GiftHistoryDao
 import com.example.core.db.dao.MemoryNoteDao
@@ -18,6 +19,7 @@ import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.dao.StyleProfileDao
 import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.db.entities.ContactEntity
+import com.example.core.db.entities.DispatchAttemptEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.GiftHistoryEntity
 import com.example.core.db.entities.MemoryNoteEntity
@@ -41,8 +43,9 @@ import net.sqlcipher.database.SupportFactory
         StyleProfileHistoryEntity::class,
         ActivityLogEntity::class,
         MessageFeedbackEntity::class,
+        DispatchAttemptEntity::class,
     ],
-    version = 13,
+    version = 15,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -55,6 +58,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun giftHistoryDao(): GiftHistoryDao
     abstract fun activityLogDao(): ActivityLogDao
     abstract fun messageFeedbackDao(): MessageFeedbackDao
+    abstract fun dispatchAttemptDao(): DispatchAttemptDao
     // abstract fun moodLogDao(): MoodLogDao
 
     companion object {
@@ -479,6 +483,129 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE sent_messages ADD COLUMN eventId TEXT")
+                db.execSQL("ALTER TABLE sent_messages ADD COLUMN occasionType TEXT NOT NULL DEFAULT 'UNKNOWN'")
+                db.execSQL("ALTER TABLE sent_messages ADD COLUMN occasionLabel TEXT")
+
+                db.execSQL("""
+                    UPDATE sent_messages
+                    SET eventId = eventType
+                    WHERE EXISTS (
+                        SELECT 1 FROM events
+                        WHERE events.id = sent_messages.eventType
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    UPDATE sent_messages
+                    SET occasionType = COALESCE(
+                        (
+                            SELECT events.type FROM events
+                            WHERE events.id = sent_messages.eventType
+                            LIMIT 1
+                        ),
+                        CASE
+                            WHEN UPPER(eventType) IN (
+                                'BIRTHDAY',
+                                'ANNIVERSARY',
+                                'WORK_ANNIVERSARY',
+                                'GRADUATION',
+                                'HOLIDAY',
+                                'REVIVAL',
+                                'FOLLOW_UP',
+                                'CUSTOM'
+                            ) THEN UPPER(eventType)
+                            WHEN UPPER(eventType) LIKE 'FOLLOWUP_%' THEN 'FOLLOW_UP'
+                            WHEN UPPER(eventType) LIKE 'FOLLOW_UP_%' THEN 'FOLLOW_UP'
+                            WHEN UPPER(eventType) LIKE 'HOLIDAY_%' THEN 'HOLIDAY'
+                            WHEN UPPER(eventType) LIKE 'REVIVAL_%' THEN 'REVIVAL'
+                            ELSE 'UNKNOWN'
+                        END
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    UPDATE sent_messages
+                    SET occasionLabel = (
+                        SELECT events.label FROM events
+                        WHERE events.id = sent_messages.eventId
+                        LIMIT 1
+                    )
+                    WHERE eventId IS NOT NULL
+                """.trimIndent())
+
+                db.execSQL("UPDATE sent_messages SET eventType = occasionType")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_sent_messages_eventId ON sent_messages(eventId)")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS idx_sent_messages_contactId_occasionType_sentAtMs " +
+                        "ON sent_messages(contactId ASC, occasionType ASC, sentAtMs DESC)"
+                )
+            }
+        }
+
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS dispatch_attempts (
+                        id TEXT NOT NULL,
+                        messageDraftId TEXT NOT NULL,
+                        contactId TEXT,
+                        occasionId TEXT,
+                        channel TEXT NOT NULL,
+                        routeRank INTEGER NOT NULL DEFAULT 0,
+                        eligibilityDecision TEXT NOT NULL,
+                        blockOrDeferReason TEXT,
+                        requestedAtMs INTEGER NOT NULL,
+                        attemptedAtMs INTEGER,
+                        resolvedAtMs INTEGER,
+                        result TEXT NOT NULL,
+                        deliveryStatus TEXT NOT NULL,
+                        providerMessageId TEXT,
+                        errorType TEXT,
+                        errorCode TEXT,
+                        redactedErrorMessage TEXT,
+                        retryCount INTEGER NOT NULL DEFAULT 0,
+                        nextRetryAtMs INTEGER,
+                        deadLetteredAtMs INTEGER,
+                        createdBy TEXT NOT NULL,
+                        metadataJson TEXT NOT NULL DEFAULT '{}',
+                        PRIMARY KEY(id),
+                        FOREIGN KEY(messageDraftId) REFERENCES pending_messages(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(contactId) REFERENCES contacts(id) ON UPDATE NO ACTION ON DELETE SET NULL,
+                        FOREIGN KEY(occasionId) REFERENCES events(id) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                """.trimIndent())
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_messageDraftId_requestedAtMs
+                    ON dispatch_attempts(messageDraftId, requestedAtMs)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_result_nextRetryAtMs
+                    ON dispatch_attempts(result, nextRetryAtMs)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_deadLetteredAtMs " +
+                        "ON dispatch_attempts(deadLetteredAtMs)"
+                )
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_contactId_requestedAtMs
+                    ON dispatch_attempts(contactId, requestedAtMs)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS idx_dispatch_attempts_occasionId " +
+                        "ON dispatch_attempts(occasionId)"
+                )
+            }
+        }
+
         fun closeAndResetInstance() {
             synchronized(this) {
                 INSTANCE?.let { db ->
@@ -525,6 +652,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_10_11,
                     MIGRATION_11_12,
                     MIGRATION_12_13,
+                    MIGRATION_13_14,
+                    MIGRATION_14_15,
                 )
                 .build()
                 INSTANCE = instance

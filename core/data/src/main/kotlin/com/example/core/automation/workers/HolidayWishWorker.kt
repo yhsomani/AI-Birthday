@@ -8,10 +8,10 @@ import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.data.R
 import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.gemini.GeminiClient
 import com.example.core.gemini.MessageVariants
@@ -23,9 +23,19 @@ import com.example.domain.automation.AiAutoSendQualityGate
 import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutomationSchedulePolicy
+import com.example.domain.contact.toDeliveryRouteProfile
+import com.example.domain.contact.toHeader
+import com.example.domain.contact.toRelationshipPromptContext
+import com.example.domain.event.toEventEntity
+import com.example.domain.message.toDeliveryRouteHistoryRecords
+import com.example.domain.notification.buildApprovalNotificationRequest
 import com.example.domain.model.ApprovalMode
-import com.example.domain.model.EventType
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.model.occasion.OccasionDate
+import com.example.domain.model.occasion.OccasionType
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.Calendar
@@ -36,6 +46,7 @@ class HolidayWishWorker @AssistedInject constructor(
     @Assisted ctx: Context,
     @Assisted params: WorkerParameters,
     private val contactDao: ContactDao,
+    private val eventDao: EventDao,
     private val pendingMessageDao: PendingMessageDao,
     private val sentMessageDao: SentMessageDao,
     private val gemini: GeminiClient,
@@ -86,7 +97,7 @@ class HolidayWishWorker @AssistedInject constructor(
 
                         RateLimiter.waitIfNeeded()
                         val prompt = prompter.buildHolidayWishPrompt(
-                            contact = contact,
+                            contact = contact.toRelationshipPromptContext(),
                             holidayName = holiday.name,
                             holidayTone = holiday.tone,
                         )
@@ -112,8 +123,8 @@ class HolidayWishWorker @AssistedInject constructor(
                         )
                         val previousMessages = sentMessageDao.getByContact(contact.id)
                         val channelSelection = AutoSendChannelSelector.selectRoute(
-                            contact = contact,
-                            previousMessages = previousMessages,
+                            contact = contact.toDeliveryRouteProfile(),
+                            routeHistory = previousMessages.toDeliveryRouteHistoryRecords(),
                             channelBlackoutJson = prefs.getChannelBlackout(),
                             senderEmail = prefs.getSenderEmail(),
                             senderEmailPassword = prefs.getSenderEmailPassword(),
@@ -129,6 +140,9 @@ class HolidayWishWorker @AssistedInject constructor(
                         } else {
                             MessageStatus.PENDING
                         }
+
+                        val holidayEvent = holiday.toOccasion(eventId, contact)
+                        eventDao.upsert(holidayEvent.toEventEntity())
 
                         val pending = PendingMessageEntity(
                             id = UUID.randomUUID().toString(),
@@ -159,10 +173,8 @@ class HolidayWishWorker @AssistedInject constructor(
                         if (ApprovalModeResolver.needsReviewNotification(approvalMode)) {
                             NotificationHelper.showApprovalNotification(
                                 context = applicationContext,
-                                contact = contact,
-                                event = holiday.toNotificationEvent(eventId, contact),
+                                request = buildApprovalNotificationRequest(contact.toHeader(), holidayEvent, pending.id),
                                 variants = suggestion.toVariants(),
-                                messageId = pending.id,
                             )
                         }
                     } catch (e: Exception) {
@@ -206,18 +218,24 @@ class HolidayWishWorker @AssistedInject constructor(
         return "HOLIDAY_${holiday.id}_${contact.id}_${holiday.year}"
     }
 
-    private fun HolidayOccurrence.toNotificationEvent(eventId: String, contact: ContactEntity): EventEntity {
+    private fun HolidayOccurrence.toOccasion(eventId: String, contact: ContactEntity): Occasion {
         val calendar = Calendar.getInstance().apply { timeInMillis = occurrenceMs }
-        return EventEntity(
-            id = eventId,
-            contactId = contact.id,
-            type = EventType.HOLIDAY.raw,
+        return Occasion(
+            id = OccasionId(eventId),
+            contactId = ContactId(contact.id),
+            type = OccasionType.HOLIDAY,
             label = name,
-            dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH),
-            month = calendar.get(Calendar.MONTH) + 1,
-            year = year,
+            date = OccasionDate(
+                dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH),
+                month = calendar.get(Calendar.MONTH) + 1,
+                year = year,
+            ),
             nextOccurrenceMs = occurrenceMs,
+            isActive = true,
+            notifyDaysBefore = 1,
             source = "AI_INFERRED",
+            confidenceScore = 100,
+            isVerified = true,
         )
     }
 

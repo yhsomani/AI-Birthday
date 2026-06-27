@@ -1,7 +1,10 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.EventEntity
 import com.example.domain.event.EventResolutionPolicy
+import com.example.domain.event.toEventListItem
+import com.example.domain.model.occasion.EventListItem
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.notification.buildEventReminderScheduleRequest
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
 import kotlinx.coroutines.flow.first
@@ -14,57 +17,60 @@ class ResolveEventConflictUseCase @Inject constructor(
     private val eventReminderSchedulerService: EventReminderSchedulerService,
 ) {
     suspend operator fun invoke(request: Request): Outcome {
-        val events = eventRepository.getAll().first()
-        val selectedEvent = events.firstOrNull { it.id == request.eventId && it.isActive }
+        val occasions = eventRepository.getOccasions().first()
+        val selectedOccasion = occasions.firstOrNull { it.id.value == request.eventId && it.isActive }
             ?: return Outcome.EventNotFound
-        val conflictGroup = EventResolutionPolicy.conflictGroupFor(events, selectedEvent)
-        if (conflictGroup.size <= 1) return Outcome.NoConflict(selectedEvent)
+        val conflictGroup = EventResolutionPolicy.conflictGroupFor(
+            occasions = occasions,
+            selectedOccasion = selectedOccasion,
+        )
+        if (conflictGroup.size <= 1) return Outcome.NoConflict(selectedOccasion.toEventListItem())
 
         return when (request.action) {
-            Action.MERGE_KEEP_SELECTED -> mergeKeepingSelected(selectedEvent, conflictGroup)
-            Action.KEEP_SEPARATE -> keepSeparate(selectedEvent, conflictGroup)
+            Action.MERGE_KEEP_SELECTED -> mergeKeepingSelected(selectedOccasion, conflictGroup)
+            Action.KEEP_SEPARATE -> keepSeparate(selectedOccasion, conflictGroup)
         }
     }
 
     private suspend fun mergeKeepingSelected(
-        selectedEvent: EventEntity,
-        conflictGroup: List<EventEntity>,
+        selectedOccasion: Occasion,
+        conflictGroup: List<Occasion>,
     ): Outcome.Resolved {
-        val resolvedSelected = selectedEvent.copy(
-            source = EventResolutionPolicy.baseSource(selectedEvent.source),
+        val resolvedSelected = selectedOccasion.copy(
+            source = EventResolutionPolicy.baseSource(selectedOccasion.source),
             isVerified = true,
         )
-        eventRepository.upsert(resolvedSelected)
-        eventReminderSchedulerService.scheduleReminder(resolvedSelected)
+        eventRepository.upsertOccasion(resolvedSelected)
+        eventReminderSchedulerService.scheduleReminder(buildEventReminderScheduleRequest(resolvedSelected))
 
-        val deactivatedEvents = conflictGroup.filterNot { it.id == selectedEvent.id }
-        deactivatedEvents.forEach { event ->
-            eventRepository.upsert(event.copy(isActive = false))
-            eventReminderSchedulerService.cancelReminder(event.id)
+        val deactivatedOccasions = conflictGroup.filterNot { it.id == selectedOccasion.id }
+        deactivatedOccasions.forEach { occasion ->
+            eventRepository.upsertOccasion(occasion.copy(isActive = false))
+            eventReminderSchedulerService.cancelReminder(occasion.id.value)
         }
 
         return Outcome.Resolved(
-            keptEvent = resolvedSelected,
-            affectedEventIds = deactivatedEvents.map { it.id },
+            keptEvent = resolvedSelected.toEventListItem(),
+            affectedEventIds = deactivatedOccasions.map { it.id.value },
             action = Action.MERGE_KEEP_SELECTED,
         )
     }
 
     private suspend fun keepSeparate(
-        selectedEvent: EventEntity,
-        conflictGroup: List<EventEntity>,
+        selectedOccasion: Occasion,
+        conflictGroup: List<Occasion>,
     ): Outcome.Resolved {
-        val resolvedEvents = conflictGroup.map { event ->
-            event.copy(
-                source = EventResolutionPolicy.keepSeparateSource(event.source),
+        val resolvedOccasions = conflictGroup.map { occasion ->
+            occasion.copy(
+                source = EventResolutionPolicy.keepSeparateSource(occasion.source),
                 isVerified = true,
             )
         }
-        resolvedEvents.forEach { eventRepository.upsert(it) }
+        resolvedOccasions.forEach { eventRepository.upsertOccasion(it) }
 
         return Outcome.Resolved(
-            keptEvent = resolvedEvents.first { it.id == selectedEvent.id },
-            affectedEventIds = resolvedEvents.map { it.id },
+            keptEvent = resolvedOccasions.first { it.id == selectedOccasion.id }.toEventListItem(),
+            affectedEventIds = resolvedOccasions.map { it.id.value },
             action = Action.KEEP_SEPARATE,
         )
     }
@@ -81,12 +87,12 @@ class ResolveEventConflictUseCase @Inject constructor(
 
     sealed class Outcome {
         data class Resolved(
-            val keptEvent: EventEntity,
+            val keptEvent: EventListItem,
             val affectedEventIds: List<String>,
             val action: Action,
         ) : Outcome()
 
-        data class NoConflict(val event: EventEntity) : Outcome()
+        data class NoConflict(val event: EventListItem) : Outcome()
         data object EventNotFound : Outcome()
     }
 }

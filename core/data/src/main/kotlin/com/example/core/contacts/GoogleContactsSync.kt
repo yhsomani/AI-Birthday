@@ -3,9 +3,9 @@ package com.example.core.contacts
 import android.accounts.AccountManager
 import android.content.Context
 import android.util.Log
-import com.example.core.db.entities.ContactEntity
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.SensitiveLogRedactor
+import com.example.domain.model.contact.ContactSyncRecord
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -87,7 +87,7 @@ class GoogleContactsSync(private val context: Context) {
         return@withContext existing.ifEmpty { null }
     }
 
-    suspend fun fetchAll(forceRefresh: Boolean = false): List<ContactEntity> = withContext(Dispatchers.IO) {
+    suspend fun fetchAll(forceRefresh: Boolean = false): List<ContactSyncRecord> = withContext(Dispatchers.IO) {
         val prefs = SecurePrefs(context)
         val token = getValidToken(prefs)
         if (token == null) {
@@ -97,7 +97,7 @@ class GoogleContactsSync(private val context: Context) {
 
         val baseFields = "names,nicknames,emailAddresses,phoneNumbers,birthdays,events,organizations,memberships,relations,addresses,photos,biographies"
         val syncToken = if (forceRefresh) "" else prefs.getSyncToken()
-        val contacts = mutableListOf<ContactEntity>()
+        val contacts = mutableListOf<ContactSyncRecord>()
         val client = OkHttpClient()
         
         var pageToken: String? = null
@@ -149,10 +149,10 @@ class GoogleContactsSync(private val context: Context) {
                         val isDeleted = metadata?.optBoolean("deleted", false) ?: false
                         
                         if (isDeleted) {
-                            contacts.add(ContactEntity(
+                            contacts.add(ContactSyncRecord(
                                 id = resourceName,
                                 googleContactId = resourceName,
-                                name = "",
+                                displayName = "",
                                 isDeleted = true
                             ))
                         } else {
@@ -307,10 +307,10 @@ class GoogleContactsSync(private val context: Context) {
                                 notesText = biographies.getJSONObject(0).optString("value", "")
                             }
             
-                            contacts.add(ContactEntity(
+                            contacts.add(ContactSyncRecord(
                                 id = resourceName,
                                 googleContactId = resourceName,
-                                name = displayName,
+                                displayName = displayName,
                                 nickname = nickname,
                                 primaryPhone = phone,
                                 primaryEmail = email,

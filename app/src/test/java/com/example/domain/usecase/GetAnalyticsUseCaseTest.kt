@@ -1,9 +1,11 @@
 package com.example.domain.usecase
 
-import com.example.core.db.dao.RelationshipTypeCount
-import com.example.core.db.entities.ContactEntity
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.contact.ContactAnalyticsSummary
+import com.example.domain.model.contact.RelationshipAnalyticsCount
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.MessageRepository
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
@@ -21,22 +23,35 @@ class GetAnalyticsUseCaseTest {
     @Test
     fun `invoke combines repository flows into AnalyticsSnapshot`() = runTest {
         val relCounts = listOf(
-            RelationshipTypeCount("FRIEND", 10),
-            RelationshipTypeCount("FAMILY", 5)
+            RelationshipAnalyticsCount("FRIEND", 10),
+            RelationshipAnalyticsCount("FAMILY", 5),
         )
 
         every { messageRepository.countAllSent() } returns flowOf(25)
         every { messageRepository.countPending() } returns flowOf(3)
         every { contactRepository.countAll() } returns flowOf(15)
-        every { contactRepository.countByRelationshipType() } returns flowOf(relCounts)
+        every { contactRepository.getRelationshipAnalyticsCounts() } returns flowOf(relCounts)
 
-        val topContacts = listOf(ContactEntity(id = "c1", name = "Alice", healthScore = 90))
-        val neglectedContacts = listOf(ContactEntity(id = "c2", name = "Bob", healthScore = 20))
+        val topContacts = listOf(
+            ContactAnalyticsSummary(
+                id = ContactId("c1"),
+                displayName = "Alice",
+                healthScore = 90,
+                relationshipType = "FRIEND",
+            ),
+        )
+        val neglectedContacts = listOf(
+            ContactAnalyticsSummary(
+                id = ContactId("c2"),
+                displayName = "Bob",
+                healthScore = 20,
+                relationshipType = "FAMILY",
+            ),
+        )
+        coEvery { contactRepository.getTopHealthSummaries(5) } returns topContacts
+        coEvery { contactRepository.getBottomHealthSummaries(5) } returns neglectedContacts
 
-        val snapshot = useCase(
-            topHealthContactsProvider = { topContacts },
-            neglectedContactsProvider = { neglectedContacts }
-        ).first()
+        val snapshot = useCase().first()
 
         assertEquals(25, snapshot.totalWishesSent)
         assertEquals(3, snapshot.pendingApprovals)

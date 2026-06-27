@@ -1,7 +1,7 @@
 package com.example.domain.usecase
 
-import com.example.core.db.dao.RelationshipTypeCount
-import com.example.core.db.entities.ContactEntity
+import com.example.domain.model.contact.ContactAnalyticsSummary
+import com.example.domain.model.contact.RelationshipAnalyticsCount
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.MessageRepository
 import kotlinx.coroutines.flow.Flow
@@ -20,21 +20,21 @@ class GetAnalyticsUseCase @Inject constructor(
     private val messageRepository: MessageRepository
 ) {
     operator fun invoke(
-        topHealthContactsProvider: suspend () -> List<ContactEntity>,
-        neglectedContactsProvider: suspend () -> List<ContactEntity>
+        topHealthLimit: Int = DEFAULT_CONTACT_RANKING_LIMIT,
+        neglectedLimit: Int = DEFAULT_CONTACT_RANKING_LIMIT,
     ): Flow<AnalyticsSnapshot> = combine(
         messageRepository.countAllSent(),
         messageRepository.countPending(),
         contactRepository.countAll(),
-        contactRepository.countByRelationshipType()
+        contactRepository.getRelationshipAnalyticsCounts()
     ) { wishesSent, pending, totalContacts, relCounts ->
         AnalyticsSnapshot(
             totalWishesSent = wishesSent,
             pendingApprovals = pending,
             totalContacts = totalContacts,
             relationshipCounts = relCounts,
-            topHealthContacts = topHealthContactsProvider(),
-            neglectedContacts = neglectedContactsProvider()
+            topHealthContacts = contactRepository.getTopHealthSummaries(topHealthLimit),
+            neglectedContacts = contactRepository.getBottomHealthSummaries(neglectedLimit),
         )
     }
 
@@ -42,8 +42,12 @@ class GetAnalyticsUseCase @Inject constructor(
         val totalWishesSent: Int,
         val pendingApprovals: Int,
         val totalContacts: Int,
-        val relationshipCounts: List<RelationshipTypeCount>,
-        val topHealthContacts: List<ContactEntity>,
-        val neglectedContacts: List<ContactEntity>
+        val relationshipCounts: List<RelationshipAnalyticsCount>,
+        val topHealthContacts: List<ContactAnalyticsSummary>,
+        val neglectedContacts: List<ContactAnalyticsSummary>,
     )
+
+    private companion object {
+        const val DEFAULT_CONTACT_RANKING_LIMIT = 5
+    }
 }

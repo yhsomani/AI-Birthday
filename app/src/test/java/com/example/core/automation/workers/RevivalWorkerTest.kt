@@ -9,6 +9,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
@@ -20,6 +21,7 @@ import com.example.domain.automation.RevivalCadencePolicy
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.occasion.OccasionType
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import io.mockk.*
@@ -38,6 +40,7 @@ class RevivalWorkerTest {
 
     private lateinit var context: Context
     private val contactDao: ContactDao = mockk(relaxed = true)
+    private val eventDao: EventDao = mockk(relaxed = true)
     private val pendingMessageDao: PendingMessageDao = mockk(relaxed = true)
     private val sentMessageDao: SentMessageDao = mockk(relaxed = true)
     private val geminiClient: GeminiClient = mockk(relaxed = true)
@@ -94,7 +97,7 @@ class RevivalWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return RevivalWorker(appContext, workerParameters, contactDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
+                    return RevivalWorker(appContext, workerParameters, contactDao, eventDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
                 }
             })
             .build()
@@ -105,6 +108,14 @@ class RevivalWorkerTest {
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
         assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
+        coVerify {
+            eventDao.upsert(match {
+                it.id == RevivalCadencePolicy.eventId("c1") &&
+                    it.type == OccasionType.REVIVAL.raw &&
+                    it.label == "Revival" &&
+                    it.source == "AI_INFERRED"
+            })
+        }
         coVerify { contactDao.updateLastRevivalAttempt("c1", any()) }
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
         verify { NotificationHelper.showRevivalNotification(any(), "Priya", any(), any(), "c1") }
@@ -131,7 +142,7 @@ class RevivalWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return RevivalWorker(appContext, workerParameters, contactDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
+                    return RevivalWorker(appContext, workerParameters, contactDao, eventDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
                 }
             })
             .build()
@@ -166,7 +177,7 @@ class RevivalWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return RevivalWorker(appContext, workerParameters, contactDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
+                    return RevivalWorker(appContext, workerParameters, contactDao, eventDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
                 }
             })
             .build()
@@ -203,7 +214,7 @@ class RevivalWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return RevivalWorker(appContext, workerParameters, contactDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
+                    return RevivalWorker(appContext, workerParameters, contactDao, eventDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
                 }
             })
             .build()
@@ -240,7 +251,7 @@ class RevivalWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return RevivalWorker(appContext, workerParameters, contactDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
+                    return RevivalWorker(appContext, workerParameters, contactDao, eventDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
                 }
             })
             .build()
@@ -249,6 +260,7 @@ class RevivalWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify(exactly = 0) { geminiClient.generate(any()) }
+        coVerify(exactly = 0) { eventDao.upsert(any()) }
         coVerify(exactly = 0) { pendingMessageDao.insert(any()) }
         coVerify(exactly = 0) { contactDao.updateLastRevivalAttempt(any(), any()) }
         verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
@@ -274,7 +286,7 @@ class RevivalWorkerTest {
                     workerClassName: String,
                     workerParameters: WorkerParameters
                 ): ListenableWorker {
-                    return RevivalWorker(appContext, workerParameters, contactDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
+                    return RevivalWorker(appContext, workerParameters, contactDao, eventDao, pendingMessageDao, sentMessageDao, geminiClient, prefs)
                 }
             })
             .build()
@@ -283,6 +295,7 @@ class RevivalWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify(exactly = 0) { geminiClient.generate(any()) }
+        coVerify(exactly = 0) { eventDao.upsert(any()) }
         coVerify(exactly = 0) { pendingMessageDao.insert(any()) }
         coVerify(exactly = 0) { contactDao.updateLastRevivalAttempt(any(), any()) }
         verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }

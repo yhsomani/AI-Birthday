@@ -6,6 +6,9 @@ import android.content.Intent
 import com.example.core.automation.scheduler.EventReminderScheduler
 import com.example.core.db.AppDatabase
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.contact.toHeader
+import com.example.domain.event.toOccasion
+import com.example.domain.notification.buildEventReminderNotificationRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,7 +26,10 @@ class EventReminderReceiver : BroadcastReceiver() {
                 val contact = db.contactDao().getById(contactId)
                 val event = db.eventDao().getById(eventId)
                 if (contact != null && event != null && event.isActive) {
-                    NotificationHelper.showEventReminderNotification(context, contact, event)
+                    NotificationHelper.showEventReminderNotification(
+                        context = context,
+                        request = buildEventReminderNotificationRequest(contact.toHeader(), event.toOccasion()),
+                    )
                 }
             } finally {
                 pendingResult.finish()

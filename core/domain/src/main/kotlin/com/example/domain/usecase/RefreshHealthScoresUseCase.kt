@@ -1,6 +1,6 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ContactEntity
+import com.example.domain.model.contact.ContactHealthProfile
 import com.example.domain.repository.ContactRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,25 +22,26 @@ class RefreshHealthScoresUseCase @Inject constructor(
     private val contactRepository: ContactRepository
 ) {
     suspend operator fun invoke(): RefreshOutcome {
-        val contacts = contactRepository.getAllSync()
+        val contacts = contactRepository.getHealthProfiles()
         var updated = 0
         contacts.forEach { contact ->
             val newScore = computeHealthScore(contact)
-            if (newScore != contact.healthScore) {
-                contactRepository.updateHealthScore(contact.id, newScore)
+            if (newScore != contact.currentHealthScore) {
+                contactRepository.updateHealthScore(contact.id.value, newScore)
                 updated++
             }
         }
         return RefreshOutcome(scanned = contacts.size, updated = updated)
     }
 
-    private fun computeHealthScore(contact: ContactEntity): Int {
+    private fun computeHealthScore(contact: ContactHealthProfile): Int {
         var score = 50
         score += (contact.interactionFrequencyPerMonth * 8).toInt().coerceAtMost(40)
 
         val now = System.currentTimeMillis()
-        val daysSinceLastContact = if (contact.lastInteractionDate != null) {
-            ((now - contact.lastInteractionDate) / (1000L * 60 * 60 * 24)).toInt()
+        val lastInteractionAtMs = contact.lastInteractionAtMs
+        val daysSinceLastContact = if (lastInteractionAtMs != null) {
+            ((now - lastInteractionAtMs) / (1000L * 60 * 60 * 24)).toInt()
         } else {
             Int.MAX_VALUE
         }
@@ -49,7 +50,7 @@ class RefreshHealthScoresUseCase @Inject constructor(
         if (daysSinceLastContact < 7) score += 10
         score += (contact.consecutiveYearsWished * 5).coerceAtMost(25)
 
-        if (contact.lastWishedDate == null && daysSinceLastContact > 180) {
+        if (contact.lastWishedAtMs == null && daysSinceLastContact > 180) {
             score -= 20
         }
 

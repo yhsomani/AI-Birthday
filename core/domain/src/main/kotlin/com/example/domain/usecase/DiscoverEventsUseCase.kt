@@ -1,10 +1,13 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.EventEntity
 import com.example.domain.event.EventDatePolicy
 import com.example.domain.event.EventIdentityPolicy
-import com.example.domain.model.EventType
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.contact.ContactEventDiscoveryProfile
+import com.example.domain.notification.buildEventReminderScheduleRequest
+import com.example.domain.model.occasion.Occasion
+import com.example.domain.model.occasion.OccasionDate
+import com.example.domain.model.occasion.OccasionType
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.EventReminderSchedulerService
@@ -13,8 +16,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Discovers events (birthday, anniversary, work anniversary) for all contacts
- * and inserts/updates EventEntity rows.
+ * Discovers events (birthday, anniversary, work anniversary) from pure contact
+ * discovery profiles and persists pure Occasion values through the event repository.
  * - Idempotent: each event has a stable id derived from contactId + type
  * - Computes nextOccurrenceMs (the next time this event will occur)
  * - Sets notifyDaysBefore (default 1)
@@ -26,15 +29,15 @@ class DiscoverEventsUseCase @Inject constructor(
     private val eventReminderSchedulerService: EventReminderSchedulerService,
 ) {
     suspend operator fun invoke(): DiscoveryOutcome {
-        val contacts = contactRepository.getAllSync()
-        val existingEvents = runCatching { eventRepository.getAll().first() }.getOrDefault(emptyList())
+        val contacts = contactRepository.getEventDiscoveryProfiles()
+        val existingOccasions = runCatching { eventRepository.getOccasions().first() }.getOrDefault(emptyList())
         var discovered = 0
 
         contacts.forEach { contact ->
-            val events = buildEventsFor(contact, existingEvents)
-            events.forEach { event ->
-                eventRepository.upsert(event)
-                eventReminderSchedulerService.scheduleReminder(event)
+            val occasions = buildOccasionsFor(contact, existingOccasions)
+            occasions.forEach { occasion ->
+                eventRepository.upsertOccasion(occasion)
+                eventReminderSchedulerService.scheduleReminder(buildEventReminderScheduleRequest(occasion))
                 discovered++
             }
         }
@@ -42,67 +45,78 @@ class DiscoverEventsUseCase @Inject constructor(
         return DiscoveryOutcome(contacts = contacts.size, events = discovered)
     }
 
-    private fun buildEventsFor(
-        contact: ContactEntity,
-        existingEvents: List<EventEntity>,
-    ): List<EventEntity> {
-        val events = mutableListOf<EventEntity>()
+    private suspend fun buildOccasionsFor(
+        contact: ContactEventDiscoveryProfile,
+        existingOccasions: List<Occasion>,
+    ): List<Occasion> {
+        val occasions = mutableListOf<Occasion>()
 
-        contact.birthdayDay?.let { day ->
-            contact.birthdayMonth?.let { month ->
-                buildContactEvent(
-                    contact = contact,
-                    existingEvents = existingEvents,
-                    type = EventType.BIRTHDAY,
-                    day = day,
-                    month = month,
-                    year = contact.birthdayYear,
-                )?.let(events::add)
-            }
-        }
+        buildContactOccasionOrDeactivate(
+            contact = contact,
+            existingOccasions = existingOccasions,
+            type = OccasionType.BIRTHDAY,
+            day = contact.birthdayDay,
+            month = contact.birthdayMonth,
+            year = contact.birthdayYear,
+        )?.let(occasions::add)
 
-        contact.anniversaryDay?.let { day ->
-            contact.anniversaryMonth?.let { month ->
-                buildContactEvent(
-                    contact = contact,
-                    existingEvents = existingEvents,
-                    type = EventType.ANNIVERSARY,
-                    day = day,
-                    month = month,
-                    year = contact.anniversaryYear,
-                )?.let(events::add)
-            }
-        }
+        buildContactOccasionOrDeactivate(
+            contact = contact,
+            existingOccasions = existingOccasions,
+            type = OccasionType.ANNIVERSARY,
+            day = contact.anniversaryDay,
+            month = contact.anniversaryMonth,
+            year = contact.anniversaryYear,
+        )?.let(occasions::add)
 
-        contact.workStartDay?.let { day ->
-            contact.workStartMonth?.let { month ->
-                buildContactEvent(
-                    contact = contact,
-                    existingEvents = existingEvents,
-                    type = EventType.WORK_ANNIVERSARY,
-                    day = day,
-                    month = month,
-                    year = contact.workStartYear,
-                )?.let(events::add)
-            }
-        }
+        buildContactOccasionOrDeactivate(
+            contact = contact,
+            existingOccasions = existingOccasions,
+            type = OccasionType.WORK_ANNIVERSARY,
+            day = contact.workStartDay,
+            month = contact.workStartMonth,
+            year = contact.workStartYear,
+        )?.let(occasions::add)
 
-        return events
+        return occasions
     }
 
-    private fun buildContactEvent(
-        contact: ContactEntity,
-        existingEvents: List<EventEntity>,
-        type: EventType,
+    private suspend fun buildContactOccasionOrDeactivate(
+        contact: ContactEventDiscoveryProfile,
+        existingOccasions: List<Occasion>,
+        type: OccasionType,
+        day: Int?,
+        month: Int?,
+        year: Int?,
+    ): Occasion? {
+        if (day == null || month == null) {
+            eventRepository.deactivateContactDerivedOccasion(contact.id, type)
+            return null
+        }
+
+        return buildContactOccasion(
+            contact = contact,
+            existingOccasions = existingOccasions,
+            type = type,
+            day = day,
+            month = month,
+            year = year,
+        )
+    }
+
+    private fun buildContactOccasion(
+        contact: ContactEventDiscoveryProfile,
+        existingOccasions: List<Occasion>,
+        type: OccasionType,
         day: Int,
         month: Int,
         year: Int?,
-    ): EventEntity? {
+    ): Occasion? {
         if (!EventDatePolicy.isValidDate(day, month, year)) return null
-        val existingMatchingEvent = EventIdentityPolicy.findMatchingActiveEvent(
-            events = existingEvents,
-            contactId = contact.id,
-            eventType = type.raw,
+        val existingMatchingEvent = EventIdentityPolicy.findMatchingActiveOccasion(
+            occasions = existingOccasions,
+            contactId = contact.id.value,
+            occasionType = type.raw,
             month = month,
             dayOfMonth = day,
         )
@@ -110,24 +124,19 @@ class DiscoverEventsUseCase @Inject constructor(
             return null
         }
         val nextMs = EventDatePolicy.nextOccurrenceMs(day, month) ?: return null
-        return EventEntity(
-            id = EventIdentityPolicy.canonicalId(contact.id, type.raw)
-                ?: return null,
+        return Occasion(
+            id = OccasionId(EventIdentityPolicy.canonicalId(contact.id.value, type.raw) ?: return null),
             contactId = contact.id,
-            type = type.raw,
-            label = contact.name,
-            dayOfMonth = day,
-            month = month,
-            year = year,
+            type = type,
+            label = contact.displayName,
+            date = OccasionDate(dayOfMonth = day, month = month, year = year),
             nextOccurrenceMs = nextMs,
             isActive = true,
-            source = "CONTACTS"
+            notifyDaysBefore = 1,
+            source = "CONTACTS",
+            confidenceScore = 100,
+            isVerified = true,
         )
-    }
-
-    private fun daysUntil(futureMs: Long): Int {
-        val diff = futureMs - System.currentTimeMillis()
-        return (diff / (1000 * 60 * 60 * 24)).toInt().coerceAtLeast(0)
     }
 
     data class DiscoveryOutcome(val contacts: Int, val events: Int)

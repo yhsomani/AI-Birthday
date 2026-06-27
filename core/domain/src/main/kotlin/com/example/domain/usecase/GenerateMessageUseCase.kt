@@ -1,11 +1,16 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.PendingMessageEntity
-import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.automation.AiAutoSendQualityGate
 import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutomationSchedulePolicy
+import com.example.domain.contact.toHeader
+import com.example.domain.contact.toDeliveryRouteProfile
+import com.example.domain.contact.toMessagePromptContact
+import com.example.domain.notification.buildApprovalNotificationRequest
+import com.example.domain.message.buildMessagePromptContext
+import com.example.domain.message.toStylePromptProfile
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
 import com.example.domain.repository.ContactRepository
@@ -49,13 +54,13 @@ class GenerateMessageUseCase @Inject constructor(
     }
 
     suspend operator fun invoke(request: Request): GenerationOutcome {
-        val event = eventRepository.getEventsBefore(Long.MAX_VALUE).firstOrNull { it.id == request.eventId }
+        val event = eventRepository.getOccasionById(request.eventId)
             ?: return GenerationOutcome.EventNotFound
 
         val scheduledYear = scheduledYearFor(event.nextOccurrenceMs)
         val existingPending = messageRepository.getPendingForEventOccurrence(
-            event.contactId,
-            event.id,
+            event.contactId.value,
+            event.id.value,
             scheduledYear
         )
         val pendingId = when {
@@ -65,34 +70,32 @@ class GenerateMessageUseCase @Inject constructor(
             else -> return GenerationOutcome.AlreadyExists
         }
 
-        val contact = contactRepository.getById(event.contactId) ?: return GenerationOutcome.ContactNotFound
+        val contact = contactRepository.getById(event.contactId.value) ?: return GenerationOutcome.ContactNotFound
         if (!preferencesRepository.isAiWishGenerationEnabled()) {
             return GenerationOutcome.AiDisabled
         }
         val styleProfile = styleProfileRepository.getProfileOnce()
-        val previousMessages = messageRepository.getSentByContact(contact.id, 10)
-        val memoryNotes = memoryNoteRepository.getByContact(contact.id)
-        val giftHistory = giftHistoryRepository.getByContact(contact.id)
-
-        var variants = aiService.generateMessage(
-            contact = contact,
+        val generationHistory = messageRepository.getGenerationHistoryByContact(contact.id, 10)
+        val memoryNotes = memoryNoteRepository.getRecordsByContact(contact.id)
+        val giftHistory = giftHistoryRepository.getRecordsByContact(contact.id)
+        val promptContext = buildMessagePromptContext(
+            contact = contact.toMessagePromptContact(),
             event = event,
-            styleProfile = styleProfile,
-            previousMessages = previousMessages,
+            styleProfile = styleProfile?.toStylePromptProfile(),
+            previousWishes = generationHistory.previousWishes,
             memoryNotes = memoryNotes,
             giftHistory = giftHistory,
         )
 
+        var variants = aiService.generateMessage(
+            context = promptContext,
+        )
+
         var retries = 0
-        while (retries < 2 && isPreviouslyUsed(variants.standard, previousMessages)) {
+        while (retries < 2 && isPreviouslyUsed(variants.standard, generationHistory.previousWishes)) {
             variants = aiService.regenerateMessage(
                 previousMessage = variants.standard,
-                contact = contact,
-                event = event,
-                styleProfile = styleProfile,
-                previousMessages = previousMessages,
-                memoryNotes = memoryNotes,
-                giftHistory = giftHistory,
+                context = promptContext,
             )
             retries++
         }
@@ -114,8 +117,8 @@ class GenerateMessageUseCase @Inject constructor(
             isUsingFallback = variants.isUsingFallback,
         )
         val channelSelection = AutoSendChannelSelector.selectRoute(
-            contact = contact,
-            previousMessages = previousMessages,
+            contact = contact.toDeliveryRouteProfile(),
+            routeHistory = generationHistory.routeHistory,
             channelBlackoutJson = preferencesRepository.getChannelBlackout(),
             senderEmail = preferencesRepository.getSenderEmail(),
             senderEmailPassword = preferencesRepository.getSenderEmailPassword(),
@@ -137,7 +140,7 @@ class GenerateMessageUseCase @Inject constructor(
         val pending = PendingMessageEntity(
             id = pendingId,
             contactId = contact.id,
-            eventId = event.id,
+            eventId = event.id.value,
             shortVariant = variants.short,
             standardVariant = variants.standard,
             longVariant = variants.long,
@@ -160,7 +163,10 @@ class GenerateMessageUseCase @Inject constructor(
             schedulerService.scheduleExactSend(pending.id)
         }
         if (ApprovalModeResolver.needsReviewNotification(approvalMode)) {
-            notificationService.showApprovalNotification(contact, event, variants, pending.id)
+            notificationService.showApprovalNotification(
+                request = buildApprovalNotificationRequest(contact.toHeader(), event, pending.id),
+                variants = variants,
+            )
         }
 
         return GenerationOutcome.Generated(pending.id, approvalMode, retries)
@@ -171,10 +177,10 @@ class GenerateMessageUseCase @Inject constructor(
         val regenerateFailedOccurrence: Boolean = false
     )
 
-    private fun isPreviouslyUsed(newMessage: String, previous: List<SentMessageEntity>): Boolean {
+    private fun isPreviouslyUsed(newMessage: String, previousWishes: List<String>): Boolean {
         val newWords = newMessage.lowercase().split(" ").toSet()
-        return previous.any { sent ->
-            val oldWords = sent.messageText.lowercase().split(" ").toSet()
+        return previousWishes.any { previousWish ->
+            val oldWords = previousWish.lowercase().split(" ").toSet()
             val intersection = newWords.intersect(oldWords).size
             val union = newWords.union(oldWords).size
             if (union == 0) false else (intersection.toFloat() / union) > 0.65f

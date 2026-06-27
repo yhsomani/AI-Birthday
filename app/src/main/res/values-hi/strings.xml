@@ -209,7 +209,7 @@
     <string name="wish_preview_summary_quality_fallback">Template fallback</string>
     <string name="wish_preview_readiness_ready">Draft approval के लिए ready है।</string>
     <string name="wish_preview_readiness_edited">Edited draft approve होने पर save होगा।</string>
-    <string name="wish_preview_readiness_short">Draft बहुत छोटा है। Approve करने से पहले review करें।</string>
+    <string name="wish_preview_readiness_short">Approval से पहले थोड़ा लंबा message लिखें।</string>
     <string name="wish_preview_readiness_blank">Approval से पहले message लिखें।</string>
     <string name="wish_preview_error_unknown">Unknown error.</string>
     <string name="wish_preview_error_message_not_found">Message नहीं मिला।</string>
@@ -357,7 +357,10 @@
     <string name="automation_setup_check_recent_errors">Recent Errors</string>
     <string name="automation_setup_recent_errors_none">Recent automation errors नहीं हैं।</string>
     <string name="automation_setup_check_dead_letter">Dead Letter Queue</string>
-    <string name="automation_setup_dead_letter_count">%1$d failed dispatch records memory में हैं।</string>
+    <string name="automation_setup_dead_letter_none">Persisted dispatch recovery records नहीं हैं।</string>
+    <string name="automation_setup_dead_letter_count">%1$d persisted dispatch recovery records को review चाहिए; %2$d dead-lettered हैं।</string>
+    <string name="automation_setup_dead_letter_count_with_memory">%1$d persisted dispatch recovery records और %2$d in-memory dispatch records को review चाहिए; %3$d dead-lettered हैं।</string>
+    <string name="automation_setup_dead_letter_latest">Latest persisted row: draft %3$s के लिए %1$s %2$s।</string>
     <string name="automation_setup_summary_blockers">AI Doctor को %1$d setup fix चाहिए</string>
     <string name="automation_setup_summary_start_with">%1$s से शुरू करें: %2$s</string>
     <string name="automation_setup_summary_required">नीचे required setup items resolve करें।</string>

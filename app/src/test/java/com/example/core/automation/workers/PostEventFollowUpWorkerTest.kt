@@ -22,6 +22,8 @@ import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.notification.ApprovalNotificationRequest
+import com.example.domain.model.occasion.OccasionType
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import io.mockk.Runs
@@ -38,6 +40,7 @@ import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -79,7 +82,7 @@ class PostEventFollowUpWorkerTest {
         coEvery { RateLimiter.waitIfNeeded() } returns Unit
         coEvery { sentMessageDao.getByContact(any()) } returns emptyList()
         every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
-        every { NotificationHelper.showApprovalNotification(any(), any(), any(), any(), any()) } just Runs
+        every { NotificationHelper.showApprovalNotification(any(), any(), any()) } just Runs
         every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
     }
 
@@ -101,23 +104,33 @@ class PostEventFollowUpWorkerTest {
         )
         val event = EventEntity(id = "event1", contactId = "c1", type = "BIRTHDAY", label = "Birthday", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         val pendingSlot = slot<PendingMessageEntity>()
+        val promptSlot = slot<String>()
 
         coEvery { sentMessageDao.getPostEventFollowUpCandidates(any(), any(), any()) } returns listOf(sent)
         coEvery { pendingMessageDao.getByEventId("FOLLOWUP_sent1") } returns null
         coEvery { contactDao.getById("c1") } returns contact
         coEvery { eventDao.getById("event1") } returns event
-        coEvery { geminiClient.generate(any()) } returns "Hey Amit, hope your birthday dinner was fun. Did you try that new place?"
+        coEvery { geminiClient.generate(capture(promptSlot)) } returns "Hey Amit, hope your birthday dinner was fun. Did you try that new place?"
 
         val result = worker().doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
+        assertTrue(promptSlot.captured.contains("- Event: Birthday"))
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
         assertEquals("FOLLOWUP_sent1", pendingSlot.captured.eventId)
         assertEquals("FULLY_AUTO", pendingSlot.captured.approvalMode)
         assertEquals(MessageStatus.APPROVED.raw, pendingSlot.captured.status)
         assertEquals(100, pendingSlot.captured.qualityScore)
+        coVerify {
+            eventDao.upsert(match {
+                it.id == "FOLLOWUP_sent1" &&
+                    it.type == OccasionType.FOLLOW_UP.raw &&
+                    it.label == "Follow-up" &&
+                    it.source == "AI_INFERRED"
+            })
+        }
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
-        verify(exactly = 0) { NotificationHelper.showApprovalNotification(any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { NotificationHelper.showApprovalNotification(any(), any(), any()) }
     }
 
     @Test
@@ -146,7 +159,17 @@ class PostEventFollowUpWorkerTest {
         assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
         assertEquals(MessageChannel.SMS.raw, pendingSlot.captured.channel)
         verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
-        verify { NotificationHelper.showApprovalNotification(any(), contact, any(), any(), pendingSlot.captured.id) }
+        verify {
+            NotificationHelper.showApprovalNotification(
+                any(),
+                match<ApprovalNotificationRequest> {
+                    it.contactId.value == contact.id &&
+                        it.eventId.value == "FOLLOWUP_sent1" &&
+                        it.messageId.value == pendingSlot.captured.id
+                },
+                any(),
+            )
+        }
     }
 
     @Test
@@ -177,7 +200,17 @@ class PostEventFollowUpWorkerTest {
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertEquals(true, pendingSlot.captured.isUsingFallback)
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
-        verify { NotificationHelper.showApprovalNotification(any(), contact, any(), any(), pendingSlot.captured.id) }
+        verify {
+            NotificationHelper.showApprovalNotification(
+                any(),
+                match<ApprovalNotificationRequest> {
+                    it.contactId.value == contact.id &&
+                        it.eventId.value == "FOLLOWUP_sent1" &&
+                        it.messageId.value == pendingSlot.captured.id
+                },
+                any(),
+            )
+        }
     }
 
     @Test
@@ -205,6 +238,7 @@ class PostEventFollowUpWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify(exactly = 0) { geminiClient.generate(any()) }
+        coVerify(exactly = 0) { eventDao.upsert(any()) }
         coVerify(exactly = 0) { pendingMessageDao.insert(any()) }
     }
 
@@ -236,6 +270,9 @@ class PostEventFollowUpWorkerTest {
             id = id,
             contactId = contactId,
             eventType = eventType,
+            eventId = eventType,
+            occasionType = "BIRTHDAY",
+            occasionLabel = "Birthday",
             eventYear = 2026,
             messageText = "Happy birthday Amit, hope this year brings more cricket and good coffee.",
             channel = MessageChannel.SMS.raw,
