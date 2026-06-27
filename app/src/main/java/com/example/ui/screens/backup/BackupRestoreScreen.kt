@@ -19,14 +19,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
@@ -125,7 +123,7 @@ fun BackupRestoreContent(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(RelateElevation.appBar)
                 )
             )
         }
@@ -137,28 +135,28 @@ fun BackupRestoreContent(
                 .background(RelateDarkBackground)
                 .testTag(BackupRestoreTestTags.SCREEN)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(RelateSpacing.screenHorizontal),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.xl)
         ) {
             // Security Warning Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(RelateRadius.card),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
+                    containerColor = RelateError.copy(alpha = RelateAlpha.feedbackContainer)
                 )
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(RelateSpacing.cardContent),
                     verticalAlignment = Alignment.Top
                 ) {
                     Icon(
                         Icons.Filled.Info,
                         contentDescription = stringResource(R.string.backup_security_warning_cd),
                         tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(RelateSize.iconLg)
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(RelateSpacing.md))
                     Column {
                         Text(
                             stringResource(R.string.backup_security_note_title),
@@ -166,7 +164,7 @@ fun BackupRestoreContent(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.error
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(RelateSpacing.xs))
                         Text(
                             stringResource(R.string.backup_security_note_body),
                             style = MaterialTheme.typography.bodyMedium,
@@ -180,8 +178,8 @@ fun BackupRestoreContent(
 
             RelateGlassCard {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(RelateSpacing.cardContent),
+                    verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)
                 ) {
                     Text(
                         stringResource(R.string.backup_passphrase_help),
@@ -217,10 +215,10 @@ fun BackupRestoreContent(
                     // Password Strength Indicator
                     if (uiState.passphrase.isNotEmpty()) {
                         val color = when (uiState.passwordStrength) {
-                            PasswordStrength.WEAK -> Color(0xFFEF4444)
-                            PasswordStrength.FAIR -> Color(0xFFF59E0B)
-                            PasswordStrength.STRONG -> Color(0xFF3B82F6)
-                            PasswordStrength.VERY_STRONG -> Color(0xFF10B981)
+                            PasswordStrength.WEAK -> RelateError
+                            PasswordStrength.FAIR -> RelateWarning
+                            PasswordStrength.STRONG -> RelateSecondary
+                            PasswordStrength.VERY_STRONG -> RelateSuccess
                         }
                         val progress = when (uiState.passwordStrength) {
                             PasswordStrength.WEAK -> 0.25f
@@ -229,7 +227,7 @@ fun BackupRestoreContent(
                             PasswordStrength.VERY_STRONG -> 1.0f
                         }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
@@ -250,6 +248,7 @@ fun BackupRestoreContent(
                                 progress = { progress },
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .height(RelateSize.progressTrack)
                                     .testTag(BackupRestoreTestTags.STRENGTH_INDICATOR),
                                 color = color,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -262,8 +261,8 @@ fun BackupRestoreContent(
             SectionHeader(title = stringResource(R.string.backup_actions_section))
 
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                if (maxWidth < 520.dp) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (maxWidth < RelateSize.actionGridBreakpoint) {
+                    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)) {
                         BackupActionCard(
                             modifier = Modifier.fillMaxWidth(),
                             testTag = BackupRestoreTestTags.EXPORT_ACTION,
@@ -294,7 +293,7 @@ fun BackupRestoreContent(
                 } else {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.lg)
                     ) {
                         BackupActionCard(
                             modifier = Modifier.weight(1f),
@@ -336,16 +335,16 @@ fun BackupRestoreContent(
                 RelateGlassCard {
                     Column(
                         modifier = Modifier
-                            .padding(16.dp)
+                            .padding(RelateSpacing.cardContent)
                             .testTag(BackupRestoreTestTags.STATUS_CARD),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)
                     ) {
                         when {
                             uiState.exportSuccessFileName != null -> {
                                 Text(
                                     stringResource(R.string.backup_export_success_title),
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF10B981),
+                                    color = RelateSuccess,
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
@@ -362,7 +361,7 @@ fun BackupRestoreContent(
                                 Text(
                                     stringResource(R.string.backup_import_success_title),
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF10B981),
+                                    color = RelateSuccess,
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
@@ -400,7 +399,9 @@ fun BackupRestoreContent(
                                 Button(
                                     onClick = onConfirmImport,
                                     enabled = !isBusy,
+                                    shape = RoundedCornerShape(RelateRadius.control),
                                     modifier = Modifier
+                                        .heightIn(min = RelateSize.compactButtonHeight)
                                         .align(Alignment.End)
                                         .testTag(BackupRestoreTestTags.CONFIRM_IMPORT)
                                 ) {
@@ -425,7 +426,9 @@ fun BackupRestoreContent(
                         Button(
                             onClick = onClearStatus,
                             colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                            shape = RoundedCornerShape(RelateRadius.control),
                             modifier = Modifier
+                                .heightIn(min = RelateSize.compactButtonHeight)
                                 .align(Alignment.End)
                                 .testTag(BackupRestoreTestTags.DISMISS_STATUS)
                         ) {
@@ -435,7 +438,7 @@ fun BackupRestoreContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
         }
     }
 }
@@ -457,39 +460,40 @@ private fun BackupActionCard(
     Card(
         modifier = modifier.testTag(testTag),
         onClick = onClick,
+        shape = RoundedCornerShape(RelateRadius.card),
         colors = CardDefaults.cardColors(containerColor = RelateCard),
         enabled = enabled,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 148.dp)
-                .padding(16.dp),
+                .heightIn(min = RelateSize.actionCardMinHeight)
+                .padding(RelateSpacing.cardContent),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(RelateSize.compactButtonHeight)
                         .testTag(progressTag),
-                    strokeWidth = 3.dp,
+                    strokeWidth = RelateSize.progressStroke,
                 )
             } else {
                 Icon(
                     icon,
                     contentDescription = contentDescription,
-                    tint = if (iconEnabled) RelatePrimary else RelateOnSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.size(36.dp)
+                    tint = if (iconEnabled) RelatePrimary else RelateOnSurfaceVariant.copy(alpha = RelateAlpha.disabled),
+                    modifier = Modifier.size(RelateSize.compactButtonHeight)
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Text(
                 title,
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleMedium
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,

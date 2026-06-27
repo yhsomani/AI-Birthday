@@ -358,7 +358,6 @@
     <string name="automation_setup_check_dead_letter">Dead Letter Queue</string>
     <string name="automation_setup_dead_letter_none">No persisted dispatch recovery records.</string>
     <string name="automation_setup_dead_letter_count">%1$d persisted dispatch recovery records need review; %2$d are dead-lettered.</string>
-    <string name="automation_setup_dead_letter_count_with_memory">%1$d persisted dispatch recovery records and %2$d in-memory dispatch records need review; %3$d are dead-lettered.</string>
     <string name="automation_setup_dead_letter_latest">Latest persisted row: %1$s %2$s for draft %3$s.</string>
     <string name="automation_setup_summary_blockers">AI Doctor found %1$d setup fix needed</string>
     <string name="automation_setup_summary_start_with">Start with %1$s: %2$s</string>

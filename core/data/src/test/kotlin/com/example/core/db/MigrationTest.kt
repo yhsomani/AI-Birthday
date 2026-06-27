@@ -87,6 +87,42 @@ class MigrationTest {
 
     @Test
     @Throws(IOException::class)
+    fun migrate15To16_addsDiagnosticSnapshotsTable() {
+        val dbName = "migration-15-to-16-diagnostic-snapshots"
+        var db = helper.createDatabase(dbName, 15)
+        db.close()
+
+        db = helper.runMigrationsAndValidate(
+            dbName,
+            16,
+            true,
+            AppDatabase.MIGRATION_15_16,
+        )
+
+        db.execSQL("""
+            INSERT INTO diagnostic_snapshots (
+                id, source, status, summary, checksJson, createdAtMs
+            ) VALUES (
+                'snapshot_1', 'HEALTH_MONITOR', 'WARNING', 'HealthMonitor warning', '{}', 1700000000000
+            )
+        """.trimIndent())
+        db.query("""
+            SELECT source, status, summary, checksJson, createdAtMs
+            FROM diagnostic_snapshots
+            WHERE id = 'snapshot_1'
+        """.trimIndent()).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("HEALTH_MONITOR", cursor.getString(0))
+            assertEquals("WARNING", cursor.getString(1))
+            assertEquals("HealthMonitor warning", cursor.getString(2))
+            assertEquals("{}", cursor.getString(3))
+            assertEquals(1_700_000_000_000L, cursor.getLong(4))
+        }
+        db.close()
+    }
+
+    @Test
+    @Throws(IOException::class)
     fun migrate12To13_addsFeedbackAndActivityWorkflowColumns() {
         val dbName = "migration-12-to-13-feedback"
         var db = helper.createDatabase(dbName, 12)

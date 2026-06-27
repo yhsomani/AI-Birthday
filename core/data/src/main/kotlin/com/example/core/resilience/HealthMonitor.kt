@@ -13,10 +13,13 @@ object HealthMonitor {
     private const val TAG = "HealthMonitor"
     private val circuitBreakers = mutableMapOf<String, CircuitBreaker>()
     private val recentErrors = mutableListOf<String>()
+    private val snapshotSinks = mutableMapOf<String, (HealthSnapshot) -> Unit>()
     private const val MAX_RECENT_ERRORS = 50
 
     fun register(name: String, breaker: CircuitBreaker) {
-        circuitBreakers[name] = breaker
+        synchronized(circuitBreakers) {
+            circuitBreakers[name] = breaker
+        }
     }
 
     fun recordError(context: String, error: String) {
@@ -29,10 +32,13 @@ object HealthMonitor {
             }
         }
         Log.w(TAG, "Error recorded: [$safeContext] $safeError")
+        notifySnapshotSinks()
     }
 
     fun snapshot(): HealthSnapshot {
-        val breakerStates = circuitBreakers.mapValues { it.value.currentState() }
+        val breakerStates = synchronized(circuitBreakers) {
+            circuitBreakers.mapValues { it.value.currentState() }
+        }
         val dlqCount = DeadLetterQueue.count()
         val errors = synchronized(recentErrors) { recentErrors.toList().takeLast(10) }
         val hasOpenBreakers = breakerStates.any { it.value != CircuitState.CLOSED }
@@ -45,4 +51,37 @@ object HealthMonitor {
     }
 
     fun isHealthy(): Boolean = snapshot().isHealthy
+
+    fun registerSnapshotSink(id: String, sink: (HealthSnapshot) -> Unit) {
+        synchronized(snapshotSinks) {
+            snapshotSinks[id] = sink
+        }
+    }
+
+    fun unregisterSnapshotSink(id: String) {
+        synchronized(snapshotSinks) {
+            snapshotSinks.remove(id)
+        }
+    }
+
+    fun clearForTests() {
+        synchronized(circuitBreakers) {
+            circuitBreakers.clear()
+        }
+        synchronized(recentErrors) {
+            recentErrors.clear()
+        }
+        synchronized(snapshotSinks) {
+            snapshotSinks.clear()
+        }
+    }
+
+    private fun notifySnapshotSinks() {
+        val snapshot = snapshot()
+        val sinks = synchronized(snapshotSinks) { snapshotSinks.values.toList() }
+        sinks.forEach { sink ->
+            runCatching { sink(snapshot) }
+                .onFailure { Log.e(TAG, "Failed to notify health snapshot sink", it) }
+        }
+    }
 }

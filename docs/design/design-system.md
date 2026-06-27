@@ -48,7 +48,17 @@ Sizing:
 | `RelateSize.iconMd` | 22 dp | Banner icons. |
 | `RelateSize.iconLg` | 24 dp | Navigation/stat icons. |
 | `RelateSize.avatar` | 44 dp | Contact avatars. |
+| `RelateSize.loadingPanelHeight` | 200 dp | Reserved loading space for dashboard panels that would otherwise shift content. |
+| `RelateSize.actionCardMinHeight` | 148 dp | Responsive command cards with icon, title, and supporting copy. |
+| `RelateSize.actionGridBreakpoint` | 520 dp | Breakpoint for switching paired action cards from stacked to side-by-side. |
 | `RelateSize.progressTrack` | 4 dp | Health/progress bars. |
+| `RelateSize.progressStroke` | 3 dp | Circular progress indicators inside compact action surfaces. |
+
+Elevation:
+
+| Token | Value | Use |
+| --- | ---: | --- |
+| `RelateElevation.appBar` | 3 dp | Subtle top app bar surface separation. |
 
 Color:
 

@@ -359,7 +359,6 @@
     <string name="automation_setup_check_dead_letter">डेड-लेटर कतार</string>
     <string name="automation_setup_dead_letter_none">स्थायी भेजाई रिकवरी रिकॉर्ड नहीं हैं।</string>
     <string name="automation_setup_dead_letter_count">%1$d स्थायी भेजाई रिकवरी रिकॉर्ड को समीक्षा चाहिए; %2$d डेड-लेटर हैं।</string>
-    <string name="automation_setup_dead_letter_count_with_memory">%1$d स्थायी भेजाई रिकवरी रिकॉर्ड और %2$d इन-मेमोरी भेजाई रिकॉर्ड को समीक्षा चाहिए; %3$d डेड-लेटर हैं।</string>
     <string name="automation_setup_dead_letter_latest">ताज़ा स्थायी पंक्ति: ड्राफ्ट %3$s के लिए %1$s %2$s।</string>
     <string name="automation_setup_summary_blockers">AI डॉक्टर को %1$d सेटअप समाधान चाहिए</string>
     <string name="automation_setup_summary_start_with">%1$s से शुरू करें: %2$s</string>

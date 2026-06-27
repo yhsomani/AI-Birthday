@@ -9,6 +9,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.core.db.dao.ActivityLogDao
 import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.DiagnosticSnapshotDao
 import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.GiftHistoryDao
@@ -19,6 +20,7 @@ import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.dao.StyleProfileDao
 import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.db.entities.ContactEntity
+import com.example.core.db.entities.DiagnosticSnapshotEntity
 import com.example.core.db.entities.DispatchAttemptEntity
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.GiftHistoryEntity
@@ -44,8 +46,9 @@ import net.sqlcipher.database.SupportFactory
         ActivityLogEntity::class,
         MessageFeedbackEntity::class,
         DispatchAttemptEntity::class,
+        DiagnosticSnapshotEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -59,6 +62,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun activityLogDao(): ActivityLogDao
     abstract fun messageFeedbackDao(): MessageFeedbackDao
     abstract fun dispatchAttemptDao(): DispatchAttemptDao
+    abstract fun diagnosticSnapshotDao(): DiagnosticSnapshotDao
     // abstract fun moodLogDao(): MoodLogDao
 
     companion object {
@@ -606,6 +610,36 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS diagnostic_snapshots (
+                        id TEXT NOT NULL,
+                        source TEXT NOT NULL DEFAULT 'AI_DOCTOR',
+                        status TEXT NOT NULL DEFAULT 'OK',
+                        summary TEXT NOT NULL,
+                        checksJson TEXT NOT NULL DEFAULT '{}',
+                        createdAtMs INTEGER NOT NULL,
+                        PRIMARY KEY(id)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_diagnostic_snapshots_source_createdAtMs
+                    ON diagnostic_snapshots(source, createdAtMs)
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_diagnostic_snapshots_createdAtMs
+                    ON diagnostic_snapshots(createdAtMs)
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun closeAndResetInstance() {
             synchronized(this) {
                 INSTANCE?.let { db ->
@@ -654,6 +688,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_12_13,
                     MIGRATION_13_14,
                     MIGRATION_14_15,
+                    MIGRATION_15_16,
                 )
                 .build()
                 INSTANCE = instance

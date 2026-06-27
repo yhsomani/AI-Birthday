@@ -37,8 +37,12 @@ object RelateSize {
     val iconMd = 22.dp
     val iconLg = 24.dp
     val avatar = 44.dp
+    val loadingPanelHeight = 200.dp
+    val actionCardMinHeight = 148.dp
+    val actionGridBreakpoint = 520.dp
     val indicatorDot = 10.dp
     val progressTrack = 4.dp
+    val progressStroke = 3.dp
 }
 
 object RelateAlpha {
@@ -46,4 +50,8 @@ object RelateAlpha {
     const val subtle = 0.82f
     const val feedbackContainer = 0.15f
     const val fieldContainer = 0.22f
+}
+
+object RelateElevation {
+    val appBar = 3.dp
 }

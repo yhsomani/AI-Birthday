@@ -389,7 +389,6 @@ class LocalizationParityTest {
             "automation_setup_check_dead_letter",
             "automation_setup_dead_letter_none",
             "automation_setup_dead_letter_count",
-            "automation_setup_dead_letter_count_with_memory",
             "automation_setup_dead_letter_latest",
             "automation_setup_summary_blockers",
             "automation_setup_summary_required",

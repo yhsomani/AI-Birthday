@@ -46,7 +46,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -54,9 +53,13 @@ import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
 import com.example.core.ui.components.StatCard
+import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSuccess
 import com.example.core.ui.theme.RelateWarning
 import com.example.ui.components.SyncErrorCard
@@ -137,10 +140,10 @@ internal fun HomeContent(
         modifier = Modifier
             .fillMaxSize()
             .background(RelateDarkBackground)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = RelateSpacing.screenHorizontal),
     ) {
         item {
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.screenTop))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -152,11 +155,11 @@ internal fun HomeContent(
                             model = state.userPhotoUrl,
                             contentDescription = stringResource(R.string.profile_photo),
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(RelateSize.avatar)
                                 .clip(CircleShape),
                             contentScale = ContentScale.Crop,
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(RelateSpacing.md))
                     }
                     Text(
                         text = stringResource(R.string.home_greeting, displayUserName),
@@ -176,7 +179,7 @@ internal fun HomeContent(
 
         state.syncError?.let { errorMsg ->
             item {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.lg))
                 SyncErrorCard(
                     message = errorMsg,
                     onRetry = onRetrySync,
@@ -193,7 +196,7 @@ internal fun HomeContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp),
+                        .height(RelateSize.loadingPanelHeight),
                     contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(color = RelatePrimary)
@@ -201,14 +204,14 @@ internal fun HomeContent(
             }
         } else {
             item {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.xl))
                 state.primaryAction?.let { action ->
                     NextActionSection(
                         primaryAction = action,
                         supportingActions = state.supportingActions,
                         onActionClick = navigateToAction,
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(RelateSpacing.lg))
                 }
                 if (state.setupProgress.totalSteps > 0) {
                     SetupProgressCard(
@@ -216,110 +219,28 @@ internal fun HomeContent(
                         onClick = onNavigateToAutomationSetup,
                         modifier = Modifier.testTag(HomeScreenTestTags.SETUP_PROGRESS_CARD),
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(RelateSpacing.lg))
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    StatCard(
-                        label = stringResource(R.string.home_stat_wishes_sent),
-                        value = "${state.sentCount}",
-                        icon = Icons.Filled.Star,
-                        modifier = Modifier.weight(1f),
-                    )
-                    StatCard(
-                        label = stringResource(R.string.home_stat_upcoming),
-                        value = "${state.upcomingEventsCount}",
-                        icon = Icons.Filled.CalendarMonth,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    StatCard(
-                        label = stringResource(R.string.dashboard_contacts),
-                        value = "${state.contactCount}",
-                        icon = Icons.Filled.People,
-                        modifier = Modifier.weight(1f),
-                    )
-                    StatCard(
-                        label = stringResource(R.string.messages_pending),
-                        value = "${state.pendingCount}",
-                        icon = Icons.Filled.MailOutline,
-                        modifier = Modifier.weight(1f),
-                    )
-                    StatCard(
-                        label = stringResource(R.string.home_stat_score),
-                        value = "${state.healthScore}",
-                        icon = Icons.Filled.Favorite,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                HomeStatsGrid(state = state)
             }
         }
 
         item {
-            Spacer(modifier = Modifier.height(24.dp))
-            SectionHeader(title = stringResource(R.string.dashboard_quick_actions))
-            Spacer(modifier = Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    QuickActionTile(
-                        label = stringResource(R.string.analytics),
-                        icon = Icons.Filled.Analytics,
-                        onClick = onNavigateToAnalytics,
-                        modifier = Modifier.weight(1f),
-                        testTag = HomeScreenTestTags.QUICK_ACTION_ANALYTICS,
-                    )
-                    QuickActionTile(
-                        label = stringResource(R.string.activity_history_title),
-                        icon = Icons.Filled.History,
-                        onClick = onNavigateToActivityHistory,
-                        modifier = Modifier.weight(1f),
-                        testTag = HomeScreenTestTags.QUICK_ACTION_ACTIVITY_HISTORY,
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    QuickActionTile(
-                        label = stringResource(R.string.settings_ai_style_coach),
-                        icon = Icons.Filled.SmartToy,
-                        onClick = onNavigateToStyleCoach,
-                        modifier = Modifier.weight(1f),
-                        testTag = HomeScreenTestTags.QUICK_ACTION_STYLE_COACH,
-                    )
-                    QuickActionTile(
-                        label = stringResource(R.string.settings_automation_setup),
-                        icon = Icons.Filled.Settings,
-                        onClick = onNavigateToAutomationSetup,
-                        modifier = Modifier.weight(1f),
-                        testTag = HomeScreenTestTags.QUICK_ACTION_AUTOMATION_SETUP,
-                    )
-                }
-                QuickActionTile(
-                    label = stringResource(R.string.backup_restore_title),
-                    icon = Icons.Filled.Storage,
-                    onClick = onNavigateToBackupRestore,
-                    testTag = HomeScreenTestTags.QUICK_ACTION_BACKUP_RESTORE,
-                )
-            }
+            HomeQuickActions(
+                onNavigateToAnalytics = onNavigateToAnalytics,
+                onNavigateToActivityHistory = onNavigateToActivityHistory,
+                onNavigateToStyleCoach = onNavigateToStyleCoach,
+                onNavigateToAutomationSetup = onNavigateToAutomationSetup,
+                onNavigateToBackupRestore = onNavigateToBackupRestore,
+            )
         }
 
         if (state.plannerItems.isNotEmpty()) {
             item {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(RelateSpacing.xl))
                 SectionHeader(title = stringResource(R.string.relationship_planner_title))
-                Spacer(modifier = Modifier.height(8.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Spacer(modifier = Modifier.height(RelateSpacing.sm))
+                Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
                     state.plannerItems.forEach { item ->
                         PlannerItemCard(
                             item = item,
@@ -334,13 +255,13 @@ internal fun HomeContent(
         }
 
         item {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
             SectionHeader(title = stringResource(R.string.home_upcoming_birthdays))
         }
 
         item {
             RelateGlassCard {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
                     if (state.upcomingBirthdays.isEmpty()) {
                         Text(
                             text = stringResource(R.string.home_no_upcoming_birthdays),
@@ -351,14 +272,119 @@ internal fun HomeContent(
                         state.upcomingBirthdays.forEachIndexed { index, birthday ->
                             BirthdayRow(name = birthday.name, date = birthday.date)
                             if (index < state.upcomingBirthdays.lastIndex) {
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(RelateSpacing.md))
                             }
                         }
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
         }
+    }
+}
+
+@Composable
+private fun HomeStatsGrid(state: HomeUiState) {
+    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
+        ) {
+            StatCard(
+                label = stringResource(R.string.home_stat_wishes_sent),
+                value = "${state.sentCount}",
+                icon = Icons.Filled.Star,
+                modifier = Modifier.weight(1f),
+            )
+            StatCard(
+                label = stringResource(R.string.home_stat_upcoming),
+                value = "${state.upcomingEventsCount}",
+                icon = Icons.Filled.CalendarMonth,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
+        ) {
+            StatCard(
+                label = stringResource(R.string.dashboard_contacts),
+                value = "${state.contactCount}",
+                icon = Icons.Filled.People,
+                modifier = Modifier.weight(1f),
+            )
+            StatCard(
+                label = stringResource(R.string.messages_pending),
+                value = "${state.pendingCount}",
+                icon = Icons.Filled.MailOutline,
+                modifier = Modifier.weight(1f),
+            )
+            StatCard(
+                label = stringResource(R.string.home_stat_score),
+                value = "${state.healthScore}",
+                icon = Icons.Filled.Favorite,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeQuickActions(
+    onNavigateToAnalytics: () -> Unit,
+    onNavigateToActivityHistory: () -> Unit,
+    onNavigateToStyleCoach: () -> Unit,
+    onNavigateToAutomationSetup: () -> Unit,
+    onNavigateToBackupRestore: () -> Unit,
+) {
+    Spacer(modifier = Modifier.height(RelateSpacing.xl))
+    SectionHeader(title = stringResource(R.string.dashboard_quick_actions))
+    Spacer(modifier = Modifier.height(RelateSpacing.sm))
+    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        ) {
+            QuickActionTile(
+                label = stringResource(R.string.analytics),
+                icon = Icons.Filled.Analytics,
+                onClick = onNavigateToAnalytics,
+                modifier = Modifier.weight(1f),
+                testTag = HomeScreenTestTags.QUICK_ACTION_ANALYTICS,
+            )
+            QuickActionTile(
+                label = stringResource(R.string.activity_history_title),
+                icon = Icons.Filled.History,
+                onClick = onNavigateToActivityHistory,
+                modifier = Modifier.weight(1f),
+                testTag = HomeScreenTestTags.QUICK_ACTION_ACTIVITY_HISTORY,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        ) {
+            QuickActionTile(
+                label = stringResource(R.string.settings_ai_style_coach),
+                icon = Icons.Filled.SmartToy,
+                onClick = onNavigateToStyleCoach,
+                modifier = Modifier.weight(1f),
+                testTag = HomeScreenTestTags.QUICK_ACTION_STYLE_COACH,
+            )
+            QuickActionTile(
+                label = stringResource(R.string.settings_automation_setup),
+                icon = Icons.Filled.Settings,
+                onClick = onNavigateToAutomationSetup,
+                modifier = Modifier.weight(1f),
+                testTag = HomeScreenTestTags.QUICK_ACTION_AUTOMATION_SETUP,
+            )
+        }
+        QuickActionTile(
+            label = stringResource(R.string.backup_restore_title),
+            icon = Icons.Filled.Storage,
+            onClick = onNavigateToBackupRestore,
+            testTag = HomeScreenTestTags.QUICK_ACTION_BACKUP_RESTORE,
+        )
     }
 }
 
@@ -378,7 +404,7 @@ private fun NextActionSection(
     onActionClick: (HomeActionTarget) -> Unit,
 ) {
     SectionHeader(title = stringResource(R.string.home_next_action_section))
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier = Modifier.height(RelateSpacing.sm))
     NextActionCard(
         action = primaryAction,
         onClick = { onActionClick(primaryAction.actionTarget) },
@@ -386,14 +412,14 @@ private fun NextActionSection(
         isPrimary = true,
     )
     if (supportingActions.isNotEmpty()) {
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Text(
             text = stringResource(R.string.home_supporting_actions_section),
             style = MaterialTheme.typography.labelMedium,
             color = RelateOnSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
+        Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
             supportingActions.forEach { action ->
                 NextActionCard(
                     action = action,
@@ -440,15 +466,15 @@ private fun NextActionCard(
             .clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(if (isPrimary) 16.dp else 14.dp),
+            modifier = Modifier.padding(if (isPrimary) RelateSpacing.cardContent else RelateSpacing.compactCardContent),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(if (isPrimary) 24.dp else 20.dp),
+                modifier = Modifier.size(if (isPrimary) RelateSize.iconLg else RelateSize.iconMd),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -545,18 +571,18 @@ private fun SetupProgressCard(
             .clickable(onClick = onClick),
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(RelateSpacing.compactCardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
             ) {
                 Icon(
                     imageVector = statusIcon,
                     contentDescription = null,
                     tint = statusColor,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(RelateSize.iconMd),
                 )
                 Text(
                     text = stringResource(R.string.setup_progress_title),
@@ -577,7 +603,9 @@ private fun SetupProgressCard(
             }
             LinearProgressIndicator(
                 progress = { summary.progressFraction.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(RelateSize.progressTrack),
                 color = statusColor,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
@@ -602,15 +630,15 @@ private fun PlannerItemCard(
             .clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(RelateSpacing.compactCardContent),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Icon(
                 imageVector = Icons.Filled.Favorite,
                 contentDescription = null,
                 tint = RelatePrimary,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(RelateSize.iconMd),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -641,15 +669,15 @@ private fun ReadinessBanner(
             .clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(RelateSpacing.compactCardContent),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Icon(
                 imageVector = Icons.Filled.Warning,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(RelateSize.iconMd),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -682,16 +710,16 @@ private fun QuickActionTile(
             .clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(RelateSpacing.compactCardContent),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = RelatePrimary,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(RelateSize.iconMd),
             )
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(RelateSpacing.sm))
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
@@ -713,9 +741,9 @@ private fun BirthdayRow(
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(RelatePrimary.copy(alpha = 0.2f)),
+                .size(RelateSize.avatar)
+                .clip(RoundedCornerShape(RelateRadius.control))
+                .background(RelatePrimary.copy(alpha = RelateAlpha.feedbackContainer)),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -724,7 +752,7 @@ private fun BirthdayRow(
                 color = RelatePrimary,
             )
         }
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(RelateSpacing.md))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = name,

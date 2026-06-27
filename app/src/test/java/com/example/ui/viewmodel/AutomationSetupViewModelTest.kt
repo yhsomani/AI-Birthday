@@ -1,21 +1,31 @@
 package com.example.ui.viewmodel
 
+import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.R
+import com.example.core.resilience.DeadLetterEntry
+import com.example.core.resilience.DeadLetterQueue
+import com.example.core.resilience.HealthMonitor
+import com.example.core.resilience.StructuredLogger
 import com.example.core.gemini.GeminiClient
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.DiagnosticSnapshotId
 import com.example.domain.model.common.DispatchAttemptId
 import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.contact.ContactAutomationReadinessProfile
+import com.example.domain.model.diagnostic.DiagnosticSnapshot
+import com.example.domain.model.diagnostic.DiagnosticSnapshotSource
+import com.example.domain.model.diagnostic.DiagnosticSnapshotStatus
 import com.example.domain.model.dispatch.DispatchAttempt
 import com.example.domain.model.dispatch.DispatchAttemptCreator
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.DispatchEligibilityRecord
 import com.example.domain.repository.ContactRepository
+import com.example.domain.repository.DiagnosticSnapshotRepository
 import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.SyncContactsUseCase
@@ -46,7 +56,7 @@ import org.robolectric.annotation.Config
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], application = Application::class)
 class AutomationSetupViewModelTest {
 
     @get:Rule
@@ -73,12 +83,18 @@ class AutomationSetupViewModelTest {
     @RelaxedMockK
     private lateinit var dispatchAttemptRepository: DispatchAttemptRepository
 
+    @RelaxedMockK
+    private lateinit var diagnosticSnapshotRepository: DiagnosticSnapshotRepository
+
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var context: Context
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        DeadLetterQueue.clear()
+        HealthMonitor.clearForTests()
+        StructuredLogger.clearForTests()
         context = ApplicationProvider.getApplicationContext()
         every { securePrefs.getGoogleOAuthToken() } returns ""
         every { securePrefs.getGeminiApiKey() } returns ""
@@ -92,10 +108,15 @@ class AutomationSetupViewModelTest {
         every { dispatchAttemptRepository.countFailureRecoveryQueue() } returns flowOf(0)
         every { dispatchAttemptRepository.countDeadLettered() } returns flowOf(0)
         coEvery { dispatchAttemptRepository.getFailureRecoveryQueue(any()) } returns emptyList()
+        coEvery { diagnosticSnapshotRepository.getLatestBySource(any()) } returns null
+        coEvery { diagnosticSnapshotRepository.record(any()) } returns Unit
     }
 
     @After
     fun tearDown() {
+        DeadLetterQueue.clear()
+        HealthMonitor.clearForTests()
+        StructuredLogger.clearForTests()
         Dispatchers.resetMain()
     }
 
@@ -299,6 +320,85 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
+    fun `buildChecksForTesting ignores legacy in-memory dead letters when persisted recovery is empty`() =
+        runTest(testDispatcher) {
+            DeadLetterQueue.enqueue(
+                DeadLetterEntry(
+                    id = "draft_memory_only",
+                    payload = "Message text",
+                    errorMessage = "Legacy failure",
+                    errorType = "LEGACY",
+                    retryCount = 0,
+                ),
+            )
+
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val recoveryCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_dead_letter) }
+
+            assertEquals(ReadinessStatus.OK, recoveryCheck.status)
+            assertEquals(context.getString(R.string.automation_setup_dead_letter_none), recoveryCheck.detail)
+        }
+
+    @Test
+    fun `buildChecksForTesting surfaces recent persisted HealthMonitor warning after process restart`() =
+        runTest(testDispatcher) {
+            coEvery {
+                diagnosticSnapshotRepository.getLatestBySource(DiagnosticSnapshotSource.HEALTH_MONITOR)
+            } returns DiagnosticSnapshot(
+                id = DiagnosticSnapshotId("health_1"),
+                source = DiagnosticSnapshotSource.HEALTH_MONITOR,
+                status = DiagnosticSnapshotStatus.WARNING,
+                summary = "HealthMonitor: healthy=false; recentErrors=1",
+                checksJson = "{}",
+                createdAtMs = System.currentTimeMillis(),
+            )
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val recentErrorsCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_recent_errors) }
+
+            assertEquals(ReadinessStatus.WARNING, recentErrorsCheck.status)
+            assertEquals(AiDoctorAction.OPEN_ACTIVITY_HISTORY, recentErrorsCheck.action)
+            assertEquals(context.getString(R.string.automation_setup_action_view_activity), recentErrorsCheck.actionLabel)
+            assertTrue(recentErrorsCheck.detail.contains("HealthMonitor"))
+        }
+
+    @Test
+    fun `buildChecksForTesting persists redacted AI Doctor diagnostic snapshot`() =
+        runTest(testDispatcher) {
+            val recorded = mutableListOf<DiagnosticSnapshot>()
+            coEvery {
+                diagnosticSnapshotRepository.getLatestBySource(DiagnosticSnapshotSource.HEALTH_MONITOR)
+            } returns DiagnosticSnapshot(
+                id = DiagnosticSnapshotId("health_secret"),
+                source = DiagnosticSnapshotSource.HEALTH_MONITOR,
+                status = DiagnosticSnapshotStatus.WARNING,
+                summary = "HealthMonitor user=aarav@example.com Authorization=Bearer ya29.secret-token",
+                checksJson = "{}",
+                createdAtMs = System.currentTimeMillis(),
+            )
+            coEvery { diagnosticSnapshotRepository.record(capture(recorded)) } returns Unit
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            viewModel.buildChecksForTesting()
+            val aiDoctorSnapshot = recorded.last { it.source == DiagnosticSnapshotSource.AI_DOCTOR }
+
+            assertEquals(DiagnosticSnapshotSource.AI_DOCTOR, aiDoctorSnapshot.source)
+            assertFalse(aiDoctorSnapshot.summary.contains("aarav@example.com"))
+            assertFalse(aiDoctorSnapshot.checksJson.contains("aarav@example.com"))
+            assertFalse(aiDoctorSnapshot.summary.contains("ya29.secret-token"))
+            assertFalse(aiDoctorSnapshot.checksJson.contains("ya29.secret-token"))
+            assertTrue(aiDoctorSnapshot.checksJson.contains(context.getString(R.string.automation_setup_check_recent_errors)))
+            assertTrue(aiDoctorSnapshot.checksJson.contains("[REDACTED_EMAIL]"))
+            assertTrue(aiDoctorSnapshot.checksJson.contains("Bearer [REDACTED]"))
+        }
+
+    @Test
     fun `recommendedFixForTesting ranks required blockers before earlier warnings and quality fixes`() = runTest(testDispatcher) {
         val viewModel = newViewModel()
         advanceUntilIdle()
@@ -405,6 +505,7 @@ class AutomationSetupViewModelTest {
             styleProfileRepository = styleProfileRepository,
             testSendUseCase = testSendUseCase,
             dispatchAttemptRepository = dispatchAttemptRepository,
+            diagnosticSnapshotRepository = diagnosticSnapshotRepository,
         )
     }
 

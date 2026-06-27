@@ -3,6 +3,7 @@ package com.example.di
 import android.content.Context
 import com.example.core.db.AppDatabase
 import com.example.core.db.dao.ContactDao
+import com.example.core.db.dao.DiagnosticSnapshotDao
 import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
@@ -13,6 +14,7 @@ import com.google.firebase.vertexai.FirebaseVertexAI
 import com.google.firebase.vertexai.GenerativeModel
 import com.example.data.repository.ContactRepositoryImpl
 import com.example.data.repository.ActivityLogRepositoryImpl
+import com.example.data.repository.DiagnosticSnapshotRepositoryImpl
 import com.example.data.repository.DispatchAttemptRepositoryImpl
 import com.example.data.repository.EventRepositoryImpl
 import com.example.data.repository.MessageRepositoryImpl
@@ -20,6 +22,7 @@ import com.example.data.repository.MessageFeedbackRepositoryImpl
 import com.example.data.repository.StyleProfileRepositoryImpl
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.ActivityLogRepository
+import com.example.domain.repository.DiagnosticSnapshotRepository
 import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
@@ -79,6 +82,12 @@ abstract class AppModuleBinds {
     @Binds
     @Singleton
     abstract fun bindDispatchAttemptRepository(impl: DispatchAttemptRepositoryImpl): DispatchAttemptRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDiagnosticSnapshotRepository(
+        impl: DiagnosticSnapshotRepositoryImpl,
+    ): DiagnosticSnapshotRepository
 }
 
 @Module
@@ -132,6 +141,11 @@ object AppModule {
     @Provides
     @Singleton
     fun provideDispatchAttemptDao(database: AppDatabase): DispatchAttemptDao = database.dispatchAttemptDao()
+
+    @Provides
+    @Singleton
+    fun provideDiagnosticSnapshotDao(database: AppDatabase): DiagnosticSnapshotDao =
+        database.diagnosticSnapshotDao()
 
     @Provides
     @Singleton

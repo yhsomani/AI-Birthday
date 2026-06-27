@@ -9,6 +9,7 @@ This checklist is the production gate for RelateAI. A release is not ready until
 - Run the full debug gate:
   `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`
 - Run focused release-risk tests when changing permissions, dispatch, backup, auth, localization, or navigation.
+- Confirm pull requests with dependency changes pass GitHub Dependency Review for moderate-or-higher vulnerabilities and denied licenses; see `docs/security/dependency-review.md`.
 - Run `git diff --check` before handoff.
 - Confirm Room schema exports and migrations are committed when database versions change.
 - Confirm no generated, local, signing, or secret files are accidentally staged.
@@ -56,7 +57,7 @@ Release requirements:
 
 - Privacy policy URL is public, non-geofenced, and describes all personal/sensitive data handling.
 - Data Safety form matches final app behavior and privacy policy.
-- Contacts, SMS, AI prompt/response data, backups, notifications, auth data, and dispatch diagnostics are represented accurately.
+- Contacts, SMS, AI prompt/response data, backups, notifications, auth data, dispatch diagnostics, and local diagnostic snapshots are represented accurately.
 - In-app disclosures precede sensitive permission or API use when required.
 - Denying a non-critical permission keeps a reasonable app path available.
 - Account deletion and local sign-out behavior are documented and tested.
@@ -83,9 +84,11 @@ Release requirements:
 
 ## Security Gate
 
-- Network security pins are valid beyond the release support window.
+- Network security pins are valid beyond the release support window. CI runs `ProductionReadinessConfigTest`, which fails release readiness when the soonest `network_security_config.xml` pin expiration is within 60 days.
+- Dependency changes pass the CI dependency-review gate, and the final release branch has no unresolved dependency graph or Dependabot security alerts.
 - No API keys, OAuth tokens, SMTP passwords, database keys, phone/email fixtures, raw AI responses, or message bodies appear in logs, test output, backups, or analytics exports outside explicit user export flows.
 - SQLCipher key strategy and backup recovery limitations are reviewed.
+- Fresh-install database keying generates random local key material formatted as SQLCipher raw-key literals; legacy identifier-derived key recovery is treated as migration-only and must be tested before removal.
 - Sign-out clears local stores, workers, alarms, notifications, cached database keys, and auth state through one orchestrator.
 - Auto backup remains disabled or sensitive stores remain excluded.
 
@@ -104,6 +107,7 @@ Release requirements:
 - Permission denial paths are exercised for contacts, notifications, SMS, exact alarms, and Accessibility.
 - Reboot recovery restores scheduled work without direct send from boot receiver.
 - Backup export/import round trip succeeds and excludes secrets.
+- Backup export/import does not restore stale local diagnostic snapshots; AI Doctor/HealthMonitor diagnostics are rebuilt from current state.
 - Sign-out clears local state and cancels scheduled work once through `AuthManager.signOut()`.
 
 ## Release Notes Requirements

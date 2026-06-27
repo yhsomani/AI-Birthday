@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,9 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -45,16 +48,19 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
 import com.example.core.ui.components.RelateStatusBanner
+import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSuccess
 import com.example.core.ui.theme.RelateWarning
 import com.example.ui.viewmodel.AiDoctorAction
@@ -90,7 +96,7 @@ fun AutomationSetupScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
         ) {
             val summaryColors = state.summary.status.statusColors()
             RelateStatusBanner(
@@ -169,7 +175,7 @@ fun AutomationSetupScreen(
                 secondary = true,
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
         }
     }
 }
@@ -194,8 +200,8 @@ private fun ReadinessDashboard(
 ) {
     RelateGlassCard {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -207,8 +213,8 @@ private fun ReadinessDashboard(
                 )
                 if (isRefreshing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(RelateSize.iconSm),
+                        strokeWidth = RelateSpacing.xxs,
                         color = RelatePrimary,
                     )
                 }
@@ -247,80 +253,101 @@ private fun ReadinessDashboard(
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = onRefresh,
-                    modifier = Modifier.weight(1f),
-                    enabled = !isRefreshing,
-                ) {
-                    Text(stringResource(R.string.automation_setup_action_refresh))
-                }
-                OutlinedButton(
-                    onClick = onDryRun,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.automation_setup_action_dry_run))
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = onSyncContacts,
-                    modifier = Modifier.weight(1f),
-                    enabled = !isSyncingContacts,
-                    colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
-                ) {
-                    if (isSyncingContacts) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = RelateDarkBackground,
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(R.string.automation_setup_action_sync_contacts),
-                            color = RelateDarkBackground,
-                        )
-                    }
-                }
-                Button(
-                    onClick = onTestAi,
-                    modifier = Modifier.weight(1f),
-                    enabled = !isTestingAi,
-                    colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
-                ) {
-                    if (isTestingAi) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = RelateDarkBackground,
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(R.string.automation_setup_action_test_ai),
-                            color = RelateDarkBackground,
-                        )
-                    }
-                }
-            }
-            Button(
-                onClick = onTestEmail,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isTestingEmail,
-                colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+            ReadinessActionPanel(
+                isRefreshing = isRefreshing,
+                isSyncingContacts = isSyncingContacts,
+                isTestingAi = isTestingAi,
+                isTestingEmail = isTestingEmail,
+                onRefresh = onRefresh,
+                onDryRun = onDryRun,
+                onSyncContacts = onSyncContacts,
+                onTestAi = onTestAi,
+                onTestEmail = onTestEmail,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReadinessActionPanel(
+    isRefreshing: Boolean,
+    isSyncingContacts: Boolean,
+    isTestingAi: Boolean,
+    isTestingEmail: Boolean,
+    onRefresh: () -> Unit,
+    onDryRun: () -> Unit,
+    onSyncContacts: () -> Unit,
+    onTestAi: () -> Unit,
+    onTestEmail: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
+            OutlinedButton(
+                onClick = onRefresh,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = RelateSize.compactButtonHeight),
+                enabled = !isRefreshing,
             ) {
-                if (isTestingEmail) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = RelateDarkBackground,
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text(
-                        text = stringResource(R.string.automation_setup_action_test_email),
-                        color = RelateDarkBackground,
-                    )
-                }
+                Text(stringResource(R.string.automation_setup_action_refresh))
             }
+            OutlinedButton(
+                onClick = onDryRun,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = RelateSize.compactButtonHeight),
+            ) {
+                Text(stringResource(R.string.automation_setup_action_dry_run))
+            }
+        }
+        PrimaryReadinessButton(
+            text = stringResource(R.string.automation_setup_action_sync_contacts),
+            loading = isSyncingContacts,
+            enabled = !isSyncingContacts,
+            onClick = onSyncContacts,
+        )
+        PrimaryReadinessButton(
+            text = stringResource(R.string.automation_setup_action_test_ai),
+            loading = isTestingAi,
+            enabled = !isTestingAi,
+            onClick = onTestAi,
+        )
+        PrimaryReadinessButton(
+            text = stringResource(R.string.automation_setup_action_test_email),
+            loading = isTestingEmail,
+            enabled = !isTestingEmail,
+            onClick = onTestEmail,
+        )
+    }
+}
+
+@Composable
+private fun PrimaryReadinessButton(
+    text: String,
+    loading: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = RelateSize.primaryButtonHeight),
+        enabled = enabled,
+        shape = RoundedCornerShape(RelateRadius.control),
+        colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+    ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(RelateSize.iconSm),
+                color = RelateDarkBackground,
+                strokeWidth = RelateSpacing.xxs,
+            )
+        } else {
+            Text(
+                text = text,
+                color = RelateDarkBackground,
+            )
         }
     }
 }
@@ -354,7 +381,7 @@ private fun SetupProgressStrip(summary: SetupProgressSummary) {
         else -> stringResource(R.string.setup_progress_ready)
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -378,7 +405,9 @@ private fun SetupProgressStrip(summary: SetupProgressSummary) {
         }
         LinearProgressIndicator(
             progress = { summary.progressFraction.coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(RelateSize.progressTrack),
             color = color,
             trackColor = MaterialTheme.colorScheme.surfaceVariant,
         )
@@ -396,17 +425,26 @@ private fun RecommendedFixSection(
     onAction: (AiDoctorAction) -> Unit,
 ) {
     val color = fix.status.statusColors().content
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = fix.status.statusColors().container,
+                shape = RoundedCornerShape(RelateRadius.card),
+            )
+            .padding(RelateSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             Icon(
                 imageVector = fix.status.statusIcon(),
                 contentDescription = null,
                 tint = color,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(RelateSize.iconMd),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -430,7 +468,10 @@ private fun RecommendedFixSection(
         }
         Button(
             onClick = { onAction(fix.action) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = RelateSize.primaryButtonHeight),
+            shape = RoundedCornerShape(RelateRadius.control),
             colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
         ) {
             Text(
@@ -447,7 +488,7 @@ private fun ReadinessGroupSection(
     checks: List<ReadinessCheck>,
     onAction: (AiDoctorAction) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
         Text(
             text = group.label(),
             style = MaterialTheme.typography.labelLarge,
@@ -478,13 +519,13 @@ private fun ReadinessRow(
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
     ) {
         Icon(
             icon,
             contentDescription = null,
             tint = color,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(RelateSize.iconMd),
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -498,13 +539,13 @@ private fun ReadinessRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = RelateOnSurfaceVariant,
             )
-        }
-        if (check.actionLabel != null && check.action != AiDoctorAction.NONE) {
-            TextButton(
-                onClick = { onAction(check.action) },
-                modifier = Modifier.padding(top = 0.dp),
-            ) {
-                Text(check.actionLabel)
+            if (check.actionLabel != null && check.action != AiDoctorAction.NONE) {
+                TextButton(
+                    onClick = { onAction(check.action) },
+                    modifier = Modifier.heightIn(min = RelateSize.compactButtonHeight),
+                ) {
+                    Text(check.actionLabel)
+                }
             }
         }
     }
@@ -518,15 +559,15 @@ private data class StatusColors(
 @Composable
 private fun ReadinessStatus.statusColors(): StatusColors = when (this) {
     ReadinessStatus.OK -> StatusColors(
-        container = RelateSuccess.copy(alpha = 0.16f),
+        container = RelateSuccess.copy(alpha = RelateAlpha.feedbackContainer),
         content = RelateSuccess,
     )
     ReadinessStatus.WARNING -> StatusColors(
-        container = RelateWarning.copy(alpha = 0.16f),
+        container = RelateWarning.copy(alpha = RelateAlpha.feedbackContainer),
         content = RelateWarning,
     )
     ReadinessStatus.ACTION_REQUIRED -> StatusColors(
-        container = MaterialTheme.colorScheme.error.copy(alpha = 0.16f),
+        container = MaterialTheme.colorScheme.error.copy(alpha = RelateAlpha.feedbackContainer),
         content = MaterialTheme.colorScheme.error,
     )
 }
@@ -576,14 +617,19 @@ private fun SetupCard(
 ) {
     RelateGlassCard {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(RelateSpacing.cardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
             ) {
-                Icon(icon, contentDescription = null, tint = RelatePrimary)
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = RelatePrimary,
+                    modifier = Modifier.size(RelateSize.iconLg),
+                )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
@@ -602,7 +648,7 @@ private fun SetupCard(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
                 ) {
                     Checkbox(
                         checked = consentChecked,
@@ -618,7 +664,10 @@ private fun SetupCard(
             }
             Button(
                 onClick = onClick,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = RelateSize.primaryButtonHeight),
+                shape = RoundedCornerShape(RelateRadius.control),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (secondary) MaterialTheme.colorScheme.surfaceVariant else RelatePrimary,
                     contentColor = if (secondary) MaterialTheme.colorScheme.onSurface else RelateDarkBackground,
@@ -629,7 +678,7 @@ private fun SetupCard(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                         contentDescription = null,
-                        modifier = Modifier.padding(start = 8.dp),
+                        modifier = Modifier.padding(start = RelateSpacing.sm),
                     )
                 }
             }

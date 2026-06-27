@@ -23,7 +23,7 @@ The rebuild will make dispatch attempts a durable aggregate.
 
 Every automatic or user-triggered send attempt must create a `dispatch_attempts` row before invoking a channel sender. The row records the decision, route, timestamps, redacted provider outcome, retry state, and dead-letter state.
 
-Implemented 2026-06-27: Room v15 now includes the `dispatch_attempts` compatibility table, DAO, pure-model mapper, schema export, migration tests, backup v3 export/import support, sender orchestration writes from `DispatchMessageUseCase`, `MessageDispatchWorker`, and `MessageDispatcher`, AI Doctor recovery diagnostics backed by persisted attempts, and Messages retry actions that mark failed/dead-letter rows as `RETRY_QUEUED` before scheduling retry execution. Sender outcome updates can stamp the resolved route channel when fallback changes the original preferred channel. Provider-specific retry taxonomy classifies SMS, email, no-route, and WhatsApp Accessibility failures, including typed WhatsApp setup/control/time-out reasons from `WhatsAppSendResult`. The table currently points `messageDraftId` to `pending_messages.id` and nullable `occasionId` to the existing `events.id` table until the target `message_drafts` and `occasions` migration lands. Automatic retry execution remains pending.
+Implemented 2026-06-27: Room v15 now includes the `dispatch_attempts` compatibility table, DAO, pure-model mapper, schema export, migration tests, backup v3 export/import support, sender orchestration writes from `DispatchMessageUseCase`, `MessageDispatchWorker`, and `MessageDispatcher`, AI Doctor recovery diagnostics backed by persisted attempts, and Messages retry actions that mark failed/dead-letter rows as `RETRY_QUEUED` before scheduling retry execution. Sender outcome updates can stamp the resolved route channel when fallback changes the original preferred channel. Provider-specific retry taxonomy classifies SMS, email, no-route, and WhatsApp Accessibility failures, including typed WhatsApp setup/control/time-out reasons from `WhatsAppSendResult`. AI Doctor no longer includes the legacy in-memory `DeadLetterQueue` count in recovery diagnostics; failed-send recovery state comes from persisted `dispatch_attempts`. The table currently points `messageDraftId` to `pending_messages.id` and nullable `occasionId` to the existing `events.id` table until the target `message_drafts` and `occasions` migration lands. Automatic retry execution remains pending.
 
 Minimum target fields:
 
@@ -83,7 +83,7 @@ Positive:
 
 Costs:
 
-- Retry actions now read and update persisted failure/dead-letter rows instead of in-memory diagnostics.
+- Recovery diagnostics and retry actions now read and update persisted failure/dead-letter rows instead of in-memory diagnostics.
 - Existing worker tests must keep verifying attempt lifecycle, not only pending-message status.
 - Channel senders use `DispatchProviderRetryPolicy` for the current provider-specific retry taxonomy; WhatsApp now exposes typed setup/control/time-out failures through `WhatsAppSendResult`, while the legacy Boolean sender wrapper remains only for compatibility.
 
@@ -93,7 +93,7 @@ The decision is fully implemented when:
 
 - Completed 2026-06-27: `dispatch_attempts` exists in the Room schema.
 - Completed 2026-06-27: worker and use-case tests prove attempts are written for send, defer, approval-needed, blocked, expired, contact-missing, no-route, and failed outcomes.
-- Completed 2026-06-27: AI Doctor recovery diagnostics read persisted recovery/dead-letter rows and surface the latest row summary.
+- Completed 2026-06-27: AI Doctor recovery diagnostics read persisted recovery/dead-letter rows, ignore legacy in-memory queue counts, and surface the latest row summary.
 - Completed 2026-06-27: Messages retry actions write a persisted `RETRY_QUEUED` state before scheduling the existing dispatch worker.
 - Completed 2026-06-27: sender failures classify SMS, WhatsApp, and email outcomes into provider-specific final or retryable dispatch-attempt results.
 - Completed 2026-06-27: WhatsApp Accessibility failures include typed service-disabled, locked-device, app-not-found, compose-field, text-verification, send-button, and timeout metadata, with app-level consent failures blocked before sender invocation.

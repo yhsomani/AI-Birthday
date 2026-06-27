@@ -42,16 +42,19 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelatePrimaryButton
+import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
@@ -175,9 +178,9 @@ internal fun WishPreviewScreenContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = RelateSpacing.screenHorizontal),
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -192,7 +195,7 @@ internal fun WishPreviewScreenContent(
                         tint = RelateOnBackground,
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.sm))
                 Text(
                     text = stringResource(R.string.wish_preview_title),
                     style = MaterialTheme.typography.headlineSmall,
@@ -238,7 +241,7 @@ internal fun WishPreviewScreenContent(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(16.dp),
+                .padding(RelateSpacing.screenHorizontal),
         )
     }
 }
@@ -260,16 +263,16 @@ internal fun WishPreviewContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.lg))
         Text(
             text = stringResource(R.string.wish_preview_choose_tone),
             style = MaterialTheme.typography.titleSmall,
             color = RelatePrimary,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             variantOptions.take(3).forEach { (key, labelRes) ->
                 ToneChip(
@@ -280,10 +283,10 @@ internal fun WishPreviewContent(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             variantOptions.drop(3).forEach { (key, labelRes) ->
                 ToneChip(
@@ -296,34 +299,34 @@ internal fun WishPreviewContent(
         }
 
         state.sendSummary?.let { summary ->
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.lg))
             WishSendSummaryCard(
                 summary = summary,
                 modifier = Modifier.testTag(WishPreviewTestTags.SEND_SUMMARY),
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.lg))
         Text(
             text = stringResource(R.string.wish_preview_message_label),
             style = MaterialTheme.typography.titleSmall,
             color = RelatePrimary,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         RelateGlassCard {
             OutlinedTextField(
                 value = state.editedText,
                 onValueChange = onEditedTextChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp)
+                    .padding(RelateSpacing.sm)
                     .testTag(WishPreviewTestTags.MESSAGE_FIELD),
                 textStyle = MaterialTheme.typography.bodyLarge,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = RelatePrimary,
                     unfocusedBorderColor = RelateSurfaceVariant,
-                    focusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
-                    unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = 0.2f),
+                    focusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                    unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
                     focusedTextColor = RelateOnBackground,
                     unfocusedTextColor = RelateOnBackground,
                 ),
@@ -337,7 +340,7 @@ internal fun WishPreviewContent(
         )
 
         state.errorMessageRes?.let { errorRes ->
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Text(
                 text = stringResource(errorRes),
                 style = MaterialTheme.typography.bodySmall,
@@ -346,7 +349,7 @@ internal fun WishPreviewContent(
         }
 
         state.qualityMessageRes?.let { messageRes ->
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Text(
                 text = messageResource(messageRes, state.qualityMessageArgRes),
                 style = MaterialTheme.typography.bodySmall,
@@ -355,24 +358,24 @@ internal fun WishPreviewContent(
         }
 
         if (state.whySignals.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.lg))
             WhyThisMessagePanel(
                 signals = state.whySignals,
                 modifier = Modifier.testTag(WishPreviewTestTags.WHY_PANEL),
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.lg))
         Text(
             text = stringResource(R.string.wish_preview_feedback_title),
             style = MaterialTheme.typography.titleSmall,
             color = RelatePrimary,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         state.feedbackOptions.chunked(2).forEach { rowOptions ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
             ) {
                 rowOptions.forEach { option ->
                     FeedbackChip(
@@ -388,7 +391,7 @@ internal fun WishPreviewContent(
                     Spacer(modifier = Modifier.weight(1f))
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
         }
         state.feedbackMessageRes?.let { messageRes ->
             Text(
@@ -398,14 +401,14 @@ internal fun WishPreviewContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.lg))
         Button(
             onClick = onRegenerate,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(WishPreviewTestTags.REGENERATE_BUTTON),
             enabled = !state.isRegenerating && !state.isApproving && !state.isRejecting && !state.isTestingSend,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(RelateRadius.control),
             colors = ButtonDefaults.buttonColors(
                 containerColor = RelateSurfaceVariant,
             ),
@@ -413,17 +416,17 @@ internal fun WishPreviewContent(
             if (state.isRegenerating) {
                 CircularProgressIndicator(
                     color = RelateOnBackground,
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(RelateSize.iconSm),
+                    strokeWidth = RelateSpacing.xxs,
                 )
             } else {
                 Icon(
                     Icons.Filled.Refresh,
                     contentDescription = null,
                     tint = RelateOnBackground,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(RelateSize.iconSm),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.sm))
                 Text(
                     text = stringResource(R.string.wish_preview_regenerate),
                     color = RelateOnBackground,
@@ -431,14 +434,14 @@ internal fun WishPreviewContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Button(
             onClick = onSendTest,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(WishPreviewTestTags.TEST_SEND_BUTTON),
             enabled = !state.isTestingSend && !state.isRegenerating && !state.isApproving && !state.isRejecting,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(RelateRadius.control),
             colors = ButtonDefaults.buttonColors(
                 containerColor = RelateSurfaceVariant,
             ),
@@ -446,8 +449,8 @@ internal fun WishPreviewContent(
             if (state.isTestingSend) {
                 CircularProgressIndicator(
                     color = RelateOnBackground,
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(RelateSize.iconSm),
+                    strokeWidth = RelateSpacing.xxs,
                 )
             } else {
                 Text(
@@ -457,7 +460,7 @@ internal fun WishPreviewContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
         if (state.isApproving) {
             Box(
                 modifier = Modifier.fillMaxWidth(),
@@ -468,15 +471,15 @@ internal fun WishPreviewContent(
         } else if (!state.approved && !state.rejected) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
             ) {
                 Button(
                     onClick = onReject,
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp)
+                        .height(RelateSize.primaryButtonHeight)
                         .testTag(WishPreviewTestTags.REJECT_BUTTON),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(RelateRadius.control),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RelateSurfaceVariant,
                     ),
@@ -485,8 +488,8 @@ internal fun WishPreviewContent(
                     if (state.isRejecting) {
                         CircularProgressIndicator(
                             color = RelateOnBackground,
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(RelateSize.iconMd),
+                            strokeWidth = RelateSpacing.xxs,
                         )
                     } else {
                         Text(
@@ -521,7 +524,7 @@ internal fun WishPreviewContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
     }
 }
 
@@ -538,7 +541,7 @@ private fun DraftReadinessMessage(
         } else {
             RelateOnSurfaceVariant
         },
-        modifier = modifier.padding(top = 8.dp),
+        modifier = modifier.padding(top = RelateSpacing.sm),
     )
 }
 
@@ -562,8 +565,8 @@ private fun WishSendSummaryCard(
     val dateFormat = remember { SimpleDateFormat("MMM dd, h:mm a", Locale.getDefault()) }
     RelateGlassCard(modifier = modifier) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(RelateSpacing.compactCardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             Text(
                 text = stringResource(R.string.wish_preview_send_summary_title),
@@ -606,7 +609,7 @@ private fun SendSummaryRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         verticalAlignment = Alignment.Top,
     ) {
         Text(
@@ -661,7 +664,7 @@ private fun ReviewResultPanel(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
     ) {
         Text(
             text = message,
@@ -716,13 +719,13 @@ private fun FeedbackChip(
 ) {
     Box(
         modifier = modifier
-            .height(40.dp)
+            .height(RelateSize.compactButtonHeight)
             .clickable(onClick = onClick)
             .background(
                 color = if (isSelected) RelatePrimary else RelateSurfaceVariant,
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(RelateRadius.pill),
             )
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = RelateSpacing.md),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -743,8 +746,8 @@ private fun WhyThisMessagePanel(
 ) {
     RelateGlassCard(modifier = modifier) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(RelateSpacing.compactCardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
         ) {
             Text(
                 text = stringResource(R.string.wish_why_title),
@@ -755,7 +758,7 @@ private fun WhyThisMessagePanel(
             signals.forEach { signal ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
                     verticalAlignment = Alignment.Top,
                 ) {
                     Text(
@@ -790,9 +793,9 @@ private fun ToneChip(
             .clickable(onClick = onClick)
             .background(
                 color = if (isSelected) RelatePrimary else RelateSurfaceVariant,
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(RelateRadius.pill),
             )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = RelateSpacing.lg, vertical = RelateSpacing.sm),
     ) {
         Text(
             text = label,

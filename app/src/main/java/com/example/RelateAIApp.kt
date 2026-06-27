@@ -10,6 +10,9 @@ class RelateAIApp : Application(), androidx.work.Configuration.Provider {
     @javax.inject.Inject
     lateinit var workerFactory: androidx.hilt.work.HiltWorkerFactory
 
+    @javax.inject.Inject
+    lateinit var healthMonitorDiagnosticRecorder: com.example.core.resilience.HealthMonitorDiagnosticRecorder
+
     override val workManagerConfiguration: androidx.work.Configuration
         get() = androidx.work.Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -20,6 +23,7 @@ class RelateAIApp : Application(), androidx.work.Configuration.Provider {
         SecurityChecks.checkCertificatePinExpiry()
         com.example.core.automation.notifications.NotificationHelper.createChannels(this)
         if (!isUnderTest()) {
+            healthMonitorDiagnosticRecorder.start()
             com.example.core.db.DatabaseKeyDerivation.warmUpAsync(this)
             com.example.core.prefs.SecurePrefs.warmUpAsync(this)
             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
@@ -29,10 +33,12 @@ class RelateAIApp : Application(), androidx.work.Configuration.Provider {
     }
 
     private fun isUnderTest(): Boolean {
-        return try {
-            Class.forName("org.robolectric.Robolectric") != null
-        } catch (e: ClassNotFoundException) {
-            false
+        if (System.getProperty("robolectric.enabled") == "true") return true
+        return listOf(
+            "org.robolectric.Robolectric",
+            "org.robolectric.RobolectricTestRunner",
+        ).any { className ->
+            runCatching { Class.forName(className) }.isSuccess
         }
     }
 

@@ -9,7 +9,7 @@ Status: Accepted
 The app stores relationship data, contact metadata, generated message drafts, sent history, backup data, API keys, SMTP credentials, and preferences. Current protection mechanisms include:
 
 - SQLCipher-backed Room database via `SupportFactory` in `AppDatabase`.
-- `DatabaseKeyDerivation`, which derives and caches a SQLCipher key using Android ID, app certificate hash, PBKDF2, and `EncryptedSharedPreferences`.
+- `DatabaseKeyDerivation`, which now generates random SQLCipher key material for fresh installs, stores the key material in Android Keystore-backed `EncryptedSharedPreferences`, formats random keys as SQLCipher raw-key literals at database open time, and keeps identifier-derived key computation only as a legacy recovery path when database files already exist but cached key material is missing.
 - `EncryptedSharedPreferences` protected with an AndroidX Security `MasterKey`.
 - A migration path that deletes legacy plaintext DB-key preferences.
 - Legacy plaintext DB quarantine before opening the encrypted database.
@@ -30,7 +30,8 @@ Live database:
 
 - Continue using SQLCipher for local Room storage.
 - Store live DB key material only in secure local storage protected by Android Keystore-backed `EncryptedSharedPreferences`, or a stronger direct Keystore wrapping equivalent.
-- Do not derive the live DB key solely from stable device/app identifiers in the target implementation.
+- Do not derive the live DB key solely from stable device/app identifiers in the target implementation. Implemented 2026-06-27 for fresh installs: missing cached key material generates random 256-bit key material when no database files exist and passes it to SQLCipher as a raw-key literal.
+- Existing database files with missing cached key material may still use the legacy identifier-derived key as a migration/recovery path; that path must remain documented as legacy and should be removed only with a tested rekey migration.
 - Treat live DB key loss as destructive unless a validated backup restore is available.
 
 Backups:
@@ -57,7 +58,7 @@ Positive:
 Costs:
 
 - Key rotation and recovery need careful migration planning.
-- Existing key derivation behavior must be migrated without data loss.
+- Existing key derivation behavior must be migrated without data loss; legacy identifier-derived recovery currently avoids silently bricking existing encrypted databases when cached key prefs are missing.
 - Automated tests need device or integration coverage for encrypted open, sign-out, and restore flows.
 
 ## Verification
@@ -67,5 +68,5 @@ The decision is implemented when:
 - Security docs explain local DB keying, backup passphrases, sign-out deletion, and restore limitations.
 - Tests verify backup exclusions, backup round trip, wrong-passphrase failure, sign-out cleanup, and encrypted database open.
 - Release checks fail if sensitive stores become auto-backed or exported without explicit approval.
-- The target live DB key strategy no longer depends only on stable device/app identifiers.
-
+- Completed 2026-06-27 for fresh installs: the target live DB key strategy no longer depends only on stable device/app identifiers when no database files exist and no cached key is present; random keys are formatted as SQLCipher raw-key literals instead of arbitrary passphrase bytes.
+- Remaining: add a tested SQLCipher rekey migration for legacy identifier-derived databases if product/security review requires eliminating legacy key material for existing installs.

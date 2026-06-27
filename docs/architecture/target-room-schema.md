@@ -1,15 +1,15 @@
-# Target Room Schema and Version 15 Migration Design
+# Target Room Schema and Version 16 Migration Design
 
 Date: 2026-06-27
 
 Status: Living design accepted for Phase 1 implementation
 
 This document expands `PLAN.md` Section 10 and the ADRs in `docs/architecture/adr/`.
-It is a design contract. The Room v15 `dispatch_attempts` slice and first production sender orchestration writes are implemented; retry/recovery UI plus the remaining target `occasions` and `message_drafts` migration are pending.
+It is a design contract. The Room v15 `dispatch_attempts` slice, first production sender orchestration writes, and Room v16 `diagnostic_snapshots` slice are implemented; retry execution plus the remaining target `occasions` and `message_drafts` migration are pending.
 
 ## Current Baseline
 
-Current Room baseline: version 15.
+Current Room baseline: version 16.
 
 Current tables from `AppDatabase` and schema export:
 
@@ -24,11 +24,12 @@ Current tables from `AppDatabase` and schema export:
 - `activity_logs`
 - `message_feedback`
 - `dispatch_attempts`
+- `diagnostic_snapshots`
 
 Important current facts:
 
 - `pending_messages.contactId` cascades on contact delete.
-- `pending_messages.eventId` is not a Room foreign key in version 15.
+- `pending_messages.eventId` is not a Room foreign key in version 16.
 - `pending_messages` has unique `(contactId, eventId, scheduledYear)`.
 - `sent_messages.contactId` sets null on contact delete.
 - `sent_messages` now has `eventId`, `occasionType`, and `occasionLabel`.
@@ -36,9 +37,12 @@ Important current facts:
 - `dispatch_attempts` was added in v15. It references `pending_messages.id` through `messageDraftId`, nullable `contactId` through `contacts.id`, and nullable `occasionId` through the current `events.id` compatibility table until first-class `occasions` lands.
 - Backup format version 3 includes `dispatchAttempts` in export, preview counts, and replace restore.
 - `DispatchMessageUseCase`, `MessageDispatchWorker`, and `MessageDispatcher` now create/update dispatch attempts for send, defer, approval-needed, blocked, expired, contact-missing, no-route, success, and final-failure outcomes before or during channel dispatch. Sender outcome updates can stamp the resolved route channel when fallback changes the original preferred channel.
-- AI Doctor recovery diagnostics read persisted failure/dead-letter rows from `dispatch_attempts` and surface recovery count, dead-letter count, and latest persisted row summary.
+- AI Doctor recovery diagnostics read persisted failure/dead-letter rows from `dispatch_attempts` and surface recovery count, dead-letter count, and latest persisted row summary. Legacy in-memory `DeadLetterQueue` counts no longer affect the recovery card.
 - Messages retry actions mark the latest persisted failure/dead-letter row as `RETRY_QUEUED` with incremented retry count and `nextRetryAtMs` before resetting the draft to `APPROVED` and scheduling the existing dispatch worker. Legacy failed drafts without an attempt get a retry marker row.
 - Provider-specific sender failures now use `DispatchProviderRetryPolicy`: final setup failures stamp `FAILED_FINAL` and `deadLetteredAtMs`, while retryable SMS/email provider failures stamp `FAILED_RETRYABLE` and `nextRetryAtMs`.
+- `diagnostic_snapshots` was added in v16 for local redacted AI Doctor and `HealthMonitor` diagnostics. It stores `source`, `status`, `summary`, `checksJson`, and `createdAtMs`, with indices for latest-by-source and recent snapshots.
+- App startup registers `HealthMonitorDiagnosticRecorder`, which persists warning snapshots when `HealthMonitor` records recent errors. AI Doctor persists redacted report snapshots and reads recent persisted health warnings after process restart.
+- Diagnostic snapshots are local evidence and are not part of backup export/import; replace restore clears them before restoring user-restorable data.
 
 ## Target Principles
 
@@ -56,7 +60,7 @@ Rules:
 - A send attempt is durable before any channel sender runs.
 - Sent history is a user-facing history table, not the authoritative retry log.
 - Deleting a contact must not corrupt audit/sent history.
-- Migration from version 15 must preserve existing user-visible data.
+- Migration from version 16 must preserve existing user-visible data.
 
 ## Target Tables
 
@@ -306,10 +310,18 @@ Purpose: persisted AI Doctor and health-monitor state.
 Minimum columns:
 
 - `id`
+- `source`
 - `status`
 - `summary`
 - `checksJson`
 - `createdAtMs`
+
+Implemented v16 behavior:
+
+- `source` values currently include `AI_DOCTOR` and `HEALTH_MONITOR`.
+- `HealthMonitor` snapshots are redacted before persistence and are surfaced by AI Doctor only when recent and non-OK.
+- AI Doctor report snapshots are redacted before persistence and are intended for diagnostics rather than user backup restore.
+- Repository writes prune diagnostic snapshots older than 30 days to keep local troubleshooting data bounded.
 
 ### `backup_manifests`
 
@@ -352,7 +364,7 @@ Recommended staged migration:
 
 Backfill rules:
 
-- If a version 15 `eventId` or `occasionId` matches `events.id`, map it to the copied `occasions.id`.
+- If a version 16 `eventId` or `occasionId` matches `events.id`, map it to the copied `occasions.id`.
 - If a reference starts with `HOLIDAY_`, create an occasion with `type = HOLIDAY`.
 - If a reference starts with `REVIVAL_`, create an occasion with `type = REVIVAL`.
 - If a reference starts with `FOLLOWUP_` or `FOLLOW_UP_`, create an occasion with `type = FOLLOW_UP`.

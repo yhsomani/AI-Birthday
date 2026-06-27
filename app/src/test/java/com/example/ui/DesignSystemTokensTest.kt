@@ -1,6 +1,7 @@
 package com.example.ui
 
 import com.example.core.ui.theme.RelateAlpha
+import com.example.core.ui.theme.RelateElevation
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
@@ -35,6 +36,22 @@ class DesignSystemTokensTest {
         )
         assertEquals(6f, RelateSize.statusDot.value)
         assertEquals(24f, RelateSize.iconLg.value)
+        assertTrue(
+            "Loading panels should reserve enough height to avoid first-paint layout jump.",
+            RelateSize.loadingPanelHeight >= RelateSize.primaryButtonHeight,
+        )
+        assertTrue(
+            "Action cards need enough height for icon, title, and wrapped supporting copy.",
+            RelateSize.actionCardMinHeight >= RelateSize.minTouchTarget,
+        )
+        assertTrue(
+            "Responsive action-card breakpoint must fit two compact action cards.",
+            RelateSize.actionGridBreakpoint.value >= RelateSize.actionCardMinHeight.value * 2,
+        )
+        assertTrue(
+            "Progress strokes should stay visible without becoming heavy.",
+            RelateSize.progressStroke.value in 1f..4f,
+        )
     }
 
     @Test
@@ -47,5 +64,10 @@ class DesignSystemTokensTest {
         ).forEach { alpha ->
             assertTrue("Alpha tokens must be between 0 and 1.", alpha in 0f..1f)
         }
+    }
+
+    @Test
+    fun elevationTokens_keepSurfacesSubtle() {
+        assertTrue("App bar elevation should stay subtle.", RelateElevation.appBar.value in 0f..4f)
     }
 }

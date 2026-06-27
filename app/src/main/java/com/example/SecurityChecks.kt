@@ -1,25 +1,48 @@
 package com.example
 
 import android.util.Log
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 
 object SecurityChecks {
+    const val PIN_EXPIRY_DATE = "2027-06-01"
+    const val PIN_EXPIRY_RELEASE_GATE_DAYS = 60L
+    private const val TAG = "SecurityChecks"
+
     fun checkCertificatePinExpiry() {
         try {
-            val format = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            val expiryDate = format.parse("2027-06-01")
-            val thirtyDaysInMillis = 30L * 24 * 60 * 60 * 1000
-
-            if (expiryDate != null) {
-                val now = Date().time
-                if (expiryDate.time - now < thirtyDaysInMillis) {
-                    Log.w("SecurityChecks", "WARNING: Certificate pins in network_security_config.xml will expire soon! Update before 2027-06-01.")
-                }
+            val daysUntilExpiry = daysUntilCertificatePinExpiry()
+            if (daysUntilExpiry <= PIN_EXPIRY_RELEASE_GATE_DAYS) {
+                Log.w(
+                    TAG,
+                    certificatePinExpiryMessage(daysUntilExpiry),
+                )
             }
         } catch (e: Exception) {
-            Log.e("SecurityChecks", "Error checking certificate pin expiry", e)
+            Log.e(TAG, "Error checking certificate pin expiry", e)
         }
+    }
+
+    fun certificatePinExpiryDate(): LocalDate = LocalDate.parse(PIN_EXPIRY_DATE)
+
+    fun daysUntilCertificatePinExpiry(
+        asOfDate: LocalDate = LocalDate.now(ZoneOffset.UTC),
+        expiryDate: LocalDate = certificatePinExpiryDate(),
+    ): Long = ChronoUnit.DAYS.between(asOfDate, expiryDate)
+
+    fun certificatePinsPassReleaseGate(
+        asOfDate: LocalDate = LocalDate.now(ZoneOffset.UTC),
+        expiryDate: LocalDate = certificatePinExpiryDate(),
+    ): Boolean {
+        return daysUntilCertificatePinExpiry(asOfDate, expiryDate) > PIN_EXPIRY_RELEASE_GATE_DAYS
+    }
+
+    fun certificatePinExpiryMessage(
+        daysUntilExpiry: Long,
+        expiryDate: LocalDate = certificatePinExpiryDate(),
+    ): String {
+        return "Certificate pins in network_security_config.xml expire in $daysUntilExpiry days " +
+            "on $expiryDate. Update pins at least $PIN_EXPIRY_RELEASE_GATE_DAYS days before expiry."
     }
 }

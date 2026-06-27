@@ -6,6 +6,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.w3c.dom.Element
 import java.io.File
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 import javax.xml.parsers.DocumentBuilderFactory
 
 class ProductionReadinessConfigTest {
@@ -72,6 +75,30 @@ class ProductionReadinessConfigTest {
     }
 
     @Test
+    fun networkSecurityPins_doNotExpireWithinReleaseGate() {
+        val networkSecurityConfig = parseXml(appFile("src/main/res/xml/network_security_config.xml"))
+        val pinSets = networkSecurityConfig.getElementsByTagName("pin-set")
+        val expirationDates = mutableListOf<LocalDate>()
+
+        for (index in 0 until pinSets.length) {
+            val pinSet = pinSets.item(index) as Element
+            expirationDates += LocalDate.parse(pinSet.getAttribute("expiration"))
+        }
+
+        assertTrue("network_security_config.xml must define certificate pin sets", expirationDates.isNotEmpty())
+
+        val soonestExpiration = requireNotNull(expirationDates.minOrNull())
+        assertEquals(SecurityChecks.certificatePinExpiryDate(), soonestExpiration)
+
+        val daysUntilExpiry = ChronoUnit.DAYS.between(LocalDate.now(ZoneOffset.UTC), soonestExpiration)
+        assertTrue(
+            "Certificate pins expire in $daysUntilExpiry days on $soonestExpiration; update pins at least " +
+                "${SecurityChecks.PIN_EXPIRY_RELEASE_GATE_DAYS} days before expiry.",
+            daysUntilExpiry > SecurityChecks.PIN_EXPIRY_RELEASE_GATE_DAYS,
+        )
+    }
+
+    @Test
     fun releaseBuild_doesNotFallBackToDebugSigning() {
         val buildScript = appFile("build.gradle.kts").readText()
 
@@ -84,8 +111,21 @@ class ProductionReadinessConfigTest {
     fun ciWorkflow_keepsReleaseReadinessGuardrails() {
         val workflow = rootFile(".github/workflows/android.yml").readText()
 
+        assertTrue(workflow.contains("contents: read"))
+        assertTrue(workflow.contains("pull-requests: read"))
+        assertTrue(workflow.contains("Review dependency changes"))
+        assertTrue(workflow.contains("if: github.event_name == 'pull_request'"))
+        assertTrue(workflow.contains("actions/dependency-review-action@v4"))
+        assertTrue(workflow.contains("fail-on-severity: moderate"))
+        assertTrue(workflow.contains("deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, LGPL-2.1, LGPL-3.0"))
         assertTrue(workflow.contains("java-version: \"21\""))
         assertTrue(workflow.contains("./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache"))
+        assertTrue(workflow.contains("Verify release readiness guardrails"))
+        assertTrue(
+            workflow.contains(
+                "./gradlew :app:testDebugUnitTest --tests com.example.ProductionReadinessConfigTest --no-configuration-cache"
+            )
+        )
         assertTrue(workflow.contains("./gradlew assembleRelease --no-configuration-cache"))
         assertTrue(workflow.contains("Release signing is not configured"))
         assertTrue(workflow.contains("KEYSTORE_PATH"))

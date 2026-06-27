@@ -12,7 +12,9 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import java.io.File
 import java.security.MessageDigest
+import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
@@ -22,9 +24,20 @@ object DatabaseKeyDerivation {
     private const val TAG = "DatabaseKeyDerivation"
     private const val PREFS_NAME = "relateai_db_meta_secure"
     private const val PREF_DB_KEY = "db_key_hex"
+    private const val PREF_DB_KEY_SOURCE = "db_key_source"
+    private const val PREF_DB_KEY_VERSION = "db_key_version"
+    private const val CURRENT_KEY_VERSION = 3
+    internal const val KEY_SOURCE_RANDOM = "random_keystore_wrapped"
+    internal const val KEY_SOURCE_LEGACY_IDENTIFIER = "legacy_identifier_recovery"
+    private const val DB_NAME = "relateai.db"
 
     @Volatile
     private var warmUpDeferred: Deferred<ByteArray>? = null
+
+    internal enum class MissingCachedKeyStrategy {
+        GENERATE_RANDOM,
+        RECOVER_LEGACY_IDENTIFIER_KEY,
+    }
 
     fun deriveKey(context: Context): ByteArray {
         return runBlocking {
@@ -44,23 +57,40 @@ object DatabaseKeyDerivation {
         val cachedHex = prefs.getString(PREF_DB_KEY, null)
 
         if (cachedHex != null) {
+            val cachedSource = prefs.getString(PREF_DB_KEY_SOURCE, null)
             val bytes = decodeStoredKeyHex(cachedHex)
             if (bytes != null) {
                 Log.d(TAG, "DB key loaded from EncryptedSharedPreferences")
-                return bytes
+                return sqlCipherPassphraseBytes(bytes, cachedSource)
             }
-            prefs.edit().remove(PREF_DB_KEY).apply()
+            prefs.edit()
+                .remove(PREF_DB_KEY)
+                .remove(PREF_DB_KEY_SOURCE)
+                .remove(PREF_DB_KEY_VERSION)
+                .apply()
         }
 
-        val derived = computeKeyFromScratch(context)
+        val strategy = missingCachedKeyStrategy(hasExistingDatabaseFiles(context))
+        val derived = when (strategy) {
+            MissingCachedKeyStrategy.GENERATE_RANDOM -> {
+                Log.i(TAG, "Generating new random DB key for fresh encrypted database")
+                generateRandomKey()
+            }
+            MissingCachedKeyStrategy.RECOVER_LEGACY_IDENTIFIER_KEY -> {
+                Log.w(TAG, "Recovering legacy identifier-derived DB key for existing database")
+                computeLegacyIdentifierKey(context)
+            }
+        }
         prefs.edit()
             .putString(PREF_DB_KEY, byteArrayToHex(derived))
+            .putString(PREF_DB_KEY_SOURCE, strategy.toStoredSource())
+            .putInt(PREF_DB_KEY_VERSION, CURRENT_KEY_VERSION)
             .apply()
-        Log.d(TAG, "DB key derived from scratch and cached in EncryptedSharedPreferences")
-        return derived
+        Log.d(TAG, "DB key cached in EncryptedSharedPreferences")
+        return sqlCipherPassphraseBytes(derived, strategy.toStoredSource())
     }
 
-    private fun computeKeyFromScratch(context: Context): ByteArray {
+    private fun computeLegacyIdentifierKey(context: Context): ByteArray {
         val androidId = Settings.Secure.getString(
             context.contentResolver,
             Settings.Secure.ANDROID_ID
@@ -80,6 +110,48 @@ object DatabaseKeyDerivation {
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         val secret = factory.generateSecret(spec)
         return secret.encoded
+    }
+
+    internal fun missingCachedKeyStrategy(hasExistingDatabaseFiles: Boolean): MissingCachedKeyStrategy {
+        return if (hasExistingDatabaseFiles) {
+            MissingCachedKeyStrategy.RECOVER_LEGACY_IDENTIFIER_KEY
+        } else {
+            MissingCachedKeyStrategy.GENERATE_RANDOM
+        }
+    }
+
+    private fun MissingCachedKeyStrategy.toStoredSource(): String {
+        return when (this) {
+            MissingCachedKeyStrategy.GENERATE_RANDOM -> KEY_SOURCE_RANDOM
+            MissingCachedKeyStrategy.RECOVER_LEGACY_IDENTIFIER_KEY -> KEY_SOURCE_LEGACY_IDENTIFIER
+        }
+    }
+
+    internal fun generateRandomKey(
+        fillRandom: (ByteArray) -> Unit = SecureRandom()::nextBytes,
+    ): ByteArray {
+        return ByteArray(KEY_LENGTH / 8).also(fillRandom)
+    }
+
+    internal fun sqlCipherPassphraseBytes(storedKeyBytes: ByteArray, storedSource: String?): ByteArray {
+        return when (storedSource) {
+            KEY_SOURCE_RANDOM -> rawSqlCipherKeyBytes(storedKeyBytes)
+            else -> storedKeyBytes
+        }
+    }
+
+    internal fun rawSqlCipherKeyBytes(keyBytes: ByteArray): ByteArray {
+        require(keyBytes.size == KEY_LENGTH / 8) { "Raw SQLCipher key material must be 256 bits" }
+        return "x'${byteArrayToHex(keyBytes)}'".toByteArray(Charsets.US_ASCII)
+    }
+
+    private fun hasExistingDatabaseFiles(context: Context): Boolean {
+        val dbFile = context.getDatabasePath(DB_NAME)
+        return listOf(
+            dbFile,
+            File("${dbFile.path}-wal"),
+            File("${dbFile.path}-shm"),
+        ).any { it.exists() }
     }
 
     private fun getAppCertificateHash(context: Context): String {

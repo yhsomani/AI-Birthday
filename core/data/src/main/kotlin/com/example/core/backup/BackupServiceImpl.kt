@@ -152,6 +152,7 @@ class BackupServiceImpl @Inject constructor(
     }
 
     private suspend fun replaceExistingRestorableData() {
+        database.diagnosticSnapshotDao().deleteAll()
         database.dispatchAttemptDao().deleteAll()
         database.messageFeedbackDao().deleteAll()
         database.activityLogDao().deleteAll()

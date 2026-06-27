@@ -87,6 +87,9 @@ Validation:
 
 ## Open Redesign Work
 
+- Completed slice 2026-06-27: AI Doctor keeps its current route and feature ownership, while the screen now uses shared spacing/radius/size/alpha tokens, keeps check actions attached to their owning row copy, and avoids nested cards in the recommended-fix surface. Screenshot and large-font validation remain pending.
+- Completed slice 2026-06-27: Home keeps existing next-action, setup-progress, quick-action, planner, and upcoming-event behavior, while the screen now uses shared spacing/radius/size/alpha tokens, extracts stats/quick actions into presentation helpers, and reserves loading-panel space to avoid layout jump. Future IA cleanup must validate any quick-action removal before changing navigation affordances.
+- Completed slice 2026-06-27: Wish Preview keeps the existing single-draft review/editor behavior, while the screen now uses shared spacing/radius/size/alpha tokens across variants, editor, feedback chips, summary/why panels, and review actions. Screenshot and large-font validation remain pending.
 - Define a formal screenshot testing strategy and store expected viewport/font-scale coverage.
 - Add light/dynamic theme decision after dark-theme redesign is stable.
 - Convert screen-local spacing, colors, and shapes to shared tokens incrementally.

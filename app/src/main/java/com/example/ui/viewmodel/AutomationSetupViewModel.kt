@@ -16,14 +16,20 @@ import androidx.work.WorkManager
 import com.example.core.gemini.GeminiClient
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.CircuitState
-import com.example.core.resilience.DeadLetterQueue
+import com.example.core.resilience.HealthSnapshot
 import com.example.core.resilience.HealthMonitor
+import com.example.core.resilience.LogEntry
 import com.example.core.resilience.SensitiveLogRedactor
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.DiagnosticSnapshotId
 import com.example.domain.model.contact.ContactAutomationReadinessProfile
+import com.example.domain.model.diagnostic.DiagnosticSnapshot
+import com.example.domain.model.diagnostic.DiagnosticSnapshotSource
+import com.example.domain.model.diagnostic.DiagnosticSnapshotStatus
 import com.example.domain.model.dispatch.DispatchAttempt
 import com.example.domain.repository.ContactRepository
+import com.example.domain.repository.DiagnosticSnapshotRepository
 import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.SyncContactsUseCase
@@ -38,7 +44,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import org.json.JSONArray
+import java.util.UUID
 
 enum class ReadinessStatus { OK, WARNING, ACTION_REQUIRED }
 
@@ -111,7 +119,6 @@ private data class AiDoctorReport(
 private data class DispatchRecoverySnapshot(
     val persistedRecoveryCount: Int,
     val persistedDeadLetterCount: Int,
-    val inMemoryDeadLetterCount: Int,
     val latestPersistedAttempt: DispatchAttempt?,
 )
 
@@ -125,9 +132,11 @@ class AutomationSetupViewModel @Inject constructor(
     private val styleProfileRepository: StyleProfileRepository,
     private val testSendUseCase: TestSendUseCase,
     private val dispatchAttemptRepository: DispatchAttemptRepository,
+    private val diagnosticSnapshotRepository: DiagnosticSnapshotRepository,
 ) : ViewModel() {
     private companion object {
         const val PERSONALIZATION_CONFIDENCE_THRESHOLD = 0.6
+        const val PERSISTED_HEALTH_SNAPSHOT_TTL_MS = 7L * 24 * 60 * 60 * 1000
     }
 
     private val _uiState = MutableStateFlow(AutomationSetupUiState())
@@ -286,11 +295,15 @@ class AutomationSetupViewModel @Inject constructor(
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
         }.getOrDefault(false)
         val dispatchRecovery = loadDispatchRecoverySnapshot()
+        val persistedHealthSnapshot = loadRecentPersistedHealthSnapshot()
         val senderEmailReady = securePrefs.getSenderEmail().isNotBlank() &&
             securePrefs.getSenderEmailPassword().isNotBlank()
         val emailPreferredContacts = contacts.count {
             it.preferredChannel == MessageChannel.EMAIL
         }
+        val hasRecentHealthEvidence = recentErrors.isNotEmpty() ||
+            health.recentErrors.isNotEmpty() ||
+            persistedHealthSnapshot != null
 
         val checks = listOf(
             ReadinessCheck(
@@ -430,14 +443,14 @@ class AutomationSetupViewModel @Inject constructor(
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_recent_errors),
-                if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) {
+                if (!hasRecentHealthEvidence) {
                     text(R.string.automation_setup_recent_errors_none)
                 } else {
-                    diagnoseAiFailure(recentErrors.lastOrNull()?.message ?: health.recentErrors.last())
+                    recentErrors.toRecentErrorDetail(health, persistedHealthSnapshot)
                 },
-                if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) ReadinessStatus.OK else ReadinessStatus.WARNING,
-                actionLabel = if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) null else text(R.string.automation_setup_action_view_activity),
-                action = if (recentErrors.isEmpty() && health.recentErrors.isEmpty()) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACTIVITY_HISTORY,
+                if (hasRecentHealthEvidence) ReadinessStatus.WARNING else ReadinessStatus.OK,
+                actionLabel = if (hasRecentHealthEvidence) text(R.string.automation_setup_action_view_activity) else null,
+                action = if (hasRecentHealthEvidence) AiDoctorAction.OPEN_ACTIVITY_HISTORY else AiDoctorAction.NONE,
                 group = ReadinessGroup.RECOVERY,
             ),
             ReadinessCheck(
@@ -454,7 +467,76 @@ class AutomationSetupViewModel @Inject constructor(
             checks = checks,
             recommendedFix = checks.toRecommendedFix(),
             setupProgress = checks.toSetupProgressSummary(),
+        ).also { report ->
+            persistAiDoctorSnapshot(report)
+        }
+    }
+
+    private fun List<LogEntry>.toRecentErrorDetail(
+        health: HealthSnapshot,
+        persistedHealthSnapshot: DiagnosticSnapshot?,
+    ): String {
+        val liveError = lastOrNull()?.message ?: health.recentErrors.lastOrNull()
+        return when {
+            liveError != null -> diagnoseAiFailure(liveError)
+            persistedHealthSnapshot != null -> text(
+                R.string.automation_setup_ai_error_recent,
+                SensitiveLogRedactor.redact(persistedHealthSnapshot.summary).take(160),
+            )
+            else -> text(R.string.automation_setup_recent_errors_none)
+        }
+    }
+
+    private suspend fun loadRecentPersistedHealthSnapshot(): DiagnosticSnapshot? {
+        val now = System.currentTimeMillis()
+        return runCatching {
+            diagnosticSnapshotRepository.getLatestBySource(DiagnosticSnapshotSource.HEALTH_MONITOR)
+                ?.takeIf { it.status != DiagnosticSnapshotStatus.OK }
+                ?.takeIf { now - it.createdAtMs <= PERSISTED_HEALTH_SNAPSHOT_TTL_MS }
+        }.getOrNull()
+    }
+
+    private suspend fun persistAiDoctorSnapshot(report: AiDoctorReport) {
+        runCatching {
+            diagnosticSnapshotRepository.record(report.toDiagnosticSnapshot())
+        }
+    }
+
+    private fun AiDoctorReport.toDiagnosticSnapshot(): DiagnosticSnapshot {
+        val checksJson = JSONArray().also { checksArray ->
+            checks.forEach { check ->
+                checksArray.put(
+                    JSONObject()
+                        .put("title", check.title)
+                        .put("status", check.status.name)
+                        .put("group", check.group.name)
+                        .put("action", check.action.name)
+                        .put("detail", check.detail),
+                )
+            }
+        }
+        val payload = JSONObject()
+            .put("source", DiagnosticSnapshotSource.AI_DOCTOR.raw)
+            .put("summaryStatus", summary.status.name)
+            .put("recommendedAction", recommendedFix?.action?.name)
+            .put("completedSteps", setupProgress.completedSteps)
+            .put("totalSteps", setupProgress.totalSteps)
+            .put("checks", checksJson)
+            .toString()
+        return DiagnosticSnapshot(
+            id = DiagnosticSnapshotId("ai-doctor-${UUID.randomUUID()}"),
+            source = DiagnosticSnapshotSource.AI_DOCTOR,
+            status = summary.status.toDiagnosticSnapshotStatus(),
+            summary = SensitiveLogRedactor.redact("${summary.title}: ${summary.detail}"),
+            checksJson = SensitiveLogRedactor.redact(payload),
+            createdAtMs = System.currentTimeMillis(),
         )
+    }
+
+    private fun ReadinessStatus.toDiagnosticSnapshotStatus(): DiagnosticSnapshotStatus = when (this) {
+        ReadinessStatus.OK -> DiagnosticSnapshotStatus.OK
+        ReadinessStatus.WARNING -> DiagnosticSnapshotStatus.WARNING
+        ReadinessStatus.ACTION_REQUIRED -> DiagnosticSnapshotStatus.ACTION_REQUIRED
     }
 
     private suspend fun loadDispatchRecoverySnapshot(): DispatchRecoverySnapshot {
@@ -470,23 +552,16 @@ class AutomationSetupViewModel @Inject constructor(
         return DispatchRecoverySnapshot(
             persistedRecoveryCount = persistedRecoveryCount,
             persistedDeadLetterCount = persistedDeadLetterCount,
-            inMemoryDeadLetterCount = DeadLetterQueue.count(),
             latestPersistedAttempt = latestPersistedAttempt,
         )
     }
 
     private val DispatchRecoverySnapshot.totalRecoveryCount: Int
-        get() = persistedRecoveryCount + inMemoryDeadLetterCount
+        get() = persistedRecoveryCount
 
     private fun DispatchRecoverySnapshot.toReadinessDetail(): String {
         val summary = when {
             totalRecoveryCount == 0 -> text(R.string.automation_setup_dead_letter_none)
-            inMemoryDeadLetterCount > 0 -> text(
-                R.string.automation_setup_dead_letter_count_with_memory,
-                persistedRecoveryCount,
-                inMemoryDeadLetterCount,
-                persistedDeadLetterCount,
-            )
             else -> text(
                 R.string.automation_setup_dead_letter_count,
                 persistedRecoveryCount,
