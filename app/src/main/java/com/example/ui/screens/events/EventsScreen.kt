@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.AlertDialog
@@ -189,6 +190,13 @@ fun EventsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(R.string.search)) },
                 placeholder = { Text(stringResource(R.string.events_search_placeholder)) },
+                trailingIcon = {
+                    if (state.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.clear_search))
+                        }
+                    }
+                },
                 singleLine = true,
                 colors = relateTextFieldColors(),
             )
