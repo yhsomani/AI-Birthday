@@ -7,6 +7,8 @@ import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.SentMessageEntity
+import com.example.core.resilience.LogLevel
+import com.example.core.resilience.StructuredLogger
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.MessageStatus
@@ -33,7 +35,12 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class MessageDispatcherPersistenceAdaptersTest {
     private val dispatchAttemptDao: DispatchAttemptDao = mockk(relaxed = true)
     private val contactDao: ContactDao = mockk(relaxed = true)
@@ -269,6 +276,139 @@ class MessageDispatcherPersistenceAdaptersTest {
                 deadLetteredAtMs = null,
             )
         }
+    }
+
+    @Test
+    fun saveMessageDispatchAttemptOutcome_mapsTypedUpdateToRawDaoCall() = runTest {
+        dispatchAttemptDao.saveMessageDispatchAttemptOutcome(
+            DispatchAttemptOutcomeUpdate(
+                id = DispatchAttemptId("attempt_2"),
+                attemptedAtMs = 1_800_000_000_000L,
+                resolvedAtMs = 1_800_000_000_500L,
+                result = DispatchAttemptResult.SENT,
+                channel = MessageChannel.EMAIL,
+                deliveryStatus = MessageDeliveryStatus.SENT,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        )
+
+        coVerify {
+            dispatchAttemptDao.updateOutcome(
+                id = "attempt_2",
+                attemptedAtMs = 1_800_000_000_000L,
+                resolvedAtMs = 1_800_000_000_500L,
+                result = DispatchAttemptResult.SENT.raw,
+                channel = MessageChannel.EMAIL.raw,
+                deliveryStatus = MessageDeliveryStatus.SENT.raw,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        }
+    }
+
+    @Test
+    fun saveMessageDispatchAttemptOutcome_ignoresNullUpdates() = runTest {
+        dispatchAttemptDao.saveMessageDispatchAttemptOutcome(null)
+
+        coVerify(exactly = 0) {
+            dispatchAttemptDao.updateOutcome(
+                id = any(),
+                attemptedAtMs = any(),
+                resolvedAtMs = any(),
+                result = any(),
+                channel = any(),
+                deliveryStatus = any(),
+                providerMessageId = any(),
+                errorType = any(),
+                errorCode = any(),
+                redactedErrorMessage = any(),
+                retryCount = any(),
+                nextRetryAtMs = any(),
+                deadLetteredAtMs = any(),
+            )
+        }
+    }
+
+    @Test
+    fun saveMessageDispatchAttemptOutcome_ignoresAbsentDao() = runTest {
+        val absentDao: DispatchAttemptDao? = null
+
+        absentDao.saveMessageDispatchAttemptOutcome(
+            DispatchAttemptOutcomeUpdate(
+                id = DispatchAttemptId("attempt_missing_dao"),
+                attemptedAtMs = 1_800_000_000_000L,
+                resolvedAtMs = 1_800_000_000_500L,
+                result = DispatchAttemptResult.SENT,
+                channel = MessageChannel.EMAIL,
+                deliveryStatus = MessageDeliveryStatus.SENT,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        )
+    }
+
+    @Test
+    fun saveMessageDispatchAttemptOutcome_logsDaoFailuresWithoutThrowing() = runTest {
+        StructuredLogger.clearForTests()
+        coEvery {
+            dispatchAttemptDao.updateOutcome(
+                id = any(),
+                attemptedAtMs = any(),
+                resolvedAtMs = any(),
+                result = any(),
+                channel = any(),
+                deliveryStatus = any(),
+                providerMessageId = any(),
+                errorType = any(),
+                errorCode = any(),
+                redactedErrorMessage = any(),
+                retryCount = any(),
+                nextRetryAtMs = any(),
+                deadLetteredAtMs = any(),
+            )
+        } throws IllegalStateException("dao unavailable")
+
+        dispatchAttemptDao.saveMessageDispatchAttemptOutcome(
+            DispatchAttemptOutcomeUpdate(
+                id = DispatchAttemptId("attempt_failing_dao"),
+                attemptedAtMs = 1_800_000_000_000L,
+                resolvedAtMs = 1_800_000_000_500L,
+                result = DispatchAttemptResult.SENT,
+                channel = MessageChannel.EMAIL,
+                deliveryStatus = MessageDeliveryStatus.SENT,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        )
+
+        val entry = StructuredLogger.getRecent(1).single()
+        assertEquals("MessageDispatcher", entry.tag)
+        assertEquals(LogLevel.ERROR, entry.level)
+        assertEquals("Failed to update dispatch attempt attempt_failing_dao", entry.message)
+        assertEquals("IllegalStateException", entry.extras["exception"])
+        assertEquals("dao unavailable", entry.extras["exceptionMessage"])
+        StructuredLogger.clearForTests()
     }
 
     @Test

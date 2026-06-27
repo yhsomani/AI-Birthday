@@ -139,6 +139,20 @@ internal suspend fun DispatchAttemptDao.saveDispatchAttemptOutcome(update: Dispa
     )
 }
 
+internal suspend fun DispatchAttemptDao?.saveMessageDispatchAttemptOutcome(update: DispatchAttemptOutcomeUpdate?) {
+    update ?: return
+    runCatching {
+        this?.saveDispatchAttemptOutcome(update)
+    }.onFailure { e ->
+        recordMessageDispatchLifecycleLog(
+            messageDispatchAttemptOutcomeUpdateFailedLog(
+                dispatchAttemptId = update.id.value,
+                cause = e,
+            )
+        )
+    }
+}
+
 internal fun contactPostDispatchUpdate(
     contactId: ContactId,
     wishedAtMs: Long,

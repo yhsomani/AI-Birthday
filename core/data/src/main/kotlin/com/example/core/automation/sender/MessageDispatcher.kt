@@ -8,7 +8,6 @@ import com.example.core.db.dao.SentMessageDao
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.SentMessageId
-import com.example.domain.model.dispatch.DispatchAttemptOutcomeUpdate
 import com.example.domain.model.dispatch.MessageDispatchRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -124,7 +123,7 @@ class MessageDispatcher(
         }
 
         if (routeLoopState.success) {
-            saveMessageDispatchAttemptOutcome(
+            dispatchAttemptDao.saveMessageDispatchAttemptOutcome(
                 successfulDispatchAttemptOutcomeUpdate(
                     dispatchAttemptId = dispatchAttemptId,
                     resolvedAtMs = System.currentTimeMillis(),
@@ -171,7 +170,7 @@ class MessageDispatcher(
             } else {
                 routeLoopState.providerFailureSelection.failureOrDispatchFailure()
             }
-            saveMessageDispatchAttemptOutcome(
+            dispatchAttemptDao.saveMessageDispatchAttemptOutcome(
                 failedDispatchAttemptOutcomeUpdate(
                     dispatchAttemptId = dispatchAttemptId,
                     failedAtMs = failedAtMs,
@@ -192,20 +191,6 @@ class MessageDispatcher(
                     preferredChannel = preferredChannel,
                     messageText = messageText,
                     failure = failure,
-                )
-            )
-        }
-    }
-
-    private suspend fun saveMessageDispatchAttemptOutcome(update: DispatchAttemptOutcomeUpdate?) {
-        update ?: return
-        runCatching {
-            dispatchAttemptDao?.saveDispatchAttemptOutcome(update)
-        }.onFailure { e ->
-            recordMessageDispatchLifecycleLog(
-                messageDispatchAttemptOutcomeUpdateFailedLog(
-                    dispatchAttemptId = update.id.value,
-                    cause = e,
                 )
             )
         }
