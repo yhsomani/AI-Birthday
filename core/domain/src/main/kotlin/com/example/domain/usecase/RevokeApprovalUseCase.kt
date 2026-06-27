@@ -16,19 +16,19 @@ class RevokeApprovalUseCase @Inject constructor(
     private val schedulerService: SchedulerService
 ) {
     suspend operator fun invoke(pendingMessageId: String): RevokeOutcome {
-        val pending = messageRepository.getPendingById(pendingMessageId)
+        val pending = messageRepository.getMessageApprovalStateById(pendingMessageId)
             ?: return RevokeOutcome.PendingNotFound
 
-        if (MessageStatus.fromRaw(pending.status) != MessageStatus.APPROVED) {
+        if (pending.status != MessageStatus.APPROVED) {
             return RevokeOutcome.NotApproved
         }
 
-        val updatedPending = pending.copy(status = MessageStatus.PENDING.raw)
-        messageRepository.insertPending(updatedPending)
+        val updatedPending = pending.withStatus(MessageStatus.PENDING)
+        messageRepository.saveMessageApprovalState(updatedPending)
 
-        schedulerService.cancelExactSend(updatedPending.id)
+        schedulerService.cancelExactSend(updatedPending.id.value)
 
-        return RevokeOutcome.Revoked(updatedPending.id)
+        return RevokeOutcome.Revoked(updatedPending.id.value)
     }
 
     sealed class RevokeOutcome {

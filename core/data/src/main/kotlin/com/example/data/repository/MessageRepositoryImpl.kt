@@ -5,14 +5,21 @@ import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.message.toMessageAnalyticsRecord
+import com.example.domain.message.toMessageApprovalState
+import com.example.domain.message.toMessageDispatchState
 import com.example.domain.message.toMessageGenerationHistory
 import com.example.domain.message.toPendingMessageListItems
+import com.example.domain.message.toRetryableMessageDraft
 import com.example.domain.message.toSentMessageListItems
 import com.example.domain.message.toWishPreviewDraft
 import com.example.domain.message.toWishPreviewReviewItem
+import com.example.domain.model.message.MessageApprovalState
 import com.example.domain.model.message.MessageAnalyticsRecord
+import com.example.domain.model.message.MessageDispatchState
 import com.example.domain.model.message.MessageGenerationHistory
 import com.example.domain.model.message.PendingMessageListItem
+import com.example.domain.model.message.RetryQueuedMessageDraft
+import com.example.domain.model.message.RetryableMessageDraft
 import com.example.domain.model.message.SentMessageListItem
 import com.example.domain.model.message.WishPreviewDraft
 import com.example.domain.model.message.WishPreviewReviewItem
@@ -46,7 +53,23 @@ class MessageRepositoryImpl @Inject constructor(
 
     override suspend fun getPendingById(id: String): PendingMessageEntity? = pendingMessageDao.getById(id)
 
+    override suspend fun getMessageApprovalStateById(id: String): MessageApprovalState? {
+        return pendingMessageDao.getById(id)?.toMessageApprovalState()
+    }
+
+    override suspend fun getRetryableMessageDraftById(id: String): RetryableMessageDraft? {
+        return pendingMessageDao.getById(id)?.toRetryableMessageDraft()
+    }
+
+    override suspend fun getMessageDispatchStateById(id: String): MessageDispatchState? {
+        return pendingMessageDao.getById(id)?.toMessageDispatchState()
+    }
+
     override suspend fun getPendingByEventId(eventId: String): PendingMessageEntity? = pendingMessageDao.getByEventId(eventId)
+
+    override suspend fun getMessageDispatchStateByEventId(eventId: String): MessageDispatchState? {
+        return pendingMessageDao.getByEventId(eventId)?.toMessageDispatchState()
+    }
 
     override suspend fun getWishPreviewDraftById(id: String): WishPreviewDraft? {
         return pendingMessageDao.getById(id)?.toWishPreviewDraft()
@@ -71,6 +94,24 @@ class MessageRepositoryImpl @Inject constructor(
     ): Boolean = pendingMessageDao.existsForEventOccurrence(contactId, eventId, scheduledYear)
 
     override suspend fun insertPending(message: PendingMessageEntity) = pendingMessageDao.insert(message)
+
+    override suspend fun saveMessageApprovalState(state: MessageApprovalState) {
+        pendingMessageDao.updateApprovalState(
+            id = state.id.value,
+            status = state.status.raw,
+            selectedVariantText = state.selectedVariantText,
+            editedByUser = state.editedByUser,
+            userEditedText = state.userEditedText,
+        )
+    }
+
+    override suspend fun saveRetryQueuedMessageDraft(state: RetryQueuedMessageDraft) {
+        pendingMessageDao.updateRetryState(
+            id = state.id.value,
+            status = state.status.raw,
+            scheduledForMs = state.scheduledForMs,
+        )
+    }
 
     override suspend fun updatePendingStatus(id: String, status: String) = pendingMessageDao.updateStatus(id, status)
 

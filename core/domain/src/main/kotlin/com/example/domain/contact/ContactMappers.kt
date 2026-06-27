@@ -23,6 +23,7 @@ import com.example.domain.model.contact.ContactWishContext
 import com.example.domain.model.contact.RelationshipAnalyticsCount
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.dispatch.MessageDispatchRecipient
 
 fun ContactEntity.toAutomationProfile(): ContactAutomationProfile {
     return ContactAutomationProfile(
@@ -243,6 +244,15 @@ fun ContactEntity.toMessageContext(): ContactMessageContext {
         id = ContactId(id),
         displayName = name,
         avatarUrl = profilePhotoUri,
+        primaryPhone = primaryPhone,
+        primaryEmail = primaryEmail,
+    )
+}
+
+fun ContactEntity.toMessageDispatchRecipient(): MessageDispatchRecipient {
+    return MessageDispatchRecipient(
+        id = ContactId(id),
+        displayName = name,
         primaryPhone = primaryPhone,
         primaryEmail = primaryEmail,
     )

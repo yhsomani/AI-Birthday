@@ -16,6 +16,7 @@ import com.example.core.resilience.StructuredLogger
 import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchDecision
 import com.example.domain.automation.DispatchEligibilityPolicy
+import com.example.domain.contact.toMessageDispatchRecipient
 import com.example.domain.dispatch.buildMessageDispatchRequest
 import com.example.domain.dispatch.newDispatchAttempt
 import com.example.domain.dispatch.toEntity
@@ -25,6 +26,7 @@ import com.example.domain.model.MessageStatus
 import com.example.domain.model.dispatch.DispatchAttemptCreator
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.DispatchEligibilityRecord
+import com.example.domain.message.toMessageDispatchDraft
 import com.example.domain.message.toMessageDraft
 import com.example.domain.service.PreferencesRepository
 import dagger.assisted.Assisted
@@ -187,7 +189,13 @@ class MessageDispatchWorker @AssistedInject constructor(
                 eventDao = eventDao,
                 dispatchAttemptDao = dispatchAttemptDao,
             )
-            dispatcher.dispatch(buildMessageDispatchRequest(pendingMsg, contact, attemptId))
+            dispatcher.dispatch(
+                buildMessageDispatchRequest(
+                    message = pendingMsg.toMessageDispatchDraft(),
+                    recipient = contact.toMessageDispatchRecipient(),
+                    dispatchAttemptId = attemptId,
+                ),
+            )
         } catch (e: Exception) {
             StructuredLogger.e(TAG, "Dispatch failed unexpectedly for message ${pendingMsg.id}", e)
             val failedAtMs = System.currentTimeMillis()
@@ -229,7 +237,7 @@ class MessageDispatchWorker @AssistedInject constructor(
         resolvedAtMs: Long?,
     ): String {
         val requestedAtMs = System.currentTimeMillis()
-        val attempt = pending.newDispatchAttempt(
+        val attempt = pending.toMessageDraft().newDispatchAttempt(
             eligibilityDecision = eligibilityDecision,
             result = result,
             createdBy = DispatchAttemptCreator.WORKER,

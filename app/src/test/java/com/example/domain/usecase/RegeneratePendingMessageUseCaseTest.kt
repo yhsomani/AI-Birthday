@@ -5,6 +5,7 @@ import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.ContactId
+import com.example.domain.model.message.MessageGenerationHistory
 import com.example.domain.model.common.OccasionId
 import com.example.domain.model.occasion.Occasion
 import com.example.domain.model.occasion.OccasionDate

@@ -12,7 +12,10 @@ import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.OccasionId
 import com.example.domain.model.common.SentMessageId
+import com.example.domain.model.message.MessageApprovalState
+import com.example.domain.model.message.RetryQueuedMessageDraft
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
@@ -108,6 +111,124 @@ class MessageRepositoryImplTest {
     }
 
     @Test
+    fun getMessageApprovalStateById_mapsRoomMessageToPureApprovalState() = runTest {
+        coEvery { pendingMessageDao.getById("pm_1") } returns pendingMessage(
+            approvalMode = " smart_approve ",
+            status = " approved ",
+        ).copy(
+            selectedVariantText = "Edited draft",
+            editedByUser = true,
+            userEditedText = "Edited draft",
+        )
+
+        val state = repository.getMessageApprovalStateById("pm_1")
+
+        assertEquals(MessageDraftId("pm_1"), state?.id)
+        assertEquals("Edited draft", state?.selectedVariantText)
+        assertEquals(ApprovalMode.SMART_APPROVE, state?.approvalMode)
+        assertEquals(MessageStatus.APPROVED, state?.status)
+        assertEquals(true, state?.editedByUser)
+        assertEquals("Edited draft", state?.userEditedText)
+    }
+
+    @Test
+    fun saveMessageApprovalState_updatesApprovalColumns() = runTest {
+        val state = MessageApprovalState(
+            id = MessageDraftId("pm_1"),
+            selectedVariantText = "Approved edit",
+            approvalMode = ApprovalMode.SMART_APPROVE,
+            status = MessageStatus.APPROVED,
+            editedByUser = true,
+            userEditedText = "Approved edit",
+        )
+
+        repository.saveMessageApprovalState(state)
+
+        coVerify {
+            pendingMessageDao.updateApprovalState(
+                id = "pm_1",
+                status = MessageStatus.APPROVED.raw,
+                selectedVariantText = "Approved edit",
+                editedByUser = true,
+                userEditedText = "Approved edit",
+            )
+        }
+    }
+
+    @Test
+    fun getRetryableMessageDraftById_mapsRoomMessageToPureRetryDraft() = runTest {
+        coEvery { pendingMessageDao.getById("pm_1") } returns pendingMessage(
+            channel = " whatsapp ",
+            status = " failed ",
+        )
+
+        val draft = repository.getRetryableMessageDraftById("pm_1")
+
+        assertEquals(MessageDraftId("pm_1"), draft?.id)
+        assertEquals(ContactId("contact_1"), draft?.contactId)
+        assertEquals(OccasionId("event_1"), draft?.occasionId)
+        assertEquals(MessageChannel.WHATSAPP, draft?.channel)
+        assertEquals(MessageStatus.FAILED, draft?.status)
+        assertEquals(1_800_000_000_000L, draft?.scheduledForMs)
+    }
+
+    @Test
+    fun saveRetryQueuedMessageDraft_updatesRetryColumns() = runTest {
+        val state = RetryQueuedMessageDraft(
+            id = MessageDraftId("pm_1"),
+            status = MessageStatus.APPROVED,
+            scheduledForMs = 1_900_000_000_000L,
+        )
+
+        repository.saveRetryQueuedMessageDraft(state)
+
+        coVerify {
+            pendingMessageDao.updateRetryState(
+                id = "pm_1",
+                status = MessageStatus.APPROVED.raw,
+                scheduledForMs = 1_900_000_000_000L,
+            )
+        }
+    }
+
+    @Test
+    fun getMessageDispatchStateById_mapsRoomMessageToPureDispatchState() = runTest {
+        coEvery { pendingMessageDao.getById("pm_1") } returns pendingMessage(
+            channel = " email ",
+            approvalMode = " smart_approve ",
+            status = " approved ",
+        ).copy(
+            editedByUser = true,
+            userEditedText = "Edited dispatch text",
+        )
+
+        val state = repository.getMessageDispatchStateById("pm_1")
+
+        assertEquals(MessageDraftId("pm_1"), state?.id)
+        assertEquals(ContactId("contact_1"), state?.contactId)
+        assertEquals(OccasionId("event_1"), state?.occasionId)
+        assertEquals(MessageChannel.EMAIL, state?.channel)
+        assertEquals(ApprovalMode.SMART_APPROVE, state?.draft?.approvalMode)
+        assertEquals(MessageStatus.APPROVED, state?.status)
+        assertEquals("Edited dispatch text", state?.dispatchDraft?.messageText)
+    }
+
+    @Test
+    fun getMessageDispatchStateByEventId_mapsRoomMessageToPureDispatchState() = runTest {
+        coEvery { pendingMessageDao.getByEventId("event_1") } returns pendingMessage(
+            id = "pm_event",
+            eventId = "event_1",
+            status = " pending ",
+        )
+
+        val state = repository.getMessageDispatchStateByEventId("event_1")
+
+        assertEquals(MessageDraftId("pm_event"), state?.id)
+        assertEquals(OccasionId("event_1"), state?.occasionId)
+        assertEquals(MessageStatus.PENDING, state?.status)
+    }
+
+    @Test
     fun getSentListItems_mapsRoomMessagesToPureListItems() = runTest {
         every { sentMessageDao.getAll() } returns flowOf(
             listOf(
@@ -134,6 +255,40 @@ class MessageRepositoryImplTest {
         assertEquals(MessageChannel.WHATSAPP, items.single().channel)
         assertEquals(1_700_000_100_000L, items.single().sentAtMs)
         assertEquals(MessageDeliveryStatus.DELIVERED, items.single().deliveryStatus)
+    }
+
+    @Test
+    fun getGenerationHistoryByContact_mapsRoomMessagesToPureGenerationHistory() = runTest {
+        coEvery { sentMessageDao.getByContact("contact_1", 10) } returns listOf(
+            SentMessageEntity(
+                id = "sent_1",
+                contactId = "contact_1",
+                eventType = "BIRTHDAY",
+                eventYear = 2026,
+                messageText = "Happy birthday",
+                channel = " email ",
+                sentAtMs = 1_700_000_100_000L,
+                deliveryStatus = " delivered ",
+            ),
+            SentMessageEntity(
+                id = "sent_2",
+                contactId = "contact_1",
+                eventType = "BIRTHDAY",
+                eventYear = 2025,
+                messageText = "Have a great year",
+                channel = MessageChannel.SMS.raw,
+                sentAtMs = 1_600_000_100_000L,
+                deliveryStatus = "failed",
+            ),
+        )
+
+        val history = repository.getGenerationHistoryByContact("contact_1", 10)
+
+        assertEquals(listOf("Happy birthday", "Have a great year"), history.previousWishes)
+        assertEquals(MessageChannel.EMAIL, history.routeHistory[0].channel)
+        assertEquals(MessageDeliveryStatus.DELIVERED, history.routeHistory[0].deliveryStatus)
+        assertEquals(MessageChannel.SMS, history.routeHistory[1].channel)
+        assertEquals(MessageDeliveryStatus.FAILED, history.routeHistory[1].deliveryStatus)
     }
 
     @Test

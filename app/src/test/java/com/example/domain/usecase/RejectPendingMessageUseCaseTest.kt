@@ -1,13 +1,15 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.PendingMessageEntity
-import com.example.domain.model.MessageChannel
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.message.MessageApprovalState
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.SchedulerService
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -21,7 +23,7 @@ class RejectPendingMessageUseCaseTest {
 
     @Test
     fun `invoke with non-existent message returns PendingNotFound`() = runTest {
-        coEvery { messageRepository.getPendingById("m1") } returns null
+        coEvery { messageRepository.getMessageApprovalStateById("m1") } returns null
 
         val result = useCase("m1")
 
@@ -30,37 +32,39 @@ class RejectPendingMessageUseCaseTest {
 
     @Test
     fun `invoke with valid message sets status to REJECTED`() = runTest {
-        val pendingMsg = PendingMessageEntity(
-            id = "m1", contactId = "c1", eventId = "e1",
-            shortVariant = "", standardVariant = "", longVariant = "",
-            formalVariant = "", funnyVariant = "", emotionalVariant = "",
-            selectedVariant = "standard", selectedVariantText = "",
-            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "MANUAL"
+        val saved = slot<MessageApprovalState>()
+        coEvery { messageRepository.getMessageApprovalStateById("m1") } returns approvalState(
+            status = MessageStatus.PENDING,
         )
-        coEvery { messageRepository.getPendingById("m1") } returns pendingMsg
 
         val result = useCase("m1")
 
         assertTrue(result is RejectPendingMessageUseCase.RejectionOutcome.Rejected)
         assertEquals("m1", (result as RejectPendingMessageUseCase.RejectionOutcome.Rejected).id)
 
-        coVerify { messageRepository.updatePendingStatus("m1", MessageStatus.REJECTED.raw) }
+        coVerify { messageRepository.saveMessageApprovalState(capture(saved)) }
+        assertEquals(MessageStatus.REJECTED, saved.captured.status)
     }
 
     @Test
     fun `invoke with approved message cancels scheduled send`() = runTest {
-        val pendingMsg = PendingMessageEntity(
-            id = "m1", contactId = "c1", eventId = "e1",
-            shortVariant = "", standardVariant = "", longVariant = "",
-            formalVariant = "", funnyVariant = "", emotionalVariant = "",
-            selectedVariant = "standard", selectedVariantText = "",
-            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "MANUAL",
-            status = " approved "
+        coEvery { messageRepository.getMessageApprovalStateById("m1") } returns approvalState(
+            status = MessageStatus.APPROVED,
         )
-        coEvery { messageRepository.getPendingById("m1") } returns pendingMsg
 
         useCase("m1")
 
         coVerify { schedulerService.cancelExactSend("m1") }
+    }
+
+    private fun approvalState(status: MessageStatus): MessageApprovalState {
+        return MessageApprovalState(
+            id = MessageDraftId("m1"),
+            selectedVariantText = "",
+            approvalMode = ApprovalMode.UNKNOWN,
+            status = status,
+            editedByUser = false,
+            userEditedText = null,
+        )
     }
 }

@@ -1,6 +1,5 @@
 package com.example.domain.dispatch
 
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.common.ContactId
@@ -11,9 +10,11 @@ import com.example.domain.model.dispatch.DispatchAttempt
 import com.example.domain.model.dispatch.DispatchAttemptCreator
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.DispatchEligibilityRecord
+import com.example.domain.model.message.MessageDraft
+import com.example.domain.model.message.RetryableMessageDraft
 import java.util.UUID
 
-fun PendingMessageEntity.newDispatchAttempt(
+fun MessageDraft.newDispatchAttempt(
     eligibilityDecision: DispatchEligibilityRecord,
     result: DispatchAttemptResult,
     createdBy: DispatchAttemptCreator,
@@ -27,12 +28,84 @@ fun PendingMessageEntity.newDispatchAttempt(
     deadLetteredAtMs: Long? = null,
     metadataJson: String = "{}",
 ): DispatchAttempt {
+    return newDispatchAttempt(
+        messageDraftId = id,
+        contactId = contactId,
+        occasionId = occasionId,
+        channel = channel,
+        eligibilityDecision = eligibilityDecision,
+        result = result,
+        createdBy = createdBy,
+        blockOrDeferReason = blockOrDeferReason,
+        requestedAtMs = requestedAtMs,
+        attemptedAtMs = attemptedAtMs,
+        resolvedAtMs = resolvedAtMs,
+        deliveryStatus = deliveryStatus,
+        retryCount = retryCount,
+        nextRetryAtMs = nextRetryAtMs,
+        deadLetteredAtMs = deadLetteredAtMs,
+        metadataJson = metadataJson,
+    )
+}
+
+fun RetryableMessageDraft.newDispatchAttempt(
+    eligibilityDecision: DispatchEligibilityRecord,
+    result: DispatchAttemptResult,
+    createdBy: DispatchAttemptCreator,
+    blockOrDeferReason: String? = null,
+    requestedAtMs: Long = System.currentTimeMillis(),
+    attemptedAtMs: Long? = null,
+    resolvedAtMs: Long? = null,
+    deliveryStatus: MessageDeliveryStatus = defaultDeliveryStatus(result),
+    retryCount: Int = 0,
+    nextRetryAtMs: Long? = null,
+    deadLetteredAtMs: Long? = null,
+    metadataJson: String = "{}",
+): DispatchAttempt {
+    return newDispatchAttempt(
+        messageDraftId = id,
+        contactId = contactId,
+        occasionId = occasionId,
+        channel = channel,
+        eligibilityDecision = eligibilityDecision,
+        result = result,
+        createdBy = createdBy,
+        blockOrDeferReason = blockOrDeferReason,
+        requestedAtMs = requestedAtMs,
+        attemptedAtMs = attemptedAtMs,
+        resolvedAtMs = resolvedAtMs,
+        deliveryStatus = deliveryStatus,
+        retryCount = retryCount,
+        nextRetryAtMs = nextRetryAtMs,
+        deadLetteredAtMs = deadLetteredAtMs,
+        metadataJson = metadataJson,
+    )
+}
+
+private fun newDispatchAttempt(
+    messageDraftId: MessageDraftId,
+    contactId: ContactId?,
+    occasionId: OccasionId?,
+    channel: MessageChannel,
+    eligibilityDecision: DispatchEligibilityRecord,
+    result: DispatchAttemptResult,
+    createdBy: DispatchAttemptCreator,
+    blockOrDeferReason: String?,
+    requestedAtMs: Long,
+    attemptedAtMs: Long?,
+    resolvedAtMs: Long?,
+    deliveryStatus: MessageDeliveryStatus,
+    retryCount: Int,
+    nextRetryAtMs: Long?,
+    deadLetteredAtMs: Long?,
+    metadataJson: String,
+): DispatchAttempt {
     return DispatchAttempt(
         id = DispatchAttemptId(UUID.randomUUID().toString()),
-        messageDraftId = MessageDraftId(id),
-        contactId = ContactId(contactId),
-        occasionId = OccasionId(eventId),
-        channel = MessageChannel.fromRaw(channel).takeUnless { it == MessageChannel.UNKNOWN } ?: MessageChannel.SMS,
+        messageDraftId = messageDraftId,
+        contactId = contactId,
+        occasionId = occasionId,
+        channel = channel.takeUnless { it == MessageChannel.UNKNOWN } ?: MessageChannel.SMS,
         routeRank = 0,
         eligibilityDecision = eligibilityDecision,
         blockOrDeferReason = blockOrDeferReason,

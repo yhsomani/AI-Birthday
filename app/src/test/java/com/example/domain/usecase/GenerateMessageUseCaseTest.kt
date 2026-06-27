@@ -2,10 +2,10 @@ package com.example.domain.usecase
 
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.PendingMessageEntity
-import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.ContactId
+import com.example.domain.model.message.MessageGenerationHistory
 import com.example.domain.model.common.OccasionId
 import com.example.domain.model.notification.ApprovalNotificationRequest
 import com.example.domain.model.occasion.Occasion

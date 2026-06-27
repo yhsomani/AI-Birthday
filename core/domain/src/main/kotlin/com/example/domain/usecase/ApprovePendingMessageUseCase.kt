@@ -1,7 +1,6 @@
 package com.example.domain.usecase
 
 import com.example.domain.model.ApprovalMode
-import com.example.domain.model.MessageStatus
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.SchedulerService
 import javax.inject.Inject
@@ -17,28 +16,19 @@ class ApprovePendingMessageUseCase @Inject constructor(
     private val schedulerService: SchedulerService
 ) {
     suspend operator fun invoke(pendingMessageId: String, finalEditedText: String? = null): ApprovalOutcome {
-        val pending = messageRepository.getPendingById(pendingMessageId)
+        val pending = messageRepository.getMessageApprovalStateById(pendingMessageId)
             ?: return ApprovalOutcome.PendingNotFound
 
-        val updatedPending = if (finalEditedText != null && finalEditedText != pending.selectedVariantText) {
-            pending.copy(
-                status = MessageStatus.APPROVED.raw,
-                editedByUser = true,
-                userEditedText = finalEditedText,
-                selectedVariantText = finalEditedText
-            )
-        } else {
-            pending.copy(status = MessageStatus.APPROVED.raw)
-        }
+        val updatedPending = pending.approved(finalEditedText)
 
-        messageRepository.insertPending(updatedPending)
+        messageRepository.saveMessageApprovalState(updatedPending)
 
         // Always schedule exactly when approved from the UI
-        schedulerService.scheduleExactSend(updatedPending.id)
+        schedulerService.scheduleExactSend(updatedPending.id.value)
 
         return ApprovalOutcome.Approved(
-            id = updatedPending.id,
-            approvalMode = ApprovalMode.fromRaw(updatedPending.approvalMode),
+            id = updatedPending.id.value,
+            approvalMode = updatedPending.approvalMode,
         )
     }
 

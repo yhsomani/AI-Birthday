@@ -16,12 +16,12 @@ class RejectPendingMessageUseCase @Inject constructor(
     private val schedulerService: SchedulerService,
 ) {
     suspend operator fun invoke(pendingMessageId: String): RejectionOutcome {
-        val pending = messageRepository.getPendingById(pendingMessageId)
+        val pending = messageRepository.getMessageApprovalStateById(pendingMessageId)
             ?: return RejectionOutcome.PendingNotFound
 
-        messageRepository.updatePendingStatus(pendingMessageId, MessageStatus.REJECTED.raw)
-        if (MessageStatus.fromRaw(pending.status) == MessageStatus.APPROVED) {
-            schedulerService.cancelExactSend(pending.id)
+        messageRepository.saveMessageApprovalState(pending.withStatus(MessageStatus.REJECTED))
+        if (pending.status == MessageStatus.APPROVED) {
+            schedulerService.cancelExactSend(pending.id.value)
         }
         return RejectionOutcome.Rejected(pendingMessageId)
     }

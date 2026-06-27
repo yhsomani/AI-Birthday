@@ -28,7 +28,6 @@ import com.example.domain.contact.toHeader
 import com.example.domain.contact.toRelationshipPromptContext
 import com.example.domain.event.toEventEntity
 import com.example.domain.event.toOccasion
-import com.example.domain.message.toDeliveryRouteHistoryRecords
 import com.example.domain.notification.buildApprovalNotificationRequest
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
@@ -122,10 +121,9 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                         blackoutDatesJson = prefs.getBlackoutDates(),
                         nowMs = now,
                     )
-                    val previousMessages = sentMessageDao.getByContact(contact.id)
                     val channelSelection = AutoSendChannelSelector.selectRoute(
                         contact = contact.toDeliveryRouteProfile(),
-                        routeHistory = previousMessages.toDeliveryRouteHistoryRecords(),
+                        routeHistory = sentMessageDao.getDeliveryRouteHistoryByContact(contact.id),
                         channelBlackoutJson = prefs.getChannelBlackout(),
                         senderEmail = prefs.getSenderEmail(),
                         senderEmailPassword = prefs.getSenderEmailPassword(),

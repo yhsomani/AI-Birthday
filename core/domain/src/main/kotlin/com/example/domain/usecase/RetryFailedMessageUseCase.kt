@@ -4,7 +4,6 @@ import com.example.domain.dispatch.newDispatchAttempt
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.MessageStatus
-import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.dispatch.DispatchAttempt
 import com.example.domain.model.dispatch.DispatchAttemptCreator
 import com.example.domain.model.dispatch.DispatchAttemptResult
@@ -22,16 +21,15 @@ class RetryFailedMessageUseCase @Inject constructor(
     private val schedulerService: SchedulerService,
 ) {
     suspend operator fun invoke(pendingMessageId: String): RetryOutcome {
-        val pending = messageRepository.getPendingById(pendingMessageId)
+        val pending = messageRepository.getRetryableMessageDraftById(pendingMessageId)
             ?: return RetryOutcome.PendingNotFound
 
-        val status = MessageStatus.fromRaw(pending.status)
-        if (status != MessageStatus.FAILED) {
-            return RetryOutcome.NotFailed(pending.id, status)
+        if (pending.status != MessageStatus.FAILED) {
+            return RetryOutcome.NotFailed(pending.id.value, pending.status)
         }
 
         val retryAtMs = System.currentTimeMillis()
-        val latestFailure = dispatchAttemptRepository.getLatestFailureForMessageDraft(MessageDraftId(pending.id))
+        val latestFailure = dispatchAttemptRepository.getLatestFailureForMessageDraft(pending.id)
         val retryCount = (latestFailure?.retryCount ?: 0) + 1
 
         if (latestFailure != null) {
@@ -66,16 +64,12 @@ class RetryFailedMessageUseCase @Inject constructor(
             )
         }
 
-        messageRepository.insertPending(
-            pending.copy(
-                status = MessageStatus.APPROVED.raw,
-                scheduledForMs = retryAtMs,
-            ),
-        )
-        schedulerService.scheduleExactSend(pending.id)
+        val retryState = pending.queuedForRetry(retryAtMs)
+        messageRepository.saveRetryQueuedMessageDraft(retryState)
+        schedulerService.scheduleExactSend(retryState.id.value)
 
         return RetryOutcome.RetryQueued(
-            pendingMessageId = pending.id,
+            pendingMessageId = pending.id.value,
             retryCount = retryCount,
             previousAttempt = latestFailure,
         )

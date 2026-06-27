@@ -1,18 +1,16 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.ActivityLogEntity
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchDecision
 import com.example.domain.automation.DispatchEligibilityPolicy
+import com.example.domain.contact.toMessageDispatchRecipient
 import com.example.domain.dispatch.buildMessageDispatchRequest
 import com.example.domain.dispatch.newDispatchAttempt
 import com.example.domain.repository.ActivityLogRepository
-import com.example.domain.message.toMessageDraft
 import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
-import com.example.domain.model.ApprovalMode
 import com.example.domain.model.DispatchActivityDecision
 import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.MessageStatus
@@ -20,6 +18,7 @@ import com.example.domain.model.common.DispatchAttemptId
 import com.example.domain.model.dispatch.DispatchAttemptCreator
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.DispatchEligibilityRecord
+import com.example.domain.model.message.MessageDispatchState
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.MessageRepository
@@ -44,13 +43,12 @@ class DispatchMessageUseCase @Inject constructor(
     private val dispatchAttemptRepository: DispatchAttemptRepository,
 ) {
     suspend operator fun invoke(messageRef: String): DispatchOutcome {
-        val pending = messageRepository.getPendingById(messageRef)
-            ?: messageRepository.getPendingByEventId(messageRef)
+        val pending = messageRepository.getMessageDispatchStateById(messageRef)
+            ?: messageRepository.getMessageDispatchStateByEventId(messageRef)
             ?: return DispatchOutcome.PendingNotFound
 
         when (val decision = DispatchEligibilityPolicy.evaluate(
-            draft = pending.toMessageDraft(),
-            approvalMode = ApprovalMode.fromRaw(pending.approvalMode),
+            draft = pending.draft,
         )) {
             DispatchDecision.SendNow -> Unit
             is DispatchDecision.DeferUntil -> {
@@ -71,7 +69,7 @@ class DispatchMessageUseCase @Inject constructor(
                     reason = decision.reason.name,
                     scheduledForMs = decision.epochMs,
                 )
-                return DispatchOutcome.Deferred(pending.id, decision.epochMs)
+                return DispatchOutcome.Deferred(pending.id.value, decision.epochMs)
             }
             is DispatchDecision.NeedsApproval -> {
                 recordDispatchAttempt(
@@ -90,19 +88,20 @@ class DispatchMessageUseCase @Inject constructor(
                     decision = DispatchActivityDecision.NEEDS_APPROVAL,
                     reason = decision.approvalMode.raw,
                 )
-                return DispatchOutcome.NotApproved(pending.status)
+                return DispatchOutcome.NotApproved(pending.status.raw)
             }
             is DispatchDecision.Expire -> {
-                messageRepository.updatePendingStatus(pending.id, MessageStatus.EXPIRED.raw)
+                messageRepository.updatePendingStatus(pending.id.value, MessageStatus.EXPIRED.raw)
+                val expired = pending.withStatus(MessageStatus.EXPIRED)
                 recordDispatchAttempt(
-                    pending = pending.copy(status = MessageStatus.EXPIRED.raw),
+                    pending = expired,
                     eligibilityDecision = DispatchEligibilityRecord.EXPIRED,
                     result = DispatchAttemptResult.EXPIRED,
                     reason = decision.reason.name,
                     resolvedAtMs = System.currentTimeMillis(),
                 )
                 recordDispatchActivity(
-                    pending = pending.copy(status = MessageStatus.EXPIRED.raw),
+                    pending = expired,
                     title = "Dispatch expired",
                     detail = "Message approval window expired before sending.",
                     severity = ActivityLogSeverity.WARNING,
@@ -110,7 +109,7 @@ class DispatchMessageUseCase @Inject constructor(
                     decision = DispatchActivityDecision.EXPIRED,
                     reason = decision.reason.name,
                 )
-                return DispatchOutcome.Expired(pending.id)
+                return DispatchOutcome.Expired(pending.id.value)
             }
             is DispatchDecision.Blocked -> {
                 recordDispatchAttempt(
@@ -129,11 +128,11 @@ class DispatchMessageUseCase @Inject constructor(
                     decision = DispatchActivityDecision.BLOCKED,
                     reason = decision.reason.name,
                 )
-                return DispatchOutcome.NotApproved(pending.status)
+                return DispatchOutcome.NotApproved(pending.status.raw)
             }
         }
 
-        val contact = contactRepository.getById(pending.contactId) ?: run {
+        val contact = contactRepository.getById(pending.contactId.value) ?: run {
             recordDispatchAttempt(
                 pending = pending,
                 eligibilityDecision = DispatchEligibilityRecord.BLOCKED,
@@ -162,7 +161,13 @@ class DispatchMessageUseCase @Inject constructor(
         )
 
         try {
-            messageDispatcherService.dispatch(buildMessageDispatchRequest(pending, contact, attemptId))
+            messageDispatcherService.dispatch(
+                buildMessageDispatchRequest(
+                    message = pending.dispatchDraft,
+                    recipient = contact.toMessageDispatchRecipient(),
+                    dispatchAttemptId = attemptId,
+                ),
+            )
         } catch (e: Exception) {
             val failedAtMs = System.currentTimeMillis()
             runCatching {
@@ -187,24 +192,24 @@ class DispatchMessageUseCase @Inject constructor(
         recordDispatchActivity(
             pending = pending,
             title = "Dispatch sent",
-            detail = "Message dispatched through ${pending.channel}.",
+            detail = "Message dispatched through ${pending.channel.raw}.",
             severity = ActivityLogSeverity.INFO,
             status = ActivityLogStatus.RESOLVED,
             decision = DispatchActivityDecision.SENT,
         )
 
-        return DispatchOutcome.Sent(pending.id, pending.channel)
+        return DispatchOutcome.Sent(pending.id.value, pending.channel.raw)
     }
 
     private suspend fun recordDispatchAttempt(
-        pending: PendingMessageEntity,
+        pending: MessageDispatchState,
         eligibilityDecision: DispatchEligibilityRecord,
         result: DispatchAttemptResult,
         reason: String?,
         resolvedAtMs: Long?,
     ): String {
         val requestedAtMs = System.currentTimeMillis()
-        val attempt = pending.newDispatchAttempt(
+        val attempt = pending.draft.newDispatchAttempt(
             eligibilityDecision = eligibilityDecision,
             result = result,
             createdBy = DispatchAttemptCreator.USER,
@@ -226,7 +231,7 @@ class DispatchMessageUseCase @Inject constructor(
     }
 
     private suspend fun recordDispatchActivity(
-        pending: PendingMessageEntity,
+        pending: MessageDispatchState,
         title: String,
         detail: String,
         severity: ActivityLogSeverity,
@@ -242,9 +247,9 @@ class DispatchMessageUseCase @Inject constructor(
                     type = ActivityLogType.MESSAGE.raw,
                     title = title,
                     detail = detail,
-                    contactId = pending.contactId,
-                    eventId = pending.eventId,
-                    messageId = pending.id,
+                    contactId = pending.contactId.value,
+                    eventId = pending.occasionId.value,
+                    messageId = pending.id.value,
                     severity = severity.raw,
                     status = status.raw,
                     metadataJson = dispatchMetadataJson(
@@ -259,19 +264,19 @@ class DispatchMessageUseCase @Inject constructor(
     }
 
     private fun dispatchMetadataJson(
-        pending: PendingMessageEntity,
+        pending: MessageDispatchState,
         decision: DispatchActivityDecision,
         reason: String?,
         scheduledForMs: Long?,
     ): String {
         val fields = buildList {
             add("decision" to decision.raw)
-            add("messageId" to pending.id)
-            add("eventId" to pending.eventId)
-            add("contactId" to pending.contactId)
-            add("channel" to pending.channel)
-            add("approvalMode" to pending.approvalMode)
-            add("status" to pending.status)
+            add("messageId" to pending.id.value)
+            add("eventId" to pending.occasionId.value)
+            add("contactId" to pending.contactId.value)
+            add("channel" to pending.channel.raw)
+            add("approvalMode" to pending.draft.approvalMode.raw)
+            add("status" to pending.status.raw)
             reason?.let { add("reason" to it) }
             scheduledForMs?.let { add("scheduledForMs" to it.toString()) }
         }

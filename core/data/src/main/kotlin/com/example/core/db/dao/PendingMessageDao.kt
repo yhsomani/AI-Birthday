@@ -40,6 +40,34 @@ interface PendingMessageDao {
     @Query("UPDATE pending_messages SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: String, status: String)
 
+    @Query("""
+        UPDATE pending_messages
+        SET status = :status,
+            selectedVariantText = :selectedVariantText,
+            editedByUser = :editedByUser,
+            userEditedText = :userEditedText
+        WHERE id = :id
+    """)
+    suspend fun updateApprovalState(
+        id: String,
+        status: String,
+        selectedVariantText: String,
+        editedByUser: Boolean,
+        userEditedText: String?,
+    )
+
+    @Query("""
+        UPDATE pending_messages
+        SET status = :status,
+            scheduledForMs = :scheduledForMs
+        WHERE id = :id
+    """)
+    suspend fun updateRetryState(
+        id: String,
+        status: String,
+        scheduledForMs: Long,
+    )
+
     @Query("UPDATE pending_messages SET status = :status WHERE eventId = :eventId")
     suspend fun updateStatusByEventId(eventId: String, status: String)
 
