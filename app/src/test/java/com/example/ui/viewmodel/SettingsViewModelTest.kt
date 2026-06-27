@@ -223,4 +223,15 @@ class SettingsViewModelTest {
         assertFalse(viewModel.uiState.value.showLegacyDbNotice)
         verify { securePrefs.setLegacyUnencryptedDbQuarantined(false) }
     }
+
+    @Test
+    fun `signOut delegates to auth manager without duplicating data wipe`() = runTest(testDispatcher) {
+        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+
+        viewModel.signOut()
+
+        verify { authManager.signOut() }
+        verify(exactly = 0) { securePrefs.clearAll() }
+        verify(exactly = 0) { context.deleteDatabase(any()) }
+    }
 }

@@ -3,6 +3,7 @@ package com.example.core.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.KeyguardManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -17,13 +18,14 @@ class WhatsAppAccessibilityService : AccessibilityService() {
     companion object {
         val pendingQueue: ConcurrentLinkedQueue<WhatsAppSendJob> = ConcurrentLinkedQueue()
         var instance: WhatsAppAccessibilityService? = null
+        private val WHATSAPP_PACKAGES = arrayOf("com.whatsapp", "com.whatsapp.w4b")
     }
 
     data class WhatsAppSendJob(
         val phoneNumber: String,
         val message: String,
         val eventId: String,
-        val onComplete: (Boolean) -> Unit
+        val onComplete: (WhatsAppSendResult) -> Unit
     )
 
     private var currentJob: WhatsAppSendJob? = null
@@ -44,7 +46,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             flags = AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
                     AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-            packageNames = arrayOf("com.whatsapp", "com.whatsapp.w4b")
+            packageNames = WHATSAPP_PACKAGES
         }
     }
 
@@ -63,27 +65,31 @@ class WhatsAppAccessibilityService : AccessibilityService() {
     private fun openWhatsAppChat(phone: String) {
         sendState = SendState.OPENING_CHAT
         if (isDeviceLocked()) {
-            failJob("Device is locked; cannot safely send WhatsApp message (would unlock screen).")
+            failJob(WhatsAppSendFailureReason.DEVICE_LOCKED)
+            return
+        }
+        if (!isWhatsAppInstalled()) {
+            failJob(WhatsAppSendFailureReason.APP_NOT_FOUND)
             return
         }
         val intent = Intent(Intent.ACTION_VIEW).apply {
             data = Uri.parse("https://wa.me/$phone")
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
-        
+
         val timeoutRunnable = Runnable {
             if (sendState != SendState.DONE) {
-                currentJob?.onComplete?.invoke(false)
-                currentJob = null
-                sendState = SendState.IDLE
-                performGlobalAction(GLOBAL_ACTION_BACK)
-                mainHandler.postDelayed({ processNextIfIdle() }, 1000L)
+                failJob(timeoutFailureReason())
             }
         }
         jobTimeoutRunnable = timeoutRunnable
         mainHandler.postDelayed(timeoutRunnable, 15000L) // 15s timeout
-        
-        applicationContext.startActivity(intent)
+
+        try {
+            applicationContext.startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            failJob(WhatsAppSendFailureReason.APP_NOT_FOUND)
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
@@ -106,7 +112,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
     private fun typeMessage(message: String) {
         sendState = SendState.TYPING_MESSAGE
         val root = rootInActiveWindow ?: run {
-            failJob("Root view not available")
+            failJob(WhatsAppSendFailureReason.COMPOSE_FIELD_NOT_FOUND)
             return
         }
         val inputField = findMessageInputField(root)
@@ -121,23 +127,23 @@ class WhatsAppAccessibilityService : AccessibilityService() {
                 verifyTextTyped(message)
             }, 500L)
         } else {
-            failJob("Input field not found")
+            failJob(WhatsAppSendFailureReason.COMPOSE_FIELD_NOT_FOUND)
         }
     }
 
     private fun verifyTextTyped(message: String) {
         val root = rootInActiveWindow ?: run {
-            failJob("Root view not available during text verification")
+            failJob(WhatsAppSendFailureReason.TEXT_VERIFICATION_FAILED)
             return
         }
         val inputField = findMessageInputField(root)
         if (inputField == null) {
-            failJob("Input field disappeared during text verification")
+            failJob(WhatsAppSendFailureReason.TEXT_VERIFICATION_FAILED)
             return
         }
         val text = inputField.text?.toString() ?: ""
         if (text != message) {
-            failJob("Text mismatch: expected '$message', got '$text'")
+            failJob(WhatsAppSendFailureReason.TEXT_VERIFICATION_FAILED)
             return
         }
 
@@ -147,7 +153,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
             sendState = SendState.WAITING_FOR_SEND_BUTTON
             verifySendCompleted(0)
         } else {
-            failJob("Send button not found after typing")
+            failJob(WhatsAppSendFailureReason.SEND_BUTTON_NOT_FOUND)
         }
     }
 
@@ -159,7 +165,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
             completeJobSuccess()
         } else {
             if (attempt >= 6) { // 6 * 500ms = 3s timeout
-                failJob("Send button failed to disappear (message send timed out)")
+                failJob(WhatsAppSendFailureReason.SEND_CONFIRMATION_TIMEOUT)
             } else {
                 mainHandler.postDelayed({
                     verifySendCompleted(attempt + 1)
@@ -168,11 +174,11 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun failJob(reason: String) {
+    private fun failJob(reason: WhatsAppSendFailureReason) {
         jobTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
         val job = currentJob
         if (job != null) {
-            job.onComplete(false)
+            job.onComplete(WhatsAppSendResult.Failed(reason))
             currentJob = null
         }
         sendState = SendState.IDLE
@@ -184,7 +190,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         jobTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
         val job = currentJob
         if (job != null) {
-            job.onComplete(true)
+            job.onComplete(WhatsAppSendResult.Sent)
             currentJob = null
         }
         sendState = SendState.IDLE
@@ -230,5 +236,24 @@ class WhatsAppAccessibilityService : AccessibilityService() {
     private fun isDeviceLocked(): Boolean {
         val km = applicationContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager ?: return false
         return km.isKeyguardLocked
+    }
+
+    private fun isWhatsAppInstalled(): Boolean {
+        return WHATSAPP_PACKAGES.any { packageName ->
+            runCatching {
+                applicationContext.packageManager.getPackageInfo(packageName, 0)
+            }.isSuccess
+        }
+    }
+
+    private fun timeoutFailureReason(): WhatsAppSendFailureReason {
+        return when (sendState) {
+            SendState.OPENING_CHAT,
+            SendState.WAITING_FOR_CHAT -> WhatsAppSendFailureReason.CHAT_OPEN_TIMEOUT
+            SendState.WAITING_FOR_SEND_BUTTON -> WhatsAppSendFailureReason.SEND_CONFIRMATION_TIMEOUT
+            SendState.IDLE,
+            SendState.TYPING_MESSAGE,
+            SendState.DONE -> WhatsAppSendFailureReason.CHAT_OPEN_TIMEOUT
+        }
     }
 }

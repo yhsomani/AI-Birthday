@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -134,6 +135,9 @@ fun AutomationSetupScreen(
                 body = stringResource(R.string.automation_setup_whatsapp_card_body),
                 actionText = stringResource(R.string.automation_setup_action_open_accessibility),
                 onClick = { context.safeStartActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
+                consentChecked = state.whatsAppAutomationConsentGranted,
+                consentText = stringResource(R.string.automation_setup_whatsapp_consent_label),
+                onConsentChange = viewModel::setWhatsAppAutomationConsent,
             )
 
             SetupCard(
@@ -566,6 +570,9 @@ private fun SetupCard(
     actionText: String,
     onClick: () -> Unit,
     secondary: Boolean = false,
+    consentChecked: Boolean? = null,
+    consentText: String? = null,
+    onConsentChange: ((Boolean) -> Unit)? = null,
 ) {
     RelateGlassCard {
         Column(
@@ -588,6 +595,24 @@ private fun SetupCard(
                         text = body,
                         style = MaterialTheme.typography.bodySmall,
                         color = RelateOnSurfaceVariant,
+                    )
+                }
+            }
+            if (consentChecked != null && consentText != null && onConsentChange != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Checkbox(
+                        checked = consentChecked,
+                        onCheckedChange = onConsentChange,
+                    )
+                    Text(
+                        text = consentText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = RelateOnSurfaceVariant,
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }

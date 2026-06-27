@@ -377,6 +377,9 @@
     <string name="automation_setup_ai_error_recent">हाल की AI समस्या: %1$s</string>
     <string name="automation_setup_whatsapp_card_title">WhatsApp ऑटोमेशन चालू करें</string>
     <string name="automation_setup_whatsapp_card_body">एक्सेसिबिलिटी सेटिंग्स खोलें और RelateAI - Auto WhatsApp चालू करें। सेवा सिर्फ WhatsApp लिखने और भेजने वाले नियंत्रण देखती है।</string>
+    <string name="automation_setup_whatsapp_consent_label">मैं समझता/समझती हूं कि RelateAI सिर्फ पात्र ऑटोमैटिक भेजाई के लिए WhatsApp खोल सकता है, स्वीकृत संदेश टाइप कर सकता है और भेजें टैप कर सकता है।</string>
+    <string name="automation_setup_whatsapp_consent_needed">इस चैनल का उपयोग करने से पहले WhatsApp ऑटोमेशन सहमति पुष्टि करें।</string>
+    <string name="automation_setup_whatsapp_consent_saved">WhatsApp ऑटोमेशन सहमति अपडेट हुई।</string>
     <string name="automation_setup_battery_card_title">बैकग्राउंड भरोसेमंदी की अनुमति दें</string>
     <string name="automation_setup_battery_card_ignored">RelateAI के लिए बैटरी ऑप्टिमाइज़ेशन पहले से अनदेखा है।</string>
     <string name="automation_setup_battery_card_body">अगर शेड्यूल वर्कर इस डिवाइस पर देरी से चलते हैं, OS बैटरी सेटिंग्स समीक्षा करें।</string>

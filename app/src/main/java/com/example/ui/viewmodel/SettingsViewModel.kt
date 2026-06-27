@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.auth.AuthManager
-import com.example.core.db.DatabaseKeyDerivation
 import com.example.core.prefs.SecurePrefs
 import com.example.R
 import com.example.domain.model.ApprovalMode
@@ -263,15 +262,8 @@ class SettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(showLegacyDbNotice = false)
     }
 
-    fun signOut(context: Context) {
+    fun signOut() {
         authManager.signOut()
-        DatabaseKeyDerivation.clearCachedKey(context)
-        securePrefs.clearAll()
-        try {
-            context.deleteDatabase("relateai.db")
-        } catch (e: Exception) {
-            android.util.Log.e("SettingsViewModel", "Failed to delete database file", e)
-        }
     }
 
     private fun SecurePrefs.isChannelBlacklisted(channel: MessageChannel): Boolean {

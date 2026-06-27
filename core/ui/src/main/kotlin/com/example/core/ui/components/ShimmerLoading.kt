@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import com.example.core.ui.theme.RelateRadius
 
 @Composable
 fun ShimmerItem(modifier: Modifier = Modifier) {
@@ -44,6 +44,6 @@ fun ShimmerItem(modifier: Modifier = Modifier) {
     )
 
     Spacer(
-        modifier = modifier.background(brush, shape = RoundedCornerShape(8.dp))
+        modifier = modifier.background(brush, shape = RoundedCornerShape(RelateRadius.control))
     )
 }

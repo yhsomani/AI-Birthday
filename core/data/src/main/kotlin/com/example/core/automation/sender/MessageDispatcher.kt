@@ -72,6 +72,7 @@ class MessageDispatcher(
                             phoneNumber = primaryPhone,
                             messageText = messageText,
                             eventRef = eventRef,
+                            automationConsentGranted = prefs.isWhatsAppAutomationConsentGranted(),
                         )
                         routeLoopState = routeLoopState.applyRouteOutcome(
                             routeResult.toMessageDispatchRouteOutcome()

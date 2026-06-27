@@ -1,5 +1,6 @@
 package com.example.core.automation.sender
 
+import com.example.core.accessibility.WhatsAppSendFailureReason
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -64,6 +65,46 @@ class MessageDispatcherProviderFailureAdaptersTest {
 
         assertEquals(DispatchProviderRetryPolicy.ERROR_DISPATCH_FAILURE, failure.errorType)
         assertEquals("All automatic delivery routes failed.", failure.redactedErrorMessage)
+    }
+
+    @Test
+    fun whatsAppAutomationFailure_mapsServiceDisabledToUnavailableProviderFailure() {
+        val failure = DispatchProviderRetryPolicy.whatsAppAutomationFailure(
+            WhatsAppSendFailureReason.SERVICE_DISABLED
+        )
+
+        assertEquals(DispatchProviderRetryPolicy.ERROR_WHATSAPP_AUTOMATION_UNAVAILABLE, failure.errorType)
+        assertEquals("ACCESSIBILITY_AUTOMATION_UNAVAILABLE", failure.errorCode)
+        assertEquals(
+            "WhatsApp Accessibility service is disabled; setup must be reviewed before retry.",
+            failure.redactedErrorMessage,
+        )
+    }
+
+    @Test
+    fun whatsAppConsentRequired_mapsMissingConsentToFinalProviderFailure() {
+        val failure = DispatchProviderRetryPolicy.whatsAppConsentRequired()
+
+        assertEquals(DispatchProviderRetryPolicy.ERROR_WHATSAPP_CONSENT_REQUIRED, failure.errorType)
+        assertEquals("APP_CONSENT_NOT_GRANTED", failure.errorCode)
+        assertEquals(
+            "WhatsApp automation consent has not been confirmed in AI Doctor.",
+            failure.redactedErrorMessage,
+        )
+    }
+
+    @Test
+    fun whatsAppAutomationFailure_mapsSpecificAutomationReasonToProviderFailure() {
+        val failure = DispatchProviderRetryPolicy.whatsAppAutomationFailure(
+            WhatsAppSendFailureReason.SEND_CONFIRMATION_TIMEOUT
+        )
+
+        assertEquals(DispatchProviderRetryPolicy.ERROR_WHATSAPP_AUTOMATION_FAILURE, failure.errorType)
+        assertEquals("SEND_CONFIRMATION_TIMEOUT", failure.errorCode)
+        assertEquals(
+            "WhatsApp send confirmation timed out before delivery handoff.",
+            failure.redactedErrorMessage,
+        )
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.example.core.backup
 
+import com.example.core.prefs.SecurePrefs
 import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.DispatchAttemptEntity
@@ -24,10 +25,24 @@ import com.example.domain.model.dispatch.DispatchEligibilityRecord
 import com.example.domain.model.occasion.Occasion
 import com.example.domain.model.occasion.OccasionDate
 import com.example.domain.model.occasion.OccasionType
+import io.mockk.mockk
+import io.mockk.verify
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class BackupDtosTest {
+
+    @Test
+    fun backupPreferences_restorePersistsWhatsAppConsentPreference() {
+        val securePrefs = mockk<SecurePrefs>(relaxed = true)
+        val preferences = BackupPreferencesDto.defaults().copy(
+            whatsAppAutomationConsentGranted = true
+        )
+
+        preferences.restoreTo(securePrefs)
+
+        verify { securePrefs.setWhatsAppAutomationConsentGranted(true) }
+    }
 
     @Test
     fun backupDtoMappers_preserveAllRestorableRoomFields() {

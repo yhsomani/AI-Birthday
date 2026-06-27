@@ -133,6 +133,11 @@ class SecurePrefs(context: Context) {
     fun setChannelBlackout(channelsJson: String) = configPrefs.edit().putString("channel_blackout", channelsJson).apply()
     fun getChannelBlackout(): String = configPrefs.getString("channel_blackout", "[]") ?: "[]"
 
+    fun setWhatsAppAutomationConsentGranted(granted: Boolean) =
+        configPrefs.edit().putBoolean("whatsapp_automation_consent_granted", granted).apply()
+    fun isWhatsAppAutomationConsentGranted(): Boolean =
+        configPrefs.getBoolean("whatsapp_automation_consent_granted", false)
+
     fun setBiometricLockEnabled(enabled: Boolean) = configPrefs.edit().putBoolean("biometric_lock", enabled).apply()
     fun isBiometricLockEnabled(): Boolean = configPrefs.getBoolean("biometric_lock", false)
 

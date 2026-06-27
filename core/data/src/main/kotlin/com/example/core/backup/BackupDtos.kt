@@ -115,6 +115,7 @@ internal data class BackupPreferencesDto(
     val biometricLockEnabled: Boolean,
     val birthdayRemindersEnabled: Boolean,
     val aiWishGenerationEnabled: Boolean,
+    val whatsAppAutomationConsentGranted: Boolean = false,
 ) {
     fun restoreTo(securePrefs: SecurePrefs) {
         securePrefs.setGlobalAutomationMode(globalAutomationMode)
@@ -126,6 +127,7 @@ internal data class BackupPreferencesDto(
         securePrefs.setBiometricLockEnabled(biometricLockEnabled)
         securePrefs.setBirthdayRemindersEnabled(birthdayRemindersEnabled)
         securePrefs.setAiWishGenerationEnabled(aiWishGenerationEnabled)
+        securePrefs.setWhatsAppAutomationConsentGranted(whatsAppAutomationConsentGranted)
     }
 
     companion object {
@@ -139,6 +141,7 @@ internal data class BackupPreferencesDto(
             biometricLockEnabled = false,
             birthdayRemindersEnabled = true,
             aiWishGenerationEnabled = true,
+            whatsAppAutomationConsentGranted = false,
         )
 
         fun from(securePrefs: SecurePrefs) = BackupPreferencesDto(
@@ -151,6 +154,7 @@ internal data class BackupPreferencesDto(
             biometricLockEnabled = securePrefs.isBiometricLockEnabled(),
             birthdayRemindersEnabled = securePrefs.isBirthdayRemindersEnabled(),
             aiWishGenerationEnabled = securePrefs.isAiWishGenerationEnabled(),
+            whatsAppAutomationConsentGranted = securePrefs.isWhatsAppAutomationConsentGranted(),
         )
     }
 }

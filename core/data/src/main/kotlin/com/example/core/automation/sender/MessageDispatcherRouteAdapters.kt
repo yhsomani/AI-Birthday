@@ -1,6 +1,7 @@
 package com.example.core.automation.sender
 
 import android.content.Context
+import com.example.core.accessibility.WhatsAppSendResult
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.MessageDraftId
@@ -29,11 +30,23 @@ internal suspend fun Context.dispatchWhatsAppRoute(
     phoneNumber: String,
     messageText: String,
     eventRef: String,
+    automationConsentGranted: Boolean = true,
 ): WhatsAppDispatchRouteResult {
-    val sent = WhatsAppSender(this).send(phoneNumber, messageText, eventRef)
+    if (!automationConsentGranted) {
+        return WhatsAppDispatchRouteResult(
+            sent = false,
+            failure = DispatchProviderRetryPolicy.whatsAppConsentRequired(),
+        )
+    }
+
+    val result = WhatsAppSender(this).sendWithResult(phoneNumber, messageText, eventRef)
+    val sent = result is WhatsAppSendResult.Sent
     return WhatsAppDispatchRouteResult(
         sent = sent,
-        failure = if (sent) null else DispatchProviderRetryPolicy.whatsAppAutomationUnavailable(),
+        failure = when (result) {
+            is WhatsAppSendResult.Sent -> null
+            is WhatsAppSendResult.Failed -> DispatchProviderRetryPolicy.whatsAppAutomationFailure(result.reason)
+        },
     )
 }
 
@@ -42,11 +55,13 @@ internal suspend fun Context.dispatchWhatsAppRouteWithFailureLog(
     phoneNumber: String,
     messageText: String,
     eventRef: String,
+    automationConsentGranted: Boolean = true,
 ): WhatsAppDispatchRouteResult {
     val result = dispatchWhatsAppRoute(
         phoneNumber = phoneNumber,
         messageText = messageText,
         eventRef = eventRef,
+        automationConsentGranted = automationConsentGranted,
     )
     result.failure?.let { failure ->
         recordMessageDispatchRouteFailureLog(

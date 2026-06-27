@@ -22,6 +22,36 @@ class ProductionReadinessConfigTest {
     }
 
     @Test
+    fun manifest_usesScheduleExactAlarmWithoutUseExactAlarmEntitlement() {
+        val manifest = parseXml(appFile("src/main/AndroidManifest.xml"))
+        val permissions = manifest.getElementsByTagName("uses-permission")
+        val declaredPermissions = mutableSetOf<String>()
+
+        for (index in 0 until permissions.length) {
+            val permission = permissions.item(index) as Element
+            declaredPermissions += permission.getAttributeNS(ANDROID_NS, "name")
+        }
+
+        assertTrue(declaredPermissions.contains("android.permission.SCHEDULE_EXACT_ALARM"))
+        assertFalse(declaredPermissions.contains("android.permission.USE_EXACT_ALARM"))
+    }
+
+    @Test
+    fun manifest_declaresWhatsAppPackageQueriesForAutomationDetection() {
+        val manifest = parseXml(appFile("src/main/AndroidManifest.xml"))
+        val packages = manifest.getElementsByTagName("package")
+        val declaredPackages = mutableSetOf<String>()
+
+        for (index in 0 until packages.length) {
+            val packageElement = packages.item(index) as Element
+            declaredPackages += packageElement.getAttributeNS(ANDROID_NS, "name")
+        }
+
+        assertTrue(declaredPackages.contains("com.whatsapp"))
+        assertTrue(declaredPackages.contains("com.whatsapp.w4b"))
+    }
+
+    @Test
     fun backupRuleFiles_excludeSensitiveStoresIfBackupIsReenabled() {
         val dataExtractionRules = appFile("src/main/res/xml/data_extraction_rules.xml").readText()
         val legacyBackupRules = appFile("src/main/res/xml/backup_rules.xml").readText()

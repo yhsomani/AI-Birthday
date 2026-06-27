@@ -2,12 +2,15 @@ package com.example.core.automation.sender
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.example.core.accessibility.WhatsAppSendFailureReason
+import com.example.core.accessibility.WhatsAppSendResult
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.LogLevel
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.model.common.MessageDraftId
 import io.mockk.Runs
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -52,8 +55,8 @@ class MessageDispatcherRouteAdaptersTest {
     @Test
     fun dispatchWhatsAppRoute_returnsSentWhenSenderSucceeds() = runTest {
         coEvery {
-            anyConstructed<WhatsAppSender>().send("+15551234567", "Selected", "event_1")
-        } returns true
+            anyConstructed<WhatsAppSender>().sendWithResult("+15551234567", "Selected", "event_1")
+        } returns WhatsAppSendResult.Sent
 
         val result = context.dispatchWhatsAppRoute(
             phoneNumber = "+15551234567",
@@ -68,8 +71,8 @@ class MessageDispatcherRouteAdaptersTest {
     @Test
     fun dispatchWhatsAppRoute_mapsUnavailableAutomationToProviderFailure() = runTest {
         coEvery {
-            anyConstructed<WhatsAppSender>().send("+15551234567", "Selected", "event_1")
-        } returns false
+            anyConstructed<WhatsAppSender>().sendWithResult("+15551234567", "Selected", "event_1")
+        } returns WhatsAppSendResult.Failed(WhatsAppSendFailureReason.SERVICE_DISABLED)
 
         val result = context.dispatchWhatsAppRoute(
             phoneNumber = "+15551234567",
@@ -84,7 +87,51 @@ class MessageDispatcherRouteAdaptersTest {
         )
         assertEquals("ACCESSIBILITY_AUTOMATION_UNAVAILABLE", result.failure?.errorCode)
         assertEquals(
-            "WhatsApp automation was unavailable; setup must be reviewed before retry.",
+            "WhatsApp Accessibility service is disabled; setup must be reviewed before retry.",
+            result.failure?.redactedErrorMessage,
+        )
+    }
+
+    @Test
+    fun dispatchWhatsAppRoute_requiresAppLevelConsentBeforeCallingSender() = runTest {
+        val result = context.dispatchWhatsAppRoute(
+            phoneNumber = "+15551234567",
+            messageText = "Selected",
+            eventRef = "event_1",
+            automationConsentGranted = false,
+        )
+
+        assertFalse(result.sent)
+        assertEquals(
+            DispatchProviderRetryPolicy.ERROR_WHATSAPP_CONSENT_REQUIRED,
+            result.failure?.errorType,
+        )
+        assertEquals("APP_CONSENT_NOT_GRANTED", result.failure?.errorCode)
+        coVerify(exactly = 0) {
+            anyConstructed<WhatsAppSender>().sendWithResult(any(), any(), any())
+        }
+    }
+
+    @Test
+    fun dispatchWhatsAppRoute_mapsTypedAutomationFailureToProviderFailure() = runTest {
+        coEvery {
+            anyConstructed<WhatsAppSender>().sendWithResult("+15551234567", "Selected", "event_1")
+        } returns WhatsAppSendResult.Failed(WhatsAppSendFailureReason.TEXT_VERIFICATION_FAILED)
+
+        val result = context.dispatchWhatsAppRoute(
+            phoneNumber = "+15551234567",
+            messageText = "Selected",
+            eventRef = "event_1",
+        )
+
+        assertFalse(result.sent)
+        assertEquals(
+            DispatchProviderRetryPolicy.ERROR_WHATSAPP_AUTOMATION_FAILURE,
+            result.failure?.errorType,
+        )
+        assertEquals("TEXT_VERIFICATION_FAILED", result.failure?.errorCode)
+        assertEquals(
+            "WhatsApp compose text could not be verified before send.",
             result.failure?.redactedErrorMessage,
         )
     }
@@ -92,8 +139,8 @@ class MessageDispatcherRouteAdaptersTest {
     @Test
     fun dispatchWhatsAppRouteWithFailureLog_recordsFailureLogWhenRouteFails() = runTest {
         coEvery {
-            anyConstructed<WhatsAppSender>().send("+15551234567", "Selected", "event_1")
-        } returns false
+            anyConstructed<WhatsAppSender>().sendWithResult("+15551234567", "Selected", "event_1")
+        } returns WhatsAppSendResult.Failed(WhatsAppSendFailureReason.SEND_BUTTON_NOT_FOUND)
 
         val result = context.dispatchWhatsAppRouteWithFailureLog(
             messageId = MessageDraftId("pending_1"),
@@ -104,7 +151,7 @@ class MessageDispatcherRouteAdaptersTest {
 
         assertFalse(result.sent)
         assertEquals(
-            DispatchProviderRetryPolicy.ERROR_WHATSAPP_AUTOMATION_UNAVAILABLE,
+            DispatchProviderRetryPolicy.ERROR_WHATSAPP_AUTOMATION_FAILURE,
             result.failure?.errorType,
         )
         val entry = StructuredLogger.getRecent(1).single()

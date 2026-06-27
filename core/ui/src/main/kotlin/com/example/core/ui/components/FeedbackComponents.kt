@@ -31,11 +31,14 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import com.example.core.ui.theme.RelateAlpha
+import com.example.core.ui.theme.RelateError
 import com.example.core.ui.theme.RelateOnSurfaceVariant
 import com.example.core.ui.theme.RelatePrimary
+import com.example.core.ui.theme.RelateRadius
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSuccess
-import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.core.ui.theme.RelateWarning
 
 enum class FeedbackType { SUCCESS, ERROR, WARNING, INFO }
@@ -55,31 +58,34 @@ fun AdaptiveFeedbackBanner(
         visible = state.visible,
         enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
         exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
-    ) {
-        val (icon, color) = when (state.type) {
-            FeedbackType.SUCCESS -> Icons.Filled.CheckCircle to RelateSuccess
-            FeedbackType.ERROR -> Icons.Filled.Error to Color(0xFFEF4444)
-            FeedbackType.WARNING -> Icons.Filled.Warning to RelateWarning
-            FeedbackType.INFO -> Icons.Filled.Info to RelatePrimary
-        }
+        ) {
+            val (icon, color) = when (state.type) {
+                FeedbackType.SUCCESS -> Icons.Filled.CheckCircle to RelateSuccess
+                FeedbackType.ERROR -> Icons.Filled.Error to RelateError
+                FeedbackType.WARNING -> Icons.Filled.Warning to RelateWarning
+                FeedbackType.INFO -> Icons.Filled.Info to RelatePrimary
+            }
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-                .background(color.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                .padding(horizontal = RelateSpacing.screenHorizontal, vertical = RelateSpacing.xs)
+                .background(
+                    color.copy(alpha = RelateAlpha.feedbackContainer),
+                    RoundedCornerShape(RelateRadius.control),
+                )
                 .semantics { liveRegion = LiveRegionMode.Polite },
         ) {
             Row(
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier.padding(RelateSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = color,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(RelateSize.iconSm),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(RelateSpacing.sm))
                 Text(
                     text = state.message,
                     color = color,
@@ -100,7 +106,7 @@ fun StatusIndicator(
 ) {
     Row(
         modifier = modifier
-            .padding(vertical = 2.dp)
+            .padding(vertical = RelateSpacing.xxs)
             .semantics(mergeDescendants = true) {
                 stateDescription = if (isActive) "Active" else "Inactive"
             },
@@ -108,13 +114,13 @@ fun StatusIndicator(
     ) {
         Box(
             modifier = Modifier
-                .size(6.dp)
+                .size(RelateSize.statusDot)
                 .background(
                     if (isActive) RelateSuccess else RelateOnSurfaceVariant,
-                    RoundedCornerShape(3.dp),
+                    RoundedCornerShape(RelateRadius.xs),
                 ),
         )
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(RelateSize.statusDot))
         Text(
             text = label,
             style = androidx.compose.material3.MaterialTheme.typography.labelSmall,

@@ -376,6 +376,9 @@
     <string name="automation_setup_ai_error_recent">Recent AI issue: %1$s</string>
     <string name="automation_setup_whatsapp_card_title">Enable WhatsApp automation</string>
     <string name="automation_setup_whatsapp_card_body">Open Accessibility settings and enable RelateAI - Auto WhatsApp. The service only looks for WhatsApp compose and send controls.</string>
+    <string name="automation_setup_whatsapp_consent_label">I understand RelateAI may open WhatsApp, type the approved message, and tap send only for eligible automatic sends.</string>
+    <string name="automation_setup_whatsapp_consent_needed">Confirm WhatsApp automation consent before this channel can be used.</string>
+    <string name="automation_setup_whatsapp_consent_saved">WhatsApp automation consent updated.</string>
     <string name="automation_setup_battery_card_title">Allow background reliability</string>
     <string name="automation_setup_battery_card_ignored">Battery optimization is already ignored for RelateAI.</string>
     <string name="automation_setup_battery_card_body">Review OS battery settings if scheduled workers are delayed on this device.</string>

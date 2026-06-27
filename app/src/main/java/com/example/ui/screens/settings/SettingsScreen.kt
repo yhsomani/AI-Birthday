@@ -492,7 +492,7 @@ fun SettingsScreen(
                 onDismiss = { showSignOutDialog = false },
                 onConfirm = {
                     showSignOutDialog = false
-                    viewModel.signOut(context)
+                    viewModel.signOut()
                     onSignOut()
                 },
             )

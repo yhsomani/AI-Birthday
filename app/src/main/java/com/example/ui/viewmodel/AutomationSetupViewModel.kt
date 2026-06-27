@@ -97,6 +97,7 @@ data class AutomationSetupUiState(
     val isSyncingContacts: Boolean = false,
     val isTestingAi: Boolean = false,
     val isTestingEmail: Boolean = false,
+    val whatsAppAutomationConsentGranted: Boolean = false,
     val operationMessage: String? = null,
 )
 
@@ -133,6 +134,9 @@ class AutomationSetupViewModel @Inject constructor(
     val uiState: StateFlow<AutomationSetupUiState> = _uiState.asStateFlow()
 
     init {
+        _uiState.value = _uiState.value.copy(
+            whatsAppAutomationConsentGranted = securePrefs.isWhatsAppAutomationConsentGranted()
+        )
         refreshChecks()
     }
 
@@ -243,6 +247,15 @@ class AutomationSetupViewModel @Inject constructor(
         }
     }
 
+    fun setWhatsAppAutomationConsent(granted: Boolean) {
+        securePrefs.setWhatsAppAutomationConsentGranted(granted)
+        _uiState.value = _uiState.value.copy(
+            whatsAppAutomationConsentGranted = granted,
+            operationMessage = text(R.string.automation_setup_whatsapp_consent_saved),
+        )
+        refreshChecks(clearOperationMessage = false)
+    }
+
     private suspend fun buildReport(): AiDoctorReport {
         val workInfos = try {
             WorkManager.getInstance(appContext).getWorkInfosByTag("daily_trigger").get()
@@ -267,6 +280,7 @@ class AutomationSetupViewModel @Inject constructor(
         val aiEnabled = securePrefs.isAiWishGenerationEnabled()
         val notificationsAllowed = runCatching { hasNotificationPermission() }.getOrDefault(false)
         val smsAllowed = runCatching { hasSmsPermission() }.getOrDefault(false)
+        val whatsAppConsentGranted = securePrefs.isWhatsAppAutomationConsentGranted()
         val whatsAppAutomationEnabled = runCatching { isWhatsAppAutomationServiceEnabled() }.getOrDefault(false)
         val exactSendsAllowed = runCatching {
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
@@ -384,8 +398,16 @@ class AutomationSetupViewModel @Inject constructor(
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_whatsapp),
-                if (whatsAppAutomationEnabled) text(R.string.automation_setup_whatsapp_ok) else text(R.string.automation_setup_whatsapp_missing),
-                if (whatsAppAutomationEnabled) ReadinessStatus.OK else ReadinessStatus.WARNING,
+                when {
+                    !whatsAppConsentGranted -> text(R.string.automation_setup_whatsapp_consent_needed)
+                    whatsAppAutomationEnabled -> text(R.string.automation_setup_whatsapp_ok)
+                    else -> text(R.string.automation_setup_whatsapp_missing)
+                },
+                when {
+                    !whatsAppConsentGranted -> ReadinessStatus.ACTION_REQUIRED
+                    whatsAppAutomationEnabled -> ReadinessStatus.OK
+                    else -> ReadinessStatus.WARNING
+                },
                 actionLabel = if (whatsAppAutomationEnabled) null else text(R.string.automation_setup_action_open_accessibility),
                 action = if (whatsAppAutomationEnabled) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS,
                 group = ReadinessGroup.RELIABILITY,

@@ -1,5 +1,6 @@
 package com.example.core.automation.sender
 
+import com.example.core.accessibility.WhatsAppSendFailureReason
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import java.net.SocketTimeoutException
 import javax.mail.AuthenticationFailedException
@@ -31,12 +32,34 @@ class DispatchProviderRetryPolicyTest {
     }
 
     @Test
-    fun `whatsapp automation failure is final until sender exposes richer cause`() {
+    fun `whatsapp disabled accessibility service failure is final`() {
         val failure = DispatchProviderRetryPolicy.whatsAppAutomationUnavailable()
 
         assertEquals(DispatchAttemptResult.FAILED_FINAL, failure.result)
         assertEquals(DispatchProviderRetryPolicy.ERROR_WHATSAPP_AUTOMATION_UNAVAILABLE, failure.errorType)
         assertEquals("ACCESSIBILITY_AUTOMATION_UNAVAILABLE", failure.errorCode)
+        assertNull(failure.nextRetryDelayMs)
+    }
+
+    @Test
+    fun `whatsapp missing consent failure is final`() {
+        val failure = DispatchProviderRetryPolicy.whatsAppConsentRequired()
+
+        assertEquals(DispatchAttemptResult.FAILED_FINAL, failure.result)
+        assertEquals(DispatchProviderRetryPolicy.ERROR_WHATSAPP_CONSENT_REQUIRED, failure.errorType)
+        assertEquals("APP_CONSENT_NOT_GRANTED", failure.errorCode)
+        assertNull(failure.nextRetryDelayMs)
+    }
+
+    @Test
+    fun `whatsapp automation reason failure is final with specific code`() {
+        val failure = DispatchProviderRetryPolicy.whatsAppAutomationFailure(
+            WhatsAppSendFailureReason.COMPOSE_FIELD_NOT_FOUND
+        )
+
+        assertEquals(DispatchAttemptResult.FAILED_FINAL, failure.result)
+        assertEquals(DispatchProviderRetryPolicy.ERROR_WHATSAPP_AUTOMATION_FAILURE, failure.errorType)
+        assertEquals("COMPOSE_FIELD_NOT_FOUND", failure.errorCode)
         assertNull(failure.nextRetryDelayMs)
     }
 

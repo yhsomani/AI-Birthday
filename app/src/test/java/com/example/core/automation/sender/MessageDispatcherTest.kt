@@ -2,6 +2,8 @@ package com.example.core.automation.sender
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.example.core.accessibility.WhatsAppSendFailureReason
+import com.example.core.accessibility.WhatsAppSendResult
 import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.data.R
 import com.example.core.db.dao.ContactDao
@@ -66,10 +68,11 @@ class MessageDispatcherTest {
         mockkConstructor(WhatsAppSender::class)
 
         every { anyConstructed<SecurePrefs>().getChannelBlackout() } returns "[]"
+        every { anyConstructed<SecurePrefs>().isWhatsAppAutomationConsentGranted() } returns true
         every { anyConstructed<SecurePrefs>().getSenderEmail() } returns ""
         every { anyConstructed<SecurePrefs>().getSenderEmailPassword() } returns ""
         coEvery { anyConstructed<EmailSender>().send(any(), any(), any(), any(), any(), any()) } returns Unit
-        coEvery { anyConstructed<WhatsAppSender>().send(any(), any(), any()) } returns true
+        coEvery { anyConstructed<WhatsAppSender>().sendWithResult(any(), any(), any()) } returns WhatsAppSendResult.Sent
         every { anyConstructed<SmsSender>().send(any(), any(), any()) } just Runs
         every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
         coEvery { sentMessageDao.insert(capture(sentSlot)) } just Runs
@@ -231,7 +234,9 @@ class MessageDispatcherTest {
 
     @Test
     fun `dispatch falls back to sms when whatsapp automation is unavailable`() = runTest {
-        coEvery { anyConstructed<WhatsAppSender>().send(any(), any(), any()) } returns false
+        coEvery {
+            anyConstructed<WhatsAppSender>().sendWithResult(any(), any(), any())
+        } returns WhatsAppSendResult.Failed(WhatsAppSendFailureReason.SERVICE_DISABLED)
 
         dispatcher().dispatch(
             dispatchRequest(
@@ -261,6 +266,42 @@ class MessageDispatcherTest {
             )
         }
         coVerify { pendingMessageDao.updateStatus("pending_1", "SENT") }
+        assertEquals(0, DeadLetterQueue.count())
+    }
+
+    @Test
+    fun `dispatch falls back to sms when whatsapp consent is missing`() = runTest {
+        every { anyConstructed<SecurePrefs>().isWhatsAppAutomationConsentGranted() } returns false
+
+        dispatcher().dispatch(
+            dispatchRequest(
+                eventId = "event_1",
+                preferredChannel = MessageChannel.WHATSAPP,
+                dispatchAttemptId = "attempt_5_consent",
+            )
+        )
+
+        coVerify(exactly = 0) {
+            anyConstructed<WhatsAppSender>().sendWithResult(any(), any(), any())
+        }
+        assertEquals(MessageChannel.SMS.raw, sentSlot.captured.channel)
+        coVerify {
+            dispatchAttemptDao.updateOutcome(
+                id = "attempt_5_consent",
+                attemptedAtMs = any(),
+                resolvedAtMs = any(),
+                result = DispatchAttemptResult.PENDING_DELIVERY.raw,
+                channel = MessageChannel.SMS.raw,
+                deliveryStatus = MessageDeliveryStatus.PENDING_DELIVERY.raw,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        }
         assertEquals(0, DeadLetterQueue.count())
     }
 

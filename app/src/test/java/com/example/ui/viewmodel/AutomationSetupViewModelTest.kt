@@ -24,6 +24,7 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -84,6 +85,7 @@ class AutomationSetupViewModelTest {
         every { securePrefs.getSenderEmail() } returns ""
         every { securePrefs.getSenderEmailPassword() } returns ""
         every { securePrefs.isAiWishGenerationEnabled() } returns true
+        every { securePrefs.isWhatsAppAutomationConsentGranted() } returns true
         coEvery { contactRepository.getAutomationReadinessProfiles() } returns emptyList()
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { testSendUseCase(any()) } returns TestSendUseCase.Outcome.MissingEmailSetup
@@ -216,6 +218,39 @@ class AutomationSetupViewModelTest {
         assertEquals(
             context.getString(R.string.automation_setup_email_missing_for_contacts, 1),
             emailCheck.detail,
+        )
+    }
+
+    @Test
+    fun `buildChecksForTesting requires WhatsApp consent before automation channel is ready`() = runTest(testDispatcher) {
+        every { securePrefs.isWhatsAppAutomationConsentGranted() } returns false
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val whatsAppCheck = viewModel.buildChecksForTesting()
+            .first { it.title == context.getString(R.string.automation_setup_check_whatsapp) }
+
+        assertEquals(ReadinessStatus.ACTION_REQUIRED, whatsAppCheck.status)
+        assertEquals(
+            context.getString(R.string.automation_setup_whatsapp_consent_needed),
+            whatsAppCheck.detail,
+        )
+    }
+
+    @Test
+    fun `setWhatsAppAutomationConsent persists acknowledgement and updates state`() = runTest(testDispatcher) {
+        every { securePrefs.isWhatsAppAutomationConsentGranted() } returns false
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.setWhatsAppAutomationConsent(true)
+        advanceUntilIdle()
+
+        verify { securePrefs.setWhatsAppAutomationConsentGranted(true) }
+        assertTrue(viewModel.uiState.value.whatsAppAutomationConsentGranted)
+        assertEquals(
+            context.getString(R.string.automation_setup_whatsapp_consent_saved),
+            viewModel.uiState.value.operationMessage,
         )
     }
 
