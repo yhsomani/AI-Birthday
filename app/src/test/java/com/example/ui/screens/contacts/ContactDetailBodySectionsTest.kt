@@ -64,7 +64,7 @@ class ContactDetailBodySectionsTest {
                         memoryNoteCategorySummary = listOf(
                             MemoryNoteCategoryCount(category = "GENERAL", count = 1),
                         ),
-                        upcomingBirthdayDaysLeft = 5,
+                        upcomingEventDaysLeft = 5,
                         onNavigateToMemoryVault = { actions += "memory:$it" },
                         onNavigateToGiftAdvisor = { actions += "gift:$it" },
                         onNavigateToChatHistory = { actions += "chat:$it" },

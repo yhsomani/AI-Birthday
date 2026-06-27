@@ -8,6 +8,7 @@
         android:shortcutLongLabel="@string/shortcut_compose_long">
         <intent
             android:action="android.intent.action.VIEW"
+            android:data="relateai://messages"
             android:targetPackage="com.aistudio.relateai.qxtjrk"
             android:targetClass="com.example.MainActivity" />
     </shortcut>
@@ -19,6 +20,7 @@
         android:shortcutLongLabel="@string/shortcut_contacts_long">
         <intent
             android:action="android.intent.action.VIEW"
+            android:data="relateai://contacts"
             android:targetPackage="com.aistudio.relateai.qxtjrk"
             android:targetClass="com.example.MainActivity" />
     </shortcut>

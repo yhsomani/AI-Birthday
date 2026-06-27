@@ -7,12 +7,9 @@ import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.MessageChannel
-import com.example.domain.model.common.SentMessageId
 import com.example.domain.model.dispatch.MessageDispatchRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.Calendar
-import java.util.UUID
 
 class MessageDispatcher(
     private val context: Context,
@@ -43,34 +40,29 @@ class MessageDispatcher(
         val primaryPhone = request.primaryPhone
         val primaryEmail = request.primaryEmail
         val dispatchOccasion = messageDispatchOccasion(eventDao, request.occasionReference)
-        var finalChannel = preferredChannel
-            .takeIf { it != MessageChannel.UNKNOWN }
-            ?: MessageChannel.SMS
-        val blockedChannels = DeliveryChannelResolver.parseBlockedChannels(
-            prefs.getChannelBlackout()
-        )
-        val deliveryRoutes = DeliveryChannelResolver.resolveRoutes(
+        val routePlan = messageDispatchRoutePlan(
             preferredChannel = preferredChannel,
             primaryPhone = primaryPhone,
             primaryEmail = primaryEmail,
             senderEmail = prefs.getSenderEmail(),
             senderEmailPassword = prefs.getSenderEmailPassword(),
-            blockedChannels = blockedChannels,
+            channelBlackoutJson = prefs.getChannelBlackout(),
         )
+        var finalChannel = routePlan.initialFinalChannel
 
-        if (deliveryRoutes.isEmpty()) {
+        if (routePlan.noDeliveryRoute) {
             recordMessageDispatchLifecycleLog(
                 messageDispatchNoRouteLog(
                     messageId = messageDraftId,
                     preferredChannel = preferredChannel,
-                    blockedChannels = blockedChannels,
+                    blockedChannels = routePlan.blockedChannels,
                     hasPhone = !primaryPhone.isNullOrBlank(),
                     hasEmail = !primaryEmail.isNullOrBlank(),
                 )
             )
         }
 
-        for (route in deliveryRoutes) {
+        for (route in routePlan.deliveryRoutes) {
             finalChannel = route
             when (route) {
                 MessageChannel.WHATSAPP -> {
@@ -122,77 +114,20 @@ class MessageDispatcher(
             if (routeLoopState.success) break
         }
 
-        if (routeLoopState.success) {
-            dispatchAttemptDao.saveMessageDispatchAttemptOutcome(
-                successfulDispatchAttemptOutcomeUpdate(
-                    dispatchAttemptId = dispatchAttemptId,
-                    resolvedAtMs = System.currentTimeMillis(),
-                    channel = finalChannel,
-                )
-            )
-            recordMessageDispatchLifecycleLog(
-                messageDispatchSucceededLog(
-                    messageId = messageDraftId,
-                    channel = finalChannel,
-                )
-            )
-            pendingMessageDao.savePendingMessageDispatchStatusUpdate(
-                sentPendingMessageStatusUpdate(messageDraftId)
-            )
-            if (!routeLoopState.successfulSentMessageInserted) {
-                sentMessageDao.saveSentMessageDispatchRecord(
-                    successfulSentMessageDispatchRecord(
-                        id = SentMessageId(UUID.randomUUID().toString()),
-                        contactId = request.contactId,
-                        dispatchOccasion = dispatchOccasion,
-                        eventYear = Calendar.getInstance().get(Calendar.YEAR),
-                        messageText = messageText,
-                        channel = finalChannel,
-                        sentAtMs = System.currentTimeMillis(),
-                    )
-                )
-            }
-            contactDao?.let { dao ->
-                dao.saveContactPostDispatchUpdate(
-                    contactPostDispatchUpdate(
-                        contactId = request.contactId,
-                        wishedAtMs = System.currentTimeMillis(),
-                    )
-                )
-            }
-        } else {
-            pendingMessageDao.savePendingMessageDispatchStatusUpdate(
-                failedPendingMessageStatusUpdate(messageDraftId)
-            )
-            val failedAtMs = System.currentTimeMillis()
-            val failure = if (deliveryRoutes.isEmpty()) {
-                DispatchProviderRetryPolicy.noDeliveryRoute()
-            } else {
-                routeLoopState.providerFailureSelection.failureOrDispatchFailure()
-            }
-            dispatchAttemptDao.saveMessageDispatchAttemptOutcome(
-                failedDispatchAttemptOutcomeUpdate(
-                    dispatchAttemptId = dispatchAttemptId,
-                    failedAtMs = failedAtMs,
-                    channel = finalChannel,
-                    failure = failure,
-                )
-            )
-            recordMessageDispatchLifecycleLog(
-                messageDispatchFailedLog(
-                    messageId = messageDraftId,
-                    preferredChannel = preferredChannel,
-                    failure = failure,
-                )
-            )
-            recordMessageDispatchFailureSideEffects(
-                messageDispatchFailureSideEffects(
-                    messageId = messageDraftId,
-                    preferredChannel = preferredChannel,
-                    messageText = messageText,
-                    failure = failure,
-                )
-            )
-        }
+        saveMessageDispatchFinalization(
+            dispatchAttemptDao = dispatchAttemptDao,
+            pendingMessageDao = pendingMessageDao,
+            sentMessageDao = sentMessageDao,
+            contactDao = contactDao,
+            messageId = messageDraftId,
+            contactId = request.contactId,
+            dispatchAttemptId = dispatchAttemptId,
+            preferredChannel = preferredChannel,
+            finalChannel = finalChannel,
+            dispatchOccasion = dispatchOccasion,
+            messageText = messageText,
+            routeLoopState = routeLoopState,
+            noDeliveryRoute = routePlan.noDeliveryRoute,
+        )
     }
 }

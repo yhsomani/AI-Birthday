@@ -144,7 +144,7 @@
     <string name="contact_detail_birthday_date_format">%1$d/%2$d</string>
     <string name="contact_detail_unknown">Unknown</string>
     <string name="contact_detail_birthday_format">Birthday: %1$s</string>
-    <string name="contact_detail_next_birthday">Next Birthday</string>
+    <string name="contact_detail_next_birthday">Next Event</string>
     <string name="contact_detail_days_left_format">in %1$d days</string>
     <string name="contact_detail_no_upcoming_event">No upcoming event</string>
     <string name="contact_detail_generate_ai_wish">Generate AI Wish</string>

@@ -16,6 +16,24 @@ object RelateDeepLinks {
         }
     }
 
+    object Home {
+        const val HOST = "home"
+        const val uri = "$SCHEME://$HOST"
+        const val pattern = uri
+    }
+
+    object Contacts {
+        const val HOST = "contacts"
+        const val uri = "$SCHEME://$HOST"
+        const val pattern = uri
+    }
+
+    object Messages {
+        const val HOST = "messages"
+        const val uri = "$SCHEME://$HOST"
+        const val pattern = uri
+    }
+
     object Wish {
         const val HOST = "wish"
         const val CONTACT_ID_ARG = "contactId"

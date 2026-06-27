@@ -1,8 +1,11 @@
 package com.example.widget
 
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.RemoteViews
 import com.example.R
 import com.example.core.db.AppDatabase
@@ -12,6 +15,7 @@ import com.example.domain.model.MessageStatus
 import com.example.domain.model.contact.ContactHeader
 import com.example.domain.model.occasion.Occasion
 import com.example.domain.model.occasion.OccasionType
+import com.example.domain.navigation.RelateDeepLinks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +50,10 @@ class BirthdayWidgetProvider : AppWidgetProvider() {
 
                 for (appWidgetId in appWidgetIds) {
                     val views = RemoteViews(context.packageName, R.layout.widget_birthday)
+                    views.setOnClickPendingIntent(
+                        R.id.widget_root,
+                        birthdayWidgetClickPendingIntent(context, appWidgetId, summary),
+                    )
                     if (summary.todayBirthdayCount == 0) {
                         views.setTextViewText(R.id.widget_title, context.getString(R.string.widget_no_birthdays_today))
                     } else {
@@ -80,6 +88,29 @@ class BirthdayWidgetProvider : AppWidgetProvider() {
             }
         }
     }
+}
+
+internal fun birthdayWidgetClickUri(summary: BirthdayWidgetSummary): String {
+    return if (summary.pendingApprovals > 0) {
+        RelateDeepLinks.Messages.uri
+    } else {
+        RelateDeepLinks.Home.uri
+    }
+}
+
+private fun birthdayWidgetClickPendingIntent(
+    context: Context,
+    appWidgetId: Int,
+    summary: BirthdayWidgetSummary,
+): PendingIntent {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(birthdayWidgetClickUri(summary)))
+        .setPackage(context.packageName)
+    return PendingIntent.getActivity(
+        context,
+        appWidgetId,
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
 }
 
 internal data class BirthdayWidgetSummary(

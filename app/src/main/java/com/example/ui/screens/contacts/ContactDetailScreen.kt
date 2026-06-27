@@ -191,7 +191,7 @@ fun ContactDetailScreen(
                         contact = currentContact,
                         memoryNoteCount = state.memoryNoteCount,
                         memoryNoteCategorySummary = state.memoryNoteCategorySummary,
-                        upcomingBirthdayDaysLeft = state.upcomingBirthdayDaysLeft,
+                        upcomingEventDaysLeft = state.upcomingEventDaysLeft,
                         isGenerating = state.isGenerating,
                         generationErrorRes = state.generationErrorRes,
                         preferenceMessageRes = state.preferenceMessageRes,
@@ -243,7 +243,7 @@ internal fun ContactDetailBodySections(
     contact: ContactDetailProfile,
     memoryNoteCount: Int = 0,
     memoryNoteCategorySummary: List<MemoryNoteCategoryCount> = emptyList(),
-    upcomingBirthdayDaysLeft: Int? = null,
+    upcomingEventDaysLeft: Int? = null,
     isGenerating: Boolean = false,
     generationErrorRes: Int? = null,
     preferenceMessageRes: Int? = null,
@@ -268,7 +268,7 @@ internal fun ContactDetailBodySections(
             ContactInfoCard(contact = contact)
             Spacer(modifier = Modifier.height(12.dp))
             UpcomingWishCard(
-                upcomingBirthdayDaysLeft = upcomingBirthdayDaysLeft,
+                upcomingEventDaysLeft = upcomingEventDaysLeft,
                 isGenerating = isGenerating,
                 generationErrorRes = generationErrorRes,
                 onGenerateWish = onGenerateWish,
@@ -518,7 +518,7 @@ private fun ContactInfoCard(contact: ContactDetailProfile) {
 
 @Composable
 private fun UpcomingWishCard(
-    upcomingBirthdayDaysLeft: Int?,
+    upcomingEventDaysLeft: Int?,
     isGenerating: Boolean,
     generationErrorRes: Int?,
     onGenerateWish: () -> Unit,
@@ -532,7 +532,7 @@ private fun UpcomingWishCard(
                     tint = RelatePrimary,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                val daysText = upcomingBirthdayDaysLeft?.let {
+                val daysText = upcomingEventDaysLeft?.let {
                     stringResource(R.string.contact_detail_days_left_format, it)
                 } ?: stringResource(R.string.contact_detail_no_upcoming_event)
                 Text(

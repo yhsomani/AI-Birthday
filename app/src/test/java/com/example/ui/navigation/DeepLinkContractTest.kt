@@ -24,6 +24,9 @@ class DeepLinkContractTest {
 
         listOf(
             RelateDeepLinks.Contact.HOST,
+            RelateDeepLinks.Home.HOST,
+            RelateDeepLinks.Contacts.HOST,
+            RelateDeepLinks.Messages.HOST,
             RelateDeepLinks.Wish.HOST,
             RelateDeepLinks.Settings.HOST,
             RelateDeepLinks.BackupRestore.HOST,
@@ -38,6 +41,9 @@ class DeepLinkContractTest {
 
         listOf(
             "RelateDeepLinks.Contact.pattern",
+            "RelateDeepLinks.Home.pattern",
+            "RelateDeepLinks.Contacts.pattern",
+            "RelateDeepLinks.Messages.pattern",
             "RelateDeepLinks.Wish.pattern",
             "RelateDeepLinks.Settings.pattern",
             "RelateDeepLinks.BackupRestore.pattern",
@@ -56,6 +62,18 @@ class DeepLinkContractTest {
             "RelateDeepLinks.BackupRestore.uri",
         ).forEach { builderReference ->
             assertTrue("NotificationHelper must use $builderReference", source.contains(builderReference))
+        }
+    }
+
+    @Test
+    fun birthdayWidgetUsesSharedDeepLinksForClickThrough() {
+        val source = rootFile("app/src/main/java/com/example/widget/BirthdayWidgetProvider.kt").readText()
+
+        listOf(
+            "RelateDeepLinks.Home.uri",
+            "RelateDeepLinks.Messages.uri",
+        ).forEach { builderReference ->
+            assertTrue("BirthdayWidgetProvider must use $builderReference", source.contains(builderReference))
         }
     }
 

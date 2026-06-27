@@ -69,7 +69,7 @@ class ContactDetailViewModelTest {
     }
 
     @Test
-    fun `loadContact populates state with contact and upcoming birthday`() = runTest(testDispatcher) {
+    fun `loadContact populates state with contact and upcoming event`() = runTest(testDispatcher) {
         val contact = contactProfile(displayName = "Alice", healthScore = 80)
         val event = upcomingEventPreview()
 
@@ -103,7 +103,7 @@ class ContactDetailViewModelTest {
             ),
             viewModel.uiState.value.memoryNoteCategorySummary,
         )
-        assertNotNull(viewModel.uiState.value.upcomingBirthdayDaysLeft)
+        assertNotNull(viewModel.uiState.value.upcomingEventDaysLeft)
         assertEquals(false, viewModel.uiState.value.isLoading)
     }
 

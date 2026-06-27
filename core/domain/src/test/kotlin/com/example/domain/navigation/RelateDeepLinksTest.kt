@@ -23,6 +23,9 @@ class RelateDeepLinksTest {
 
     @Test
     fun staticUrisMatchManifestHosts() {
+        assertEquals("relateai://home", RelateDeepLinks.Home.uri)
+        assertEquals("relateai://contacts", RelateDeepLinks.Contacts.uri)
+        assertEquals("relateai://messages", RelateDeepLinks.Messages.uri)
         assertEquals("relateai://settings", RelateDeepLinks.Settings.uri)
         assertEquals("relateai://backup-restore", RelateDeepLinks.BackupRestore.uri)
     }

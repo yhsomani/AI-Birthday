@@ -103,7 +103,7 @@ Verified from Gradle:
 
 Verified from manifest/resources/source:
 
-- `MainActivity` is launcher and handles deep links for `relateai://wish`, `relateai://contact`, and `relateai://settings`.
+- `MainActivity` is launcher and handles deep links for `relateai://wish`, `relateai://contact`, `relateai://contacts`, `relateai://messages`, `relateai://settings`, and `relateai://backup-restore`.
 - `RelateAIApp` initializes security checks, notification channels, encrypted database/key material, secure prefs, and scheduled workers.
 - `WhatsAppAccessibilityService` is declared with `BIND_ACCESSIBILITY_SERVICE`, scoped to `com.whatsapp` and `com.whatsapp.w4b`.
 - Receivers: message dispatch, approval actions, event reminders, boot recovery, SMS status, birthday widget.
@@ -111,7 +111,7 @@ Verified from manifest/resources/source:
 - Android auto backup is disabled, and backup/data extraction rules exclude database and secure preference files.
 - Network security config pins Google/Firebase/Gmail related domains until 2027-06-01.
 - App widget shows birthdays, next events, and pending approval count.
-- Shortcuts exist for compose and contacts, but current shortcut intents only open `MainActivity` without a specific deep link route.
+- Shortcuts exist for compose and contacts. Completed 2026-06-27: compose now routes to the current Messages workflow via `relateai://messages`, and contacts routes to Contact List via `relateai://contacts`.
 
 ### 3.4 Navigation
 
@@ -142,11 +142,14 @@ Deep links wired in navigation:
 
 ```text
 relateai://contact/{contactId}
+relateai://contacts
+relateai://messages
 relateai://wish/{contactId}/{messageRef}
 relateai://settings
+relateai://backup-restore
 ```
 
-Completed 2026-06-27: `relateai://backup-restore` is now declared in the manifest, registered in `NavGraph`, and built through the shared `RelateDeepLinks` contract used by `NotificationHelper`. The remaining route-contract follow-up is to reuse the same contract for shortcuts and widget click actions.
+Completed 2026-06-27: `relateai://backup-restore` is now declared in the manifest, registered in `NavGraph`, and built through the shared `RelateDeepLinks` contract used by `NotificationHelper`. Completed 2026-06-27: shortcut routes now reuse the same contract for `relateai://messages` and `relateai://contacts`. The remaining route-contract follow-up is widget click actions.
 
 ## 4. Feature Inventory
 
@@ -325,12 +328,12 @@ Severity definitions:
 | D-006 | P0 | Completed 2026-06-27: holiday, revival, and follow-up workers now persist deterministic synthetic `EventEntity` rows before pending messages are created. | `HolidayWishWorker.kt`, `RevivalWorker.kt`, `PostEventFollowUpWorker.kt`, worker tests | Keep synthetic event persistence tests green; later target schema can still replace this compatibility layer with a dedicated `occasions` table. |
 | D-007 | P1 | Domain module depends on Room/Paging and contains persistence entities. | `core/domain/build.gradle.kts`, entity package under `core/domain`, ADR 0001 | Move Room entities to database/data module; domain owns pure models and policies. |
 | D-008 | P1 | Completed 2026-06-27: message generation and regeneration no longer scan all events with `getEventsBefore(Long.MAX_VALUE)`. | `GenerateMessageUseCase`, `RegeneratePendingMessageUseCase`, `EventRepository.getOccasionById`, `EventRepositoryImplTest` | Keep the direct occasion lookup tests green; continue occurrence-specific draft/idempotency query hardening in the broader `message_drafts` migration. |
-| D-009 | P1 | Contact detail labels first upcoming event as birthday-oriented data even when not a birthday. | `ContactDetailViewModel` | Use explicit birthday query or rename UI state to upcoming event. |
+| D-009 | P1 | Completed 2026-06-27: Contact Detail now treats the first upcoming occasion as a generic upcoming event in UI state and copy, while the separate contact birthday field remains birthday-specific. | `ContactDetailViewModel.kt`, `ContactDetailScreen.kt`, `strings.xml`, `values-hi/strings.xml`, Contact Detail tests | Keep Contact Detail tests green and avoid reintroducing birthday-specific labels for `getNextUpcomingPreviewForContact()` results unless the data source is narrowed to birthdays only. |
 | D-010 | P1 | Completed 2026-06-27: Wish Preview treats `TOO_SHORT` as a blocking readiness state in ViewModel approval and Compose button state. | `WishPreviewViewModel.kt`, `WishPreviewScreen.kt`, strings, Wish Preview tests | Keep short-draft approval blocker tests green. |
 | D-011 | P1 | Dead letter queue and health monitor are in-memory. | `DeadLetterQueue`, `HealthMonitor`, `AutomationSetupViewModel`, ADR 0003 | Persist dispatch failures and health snapshots for process death and support diagnostics. |
 | D-012 | P1 | Settings sign-out duplicates data clearing already handled by `AuthManager.signOut`. | `SettingsViewModel`, `AuthManager` | One sign-out orchestrator only. |
-| D-013 | P1 | Shortcut intents open the activity but do not route to compose/contacts. | `shortcuts.xml` | Add explicit deep links or extras and test them. |
-| D-014 | P1 | Hindi string table has key parity but many visible English/Hinglish leftovers. | `values-hi/strings.xml`, `LocalizationParityTest` | Add translation quality review beyond parity. |
+| D-013 | P1 | Completed 2026-06-27: shortcut intents now carry explicit shared deep-link data, routing Compose to the current Messages workflow and Contacts to the Contact List. | `shortcuts.xml`, `RelateDeepLinks.kt`, `AndroidManifest.xml`, `NavGraph.kt`, route/shortcut tests | Keep route contract tests green; remaining route-contract follow-up is widget click-through actions. |
+| D-014 | P1 | In progress 2026-06-27: reviewed Hindi quality slices now cover shortcuts/widget summary text, onboarding/setup copy, Memory Vault prompts, Contact Detail, Chat History, Wish Preview, Dashboard quick actions, Analytics summary labels, Events, Messages queue/activity strings, AI Doctor setup/diagnostics, Settings email/quiet-hours/biometric/channel setup, contact preferences, personalization-quality copy, failed-send recovery, and readiness/secondary analytics labels. Remaining Latin scan is limited to accepted product/provider/channel/acronym/enum/date-format terms such as RelateAI, WhatsApp, Google/Gemini/Firebase/Gmail/API/WorkManager, approval-mode constants, and date patterns. | `values-hi/strings.xml`, `LocalizationParityTest` | Continue D-014 with screenshot/native-speaker review at large font scale and any remaining non-primary strings that read awkwardly in context before closing the full localization quality item. |
 | D-015 | P1 | Exact alarm permissions include both `SCHEDULE_EXACT_ALARM` and `USE_EXACT_ALARM`, which may have Play policy impact. | `AndroidManifest.xml`, `DailyScheduler` | Confirm entitlement; prefer exact alarm only for user-visible scheduled messages with fallback. |
 | D-016 | P1 | Accessibility-based WhatsApp sending is powerful and fragile. | `WhatsAppAccessibilityService`, accessibility XML | Keep opt-in, add consent, dry-run, failure reasons, and Play policy review. |
 | D-017 | P1 | SQLCipher key is locally derived/cached from device/app material, not a user-held secret. | `DatabaseKeyDerivation`, strings backup warning, ADR 0004 | Implement target live DB key strategy, hardware-backed wrapping review, and backup-first recovery UX. |
@@ -719,15 +722,95 @@ Target:
 
 ## 13. UX and Product Redesign
 
-### 13.1 Information Architecture
+This section is the UI/UX single source of truth for the redesign. It is grounded in the verified Compose screens, navigation routes, ViewModels, and shared UI components in this repository. The redesign is presentation and information architecture work only: do not remove or change existing behavior unless a later implementation task validates the behavior, updates tests, and records the decision here.
 
-Primary bottom nav should remain:
+### 13.1 Verified UI Surface Inventory
+
+Verified app shell:
+
+- Primary bottom navigation is defined by `Screen.bottomNavItems`: Home, Contacts, Events, Messages, Analytics.
+- Secondary routes exist for Settings, Activity History, Wish Preview, Chat History, Style Coach, Backup/Restore, Automation Setup, Memory Vault, and Gift Advisor.
+- Deep links exist for wish preview, contact detail, settings, and backup/restore.
+- Bottom navigation is shown only for primary routes in `MainActivity`.
+
+Verified major surfaces:
+
+| Surface | Route | Evidence | Current role |
+| --- | --- | --- | --- |
+| Splash | `splash` | `Screen.Splash`, `NavGraph` | Startup routing. |
+| Onboarding | `onboarding` | `OnboardingScreen`, `OnboardingViewModel` | Setup checklist before reliable automation. |
+| Auth | `auth` | `AuthScreen` | Sign-in and debug bypass. |
+| Home | `home` | `HomeScreen`, `HomeViewModel` | Operational dashboard with next actions, setup progress, stats, planner items, upcoming birthdays/events. |
+| Contacts | `contacts` | `ContactListScreen`, `ContactListViewModel` | Contact search, sync, filters, sorting, and data-quality states. |
+| Contact Detail | `contacts/{contactId}` | `ContactDetailScreen`, `ContactDetailViewModel` | Relationship workspace, preferences, context, automation, history links. |
+| Events | `events` | `EventsScreen`, `EventsViewModel` | Occasion management, manual events, conflicts, trust/verification. |
+| Messages | `messages` | `MessagesScreen`, `MessagesViewModel` | Work queue for review, scheduled, blocked, sent, failed, bulk actions. |
+| Wish Preview | `wish/{contactId}/{messageRef}` | `WishPreviewScreen`, `WishPreviewViewModel` | Per-draft review, edit, regenerate, approve, reject, test send. |
+| Settings | `settings` | `SettingsScreen`, `SettingsViewModel` | Global preferences, credentials, sign out, secret inputs, data links. |
+| Analytics | `analytics` | `AnalyticsScreen`, `AnalyticsViewModel` | Reporting dashboard, trends, health, exports. |
+| Activity History | `activity-history` | `ActivityHistoryScreen`, `ActivityHistoryViewModel` | Audit trail with filters and deep links. |
+| Style Coach | `style-coach` | `StyleCoachScreen`, `StyleCoachViewModel` | Writing-style training, learned profile, history. |
+| Backup/Restore | `backup-restore` | `BackupRestoreScreen`, `BackupRestoreViewModel` | Encrypted export/import and preview confirmation. |
+| AI Doctor | `automation-setup` | `AutomationSetupScreen`, `AutomationSetupViewModel` | Readiness checks, recommended fixes, recovery actions. |
+| Memory Vault | `memory-vault/{contactId}` | `MemoryVaultScreen`, `MemoryVaultViewModel` | Per-contact notes and pinned context. |
+| Gift Advisor | `gift-advisor/{contactId}` | `GiftAdvisorScreen`, `GiftAdvisorViewModel` | Per-contact gift history, budget, AI suggestions. |
+| Chat History | `chat-history/{contactId}` | `ChatHistoryScreen`, `ChatHistoryViewModel` | Per-contact sent-message history. |
+
+### 13.2 Dashboard And Feature Necessity Audit
+
+Dashboard definition for this plan: any screen that summarizes several workflows or exposes cross-feature shortcuts. The redesign must reduce duplicate dashboards while preserving every workflow.
+
+| Surface | Necessary? | Current value | Restructure decision | Single owner after redesign |
+| --- | --- | --- | --- | --- |
+| Home | Yes | It ranks next actions, setup progress, pending count, upcoming events, backup freshness, and relationship health. | Keep as the only daily dashboard. Make it answer "What should I do now?" Do not turn it into an analytics or settings hub. | Daily triage, next action, critical alerts. |
+| Messages | Yes | It is the only complete queue for needs-review, scheduled, blocked, sent, failed, and bulk message actions. | Keep as the operational message dashboard. Home may show counts and deep links only. | Message operations and approvals. |
+| Analytics | Yes, but narrow | It reports trends, health, exports, neglected contacts, and delivery/personalization metrics. Some stat cards overlap Home. | Keep as the reporting dashboard. Move repeated first-viewport operational stats behind compact summary cards or trend-first layout. | Reporting, trends, exportable insight. |
+| AI Doctor | Yes, secondary | It aggregates setup, quality, reliability, and recovery checks with recommended fixes. | Keep as the support/diagnostic dashboard. Do not duplicate Settings forms or Messages queue; link to exact owner screens. | Readiness, diagnostics, recovery. |
+| Contacts | Yes, not a dashboard | It owns search, filters, sync, and data-quality discovery. | Keep as a primary workspace. Avoid copying its missing-data filters into Home or Analytics. | Contact discovery and data quality. |
+| Events | Yes, not a dashboard | It owns occasion CRUD, filtering, duplicate/conflict resolution, and trust status. | Keep as the occasion workspace. Home may preview upcoming events only. | Occasion management. |
+| Settings | Yes, not a dashboard | It owns credentials, preferences, channel/global toggles, sign out, and data links. | Keep as configuration. Remove dashboard-style status summaries from Settings if duplicated by AI Doctor. | Global configuration and secrets. |
+| Contact Detail | Yes, contextual workspace | It centralizes one relationship: profile, preferences, personalization, automation, history, and generation. | Keep as the relationship detail hub. Memory, gifts, and chat remain contextual subflows. | Per-contact decisions and enrichment entry. |
+| Wish Preview | Yes, transactional | It is the send-safety gate for one draft. | Keep as a focused review screen. Do not add queue browsing beyond "review next". | Per-draft safety and approval. |
+| Activity History | Yes, secondary | It provides auditability and route recovery. | Keep as a secondary evidence trail. Link from Analytics, AI Doctor, Settings, and failed/sent message contexts. | Audit log and traceability. |
+| Backup/Restore | Yes, secondary | It handles sensitive export/import with preview and passphrase validation. | Keep separate from Settings because the workflow is risky and needs full-screen focus. Settings links to it. | Data portability and restore safety. |
+| Style Coach | Yes, secondary | It owns learned voice profile and sample training. | Keep as a secondary training tool. AI Doctor may recommend it when quality is low; Settings may link to it. | Writing-style training. |
+| Memory Vault | Yes, contextual | It owns per-contact notes. | Keep under Contact Detail. Do not expose as a global dashboard unless future code adds global memory search. | Per-contact memories. |
+| Gift Advisor | Yes, contextual | It owns per-contact gift history, budget, and suggestions. | Keep under Contact Detail. Do not expose as a global gift dashboard without validated product need. | Per-contact gifts. |
+| Chat History | Yes, contextual | It shows sent messages for one contact. | Keep under Contact Detail. Do not duplicate sent-history browsing already available in Messages. | Per-contact sent history. |
+| Onboarding/Auth | Yes | They gate setup and identity. | Keep simple, task-oriented, and connected to AI Doctor after sign-in. | First-run setup and identity. |
+
+### 13.3 Feature Ownership Matrix
+
+Each feature must have one owner screen. Other screens may show small status summaries or links, but they must not duplicate full controls.
+
+| Feature | Owner screen | Allowed secondary placements | Do not duplicate |
+| --- | --- | --- | --- |
+| Ranked next action | Home | Notification/deep link entry, onboarding completion route | Analytics, Settings, Messages. |
+| Setup/readiness summary | AI Doctor | Home compact progress card, onboarding checklist | Settings diagnostics blocks. |
+| Google/device contact sync | Contacts | Settings sync action, AI Doctor fix action | Home full sync controls. |
+| Contact search/filter/sort | Contacts | None | Home, Analytics. |
+| Relationship preferences | Contact Detail | Contact row status link only | Settings global forms. |
+| Personal memories | Memory Vault | Contact Detail summary/link, Wish Preview "why" evidence | Global Home cards. |
+| Gifts and budgets | Gift Advisor | Contact Detail summary/link, Wish Preview "why" evidence | Analytics/Home unless future aggregate gift reporting is built. |
+| Occasions and conflicts | Events | Home upcoming preview, Contact Detail next occasion summary | Messages queue tabs. |
+| Draft queue and bulk approval | Messages | Home count/link, AI Doctor recovery link | Analytics/Home. |
+| One draft edit/regenerate/approve | Wish Preview | Messages row link, Contact Detail generate result link | Messages inline full editor. |
+| Automation mode and credentials | Settings | AI Doctor fix link to settings | Home quick forms. |
+| Readiness tests and recovery | AI Doctor | Failed message recovery assistant link | Settings. |
+| Backup export/import | Backup/Restore | Home freshness warning, Settings link | Analytics export UI. |
+| Analytics export/reporting | Analytics | Activity log evidence link | Backup/Restore. |
+| Audit logs | Activity History | Contextual "open logs" links | Home feed unless future activity feed is validated. |
+| Style training/profile | Style Coach | AI Doctor quality fix, Settings link | Wish Preview controls beyond tone/feedback. |
+
+### 13.4 Target Information Architecture
+
+Primary navigation remains because it matches the verified app domains and keeps high-frequency work within one tap:
 
 ```text
 Home | Contacts | Events | Messages | Analytics
 ```
 
-Secondary surfaces:
+Secondary navigation is task-linked, not always visible:
 
 ```text
 Settings
@@ -741,94 +824,242 @@ Chat History
 Wish Preview
 ```
 
-Home should be operational, not marketing:
+Home target structure:
 
-- Next best action.
-- Setup/readiness summary.
-- Pending approvals.
-- Upcoming events.
-- Backup freshness.
-- Low-health relationship action.
-- Quick links only when they are actionable.
+1. Critical system banner only when action is required.
+2. "Next best action" module with one primary CTA and up to two secondary CTAs from `HomeViewModel.supportingActions`.
+3. Today/upcoming strip: pending review count, next occasion, highest-risk relationship, backup freshness.
+4. Compact setup progress when incomplete. Full diagnostics live in AI Doctor.
+5. Short upcoming occasion list. Link to Events for the complete list.
+6. Remove always-visible quick-action clutter; show contextual shortcuts only when backed by state.
 
-Messages should be the operational work queue:
+Messages target structure:
 
-- Needs review.
-- Scheduled.
-- Blocked.
-- Failed.
-- Sent history.
-- Bulk actions with clear eligibility.
+1. Queue tabs: Needs review, Scheduled, Blocked, Sent, Failed.
+2. Search and channel filter in a stable toolbar.
+3. Bulk action bar appears only after selection and must show eligibility.
+4. Blocked/failed rows show the exact fix and route to AI Doctor or Settings.
+5. Wish Preview remains the full editor; message cards should not expand into complex editors.
 
-Contacts should be the data quality hub:
+Contacts target structure:
 
-- Missing relationship.
-- Missing channel.
-- Missing context.
-- Low health.
-- VIP/close contacts.
-- Personalization quality per contact.
+1. Search first, then compact chips for relationship/data-quality filters.
+2. Contact rows show relationship, next occasion, readiness/quality, preferred channel, and health.
+3. Missing data has one clear action: open Contact Detail edit/preferences.
+4. Pull-to-refresh and sync errors remain discoverable.
 
-AI Doctor should be the support/debug hub:
+Events target structure:
 
-- Required setup.
-- Quality warnings.
-- Reliability warnings.
-- Recovery/dead-letter items.
-- Test AI/email/contact sync actions.
+1. Upcoming timeline grouped by date/month.
+2. Conflict/duplicate section appears above normal events when present.
+3. Manual event creation remains explicit and validates duplicates before save.
+4. Generation actions route to Wish Preview instead of in-place draft editing.
 
-### 13.2 Screen Contracts
+Analytics target structure:
 
-| Screen | Must answer | Primary action |
+1. Trend-first layout: delivery reliability, response rate, personalization coverage, health movement.
+2. Compact summary metrics only where they explain trends.
+3. Neglected contacts must link to Contact Detail.
+4. Export/share remains a clear top-level action.
+
+AI Doctor target structure:
+
+1. Overall readiness status and highest-ranked fix.
+2. Required setup, quality, reliability, recovery groups.
+3. Each check has status, reason, impact, and one action.
+4. Test actions remain explicit and must not run without user intent.
+
+Settings target structure:
+
+1. Account and security.
+2. AI and delivery credentials.
+3. Automation preferences.
+4. Channel and quiet-hour preferences.
+5. Data management links.
+6. About/sign out.
+
+### 13.5 Screen Redesign Contracts
+
+| Screen | Must answer | Primary action | Redesign focus |
+| --- | --- | --- | --- |
+| Onboarding | What setup is needed before automation is reliable? | Continue to sign in or setup checklist. | Convert into a compact checklist with progress, not a marketing page. |
+| Auth | Who is using the app and can contacts be synced? | Sign in or debug bypass in debug builds. | Keep legal text readable and secondary. Preserve debug-only bypass behavior. |
+| Home | What should I do next? | Execute ranked next action. | Reduce duplicate stats and quick links; emphasize one action, one reason, one destination. |
+| Contacts | Which contacts need data before AI can personalize? | Open/edit a contact. | Make filters scannable, show quality reason inline, preserve sync and sort. |
+| Contact Detail | What does RelateAI know about this relationship? | Add context or generate wish. | Organize as Overview, Personalization, Occasions, Automation, History. |
+| Events | Which occasions are upcoming or conflicted? | Add/resolve/generate. | Separate conflicts from normal timeline; strengthen empty states. |
+| Messages | What requires review, is scheduled, blocked, failed, or sent? | Approve/reject/retry. | Use queue-first layout, stable filters, clearer blocked recovery. |
+| Wish Preview | Is this exact text safe to send? | Edit, regenerate, approve. | Linear review flow: summary, draft, quality, explanation, actions. |
+| Settings | Which global preferences and credentials are configured? | Save credentials/preferences. | Group configuration, avoid diagnostics duplication, make dangerous sign out distinct. |
+| Analytics | What is relationship health and delivery performance over time? | Export report. | Trend-first reporting; avoid looking like Home with more charts. |
+| Activity History | What happened and what can be opened? | Open related route. | Keep filters persistent and make severity/status visual but accessible. |
+| Style Coach | What writing style has been learned? | Train/analyze. | Show current profile before history; make samples and auto-analysis clear. |
+| Backup/Restore | Is data protected and can restore be safely previewed? | Export or preview import. | Use stepper-style import flow, strong warnings, visible passphrase quality. |
+| AI Doctor | Why is automation or AI not ready? | Fix highest-ranked blocker. | Checklist grouped by impact with one fix per row. |
+| Memory Vault | What personal context exists for this contact? | Add note. | Make note creation fast; separate pinned from journal. |
+| Gift Advisor | What gifts and budgets exist for this contact? | Add gift or ask AI. | Separate budget, AI suggestions, and gift history. |
+| Chat History | What has been sent to this contact? | Review previous sent message. | Keep read-only and lightweight. |
+
+### 13.6 Design System Tokens
+
+Current verified source: `core/ui/src/main/kotlin/com/example/core/ui/theme` defines a dark Material 3 theme with purple primary, cyan secondary, rose tertiary, semantic success/warning/error colors, app surfaces, typography, cards, feedback banners, shimmer loading, status indicators, avatars, and stats.
+
+Target token model:
+
+| Token group | Required tokens | Rule |
 | --- | --- | --- |
-| Onboarding | What setup is needed before automation is reliable? | Continue to sign in or setup checklist |
-| Auth | Who is using the app and can contacts be synced? | Sign in or guest mode |
-| Home | What should I do next? | Ranked next action |
-| Contacts | Which contacts need data before AI can personalize? | Edit personalization |
-| Contact Detail | What does RelateAI know about this relationship? | Add context or generate wish |
-| Events | Which occasions are upcoming or conflicted? | Add/resolve/generate |
-| Messages | What requires review, is scheduled, blocked, failed, or sent? | Approve/reject/retry |
-| Wish Preview | Is this exact text safe to send? | Edit, regenerate, approve |
-| Settings | Which global preferences and credentials are configured? | Save credentials/preferences |
-| AI Doctor | Why is automation or AI not ready? | Fix highest-ranked blocker |
-| Backup | Is data protected and can a restore be safely previewed? | Export or preview import |
-| Analytics | What is relationship health and delivery performance? | Export report |
-| Activity | What happened and what can be opened? | Open related route |
-| Style Coach | What writing style has been learned? | Train/analyze |
-| Memory Vault | What personal context is available? | Add note |
-| Gift Advisor | What gifts and budgets exist? | Add gift or ask AI |
+| Color: surface | `background`, `surface`, `surfaceRaised`, `surfaceSubtle`, `surfaceInverse`, `outline`, `divider` | Use surfaces for structure. Do not use brand color as background fill for large operational areas. |
+| Color: text | `textPrimary`, `textSecondary`, `textTertiary`, `textDisabled`, `textInverse` | Body text must meet contrast in dark theme and future light theme. |
+| Color: brand | `brandPrimary`, `brandOnPrimary`, `brandContainer`, `brandOnContainer` | Reserve for one primary action per screen and selected navigation state. |
+| Color: accent | `accentInfo`, `accentCare`, `accentNeutral` | Use for category differentiation only, not status. |
+| Color: status | `success`, `warning`, `error`, `info`, `blocked`, `pending`, `scheduled`, `sent` | Message/event/readiness states must use semantic status tokens, not arbitrary colors. |
+| Spacing | `0`, `2`, `4`, `8`, `12`, `16`, `20`, `24`, `32`, `40`, `48`, `64` dp | Use 16 dp page padding on phones, 24 dp on expanded width, 8/12 dp for dense list internals. |
+| Shape | `none`, `xs=4`, `sm=8`, `md=12`, `lg=16`, `full` | Default cards should be 8 dp unless an existing Material component requires otherwise. |
+| Typography | `display`, `headline`, `title`, `body`, `label`, `metric` | Hero-scale type is only for app-level or empty-state moments, not dense dashboards. |
+| Elevation | `flat`, `raised`, `overlay`, `modal` | Prefer tonal separation over heavy shadows in the dark theme. |
+| Motion | `instant`, `fast=120ms`, `normal=180ms`, `slow=240ms` | Use motion for state changes and progress only; do not animate critical text into unreadability. |
+| Density | `comfortable`, `compact`, `dataDense` | Messages, Contacts, Activity, and AI Doctor should support dense scanning without reducing touch targets below 48 dp. |
 
-### 13.3 Design System
+Color guidance:
 
-Current `core:ui` provides a dark Material 3 theme, reusable cards, feedback components, and shimmer loading. Rebuild target:
+- Keep the existing non-single-hue palette, but reduce over-reliance on purple in operational screens.
+- Purple is brand/primary action, cyan is informational/help, rose is care/personalization emphasis, green/amber/red are status.
+- Add a light theme only after screenshot tests and contrast checks exist, or explicitly document dark-only as a product decision. Dark-only is current behavior from source.
 
-- Keep Material 3.
-- Promote `core:ui` to `core:designsystem`.
-- Define tokens for spacing, elevation, shape, content density, and semantic colors.
-- Cards may be used for repeated items, dialogs, and framed tools. Avoid cards nested inside cards.
-- Use icon buttons for common actions and text buttons for explicit commands.
-- Keep operational screens dense and scannable.
-- Add light theme or explicitly document dark-only product decision.
-- Ensure all text fits at 320 dp width, large font scale, and Hindi strings.
-- Add preview/screenshot coverage for primary states.
+### 13.7 Component Usage Guidelines
 
-Color note: current palette is dark with purple primary, cyan secondary, and rose tertiary. It is not a pure single-hue palette, but the rebuild should reduce over-reliance on purple for status-heavy operational UI.
+Promote the shared UI layer into a stable design system surface. Existing component names may remain during incremental migration, but usage rules must be consistent.
 
-### 13.4 Accessibility and Localization
+| Component/pattern | Use for | Required states |
+| --- | --- | --- |
+| App shell | Bottom nav, permission gate, biometric lock, routed content. | Loading destination, permission rationale, locked/unlocked. |
+| Screen scaffold | Shared padding, background, top app bar, snackbar/feedback host. | Loading, error, empty, content. |
+| Top app bar | Screen title, one or two high-value actions. | Back where applicable, content descriptions for icons. |
+| Primary action button | One dominant action per screen or section. | Enabled, disabled, loading, destructive variant when needed. |
+| Secondary/tertiary buttons | Lower-priority explicit commands. | Icons where meaning is familiar; labels where command is ambiguous. |
+| Icon button | Navigation, edit, delete, refresh, share, search, filter, visibility. | Tooltip/content description, 48 dp hit target. |
+| Status banner | Cross-screen alerts and recoverable errors. | Info, warning, error, success with route/action where useful. |
+| Stat tile | Small numeric summaries. | Do not use as the main content on every dashboard. Add label and explanation. |
+| Queue card | Messages and AI Doctor rows. | Status, reason, one primary action, secondary actions menu. |
+| Contact row | Contact list and contact pickers. | Avatar, name, relationship/channel, quality/health signal, next event when relevant. |
+| Event row | Timelines and conflicts. | Date, type, source, trust/conflict state, actions. |
+| Filter chips | Small mutually compatible filters. | Selected, unselected, disabled, overflow behavior. |
+| Segmented tabs | Exclusive high-level queue or report modes. | Selected state, accessible role, stable width. |
+| Forms | Preferences, events, gifts, memories, credentials. | Inline validation, save progress, dirty-state handling where behavior exists. |
+| Dialogs | Focused create/edit/confirm tasks. | Dismiss, confirm, validation errors, destructive confirmation. |
+| Skeleton/shimmer | Initial loading for repeated rows/cards. | Same approximate geometry as loaded content to avoid layout shift. |
+| Empty state | Valid no-data states. | Cause, primary next action, no feature marketing copy. |
 
-Current:
+Card rules:
 
-- Accessibility label regression tests exist.
-- Hindi string parity tests exist.
-- Accessibility service description is explicit.
+- Cards are allowed for repeated items, modal-like framed tools, and row groups.
+- Do not place page sections inside floating decorative cards.
+- Do not nest cards inside cards.
+- Use full-width bands or plain layout groups for major screen sections.
 
-Target:
+### 13.8 Layout, Spacing, And Typography Rules
 
-- Keep content descriptions on all icon-only actions.
-- Minimum touch target 48 dp.
-- Test TalkBack order on Messages, Wish Preview, AI Doctor, Backup, and Contact Detail.
-- Add translation quality review for Hindi; parity alone is insufficient because many Hindi strings currently contain English.
-- Make SMS/WhatsApp/email consent and permission explanations localized.
+Phone layout:
+
+- Use 16 dp horizontal page padding.
+- Use 8 dp between related controls, 12 or 16 dp between list rows, 24 dp between major sections.
+- Primary bottom navigation remains visible only on primary routes.
+- Form controls must not overflow at 320 dp width or large font scale.
+
+Tablet/foldable layout:
+
+- Use a constrained content column for forms and detail pages.
+- Use two-pane layouts where it reduces navigation: Contacts plus Contact Detail, Events timeline plus detail/actions, Messages queue plus preview summary.
+- Do not invent tablet-only features; expose the same workflows with better layout.
+
+Typography:
+
+- Use title styles for section headers and body styles for dense explanatory text.
+- Metrics may use a dedicated metric style, but each metric needs a text label.
+- Avoid viewport-scaled font sizes.
+- Letter spacing remains 0 unless Material component defaults require otherwise.
+- Long localized strings must wrap cleanly inside buttons, chips, banners, and cards.
+
+Responsive stability:
+
+- Fixed-format elements such as tabs, icon buttons, stat tiles, avatars, queue cards, charts, and filter rows need stable min/max sizes.
+- Loading, error, and empty content should reserve similar space to loaded content where practical.
+
+### 13.9 Navigation And Interaction Patterns
+
+Navigation:
+
+- Primary bottom nav is for the five verified high-frequency domains only.
+- Secondary routes are reached from contextual owners, Settings, AI Doctor, Home next action, or deep links.
+- Back behavior must return to the previous workflow context.
+- Activity History route links must open the exact owner screen for the logged item.
+- Home quick actions are state-driven; remove static shortcut grids unless the action is currently relevant.
+
+Interaction:
+
+- Every screen has one obvious primary action.
+- Destructive or risky operations require confirmation: sign out, restore import, delete memory, delete gift, reject draft when appropriate.
+- Bulk actions in Messages must expose selected count and disabled reasons.
+- AI/test actions must be user-triggered and show progress/result.
+- Permission requests must be contextual: contacts during sync, SMS during SMS setup/sending, notifications before reminder/approval workflows.
+
+Accessibility:
+
+- Minimum touch target is 48 dp.
+- All icon-only actions require content descriptions and, where supported, tooltips.
+- Status colors must always have text labels or icons plus text; never rely on color alone.
+- Dynamic status banners should use live region semantics where they report operation results.
+- TalkBack reading order must match visible hierarchy on Messages, Wish Preview, AI Doctor, Backup/Restore, Contact Detail, and Events.
+- Keyboard/focus traversal must work for dialogs, tab rows, forms, and bulk-action controls.
+- Hindi parity tests already exist; add qualitative translation review because parity does not prove readability.
+
+### 13.10 Performance-Aware UI Patterns
+
+- Keep large lists in `LazyColumn`/`LazyVerticalGrid` with stable keys where item identity is available.
+- Use skeleton rows for initial list loading in Contacts, Messages, Events, Activity, and Analytics.
+- Prefer progressive sections: load critical summary first, then secondary charts/history.
+- Avoid recomputing expensive filters in composables; derive filtered state in ViewModels or memoized state.
+- Do not block screen rendering on export/import/report generation; show progress and completion/error state.
+- Charts and analytics should render from prepared view state, not from database entities in composables.
+- Keep retry/recovery actions idempotent from the user's point of view: show current state after action completes.
+
+### 13.11 UX Audit Checklist
+
+Use this checklist for every redesigned screen before implementation is accepted.
+
+- [ ] Screen has one clear purpose and one primary action.
+- [ ] Feature ownership matches the matrix in section 13.3.
+- [ ] No duplicate full-feature placement exists on another screen.
+- [ ] Any removed or merged UI entry point has a validated replacement path.
+- [ ] Empty, loading, error, permission-denied, and success states are designed.
+- [ ] Important actions are reachable in one or two taps from the owning screen.
+- [ ] Labels explain status, eligibility, and risk without relying on color alone.
+- [ ] Icon-only buttons have content descriptions.
+- [ ] Touch targets are at least 48 dp.
+- [ ] Layout works at 320 dp width, large font scale, and Hindi strings.
+- [ ] Back behavior returns to the expected workflow.
+- [ ] Long-running actions show progress and completion/error feedback.
+- [ ] Destructive or risky actions require confirmation.
+- [ ] Lists use stable item layout and avoid content jump during loading.
+- [ ] Permission prompts are contextual and localized.
+- [ ] Visual hierarchy is consistent with Material 3 and shared tokens.
+- [ ] Cards are used only for repeated items, modals, or framed tools.
+- [ ] No nested cards or decorative page-section cards are introduced.
+- [ ] Analytics/reporting screens distinguish insight from operational triage.
+- [ ] Diagnostics screens route to the owner screen instead of duplicating forms.
+- [ ] Screenshot/preview coverage exists for primary, empty, loading, and error states.
+- [ ] Existing behavior tests remain green after UI-only changes.
+
+### 13.12 UI Implementation Guardrails
+
+- Preserve route names, deep links, ViewModel contracts, repositories, use cases, permissions, and dispatch behavior unless a separate technical task validates a change.
+- Start by extracting shared design-system components, then migrate one screen at a time.
+- Do not redesign by moving business logic into composables. Composables render state and emit events only.
+- Prefer small adapters/mappers when screen state needs clearer UI models.
+- Every screen migration must include before/after screenshot review or Compose UI tests for critical flows.
+- If a dashboard item is removed from one screen, document the replacement path in this plan before implementation.
+- Do not add new feature behavior under the label of UI redesign. New behavior requires its own product and test entry.
+- Maintain existing accessibility and localization tests, then add screenshot and TalkBack-order coverage for the highest-risk screens.
 
 ## 14. Security, Privacy, and Compliance
 
@@ -1154,7 +1385,9 @@ Tasks:
 - Implement design system tokens.
 - Rebuild Home, Messages, Wish Preview, Contact Detail, Events, AI Doctor, Backup as primary workflows.
 - Add widget click-through actions and route-aware shortcuts.
-- Improve Hindi localization quality.
+- Started 2026-06-27: improve Hindi localization quality; primary workflow, dashboard, events, messages, onboarding/setup, AI Doctor setup/diagnostics, settings setup, contact preferences, personalization-quality, failed-send recovery, readiness, and secondary analytics strings now have reviewed copy and resource-level regression coverage. Continue with screenshot/native-speaker review before closing D-014.
+- Completed 2026-06-27: Contact Detail now presents the first upcoming occasion as a generic upcoming event instead of birthday-specific UI state/copy; birthday information remains confined to the contact info field.
+- Completed 2026-06-27: launcher shortcuts now deep-link to Messages and Contact List through the shared route contract; widget click-through actions remain.
 - Add accessibility and screenshot coverage.
 
 Exit criteria:
@@ -1415,4 +1648,11 @@ The tracker is updated after each implementation cycle. `Completed` means implem
 | D-133 MessageDispatcher SMS route control-flow boundary | Completed | P1 | `SmsRouteDispatchOutcome`, `dispatchSmsRouteWithSentMessageRecord`, `MessageDispatcherSmsRouteAdapters`, `MessageDispatcher`, SMS route adapter tests, dispatcher focused tests | 100% | 2026-06-27 | Verified by source inspection and tests: the SMS branch in `MessageDispatcher` no longer owns the nested sent-message insert/send/failure-update try-catch, local `smsAttemptInserted` state, direct `Context.dispatchSmsRoute()` call, failed sent-message delivery-status update, SMS route-failure log emission, or SMS permission setup notification decision. The branch now delegates SMS pending-row insertion, sender invocation, failed delivery-status persistence, route-failure logging, setup notification display, and provider-failure return to `dispatchSmsRouteWithSentMessageRecord()`, and only applies the returned `SmsRouteDispatchOutcome` to cross-route success and provider-failure selection. This preserves SMS pending-delivery sent-message row insertion, sent-message id propagation to `SmsSender`, failed delivery-status updates for route-result failures and outer SMS persistence/send-path exceptions, setup notification display for missing SMS permission, retryable SMS provider failure metadata, SMS pending-delivery dispatch-attempt outcomes, fallback after WhatsApp route failure, pending-message success/failure persistence, contact post-dispatch updates, lifecycle logging, route-failure logging, and failure side effects. | Passed focused command `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test :core:data:testDebugUnitTest :app:testDebugUnitTest --tests com.example.core.automation.sender.MessageDispatcherSmsRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherPersistenceAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherLoggingAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherProviderFailureAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherFailureSideEffectAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest --tests com.example.core.automation.sender.DeliveryChannelResolverTest --tests com.example.core.automation.sender.MessageDispatcherTest --tests com.example.core.automation.sender.DispatchProviderRetryPolicyTest --no-configuration-cache`; then passed full gate `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`. Static checks passed: `git diff --check`; focused scan found production `MessageDispatcher` using `dispatchSmsRouteWithSentMessageRecord()` with SMS pending-row, failed-status, route-failure log, permission-notification, and SMS exception classification details isolated to `MessageDispatcherSmsRouteAdapters` and focused tests. | `MessageDispatcherSmsRouteAdapters` is still a data-layer orchestration bridge over `SentMessageDao`, Android `Context`, route senders, logging, and notification adapters. At D-133 completion, `MessageDispatcher` still owned broad success/failure finalization, non-SMS route failure selection/logging, sent-message/contact success finalization, and the private dispatch-attempt outcome save wrapper; D-134 later moved non-SMS route failure log emission to `dispatchWhatsAppRouteWithFailureLog()` and `dispatchEmailRouteWithFailureLog()`. | None for D-133. | Continue with non-SMS route orchestration cleanup, success/failure branch orchestration cleanup, or raw repository status method cleanup. |
 | D-134 MessageDispatcher non-SMS route failure-log boundary | Completed | P1 | `dispatchWhatsAppRouteWithFailureLog`, `dispatchEmailRouteWithFailureLog`, `MessageDispatcherRouteAdapters`, `MessageDispatcher`, route adapter tests, dispatcher focused tests | 100% | 2026-06-27 | Verified by source inspection and tests: the WhatsApp and email branches in `MessageDispatcher` no longer construct or emit route-failure logs inline after a provider failure. WhatsApp dispatch now calls `Context.dispatchWhatsAppRouteWithFailureLog()`, email dispatch now calls `SecurePrefs.dispatchEmailRouteWithFailureLog()`, and those helpers wrap the existing sender-result adapters while emitting the typed `MessageDispatchRouteFailureLog` through `recordMessageDispatchRouteFailureLog()`. `MessageDispatcher` only applies the returned sender result to route success and provider-failure selection. This preserves WhatsApp automation-unavailable fallback logging, email provider failure logging with cause metadata, provider-failure selection ordering, fallback from WhatsApp to SMS, preferred-email success, pending-message success/failure persistence, sent-message/contact success persistence, dispatch-attempt outcomes, SMS route behavior, lifecycle logging, and failure side effects. | Passed focused command `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test :core:data:testDebugUnitTest :app:testDebugUnitTest --tests com.example.core.automation.sender.MessageDispatcherRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherSmsRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherPersistenceAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherLoggingAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherProviderFailureAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherFailureSideEffectAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest --tests com.example.core.automation.sender.DeliveryChannelResolverTest --tests com.example.core.automation.sender.MessageDispatcherTest --tests com.example.core.automation.sender.DispatchProviderRetryPolicyTest --no-configuration-cache`; then passed full gate `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`. Static checks passed: `git diff --check`; focused scan found production `MessageDispatcher` using `dispatchWhatsAppRouteWithFailureLog()` and `dispatchEmailRouteWithFailureLog()` with no `recordMessageDispatchRouteFailureLog()` or `messageDispatchRouteFailureLog()` call in the dispatcher. | `MessageDispatcherRouteAdapters` now owns sender-call result mapping plus non-SMS route-failure log emission. At D-134 completion, `MessageDispatcher` still owned broad success/failure finalization, provider-failure selection mutation in the route loop, sent-message/contact success finalization, and the private dispatch-attempt outcome save wrapper; D-135 later moved route-loop result application to `MessageDispatchRouteLoopState.applyRouteOutcome()`. | None for D-134. | Continue with route-loop outcome application cleanup, success/failure branch orchestration cleanup, or raw repository status method cleanup. |
 | D-135 MessageDispatcher route-loop outcome application boundary | Completed | P1 | `MessageDispatchRouteOutcome`, `MessageDispatchRouteLoopState`, `toMessageDispatchRouteOutcome`, `applyRouteOutcome`, `MessageDispatcherRouteOutcomeAdapters`, `MessageDispatcher`, route outcome adapter tests, dispatcher focused tests | 100% | 2026-06-27 | Verified by source inspection and tests: `MessageDispatcher` no longer keeps separate mutable `success`, `successfulSentMessageInserted`, and provider-failure-selection variables inside the route branches, and it no longer applies WhatsApp/SMS/email route results with repeated inline branch logic. The route loop now starts from `messageDispatchRouteLoopState()`, maps each route-specific result to `MessageDispatchRouteOutcome`, and applies it through `MessageDispatchRouteLoopState.applyRouteOutcome()`. The dispatcher reads `routeLoopState.success` for loop termination/finalization, `routeLoopState.successfulSentMessageInserted` for SMS duplicate sent-message insert avoidance, and `routeLoopState.providerFailureSelection` for final failure selection. This preserves route ordering, fallback from WhatsApp to SMS, SMS pending-delivery duplicate-insert avoidance, preferred-email success, retryable provider-failure priority selection, no-route final failure behavior, pending-message success/failure persistence, sent-message/contact success persistence, dispatch-attempt outcomes, lifecycle logging, route-failure logging, SMS permission setup notifications, and failure side effects. | Passed focused command `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test :core:data:testDebugUnitTest :app:testDebugUnitTest --tests com.example.core.automation.sender.MessageDispatcherRouteOutcomeAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherSmsRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherPersistenceAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherLoggingAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherProviderFailureAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherFailureSideEffectAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest --tests com.example.core.automation.sender.DeliveryChannelResolverTest --tests com.example.core.automation.sender.MessageDispatcherTest --tests com.example.core.automation.sender.DispatchProviderRetryPolicyTest --no-configuration-cache`; then passed full gate `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`. Static checks passed: `git diff --check`; focused scan found production `MessageDispatcher` using `messageDispatchRouteLoopState()`, `applyRouteOutcome()`, and route-result `toMessageDispatchRouteOutcome()` mappings, with branch-local `success =`, `successfulSentMessageInserted =`, and `providerFailureSelection = ...select(...)` mutations removed from the dispatcher. | `MessageDispatcherRouteOutcomeAdapters` is still a data-layer orchestration helper over the current provider-failure selection policy and route-specific result models. At D-135 completion, `MessageDispatcher` still owned broad success/failure finalization, sent-message/contact success finalization, and the private dispatch-attempt outcome save wrapper; D-136 later moved the outcome save wrapper to `DispatchAttemptDao?.saveMessageDispatchAttemptOutcome()`. | None for D-135. | Continue with finalization helper extraction, success/failure branch orchestration cleanup, or raw repository status method cleanup. |
-| D-136 MessageDispatcher dispatch-attempt outcome save adapter boundary | Completed | P1 | `saveMessageDispatchAttemptOutcome`, `MessageDispatcherPersistenceAdapters`, `MessageDispatcher`, persistence adapter tests, dispatcher focused tests | 100% | 2026-06-27 | Verified by source inspection and tests: `MessageDispatcher` no longer imports `DispatchAttemptOutcomeUpdate` or owns the private `saveMessageDispatchAttemptOutcome()` wrapper. Successful and failed dispatch finalization now call the nullable DAO adapter `dispatchAttemptDao.saveMessageDispatchAttemptOutcome(...)`, which skips null commands, tolerates an absent DAO, delegates valid commands to `DispatchAttemptDao.saveDispatchAttemptOutcome()`, and records the existing lifecycle log if the DAO write fails. This preserves successful SMS pending-delivery attempt outcomes, non-SMS sent attempt outcomes, no-route failed-final outcomes, retryable provider-failure outcomes, DAO failure logging, pending-message success/failure persistence, sent-message/contact success persistence, route fallback, lifecycle logging, route-failure logging, SMS permission setup notifications, and failure side effects. | Passed focused command `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test :core:data:testDebugUnitTest :app:testDebugUnitTest --tests com.example.core.automation.sender.MessageDispatcherPersistenceAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherLoggingAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteOutcomeAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherSmsRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherProviderFailureAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherFailureSideEffectAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest --tests com.example.core.automation.sender.DeliveryChannelResolverTest --tests com.example.core.automation.sender.MessageDispatcherTest --tests com.example.core.automation.sender.DispatchProviderRetryPolicyTest --no-configuration-cache`; then passed full gate `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`. Static checks passed: `git diff --check`; focused scan found production `MessageDispatcher` calling `dispatchAttemptDao.saveMessageDispatchAttemptOutcome(...)`, with no private `saveMessageDispatchAttemptOutcome()` function and no `DispatchAttemptOutcomeUpdate` import in the dispatcher. The first focused run exposed the new DAO-failure logging test running outside Robolectric; the test class was aligned with existing logging tests via `RobolectricTestRunner`, and the focused gate then passed. | `MessageDispatcherPersistenceAdapters` now owns dispatch-attempt command persistence and failure logging over the current DAO. `MessageDispatcher` still owns broad success/failure finalization plus sent-message/contact success finalization. | None for D-136. | Continue with finalization helper extraction, success/failure branch orchestration cleanup, or raw repository status method cleanup. |
+| D-136 MessageDispatcher dispatch-attempt outcome save adapter boundary | Completed | P1 | `saveMessageDispatchAttemptOutcome`, `MessageDispatcherPersistenceAdapters`, `MessageDispatcher`, persistence adapter tests, dispatcher focused tests | 100% | 2026-06-27 | Verified by source inspection and tests: `MessageDispatcher` no longer imports `DispatchAttemptOutcomeUpdate` or owns the private `saveMessageDispatchAttemptOutcome()` wrapper. Successful and failed dispatch finalization now call the nullable DAO adapter `dispatchAttemptDao.saveMessageDispatchAttemptOutcome(...)`, which skips null commands, tolerates an absent DAO, delegates valid commands to `DispatchAttemptDao.saveDispatchAttemptOutcome()`, and records the existing lifecycle log if the DAO write fails. This preserves successful SMS pending-delivery attempt outcomes, non-SMS sent attempt outcomes, no-route failed-final outcomes, retryable provider-failure outcomes, DAO failure logging, pending-message success/failure persistence, sent-message/contact success persistence, route fallback, lifecycle logging, route-failure logging, SMS permission setup notifications, and failure side effects. | Passed focused command `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test :core:data:testDebugUnitTest :app:testDebugUnitTest --tests com.example.core.automation.sender.MessageDispatcherPersistenceAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherLoggingAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteOutcomeAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherSmsRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherProviderFailureAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherFailureSideEffectAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest --tests com.example.core.automation.sender.DeliveryChannelResolverTest --tests com.example.core.automation.sender.MessageDispatcherTest --tests com.example.core.automation.sender.DispatchProviderRetryPolicyTest --no-configuration-cache`; then passed full gate `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`. Static checks passed: `git diff --check`; focused scan found production `MessageDispatcher` calling `dispatchAttemptDao.saveMessageDispatchAttemptOutcome(...)`, with no private `saveMessageDispatchAttemptOutcome()` function and no `DispatchAttemptOutcomeUpdate` import in the dispatcher. The first focused run exposed the new DAO-failure logging test running outside Robolectric; the test class was aligned with existing logging tests via `RobolectricTestRunner`, and the focused gate then passed. | `MessageDispatcherPersistenceAdapters` now owns dispatch-attempt command persistence and failure logging over the current DAO. At D-136 completion, `MessageDispatcher` still owned broad success/failure finalization plus sent-message/contact success finalization; D-137 later moved successful dispatch finalization to `saveSuccessfulMessageDispatchFinalization()`. | None for D-136. | Continue with success/failure branch orchestration cleanup, failure finalization helper extraction, or raw repository status method cleanup. |
+| D-137 MessageDispatcher successful finalization boundary | Completed | P1 | `saveSuccessfulMessageDispatchFinalization`, `MessageDispatcherFinalizationAdapters`, `MessageDispatcher`, finalization adapter tests, dispatcher focused tests | 100% | 2026-06-27 | Verified by source inspection and tests: the successful branch in `MessageDispatcher` no longer coordinates dispatch-attempt outcome persistence, success lifecycle logging, pending-message `SENT` status persistence, optional successful sent-message row insertion, or contact post-dispatch updates inline. Successful dispatch finalization now delegates those side effects to `saveSuccessfulMessageDispatchFinalization()`, which composes the existing typed persistence/logging commands and keeps separate default runtime timestamps for attempt resolution, sent-message insertion, and contact wished time. This preserves SMS pending-delivery attempt outcomes, non-SMS sent attempt outcomes, success lifecycle logging metadata, pending-message `SENT` persistence, SMS successful-route duplicate sent-message insert avoidance, non-SMS successful sent-message persistence, contact `lastWished`/consecutive-year/health-score updates, route fallback behavior, SMS permission setup notifications, route-failure logging, and failure branch behavior. | Passed focused command `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test :core:data:testDebugUnitTest :app:testDebugUnitTest --tests com.example.core.automation.sender.MessageDispatcherFinalizationAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherPersistenceAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherLoggingAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteOutcomeAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherSmsRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherProviderFailureAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherFailureSideEffectAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest --tests com.example.core.automation.sender.DeliveryChannelResolverTest --tests com.example.core.automation.sender.MessageDispatcherTest --tests com.example.core.automation.sender.DispatchProviderRetryPolicyTest --no-configuration-cache`; then passed full gate `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`. Static checks passed: `git diff --check`; focused scan found production `MessageDispatcher` calling `saveSuccessfulMessageDispatchFinalization(...)`, with `successfulDispatchAttemptOutcomeUpdate()`, `messageDispatchSucceededLog()`, `sentPendingMessageStatusUpdate()`, `successfulSentMessageDispatchRecord()`, and `contactPostDispatchUpdate()` composition isolated to `MessageDispatcherFinalizationAdapters` and focused tests. | `MessageDispatcherFinalizationAdapters` now owns success-side finalization orchestration over current DAO/logging adapters. D-138 later moved failed dispatch finalization to `saveFailedMessageDispatchFinalization()`. | None for D-137. | Continue with failure finalization helper extraction, success/failure branch orchestration cleanup, or raw repository status method cleanup. |
+| D-138 MessageDispatcher failed finalization boundary | Completed | P1 | `saveFailedMessageDispatchFinalization`, `MessageDispatcherFinalizationAdapters`, `MessageDispatcher`, finalization adapter tests, dispatcher focused tests | 100% | 2026-06-27 | Verified by source inspection and tests: the failed branch in `MessageDispatcher` no longer coordinates pending-message `FAILED` status persistence, no-route versus selected provider-failure resolution, failed dispatch-attempt outcome persistence, failure lifecycle logging, or failure health/dead-letter side effects inline. Failed dispatch finalization now delegates those effects to `saveFailedMessageDispatchFinalization()`, which composes the existing typed pending-status, dispatch-attempt outcome, lifecycle-log, and failure-side-effect commands. This preserves no-delivery-route final failures, selected provider failure propagation, retryable provider outcome metadata, next-retry timestamps, final-failure dead-letter timestamps, final-failure dead-letter enqueue behavior, retryable-failure no-dead-letter behavior, health-monitor failure reporting, failure lifecycle logging, SMS permission setup behavior before finalization, route fallback behavior, and successful branch behavior. | Passed focused command `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test :core:data:testDebugUnitTest :app:testDebugUnitTest --tests com.example.core.automation.sender.MessageDispatcherFinalizationAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherPersistenceAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherLoggingAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteOutcomeAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherSmsRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherProviderFailureAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherFailureSideEffectAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest --tests com.example.core.automation.sender.DeliveryChannelResolverTest --tests com.example.core.automation.sender.MessageDispatcherTest --tests com.example.core.automation.sender.DispatchProviderRetryPolicyTest --no-configuration-cache`; then passed full gate `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`. Static checks passed: `git diff --check`; focused scan found production `MessageDispatcher` calling `saveFailedMessageDispatchFinalization(...)`, with `failedPendingMessageStatusUpdate()`, `failedDispatchAttemptOutcomeUpdate()`, `messageDispatchFailedLog()`, `messageDispatchFailureSideEffects()`, no-route failure selection, and selected provider-failure fallback composition isolated to `MessageDispatcherFinalizationAdapters` and focused tests. | `MessageDispatcherFinalizationAdapters` now owns both success-side and failure-side finalization orchestration over current DAO/logging/failure-side-effect adapters. D-139 later moved terminal finalization branch selection to `saveMessageDispatchFinalization()`. | None for D-138. | Continue with final branch orchestration cleanup, startup/no-route logging extraction, delivery-route plan adapter extraction, or raw repository status method cleanup. |
+| D-139 MessageDispatcher finalization branch orchestration boundary | Completed | P1 | `saveMessageDispatchFinalization`, `MessageDispatcherFinalizationAdapters`, `MessageDispatcher`, finalization adapter tests, dispatcher focused tests | 100% | 2026-06-27 | Verified by source inspection and tests: `MessageDispatcher` no longer owns the terminal `routeLoopState.success` success/failure finalization branch. After the delivery route loop, it now calls `saveMessageDispatchFinalization(...)` once with the route-loop state, final channel, no-route flag, request ids, occasion, message text, and persistence dependencies. `MessageDispatcherFinalizationAdapters` chooses the successful or failed finalization helper, preserving the SMS duplicate sent-message insert guard and failed no-route versus selected provider-failure resolution. This preserves successful SMS pending-delivery finalization, non-SMS sent-message persistence, contact post-dispatch updates, no-route final failure metadata, retryable provider failure metadata, health/dead-letter side effects, lifecycle logging, SMS permission setup behavior before finalization, route fallback behavior, and route-loop termination behavior. | Passed focused command `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test :core:data:testDebugUnitTest :app:testDebugUnitTest --tests com.example.core.automation.sender.MessageDispatcherFinalizationAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherPersistenceAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherLoggingAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteOutcomeAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherSmsRouteAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherProviderFailureAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherFailureSideEffectAdaptersTest --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest --tests com.example.core.automation.sender.DeliveryChannelResolverTest --tests com.example.core.automation.sender.MessageDispatcherTest --tests com.example.core.automation.sender.DispatchProviderRetryPolicyTest --no-configuration-cache`; then passed full gate `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`. Static checks passed: `git diff --check`; focused scan found production `MessageDispatcher` calling `saveMessageDispatchFinalization(...)` with no terminal `if (routeLoopState.success)` branch in the dispatcher, and focused tests cover wrapper selection for successful and failed route-loop states. | `MessageDispatcherFinalizationAdapters` now owns finalization branch selection and success/failure side-effect orchestration over the current route-loop state and persistence/logging adapters. `MessageDispatcher` still owns startup/no-route logging, delivery-route resolution, route-loop orchestration, concrete route delegation, and route-loop break control. | None for D-139. | Continue with startup/no-route logging extraction, delivery-route plan adapter extraction, route-loop orchestration cleanup, or raw repository status method cleanup. |
+| D-140 Hindi visible workflow localization quality slices | Completed | P1 | D-014, `values-hi/strings.xml`, `LocalizationParityTest` | 100% | 2026-06-27 | Verified by source inspection and focused tests: reviewed Hindi strings now cover shortcuts/widget summary text, onboarding/setup copy, Memory Vault prompts, Contact Detail, Chat History, Wish Preview, Dashboard quick actions, Analytics summary labels, Events, Messages queue/activity strings, and AI Doctor setup actions. `LocalizationParityTest.appHindiPrimaryWorkflowStrings_haveReviewedHindiCopy()` checks the reviewed key set for Devanagari text and stale English phrase regressions. | Passed `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.LocalizationParityTest --no-configuration-cache`. Static check passed: `git diff --check -- app/src/main/res/values-hi/strings.xml app/src/test/java/com/example/ui/LocalizationParityTest.kt PLAN.md`. | This is a quality slice, not full completion of D-014. Remaining deeper Settings/email/biometric/channel strings, contact preferences, personalization-quality copy, secondary analytics/activity labels, and other mixed Hindi/English strings still need review before D-014 can be closed. | None for D-140. | Continue D-014 with remaining settings, contact-preference, personalization-quality, analytics/activity, and setup detail strings. |
+| D-141 Hindi settings, personalization, and recovery localization slice | Completed | P1 | D-014, `values-hi/strings.xml`, `LocalizationParityTest` | 100% | 2026-06-27 | Verified by source inspection and focused tests: reviewed Hindi strings now cover AI Doctor diagnostics and setup cards, Settings email/quiet-hours/biometric/channel copy, Contact Detail preference editing, contact preference validation/labels, personalization-quality guidance, failed-send recovery, readiness copy, and secondary analytics labels. Visible contact preference labels no longer expose raw enum lists; selector values remain unchanged in code. | Passed `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.LocalizationParityTest --no-configuration-cache`. Static check passed: `git diff --check -- PLAN.md app/src/main/res/values-hi/strings.xml app/src/test/java/com/example/ui/LocalizationParityTest.kt`. Latin scan now shows accepted product/provider/channel/acronym/enum/date-format terms rather than stale user-facing English copy. | This does not close all of D-014 because screenshot/native-speaker validation and any in-context awkward strings remain to be reviewed. | None for D-141. | Continue D-014 with large-font Hindi screenshot review, accessibility scan for overflow/clipping, and final native-language copy pass. |
+| D-142 Contact Detail upcoming event wording | Completed | P1 | D-009, `ContactDetailViewModel.kt`, `ContactDetailScreen.kt`, `strings.xml`, `values-hi/strings.xml`, `ContactDetailViewModelTest`, `ContactDetailBodySectionsTest`, `LocalizationParityTest` | 100% | 2026-06-27 | Verified by source inspection and focused tests: `ContactDetailUiState.upcomingBirthdayDaysLeft` and matching Compose parameters were renamed to `upcomingEventDaysLeft`, matching the existing `UpcomingEventPreview` source returned by `getNextUpcomingPreviewForContact()`. The reviewed `contact_detail_next_birthday` copy now reads as a generic next event in English and Hindi; the contact info birthday date row remains unchanged because it still displays the actual birthday fields. | Passed `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.ContactDetailViewModelTest --tests com.example.ui.screens.contacts.ContactDetailBodySectionsTest --tests com.example.ui.LocalizationParityTest --no-configuration-cache`. Static check passed: `git diff --check -- PLAN.md app/src/main/java/com/example/ui/viewmodel/ContactDetailViewModel.kt app/src/main/java/com/example/ui/screens/contacts/ContactDetailScreen.kt app/src/test/java/com/example/ui/viewmodel/ContactDetailViewModelTest.kt app/src/test/java/com/example/ui/screens/contacts/ContactDetailBodySectionsTest.kt app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml app/src/test/java/com/example/ui/LocalizationParityTest.kt`. | This is a UI/presentation cleanup only; event lookup, generation use case input, navigation, and repository contracts were intentionally unchanged. | None for D-142. | Continue Phase 4 with screenshot/accessibility coverage for Contact Detail and broader primary workflow redesign tasks. |
+| D-143 Shortcut route contract | Completed | P1 | D-013, `RelateDeepLinks.kt`, `NavGraph.kt`, `AndroidManifest.xml`, `shortcuts.xml`, `RelateDeepLinksTest`, `DeepLinkContractTest`, `ShortcutContractTest` | 100% | 2026-06-27 | Verified by source inspection and focused tests: added shared `RelateDeepLinks.Contacts` and `RelateDeepLinks.Messages` contracts, declared both hosts in the manifest, registered both patterns in `NavGraph`, and added `android:data` deep-link URIs to the static compose/contact shortcuts. The Compose shortcut routes to Messages because no standalone Compose screen is verified in `Screen.kt`/`NavGraph.kt`; Messages is the current owner of message review/edit operations. | Passed `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest --tests com.example.domain.navigation.RelateDeepLinksTest --tests com.example.ui.navigation.DeepLinkContractTest --tests com.example.ui.navigation.ShortcutContractTest --no-configuration-cache`. Static check passed: `git diff --check -- core/domain/src/main/kotlin/com/example/domain/navigation/RelateDeepLinks.kt core/domain/src/test/kotlin/com/example/domain/navigation/RelateDeepLinksTest.kt app/src/main/java/com/example/ui/navigation/NavGraph.kt app/src/main/AndroidManifest.xml app/src/main/res/xml/shortcuts.xml app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt app/src/test/java/com/example/ui/navigation/ShortcutContractTest.kt`. | Shortcut component targeting remains the existing `MainActivity`/release package targeting while the route data is now explicit. Widget click-through still needs the shared contract follow-up. | None for D-143. | Continue with widget click-through routing, or move to the next Phase 4 design-system/accessibility slice. |

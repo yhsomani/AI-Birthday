@@ -6,6 +6,7 @@ import com.example.domain.model.contact.ContactHeader
 import com.example.domain.model.occasion.Occasion
 import com.example.domain.model.occasion.OccasionDate
 import com.example.domain.model.occasion.OccasionType
+import com.example.domain.navigation.RelateDeepLinks
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -97,6 +98,30 @@ class BirthdayWidgetProviderTest {
         assertEquals(emptyList<String>(), summary.todayBirthdayNames)
         assertEquals(listOf("Unknown Contact: WORK ANNIVERSARY"), summary.nextEvents)
         assertEquals(0, summary.pendingApprovals)
+    }
+
+    @Test
+    fun `widget click routes pending approvals to messages`() {
+        val summary = BirthdayWidgetSummary(
+            todayBirthdayCount = 0,
+            todayBirthdayNames = emptyList(),
+            nextEvents = emptyList(),
+            pendingApprovals = 2,
+        )
+
+        assertEquals(RelateDeepLinks.Messages.uri, birthdayWidgetClickUri(summary))
+    }
+
+    @Test
+    fun `widget click routes non pending summary to home`() {
+        val summary = BirthdayWidgetSummary(
+            todayBirthdayCount = 1,
+            todayBirthdayNames = listOf("Asha"),
+            nextEvents = listOf("Asha: Birthday"),
+            pendingApprovals = 0,
+        )
+
+        assertEquals(RelateDeepLinks.Home.uri, birthdayWidgetClickUri(summary))
     }
 
     private fun occasion(

@@ -48,6 +48,24 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="relateai" android:host="contact" />
             </intent-filter>
+            <intent-filter android:label="home">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="relateai" android:host="home" />
+            </intent-filter>
+            <intent-filter android:label="contacts">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="relateai" android:host="contacts" />
+            </intent-filter>
+            <intent-filter android:label="messages">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="relateai" android:host="messages" />
+            </intent-filter>
             <intent-filter android:label="settings">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

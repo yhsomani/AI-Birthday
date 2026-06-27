@@ -119,7 +119,14 @@ fun RelateNavGraph(
                 }
             )
         }
-        composable(Screen.Home.route) {
+        composable(
+            route = Screen.Home.route,
+            deepLinks = listOf(
+                navDeepLink {
+                    uriPattern = RelateDeepLinks.Home.pattern
+                }
+            )
+        ) {
             HomeScreen(
                 onNavigateToContact = { contactId ->
                     navController.navigate(Screen.ContactDetail.createRoute(contactId))
@@ -147,7 +154,14 @@ fun RelateNavGraph(
                 },
             )
         }
-        composable(Screen.ContactList.route) {
+        composable(
+            route = Screen.ContactList.route,
+            deepLinks = listOf(
+                navDeepLink {
+                    uriPattern = RelateDeepLinks.Contacts.pattern
+                }
+            )
+        ) {
             ContactListScreen(
                 onContactClick = { contactId ->
                     navController.navigate(Screen.ContactDetail.createRoute(contactId))
@@ -213,7 +227,14 @@ fun RelateNavGraph(
         composable(Screen.Events.route) {
             EventsScreen()
         }
-        composable(Screen.Messages.route) {
+        composable(
+            route = Screen.Messages.route,
+            deepLinks = listOf(
+                navDeepLink {
+                    uriPattern = RelateDeepLinks.Messages.pattern
+                }
+            )
+        ) {
             MessagesScreen(
                 onNavigateToWish = { contactId, messageRef ->
                     navController.navigate(Screen.WishPreview.createRoute(contactId, messageRef))

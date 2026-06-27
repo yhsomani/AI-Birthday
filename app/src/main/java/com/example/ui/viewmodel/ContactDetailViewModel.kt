@@ -24,7 +24,7 @@ data class ContactDetailUiState(
     val contact: ContactDetailProfile? = null,
     val memoryNoteCount: Int = 0,
     val memoryNoteCategorySummary: List<MemoryNoteCategoryCount> = emptyList(),
-    val upcomingBirthdayDaysLeft: Int? = null,
+    val upcomingEventDaysLeft: Int? = null,
     val upcomingEvent: UpcomingEventPreview? = null,
     val isLoading: Boolean = true,
     val isGenerating: Boolean = false,
@@ -72,7 +72,7 @@ class ContactDetailViewModel @Inject constructor(
                     contact = contact,
                     memoryNoteCount = memoryNoteSummary.totalCount,
                     memoryNoteCategorySummary = memoryNoteSummary.categoryCounts,
-                    upcomingBirthdayDaysLeft = daysLeft,
+                    upcomingEventDaysLeft = daysLeft,
                     upcomingEvent = upcomingEvent,
                     isLoading = false,
                 )
