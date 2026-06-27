@@ -19,7 +19,11 @@ data class EventListItem(
     val isVerified: Boolean,
 ) {
     val daysUntil: Int
-        get() = ((nextOccurrenceMs - System.currentTimeMillis()).coerceAtLeast(0) / MILLIS_PER_DAY).toInt()
+        get() = daysUntil(System.currentTimeMillis())
+
+    fun daysUntil(nowMs: Long): Int {
+        return ((nextOccurrenceMs - nowMs).coerceAtLeast(0) / MILLIS_PER_DAY).toInt()
+    }
 
     private companion object {
         const val MILLIS_PER_DAY = 86_400_000L

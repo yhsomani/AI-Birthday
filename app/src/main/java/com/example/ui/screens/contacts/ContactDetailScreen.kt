@@ -57,10 +57,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.ui.components.HealthIndicatorDot
+import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelatePrimaryButton
 import com.example.core.ui.components.SectionHeader
-import com.example.core.ui.components.FilterChip
 import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateOnBackground
 import com.example.core.ui.theme.RelateOnSurfaceVariant
@@ -74,6 +74,7 @@ import com.example.domain.model.MessageChannel
 import com.example.domain.model.contact.ContactDetailProfile
 import com.example.domain.model.memory.MemoryNoteCategoryCount
 import com.example.domain.usecase.UpdateContactPreferencesUseCase
+import com.example.ui.viewmodel.ContactDetailUiState
 import com.example.ui.viewmodel.ContactDetailViewModel
 
 internal object ContactDetailTestTags {
@@ -85,6 +86,7 @@ internal object ContactDetailTestTags {
     const val ACTION_ADD_MEMORY = "contact_detail_action_add_memory"
     const val ACTION_ADD_GIFT = "contact_detail_action_add_gift"
     const val ACTION_EDIT_PREFERENCES = "contact_detail_action_edit_preferences"
+    const val CONTENT_BOTTOM = "contact_detail_content_bottom"
 }
 
 @Composable
@@ -116,6 +118,59 @@ fun ContactDetailScreen(
         }
     }
 
+    ContactDetailContent(
+        contactId = contactId,
+        state = state,
+        onBack = onBack,
+        onNavigateToMemoryVault = onNavigateToMemoryVault,
+        onNavigateToGiftAdvisor = onNavigateToGiftAdvisor,
+        onNavigateToChatHistory = onNavigateToChatHistory,
+        onEditPreferences = { showPreferencesEditor = true },
+        onGenerateWish = { viewModel.generateWish() },
+        onMarkVip = { contact ->
+            viewModel.savePreferences(
+                contact.toPreferenceRequest().copy(automationMode = ApprovalMode.VIP_APPROVE),
+            )
+        },
+        onSetWhatsApp = { contact ->
+            viewModel.savePreferences(
+                contact.toPreferenceRequest().copy(preferredChannel = MessageChannel.WHATSAPP),
+            )
+        },
+        onSetSms = { contact ->
+            viewModel.savePreferences(
+                contact.toPreferenceRequest().copy(preferredChannel = MessageChannel.SMS),
+            )
+        },
+    )
+
+    val editorContact = state.contact
+    if (showPreferencesEditor && editorContact != null) {
+        ContactPreferencesDialog(
+            contact = editorContact,
+            isSaving = state.isSavingPreferences,
+            onDismiss = { showPreferencesEditor = false },
+            onSave = { request ->
+                viewModel.savePreferences(request)
+            },
+        )
+    }
+}
+
+@Composable
+internal fun ContactDetailContent(
+    contactId: String,
+    state: ContactDetailUiState,
+    onBack: () -> Unit = {},
+    onNavigateToMemoryVault: (String) -> Unit = {},
+    onNavigateToGiftAdvisor: (String) -> Unit = {},
+    onNavigateToChatHistory: (String) -> Unit = {},
+    onEditPreferences: () -> Unit = {},
+    onGenerateWish: () -> Unit = {},
+    onMarkVip: (ContactDetailProfile) -> Unit = {},
+    onSetWhatsApp: (ContactDetailProfile) -> Unit = {},
+    onSetSms: (ContactDetailProfile) -> Unit = {},
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -204,41 +259,21 @@ fun ContactDetailScreen(
                         onNavigateToMemoryVault = onNavigateToMemoryVault,
                         onNavigateToGiftAdvisor = onNavigateToGiftAdvisor,
                         onNavigateToChatHistory = onNavigateToChatHistory,
-                        onEditPreferences = { showPreferencesEditor = true },
-                        onGenerateWish = { viewModel.generateWish() },
-                        onMarkVip = {
-                            viewModel.savePreferences(
-                                currentContact.toPreferenceRequest().copy(automationMode = ApprovalMode.VIP_APPROVE),
-                            )
-                        },
-                        onSetWhatsApp = {
-                            viewModel.savePreferences(
-                                currentContact.toPreferenceRequest().copy(preferredChannel = MessageChannel.WHATSAPP),
-                            )
-                        },
-                        onSetSms = {
-                            viewModel.savePreferences(
-                                currentContact.toPreferenceRequest().copy(preferredChannel = MessageChannel.SMS),
-                            )
-                        },
+                        onEditPreferences = onEditPreferences,
+                        onGenerateWish = onGenerateWish,
+                        onMarkVip = { onMarkVip(currentContact) },
+                        onSetWhatsApp = { onSetWhatsApp(currentContact) },
+                        onSetSms = { onSetSms(currentContact) },
                     )
                 }
 
-                Spacer(modifier = Modifier.height(RelateSpacing.xl))
+                Spacer(
+                    modifier = Modifier
+                        .height(RelateSpacing.xl)
+                        .testTag(ContactDetailTestTags.CONTENT_BOTTOM),
+                )
             }
         }
-    }
-
-    val editorContact = state.contact
-    if (showPreferencesEditor && editorContact != null) {
-        ContactPreferencesDialog(
-            contact = editorContact,
-            isSaving = state.isSavingPreferences,
-            onDismiss = { showPreferencesEditor = false },
-            onSave = { request ->
-                viewModel.savePreferences(request)
-            },
-        )
     }
 }
 
@@ -658,11 +693,14 @@ private fun AutomationActionsCard(
                 color = RelatePrimary,
                 fontWeight = FontWeight.SemiBold,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm), modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+            ) {
                 Button(
                     onClick = onMarkVip,
                     modifier = Modifier
-                        .weight(1f)
+                        .fillMaxWidth()
                         .heightIn(min = RelateSize.compactButtonHeight),
                     enabled = contact.automationMode != ApprovalMode.VIP_APPROVE,
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
@@ -673,7 +711,7 @@ private fun AutomationActionsCard(
                 Button(
                     onClick = onSetWhatsApp,
                     modifier = Modifier
-                        .weight(1f)
+                        .fillMaxWidth()
                         .heightIn(min = RelateSize.compactButtonHeight),
                     enabled = contact.preferredChannel != MessageChannel.WHATSAPP,
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
@@ -684,7 +722,7 @@ private fun AutomationActionsCard(
                 Button(
                     onClick = onSetSms,
                     modifier = Modifier
-                        .weight(1f)
+                        .fillMaxWidth()
                         .heightIn(min = RelateSize.compactButtonHeight),
                     enabled = contact.preferredChannel != MessageChannel.SMS,
                     colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),

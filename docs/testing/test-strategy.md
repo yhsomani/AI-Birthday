@@ -38,7 +38,7 @@ Screenshot and large-font validation:
 - Target coverage: Home, Messages, Wish Preview, Contact Detail, Events, AI Doctor, Settings, Backup/Restore, Analytics, Activity History, onboarding/auth, and contextual tools.
 - Required variants: compact phone width, typical phone width, large font scale, English, Hindi, loading, empty, error, and populated states where applicable.
 - Use one repeatable path: Roborazzi for JVM screenshots first. Instrumented screenshots may be added later only for device-only concerns and must be documented separately.
-- Current pilot baselines cover Splash, Auth, Onboarding, Home, and Messages at compact phone width, with large-font startup/Home/Messages coverage and Home/Messages loading coverage; broader screen and Hindi variants remain open.
+- Current pilot baselines cover Splash, Auth, Onboarding, Home, Messages, Wish Preview, Contact Detail, Events, and AI Doctor at compact phone width, with large-font startup/Home/Messages/Wish Preview/Contact Detail/Events/AI Doctor coverage plus Home/Messages/Wish Preview/Contact Detail/Events/AI Doctor loading or refreshing coverage; broader screen and Hindi variants remain open.
 
 ## Standard Commands
 
@@ -77,7 +77,7 @@ A screen redesign is complete only when:
 
 ## Current Gaps
 
-- Roborazzi is wired with Splash, Auth, Onboarding, Home, and Messages compact-phone pilot baselines, including large-font startup/Home/Messages coverage and Home/Messages loading coverage; broad screenshot coverage is still missing.
+- Roborazzi is wired with Splash, Auth, Onboarding, Home, Messages, Wish Preview, Contact Detail, Events, and AI Doctor compact-phone pilot baselines, including large-font startup/Home/Messages/Wish Preview/Contact Detail/Events/AI Doctor coverage plus Home/Messages/Wish Preview/Contact Detail/Events/AI Doctor loading or refreshing coverage; broad screenshot coverage is still missing.
 - `core/ui` has compile coverage through app usage, but not dedicated component tests for every primitive.
 - `RelateAITheme` remains dark-only.
 - Screen-level hard-coded `.dp`, `.sp`, raw `Color(0x...)`, gray/white, and ad hoc fractional values are cleared for the reviewed scan patterns; future slices should keep the scan clean and document any intentional exceptions.

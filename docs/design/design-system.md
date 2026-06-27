@@ -139,6 +139,7 @@ Typography:
 
 - Use for the one main command in a section.
 - Disable when the action cannot safely run; pair disabled states with visible reason text.
+- Keep the tokenized minimum height, but allow labels to wrap and grow vertically at large font scale or in longer localizations.
 - Use icon+text buttons for specific tools when the icon improves recognition.
 
 `RelateStatusBanner` and `AdaptiveFeedbackBanner`:

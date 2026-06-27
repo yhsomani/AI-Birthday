@@ -95,6 +95,7 @@ internal object WishPreviewTestTags {
     const val REVIEW_NEXT_BUTTON = "wish_preview_review_next"
     const val REVIEW_NEXT_COUNT = "wish_preview_review_next_count"
     const val ERROR_MESSAGE = "wish_preview_error_message"
+    const val CONTENT_BOTTOM = "wish_preview_content_bottom"
     const val VARIANT_PREFIX = "wish_preview_variant_"
     const val FEEDBACK_PREFIX = "wish_preview_feedback_"
 }
@@ -525,7 +526,11 @@ internal fun WishPreviewContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(RelateSpacing.xl))
+        Spacer(
+            modifier = Modifier
+                .height(RelateSpacing.xl)
+                .testTag(WishPreviewTestTags.CONTENT_BOTTOM),
+        )
     }
 }
 

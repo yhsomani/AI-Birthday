@@ -53,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -84,6 +85,7 @@ import com.example.ui.viewmodel.EventTrustConflictState
 import com.example.ui.viewmodel.EventTrustState
 import com.example.ui.viewmodel.EventVerificationState
 import com.example.ui.viewmodel.EventTypeFilter
+import com.example.ui.viewmodel.EventsUiState
 import com.example.ui.viewmodel.EventsViewModel
 import com.example.ui.viewmodel.ManualEventDuplicateWarning
 import com.example.ui.viewmodel.ManualEventWarningKind
@@ -115,6 +117,10 @@ private val eventHorizonFilters = listOf(
     EventHorizonFilter.NEXT_90_DAYS,
 )
 
+internal object EventsTestTags {
+    const val CONTENT_BOTTOM = "events_content_bottom"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventsScreen(
@@ -139,26 +145,82 @@ fun EventsScreen(
         }
     }
 
+    EventsContent(
+        state = state,
+        snackbarHostState = snackbarHostState,
+        showManualDialog = showManualDialog,
+        onShowManualDialog = { showManualDialog = true },
+        onDismissManualDialog = {
+            viewModel.clearManualEventDuplicateWarning()
+            showManualDialog = false
+        },
+        onManualInputChanged = viewModel::clearManualEventDuplicateWarning,
+        onSaveManualEvent = { existingContactId, newContactName, eventType, label, month, day, year, allowDuplicate ->
+            viewModel.saveManualEvent(
+                existingContactId = existingContactId,
+                newContactName = newContactName,
+                eventType = eventType,
+                label = label,
+                month = month,
+                day = day,
+                year = year,
+                allowDuplicate = allowDuplicate,
+            )
+        },
+        onSearchQueryChanged = viewModel::updateSearchQuery,
+        onTypeFilterSelected = viewModel::selectTypeFilter,
+        onHorizonFilterSelected = viewModel::selectHorizonFilter,
+        onRefresh = viewModel::refresh,
+        onMergeEvent = { viewModel.resolveEventConflict(it, EventResolutionAction.MERGE_KEEP_SELECTED) },
+        onKeepSeparateEvent = { viewModel.resolveEventConflict(it, EventResolutionAction.KEEP_SEPARATE) },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun EventsContent(
+    state: EventsUiState,
+    snackbarHostState: SnackbarHostState? = null,
+    showManualDialog: Boolean = false,
+    currentTimeMillis: Long = System.currentTimeMillis(),
+    onShowManualDialog: () -> Unit = {},
+    onDismissManualDialog: () -> Unit = {},
+    onManualInputChanged: () -> Unit = {},
+    onSaveManualEvent: (
+        existingContactId: String?,
+        newContactName: String?,
+        eventType: String,
+        label: String?,
+        month: Int,
+        day: Int,
+        year: Int?,
+        allowDuplicate: Boolean,
+    ) -> Unit = { _, _, _, _, _, _, _, _ -> },
+    onSearchQueryChanged: (String) -> Unit = {},
+    onTypeFilterSelected: (EventTypeFilter) -> Unit = {},
+    onHorizonFilterSelected: (EventHorizonFilter) -> Unit = {},
+    onRefresh: () -> Unit = {},
+    onMergeEvent: (String) -> Unit = {},
+    onKeepSeparateEvent: (String) -> Unit = {},
+) {
+    val resolvedSnackbarHostState = snackbarHostState ?: remember { SnackbarHostState() }
     if (showManualDialog) {
         ManualEventDialog(
             contacts = state.contacts,
             isSaving = state.isSavingManualEvent,
             duplicateWarning = state.duplicateWarning,
-            onDismiss = {
-                viewModel.clearManualEventDuplicateWarning()
-                showManualDialog = false
-            },
-            onInputChanged = viewModel::clearManualEventDuplicateWarning,
+            onDismiss = onDismissManualDialog,
+            onInputChanged = onManualInputChanged,
             onSave = { existingContactId, newContactName, eventType, label, month, day, year, allowDuplicate ->
-                viewModel.saveManualEvent(
-                    existingContactId = existingContactId,
-                    newContactName = newContactName,
-                    eventType = eventType,
-                    label = label,
-                    month = month,
-                    day = day,
-                    year = year,
-                    allowDuplicate = allowDuplicate,
+                onSaveManualEvent(
+                    existingContactId,
+                    newContactName,
+                    eventType,
+                    label,
+                    month,
+                    day,
+                    year,
+                    allowDuplicate,
                 )
             },
         )
@@ -174,9 +236,7 @@ fun EventsScreen(
             subtitle = stringResource(R.string.events_subtitle),
             action = {
                 IconButton(
-                    onClick = {
-                        showManualDialog = true
-                    }
+                    onClick = onShowManualDialog
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Add,
@@ -188,7 +248,7 @@ fun EventsScreen(
         ) {
             OutlinedTextField(
                 value = state.searchQuery,
-                onValueChange = viewModel::updateSearchQuery,
+                onValueChange = onSearchQueryChanged,
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(R.string.search)) },
                 placeholder = { Text(stringResource(R.string.events_search_placeholder)) },
@@ -206,7 +266,7 @@ fun EventsScreen(
                     FilterChip(
                         label = filter.label(),
                         isSelected = state.selectedTypeFilter == filter,
-                        onClick = { viewModel.selectTypeFilter(filter) },
+                        onClick = { onTypeFilterSelected(filter) },
                     )
                 }
             }
@@ -221,14 +281,14 @@ fun EventsScreen(
                     FilterChip(
                         label = filter.label(),
                         isSelected = state.selectedHorizonFilter == filter,
-                        onClick = { viewModel.selectHorizonFilter(filter) },
+                        onClick = { onHorizonFilterSelected(filter) },
                     )
                 }
             }
             Spacer(modifier = Modifier.height(RelateSpacing.md))
             PullToRefreshBox(
                 isRefreshing = state.isRefreshing,
-                onRefresh = { viewModel.refresh() },
+                onRefresh = onRefresh,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
@@ -250,19 +310,16 @@ fun EventsScreen(
                         events = state.events,
                         eventTrust = state.eventTrust,
                         resolvingEventId = state.resolvingEventId,
-                        onMergeEvent = {
-                            viewModel.resolveEventConflict(it, EventResolutionAction.MERGE_KEEP_SELECTED)
-                        },
-                        onKeepSeparateEvent = {
-                            viewModel.resolveEventConflict(it, EventResolutionAction.KEEP_SEPARATE)
-                        },
+                        currentTimeMillis = currentTimeMillis,
+                        onMergeEvent = onMergeEvent,
+                        onKeepSeparateEvent = onKeepSeparateEvent,
                     )
                 }
             }
         }
 
         SnackbarHost(
-            hostState = snackbarHostState,
+            hostState = resolvedSnackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(RelateSpacing.screenHorizontal),
@@ -275,6 +332,7 @@ internal fun EventsList(
     events: List<EventListItem>,
     eventTrust: Map<String, EventTrustState> = buildEventTrustStates(events),
     resolvingEventId: String? = null,
+    currentTimeMillis: Long = System.currentTimeMillis(),
     onMergeEvent: (String) -> Unit = {},
     onKeepSeparateEvent: (String) -> Unit = {},
 ) {
@@ -303,13 +361,20 @@ internal fun EventsList(
                         event = event,
                         trustState = resolvedEventTrust.getValue(event.id.value),
                         isResolving = resolvingEventId == event.id.value,
+                        currentTimeMillis = currentTimeMillis,
                         onMerge = { onMergeEvent(event.id.value) },
                         onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
                     )
                 }
             }
         }
-        item { Spacer(modifier = Modifier.height(RelateSpacing.xl)) }
+        item {
+            Spacer(
+                modifier = Modifier
+                    .height(RelateSpacing.xl)
+                    .testTag(EventsTestTags.CONTENT_BOTTOM),
+            )
+        }
     }
 }
 
@@ -654,10 +719,11 @@ private fun EventCard(
     event: EventListItem,
     trustState: EventTrustState,
     isResolving: Boolean,
+    currentTimeMillis: Long,
     onMerge: () -> Unit,
     onKeepSeparate: () -> Unit,
 ) {
-    val daysUntil = event.daysUntil
+    val daysUntil = event.daysUntil(currentTimeMillis)
     val dateFormat = remember { SimpleDateFormat("MMM dd", Locale.getDefault()) }
     val sourceLabel = eventSourceLabel(trustState.source).ifBlank { stringResource(R.string.event_source_unknown) }
     val verificationLabel = eventVerificationLabel(trustState)

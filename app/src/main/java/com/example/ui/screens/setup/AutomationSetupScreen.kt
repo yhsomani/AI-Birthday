@@ -46,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -72,6 +73,12 @@ import com.example.ui.viewmodel.ReadinessCheck
 import com.example.ui.viewmodel.ReadinessStatus
 import com.example.ui.viewmodel.SetupProgressSummary
 
+internal object AutomationSetupTestTags {
+    const val DASHBOARD = "automation_setup_dashboard"
+    const val WHATSAPP_CARD = "automation_setup_whatsapp_card"
+    const val CONTENT_BOTTOM = "automation_setup_content_bottom"
+}
+
 @Composable
 fun AutomationSetupScreen(
     onBack: () -> Unit,
@@ -85,6 +92,51 @@ fun AutomationSetupScreen(
     val isIgnoringBattery = remember { context.isIgnoringBatteryOptimizations() }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    AutomationSetupContent(
+        state = state,
+        isIgnoringBatteryOptimizations = isIgnoringBattery,
+        onBack = onBack,
+        onRefresh = viewModel::refreshChecks,
+        onSyncContacts = viewModel::syncContacts,
+        onDryRun = viewModel::runSafeGenerationCheck,
+        onTestAi = viewModel::testAiGeneration,
+        onTestEmail = viewModel::testEmailSend,
+        onWhatsAppConsentChange = viewModel::setWhatsAppAutomationConsent,
+        onOpenAccessibilitySettings = {
+            context.safeStartActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        },
+        onOpenBatterySettings = { context.openBatteryOptimizationSettings() },
+        onOpenAppSettings = { context.openAppSettings() },
+        onAction = { action ->
+            handleAiDoctorAction(
+                action = action,
+                context = context,
+                viewModel = viewModel,
+                onOpenSettings = onOpenSettings,
+                onOpenStyleCoach = onOpenStyleCoach,
+                onOpenContacts = onOpenContacts,
+                onOpenActivityHistory = onOpenActivityHistory,
+            )
+        },
+    )
+}
+
+@Composable
+internal fun AutomationSetupContent(
+    state: com.example.ui.viewmodel.AutomationSetupUiState,
+    isIgnoringBatteryOptimizations: Boolean,
+    onBack: () -> Unit = {},
+    onRefresh: () -> Unit = {},
+    onSyncContacts: () -> Unit = {},
+    onDryRun: () -> Unit = {},
+    onTestAi: () -> Unit = {},
+    onTestEmail: () -> Unit = {},
+    onWhatsAppConsentChange: (Boolean) -> Unit = {},
+    onOpenAccessibilitySettings: () -> Unit = {},
+    onOpenBatterySettings: () -> Unit = {},
+    onOpenAppSettings: () -> Unit = {},
+    onAction: (AiDoctorAction) -> Unit = {},
+) {
     RelateScreen(
         title = stringResource(R.string.automation_setup_title),
         subtitle = stringResource(R.string.automation_setup_subtitle),
@@ -117,22 +169,13 @@ fun AutomationSetupScreen(
                 isTestingAi = state.isTestingAi,
                 isTestingEmail = state.isTestingEmail,
                 operationMessage = state.operationMessage,
-                onRefresh = viewModel::refreshChecks,
-                onSyncContacts = viewModel::syncContacts,
-                onDryRun = viewModel::runSafeGenerationCheck,
-                onTestAi = viewModel::testAiGeneration,
-                onTestEmail = viewModel::testEmailSend,
-                onAction = { action ->
-                    handleAiDoctorAction(
-                        action = action,
-                        context = context,
-                        viewModel = viewModel,
-                        onOpenSettings = onOpenSettings,
-                        onOpenStyleCoach = onOpenStyleCoach,
-                        onOpenContacts = onOpenContacts,
-                        onOpenActivityHistory = onOpenActivityHistory,
-                    )
-                },
+                onRefresh = onRefresh,
+                onSyncContacts = onSyncContacts,
+                onDryRun = onDryRun,
+                onTestAi = onTestAi,
+                onTestEmail = onTestEmail,
+                onAction = onAction,
+                modifier = Modifier.testTag(AutomationSetupTestTags.DASHBOARD),
             )
 
             SetupCard(
@@ -140,22 +183,23 @@ fun AutomationSetupScreen(
                 title = stringResource(R.string.automation_setup_whatsapp_card_title),
                 body = stringResource(R.string.automation_setup_whatsapp_card_body),
                 actionText = stringResource(R.string.automation_setup_action_open_accessibility),
-                onClick = { context.safeStartActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
+                onClick = onOpenAccessibilitySettings,
                 consentChecked = state.whatsAppAutomationConsentGranted,
                 consentText = stringResource(R.string.automation_setup_whatsapp_consent_label),
-                onConsentChange = viewModel::setWhatsAppAutomationConsent,
+                onConsentChange = onWhatsAppConsentChange,
+                modifier = Modifier.testTag(AutomationSetupTestTags.WHATSAPP_CARD),
             )
 
             SetupCard(
                 icon = Icons.Filled.BatterySaver,
                 title = stringResource(R.string.automation_setup_battery_card_title),
-                body = if (isIgnoringBattery) {
+                body = if (isIgnoringBatteryOptimizations) {
                     stringResource(R.string.automation_setup_battery_card_ignored)
                 } else {
                     stringResource(R.string.automation_setup_battery_card_body)
                 },
                 actionText = stringResource(R.string.automation_setup_action_open_battery_settings),
-                onClick = { context.openBatteryOptimizationSettings() },
+                onClick = onOpenBatterySettings,
             )
 
             SetupCard(
@@ -163,7 +207,7 @@ fun AutomationSetupScreen(
                 title = stringResource(R.string.automation_setup_notifications_card_title),
                 body = stringResource(R.string.automation_setup_notifications_card_body),
                 actionText = stringResource(R.string.automation_setup_action_app_settings),
-                onClick = { context.openAppSettings() },
+                onClick = onOpenAppSettings,
             )
 
             SetupCard(
@@ -175,7 +219,11 @@ fun AutomationSetupScreen(
                 secondary = true,
             )
 
-            Spacer(modifier = Modifier.height(RelateSpacing.xl))
+            Spacer(
+                modifier = Modifier
+                    .height(RelateSpacing.xl)
+                    .testTag(AutomationSetupTestTags.CONTENT_BOTTOM),
+            )
         }
     }
 }
@@ -197,8 +245,9 @@ private fun ReadinessDashboard(
     onTestAi: () -> Unit,
     onTestEmail: () -> Unit,
     onAction: (AiDoctorAction) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    RelateGlassCard {
+    RelateGlassCard(modifier = modifier) {
         Column(
             modifier = Modifier.padding(RelateSpacing.cardContent),
             verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
@@ -610,12 +659,13 @@ private fun SetupCard(
     body: String,
     actionText: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     secondary: Boolean = false,
     consentChecked: Boolean? = null,
     consentText: String? = null,
     onConsentChange: ((Boolean) -> Unit)? = null,
 ) {
-    RelateGlassCard {
+    RelateGlassCard(modifier = modifier) {
         Column(
             modifier = Modifier.padding(RelateSpacing.cardContent),
             verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),

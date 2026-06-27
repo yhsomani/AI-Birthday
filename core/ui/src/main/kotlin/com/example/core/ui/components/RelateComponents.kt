@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -155,7 +156,7 @@ fun RelatePrimaryButton(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .height(RelateSize.primaryButtonHeight),
+            .heightIn(min = RelateSize.primaryButtonHeight),
         shape = RoundedCornerShape(RelateRadius.control),
         colors = ButtonDefaults.buttonColors(
             containerColor = RelatePrimary,
@@ -166,6 +167,7 @@ fun RelatePrimaryButton(
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
+            textAlign = TextAlign.Center,
         )
     }
 }
