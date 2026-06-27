@@ -282,6 +282,24 @@ class ContactRepositoryImplTest {
     }
 
     @Test
+    fun getMessageDispatchRecipient_mapsRoomContactToPureRecipient() = runTest {
+        coEvery { contactDao.getById("c1") } returns ContactEntity(
+            id = "c1",
+            name = "Asha Sharma",
+            primaryPhone = "+911234567890",
+            primaryEmail = "asha@example.com",
+            notesText = "Not needed for dispatch recipient.",
+        )
+
+        val recipient = repository.getMessageDispatchRecipient("c1")
+
+        assertEquals(ContactId("c1"), recipient?.id)
+        assertEquals("Asha Sharma", recipient?.displayName)
+        assertEquals("+911234567890", recipient?.primaryPhone)
+        assertEquals("asha@example.com", recipient?.primaryEmail)
+    }
+
+    @Test
     fun getContactListItems_mapsRoomContactsToPureListItems() = runTest {
         every { contactDao.getAll() } returns flowOf(
             listOf(

@@ -49,7 +49,7 @@ class MessageDispatchWorkerTest {
         mockkConstructor(MessageDispatcher::class)
         mockkObject(DailyScheduler)
         coEvery { anyConstructed<MessageDispatcher>().dispatch(any()) } returns Unit
-        every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
+        every { DailyScheduler.scheduleExactSendCommand(any(), any()) } just Runs
         every { preferencesRepository.getQuietHoursStart() } returns 0
         every { preferencesRepository.getQuietHoursEnd() } returns 0
         every { preferencesRepository.getBlackoutDates() } returns "[]"
@@ -163,7 +163,8 @@ class MessageDispatchWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
-        verify { DailyScheduler.scheduleExactSend(any(), "msg_1") }
+        verify { DailyScheduler.scheduleExactSendCommand(any(), match { it.messageId.value == "msg_1" }) }
+        coVerify(exactly = 0) { pendingMessageDao.updateScheduledFor(any(), any()) }
         coVerify(exactly = 0) { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
         coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any()) }
         coVerify {
@@ -331,8 +332,14 @@ class MessageDispatchWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
-        coVerify { pendingMessageDao.insert(match { it.id == "msg_1" && it.scheduledForMs > System.currentTimeMillis() }) }
-        verify { DailyScheduler.scheduleExactSend(any(), "msg_1") }
+        coVerify {
+            pendingMessageDao.updateScheduledFor(
+                id = "msg_1",
+                scheduledForMs = match { it > System.currentTimeMillis() },
+            )
+        }
+        coVerify(exactly = 0) { pendingMessageDao.insert(any()) }
+        verify { DailyScheduler.scheduleExactSendCommand(any(), match { it.messageId.value == "msg_1" }) }
         coVerify(exactly = 0) { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
         coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any()) }
     }

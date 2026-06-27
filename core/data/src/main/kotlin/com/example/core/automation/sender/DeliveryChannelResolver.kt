@@ -3,6 +3,15 @@ package com.example.core.automation.sender
 import com.example.domain.model.MessageChannel
 
 internal object DeliveryChannelResolver {
+    private val channelTokenPattern = Regex("\"([A-Za-z_]+)\"")
+
+    fun parseBlockedChannels(channelBlackoutJson: String): Set<MessageChannel> {
+        return channelTokenPattern.findAll(channelBlackoutJson)
+            .map { MessageChannel.fromRaw(it.groupValues[1]) }
+            .filter { it != MessageChannel.UNKNOWN }
+            .toSet()
+    }
+
     fun resolveRoutes(
         preferredChannel: MessageChannel,
         primaryPhone: String?,

@@ -11,23 +11,19 @@ import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
-import com.example.core.db.entities.PendingMessageEntity
+import com.example.core.db.dao.saveMessageStatusUpdate
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchDecision
 import com.example.domain.automation.DispatchEligibilityPolicy
-import com.example.domain.contact.toMessageDispatchRecipient
 import com.example.domain.dispatch.buildMessageDispatchRequest
 import com.example.domain.dispatch.newDispatchAttempt
 import com.example.domain.dispatch.toEntity
-import com.example.domain.model.ApprovalMode
-import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.MessageStatus
 import com.example.domain.model.dispatch.DispatchAttemptCreator
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.DispatchEligibilityRecord
-import com.example.domain.message.toMessageDispatchDraft
-import com.example.domain.message.toMessageDraft
+import com.example.domain.model.message.MessageDispatchState
 import com.example.domain.service.PreferencesRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -46,31 +42,20 @@ class MessageDispatchWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        val pendingMessageId = inputData.getString(MessageDispatchWorkRequests.KEY_PENDING_MESSAGE_ID)
-        val eventId = inputData.getString(MessageDispatchWorkRequests.KEY_EVENT_ID)
-        if (pendingMessageId.isNullOrBlank() && eventId.isNullOrBlank()) {
+        val inputCommand = inputData.toMessageDispatchWorkerInputCommand()
+        if (inputCommand == null) {
             StructuredLogger.e(TAG, "Missing pending_message_id and event_id in input data")
             return Result.failure()
         }
 
-        StructuredLogger.i(TAG, "Dispatching message", mapOf(
-            "pendingMessageId" to (pendingMessageId ?: ""),
-            "eventId" to (eventId ?: ""),
-        ))
+        StructuredLogger.i(TAG, "Dispatching message", inputCommand.logFields())
 
-        val pendingMsg = if (!pendingMessageId.isNullOrBlank()) {
-            pendingMessageDao.getById(pendingMessageId)
-        } else {
-            pendingMessageDao.getByEventId(eventId.orEmpty())
-        } ?: run {
-            StructuredLogger.w(TAG, "No pending message found", extras = mapOf(
-                "pendingMessageId" to (pendingMessageId ?: ""),
-                "eventId" to (eventId ?: ""),
-            ))
+        val pendingMsg = pendingMessageDao.getMessageDispatchState(inputCommand) ?: run {
+            StructuredLogger.w(TAG, "No pending message found", extras = inputCommand.logFields())
             return Result.failure()
         }
 
-        val contact = contactDao.getById(pendingMsg.contactId) ?: run {
+        val recipient = contactDao.getMessageDispatchRecipientById(pendingMsg.contactId.value) ?: run {
             recordDispatchAttempt(
                 pending = pendingMsg,
                 eligibilityDecision = DispatchEligibilityRecord.BLOCKED,
@@ -78,14 +63,13 @@ class MessageDispatchWorker @AssistedInject constructor(
                 reason = "CONTACT_NOT_FOUND",
                 resolvedAtMs = System.currentTimeMillis(),
             )
-            StructuredLogger.w(TAG, "Contact not found for ${pendingMsg.contactId}")
+            StructuredLogger.w(TAG, "Contact not found for ${pendingMsg.contactId.value}")
             return Result.failure()
         }
 
         val now = System.currentTimeMillis()
         when (val decision = DispatchEligibilityPolicy.evaluate(
-            draft = pendingMsg.toMessageDraft(),
-            approvalMode = ApprovalMode.fromRaw(pendingMsg.approvalMode),
+            draft = pendingMsg.draft,
             nowMs = now,
             quietHoursStart = preferencesRepository.getQuietHoursStart(),
             quietHoursEnd = preferencesRepository.getQuietHoursEnd(),
@@ -101,14 +85,16 @@ class MessageDispatchWorker @AssistedInject constructor(
                     resolvedAtMs = System.currentTimeMillis(),
                 )
                 StructuredLogger.i(TAG, "Deferring dispatch", mapOf(
-                    "pendingMessageId" to pendingMsg.id,
+                    "pendingMessageId" to pendingMsg.id.value,
                     "scheduledForMs" to decision.epochMs.toString(),
                     "reason" to decision.reason.name,
                 ))
-                if (decision.epochMs != pendingMsg.scheduledForMs) {
-                    pendingMessageDao.insert(pendingMsg.copy(scheduledForMs = decision.epochMs))
+                if (decision.epochMs != pendingMsg.draft.scheduledForMs) {
+                    pendingMessageDao.saveMessageDispatchDeferralScheduleUpdate(
+                        pendingMsg.toExactSendScheduleUpdate(decision.epochMs)
+                    )
                 }
-                DailyScheduler.scheduleExactSend(context, pendingMsg.id)
+                DailyScheduler.scheduleExactSendCommand(context, pendingMsg.toExactSendCommand())
                 return Result.success()
             }
             is DispatchDecision.NeedsApproval -> {
@@ -120,19 +106,20 @@ class MessageDispatchWorker @AssistedInject constructor(
                     resolvedAtMs = System.currentTimeMillis(),
                 )
                 StructuredLogger.i(TAG, "Message still pending approval; waiting", mapOf(
-                    "pendingMessageId" to pendingMsg.id,
+                    "pendingMessageId" to pendingMsg.id.value,
                     "approvalMode" to decision.approvalMode.raw,
                 ))
                 return Result.success()
             }
             is DispatchDecision.Expire -> {
                 StructuredLogger.i(TAG, "Approval deadline passed without user action; expiring", mapOf(
-                    "pendingMessageId" to pendingMsg.id,
+                    "pendingMessageId" to pendingMsg.id.value,
                     "reason" to decision.reason.name,
                 ))
-                pendingMessageDao.updateStatus(pendingMsg.id, MessageStatus.EXPIRED.raw)
+                pendingMessageDao.saveMessageStatusUpdate(pendingMsg.statusUpdate(MessageStatus.EXPIRED))
+                val expired = pendingMsg.withStatus(MessageStatus.EXPIRED)
                 recordDispatchAttempt(
-                    pending = pendingMsg.copy(status = MessageStatus.EXPIRED.raw),
+                    pending = expired,
                     eligibilityDecision = DispatchEligibilityRecord.EXPIRED,
                     result = DispatchAttemptResult.EXPIRED,
                     reason = decision.reason.name,
@@ -141,7 +128,7 @@ class MessageDispatchWorker @AssistedInject constructor(
                 com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
                     context,
                     context.getString(R.string.notification_setup_message_expired_title),
-                    context.getString(R.string.notification_setup_message_expired_message, contact.name),
+                    context.getString(R.string.notification_setup_message_expired_message, recipient.displayName),
                 )
                 return Result.success()
             }
@@ -154,15 +141,15 @@ class MessageDispatchWorker @AssistedInject constructor(
                     resolvedAtMs = System.currentTimeMillis(),
                 )
                 StructuredLogger.i(TAG, "Dispatch blocked by message state", mapOf(
-                    "pendingMessageId" to pendingMsg.id,
-                    "status" to pendingMsg.status,
+                    "pendingMessageId" to pendingMsg.id.value,
+                    "status" to pendingMsg.status.raw,
                     "reason" to decision.reason.name,
                 ))
                 if (decision.reason == DispatchBlockReason.ALREADY_HANDLED) {
                     com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
                         context,
                         context.getString(R.string.notification_setup_double_send_title),
-                        context.getString(R.string.notification_setup_double_send_message, contact.name),
+                        context.getString(R.string.notification_setup_double_send_message, recipient.displayName),
                     )
                 }
                 return Result.success()
@@ -178,7 +165,7 @@ class MessageDispatchWorker @AssistedInject constructor(
         )
 
         // Idempotency: mark status as DISPATCHING immediately
-        pendingMessageDao.updateStatus(pendingMsg.id, MessageStatus.DISPATCHING.raw)
+        pendingMessageDao.saveMessageStatusUpdate(pendingMsg.statusUpdate(MessageStatus.DISPATCHING))
 
         try {
             val dispatcher = MessageDispatcher(
@@ -191,37 +178,29 @@ class MessageDispatchWorker @AssistedInject constructor(
             )
             dispatcher.dispatch(
                 buildMessageDispatchRequest(
-                    message = pendingMsg.toMessageDispatchDraft(),
-                    recipient = contact.toMessageDispatchRecipient(),
+                    message = pendingMsg.dispatchDraft,
+                    recipient = recipient,
                     dispatchAttemptId = attemptId,
                 ),
             )
         } catch (e: Exception) {
-            StructuredLogger.e(TAG, "Dispatch failed unexpectedly for message ${pendingMsg.id}", e)
+            StructuredLogger.e(TAG, "Dispatch failed unexpectedly for message ${pendingMsg.id.value}", e)
             val failedAtMs = System.currentTimeMillis()
             runCatching {
-                dispatchAttemptDao.updateOutcome(
-                    id = attemptId,
-                    attemptedAtMs = failedAtMs,
-                    resolvedAtMs = failedAtMs,
-                    result = DispatchAttemptResult.FAILED_FINAL.raw,
-                    channel = null,
-                    deliveryStatus = MessageDeliveryStatus.FAILED.raw,
-                    providerMessageId = null,
-                    errorType = e::class.simpleName ?: "DISPATCH_EXCEPTION",
-                    errorCode = null,
-                    redactedErrorMessage = "Dispatcher failed before completing send.",
-                    retryCount = 0,
-                    nextRetryAtMs = null,
-                    deadLetteredAtMs = failedAtMs,
+                dispatchAttemptDao.saveMessageDispatchExceptionOutcome(
+                    messageDispatchExceptionOutcomeUpdate(
+                        dispatchAttemptId = attemptId,
+                        failedAtMs = failedAtMs,
+                        exception = e,
+                    )
                 )
             }.onFailure { attemptError ->
                 StructuredLogger.e(TAG, "Failed to update dispatch attempt $attemptId after dispatch exception", attemptError)
             }
             runCatching {
-                pendingMessageDao.updateStatus(pendingMsg.id, MessageStatus.FAILED.raw)
+                pendingMessageDao.saveMessageStatusUpdate(pendingMsg.statusUpdate(MessageStatus.FAILED))
             }.onFailure { statusError ->
-                StructuredLogger.e(TAG, "Failed to mark message ${pendingMsg.id} as FAILED after dispatch exception", statusError)
+                StructuredLogger.e(TAG, "Failed to mark message ${pendingMsg.id.value} as FAILED after dispatch exception", statusError)
             }
             return Result.failure()
         }
@@ -230,14 +209,14 @@ class MessageDispatchWorker @AssistedInject constructor(
     }
 
     private suspend fun recordDispatchAttempt(
-        pending: PendingMessageEntity,
+        pending: MessageDispatchState,
         eligibilityDecision: DispatchEligibilityRecord,
         result: DispatchAttemptResult,
         reason: String?,
         resolvedAtMs: Long?,
     ): String {
         val requestedAtMs = System.currentTimeMillis()
-        val attempt = pending.toMessageDraft().newDispatchAttempt(
+        val attempt = pending.draft.newDispatchAttempt(
             eligibilityDecision = eligibilityDecision,
             result = result,
             createdBy = DispatchAttemptCreator.WORKER,

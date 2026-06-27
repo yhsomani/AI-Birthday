@@ -1,6 +1,5 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ContactEntity
 import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ApprovalMode
@@ -13,8 +12,10 @@ import com.example.domain.model.common.OccasionId
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.DispatchEligibilityRecord
 import com.example.domain.model.dispatch.MessageDispatchDraft
+import com.example.domain.model.dispatch.MessageDispatchRecipient
 import com.example.domain.model.message.MessageDispatchState
 import com.example.domain.model.message.MessageDraft
+import com.example.domain.model.message.MessageStatusUpdate
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.DispatchAttemptRepository
@@ -89,7 +90,7 @@ class DispatchMessageUseCaseTest {
         val pendingMsg = dispatchMessage(status = MessageStatus.APPROVED)
         coEvery { messageRepository.getMessageDispatchStateById("e1") } returns null
         coEvery { messageRepository.getMessageDispatchStateByEventId("e1") } returns pendingMsg
-        coEvery { contactRepository.getById("c1") } returns null
+        coEvery { contactRepository.getMessageDispatchRecipient("c1") } returns null
 
         val result = useCase("e1")
 
@@ -114,11 +115,11 @@ class DispatchMessageUseCaseTest {
     @Test
     fun `invoke with valid approved message dispatches successfully`() = runTest {
         val pendingMsg = dispatchMessage(status = MessageStatus.APPROVED)
-        val contact = ContactEntity(id = "c1", name = "John Doe")
+        val recipient = dispatchRecipient()
 
         coEvery { messageRepository.getMessageDispatchStateById("e1") } returns null
         coEvery { messageRepository.getMessageDispatchStateByEventId("e1") } returns pendingMsg
-        coEvery { contactRepository.getById("c1") } returns contact
+        coEvery { contactRepository.getMessageDispatchRecipient("c1") } returns recipient
 
         val result = useCase("e1")
 
@@ -137,7 +138,7 @@ class DispatchMessageUseCaseTest {
         coVerify {
             messageDispatcherService.dispatch(match {
                 it.messageId == pendingMsg.id &&
-                    it.contactId.value == contact.id &&
+                    it.contactId == recipient.id &&
                     it.messageText == "hi" &&
                     it.dispatchAttemptId != null
             })
@@ -193,10 +194,10 @@ class DispatchMessageUseCaseTest {
             approvalMode = ApprovalMode.SMART_APPROVE,
             status = MessageStatus.PENDING,
         )
-        val contact = ContactEntity(id = "c1", name = "John Doe")
+        val recipient = dispatchRecipient()
 
         coEvery { messageRepository.getMessageDispatchStateById("msg_1") } returns pendingMsg
-        coEvery { contactRepository.getById("c1") } returns contact
+        coEvery { contactRepository.getMessageDispatchRecipient("c1") } returns recipient
 
         val result = useCase("msg_1")
 
@@ -204,7 +205,7 @@ class DispatchMessageUseCaseTest {
         coVerify {
             messageDispatcherService.dispatch(match {
                 it.messageId == pendingMsg.id &&
-                    it.contactId.value == contact.id &&
+                    it.contactId == recipient.id &&
                     it.preferredChannel == MessageChannel.SMS &&
                     it.dispatchAttemptId != null
             })
@@ -226,12 +227,17 @@ class DispatchMessageUseCaseTest {
         )
 
         coEvery { messageRepository.getMessageDispatchStateById("msg_1") } returns pendingMsg
-        coEvery { messageRepository.updatePendingStatus(any(), any()) } returns Unit
-
         val result = useCase("msg_1")
 
         assertEquals(DispatchMessageUseCase.DispatchOutcome.Expired("msg_1"), result)
-        coVerify { messageRepository.updatePendingStatus("msg_1", "EXPIRED") }
+        coVerify {
+            messageRepository.saveMessageStatusUpdate(
+                MessageStatusUpdate(
+                    id = MessageDraftId("msg_1"),
+                    status = MessageStatus.EXPIRED,
+                )
+            )
+        }
         coVerify(exactly = 0) { messageDispatcherService.dispatch(any()) }
         coVerify {
             dispatchAttemptRepository.upsert(match {
@@ -312,6 +318,15 @@ class DispatchMessageUseCaseTest {
                 preferredChannel = channel,
                 messageText = text,
             ),
+        )
+    }
+
+    private fun dispatchRecipient(): MessageDispatchRecipient {
+        return MessageDispatchRecipient(
+            id = ContactId("c1"),
+            displayName = "John Doe",
+            primaryPhone = "+15551234567",
+            primaryEmail = "john@example.com",
         )
     }
 }

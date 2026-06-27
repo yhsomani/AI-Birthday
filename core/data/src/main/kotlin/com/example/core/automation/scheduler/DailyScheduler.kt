@@ -12,40 +12,51 @@ import com.example.core.data.R
 import com.example.core.db.AppDatabase
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.automation.AutomationSchedulePolicy
+import com.example.domain.model.message.ExactSendCommand
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 object DailyScheduler {
+    fun scheduleExactSendCommand(context: Context, command: ExactSendCommand) {
+        scheduleExactSend(context, command.messageId.value)
+    }
+
     @SuppressLint("ScheduleExactAlarm")
     fun scheduleExactSend(context: Context, pendingMessageId: String) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val db = AppDatabase.getInstance(context)
         CoroutineScope(Dispatchers.IO).launch {
-            val pending = db.pendingMessageDao().getById(pendingMessageId)
-            if (pending != null) {
+            val pendingMessageDao = db.pendingMessageDao()
+            val scheduleState = pendingMessageDao.getExactSendScheduleState(pendingMessageId)
+            if (scheduleState != null) {
                 val prefs = SecurePrefs(context)
                 val scheduledForMs = AutomationSchedulePolicy.nextAllowedSendMs(
-                    candidateMs = pending.scheduledForMs,
+                    candidateMs = scheduleState.scheduledForMs,
                     quietHoursStart = prefs.getQuietHoursStart(),
                     quietHoursEnd = prefs.getQuietHoursEnd(),
                     blackoutDatesJson = prefs.getBlackoutDates(),
                 )
-                if (scheduledForMs != pending.scheduledForMs) {
-                    db.pendingMessageDao().insert(pending.copy(scheduledForMs = scheduledForMs))
+                if (scheduledForMs != scheduleState.scheduledForMs) {
+                    pendingMessageDao.saveExactSendScheduleUpdate(scheduleState.scheduleUpdate(scheduledForMs))
                 }
                 val pendingIntent = buildDispatchPendingIntent(
                     context = context,
-                    requestCode = pending.id.hashCode(),
-                    pendingMessageId = pending.id,
-                    eventId = pending.eventId,
+                    requestCode = scheduleState.messageId.value.hashCode(),
+                    pendingMessageId = scheduleState.messageId.value,
+                    eventId = scheduleState.occasionId.value,
                     flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
 
                 val nowMs = System.currentTimeMillis()
                 if (scheduledForMs <= nowMs) {
                     androidx.work.WorkManager.getInstance(context)
-                        .enqueue(MessageDispatchWorkRequests.create(pending.id, pending.eventId))
+                        .enqueue(
+                            MessageDispatchWorkRequests.create(
+                                pendingMessageId = scheduleState.messageId.value,
+                                eventId = scheduleState.occasionId.value,
+                            )
+                        )
                     return@launch
                 }
 
@@ -63,8 +74,8 @@ object DailyScheduler {
                     androidx.work.WorkManager.getInstance(context)
                         .enqueue(
                             MessageDispatchWorkRequests.create(
-                                pendingMessageId = pending.id,
-                                eventId = pending.eventId,
+                                pendingMessageId = scheduleState.messageId.value,
+                                eventId = scheduleState.occasionId.value,
                                 initialDelayMs = scheduledForMs - nowMs,
                             )
                         )
@@ -128,16 +139,8 @@ object DailyScheduler {
 
 class MessageDispatchReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val pendingMessageId = intent.getStringExtra(MessageDispatchWorkRequests.KEY_PENDING_MESSAGE_ID)
-        val eventId = intent.getStringExtra(MessageDispatchWorkRequests.KEY_EVENT_ID)
-        if (pendingMessageId.isNullOrBlank() && eventId.isNullOrBlank()) return
-        
-        val workManager = androidx.work.WorkManager.getInstance(context)
-        if (!pendingMessageId.isNullOrBlank()) {
-            workManager.enqueue(MessageDispatchWorkRequests.create(pendingMessageId, eventId))
-        } else if (!eventId.isNullOrBlank()) {
-            workManager.enqueue(MessageDispatchWorkRequests.createForEvent(eventId))
-        }
+        val command = intent.toMessageDispatchReceiverWorkCommand() ?: return
+        androidx.work.WorkManager.getInstance(context).enqueueMessageDispatchReceiverWork(command)
     }
 }
 
@@ -149,60 +152,16 @@ class BootReceiver : BroadcastReceiver() {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     // 1. Reschedule alarms that can send without more user action.
-                    val pending = db.pendingMessageDao().getBootRecoverableAutoSends()
-                    pending.forEach { msg ->
-                        DailyScheduler.scheduleExactSend(context, msg.id)
+                    val exactSendCommands = db.pendingMessageDao().getBootRecoverableExactSendCommands()
+                    exactSendCommands.forEach { command ->
+                        DailyScheduler.scheduleExactSendCommand(context, command)
                     }
                     EventReminderScheduler.scheduleAll(context)
                     
                     // 2. Reschedule periodic workers conditionally
                     val workManager = androidx.work.WorkManager.getInstance(context)
-
-                    val hasDailyTrigger = workManager.getWorkInfosByTag("daily_trigger").get().any {
-                        it.state == androidx.work.WorkInfo.State.ENQUEUED || it.state == androidx.work.WorkInfo.State.RUNNING
-                    }
-                    val hasRevival = workManager.getWorkInfosByTag("revival").get().any {
-                        it.state == androidx.work.WorkInfo.State.ENQUEUED || it.state == androidx.work.WorkInfo.State.RUNNING
-                    }
-                    val hasStyle = workManager.getWorkInfosByTag("style_analysis").get().any {
-                        it.state == androidx.work.WorkInfo.State.ENQUEUED || it.state == androidx.work.WorkInfo.State.RUNNING
-                    }
-
-                    val constraints = androidx.work.Constraints.Builder()
-                        .setRequiresBatteryNotLow(true)
-                        .setRequiresStorageNotLow(true)
-                        .build()
-
-                    if (!hasDailyTrigger) {
-                        val request = androidx.work.PeriodicWorkRequestBuilder<com.example.core.automation.workers.DailyTriggerWorker>(24, java.util.concurrent.TimeUnit.HOURS)
-                            .setConstraints(constraints)
-                            .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, java.util.concurrent.TimeUnit.SECONDS)
-                            .addTag("daily_trigger")
-                            .build()
-                        workManager.enqueueUniquePeriodicWork("daily_trigger", androidx.work.ExistingPeriodicWorkPolicy.KEEP, request)
-                    }
-
-                    if (!hasRevival) {
-                        val request = androidx.work.PeriodicWorkRequestBuilder<com.example.core.automation.workers.RevivalWorker>(7, java.util.concurrent.TimeUnit.DAYS)
-                            .setConstraints(constraints)
-                            .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, java.util.concurrent.TimeUnit.SECONDS)
-                            .addTag("revival")
-                            .build()
-                        workManager.enqueueUniquePeriodicWork("revival_check", androidx.work.ExistingPeriodicWorkPolicy.KEEP, request)
-                    }
-
-                    if (!hasStyle) {
-                        val styleConstraints = androidx.work.Constraints.Builder()
-                            .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
-                            .setRequiresBatteryNotLow(true)
-                            .setRequiresStorageNotLow(true)
-                            .build()
-                        val request = androidx.work.PeriodicWorkRequestBuilder<com.example.core.automation.workers.StyleAnalysisWorker>(14, java.util.concurrent.TimeUnit.DAYS)
-                            .setConstraints(styleConstraints)
-                            .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 30, java.util.concurrent.TimeUnit.SECONDS)
-                            .addTag("style_analysis")
-                            .build()
-                        workManager.enqueueUniquePeriodicWork("style_analysis", androidx.work.ExistingPeriodicWorkPolicy.KEEP, request)
+                    bootRecoveryRecurringWorkCommands().forEach { command ->
+                        workManager.reconcileBootRecoveryRecurringWork(command)
                     }
                 } finally {
                     pendingResult.finish()

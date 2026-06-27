@@ -12,6 +12,7 @@ import com.example.domain.contact.toHealthProfile
 import com.example.domain.contact.toHeader
 import com.example.domain.contact.toListItem
 import com.example.domain.contact.toMessageContext
+import com.example.domain.contact.toMessageDispatchRecipient
 import com.example.domain.contact.toPickerItem
 import com.example.domain.contact.toRelationshipAnalyticsCount
 import com.example.domain.contact.toWishContext
@@ -29,6 +30,7 @@ import com.example.domain.model.contact.ContactPickerItem
 import com.example.domain.model.contact.ContactPreferences
 import com.example.domain.model.contact.ContactWishContext
 import com.example.domain.model.contact.RelationshipAnalyticsCount
+import com.example.domain.model.dispatch.MessageDispatchRecipient
 import com.example.domain.repository.ContactRepository
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -87,6 +89,10 @@ class ContactRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getById(id: String): ContactEntity? = contactDao.getById(id)
+
+    override suspend fun getMessageDispatchRecipient(id: String): MessageDispatchRecipient? {
+        return contactDao.getById(id)?.toMessageDispatchRecipient()
+    }
 
     override suspend fun getDetailProfile(id: String): ContactDetailProfile? {
         return contactDao.getById(id)?.toDetailProfile()

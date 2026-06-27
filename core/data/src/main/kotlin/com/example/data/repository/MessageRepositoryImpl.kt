@@ -2,6 +2,7 @@ package com.example.data.repository
 
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
+import com.example.core.db.dao.saveMessageStatusUpdate
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.message.toMessageAnalyticsRecord
@@ -17,6 +18,7 @@ import com.example.domain.model.message.MessageApprovalState
 import com.example.domain.model.message.MessageAnalyticsRecord
 import com.example.domain.model.message.MessageDispatchState
 import com.example.domain.model.message.MessageGenerationHistory
+import com.example.domain.model.message.MessageStatusUpdate
 import com.example.domain.model.message.PendingMessageListItem
 import com.example.domain.model.message.RetryQueuedMessageDraft
 import com.example.domain.model.message.RetryableMessageDraft
@@ -111,6 +113,10 @@ class MessageRepositoryImpl @Inject constructor(
             status = state.status.raw,
             scheduledForMs = state.scheduledForMs,
         )
+    }
+
+    override suspend fun saveMessageStatusUpdate(update: MessageStatusUpdate) {
+        pendingMessageDao.saveMessageStatusUpdate(update)
     }
 
     override suspend fun updatePendingStatus(id: String, status: String) = pendingMessageDao.updateStatus(id, status)

@@ -13,6 +13,7 @@ import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.OccasionId
 import com.example.domain.model.common.SentMessageId
 import com.example.domain.model.message.MessageApprovalState
+import com.example.domain.model.message.MessageStatusUpdate
 import com.example.domain.model.message.RetryQueuedMessageDraft
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -187,6 +188,23 @@ class MessageRepositoryImplTest {
                 id = "pm_1",
                 status = MessageStatus.APPROVED.raw,
                 scheduledForMs = 1_900_000_000_000L,
+            )
+        }
+    }
+
+    @Test
+    fun saveMessageStatusUpdate_updatesStatusColumn() = runTest {
+        repository.saveMessageStatusUpdate(
+            MessageStatusUpdate(
+                id = MessageDraftId("pm_1"),
+                status = MessageStatus.EXPIRED,
+            )
+        )
+
+        coVerify {
+            pendingMessageDao.updateStatus(
+                id = "pm_1",
+                status = MessageStatus.EXPIRED.raw,
             )
         }
     }

@@ -32,6 +32,22 @@ data class DispatchAttempt(
     val metadataJson: String = "{}",
 )
 
+data class DispatchAttemptOutcomeUpdate(
+    val id: DispatchAttemptId,
+    val attemptedAtMs: Long?,
+    val resolvedAtMs: Long?,
+    val result: DispatchAttemptResult,
+    val channel: MessageChannel?,
+    val deliveryStatus: MessageDeliveryStatus,
+    val providerMessageId: String?,
+    val errorType: String?,
+    val errorCode: String?,
+    val redactedErrorMessage: String?,
+    val retryCount: Int,
+    val nextRetryAtMs: Long?,
+    val deadLetteredAtMs: Long?,
+)
+
 enum class DispatchEligibilityRecord(val raw: String) {
     SEND_NOW("SEND_NOW"),
     DEFERRED("DEFERRED"),

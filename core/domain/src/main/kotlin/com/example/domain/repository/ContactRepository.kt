@@ -15,6 +15,7 @@ import com.example.domain.model.contact.ContactPickerItem
 import com.example.domain.model.contact.ContactPreferences
 import com.example.domain.model.contact.ContactWishContext
 import com.example.domain.model.contact.RelationshipAnalyticsCount
+import com.example.domain.model.dispatch.MessageDispatchRecipient
 import androidx.paging.PagingData
 import androidx.paging.PagingSource
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,7 @@ interface ContactRepository {
     suspend fun getEventDiscoveryProfiles(): List<ContactEventDiscoveryProfile>
     suspend fun getHealthProfiles(): List<ContactHealthProfile>
     suspend fun getById(id: String): ContactEntity?
+    suspend fun getMessageDispatchRecipient(id: String): MessageDispatchRecipient?
     suspend fun getDetailProfile(id: String): ContactDetailProfile?
     suspend fun getHeader(id: String): ContactHeader?
     suspend fun getGiftAdvisorProfile(id: String): ContactGiftAdvisorProfile?

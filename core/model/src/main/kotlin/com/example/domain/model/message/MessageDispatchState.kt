@@ -29,4 +29,11 @@ data class MessageDispatchState(
     fun withStatus(status: MessageStatus): MessageDispatchState {
         return copy(draft = draft.copy(status = status))
     }
+
+    fun statusUpdate(status: MessageStatus): MessageStatusUpdate {
+        return MessageStatusUpdate(
+            id = id,
+            status = status,
+        )
+    }
 }

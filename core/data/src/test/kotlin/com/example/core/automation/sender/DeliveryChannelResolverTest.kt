@@ -8,6 +8,29 @@ import org.junit.Test
 class DeliveryChannelResolverTest {
 
     @Test
+    fun `parseBlockedChannels maps persisted quoted channel tokens`() {
+        val channels = DeliveryChannelResolver.parseBlockedChannels("[\"WHATSAPP\", \"sms\"]")
+
+        assertEquals(setOf(MessageChannel.WHATSAPP, MessageChannel.SMS), channels)
+    }
+
+    @Test
+    fun `parseBlockedChannels ignores unknown and duplicate tokens`() {
+        val channels = DeliveryChannelResolver.parseBlockedChannels(
+            "[\"SMS\", \"TELEGRAM\", \"sms\", \"UNKNOWN\"]"
+        )
+
+        assertEquals(setOf(MessageChannel.SMS), channels)
+    }
+
+    @Test
+    fun `parseBlockedChannels returns empty set for malformed or empty input`() {
+        assertTrue(DeliveryChannelResolver.parseBlockedChannels("[]").isEmpty())
+        assertTrue(DeliveryChannelResolver.parseBlockedChannels("SMS,EMAIL").isEmpty())
+        assertTrue(DeliveryChannelResolver.parseBlockedChannels("").isEmpty())
+    }
+
+    @Test
     fun `resolveRoutes keeps preferred email first when email is configured`() {
         val routes = DeliveryChannelResolver.resolveRoutes(
             preferredChannel = MessageChannel.EMAIL,

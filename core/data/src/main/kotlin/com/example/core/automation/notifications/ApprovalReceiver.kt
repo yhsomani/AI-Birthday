@@ -4,11 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
-import androidx.work.WorkManager
-import com.example.core.automation.scheduler.DailyScheduler
-import com.example.core.automation.workers.MessageDispatchWorkRequests
 import com.example.core.db.dao.PendingMessageDao
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.message.MessageDraft
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -42,29 +40,28 @@ class ApprovalReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val pending = if (messageId.isNotEmpty()) {
-                    pendingMessageDao.getById(messageId)
-                } else if (eventId.isNotEmpty()) {
-                    pendingMessageDao.getByEventId(eventId)
-                } else {
-                    null
-                }
-                val resolvedEventId = pending?.eventId ?: eventId
+                val pending = pendingMessageDao.getApprovalNotificationDraftByIdOrOccasion(
+                    messageId = messageId,
+                    eventId = eventId,
+                )
+                val resolvedEventId = pending?.occasionId?.value ?: eventId
 
                 when (action) {
                     "ACTION_APPROVE", "APPROVE", "ACTION_APPROVE_REVIVAL" ->
-                        approveAndScheduleOrDispatch(context, pendingMessageDao, pending?.id, resolvedEventId)
+                        approveAndScheduleOrDispatch(context, pendingMessageDao, pending)
                     "ACTION_REJECT", "REJECT", "SKIP" -> {
                         if (pending != null) {
-                            pendingMessageDao.updateStatus(pending.id, MessageStatus.REJECTED.raw)
-                            DailyScheduler.cancelExactSend(context, pending.id)
+                            pendingMessageDao.savePendingMessageStatus(pending, MessageStatus.REJECTED)
+                            context.cancelExactSend(pending.toExactSendCommand())
                         } else if (resolvedEventId.isNotEmpty()) {
-                            pendingMessageDao.updateStatusByEventId(resolvedEventId, MessageStatus.REJECTED.raw)
-                            DailyScheduler.cancelLegacyExactSend(context, resolvedEventId)
+                            pendingMessageDao.savePendingMessageStatusByOccasion(resolvedEventId, MessageStatus.REJECTED)
+                            resolvedEventId.toLegacyExactSendCancelCommand()?.let { command ->
+                                context.cancelLegacyExactSend(command)
+                            }
                         }
                     }
                     "ACTION_RETRY" -> {
-                        retryNow(context, pendingMessageDao, pending?.id, resolvedEventId)
+                        retryNow(context, pendingMessageDao, pending)
                     }
                 }
             } finally {
@@ -76,29 +73,25 @@ class ApprovalReceiver : BroadcastReceiver() {
     private suspend fun approveAndScheduleOrDispatch(
         context: Context,
         pendingMessageDao: PendingMessageDao,
-        pendingMessageId: String?,
-        eventId: String,
+        pending: MessageDraft?,
     ) {
-        val pending = pendingMessageId?.let { pendingMessageDao.getById(it) }
-            ?: eventId.takeIf { it.isNotBlank() }?.let { pendingMessageDao.getByEventId(it) }
-            ?: return
+        if (pending == null) return
 
         when (ApprovalNotificationActionPolicy.approveAction(pending)) {
             ApprovalNotificationAction.ApproveAndDispatchNow -> {
-                pendingMessageDao.updateStatus(pending.id, MessageStatus.APPROVED.raw)
-                WorkManager.getInstance(context)
-                    .enqueue(MessageDispatchWorkRequests.create(pending.id, pending.eventId))
+                pendingMessageDao.savePendingMessageStatus(pending, MessageStatus.APPROVED)
+                context.enqueueMessageDispatchWork(pending.toMessageDispatchWorkCommand())
             }
             is ApprovalNotificationAction.ApproveAndSchedule -> {
-                pendingMessageDao.updateStatus(pending.id, MessageStatus.APPROVED.raw)
-                DailyScheduler.scheduleExactSend(context, pending.id)
+                pendingMessageDao.savePendingMessageStatus(pending, MessageStatus.APPROVED)
+                context.scheduleExactSend(pending.toExactSendCommand())
             }
             is ApprovalNotificationAction.Expire -> {
-                pendingMessageDao.updateStatus(pending.id, MessageStatus.EXPIRED.raw)
-                DailyScheduler.cancelExactSend(context, pending.id)
+                pendingMessageDao.savePendingMessageStatus(pending, MessageStatus.EXPIRED)
+                context.cancelExactSend(pending.toExactSendCommand())
             }
             is ApprovalNotificationAction.Blocked -> {
-                DailyScheduler.cancelExactSend(context, pending.id)
+                context.cancelExactSend(pending.toExactSendCommand())
             }
         }
     }
@@ -106,15 +99,11 @@ class ApprovalReceiver : BroadcastReceiver() {
     private suspend fun retryNow(
         context: Context,
         pendingMessageDao: PendingMessageDao,
-        pendingMessageId: String?,
-        eventId: String,
+        pending: MessageDraft?,
     ) {
-        val pending = pendingMessageId?.let { pendingMessageDao.getById(it) }
-            ?: eventId.takeIf { it.isNotBlank() }?.let { pendingMessageDao.getByEventId(it) }
-            ?: return
+        if (pending == null) return
 
-        pendingMessageDao.updateStatus(pending.id, MessageStatus.APPROVED.raw)
-        WorkManager.getInstance(context)
-            .enqueue(MessageDispatchWorkRequests.create(pending.id, pending.eventId))
+        pendingMessageDao.savePendingMessageStatus(pending, MessageStatus.APPROVED)
+        context.enqueueMessageDispatchWork(pending.toMessageDispatchWorkCommand())
     }
 }

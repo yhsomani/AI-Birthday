@@ -1,10 +1,15 @@
 package com.example.core.automation.notifications
 
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchEligibilityPolicy
 import com.example.domain.automation.DispatchExpireReason
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.message.MessageDraft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -89,22 +94,18 @@ class ApprovalNotificationActionPolicyTest {
         approvalMode: String,
         status: String,
         scheduledForMs: Long,
-    ): PendingMessageEntity {
-        return PendingMessageEntity(
-            id = "msg_1",
-            contactId = "c1",
-            eventId = "e1",
-            shortVariant = "Short",
-            standardVariant = "Standard",
-            longVariant = "Long",
-            formalVariant = "Formal",
-            funnyVariant = "Funny",
-            emotionalVariant = "Emotional",
-            selectedVariantText = "Standard",
-            channel = MessageChannel.SMS.raw,
+    ): MessageDraft {
+        return MessageDraft(
+            id = MessageDraftId("msg_1"),
+            contactId = ContactId("c1"),
+            occasionId = OccasionId("e1"),
             scheduledForMs = scheduledForMs,
-            approvalMode = approvalMode,
-            status = status,
+            approvalMode = ApprovalMode.fromRaw(approvalMode),
+            status = MessageStatus.fromRaw(status),
+            channel = MessageChannel.SMS,
+            scheduledYear = 2026,
+            qualityScore = 0,
+            isUsingFallback = false,
         )
     }
 }

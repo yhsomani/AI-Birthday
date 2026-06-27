@@ -6,6 +6,7 @@ import com.example.domain.model.message.MessageApprovalState
 import com.example.domain.model.message.MessageAnalyticsRecord
 import com.example.domain.model.message.MessageDispatchState
 import com.example.domain.model.message.MessageGenerationHistory
+import com.example.domain.model.message.MessageStatusUpdate
 import com.example.domain.model.message.PendingMessageListItem
 import com.example.domain.model.message.RetryQueuedMessageDraft
 import com.example.domain.model.message.RetryableMessageDraft
@@ -33,6 +34,7 @@ interface MessageRepository {
     suspend fun insertPending(message: PendingMessageEntity)
     suspend fun saveMessageApprovalState(state: MessageApprovalState)
     suspend fun saveRetryQueuedMessageDraft(state: RetryQueuedMessageDraft)
+    suspend fun saveMessageStatusUpdate(update: MessageStatusUpdate)
     suspend fun updatePendingStatus(id: String, status: String)
     suspend fun updatePendingStatusByEventId(eventId: String, status: String)
     fun getAllSent(): Flow<List<SentMessageEntity>>

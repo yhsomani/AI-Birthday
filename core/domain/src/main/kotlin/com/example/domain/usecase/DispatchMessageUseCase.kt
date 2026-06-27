@@ -4,7 +4,6 @@ import com.example.core.db.entities.ActivityLogEntity
 import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchDecision
 import com.example.domain.automation.DispatchEligibilityPolicy
-import com.example.domain.contact.toMessageDispatchRecipient
 import com.example.domain.dispatch.buildMessageDispatchRequest
 import com.example.domain.dispatch.newDispatchAttempt
 import com.example.domain.repository.ActivityLogRepository
@@ -91,7 +90,7 @@ class DispatchMessageUseCase @Inject constructor(
                 return DispatchOutcome.NotApproved(pending.status.raw)
             }
             is DispatchDecision.Expire -> {
-                messageRepository.updatePendingStatus(pending.id.value, MessageStatus.EXPIRED.raw)
+                messageRepository.saveMessageStatusUpdate(pending.statusUpdate(MessageStatus.EXPIRED))
                 val expired = pending.withStatus(MessageStatus.EXPIRED)
                 recordDispatchAttempt(
                     pending = expired,
@@ -132,7 +131,7 @@ class DispatchMessageUseCase @Inject constructor(
             }
         }
 
-        val contact = contactRepository.getById(pending.contactId.value) ?: run {
+        val recipient = contactRepository.getMessageDispatchRecipient(pending.contactId.value) ?: run {
             recordDispatchAttempt(
                 pending = pending,
                 eligibilityDecision = DispatchEligibilityRecord.BLOCKED,
@@ -164,7 +163,7 @@ class DispatchMessageUseCase @Inject constructor(
             messageDispatcherService.dispatch(
                 buildMessageDispatchRequest(
                     message = pending.dispatchDraft,
-                    recipient = contact.toMessageDispatchRecipient(),
+                    recipient = recipient,
                     dispatchAttemptId = attemptId,
                 ),
             )

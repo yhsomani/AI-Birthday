@@ -1,42 +1,36 @@
 package com.example.core.automation.notifications
 
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchDecision
 import com.example.domain.automation.DispatchEligibilityPolicy
 import com.example.domain.automation.DispatchExpireReason
-import com.example.domain.message.toMessageDraft
-import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.message.MessageDraft
 
 internal object ApprovalNotificationActionPolicy {
     fun approveAction(
-        pending: PendingMessageEntity,
+        pending: MessageDraft,
         nowMs: Long = System.currentTimeMillis(),
     ): ApprovalNotificationAction {
-        val approvalMode = ApprovalMode.fromRaw(pending.approvalMode)
         return when (val currentDecision = DispatchEligibilityPolicy.evaluate(
-            draft = pending.toMessageDraft(),
-            approvalMode = approvalMode,
+            draft = pending,
             nowMs = nowMs,
         )) {
             is DispatchDecision.Expire -> ApprovalNotificationAction.Expire(currentDecision.reason)
             is DispatchDecision.Blocked -> ApprovalNotificationAction.Blocked(currentDecision.reason)
             DispatchDecision.SendNow,
             is DispatchDecision.DeferUntil,
-            is DispatchDecision.NeedsApproval -> approvedAction(pending, approvalMode, nowMs)
+            is DispatchDecision.NeedsApproval -> approvedAction(pending, nowMs)
         }
     }
 
     private fun approvedAction(
-        pending: PendingMessageEntity,
-        approvalMode: ApprovalMode,
+        pending: MessageDraft,
         nowMs: Long,
     ): ApprovalNotificationAction {
-        val approved = pending.copy(status = MessageStatus.APPROVED.raw)
+        val approved = pending.copy(status = MessageStatus.APPROVED)
         return when (val approvedDecision = DispatchEligibilityPolicy.evaluate(
-            draft = approved.toMessageDraft(),
-            approvalMode = approvalMode,
+            draft = approved,
             nowMs = nowMs,
         )) {
             DispatchDecision.SendNow -> ApprovalNotificationAction.ApproveAndDispatchNow
