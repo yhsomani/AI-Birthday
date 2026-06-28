@@ -162,7 +162,9 @@ internal fun OnboardingContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(OnboardingTestTags.CONTINUE_BUTTON),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+            ),
             shape = RoundedCornerShape(RelateRadius.control),
         ) {
             Text(
@@ -203,7 +205,10 @@ private fun SetupChecklistRow(
             Box(
                 modifier = Modifier
                     .size(RelateSize.setupStepIndex)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(RelateRadius.control)),
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(RelateRadius.control),
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
