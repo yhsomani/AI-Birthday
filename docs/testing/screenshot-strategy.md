@@ -23,6 +23,7 @@ Primary coverage:
 - Messages queue populated, failed, reject-confirmation dialog, and empty states, including top-aligned populated pager pages below filters.
 - Wish Preview editable, blocked, and approved states.
 - Contact Detail profile and contextual action states.
+- Contact List populated, sync-error, empty, and loading states.
 - Events list and conflict states.
 - AI Doctor setup blocker and healthy states.
 - Settings account/preferences/data tools state.
@@ -51,6 +52,7 @@ Approved baseline location:
 - `app/src/test/screenshots/baseline`
 
 Generated review artifacts should stay outside source-controlled baselines unless they are approved as expected images.
+The root `.gitignore` intentionally unignores `app/src/test/screenshots/baseline/*.png` so approved Roborazzi baselines appear in normal git status while other generated PNGs stay ignored.
 
 Current pilot baselines:
 
@@ -223,7 +225,7 @@ Current pilot baselines:
 - Screenshot tests use the `com.example.ui.screenshots.ScreenshotTests` JUnit category.
 - Normal unit-test commands exclude screenshot tests by default; use `-Pscreenshot` with Roborazzi tasks to include them.
 - Dense text-field form dialogs require their own harness stabilization before Roborazzi coverage. Gift Advisor now covers the shared add-gift form body, Contact Preferences covers the shared preferences form body, and Events covers the shared manual-entry form body through deterministic large-font fixtures because platform `AlertDialog` windows still do not idle reliably under JVM screenshot runs.
-- Theme-token migrations that should be visually equivalent must run the focused screen screenshot test plus the full Roborazzi suite; D-219 Events, D-220 Chat History, D-221 Splash, and D-222 Auth use this guardrail for production-screen color-role migrations.
+- Theme-token migrations that should be visually equivalent must run the focused screen screenshot test plus the full Roborazzi suite; D-219 Events, D-220 Chat History, D-221 Splash, D-222 Auth, D-223 Onboarding, D-224 Style Coach, D-225 Backup/Restore, D-226 Activity History, D-227 Memory Vault, D-229 Contact List, and D-230 Home use this guardrail for production-screen color-role migrations.
 
 ## CI Policy
 

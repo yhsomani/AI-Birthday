@@ -16,7 +16,7 @@ RelateAI is an operational relationship assistant. The UI should feel calm, dire
 - Supported production mode: dark theme only.
 - `RelateAITheme` intentionally installs the validated dark color scheme by default, and `RelateThemeContractTest` guards that contract.
 - `RelateAITheme` also provides `MaterialTheme.relateSemanticColors` for card surfaces, card outlines, status accents, and status containers. Shared components and screen-local status accents should read card, success, warning, and info colors from this semantic layer instead of importing dark-specific color exports directly.
-- Splash, Auth, Events, and Chat History production color roles now read from `MaterialTheme.colorScheme` or `MaterialTheme.relateSemanticColors`; use that pattern when migrating remaining screen-local color reads.
+- Splash, Auth, Onboarding, Home, Contact List, Activity History, Backup/Restore, Events, Chat History, Memory Vault, and Style Coach production color roles now read from `MaterialTheme.colorScheme` or `MaterialTheme.relateSemanticColors`; use that pattern when migrating remaining screen-local color reads.
 - Light and dynamic color are deferred because other production screens and screenshot fixtures still import dark-specific color tokens such as `RelateDarkBackground`, `RelateCard`, and `RelateSurfaceVariant` directly. Enabling system light or dynamic color before those surfaces are tokenized and contrast-reviewed would create unverified presentation changes.
 - Future light/dynamic support must first replace dark-specific exported color use with semantic/theme-backed tokens, then add compact-phone, typical-phone, large-font, and Hindi Roborazzi baselines before release.
 

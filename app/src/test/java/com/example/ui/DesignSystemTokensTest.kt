@@ -327,6 +327,161 @@ class DesignSystemTokensTest {
         }
     }
 
+    @Test
+    fun styleCoachScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt").readText()
+
+        assertTrue(
+            "StyleCoachScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        assertTrue(
+            "StyleCoachScreen should resolve success status colors through MaterialTheme.relateSemanticColors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateSuccess",
+        ).forEach { rawColor ->
+            assertTrue(
+                "StyleCoachScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun backupRestoreScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt").readText()
+
+        assertTrue(
+            "BackupRestoreScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        assertTrue(
+            "BackupRestoreScreen should resolve status and card colors through MaterialTheme.relateSemanticColors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateCard",
+            "RelateError",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSecondary",
+            "RelateSurfaceVariant",
+            "RelateSuccess",
+            "RelateWarning",
+        ).forEach { rawColor ->
+            assertTrue(
+                "BackupRestoreScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun activityHistoryScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/activity/ActivityHistoryScreen.kt")
+            .readText()
+
+        assertTrue(
+            "ActivityHistoryScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        assertTrue(
+            "ActivityHistoryScreen should resolve warning severity colors through MaterialTheme.relateSemanticColors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        listOf(
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateWarning",
+        ).forEach { rawColor ->
+            assertTrue(
+                "ActivityHistoryScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun memoryVaultScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt")
+            .readText()
+
+        assertTrue(
+            "MemoryVaultScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        assertTrue(
+            "MemoryVaultScreen should resolve note card colors through MaterialTheme.relateSemanticColors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        listOf(
+            "RelateCard",
+            "RelateDarkBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSurfaceVariant",
+        ).forEach { rawColor ->
+            assertTrue(
+                "MemoryVaultScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun contactListScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/contacts/ContactListScreen.kt")
+            .readText()
+
+        assertTrue(
+            "ContactListScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateOnBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSurfaceVariant",
+        ).forEach { rawColor ->
+            assertTrue(
+                "ContactListScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun homeScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/home/HomeScreen.kt")
+            .readText()
+
+        assertTrue(
+            "HomeScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        assertTrue(
+            "HomeScreen should resolve success and warning status colors through MaterialTheme.relateSemanticColors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSuccess",
+            "RelateWarning",
+        ).forEach { rawColor ->
+            assertTrue(
+                "HomeScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
     private fun sourceFile(rootRelativePath: String): File {
         return listOf(
             File(rootRelativePath),

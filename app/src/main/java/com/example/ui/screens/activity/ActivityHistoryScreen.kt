@@ -47,10 +47,8 @@ import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateWarning
+import com.example.core.ui.theme.relateSemanticColors
 import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
@@ -156,7 +154,7 @@ internal fun ActivityHistoryContent(
                 verticalArrangement = Arrangement.Center,
             ) {
                 CircularProgressIndicator(
-                    color = RelatePrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.testTag(ActivityHistoryTestTags.LOADING),
                 )
             }
@@ -230,7 +228,7 @@ private fun ActivityLogCard(
             Icon(
                 imageVector = entry.type.icon(),
                 contentDescription = null,
-                tint = RelatePrimary,
+                tint = MaterialTheme.colorScheme.primary,
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -242,7 +240,7 @@ private fun ActivityLogCard(
                 Text(
                     text = entry.detail,
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(RelateSpacing.xs))
                 Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
@@ -254,21 +252,23 @@ private fun ActivityLogCard(
                     Text(
                         text = entry.status.statusLabel(),
                         style = MaterialTheme.typography.labelSmall,
-                        color = RelateOnSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Spacer(modifier = Modifier.height(RelateSpacing.xs))
                 Text(
                     text = dateFormat.format(Date(entry.createdAtMs)),
                     style = MaterialTheme.typography.labelSmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 entry.actionRoute?.let { route ->
                     Spacer(modifier = Modifier.height(RelateSpacing.sm))
                     Button(
                         onClick = { onOpenRoute(route) },
                         modifier = Modifier.testTag(ActivityHistoryTestTags.OPEN_ROUTE_PREFIX + entry.id),
-                        colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
                     ) {
                         Text(stringResource(R.string.activity_history_open_action))
                     }
@@ -325,8 +325,8 @@ private fun String.icon(): ImageVector = when (ActivityLogType.fromRaw(this)) {
 @Composable
 private fun String.severityColor() = when (ActivityLogSeverity.fromRaw(this)) {
     ActivityLogSeverity.ERROR -> MaterialTheme.colorScheme.error
-    ActivityLogSeverity.WARNING -> RelateWarning
-    else -> RelatePrimary
+    ActivityLogSeverity.WARNING -> MaterialTheme.relateSemanticColors.warning
+    else -> MaterialTheme.colorScheme.primary
 }
 
 @Composable

@@ -53,14 +53,10 @@ import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
 import com.example.core.ui.theme.RelateAlpha
-import com.example.core.ui.theme.RelateCard
-import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateElevation
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.core.ui.theme.relateSemanticColors
 import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.ui.viewmodel.MemoryVaultUiState
 import com.example.ui.viewmodel.MemoryVaultViewModel
@@ -191,16 +187,16 @@ internal fun MemoryVaultContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .testTag(MemoryVaultTestTags.LOADING)
-                    .background(RelateDarkBackground),
+                    .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator(color = RelatePrimary)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(RelateDarkBackground)
+                    .background(MaterialTheme.colorScheme.background)
                     .padding(paddingValues)
                     .padding(RelateSpacing.screenHorizontal),
                 contentPadding = PaddingValues(bottom = RelateSpacing.xxl),
@@ -282,7 +278,7 @@ private fun AddMemoryCard(
             Text(
                 text = stringResource(R.string.memory_vault_suggested_prompts_title),
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -345,7 +341,7 @@ private fun AddMemoryCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag(MemoryVaultTestTags.ADD_BUTTON),
-                colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             ) {
                 Text(stringResource(R.string.memory_vault_add_button))
             }
@@ -381,9 +377,9 @@ private fun MemoryNoteCard(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (note.isPinned) {
-                RelateSurfaceVariant.copy(alpha = RelateAlpha.outline)
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.outline)
             } else {
-                RelateCard
+                MaterialTheme.relateSemanticColors.cardContainer
             },
         ),
     ) {
@@ -409,7 +405,11 @@ private fun MemoryNoteCard(
                             } else {
                                 stringResource(R.string.memory_vault_pin_note)
                             },
-                            tint = if (note.isPinned) RelatePrimary else RelateOnSurfaceVariant.copy(alpha = RelateAlpha.disabled),
+                            tint = if (note.isPinned) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = RelateAlpha.disabled)
+                            },
                         )
                     }
                     IconButton(
@@ -434,7 +434,7 @@ private fun MemoryNoteCard(
             Text(
                 text = date,
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

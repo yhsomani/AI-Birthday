@@ -54,14 +54,10 @@ import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
 import com.example.core.ui.components.StatCard
 import com.example.core.ui.theme.RelateAlpha
-import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSuccess
-import com.example.core.ui.theme.RelateWarning
+import com.example.core.ui.theme.relateSemanticColors
 import com.example.ui.components.SyncErrorCard
 import com.example.ui.viewmodel.HomeActionTarget
 import com.example.ui.viewmodel.HomeNextAction
@@ -139,7 +135,7 @@ internal fun HomeContent(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(RelateDarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = RelateSpacing.screenHorizontal),
     ) {
         item {
@@ -171,7 +167,7 @@ internal fun HomeContent(
                     Icon(
                         imageVector = Icons.Filled.Settings,
                         contentDescription = stringResource(R.string.settings),
-                        tint = RelateOnSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -199,7 +195,7 @@ internal fun HomeContent(
                         .height(RelateSize.loadingPanelHeight),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = RelatePrimary)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
         } else {
@@ -266,7 +262,7 @@ internal fun HomeContent(
                         Text(
                             text = stringResource(R.string.home_no_upcoming_birthdays),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = RelateOnSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
                         state.upcomingBirthdays.forEachIndexed { index, birthday ->
@@ -416,7 +412,7 @@ private fun NextActionSection(
         Text(
             text = stringResource(R.string.home_supporting_actions_section),
             style = MaterialTheme.typography.labelMedium,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
@@ -455,10 +451,10 @@ private fun NextActionCard(
         HomeNextActionKind.FIX_CONTACT_SYNC,
         HomeNextActionKind.CONNECT_AI,
         HomeNextActionKind.ENABLE_AI_GENERATION -> MaterialTheme.colorScheme.error
-        HomeNextActionKind.REVIEW_PENDING -> RelatePrimary
+        HomeNextActionKind.REVIEW_PENDING -> MaterialTheme.colorScheme.primary
         HomeNextActionKind.CREATE_BACKUP,
-        HomeNextActionKind.REFRESH_BACKUP -> RelateWarning
-        HomeNextActionKind.RECONNECT_CONTACT -> RelatePrimary
+        HomeNextActionKind.REFRESH_BACKUP -> MaterialTheme.relateSemanticColors.warning
+        HomeNextActionKind.RECONNECT_CONTACT -> MaterialTheme.colorScheme.primary
     }
     RelateGlassCard(
         modifier = modifier
@@ -490,7 +486,7 @@ private fun NextActionCard(
                 Text(
                     text = action.detailText(),
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -545,8 +541,8 @@ private fun SetupProgressCard(
 ) {
     val statusColor = when {
         summary.actionRequiredCount > 0 -> MaterialTheme.colorScheme.error
-        summary.warningCount > 0 -> RelateWarning
-        else -> RelateSuccess
+        summary.warningCount > 0 -> MaterialTheme.relateSemanticColors.warning
+        else -> MaterialTheme.relateSemanticColors.success
     }
     val statusIcon = when {
         summary.actionRequiredCount > 0 -> Icons.Filled.Error
@@ -612,7 +608,7 @@ private fun SetupProgressCard(
             Text(
                 text = detail,
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -637,7 +633,7 @@ private fun PlannerItemCard(
             Icon(
                 imageVector = Icons.Filled.Favorite,
                 contentDescription = null,
-                tint = RelatePrimary,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(RelateSize.iconMd),
             )
             Column(modifier = Modifier.weight(1f)) {
@@ -649,7 +645,7 @@ private fun PlannerItemCard(
                 Text(
                     text = item.detail,
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -689,7 +685,7 @@ private fun ReadinessBanner(
                 Text(
                     text = detail,
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -716,7 +712,7 @@ private fun QuickActionTile(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = RelatePrimary,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(RelateSize.iconMd),
             )
             Spacer(modifier = Modifier.width(RelateSpacing.sm))
@@ -743,13 +739,13 @@ private fun BirthdayRow(
             modifier = Modifier
                 .size(RelateSize.avatar)
                 .clip(RoundedCornerShape(RelateRadius.control))
-                .background(RelatePrimary.copy(alpha = RelateAlpha.feedbackContainer)),
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = RelateAlpha.feedbackContainer)),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = date.take(3),
                 style = MaterialTheme.typography.labelMedium,
-                color = RelatePrimary,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
         Spacer(modifier = Modifier.width(RelateSpacing.md))
@@ -762,7 +758,7 @@ private fun BirthdayRow(
             Text(
                 text = stringResource(R.string.home_birthday_on_date, date),
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

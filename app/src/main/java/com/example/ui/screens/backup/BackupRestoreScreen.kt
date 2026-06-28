@@ -109,6 +109,7 @@ fun BackupRestoreContent(
         uiState.passwordStrength != PasswordStrength.WEAK &&
         !isBusy
     val canImport = uiState.passphrase.isNotEmpty() && !isBusy
+    val semanticColors = MaterialTheme.relateSemanticColors
 
     Scaffold(
         topBar = {
@@ -132,7 +133,7 @@ fun BackupRestoreContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(RelateDarkBackground)
+                .background(MaterialTheme.colorScheme.background)
                 .testTag(BackupRestoreTestTags.SCREEN)
                 .verticalScroll(rememberScrollState())
                 .padding(RelateSpacing.screenHorizontal),
@@ -143,7 +144,9 @@ fun BackupRestoreContent(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(RelateRadius.card),
                 colors = CardDefaults.cardColors(
-                    containerColor = RelateError.copy(alpha = RelateAlpha.feedbackContainer)
+                    containerColor = MaterialTheme.colorScheme.error.copy(
+                        alpha = RelateAlpha.feedbackContainer
+                    )
                 )
             ) {
                 Row(
@@ -215,10 +218,10 @@ fun BackupRestoreContent(
                     // Password Strength Indicator
                     if (uiState.passphrase.isNotEmpty()) {
                         val color = when (uiState.passwordStrength) {
-                            PasswordStrength.WEAK -> RelateError
-                            PasswordStrength.FAIR -> RelateWarning
-                            PasswordStrength.STRONG -> RelateSecondary
-                            PasswordStrength.VERY_STRONG -> RelateSuccess
+                            PasswordStrength.WEAK -> MaterialTheme.colorScheme.error
+                            PasswordStrength.FAIR -> semanticColors.warning
+                            PasswordStrength.STRONG -> MaterialTheme.colorScheme.secondary
+                            PasswordStrength.VERY_STRONG -> semanticColors.success
                         }
                         val progress = when (uiState.passwordStrength) {
                             PasswordStrength.WEAK -> RelateFraction.strengthWeak
@@ -344,7 +347,7 @@ fun BackupRestoreContent(
                                 Text(
                                     stringResource(R.string.backup_export_success_title),
                                     fontWeight = FontWeight.Bold,
-                                    color = RelateSuccess,
+                                    color = semanticColors.success,
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
@@ -361,7 +364,7 @@ fun BackupRestoreContent(
                                 Text(
                                     stringResource(R.string.backup_import_success_title),
                                     fontWeight = FontWeight.Bold,
-                                    color = RelateSuccess,
+                                    color = semanticColors.success,
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
@@ -425,7 +428,9 @@ fun BackupRestoreContent(
 
                         Button(
                             onClick = onClearStatus,
-                            colors = ButtonDefaults.buttonColors(containerColor = RelateSurfaceVariant),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
                             shape = RoundedCornerShape(RelateRadius.control),
                             modifier = Modifier
                                 .heightIn(min = RelateSize.compactButtonHeight)
@@ -457,11 +462,13 @@ private fun BackupActionCard(
     iconEnabled: Boolean,
     onClick: () -> Unit,
 ) {
+    val semanticColors = MaterialTheme.relateSemanticColors
+
     Card(
         modifier = modifier.testTag(testTag),
         onClick = onClick,
         shape = RoundedCornerShape(RelateRadius.card),
-        colors = CardDefaults.cardColors(containerColor = RelateCard),
+        colors = CardDefaults.cardColors(containerColor = semanticColors.cardContainer),
         enabled = enabled,
     ) {
         Column(
@@ -483,7 +490,11 @@ private fun BackupActionCard(
                 Icon(
                     icon,
                     contentDescription = contentDescription,
-                    tint = if (iconEnabled) RelatePrimary else RelateOnSurfaceVariant.copy(alpha = RelateAlpha.disabled),
+                    tint = if (iconEnabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = RelateAlpha.disabled)
+                    },
                     modifier = Modifier.size(RelateSize.compactButtonHeight)
                 )
             }

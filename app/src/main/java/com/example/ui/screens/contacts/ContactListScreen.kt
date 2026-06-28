@@ -54,15 +54,10 @@ import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.HealthIndicatorDot
 import com.example.core.ui.components.ShimmerItem
 import com.example.core.ui.theme.RelateAlpha
-import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateFraction
-import com.example.core.ui.theme.RelateOnBackground
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.domain.model.contact.ContactListItem
 import com.example.ui.components.SyncErrorCard
 import com.example.ui.viewmodel.ContactFilter
@@ -151,7 +146,7 @@ internal fun ContactListContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(RelateDarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = RelateSpacing.screenHorizontal),
     ) {
         Spacer(modifier = Modifier.height(RelateSize.minTouchTarget))
@@ -165,15 +160,26 @@ internal fun ContactListContent(
             value = state.searchQuery,
             onValueChange = onSearchQueryChange,
             placeholder = {
-                Text(stringResource(R.string.contacts_search_placeholder), color = RelateOnSurfaceVariant)
+                Text(
+                    stringResource(R.string.contacts_search_placeholder),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             },
             leadingIcon = {
-                Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.search), tint = RelateOnSurfaceVariant)
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = stringResource(R.string.search),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             },
             trailingIcon = {
                 if (state.searchQuery.isNotEmpty()) {
                     IconButton(onClick = onClearSearch) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.clear_search), tint = RelateOnSurfaceVariant)
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = stringResource(R.string.clear_search),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             },
@@ -182,12 +188,12 @@ internal fun ContactListContent(
                 .testTag(ContactListTestTags.SEARCH_FIELD),
             shape = RoundedCornerShape(RelateRadius.control),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = RelatePrimary,
-                unfocusedBorderColor = RelateSurfaceVariant,
-                focusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                focusedTextColor = RelateOnBackground,
-                unfocusedTextColor = RelateOnBackground,
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
             ),
             singleLine = true,
         )
@@ -324,12 +330,12 @@ private fun ContactRow(
             modifier = Modifier
                 .size(RelateSize.minTouchTarget)
                 .clip(CircleShape)
-                .background(RelateSurfaceVariant),
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = contact.displayName.take(1),
-                color = RelateOnBackground,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Medium,
                 style = MaterialTheme.typography.titleLarge,
             )
@@ -349,7 +355,7 @@ private fun ContactRow(
             Text(
                 text = group,
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             quality?.let {
                 Text(
@@ -373,7 +379,7 @@ private fun ContactQualityState.label(): String = when (status) {
 
 @Composable
 private fun ContactQualityState.labelColor() = when (status) {
-    ContactQualityStatus.READY -> RelateOnSurfaceVariant
+    ContactQualityStatus.READY -> MaterialTheme.colorScheme.onSurfaceVariant
     ContactQualityStatus.MISSING_EVENT,
     ContactQualityStatus.MISSING_CHANNEL,
     ContactQualityStatus.MISSING_CONTEXT -> MaterialTheme.colorScheme.error

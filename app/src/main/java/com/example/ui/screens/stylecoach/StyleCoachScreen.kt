@@ -52,12 +52,11 @@ import com.example.R
 import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.db.entities.StyleProfileHistoryEntity
 import com.example.core.ui.theme.RelateAlpha
-import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateElevation
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSuccess
+import com.example.core.ui.theme.relateSemanticColors
 import com.example.ui.viewmodel.StyleCoachUiState
 import com.example.ui.viewmodel.StyleCoachViewModel
 import java.text.DateFormat
@@ -136,7 +135,7 @@ internal fun StyleCoachContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(RelateDarkBackground)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(RelateSpacing.screenHorizontal),
             verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
             contentPadding = PaddingValues(bottom = RelateSpacing.xxxl + RelateSpacing.xxl),
@@ -311,7 +310,11 @@ private fun StatusMessage(
     message: String,
     isError: Boolean,
 ) {
-    val color = if (isError) MaterialTheme.colorScheme.error else RelateSuccess
+    val color = if (isError) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.relateSemanticColors.success
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
