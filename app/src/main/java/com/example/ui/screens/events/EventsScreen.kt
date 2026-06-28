@@ -339,18 +339,16 @@ internal fun EventsList(
     onMergeEvent: (String) -> Unit = {},
     onKeepSeparateEvent: (String) -> Unit = {},
 ) {
-    val resolvedEventTrust = remember(events, eventTrust) {
-        if (events.all { eventTrust.containsKey(it.id.value) }) {
-            eventTrust
-        } else {
-            buildEventTrustStates(events)
-        }
+    val resolvedEventTrust = if (events.all { eventTrust.containsKey(it.id.value) }) {
+        eventTrust
+    } else {
+        buildEventTrustStates(events)
     }
-    // Optimization: remember groupBy result to prevent unnecessary recompositions and
-    // Calendar instance allocations on every render pass.
+    // Optimization: remember the groupBy result and reuse a single Calendar instance
+    // to avoid O(N) object allocations and heavy recalculations on every recomposition.
     val groupedEvents = remember(events) {
+        val cal = java.util.Calendar.getInstance()
         events.groupBy {
-            val cal = java.util.Calendar.getInstance()
             cal.timeInMillis = it.nextOccurrenceMs
             cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
         }
