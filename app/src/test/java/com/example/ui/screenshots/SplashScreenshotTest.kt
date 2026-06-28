@@ -35,6 +35,15 @@ class SplashScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun splashDefault_typicalPhone() {
+        setSplashContent()
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/splash_default_typical_phone.png")
+    }
+
+    @Test
     fun splashDefault_compactPhoneLargeFont() {
         setSplashContent(fontScale = LargeFontScale)
 

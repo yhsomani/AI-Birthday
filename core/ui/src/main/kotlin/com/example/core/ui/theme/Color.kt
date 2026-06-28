@@ -1,5 +1,10 @@
 package com.example.core.ui.theme
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
 
 val RelateDarkBackground = Color(0xFF0F0F1A)
@@ -35,3 +40,45 @@ val HealthGradientStart = Color(0xFF22C55E)
 val HealthGradientEnd = Color(0xFFEF4444)
 
 val VioletGlow = Color(0x338B5CF6)
+
+@Immutable
+data class RelateSemanticColors(
+    val cardContainer: Color,
+    val cardOutline: Color,
+    val success: Color,
+    val onSuccess: Color,
+    val successContainer: Color,
+    val onSuccessContainer: Color,
+    val warning: Color,
+    val onWarning: Color,
+    val warningContainer: Color,
+    val onWarningContainer: Color,
+    val info: Color,
+    val onInfo: Color,
+    val infoContainer: Color,
+    val onInfoContainer: Color,
+)
+
+internal val RelateDarkSemanticColors = RelateSemanticColors(
+    cardContainer = RelateCard,
+    cardOutline = RelateCardBorder,
+    success = RelateSuccess,
+    onSuccess = RelateDarkBackground,
+    successContainer = RelateSuccess.copy(alpha = RelateAlpha.feedbackContainer),
+    onSuccessContainer = RelateSuccess,
+    warning = RelateWarning,
+    onWarning = RelateDarkBackground,
+    warningContainer = RelateWarning.copy(alpha = RelateAlpha.feedbackContainer),
+    onWarningContainer = RelateWarning,
+    info = RelatePrimary,
+    onInfo = RelateOnPrimary,
+    infoContainer = RelatePrimary.copy(alpha = RelateAlpha.feedbackContainer),
+    onInfoContainer = RelatePrimary,
+)
+
+internal val LocalRelateSemanticColors = staticCompositionLocalOf { RelateDarkSemanticColors }
+
+val MaterialTheme.relateSemanticColors: RelateSemanticColors
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalRelateSemanticColors.current

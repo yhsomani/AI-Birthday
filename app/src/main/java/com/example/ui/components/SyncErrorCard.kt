@@ -22,15 +22,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
-import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateOnBackground
-import com.example.core.ui.theme.RelateOnSurfaceVariant
+import com.example.core.ui.theme.RelateSpacing
+import com.example.core.ui.theme.relateSemanticColors
 
 @Composable
 fun SyncErrorCard(
@@ -39,29 +36,29 @@ fun SyncErrorCard(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val warningColor = Color(0xFFFBBF24)
+    val warningColors = MaterialTheme.relateSemanticColors
 
     RelateGlassCard(modifier = modifier) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(RelateSpacing.lg)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Warning,
                         contentDescription = null,
-                        tint = warningColor,
+                        tint = warningColors.warning,
                     )
                     Text(
                         text = stringResource(R.string.sync_error_title),
                         style = MaterialTheme.typography.titleMedium,
-                        color = warningColor,
+                        color = warningColors.warning,
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -69,20 +66,20 @@ fun SyncErrorCard(
                     Icon(
                         imageVector = Icons.Filled.Close,
                         contentDescription = stringResource(R.string.sync_error_dismiss),
-                        tint = RelateOnSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
-                color = RelateOnBackground,
+                color = MaterialTheme.colorScheme.onSurface,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(RelateSpacing.md))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(onClick = onDismiss) {
@@ -91,15 +88,15 @@ fun SyncErrorCard(
                 Button(
                     onClick = onRetry,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = warningColor,
-                        contentColor = RelateDarkBackground,
+                        containerColor = warningColors.warning,
+                        contentColor = warningColors.onWarning,
                     ),
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Refresh,
                         contentDescription = null,
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(RelateSpacing.xs))
                     Text(text = stringResource(R.string.sync_error_retry))
                 }
             }

@@ -46,6 +46,15 @@ class HomeScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun homePopulated_typicalPhone() {
+        setHomeContent(state = populatedHomeState())
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/home_populated_typical_phone.png")
+    }
+
+    @Test
     fun homePopulated_compactPhoneLargeFont() {
         setHomeContent(
             state = populatedHomeState(),
@@ -70,6 +79,19 @@ class HomeScreenshotTest {
     }
 
     @Test
+    fun homeSyncError_compactPhoneLargeFont() {
+        setHomeContent(
+            state = populatedHomeState(
+                syncError = "Google Contacts sync failed. Check permissions and try again.",
+            ),
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/home_sync_error_compact_phone_large_font.png")
+    }
+
+    @Test
     fun homeLoading_compactPhone() {
         setHomeContent(
             state = loadingHomeState(),
@@ -78,6 +100,18 @@ class HomeScreenshotTest {
 
         composeRule.onRoot()
             .captureRoboImage("src/test/screenshots/baseline/home_loading_compact_phone.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun homeLoading_typicalPhone() {
+        setHomeContent(
+            state = loadingHomeState(),
+            animationFrameMillis = ProgressAnimationFrameMillis,
+        )
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/home_loading_typical_phone.png")
     }
 
     private fun setHomeContent(
@@ -97,7 +131,9 @@ class HomeScreenshotTest {
         }
     }
 
-    private fun populatedHomeState(): HomeUiState {
+    private fun populatedHomeState(
+        syncError: String? = null,
+    ): HomeUiState {
         return HomeUiState(
             userName = "Yash",
             healthScore = 82,
@@ -143,6 +179,7 @@ class HomeScreenshotTest {
                     actionTarget = HomeActionTarget.ContactDetail("contact-2"),
                 ),
             ),
+            syncError = syncError,
         )
     }
 

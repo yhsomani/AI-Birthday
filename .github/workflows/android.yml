@@ -36,6 +36,9 @@ jobs:
       - name: Run verification
         run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
 
+      - name: Verify screenshot baselines
+        run: ./gradlew :app:verifyRoborazziDebug -Pscreenshot --tests 'com.example.ui.screenshots.*' --no-configuration-cache
+
       - name: Verify release readiness guardrails
         run: ./gradlew :app:testDebugUnitTest --tests com.example.ProductionReadinessConfigTest --no-configuration-cache
 
@@ -75,6 +78,16 @@ jobs:
           path: |
             **/build/reports/tests/testDebugUnitTest/**
             **/build/test-results/testDebugUnitTest/**
+
+      - name: Upload Roborazzi reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: roborazzi-reports
+          path: |
+            app/build/reports/roborazzi/**
+            app/build/outputs/roborazzi/**
+            app/build/test-results/roborazzi/**
 
       - name: Upload coverage reports
         if: always()

@@ -57,6 +57,15 @@ class AutomationSetupScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun aiDoctorBlockers_typicalPhone() {
+        setAutomationSetupContent(state = blockerState())
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/ai_doctor_blockers_typical_phone.png")
+    }
+
+    @Test
     fun aiDoctorSetupCards_compactPhoneLargeFont() {
         setAutomationSetupContent(
             state = blockerState(),
@@ -70,11 +79,34 @@ class AutomationSetupScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun aiDoctorSetupCards_compactPhoneHindiLargeFont() {
+        setAutomationSetupContent(
+            state = hindiBlockerState(),
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(AutomationSetupTestTags.WHATSAPP_CARD)
+            .performScrollTo()
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/ai_doctor_setup_cards_compact_phone_hindi_large_font.png")
+    }
+
+    @Test
     fun aiDoctorHealthy_compactPhone() {
         setAutomationSetupContent(state = healthyState())
 
         composeRule.onRoot()
             .captureRoboImage("src/test/screenshots/baseline/ai_doctor_healthy_compact_phone.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun aiDoctorHealthy_typicalPhone() {
+        setAutomationSetupContent(state = healthyState())
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/ai_doctor_healthy_typical_phone.png")
     }
 
     @Test
@@ -86,6 +118,18 @@ class AutomationSetupScreenshotTest {
 
         composeRule.onRoot()
             .captureRoboImage("src/test/screenshots/baseline/ai_doctor_refreshing_compact_phone.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun aiDoctorRefreshing_typicalPhone() {
+        setAutomationSetupContent(
+            state = blockerState().copy(isRefreshing = true),
+            animationFrameMillis = ProgressAnimationFrameMillis,
+        )
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/ai_doctor_refreshing_typical_phone.png")
     }
 
     private fun setAutomationSetupContent(
@@ -247,6 +291,81 @@ class AutomationSetupScreenshotTest {
             ),
             operationMessage = "AI generation test passed.",
             whatsAppAutomationConsentGranted = true,
+        )
+    }
+
+    private fun hindiBlockerState(): AutomationSetupUiState {
+        val checks = listOf(
+            check(
+                title = "Google संपर्क",
+                detail = "संपर्क सिंक हैं और पर्सनलाइज़ेशन के लिए तैयार हैं।",
+                status = ReadinessStatus.OK,
+                group = ReadinessGroup.REQUIRED,
+            ),
+            check(
+                title = "Gemini एक्सेस",
+                detail = "विश जनरेट करने से पहले Gemini API कुंजी जोड़ें या साइन इन करें।",
+                status = ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = "सेटिंग्स खोलें",
+                action = AiDoctorAction.OPEN_SETTINGS,
+                group = ReadinessGroup.REQUIRED,
+            ),
+            check(
+                title = "SMS अनुमति",
+                detail = "शेड्यूल किए गए संदेश अपने-आप भेजने से पहले SMS अनुमति दें।",
+                status = ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = "ऐप सेटिंग्स",
+                action = AiDoctorAction.OPEN_APP_SETTINGS,
+                group = ReadinessGroup.REQUIRED,
+            ),
+            check(
+                title = "Style Coach",
+                detail = "टोन मिलान बेहतर करने के लिए दो और लेखन नमूने जोड़ें।",
+                status = ReadinessStatus.WARNING,
+                actionLabel = "Style Coach खोलें",
+                action = AiDoctorAction.OPEN_STYLE_COACH,
+                group = ReadinessGroup.QUALITY,
+            ),
+            check(
+                title = "WhatsApp ऑटोमेशन",
+                detail = "WhatsApp ऑटोमेट करने से पहले सहमति दें और Accessibility सेवा सक्षम करें।",
+                status = ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = "Accessibility खोलें",
+                action = AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS,
+                group = ReadinessGroup.RELIABILITY,
+            ),
+            check(
+                title = "विफल भेजाई रिकवरी",
+                detail = "दो स्थायी रिकवरी रिकॉर्ड समीक्षा चाहते हैं; एक डेड-लेटर हुआ है।",
+                status = ReadinessStatus.WARNING,
+                actionLabel = "गतिविधि देखें",
+                action = AiDoctorAction.OPEN_ACTIVITY_HISTORY,
+                group = ReadinessGroup.RECOVERY,
+            ),
+        )
+        return AutomationSetupUiState(
+            checks = checks,
+            summary = AiDoctorSummary(
+                title = "4 ब्लॉकर ध्यान चाहते हैं",
+                detail = "पहले Gemini एक्सेस ठीक करें ताकि विश जनरेशन सुरक्षित रूप से चले।",
+                status = ReadinessStatus.ACTION_REQUIRED,
+            ),
+            recommendedFix = AiDoctorRecommendedFix(
+                title = "Gemini एक्सेस",
+                detail = "कुंजी जोड़ें या साइन इन करें, फिर AI जनरेशन टेस्ट चलाएं।",
+                actionLabel = "सेटिंग्स खोलें",
+                action = AiDoctorAction.OPEN_SETTINGS,
+                status = ReadinessStatus.ACTION_REQUIRED,
+                group = ReadinessGroup.REQUIRED,
+            ),
+            setupProgress = SetupProgressSummary(
+                completedSteps = 1,
+                totalSteps = checks.size,
+                actionRequiredCount = 3,
+                warningCount = 2,
+            ),
+            operationMessage = "ड्राई रन Gemini एक्सेस के कारण रुका।",
+            whatsAppAutomationConsentGranted = false,
         )
     }
 

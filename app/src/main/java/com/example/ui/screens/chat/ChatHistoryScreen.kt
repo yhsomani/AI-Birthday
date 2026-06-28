@@ -18,9 +18,8 @@ import com.example.R
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSpacing
+import com.example.domain.model.MessageChannel
 import java.text.DateFormat
 import java.util.Date
 
@@ -59,7 +58,7 @@ internal fun ChatHistoryContent(
         if (uiState.isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
-                    color = RelatePrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.testTag(ChatHistoryTestTags.LOADING),
                 )
             }
@@ -99,9 +98,13 @@ internal fun ChatHistoryContent(
                                 .getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
                                 .format(Date(message.sentAtMs))
                             Text(
-                                text = stringResource(R.string.chat_history_sent_via_format, message.channel, date),
+                                text = stringResource(
+                                    R.string.chat_history_sent_via_format,
+                                    channelLabel(message.channel),
+                                    date,
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = RelateOnSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -109,4 +112,12 @@ internal fun ChatHistoryContent(
             }
         }
     }
+}
+
+@Composable
+private fun channelLabel(channel: String): String = when (MessageChannel.fromRaw(channel)) {
+    MessageChannel.SMS -> stringResource(R.string.channel_sms)
+    MessageChannel.WHATSAPP -> stringResource(R.string.channel_whatsapp)
+    MessageChannel.EMAIL -> stringResource(R.string.channel_email)
+    MessageChannel.UNKNOWN -> channel
 }

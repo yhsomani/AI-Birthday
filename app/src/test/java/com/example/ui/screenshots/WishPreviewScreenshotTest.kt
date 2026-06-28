@@ -54,6 +54,15 @@ class WishPreviewScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun wishPreviewEditor_typicalPhone() {
+        setWishPreviewContent(state = wishPreviewState())
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/wish_preview_editor_typical_phone.png")
+    }
+
+    @Test
     fun wishPreviewEditor_compactPhoneLargeFont() {
         setWishPreviewContent(
             state = wishPreviewState(),
@@ -83,6 +92,25 @@ class WishPreviewScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun wishPreviewBlocked_compactPhoneHindiLargeFont() {
+        setWishPreviewContent(
+            state = wishPreviewHindiState().copy(
+                editedText = "थोड़ा छोटा",
+                draftReadiness = WishDraftReadiness.TOO_SHORT,
+                selectedFeedbackKey = "wrong_language",
+                feedbackMessageRes = R.string.wish_preview_feedback_saved,
+            ),
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(WishPreviewTestTags.CONTENT_BOTTOM)
+            .performScrollTo()
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/wish_preview_blocked_compact_phone_hindi_large_font.png")
+    }
+
+    @Test
     fun wishPreviewApproved_compactPhone() {
         setWishPreviewContent(
             state = wishPreviewState().copy(
@@ -102,6 +130,26 @@ class WishPreviewScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun wishPreviewApproved_typicalPhone() {
+        setWishPreviewContent(
+            state = wishPreviewState().copy(
+                approved = true,
+                nextReviewTarget = ReviewNextTarget(
+                    contactId = "contact-mira",
+                    messageRef = "draft-mira",
+                ),
+                remainingReviewCount = 2,
+            ),
+        )
+
+        composeRule.onNodeWithTag(WishPreviewTestTags.CONTENT_BOTTOM)
+            .performScrollTo()
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/wish_preview_approved_typical_phone.png")
+    }
+
+    @Test
     fun wishPreviewLoading_compactPhone() {
         setWishPreviewContent(
             state = WishPreviewUiState(isLoading = true),
@@ -110,6 +158,18 @@ class WishPreviewScreenshotTest {
 
         composeRule.onRoot()
             .captureRoboImage("src/test/screenshots/baseline/wish_preview_loading_compact_phone.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun wishPreviewLoading_typicalPhone() {
+        setWishPreviewContent(
+            state = WishPreviewUiState(isLoading = true),
+            animationFrameMillis = ProgressAnimationFrameMillis,
+        )
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/wish_preview_loading_typical_phone.png")
     }
 
     private fun setWishPreviewContent(
@@ -156,6 +216,29 @@ class WishPreviewScreenshotTest {
         )
     }
 
+    private fun wishPreviewHindiState(): WishPreviewUiState {
+        return WishPreviewUiState(
+            previewDraft = previewDraftHindi(),
+            selectedVariant = "standard",
+            editedText = "जन्मदिन मुबारक हो, आशा। उम्मीद है आज की सुबह शांत हो, खूब हंसी मिले और आपको यह महसूस हो कि आप कितने मायने रखती हैं।",
+            isLoading = false,
+            whySignals = listOf(
+                WhySignal(R.string.wish_why_relationship, "करीबी दोस्त"),
+                WhySignal(R.string.wish_why_language, "हिंदी"),
+                WhySignal(R.string.wish_why_memories, "3 मेमोरी नोट"),
+                WhySignal(R.string.wish_why_gifts, "2 गिफ्ट रिकॉर्ड"),
+            ),
+            sendSummary = WishPreviewSendSummary(
+                eventType = "जन्मदिन",
+                channel = MessageChannel.SMS.raw,
+                scheduledForMs = ScheduledAtMs,
+                approvalMode = ApprovalMode.VIP_APPROVE.raw,
+                usesFallback = false,
+            ),
+            draftReadiness = WishDraftReadiness.READY,
+        )
+    }
+
     private fun previewDraft(): WishPreviewDraft {
         return WishPreviewDraft(
             id = MessageDraftId("draft-asha"),
@@ -171,6 +254,29 @@ class WishPreviewScreenshotTest {
             ),
             selectedVariant = "standard",
             selectedVariantText = "Happy birthday, Asha. I hope today brings you a calm morning, a loud laugh, and a few reminders of how much you matter to the people around you.",
+            channel = MessageChannel.SMS,
+            scheduledForMs = ScheduledAtMs,
+            approvalMode = ApprovalMode.VIP_APPROVE,
+            status = MessageStatus.PENDING,
+            isUsingFallback = false,
+        )
+    }
+
+    private fun previewDraftHindi(): WishPreviewDraft {
+        return WishPreviewDraft(
+            id = MessageDraftId("draft-asha"),
+            contactId = ContactId("contact-asha"),
+            occasionId = OccasionId("event-asha-birthday"),
+            variants = WishPreviewVariants(
+                short = "जन्मदिन मुबारक हो, आशा। आज का दिन आसान और खुशियों भरा रहे।",
+                standard = "जन्मदिन मुबारक हो, आशा। उम्मीद है आज की सुबह शांत हो, खूब हंसी मिले और आपको यह महसूस हो कि आप कितने मायने रखती हैं।",
+                long = "जन्मदिन मुबारक हो, आशा। उम्मीद है आज आपको आराम, अपनापन और उन लोगों के साथ समय मिले जो आपकी कद्र करते हैं।",
+                formal = "आशा, आपको जन्मदिन की हार्दिक शुभकामनाएं। आने वाला साल सेहत, प्रगति और अच्छे पलों से भरा रहे।",
+                funny = "जन्मदिन मुबारक हो, आशा। केक अच्छा हो, नोटिफिकेशन संभल जाएं और प्लान बिना प्रोजेक्ट मैनेजमेंट के पूरे हों।",
+                emotional = "जन्मदिन मुबारक हो, आशा। आपकी दयालुता और स्थिर साथ के लिए मैं सच में आभारी हूं।",
+            ),
+            selectedVariant = "standard",
+            selectedVariantText = "जन्मदिन मुबारक हो, आशा। उम्मीद है आज की सुबह शांत हो, खूब हंसी मिले और आपको यह महसूस हो कि आप कितने मायने रखती हैं।",
             channel = MessageChannel.SMS,
             scheduledForMs = ScheduledAtMs,
             approvalMode = ApprovalMode.VIP_APPROVE,

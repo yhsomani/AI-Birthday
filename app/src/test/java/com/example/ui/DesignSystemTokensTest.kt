@@ -6,6 +6,7 @@ import com.example.core.ui.theme.RelateFraction
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -133,5 +134,205 @@ class DesignSystemTokensTest {
     fun elevationTokens_keepSurfacesSubtle() {
         assertTrue("Card elevation should stay subtle.", RelateElevation.card.value in 0f..3f)
         assertTrue("App bar elevation should stay subtle.", RelateElevation.appBar.value in 0f..4f)
+    }
+
+    @Test
+    fun syncErrorCard_usesDesignTokensAndSemanticWarningColors() {
+        val source = sourceFile("app/src/main/java/com/example/ui/components/SyncErrorCard.kt").readText()
+
+        assertTrue(
+            "SyncErrorCard should use theme-provided semantic warning colors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        assertTrue(
+            "SyncErrorCard should use RelateSpacing instead of local dp values.",
+            source.contains("RelateSpacing.") && !Regex("""\d+\.dp""").containsMatchIn(source),
+        )
+        assertTrue(
+            "SyncErrorCard should not define raw color literals.",
+            !source.contains("Color(0x"),
+        )
+    }
+
+    @Test
+    fun feedbackComponents_useSemanticStatusColors() {
+        val source = sourceFile("core/ui/src/main/kotlin/com/example/core/ui/components/FeedbackComponents.kt")
+            .readText()
+
+        assertTrue(
+            "Feedback components should resolve status colors through MaterialTheme.relateSemanticColors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        listOf("RelateSuccess", "RelateWarning", "RelateError", "RelatePrimary").forEach { rawColor ->
+            assertTrue(
+                "Feedback components should not import or reference $rawColor directly.",
+                !source.contains(rawColor),
+            )
+        }
+    }
+
+    @Test
+    fun relateComponents_useThemeBackedColorRoles() {
+        val source = sourceFile("core/ui/src/main/kotlin/com/example/core/ui/components/RelateComponents.kt")
+            .readText()
+
+        assertTrue(
+            "Shared Relate components should use MaterialTheme.relateSemanticColors for non-Material card/status roles.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        assertTrue(
+            "Shared Relate components should use MaterialTheme.colorScheme for Material color roles.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateCard",
+            "RelateCardBorder",
+            "RelateOnBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSurfaceVariant",
+            "RelateSuccess",
+            "RelateWarning",
+            "RelateError",
+        ).forEach { rawColor ->
+            assertTrue(
+                "RelateComponents should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun shimmerLoading_usesThemeBackedSurfaceColor() {
+        val source = sourceFile("core/ui/src/main/kotlin/com/example/core/ui/components/ShimmerLoading.kt")
+            .readText()
+
+        assertTrue(
+            "ShimmerItem should derive its base color from MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme.surfaceVariant"),
+        )
+        assertTrue(
+            "ShimmerItem should not reference dark-specific surface colors directly.",
+            !source.contains("RelateSurfaceVariant") && !source.contains("Color(0x"),
+        )
+    }
+
+    @Test
+    fun eventsScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/events/EventsScreen.kt").readText()
+
+        assertTrue(
+            "Events screen should resolve status accents through MaterialTheme.relateSemanticColors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        assertTrue(
+            "Events screen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSurfaceVariant",
+            "RelateWarning",
+        ).forEach { rawColor ->
+            assertTrue(
+                "EventsScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun chatHistoryScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/chat/ChatHistoryScreen.kt").readText()
+
+        assertTrue(
+            "ChatHistoryScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        listOf(
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+        ).forEach { rawColor ->
+            assertTrue(
+                "ChatHistoryScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun splashScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/splash/SplashScreen.kt").readText()
+
+        assertTrue(
+            "SplashScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateOnBackground",
+            "RelatePrimary",
+        ).forEach { rawColor ->
+            assertTrue(
+                "SplashScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun authScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/auth/AuthScreen.kt").readText()
+
+        assertTrue(
+            "AuthScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateOnBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSurfaceVariant",
+        ).forEach { rawColor ->
+            assertTrue(
+                "AuthScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun onboardingScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/onboarding/OnboardingScreen.kt").readText()
+
+        assertTrue(
+            "OnboardingScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateOnBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSurfaceVariant",
+        ).forEach { rawColor ->
+            assertTrue(
+                "OnboardingScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    private fun sourceFile(rootRelativePath: String): File {
+        return listOf(
+            File(rootRelativePath),
+            File("../$rootRelativePath"),
+            File(rootRelativePath.removePrefix("app/")),
+        ).firstOrNull { it.exists() }
+            ?: error("Could not locate source file $rootRelativePath from ${File(".").absolutePath}")
     }
 }

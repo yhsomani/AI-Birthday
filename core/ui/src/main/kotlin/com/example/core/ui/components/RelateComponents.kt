@@ -38,20 +38,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextAlign
 import com.example.core.ui.theme.RelateAlpha
-import com.example.core.ui.theme.RelateCard
-import com.example.core.ui.theme.RelateCardBorder
-import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateError
 import com.example.core.ui.theme.RelateFraction
-import com.example.core.ui.theme.RelateOnBackground
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSuccess
-import com.example.core.ui.theme.RelateSurfaceVariant
-import com.example.core.ui.theme.RelateWarning
+import com.example.core.ui.theme.relateSemanticColors
 
 @Composable
 fun RelateScreen(
@@ -67,7 +58,7 @@ fun RelateScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(RelateDarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = RelateSpacing.screenHorizontal),
     ) {
         Spacer(modifier = Modifier.height(RelateSpacing.screenTop))
@@ -103,7 +94,7 @@ fun RelateTopBar(
                 Icon(
                     imageVector = navigationIcon,
                     contentDescription = navigationContentDescription,
-                    tint = RelateOnBackground,
+                    tint = MaterialTheme.colorScheme.onBackground,
                 )
             }
             Spacer(modifier = Modifier.width(RelateSpacing.xs))
@@ -120,7 +111,7 @@ fun RelateTopBar(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -135,12 +126,14 @@ fun RelateGlassCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val semanticColors = MaterialTheme.relateSemanticColors
+
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .border(RelateSize.outlineStroke, RelateCardBorder, RoundedCornerShape(RelateRadius.card)),
+            .border(RelateSize.outlineStroke, semanticColors.cardOutline, RoundedCornerShape(RelateRadius.card)),
         shape = RoundedCornerShape(RelateRadius.card),
-        colors = CardDefaults.cardColors(containerColor = RelateCard),
+        colors = CardDefaults.cardColors(containerColor = semanticColors.cardContainer),
         content = content,
     )
 }
@@ -159,8 +152,8 @@ fun RelatePrimaryButton(
             .heightIn(min = RelateSize.primaryButtonHeight),
         shape = RoundedCornerShape(RelateRadius.control),
         colors = ButtonDefaults.buttonColors(
-            containerColor = RelatePrimary,
-            disabledContainerColor = RelatePrimary.copy(alpha = RelateAlpha.disabled),
+            containerColor = MaterialTheme.colorScheme.primary,
+            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = RelateAlpha.disabled),
         ),
         enabled = enabled,
     ) {
@@ -178,7 +171,7 @@ fun RelateStatusBanner(
     message: String,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    containerColor: Color = RelateSurfaceVariant,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     action: (@Composable () -> Unit)? = null,
 ) {
@@ -227,12 +220,12 @@ fun RelateAvatar(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(RelateSurfaceVariant),
+            .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = name.trim().take(1).uppercase().ifBlank { "?" },
-            color = RelateOnBackground,
+            color = MaterialTheme.colorScheme.onBackground,
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
             style = MaterialTheme.typography.titleMedium,
         )
@@ -241,16 +234,16 @@ fun RelateAvatar(
 
 @Composable
 fun relateTextFieldColors(): TextFieldColors = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = RelatePrimary,
-    unfocusedBorderColor = RelateSurfaceVariant,
-    focusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-    unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-    focusedTextColor = RelateOnBackground,
-    unfocusedTextColor = RelateOnBackground,
-    focusedPlaceholderColor = RelateOnSurfaceVariant,
-    unfocusedPlaceholderColor = RelateOnSurfaceVariant,
-    focusedLabelColor = RelatePrimary,
-    unfocusedLabelColor = RelateOnSurfaceVariant,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+    unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
 )
 
 @Composable
@@ -268,7 +261,7 @@ fun StatCard(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = RelatePrimary,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(RelateSize.iconLg),
             )
             Spacer(modifier = Modifier.height(RelateSpacing.xs))
@@ -294,9 +287,10 @@ fun HealthIndicatorDot(
     modifier: Modifier = Modifier,
     size: Dp = RelateSize.indicatorDot,
 ) {
-    val color = if (health > RelateFraction.healthStrongThreshold) RelateSuccess
-    else if (health > RelateFraction.healthAttentionThreshold) RelateWarning
-    else RelateError
+    val semanticColors = MaterialTheme.relateSemanticColors
+    val color = if (health > RelateFraction.healthStrongThreshold) semanticColors.success
+    else if (health > RelateFraction.healthAttentionThreshold) semanticColors.warning
+    else MaterialTheme.colorScheme.error
 
     Box(
         modifier = modifier
@@ -311,11 +305,12 @@ fun HealthBar(
     health: Float,
     modifier: Modifier = Modifier,
 ) {
+    val semanticColors = MaterialTheme.relateSemanticColors
     val brush = Brush.horizontalGradient(
         colors = listOf(
-            RelateSuccess,
-            RelateWarning,
-            RelateError,
+            semanticColors.success,
+            semanticColors.warning,
+            MaterialTheme.colorScheme.error,
         )
     )
     Box(
@@ -323,7 +318,7 @@ fun HealthBar(
             .fillMaxWidth()
             .height(RelateSize.progressTrack)
             .clip(RoundedCornerShape(RelateRadius.xs))
-            .background(RelateSurfaceVariant)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Box(
             modifier = Modifier
@@ -374,7 +369,7 @@ fun EmptyState(
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyLarge,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
         }
@@ -393,7 +388,11 @@ fun FilterChip(
         modifier = modifier,
         shape = RoundedCornerShape(RelateRadius.pill),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) RelatePrimary else RelateSurfaceVariant,
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
         ),
     ) {
         Text(

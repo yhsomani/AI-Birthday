@@ -52,6 +52,7 @@ import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateWarning
 import com.example.domain.model.ActivityLogSeverity
+import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
 import com.example.ui.viewmodel.ActivityHistoryUiState
 import com.example.ui.viewmodel.ActivityHistoryViewModel
@@ -246,12 +247,12 @@ private fun ActivityLogCard(
                 Spacer(modifier = Modifier.height(RelateSpacing.xs))
                 Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
                     Text(
-                        text = entry.severity,
+                        text = entry.severity.severityLabel(),
                         style = MaterialTheme.typography.labelSmall,
                         color = entry.severity.severityColor(),
                     )
                     Text(
-                        text = entry.status,
+                        text = entry.status.statusLabel(),
                         style = MaterialTheme.typography.labelSmall,
                         color = RelateOnSurfaceVariant,
                     )
@@ -326,4 +327,19 @@ private fun String.severityColor() = when (ActivityLogSeverity.fromRaw(this)) {
     ActivityLogSeverity.ERROR -> MaterialTheme.colorScheme.error
     ActivityLogSeverity.WARNING -> RelateWarning
     else -> RelatePrimary
+}
+
+@Composable
+private fun String.severityLabel(): String = when (ActivityLogSeverity.fromRaw(this)) {
+    ActivityLogSeverity.INFO -> stringResource(R.string.activity_severity_info)
+    ActivityLogSeverity.WARNING -> stringResource(R.string.activity_severity_warning)
+    ActivityLogSeverity.ERROR -> stringResource(R.string.activity_severity_error)
+    ActivityLogSeverity.UNKNOWN -> stringResource(R.string.activity_severity_unknown)
+}
+
+@Composable
+private fun String.statusLabel(): String = when (ActivityLogStatus.fromRaw(this)) {
+    ActivityLogStatus.OPEN -> stringResource(R.string.activity_filter_open)
+    ActivityLogStatus.RESOLVED -> stringResource(R.string.activity_filter_resolved)
+    ActivityLogStatus.UNKNOWN -> stringResource(R.string.activity_status_unknown)
 }

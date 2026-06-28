@@ -3,6 +3,7 @@ package com.example.ui.screens.stylecoach
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -59,7 +60,7 @@ import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.RelateSuccess
 import com.example.ui.viewmodel.StyleCoachUiState
 import com.example.ui.viewmodel.StyleCoachViewModel
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import org.json.JSONArray
@@ -106,7 +107,7 @@ internal fun StyleCoachContent(
     onManualAnalyze: (List<String>) -> Unit,
     onAutoAnalyze: () -> Unit,
 ) {
-    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
 
     Scaffold(
         topBar = {
@@ -138,6 +139,7 @@ internal fun StyleCoachContent(
                 .background(RelateDarkBackground)
                 .padding(RelateSpacing.screenHorizontal),
             verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
+            contentPadding = PaddingValues(bottom = RelateSpacing.xxxl + RelateSpacing.xxl),
         ) {
             item {
                 StyleTrainingCard(
@@ -351,7 +353,7 @@ private fun LearnedProfileCard(
             ) {
                 MetricBlock(
                     label = stringResource(R.string.style_coach_formality_level),
-                    value = profile.formalityLevel,
+                    value = formalityLabel(profile.formalityLevel),
                 )
                 MetricBlock(
                     label = stringResource(R.string.style_coach_emoji_preference),
@@ -492,10 +494,9 @@ private fun HistorySnapshotCard(
         ),
     ) {
         Column(modifier = Modifier.padding(RelateSpacing.compactCardContent)) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs),
             ) {
                 Text(
                     text = historySourceLabel(snapshot.source),
@@ -514,7 +515,7 @@ private fun HistorySnapshotCard(
                 Text(
                     text = stringResource(
                         R.string.style_coach_history_summary,
-                        obj.optString("formalityLevel"),
+                        formalityLabel(obj.optString("formalityLevel")),
                         obj.optString("preferredLanguage"),
                         obj.optInt("avgMessageLength"),
                     ),
@@ -523,6 +524,14 @@ private fun HistorySnapshotCard(
             }
         }
     }
+}
+
+@Composable
+private fun formalityLabel(formality: String): String = when (formality.trim().uppercase(Locale.ROOT)) {
+    "CASUAL" -> stringResource(R.string.formality_casual)
+    "SEMI_FORMAL" -> stringResource(R.string.formality_semi_formal)
+    "FORMAL" -> stringResource(R.string.formality_formal)
+    else -> formality
 }
 
 @Composable

@@ -9,20 +9,21 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateRadius
-import com.example.core.ui.theme.RelateSurfaceVariant
 
 @Composable
 fun ShimmerItem(modifier: Modifier = Modifier) {
+    val shimmerBaseColor = MaterialTheme.colorScheme.surfaceVariant
     val shimmerColors = listOf(
-        RelateSurfaceVariant.copy(alpha = RelateAlpha.shimmerHigh),
-        RelateSurfaceVariant.copy(alpha = RelateAlpha.shimmerLow),
-        RelateSurfaceVariant.copy(alpha = RelateAlpha.shimmerHigh),
+        shimmerBaseColor.copy(alpha = RelateAlpha.shimmerHigh),
+        shimmerBaseColor.copy(alpha = RelateAlpha.shimmerLow),
+        shimmerBaseColor.copy(alpha = RelateAlpha.shimmerHigh),
     )
 
     val transition = rememberInfiniteTransition()

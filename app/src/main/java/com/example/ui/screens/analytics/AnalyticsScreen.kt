@@ -188,107 +188,107 @@ internal fun AnalyticsContent(
                 StatCard(label = stringResource(R.string.messages_pending), value = "${state.pendingApprovals}", icon = Icons.Filled.MailOutline, modifier = Modifier.weight(1f))
                 StatCard(label = stringResource(R.string.home_stat_upcoming), value = "${state.upcomingEventsCount}", icon = Icons.Filled.CalendarMonth, modifier = Modifier.weight(1f))
             }
-        }
 
-        Spacer(modifier = Modifier.height(RelateSpacing.xl))
-        SectionHeader(title = stringResource(R.string.analytics_monthly_wishes))
-        RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.MONTHLY_SECTION)) {
-            Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
-                if (state.monthlyCounts.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.analytics_no_wishes_this_year),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = RelateOnSurfaceVariant,
-                    )
-                } else {
-                    BarChart(data = state.monthlyCounts)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(RelateSpacing.xl))
-        SectionHeader(title = stringResource(R.string.analytics_contact_distribution))
-        RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.DISTRIBUTION_SECTION)) {
-            Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
-                val family = state.relationshipCounts["FAMILY"] ?: 0
-                val friends = state.relationshipCounts["FRIEND"] ?: 0
-                val work = state.relationshipCounts["WORK"] ?: 0
-                val closeFriends = state.relationshipCounts["CLOSE_FRIEND"] ?: 0
-                val other = state.relationshipCounts.filterKeys { it !in listOf("FAMILY", "FRIEND", "WORK", "CLOSE_FRIEND") }.values.sum()
-
-                DistributionRow(stringResource(R.string.contact_filter_family), family, RelatePrimary)
-                DistributionRow(stringResource(R.string.contact_filter_friends), friends, RelateSecondary)
-                DistributionRow(stringResource(R.string.contact_filter_work), work, RelateTertiary)
-                DistributionRow(stringResource(R.string.contact_filter_close_friends), closeFriends, RelateWarning)
-                if (other > 0) {
-                    DistributionRow(stringResource(R.string.analytics_others), other, RelateOnSurfaceVariant)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(RelateSpacing.xl))
-        SectionHeader(title = stringResource(R.string.analytics_relationship_health))
-        RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.HEALTH_SECTION)) {
-            Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
-                val healthy = state.healthCounts["Healthy (70%+)"] ?: 0
-                val attention = state.healthCounts["Needs Attention"] ?: 0
-                val atRisk = state.healthCounts["At Risk"] ?: 0
-
-                HealthTrendRow(stringResource(R.string.analytics_health_healthy), healthy, RelateSuccess)
-                HealthTrendRow(stringResource(R.string.analytics_health_attention), attention, RelateWarning)
-                HealthTrendRow(stringResource(R.string.analytics_health_at_risk), atRisk, RelateError)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(RelateSpacing.xl))
-        SectionHeader(title = stringResource(R.string.analytics_growth_metrics))
-        RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.GROWTH_SECTION)) {
-            Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
-                DistributionRow(
-                    stringResource(R.string.analytics_delivery_reliability),
-                    state.deliveryReliabilityPercent,
-                    RelateSuccess,
-                    suffix = "%",
-                )
-                DistributionRow(
-                    stringResource(R.string.analytics_response_rate),
-                    state.responseRatePercent,
-                    RelateSecondary,
-                    suffix = "%",
-                )
-                DistributionRow(
-                    stringResource(R.string.analytics_personalization_coverage),
-                    state.personalizationCoveragePercent,
-                    RelatePrimary,
-                    suffix = "%",
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(RelateSpacing.xl))
-        SectionHeader(title = stringResource(R.string.analytics_top_neglected))
-        RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.NEGLECTED_SECTION)) {
-            Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
-                if (state.topNeglectedContacts.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.analytics_no_neglected_contacts),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = RelateOnSurfaceVariant,
-                    )
-                } else {
-                    state.topNeglectedContacts.forEach { contact ->
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
+            SectionHeader(title = stringResource(R.string.analytics_monthly_wishes))
+            RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.MONTHLY_SECTION)) {
+                Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
+                    if (state.monthlyCounts.isEmpty()) {
                         Text(
-                            text = contact,
+                            text = stringResource(R.string.analytics_no_wishes_this_year),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(vertical = RelateSpacing.xs),
+                            color = RelateOnSurfaceVariant,
                         )
+                    } else {
+                        BarChart(data = state.monthlyCounts)
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(RelateSpacing.xl))
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
+            SectionHeader(title = stringResource(R.string.analytics_contact_distribution))
+            RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.DISTRIBUTION_SECTION)) {
+                Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
+                    val family = state.relationshipCounts["FAMILY"] ?: 0
+                    val friends = state.relationshipCounts["FRIEND"] ?: 0
+                    val work = state.relationshipCounts["WORK"] ?: 0
+                    val closeFriends = state.relationshipCounts["CLOSE_FRIEND"] ?: 0
+                    val other = state.relationshipCounts.filterKeys { it !in listOf("FAMILY", "FRIEND", "WORK", "CLOSE_FRIEND") }.values.sum()
+
+                    DistributionRow(stringResource(R.string.contact_filter_family), family, RelatePrimary)
+                    DistributionRow(stringResource(R.string.contact_filter_friends), friends, RelateSecondary)
+                    DistributionRow(stringResource(R.string.contact_filter_work), work, RelateTertiary)
+                    DistributionRow(stringResource(R.string.contact_filter_close_friends), closeFriends, RelateWarning)
+                    if (other > 0) {
+                        DistributionRow(stringResource(R.string.analytics_others), other, RelateOnSurfaceVariant)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
+            SectionHeader(title = stringResource(R.string.analytics_relationship_health))
+            RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.HEALTH_SECTION)) {
+                Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
+                    val healthy = state.healthCounts["Healthy (70%+)"] ?: 0
+                    val attention = state.healthCounts["Needs Attention"] ?: 0
+                    val atRisk = state.healthCounts["At Risk"] ?: 0
+
+                    HealthTrendRow(stringResource(R.string.analytics_health_healthy), healthy, RelateSuccess)
+                    HealthTrendRow(stringResource(R.string.analytics_health_attention), attention, RelateWarning)
+                    HealthTrendRow(stringResource(R.string.analytics_health_at_risk), atRisk, RelateError)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
+            SectionHeader(title = stringResource(R.string.analytics_growth_metrics))
+            RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.GROWTH_SECTION)) {
+                Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
+                    DistributionRow(
+                        stringResource(R.string.analytics_delivery_reliability),
+                        state.deliveryReliabilityPercent,
+                        RelateSuccess,
+                        suffix = "%",
+                    )
+                    DistributionRow(
+                        stringResource(R.string.analytics_response_rate),
+                        state.responseRatePercent,
+                        RelateSecondary,
+                        suffix = "%",
+                    )
+                    DistributionRow(
+                        stringResource(R.string.analytics_personalization_coverage),
+                        state.personalizationCoveragePercent,
+                        RelatePrimary,
+                        suffix = "%",
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
+            SectionHeader(title = stringResource(R.string.analytics_top_neglected))
+            RelateGlassCard(modifier = Modifier.testTag(AnalyticsScreenTestTags.NEGLECTED_SECTION)) {
+                Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
+                    if (state.topNeglectedContacts.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.analytics_no_neglected_contacts),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = RelateOnSurfaceVariant,
+                        )
+                    } else {
+                        state.topNeglectedContacts.forEach { contact ->
+                            Text(
+                                text = contact,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(vertical = RelateSpacing.xs),
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(RelateSpacing.xl))
+        }
     }
 }
 

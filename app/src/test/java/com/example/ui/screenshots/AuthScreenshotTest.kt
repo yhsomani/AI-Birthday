@@ -36,6 +36,15 @@ class AuthScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun authDefault_typicalPhone() {
+        setAuthContent()
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/auth_default_typical_phone.png")
+    }
+
+    @Test
     fun authDefault_compactPhoneLargeFont() {
         setAuthContent(fontScale = LargeFontScale)
 

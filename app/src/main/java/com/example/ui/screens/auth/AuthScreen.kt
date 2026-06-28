@@ -30,14 +30,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.BuildConfig
 import com.example.R
-import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateOnBackground
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.viewmodel.AuthUiState
 import com.example.ui.viewmodel.AuthViewModel
 
@@ -85,7 +80,7 @@ internal fun AuthContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(RelateDarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(RelateSpacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -95,19 +90,19 @@ internal fun AuthContent(
             style = MaterialTheme.typography.displayLarge.copy(
                 fontWeight = FontWeight.Bold,
             ),
-            color = RelatePrimary,
+            color = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Text(
             text = stringResource(R.string.auth_subtitle),
             style = MaterialTheme.typography.bodyLarge,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(RelateSize.heroIcon))
         if (state.isLoading) {
             CircularProgressIndicator(
-                color = RelatePrimary,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.testTag(AuthScreenTestTags.LOADING),
             )
         } else {
@@ -119,13 +114,13 @@ internal fun AuthContent(
                     .testTag(AuthScreenTestTags.SIGN_IN_BUTTON),
                 shape = RoundedCornerShape(RelateRadius.control),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = RelateSurfaceVariant,
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 ),
             ) {
                 Text(
                     text = stringResource(R.string.auth_sign_in_google),
                     style = MaterialTheme.typography.labelLarge,
-                    color = RelateOnBackground,
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
             }
             if (showDevBypass) {
@@ -138,13 +133,13 @@ internal fun AuthContent(
                         .testTag(AuthScreenTestTags.DEV_BYPASS_BUTTON),
                     shape = RoundedCornerShape(RelateRadius.control),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = RelatePrimary,
+                        containerColor = MaterialTheme.colorScheme.primary,
                     ),
                 ) {
                     Text(
                         text = stringResource(R.string.auth_dev_bypass),
                         style = MaterialTheme.typography.labelLarge,
-                        color = RelateDarkBackground,
+                        color = MaterialTheme.colorScheme.background,
                     )
                 }
             }
@@ -154,7 +149,7 @@ internal fun AuthContent(
             Text(
                 text = error,
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.testTag(AuthScreenTestTags.ERROR),
             )
@@ -163,7 +158,7 @@ internal fun AuthContent(
         Text(
             text = stringResource(R.string.auth_legal_agreement),
             style = MaterialTheme.typography.bodySmall,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
     }

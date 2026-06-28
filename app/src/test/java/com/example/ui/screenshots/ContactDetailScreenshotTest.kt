@@ -1,11 +1,37 @@
 package com.example.ui.screenshots
 
 import android.app.Application
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.R
+import com.example.core.ui.theme.RelateCard
+import com.example.core.ui.theme.RelateDarkBackground
+import com.example.core.ui.theme.RelateSpacing
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.ContactId
@@ -13,6 +39,7 @@ import com.example.domain.model.contact.ContactDetailProfile
 import com.example.domain.model.memory.MemoryNoteCategoryCount
 import com.example.ui.screens.contacts.ContactDetailContent
 import com.example.ui.screens.contacts.ContactDetailTestTags
+import com.example.ui.screens.contacts.ContactPreferencesDialogBody
 import com.example.ui.viewmodel.ContactDetailUiState
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -44,6 +71,15 @@ class ContactDetailScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun contactDetailProfile_typicalPhone() {
+        setContactDetailContent(state = contactDetailState())
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/contact_detail_profile_typical_phone.png")
+    }
+
+    @Test
     fun contactDetailPersonalization_compactPhoneLargeFont() {
         setContactDetailContent(
             state = contactDetailState(
@@ -66,6 +102,33 @@ class ContactDetailScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun contactDetailPersonalization_compactPhoneHindiLargeFont() {
+        setContactDetailContent(
+            state = contactDetailState(
+                contact = contactProfile(
+                    displayName = "आशा मेहता",
+                    contactGroup = "करीबी दोस्त",
+                    nickname = null,
+                    interestsJson = """["संगीत","कॉफी","शांत उत्सव"]""",
+                    preferredLanguage = "hi",
+                    notesText = "कॉलेज रीयूनियन में मुलाकात हुई थी और इन्हें छोटे, आत्मीय संदेश पसंद हैं।",
+                    preferredChannel = MessageChannel.UNKNOWN,
+                ),
+                memoryNoteCount = 0,
+                memoryNoteCategorySummary = emptyList(),
+                preferenceMessageRes = com.example.R.string.contact_detail_preferences_saved,
+            ),
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(ContactDetailTestTags.SECTION_PERSONALIZATION)
+            .performScrollTo()
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/contact_detail_personalization_compact_phone_hindi_large_font.png")
+    }
+
+    @Test
     fun contactDetailAutomationHistory_compactPhoneLargeFont() {
         setContactDetailContent(
             state = contactDetailState(
@@ -81,6 +144,52 @@ class ContactDetailScreenshotTest {
             .performScrollTo()
         composeRule.onRoot()
             .captureRoboImage("src/test/screenshots/baseline/contact_detail_automation_history_compact_phone_large_font.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun contactDetailAutomationHistory_typicalPhone() {
+        setContactDetailContent(
+            state = contactDetailState(
+                contact = contactProfile(
+                    preferredChannel = MessageChannel.SMS,
+                    automationMode = ApprovalMode.DEFAULT,
+                ),
+            ),
+        )
+
+        composeRule.onNodeWithTag(ContactDetailTestTags.CONTENT_BOTTOM)
+            .performScrollTo()
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/contact_detail_automation_history_typical_phone.png")
+    }
+
+    @Test
+    fun contactDetailPreferencesForm_compactPhoneLargeFont() {
+        setContactPreferencesFormContent(
+            contact = contactProfile(
+                notesText = "Prefers warm, concise wishes with one personal memory and no work reminders.",
+            ),
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(ContactDetailTestTags.PREFERENCES_DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/contact_detail_preferences_form_compact_phone_large_font.png")
+    }
+
+    @Test
+    fun contactDetailPreferencesFormBottom_compactPhoneLargeFont() {
+        setContactPreferencesFormContent(
+            contact = contactProfile(
+                notesText = "Prefers warm, concise wishes with one personal memory, a soft sign-off, and no work reminders.",
+            ),
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(ContactDetailTestTags.PREFERENCES_SKIP_AUTO_WISH)
+            .performScrollTo()
+        composeRule.onNodeWithTag(ContactDetailTestTags.PREFERENCES_DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/contact_detail_preferences_form_bottom_compact_phone_large_font.png")
     }
 
     @Test
@@ -114,6 +223,101 @@ class ContactDetailScreenshotTest {
         }
     }
 
+    private fun setContactPreferencesFormContent(
+        contact: ContactDetailProfile,
+        fontScale: Float = DefaultFontScale,
+    ) {
+        composeRule.setRelateScreenshotContent(fontScale = fontScale) {
+            ContactPreferencesFormSnapshot(contact = contact)
+        }
+    }
+
+    @Composable
+    private fun ContactPreferencesFormSnapshot(contact: ContactDetailProfile) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(RelateDarkBackground)
+                .padding(RelateSpacing.screenHorizontal),
+            contentAlignment = Alignment.Center,
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(ContactDetailTestTags.PREFERENCES_DIALOG),
+                colors = CardDefaults.cardColors(
+                    containerColor = RelateCard,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                Column(
+                    modifier = Modifier.padding(RelateSpacing.cardContent),
+                    verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
+                ) {
+                    Text(
+                        text = stringResource(R.string.contact_preferences_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    ContactPreferencesDialogBody(
+                        nickname = contact.nickname.orEmpty(),
+                        onNicknameChange = {},
+                        relationshipType = contact.relationshipType,
+                        onRelationshipTypeChange = {},
+                        language = contact.preferredLanguage,
+                        onLanguageChange = {},
+                        channel = contact.preferredChannel,
+                        onChannelChange = {},
+                        formality = contact.formalityLevel,
+                        onFormalityChange = {},
+                        style = contact.communicationStyle,
+                        onStyleChange = {},
+                        automationMode = contact.automationMode,
+                        onAutomationModeChange = {},
+                        sendTime = contact.formattedSendTime(),
+                        onSendTimeChange = {},
+                        giftBudget = contact.giftBudgetInr.toString(),
+                        onGiftBudgetChange = {},
+                        annualBudget = contact.annualBudgetInr.toString(),
+                        onAnnualBudgetChange = {},
+                        interests = "music, coffee, weekend hikes",
+                        onInterestsChange = {},
+                        sensitiveTopics = "work stress",
+                        onSensitiveTopicsChange = {},
+                        lifePhase = "New city",
+                        onLifePhaseChange = {},
+                        notes = contact.notesText,
+                        onNotesChange = {},
+                        skipAutoWish = contact.skipAutoWish,
+                        onSkipAutoWishChange = {},
+                        localError = null,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(
+                            onClick = {},
+                            modifier = Modifier.testTag(ContactDetailTestTags.PREFERENCES_CANCEL),
+                        ) {
+                            Text(text = stringResource(R.string.cancel))
+                        }
+                        Spacer(modifier = Modifier.width(RelateSpacing.xs))
+                        Button(
+                            onClick = {},
+                            modifier = Modifier.testTag(ContactDetailTestTags.PREFERENCES_SAVE),
+                        ) {
+                            Text(text = stringResource(R.string.save))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private fun contactDetailState(
         contact: ContactDetailProfile = contactProfile(),
         memoryNoteCount: Int = 3,
@@ -134,15 +338,19 @@ class ContactDetailScreenshotTest {
     }
 
     private fun contactProfile(
+        displayName: String = "Asha Mehta",
+        contactGroup: String = "Close friends",
         nickname: String? = "Ash",
         interestsJson: String = """["music","coffee","weekend hikes"]""",
+        preferredLanguage: String = "en",
+        notesText: String = "Met at a college reunion and usually prefers warm, concise messages.",
         preferredChannel: MessageChannel = MessageChannel.EMAIL,
         automationMode: ApprovalMode = ApprovalMode.VIP_APPROVE,
     ): ContactDetailProfile {
         return ContactDetailProfile(
             id = ContactId(ContactIdValue),
-            displayName = "Asha Mehta",
-            contactGroup = "Close friends",
+            displayName = displayName,
+            contactGroup = contactGroup,
             healthScore = 86,
             nickname = nickname,
             birthdayDay = 10,
@@ -150,7 +358,7 @@ class ContactDetailScreenshotTest {
             primaryPhone = "+1 555 0100",
             primaryEmail = "asha@example.com",
             relationshipType = "FRIEND",
-            preferredLanguage = "en",
+            preferredLanguage = preferredLanguage,
             preferredChannel = preferredChannel,
             formalityLevel = "CASUAL",
             communicationStyle = "WARM",
@@ -163,8 +371,16 @@ class ContactDetailScreenshotTest {
             interestsJson = interestsJson,
             sensitiveTopicsJson = """["work stress"]""",
             currentLifePhaseJson = """{"phase":"New city"}""",
-            notesText = "Met at a college reunion and usually prefers warm, concise messages.",
+            notesText = notesText,
         )
+    }
+
+    private fun ContactDetailProfile.formattedSendTime(): String {
+        return if (customSendTimeHour != null && customSendTimeMinute != null) {
+            "%02d:%02d".format(customSendTimeHour, customSendTimeMinute)
+        } else {
+            ""
+        }
     }
 
     private companion object {

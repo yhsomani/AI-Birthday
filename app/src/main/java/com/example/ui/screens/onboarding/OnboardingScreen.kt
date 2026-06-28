@@ -40,14 +40,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
-import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateOnBackground
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.ui.viewmodel.OnboardingViewModel
 
 internal object OnboardingTestTags {
@@ -119,7 +114,7 @@ internal fun OnboardingContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(RelateDarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(RelateSpacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -129,7 +124,7 @@ internal fun OnboardingContent(
         Icon(
             imageVector = Icons.Filled.Settings,
             contentDescription = null,
-            tint = RelatePrimary,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(RelateSize.heroIcon),
         )
         Spacer(modifier = Modifier.height(RelateSpacing.lg))
@@ -144,7 +139,7 @@ internal fun OnboardingContent(
         Text(
             text = stringResource(R.string.onboarding_setup_subtitle),
             style = MaterialTheme.typography.bodyLarge,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(RelateSpacing.xl))
@@ -167,12 +162,12 @@ internal fun OnboardingContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(OnboardingTestTags.CONTINUE_BUTTON),
-            colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             shape = RoundedCornerShape(RelateRadius.control),
         ) {
             Text(
                 text = stringResource(R.string.onboarding_continue_to_sign_in),
-                color = RelateDarkBackground,
+                color = MaterialTheme.colorScheme.background,
             )
         }
         Spacer(modifier = Modifier.height(RelateSpacing.sm))
@@ -185,7 +180,7 @@ internal fun OnboardingContent(
         ) {
             Text(
                 text = stringResource(R.string.onboarding_open_setup_checklist),
-                color = RelateOnBackground,
+                color = MaterialTheme.colorScheme.onBackground,
             )
         }
         Spacer(modifier = Modifier.height(RelateSpacing.lg))
@@ -208,20 +203,20 @@ private fun SetupChecklistRow(
             Box(
                 modifier = Modifier
                     .size(RelateSize.setupStepIndex)
-                    .background(RelateSurfaceVariant, RoundedCornerShape(RelateRadius.control)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(RelateRadius.control)),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = index.toString(),
                     style = MaterialTheme.typography.labelLarge,
-                    color = RelatePrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                 )
             }
             Icon(
                 imageVector = step.icon,
                 contentDescription = null,
-                tint = RelatePrimary,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(RelateSize.iconLg),
             )
             Column(modifier = Modifier.weight(1f)) {
@@ -235,7 +230,7 @@ private fun SetupChecklistRow(
                 Text(
                     text = stringResource(step.descriptionRes),
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

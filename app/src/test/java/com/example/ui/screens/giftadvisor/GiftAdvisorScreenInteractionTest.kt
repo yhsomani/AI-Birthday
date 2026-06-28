@@ -202,6 +202,7 @@ class GiftAdvisorScreenInteractionTest {
             errorMessageRes = null,
             isGeneratingSuggestions = true,
         )
+        composeRule.assertLazyItemVisible(GiftAdvisorTestTags.GENERATE_SUGGESTIONS_BUTTON)
         composeRule.onNodeWithTag(GiftAdvisorTestTags.GENERATE_SUGGESTIONS_BUTTON)
             .assertIsNotEnabled()
         composeRule.onNodeWithTag(GiftAdvisorTestTags.SUGGESTIONS_PROGRESS)

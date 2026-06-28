@@ -1,9 +1,9 @@
 package com.example.core.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 
 private val RelateDarkColorScheme = darkColorScheme(
     primary = RelatePrimary,
@@ -26,11 +26,13 @@ private val RelateDarkColorScheme = darkColorScheme(
 
 @Composable
 fun RelateAITheme(
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = RelateDarkColorScheme,
-        typography = RelateTypography,
-        content = content
-    )
+    CompositionLocalProvider(LocalRelateSemanticColors provides RelateDarkSemanticColors) {
+        MaterialTheme(
+            colorScheme = RelateDarkColorScheme,
+            typography = RelateTypography,
+            content = content,
+        )
+    }
 }

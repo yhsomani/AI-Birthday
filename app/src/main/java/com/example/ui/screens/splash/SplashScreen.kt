@@ -28,9 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.R
 import com.example.core.ui.theme.RelateAlpha
-import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateOnBackground
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
 import com.example.ui.viewmodel.SplashDestination
@@ -72,7 +69,7 @@ internal fun SplashContent(alpha: Float) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(RelateDarkBackground),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -85,20 +82,20 @@ internal fun SplashContent(alpha: Float) {
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontWeight = FontWeight.Bold,
                 ),
-                color = RelatePrimary,
+                color = MaterialTheme.colorScheme.primary,
             )
             Spacer(modifier = Modifier.height(RelateSpacing.sm))
             Text(
                 text = stringResource(R.string.auth_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
-                color = RelateOnBackground.copy(alpha = RelateAlpha.muted),
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = RelateAlpha.muted),
             )
             Spacer(modifier = Modifier.height(RelateSpacing.xxxl))
             CircularProgressIndicator(
                 modifier = Modifier
                     .size(RelateSize.progressIndicator)
                     .testTag(SplashScreenTestTags.PROGRESS),
-                color = RelatePrimary,
+                color = MaterialTheme.colorScheme.primary,
                 strokeWidth = RelateSize.progressStroke,
             )
         }

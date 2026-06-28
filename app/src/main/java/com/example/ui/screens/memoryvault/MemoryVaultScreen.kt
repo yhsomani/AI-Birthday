@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -63,9 +64,8 @@ import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.ui.viewmodel.MemoryVaultUiState
 import com.example.ui.viewmodel.MemoryVaultViewModel
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Date
-import java.util.Locale
 
 private data class MemoryCategoryOption(
     val value: String,
@@ -103,6 +103,7 @@ internal object MemoryVaultTestTags {
     const val ADD_BUTTON = "memory_vault_add_button"
     const val ERROR_CARD = "memory_vault_error_card"
     const val EMPTY_STATE = "memory_vault_empty_state"
+    const val JOURNAL_HEADER = "memory_vault_journal_header"
     const val NOTE_CARD_PREFIX = "memory_vault_note_"
     const val PIN_BUTTON_PREFIX = "memory_vault_pin_"
     const val DELETE_BUTTON_PREFIX = "memory_vault_delete_"
@@ -158,7 +159,7 @@ internal fun MemoryVaultContent(
     onTogglePin: (MemoryNoteRecord) -> Unit,
     onDelete: (MemoryNoteRecord) -> Unit,
 ) {
-    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+    val dateFormat = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
 
     Scaffold(
         topBar = {
@@ -202,6 +203,7 @@ internal fun MemoryVaultContent(
                     .background(RelateDarkBackground)
                     .padding(paddingValues)
                     .padding(RelateSpacing.screenHorizontal),
+                contentPadding = PaddingValues(bottom = RelateSpacing.xxl),
                 verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
             ) {
                 item {
@@ -222,7 +224,10 @@ internal fun MemoryVaultContent(
                 }
 
                 item {
-                    SectionHeader(title = stringResource(R.string.memory_vault_journal_title))
+                    SectionHeader(
+                        title = stringResource(R.string.memory_vault_journal_title),
+                        modifier = Modifier.testTag(MemoryVaultTestTags.JOURNAL_HEADER),
+                    )
                 }
 
                 if (uiState.notes.isEmpty()) {

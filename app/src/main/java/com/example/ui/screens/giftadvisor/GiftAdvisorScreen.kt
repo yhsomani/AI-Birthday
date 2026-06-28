@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,7 +35,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -64,7 +65,6 @@ import com.example.R
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
-import com.example.core.ui.components.StatCard
 import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateCard
 import com.example.core.ui.theme.RelateDarkBackground
@@ -90,6 +90,7 @@ internal object GiftAdvisorTestTags {
     const val SUGGESTION_CARD_PREFIX = "gift_advisor_suggestion_"
     const val ERROR_CARD = "gift_advisor_error_card"
     const val EMPTY_HISTORY = "gift_advisor_empty_history"
+    const val HISTORY_HEADER = "gift_advisor_history_header"
     const val HISTORY_CARD_PREFIX = "gift_advisor_history_"
     const val DELETE_BUTTON_PREFIX = "gift_advisor_delete_"
     const val DIALOG = "gift_advisor_dialog"
@@ -236,18 +237,8 @@ internal fun GiftAdvisorContent(
                 ),
             )
         },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onShowAddDialog,
-                containerColor = RelatePrimary,
-                modifier = Modifier.testTag(GiftAdvisorTestTags.RECORD_FAB),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CardGiftcard,
-                    contentDescription = stringResource(R.string.gift_advisor_record_gift),
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                )
-            }
+        bottomBar = {
+            GiftRecordBottomBar(onShowAddDialog = onShowAddDialog)
         },
     ) { paddingValues ->
         if (uiState.isLoading) {
@@ -278,6 +269,7 @@ internal fun GiftAdvisorContent(
                     .background(RelateDarkBackground)
                     .padding(paddingValues)
                     .padding(RelateSpacing.screenHorizontal),
+                contentPadding = PaddingValues(bottom = RelateSpacing.lg),
                 verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
             ) {
                 item {
@@ -301,7 +293,10 @@ internal fun GiftAdvisorContent(
                 }
 
                 item {
-                    SectionHeader(title = stringResource(R.string.gift_history_journal_title))
+                    SectionHeader(
+                        title = stringResource(R.string.gift_history_journal_title),
+                        modifier = Modifier.testTag(GiftAdvisorTestTags.HISTORY_HEADER),
+                    )
                 }
 
                 if (uiState.giftHistory.isEmpty()) {
@@ -358,6 +353,32 @@ internal fun GiftAdvisorContent(
 }
 
 @Composable
+private fun GiftRecordBottomBar(onShowAddDialog: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(RelateElevation.appBar))
+            .padding(horizontal = RelateSpacing.screenHorizontal, vertical = RelateSpacing.sm),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Button(
+            onClick = onShowAddDialog,
+            colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+            modifier = Modifier.testTag(GiftAdvisorTestTags.RECORD_FAB),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CardGiftcard,
+                contentDescription = null,
+                modifier = Modifier.size(RelateSize.iconSm),
+            )
+            Spacer(modifier = Modifier.width(RelateSpacing.sm))
+            Text(text = stringResource(R.string.gift_advisor_record_gift))
+        }
+    }
+}
+
+@Composable
 private fun BudgetStats(
     uiState: GiftAdvisorUiState,
     modifier: Modifier = Modifier,
@@ -366,24 +387,61 @@ private fun BudgetStats(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
     ) {
-        StatCard(
+        BudgetStatCard(
             label = stringResource(R.string.gift_stat_annual_budget),
             value = stringResource(R.string.gift_currency_inr_format, uiState.contact?.giftBudgetInr ?: 500),
             icon = Icons.Filled.CardGiftcard,
             modifier = Modifier.weight(1f),
         )
-        StatCard(
+        BudgetStatCard(
             label = stringResource(R.string.gift_stat_total_spent),
             value = stringResource(R.string.gift_currency_inr_format, uiState.totalSpentThisYear),
             icon = Icons.Filled.ShoppingCart,
             modifier = Modifier.weight(1f),
         )
-        StatCard(
+        BudgetStatCard(
             label = stringResource(R.string.gift_stat_remaining),
             value = stringResource(R.string.gift_currency_inr_format, uiState.remainingBudget),
             icon = Icons.Filled.AttachMoney,
             modifier = Modifier.weight(1f),
         )
+    }
+}
+
+@Composable
+private fun BudgetStatCard(
+    label: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+) {
+    RelateGlassCard(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(RelateSpacing.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = RelatePrimary,
+                modifier = Modifier.size(RelateSize.iconLg),
+            )
+            Spacer(modifier = Modifier.height(RelateSpacing.xs))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
@@ -509,43 +567,42 @@ private fun GiftHistoryCard(
         colors = CardDefaults.cardColors(containerColor = RelateCard),
     ) {
         Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.xxs),
+            ) {
+                Text(
+                    text = gift.giftName,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = gift.giftCategory,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = RelatePrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = stringResource(R.string.gift_occasion_year_format, gift.occasionType, gift.year),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RelateOnSurfaceVariant,
+                )
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(RelateSpacing.xxs),
-                ) {
-                    Text(
-                        text = gift.giftName,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = gift.giftCategory,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = RelatePrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = stringResource(R.string.gift_occasion_year_format, gift.occasionType, gift.year),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RelateOnSurfaceVariant,
-                    )
-                }
-
+                Text(
+                    text = stringResource(R.string.gift_currency_inr_format, gift.approxCostInr),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = RelatePrimary,
+                )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = stringResource(R.string.gift_currency_inr_format, gift.approxCostInr),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = RelatePrimary,
-                        modifier = Modifier.padding(horizontal = RelateSpacing.sm),
-                    )
                     GiftFeedbackIcon(receivedWell = gift.receivedWell)
                     IconButton(
                         onClick = onDelete,
@@ -621,127 +678,32 @@ private fun AddGiftDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag(GiftAdvisorTestTags.DIALOG),
-        title = { Text(text = stringResource(R.string.gift_record_history_title)) },
+        title = {
+            Text(
+                text = stringResource(R.string.gift_record_history_title),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = RelateSize.dialogContentMaxHeight)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                errorMessageRes?.let { errorRes ->
-                    GiftAdvisorErrorCard(message = stringResource(errorRes))
-                }
-
-                RequiredTextField(
-                    value = giftName,
-                    onValueChange = onGiftNameChange,
-                    labelRes = R.string.gift_name_label,
-                    isError = showGiftNameError,
-                    modifier = Modifier.testTag(GiftAdvisorTestTags.GIFT_NAME_FIELD),
-                )
-
-                RequiredTextField(
-                    value = giftCategory,
-                    onValueChange = onGiftCategoryChange,
-                    labelRes = R.string.gift_category_label,
-                    isError = showCategoryError,
-                    modifier = Modifier.testTag(GiftAdvisorTestTags.GIFT_CATEGORY_FIELD),
-                )
-
-                RequiredTextField(
-                    value = occasionType,
-                    onValueChange = onOccasionTypeChange,
-                    labelRes = R.string.gift_occasion_label,
-                    isError = showOccasionError,
-                    modifier = Modifier.testTag(GiftAdvisorTestTags.OCCASION_FIELD),
-                )
-
-                OutlinedTextField(
-                    value = approxCost,
-                    onValueChange = onApproxCostChange,
-                    label = { Text(text = stringResource(R.string.gift_cost_label)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    isError = showCostError,
-                    supportingText = {
-                        if (showCostError) {
-                            Text(text = stringResource(R.string.gift_advisor_error_invalid_cost))
-                        }
-                    },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(GiftAdvisorTestTags.COST_FIELD),
-                )
-
-                Text(
-                    text = stringResource(R.string.gift_feedback_question),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-                ) {
-                    FeedbackButton(
-                        selected = receivedWellState == true,
-                        onClick = { onReceivedWellChange(true) },
-                        selectedColor = RelateSuccess,
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Filled.ThumbUp,
-                                contentDescription = stringResource(R.string.gift_feedback_liked),
-                            )
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(GiftAdvisorTestTags.FEEDBACK_LIKED),
-                    )
-                    FeedbackButton(
-                        selected = receivedWellState == false,
-                        onClick = { onReceivedWellChange(false) },
-                        selectedColor = RelateError,
-                        icon = {
-                            Icon(
-                                imageVector = Icons.Filled.ThumbDown,
-                                contentDescription = stringResource(R.string.gift_feedback_disliked),
-                            )
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(GiftAdvisorTestTags.FEEDBACK_DISLIKED),
-                    )
-                    FeedbackButton(
-                        selected = receivedWellState == null,
-                        onClick = { onReceivedWellChange(null) },
-                        selectedColor = RelateOnSurfaceVariant,
-                        icon = {
-                            Text(text = stringResource(R.string.gift_feedback_unknown_short))
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag(GiftAdvisorTestTags.FEEDBACK_UNKNOWN),
-                    )
-                }
-
-                OutlinedTextField(
-                    value = giftNotes,
-                    onValueChange = onGiftNotesChange,
-                    label = { Text(text = stringResource(R.string.gift_notes_label)) },
-                    supportingText = {
-                        Text(
-                            text = stringResource(
-                                R.string.gift_notes_counter,
-                                giftNotes.length,
-                                GiftAdvisorViewModel.MAX_NOTES_LENGTH,
-                            ),
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(GiftAdvisorTestTags.NOTES_FIELD),
-                )
-            }
+            AddGiftDialogBody(
+                giftName = giftName,
+                onGiftNameChange = onGiftNameChange,
+                showGiftNameError = showGiftNameError,
+                giftCategory = giftCategory,
+                onGiftCategoryChange = onGiftCategoryChange,
+                showCategoryError = showCategoryError,
+                occasionType = occasionType,
+                onOccasionTypeChange = onOccasionTypeChange,
+                showOccasionError = showOccasionError,
+                approxCost = approxCost,
+                onApproxCostChange = onApproxCostChange,
+                showCostError = showCostError,
+                receivedWellState = receivedWellState,
+                onReceivedWellChange = onReceivedWellChange,
+                giftNotes = giftNotes,
+                onGiftNotesChange = onGiftNotesChange,
+                errorMessageRes = errorMessageRes,
+            )
         },
         confirmButton = {
             Button(
@@ -760,6 +722,149 @@ private fun AddGiftDialog(
             }
         },
     )
+}
+
+@Composable
+internal fun AddGiftDialogBody(
+    giftName: String,
+    onGiftNameChange: (String) -> Unit,
+    showGiftNameError: Boolean,
+    giftCategory: String,
+    onGiftCategoryChange: (String) -> Unit,
+    showCategoryError: Boolean,
+    occasionType: String,
+    onOccasionTypeChange: (String) -> Unit,
+    showOccasionError: Boolean,
+    approxCost: String,
+    onApproxCostChange: (String) -> Unit,
+    showCostError: Boolean,
+    receivedWellState: Boolean?,
+    onReceivedWellChange: (Boolean?) -> Unit,
+    giftNotes: String,
+    onGiftNotesChange: (String) -> Unit,
+    errorMessageRes: Int?,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(max = RelateSize.dialogContentMaxHeight)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        errorMessageRes?.let { errorRes ->
+            GiftAdvisorErrorCard(message = stringResource(errorRes))
+        }
+
+        RequiredTextField(
+            value = giftName,
+            onValueChange = onGiftNameChange,
+            labelRes = R.string.gift_name_label,
+            isError = showGiftNameError,
+            modifier = Modifier.testTag(GiftAdvisorTestTags.GIFT_NAME_FIELD),
+        )
+
+        RequiredTextField(
+            value = giftCategory,
+            onValueChange = onGiftCategoryChange,
+            labelRes = R.string.gift_category_label,
+            isError = showCategoryError,
+            modifier = Modifier.testTag(GiftAdvisorTestTags.GIFT_CATEGORY_FIELD),
+        )
+
+        RequiredTextField(
+            value = occasionType,
+            onValueChange = onOccasionTypeChange,
+            labelRes = R.string.gift_occasion_label,
+            isError = showOccasionError,
+            modifier = Modifier.testTag(GiftAdvisorTestTags.OCCASION_FIELD),
+        )
+
+        OutlinedTextField(
+            value = approxCost,
+            onValueChange = onApproxCostChange,
+            label = { Text(text = stringResource(R.string.gift_cost_label)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            isError = showCostError,
+            supportingText = {
+                if (showCostError) {
+                    Text(text = stringResource(R.string.gift_advisor_error_invalid_cost))
+                }
+            },
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(GiftAdvisorTestTags.COST_FIELD),
+        )
+
+        Text(
+            text = stringResource(R.string.gift_feedback_question),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        ) {
+            FeedbackButton(
+                selected = receivedWellState == true,
+                onClick = { onReceivedWellChange(true) },
+                selectedColor = RelateSuccess,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.ThumbUp,
+                        contentDescription = stringResource(R.string.gift_feedback_liked),
+                    )
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(GiftAdvisorTestTags.FEEDBACK_LIKED),
+            )
+            FeedbackButton(
+                selected = receivedWellState == false,
+                onClick = { onReceivedWellChange(false) },
+                selectedColor = RelateError,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.ThumbDown,
+                        contentDescription = stringResource(R.string.gift_feedback_disliked),
+                    )
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(GiftAdvisorTestTags.FEEDBACK_DISLIKED),
+            )
+            FeedbackButton(
+                selected = receivedWellState == null,
+                onClick = { onReceivedWellChange(null) },
+                selectedColor = RelateOnSurfaceVariant,
+                icon = {
+                    Text(text = stringResource(R.string.gift_feedback_unknown_short))
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(GiftAdvisorTestTags.FEEDBACK_UNKNOWN),
+            )
+        }
+
+        OutlinedTextField(
+            value = giftNotes,
+            onValueChange = onGiftNotesChange,
+            label = { Text(text = stringResource(R.string.gift_notes_label)) },
+            supportingText = {
+                Text(
+                    text = stringResource(
+                        R.string.gift_notes_counter,
+                        giftNotes.length,
+                        GiftAdvisorViewModel.MAX_NOTES_LENGTH,
+                    ),
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(GiftAdvisorTestTags.NOTES_FIELD),
+        )
+    }
 }
 
 @Composable

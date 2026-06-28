@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -66,15 +67,11 @@ import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
 import com.example.core.ui.components.SectionHeader
 import com.example.core.ui.components.relateTextFieldColors
-import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSurfaceVariant
-import com.example.core.ui.theme.RelateWarning
+import com.example.core.ui.theme.relateSemanticColors
 import com.example.domain.event.EventResolutionPolicy
 import com.example.domain.model.contact.ContactPickerItem
 import com.example.domain.model.occasion.EventListItem
@@ -119,6 +116,12 @@ private val eventHorizonFilters = listOf(
 
 internal object EventsTestTags {
     const val CONTENT_BOTTOM = "events_content_bottom"
+    const val MANUAL_DIALOG = "events_manual_dialog"
+    const val MANUAL_FORM_BODY = "events_manual_form_body"
+    const val MANUAL_YEAR_FIELD = "events_manual_year_field"
+    const val MANUAL_WARNING = "events_manual_warning"
+    const val MANUAL_SAVE = "events_manual_save"
+    const val MANUAL_CANCEL = "events_manual_cancel"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -229,7 +232,7 @@ internal fun EventsContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(RelateDarkBackground),
+            .background(MaterialTheme.colorScheme.background),
     ) {
         RelateScreen(
             title = stringResource(R.string.nav_events),
@@ -241,7 +244,7 @@ internal fun EventsContent(
                     Icon(
                         imageVector = Icons.Filled.Add,
                         contentDescription = stringResource(R.string.events_add_event),
-                        tint = RelatePrimary,
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             },
@@ -298,7 +301,7 @@ internal fun EventsContent(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator(color = RelatePrimary)
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 } else if (state.events.isEmpty()) {
                     EmptyState(
@@ -378,7 +381,6 @@ internal fun EventsList(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ManualEventDialog(
     contacts: List<ContactPickerItem>,
@@ -399,7 +401,6 @@ private fun ManualEventDialog(
 ) {
     var useExistingContact by remember { mutableStateOf(contacts.isNotEmpty()) }
     var selectedContactId by remember { mutableStateOf(contacts.firstOrNull()?.id?.value) }
-    var contactMenuExpanded by remember { mutableStateOf(false) }
     var newContactName by remember { mutableStateOf("") }
     var eventType by remember { mutableStateOf(OccasionType.BIRTHDAY.raw) }
     var label by remember { mutableStateOf("") }
@@ -410,208 +411,39 @@ private fun ManualEventDialog(
     val errorMonthDay = stringResource(R.string.events_error_month_day)
     val errorChooseContact = stringResource(R.string.events_error_choose_contact)
     val errorContactName = stringResource(R.string.events_error_contact_name)
-    val selectedContactName = contacts.firstOrNull { it.id.value == selectedContactId }?.displayName
 
     AlertDialog(
+        modifier = Modifier.testTag(EventsTestTags.MANUAL_DIALOG),
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.events_add_event), color = MaterialTheme.colorScheme.onSurface) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-                    verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-                ) {
-                    FilterChip(
-                        label = stringResource(R.string.events_existing_contact),
-                        isSelected = useExistingContact,
-                        onClick = {
-                            onInputChanged()
-                            useExistingContact = true
-                            selectedContactId = selectedContactId ?: contacts.firstOrNull()?.id?.value
-                        },
-                    )
-                    FilterChip(
-                        label = stringResource(R.string.events_new_contact),
-                        isSelected = !useExistingContact,
-                        onClick = {
-                            onInputChanged()
-                            useExistingContact = false
-                        },
-                    )
-                }
-
-                if (useExistingContact) {
-                    Box {
-                        OutlinedTextField(
-                            value = selectedContactName
-                                ?: stringResource(R.string.events_choose_contact),
-                            onValueChange = {},
-                            readOnly = true,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = contacts.isNotEmpty()) {
-                                    contactMenuExpanded = true
-                                },
-                            label = { Text(stringResource(R.string.events_contact_label)) },
-                            enabled = contacts.isNotEmpty(),
-                            colors = relateTextFieldColors(),
-                        )
-                        DropdownMenu(
-                            expanded = contactMenuExpanded,
-                            onDismissRequest = { contactMenuExpanded = false },
-                        ) {
-                            contacts.forEach { contact ->
-                                DropdownMenuItem(
-                                    text = { Text(contact.displayName) },
-                                    onClick = {
-                                        onInputChanged()
-                                        selectedContactId = contact.id.value
-                                        contactMenuExpanded = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-                    if (contacts.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.events_no_contacts_for_manual),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = RelateOnSurfaceVariant,
-                        )
-                    }
-                } else {
-                    OutlinedTextField(
-                        value = newContactName,
-                        onValueChange = {
-                            onInputChanged()
-                            newContactName = it
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.events_new_contact_name)) },
-                        singleLine = true,
-                        colors = relateTextFieldColors(),
-                    )
-                }
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-                    verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-                ) {
-                    eventTypeOptions.forEach { value ->
-                        FilterChip(
-                            label = eventTypeLabel(value),
-                            isSelected = eventType == value,
-                            onClick = {
-                                onInputChanged()
-                                eventType = value
-                            },
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = label,
-                    onValueChange = {
-                        onInputChanged()
-                        label = it
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.events_label)) },
-                    placeholder = { Text(stringResource(R.string.optional)) },
-                    singleLine = true,
-                    colors = relateTextFieldColors(),
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
-                    OutlinedTextField(
-                        value = monthText,
-                        onValueChange = {
-                            onInputChanged()
-                            monthText = it.filter(Char::isDigit).take(2)
-                        },
-                        modifier = Modifier.weight(1f),
-                        label = { Text(stringResource(R.string.events_month_label)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        colors = relateTextFieldColors(),
-                    )
-                    OutlinedTextField(
-                        value = dayText,
-                        onValueChange = {
-                            onInputChanged()
-                            dayText = it.filter(Char::isDigit).take(2)
-                        },
-                        modifier = Modifier.weight(1f),
-                        label = { Text(stringResource(R.string.events_day_label)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        colors = relateTextFieldColors(),
-                    )
-                    OutlinedTextField(
-                        value = yearText,
-                        onValueChange = {
-                            onInputChanged()
-                            yearText = it.filter(Char::isDigit).take(4)
-                        },
-                        modifier = Modifier.weight(1f),
-                        label = { Text(stringResource(R.string.events_year_label)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        colors = relateTextFieldColors(),
-                    )
-                }
-
-                localError?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-
-                duplicateWarning?.let { warning ->
-                    val warningMessage = when (warning.kind) {
-                        ManualEventWarningKind.DUPLICATE -> stringResource(
-                            R.string.events_duplicate_message,
-                            warning.contactName,
-                            eventTypeLabel(warning.eventType),
-                            warning.month,
-                            warning.dayOfMonth,
-                        )
-                        ManualEventWarningKind.DATE_CONFLICT -> stringResource(
-                            R.string.events_conflict_message,
-                            warning.contactName,
-                            eventTypeLabel(warning.eventType),
-                            warning.month,
-                            warning.dayOfMonth,
-                            warning.requestedMonth ?: warning.month,
-                            warning.requestedDayOfMonth ?: warning.dayOfMonth,
-                        )
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs)) {
-                        Text(
-                            text = stringResource(
-                                when (warning.kind) {
-                                    ManualEventWarningKind.DUPLICATE -> R.string.events_duplicate_title
-                                    ManualEventWarningKind.DATE_CONFLICT -> R.string.events_conflict_title
-                                }
-                            ),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = RelateWarning,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = warningMessage,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = RelateOnSurfaceVariant,
-                        )
-                    }
-                }
-            }
+            ManualEventDialogBody(
+                contacts = contacts,
+                useExistingContact = useExistingContact,
+                onUseExistingContactChange = { useExistingContact = it },
+                selectedContactId = selectedContactId,
+                onSelectedContactIdChange = { selectedContactId = it },
+                newContactName = newContactName,
+                onNewContactNameChange = { newContactName = it },
+                eventType = eventType,
+                onEventTypeChange = { eventType = it },
+                label = label,
+                onLabelChange = { label = it },
+                monthText = monthText,
+                onMonthTextChange = { monthText = it.filter(Char::isDigit).take(2) },
+                dayText = dayText,
+                onDayTextChange = { dayText = it.filter(Char::isDigit).take(2) },
+                yearText = yearText,
+                onYearTextChange = { yearText = it.filter(Char::isDigit).take(4) },
+                localError = localError,
+                duplicateWarning = duplicateWarning,
+                onInputChanged = onInputChanged,
+            )
         },
         confirmButton = {
             TextButton(
                 enabled = !isSaving,
+                modifier = Modifier.testTag(EventsTestTags.MANUAL_SAVE),
                 onClick = {
                     val month = monthText.toIntOrNull()
                     val day = dayText.toIntOrNull()
@@ -648,11 +480,249 @@ private fun ManualEventDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag(EventsTestTags.MANUAL_CANCEL),
+            ) {
                 Text(stringResource(R.string.cancel))
             }
         },
     )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun ManualEventDialogBody(
+    contacts: List<ContactPickerItem>,
+    useExistingContact: Boolean,
+    onUseExistingContactChange: (Boolean) -> Unit,
+    selectedContactId: String?,
+    onSelectedContactIdChange: (String?) -> Unit,
+    newContactName: String,
+    onNewContactNameChange: (String) -> Unit,
+    eventType: String,
+    onEventTypeChange: (String) -> Unit,
+    label: String,
+    onLabelChange: (String) -> Unit,
+    monthText: String,
+    onMonthTextChange: (String) -> Unit,
+    dayText: String,
+    onDayTextChange: (String) -> Unit,
+    yearText: String,
+    onYearTextChange: (String) -> Unit,
+    localError: String?,
+    duplicateWarning: ManualEventDuplicateWarning?,
+    onInputChanged: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var contactMenuExpanded by remember { mutableStateOf(false) }
+    val selectedContactName = contacts.firstOrNull { it.id.value == selectedContactId }?.displayName
+
+    Column(
+        modifier = modifier
+            .height(RelateSize.dialogContentMaxHeight)
+            .verticalScroll(rememberScrollState())
+            .testTag(EventsTestTags.MANUAL_FORM_BODY),
+        verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
+    ) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        ) {
+            FilterChip(
+                label = stringResource(R.string.events_existing_contact),
+                isSelected = useExistingContact,
+                onClick = {
+                    onInputChanged()
+                    onUseExistingContactChange(true)
+                    if (selectedContactId == null) {
+                        onSelectedContactIdChange(contacts.firstOrNull()?.id?.value)
+                    }
+                },
+            )
+            FilterChip(
+                label = stringResource(R.string.events_new_contact),
+                isSelected = !useExistingContact,
+                onClick = {
+                    onInputChanged()
+                    onUseExistingContactChange(false)
+                },
+            )
+        }
+
+        if (useExistingContact) {
+            Box {
+                OutlinedTextField(
+                    value = selectedContactName
+                        ?: stringResource(R.string.events_choose_contact),
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = contacts.isNotEmpty()) {
+                            contactMenuExpanded = true
+                        },
+                    label = { Text(stringResource(R.string.events_contact_label)) },
+                    enabled = contacts.isNotEmpty(),
+                    colors = relateTextFieldColors(),
+                )
+                DropdownMenu(
+                    expanded = contactMenuExpanded,
+                    onDismissRequest = { contactMenuExpanded = false },
+                ) {
+                    contacts.forEach { contact ->
+                        DropdownMenuItem(
+                            text = { Text(contact.displayName) },
+                            onClick = {
+                                onInputChanged()
+                                onSelectedContactIdChange(contact.id.value)
+                                contactMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+            if (contacts.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.events_no_contacts_for_manual),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            OutlinedTextField(
+                value = newContactName,
+                onValueChange = {
+                    onInputChanged()
+                    onNewContactNameChange(it)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.events_new_contact_name)) },
+                singleLine = true,
+                colors = relateTextFieldColors(),
+            )
+        }
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        ) {
+            eventTypeOptions.forEach { value ->
+                FilterChip(
+                    label = eventTypeLabel(value),
+                    isSelected = eventType == value,
+                    onClick = {
+                        onInputChanged()
+                        onEventTypeChange(value)
+                    },
+                )
+            }
+        }
+
+        OutlinedTextField(
+            value = label,
+            onValueChange = {
+                onInputChanged()
+                onLabelChange(it)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.events_label)) },
+            placeholder = { Text(stringResource(R.string.optional)) },
+            singleLine = true,
+            colors = relateTextFieldColors(),
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
+            OutlinedTextField(
+                value = monthText,
+                onValueChange = {
+                    onInputChanged()
+                    onMonthTextChange(it)
+                },
+                modifier = Modifier.weight(1f),
+                label = { Text(stringResource(R.string.events_month_label)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                colors = relateTextFieldColors(),
+            )
+            OutlinedTextField(
+                value = dayText,
+                onValueChange = {
+                    onInputChanged()
+                    onDayTextChange(it)
+                },
+                modifier = Modifier.weight(1f),
+                label = { Text(stringResource(R.string.events_day_label)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                colors = relateTextFieldColors(),
+            )
+            OutlinedTextField(
+                value = yearText,
+                onValueChange = {
+                    onInputChanged()
+                    onYearTextChange(it)
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(EventsTestTags.MANUAL_YEAR_FIELD),
+                label = { Text(stringResource(R.string.events_year_label)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                colors = relateTextFieldColors(),
+            )
+        }
+
+        localError?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        duplicateWarning?.let { warning ->
+            val warningMessage = when (warning.kind) {
+                ManualEventWarningKind.DUPLICATE -> stringResource(
+                    R.string.events_duplicate_message,
+                    warning.contactName,
+                    eventTypeLabel(warning.eventType),
+                    warning.month,
+                    warning.dayOfMonth,
+                )
+                ManualEventWarningKind.DATE_CONFLICT -> stringResource(
+                    R.string.events_conflict_message,
+                    warning.contactName,
+                    eventTypeLabel(warning.eventType),
+                    warning.month,
+                    warning.dayOfMonth,
+                    warning.requestedMonth ?: warning.month,
+                    warning.requestedDayOfMonth ?: warning.dayOfMonth,
+                )
+            }
+            Column(
+                modifier = Modifier.testTag(EventsTestTags.MANUAL_WARNING),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs),
+            ) {
+                Text(
+                    text = stringResource(
+                        when (warning.kind) {
+                            ManualEventWarningKind.DUPLICATE -> R.string.events_duplicate_title
+                            ManualEventWarningKind.DATE_CONFLICT -> R.string.events_conflict_title
+                        }
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.relateSemanticColors.warning,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = warningMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -728,14 +798,14 @@ private fun EventCard(
     val sourceLabel = eventSourceLabel(trustState.source).ifBlank { stringResource(R.string.event_source_unknown) }
     val verificationLabel = eventVerificationLabel(trustState)
     val sourceColor = when (EventResolutionPolicy.baseSource(trustState.source).trim().uppercase(Locale.US)) {
-        "MANUAL" -> RelatePrimary
+        "MANUAL" -> MaterialTheme.colorScheme.primary
         "CONFLICT" -> MaterialTheme.colorScheme.error
-        else -> RelateOnSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     val verificationColor = when (trustState.verification) {
         EventVerificationState.CONFLICT -> MaterialTheme.colorScheme.error
-        EventVerificationState.VERIFIED -> RelatePrimary
-        EventVerificationState.NEEDS_REVIEW -> RelateWarning
+        EventVerificationState.VERIFIED -> MaterialTheme.colorScheme.primary
+        EventVerificationState.NEEDS_REVIEW -> MaterialTheme.relateSemanticColors.warning
     }
 
     RelateGlassCard {
@@ -748,15 +818,22 @@ private fun EventCard(
                     .size(RelateSize.minTouchTarget)
                     .clip(RoundedCornerShape(RelateRadius.control))
                     .background(
-                        if (daysUntil <= 14) RelatePrimary.copy(alpha = RelateAlpha.feedbackContainer)
-                        else RelateSurfaceVariant
+                        if (daysUntil <= 14) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = RelateAlpha.feedbackContainer)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        }
                     ),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     eventTypeIcon(event.type.raw),
                     contentDescription = null,
-                    tint = if (daysUntil <= 14) RelatePrimary else RelateOnSurfaceVariant,
+                    tint = if (daysUntil <= 14) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                     modifier = Modifier.size(RelateSize.iconLg),
                 )
             }
@@ -775,7 +852,7 @@ private fun EventCard(
                         dateFormat.format(Date(event.nextOccurrenceMs)),
                     ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(RelateSpacing.sm))
                 FlowRow(
@@ -796,7 +873,7 @@ private fun EventCard(
                             color = if (trustState.conflict == EventTrustConflictState.DATE_CONFLICT) {
                                 MaterialTheme.colorScheme.error
                             } else {
-                                RelateWarning
+                                MaterialTheme.relateSemanticColors.warning
                             },
                         )
                     }
@@ -832,13 +909,13 @@ private fun EventCard(
                 Text(
                     text = "$daysUntil",
                     style = MaterialTheme.typography.headlineSmall,
-                    color = RelatePrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
                     text = stringResource(R.string.days),
                     style = MaterialTheme.typography.labelSmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

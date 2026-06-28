@@ -810,6 +810,11 @@
     <string name="activity_filter_last_30_days">30 days</string>
     <string name="activity_filter_open">Open</string>
     <string name="activity_filter_resolved">Resolved</string>
+    <string name="activity_severity_info">Info</string>
+    <string name="activity_severity_warning">Warning</string>
+    <string name="activity_severity_error">Error</string>
+    <string name="activity_severity_unknown">Unknown</string>
+    <string name="activity_status_unknown">Unknown</string>
     <string name="settings_activity_history_subtitle">Review recent app activity</string>
 
     <!-- Roadmap implementation -->

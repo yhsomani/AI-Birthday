@@ -120,6 +120,12 @@ class ProductionReadinessConfigTest {
         assertTrue(workflow.contains("deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, LGPL-2.1, LGPL-3.0"))
         assertTrue(workflow.contains("java-version: \"21\""))
         assertTrue(workflow.contains("./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache"))
+        assertTrue(workflow.contains("Verify screenshot baselines"))
+        assertTrue(
+            workflow.contains(
+                "./gradlew :app:verifyRoborazziDebug -Pscreenshot --tests 'com.example.ui.screenshots.*' --no-configuration-cache"
+            )
+        )
         assertTrue(workflow.contains("Verify release readiness guardrails"))
         assertTrue(
             workflow.contains(
@@ -135,6 +141,10 @@ class ProductionReadinessConfigTest {
         assertTrue(workflow.contains("actions/upload-artifact@v4"))
         assertTrue(workflow.contains("lint-reports"))
         assertTrue(workflow.contains("unit-test-reports"))
+        assertTrue(workflow.contains("roborazzi-reports"))
+        assertTrue(workflow.contains("app/build/reports/roborazzi/**"))
+        assertTrue(workflow.contains("app/build/outputs/roborazzi/**"))
+        assertTrue(workflow.contains("app/build/test-results/roborazzi/**"))
         assertTrue(workflow.contains("./gradlew jacocoDebugUnitTestReport --no-configuration-cache"))
         assertTrue(workflow.contains("coverage-reports"))
         assertTrue(workflow.contains("debug-apk"))

@@ -87,6 +87,12 @@ internal object ContactDetailTestTags {
     const val ACTION_ADD_GIFT = "contact_detail_action_add_gift"
     const val ACTION_EDIT_PREFERENCES = "contact_detail_action_edit_preferences"
     const val CONTENT_BOTTOM = "contact_detail_content_bottom"
+    const val PREFERENCES_DIALOG = "contact_preferences_dialog"
+    const val PREFERENCES_FORM_BODY = "contact_preferences_form_body"
+    const val PREFERENCES_NOTES_FIELD = "contact_preferences_notes_field"
+    const val PREFERENCES_SKIP_AUTO_WISH = "contact_preferences_skip_auto_wish"
+    const val PREFERENCES_SAVE = "contact_preferences_save"
+    const val PREFERENCES_CANCEL = "contact_preferences_cancel"
 }
 
 @Composable
@@ -836,96 +842,53 @@ internal fun ContactPreferencesDialog(
     val invalidSendTime = stringResource(R.string.contact_preferences_invalid_send_time)
 
     AlertDialog(
+        modifier = Modifier.testTag(ContactDetailTestTags.PREFERENCES_DIALOG),
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.contact_preferences_title)) },
+        title = {
+            Text(
+                text = stringResource(R.string.contact_preferences_title),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        },
         text = {
-            Column(
-                modifier = Modifier
-                    .height(RelateSize.dialogContentMaxHeight)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
-            ) {
-                PreferenceField(R.string.contact_preferences_nickname, nickname) { nickname = it }
-                PreferenceField(R.string.contact_preferences_relationship_type, relationshipType) { relationshipType = it }
-                ChoiceRow(
-                    titleRes = R.string.contact_preferences_language,
-                    options = listOf(
-                        "en" to stringResource(R.string.language_english),
-                        "hi" to stringResource(R.string.language_hindi),
-                    ),
-                    selected = language,
-                    onSelect = { language = it },
-                )
-                ChoiceRow(
-                    titleRes = R.string.contact_preferences_channel,
-                    options = listOf(
-                        MessageChannel.SMS to stringResource(R.string.channel_sms),
-                        MessageChannel.WHATSAPP to stringResource(R.string.channel_whatsapp),
-                        MessageChannel.EMAIL to stringResource(R.string.channel_email),
-                    ),
-                    selected = channel,
-                    onSelect = { channel = it },
-                )
-                ChoiceRow(
-                    titleRes = R.string.contact_preferences_formality,
-                    options = listOf(
-                        "CASUAL" to stringResource(R.string.formality_casual),
-                        "SEMI_FORMAL" to stringResource(R.string.formality_semi_formal),
-                        "FORMAL" to stringResource(R.string.formality_formal),
-                    ),
-                    selected = formality,
-                    onSelect = { formality = it },
-                )
-                ChoiceRow(
-                    titleRes = R.string.contact_preferences_style,
-                    options = listOf(
-                        "WARM" to stringResource(R.string.style_warm),
-                        "FUNNY" to stringResource(R.string.style_funny),
-                        "PROFESSIONAL" to stringResource(R.string.style_professional),
-                        "EMOTIONAL" to stringResource(R.string.style_emotional),
-                    ),
-                    selected = style,
-                    onSelect = { style = it },
-                )
-                ChoiceRow(
-                    titleRes = R.string.contact_preferences_automation_mode,
-                    options = listOf(
-                        ApprovalMode.DEFAULT to stringResource(R.string.automation_mode_default),
-                        ApprovalMode.SMART_APPROVE to stringResource(R.string.automation_mode_smart_approve_default),
-                        ApprovalMode.VIP_APPROVE to stringResource(R.string.automation_mode_vip_approve),
-                        ApprovalMode.FULLY_AUTO to stringResource(R.string.automation_mode_fully_auto),
-                        ApprovalMode.ALWAYS_ASK to stringResource(R.string.automation_mode_always_ask),
-                    ),
-                    selected = automationMode,
-                    onSelect = { automationMode = it },
-                )
-                PreferenceField(R.string.contact_preferences_send_time, sendTime) { sendTime = it }
-                PreferenceField(R.string.contact_preferences_gift_budget, giftBudget) { giftBudget = it.filter(Char::isDigit) }
-                PreferenceField(R.string.contact_preferences_annual_budget, annualBudget) { annualBudget = it.filter(Char::isDigit) }
-                PreferenceField(R.string.contact_preferences_interests, interests) { interests = it }
-                PreferenceField(R.string.contact_preferences_sensitive_topics, sensitiveTopics) { sensitiveTopics = it }
-                PreferenceField(R.string.contact_preferences_life_phase, lifePhase) { lifePhase = it }
-                PreferenceField(R.string.contact_preferences_notes, notes, minLines = 2) { notes = it }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = stringResource(R.string.contact_preferences_skip_auto_wish),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Switch(checked = skipAutoWish, onCheckedChange = { skipAutoWish = it })
-                }
-                localError?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
+            ContactPreferencesDialogBody(
+                nickname = nickname,
+                onNicknameChange = { nickname = it },
+                relationshipType = relationshipType,
+                onRelationshipTypeChange = { relationshipType = it },
+                language = language,
+                onLanguageChange = { language = it },
+                channel = channel,
+                onChannelChange = { channel = it },
+                formality = formality,
+                onFormalityChange = { formality = it },
+                style = style,
+                onStyleChange = { style = it },
+                automationMode = automationMode,
+                onAutomationModeChange = { automationMode = it },
+                sendTime = sendTime,
+                onSendTimeChange = { sendTime = it },
+                giftBudget = giftBudget,
+                onGiftBudgetChange = { giftBudget = it.filter(Char::isDigit) },
+                annualBudget = annualBudget,
+                onAnnualBudgetChange = { annualBudget = it.filter(Char::isDigit) },
+                interests = interests,
+                onInterestsChange = { interests = it },
+                sensitiveTopics = sensitiveTopics,
+                onSensitiveTopicsChange = { sensitiveTopics = it },
+                lifePhase = lifePhase,
+                onLifePhaseChange = { lifePhase = it },
+                notes = notes,
+                onNotesChange = { notes = it },
+                skipAutoWish = skipAutoWish,
+                onSkipAutoWishChange = { skipAutoWish = it },
+                localError = localError,
+            )
         },
         confirmButton = {
             TextButton(
                 enabled = !isSaving,
+                modifier = Modifier.testTag(ContactDetailTestTags.PREFERENCES_SAVE),
                 onClick = {
                     val parsedTime = sendTime.parseSendTime()
                     if (sendTime.isNotBlank() && parsedTime == null) {
@@ -959,11 +922,152 @@ internal fun ContactPreferencesDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag(ContactDetailTestTags.PREFERENCES_CANCEL),
+            ) {
                 Text(stringResource(R.string.cancel))
             }
         },
     )
+}
+
+@Composable
+internal fun ContactPreferencesDialogBody(
+    nickname: String,
+    onNicknameChange: (String) -> Unit,
+    relationshipType: String,
+    onRelationshipTypeChange: (String) -> Unit,
+    language: String,
+    onLanguageChange: (String) -> Unit,
+    channel: MessageChannel,
+    onChannelChange: (MessageChannel) -> Unit,
+    formality: String,
+    onFormalityChange: (String) -> Unit,
+    style: String,
+    onStyleChange: (String) -> Unit,
+    automationMode: ApprovalMode,
+    onAutomationModeChange: (ApprovalMode) -> Unit,
+    sendTime: String,
+    onSendTimeChange: (String) -> Unit,
+    giftBudget: String,
+    onGiftBudgetChange: (String) -> Unit,
+    annualBudget: String,
+    onAnnualBudgetChange: (String) -> Unit,
+    interests: String,
+    onInterestsChange: (String) -> Unit,
+    sensitiveTopics: String,
+    onSensitiveTopicsChange: (String) -> Unit,
+    lifePhase: String,
+    onLifePhaseChange: (String) -> Unit,
+    notes: String,
+    onNotesChange: (String) -> Unit,
+    skipAutoWish: Boolean,
+    onSkipAutoWishChange: (Boolean) -> Unit,
+    localError: String?,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .height(RelateSize.dialogContentMaxHeight)
+            .verticalScroll(rememberScrollState())
+            .testTag(ContactDetailTestTags.PREFERENCES_FORM_BODY),
+        verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
+    ) {
+        PreferenceField(R.string.contact_preferences_nickname, nickname, onChange = onNicknameChange)
+        PreferenceField(
+            labelRes = R.string.contact_preferences_relationship_type,
+            value = relationshipType,
+            onChange = onRelationshipTypeChange,
+        )
+        ChoiceRow(
+            titleRes = R.string.contact_preferences_language,
+            options = listOf(
+                "en" to stringResource(R.string.language_english),
+                "hi" to stringResource(R.string.language_hindi),
+            ),
+            selected = language,
+            onSelect = onLanguageChange,
+        )
+        ChoiceRow(
+            titleRes = R.string.contact_preferences_channel,
+            options = listOf(
+                MessageChannel.SMS to stringResource(R.string.channel_sms),
+                MessageChannel.WHATSAPP to stringResource(R.string.channel_whatsapp),
+                MessageChannel.EMAIL to stringResource(R.string.channel_email),
+            ),
+            selected = channel,
+            onSelect = onChannelChange,
+        )
+        ChoiceRow(
+            titleRes = R.string.contact_preferences_formality,
+            options = listOf(
+                "CASUAL" to stringResource(R.string.formality_casual),
+                "SEMI_FORMAL" to stringResource(R.string.formality_semi_formal),
+                "FORMAL" to stringResource(R.string.formality_formal),
+            ),
+            selected = formality,
+            onSelect = onFormalityChange,
+        )
+        ChoiceRow(
+            titleRes = R.string.contact_preferences_style,
+            options = listOf(
+                "WARM" to stringResource(R.string.style_warm),
+                "FUNNY" to stringResource(R.string.style_funny),
+                "PROFESSIONAL" to stringResource(R.string.style_professional),
+                "EMOTIONAL" to stringResource(R.string.style_emotional),
+            ),
+            selected = style,
+            onSelect = onStyleChange,
+        )
+        ChoiceRow(
+            titleRes = R.string.contact_preferences_automation_mode,
+            options = listOf(
+                ApprovalMode.DEFAULT to stringResource(R.string.automation_mode_default),
+                ApprovalMode.SMART_APPROVE to stringResource(R.string.automation_mode_smart_approve_default),
+                ApprovalMode.VIP_APPROVE to stringResource(R.string.automation_mode_vip_approve),
+                ApprovalMode.FULLY_AUTO to stringResource(R.string.automation_mode_fully_auto),
+                ApprovalMode.ALWAYS_ASK to stringResource(R.string.automation_mode_always_ask),
+            ),
+            selected = automationMode,
+            onSelect = onAutomationModeChange,
+        )
+        PreferenceField(R.string.contact_preferences_send_time, sendTime, onChange = onSendTimeChange)
+        PreferenceField(R.string.contact_preferences_gift_budget, giftBudget, onChange = onGiftBudgetChange)
+        PreferenceField(R.string.contact_preferences_annual_budget, annualBudget, onChange = onAnnualBudgetChange)
+        PreferenceField(R.string.contact_preferences_interests, interests, onChange = onInterestsChange)
+        PreferenceField(
+            labelRes = R.string.contact_preferences_sensitive_topics,
+            value = sensitiveTopics,
+            onChange = onSensitiveTopicsChange,
+        )
+        PreferenceField(R.string.contact_preferences_life_phase, lifePhase, onChange = onLifePhaseChange)
+        PreferenceField(
+            labelRes = R.string.contact_preferences_notes,
+            value = notes,
+            minLines = 2,
+            modifier = Modifier.testTag(ContactDetailTestTags.PREFERENCES_NOTES_FIELD),
+            onChange = onNotesChange,
+        )
+        Row(
+            modifier = Modifier.testTag(ContactDetailTestTags.PREFERENCES_SKIP_AUTO_WISH),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.contact_preferences_skip_auto_wish),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(checked = skipAutoWish, onCheckedChange = onSkipAutoWishChange)
+        }
+        localError?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
 }
 
 @Composable
@@ -1021,6 +1125,7 @@ private fun PreferenceField(
     labelRes: Int,
     value: String,
     minLines: Int = 1,
+    modifier: Modifier = Modifier,
     onChange: (String) -> Unit,
 ) {
     OutlinedTextField(
@@ -1029,7 +1134,7 @@ private fun PreferenceField(
         label = { Text(stringResource(labelRes)) },
         minLines = minLines,
         maxLines = if (minLines > 1) 4 else 1,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     )
 }
 

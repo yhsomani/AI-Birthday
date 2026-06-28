@@ -38,6 +38,15 @@ class OnboardingScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun onboardingDefault_typicalPhone() {
+        setOnboardingContent()
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/onboarding_default_typical_phone.png")
+    }
+
+    @Test
     fun onboardingDefault_compactPhoneLargeFont() {
         setOnboardingContent(fontScale = LargeFontScale)
 
@@ -53,6 +62,28 @@ class OnboardingScreenshotTest {
             .performScrollTo()
         composeRule.onRoot()
             .captureRoboImage("src/test/screenshots/baseline/onboarding_actions_compact_phone_large_font.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun onboardingActions_typicalPhone() {
+        setOnboardingContent()
+
+        composeRule.onNodeWithTag(OnboardingTestTags.SETUP_CHECKLIST_BUTTON)
+            .performScrollTo()
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/onboarding_actions_typical_phone.png")
+    }
+
+    @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun onboardingActions_compactPhoneHindiLargeFont() {
+        setOnboardingContent(fontScale = LargeFontScale)
+
+        composeRule.onNodeWithTag(OnboardingTestTags.SETUP_CHECKLIST_BUTTON)
+            .performScrollTo()
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/onboarding_actions_compact_phone_hindi_large_font.png")
     }
 
     private fun setOnboardingContent(fontScale: Float = DefaultFontScale) {

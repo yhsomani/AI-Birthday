@@ -89,9 +89,12 @@ import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.ui.feedback.asString
+import com.example.ui.viewmodel.SettingsUiState
 import com.example.ui.viewmodel.SettingsViewModel
 
 internal object SettingsScreenTestTags {
+    const val AI_CONFIGURATION_SECTION = "settings_ai_configuration_section"
+    const val DATA_SYNC_SECTION = "settings_data_sync_section"
     const val SIGN_OUT_TRIGGER = "settings_sign_out_trigger"
     const val SIGN_OUT_DIALOG = "settings_sign_out_dialog"
     const val SIGN_OUT_CONFIRM = "settings_sign_out_confirm"
@@ -108,10 +111,7 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
-    var showModeMenu by remember { mutableStateOf(false) }
-    var showSignOutDialog by remember { mutableStateOf(false) }
     val contactsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) {
@@ -136,6 +136,64 @@ fun SettingsScreen(
             viewModel.clearSyncError()
         }
     }
+
+    SettingsContent(
+        state = state,
+        snackbarHostState = snackbarHostState,
+        onBirthdayRemindersChange = viewModel::toggleBirthdayReminders,
+        onAiWishGenerationChange = viewModel::toggleAiWishGeneration,
+        onBiometricLockChange = viewModel::toggleBiometricLock,
+        onNavigateToStyleCoach = onNavigateToStyleCoach,
+        onNavigateToAutomationSetup = onNavigateToAutomationSetup,
+        onGeminiApiKeyChange = viewModel::onGeminiApiKeyChange,
+        onSaveGeminiApiKey = viewModel::saveGeminiApiKey,
+        onSenderEmailChange = viewModel::onSenderEmailChange,
+        onSenderEmailPasswordChange = viewModel::onSenderEmailPasswordChange,
+        onSaveSenderEmailSettings = viewModel::saveSenderEmailSettings,
+        onAutomationModeChange = viewModel::setAutomationMode,
+        onQuietHoursStartChange = viewModel::onQuietHoursStartChange,
+        onQuietHoursEndChange = viewModel::onQuietHoursEndChange,
+        onSaveQuietHours = viewModel::saveQuietHours,
+        onChannelBlackoutChange = viewModel::toggleChannelBlackout,
+        onDismissLegacyDbNotice = viewModel::dismissLegacyDbNotice,
+        onSyncContacts = syncContacts,
+        onNavigateToBackupRestore = onNavigateToBackupRestore,
+        onNavigateToActivityHistory = onNavigateToActivityHistory,
+        onSignOut = {
+            viewModel.signOut()
+            onSignOut()
+        },
+    )
+}
+
+@Composable
+internal fun SettingsContent(
+    state: SettingsUiState,
+    snackbarHostState: SnackbarHostState,
+    onBirthdayRemindersChange: (Boolean) -> Unit = {},
+    onAiWishGenerationChange: (Boolean) -> Unit = {},
+    onBiometricLockChange: (Boolean) -> Unit = {},
+    onNavigateToStyleCoach: () -> Unit = {},
+    onNavigateToAutomationSetup: () -> Unit = {},
+    onGeminiApiKeyChange: (String) -> Unit = {},
+    onSaveGeminiApiKey: () -> Unit = {},
+    onSenderEmailChange: (String) -> Unit = {},
+    onSenderEmailPasswordChange: (String) -> Unit = {},
+    onSaveSenderEmailSettings: () -> Unit = {},
+    onAutomationModeChange: (ApprovalMode) -> Unit = {},
+    onQuietHoursStartChange: (String) -> Unit = {},
+    onQuietHoursEndChange: (String) -> Unit = {},
+    onSaveQuietHours: () -> Unit = {},
+    onChannelBlackoutChange: (MessageChannel, Boolean) -> Unit = { _, _ -> },
+    onDismissLegacyDbNotice: () -> Unit = {},
+    onSyncContacts: () -> Unit = {},
+    onNavigateToBackupRestore: () -> Unit = {},
+    onNavigateToActivityHistory: () -> Unit = {},
+    onSignOut: () -> Unit = {},
+) {
+    val focusManager = LocalFocusManager.current
+    var showModeMenu by remember { mutableStateOf(false) }
+    var showSignOutDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -206,19 +264,19 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_birthday_reminders),
                             icon = Icons.Filled.Notifications,
                             checked = state.birthdayReminders,
-                        ) { viewModel.toggleBirthdayReminders(it) }
+                        ) { onBirthdayRemindersChange(it) }
                         SettingsDivider()
                         SettingsToggle(
                             title = stringResource(R.string.settings_ai_wish_generation),
                             icon = Icons.Filled.SmartToy,
                             checked = state.aiWishGeneration,
-                        ) { viewModel.toggleAiWishGeneration(it) }
+                        ) { onAiWishGenerationChange(it) }
                         SettingsDivider()
                         SettingsToggle(
                             title = stringResource(R.string.settings_biometric_lock),
                             icon = Icons.Filled.Security,
                             checked = state.biometricLockEnabled,
-                        ) { viewModel.toggleBiometricLock(it) }
+                        ) { onBiometricLockChange(it) }
                         SettingsDivider()
                         SettingsRow(
                             icon = Icons.Filled.Person,
@@ -238,7 +296,10 @@ fun SettingsScreen(
 
                 // AI configuration and send readiness
             Spacer(modifier = Modifier.height(RelateSpacing.xl))
-            SettingsSection(stringResource(R.string.settings_ai_configuration_section)) {
+            SettingsSection(
+                title = stringResource(R.string.settings_ai_configuration_section),
+                modifier = Modifier.testTag(SettingsScreenTestTags.AI_CONFIGURATION_SECTION),
+            ) {
                 SettingsCard {
                     Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
                         Text(
@@ -254,7 +315,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(RelateSpacing.sm))
                         OutlinedTextField(
                             value = state.geminiApiKey,
-                            onValueChange = viewModel::onGeminiApiKeyChange,
+                            onValueChange = onGeminiApiKeyChange,
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text(stringResource(R.string.settings_gemini_api_key_placeholder), color = RelateOnSurfaceVariant) },
                             visualTransformation = PasswordVisualTransformation(),
@@ -262,7 +323,7 @@ fun SettingsScreen(
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(onDone = {
                                 focusManager.clearFocus()
-                                viewModel.saveGeminiApiKey()
+                                onSaveGeminiApiKey()
                             }),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = RelatePrimary,
@@ -278,7 +339,7 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 focusManager.clearFocus()
-                                viewModel.saveGeminiApiKey()
+                                onSaveGeminiApiKey()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
                             shape = RoundedCornerShape(RelateRadius.control),
@@ -319,7 +380,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(RelateSpacing.sm))
                         OutlinedTextField(
                             value = state.senderEmail,
-                            onValueChange = viewModel::onSenderEmailChange,
+                            onValueChange = onSenderEmailChange,
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text(stringResource(R.string.settings_sender_email)) },
                             singleLine = true,
@@ -336,7 +397,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(RelateSpacing.sm))
                         OutlinedTextField(
                             value = state.senderEmailPassword,
-                            onValueChange = viewModel::onSenderEmailPasswordChange,
+                            onValueChange = onSenderEmailPasswordChange,
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text(stringResource(R.string.settings_app_password)) },
                             visualTransformation = PasswordVisualTransformation(),
@@ -355,7 +416,7 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 focusManager.clearFocus()
-                                viewModel.saveSenderEmailSettings()
+                                onSaveSenderEmailSettings()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
                             shape = RoundedCornerShape(RelateRadius.control),
@@ -392,7 +453,7 @@ fun SettingsScreen(
                                 DropdownMenuItem(
                                     text = { Text(label) },
                                     onClick = {
-                                        viewModel.setAutomationMode(mode)
+                                        onAutomationModeChange(mode)
                                         showModeMenu = false
                                     }
                                 )
@@ -403,27 +464,30 @@ fun SettingsScreen(
                     QuietHoursEditor(
                         start = state.quietHoursStart,
                         end = state.quietHoursEnd,
-                        onStartChange = viewModel::onQuietHoursStartChange,
-                        onEndChange = viewModel::onQuietHoursEndChange,
-                        onSave = viewModel::saveQuietHours,
+                        onStartChange = onQuietHoursStartChange,
+                        onEndChange = onQuietHoursEndChange,
+                        onSave = onSaveQuietHours,
                     )
                     SettingsDivider()
                     ChannelBlackoutEditor(
                         smsDisabled = state.channelBlackoutSms,
                         whatsAppDisabled = state.channelBlackoutWhatsApp,
                         emailDisabled = state.channelBlackoutEmail,
-                        onSmsChange = { viewModel.toggleChannelBlackout(MessageChannel.SMS, it) },
-                        onWhatsAppChange = { viewModel.toggleChannelBlackout(MessageChannel.WHATSAPP, it) },
-                        onEmailChange = { viewModel.toggleChannelBlackout(MessageChannel.EMAIL, it) },
+                        onSmsChange = { onChannelBlackoutChange(MessageChannel.SMS, it) },
+                        onWhatsAppChange = { onChannelBlackoutChange(MessageChannel.WHATSAPP, it) },
+                        onEmailChange = { onChannelBlackoutChange(MessageChannel.EMAIL, it) },
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(RelateSpacing.xl))
-            SettingsSection(stringResource(R.string.settings_data_sync_section)) {
+            SettingsSection(
+                title = stringResource(R.string.settings_data_sync_section),
+                modifier = Modifier.testTag(SettingsScreenTestTags.DATA_SYNC_SECTION),
+            ) {
                 SettingsCard {
                     if (state.showLegacyDbNotice) {
-                        LegacyDbNotice(onDismiss = viewModel::dismissLegacyDbNotice)
+                        LegacyDbNotice(onDismiss = onDismissLegacyDbNotice)
                         SettingsDivider()
                     }
                     val subtitle = if (state.isSyncing) {
@@ -435,7 +499,7 @@ fun SettingsScreen(
                         icon = Icons.Filled.CloudSync,
                         title = stringResource(R.string.settings_sync_contacts),
                         subtitle = subtitle,
-                        onClick = { if (!state.isSyncing) syncContacts() }
+                        onClick = { if (!state.isSyncing) onSyncContacts() }
                     )
                     SettingsDivider()
                     SettingsRow(
@@ -494,7 +558,6 @@ fun SettingsScreen(
                 onDismiss = { showSignOutDialog = false },
                 onConfirm = {
                     showSignOutDialog = false
-                    viewModel.signOut()
                     onSignOut()
                 },
             )
@@ -726,12 +789,16 @@ private fun LegacyDbNotice(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun SettingsSection(title: String, content: @Composable () -> Unit) {
+private fun SettingsSection(
+    title: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall,
         color = RelatePrimary,
-        modifier = Modifier.padding(bottom = RelateSpacing.sm),
+        modifier = modifier.padding(bottom = RelateSpacing.sm),
     )
     content()
 }

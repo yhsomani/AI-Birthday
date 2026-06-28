@@ -811,6 +811,11 @@
     <string name="activity_filter_last_30_days">30 दिन</string>
     <string name="activity_filter_open">खुला</string>
     <string name="activity_filter_resolved">हल किया गया</string>
+    <string name="activity_severity_info">जानकारी</string>
+    <string name="activity_severity_warning">चेतावनी</string>
+    <string name="activity_severity_error">त्रुटि</string>
+    <string name="activity_severity_unknown">अज्ञात</string>
+    <string name="activity_status_unknown">अज्ञात</string>
     <string name="settings_activity_history_subtitle">हाल की ऐप गतिविधि देखें</string>
 
     <!-- Roadmap implementation -->

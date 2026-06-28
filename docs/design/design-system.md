@@ -1,6 +1,6 @@
 # RelateAI Design System
 
-Last reviewed: 2026-06-27
+Last reviewed: 2026-06-28
 
 RelateAI is an operational relationship assistant. The UI should feel calm, direct, and efficient: dense enough for repeated work, clear enough for new users, and careful around automation, permissions, and personal data.
 
@@ -10,6 +10,15 @@ RelateAI is an operational relationship assistant. The UI should feel calm, dire
 - Shared components: `core/ui/src/main/kotlin/com/example/core/ui/components`
 - App shell navigation: `app/src/main/java/com/example/MainActivity.kt`
 - Screen routes: `app/src/main/java/com/example/ui/navigation/Screen.kt`
+
+## Theme Mode Policy
+
+- Supported production mode: dark theme only.
+- `RelateAITheme` intentionally installs the validated dark color scheme by default, and `RelateThemeContractTest` guards that contract.
+- `RelateAITheme` also provides `MaterialTheme.relateSemanticColors` for card surfaces, card outlines, status accents, and status containers. Shared components and screen-local status accents should read card, success, warning, and info colors from this semantic layer instead of importing dark-specific color exports directly.
+- Splash, Auth, Events, and Chat History production color roles now read from `MaterialTheme.colorScheme` or `MaterialTheme.relateSemanticColors`; use that pattern when migrating remaining screen-local color reads.
+- Light and dynamic color are deferred because other production screens and screenshot fixtures still import dark-specific color tokens such as `RelateDarkBackground`, `RelateCard`, and `RelateSurfaceVariant` directly. Enabling system light or dynamic color before those surfaces are tokenized and contrast-reviewed would create unverified presentation changes.
+- Future light/dynamic support must first replace dark-specific exported color use with semantic/theme-backed tokens, then add compact-phone, typical-phone, large-font, and Hindi Roborazzi baselines before release.
 
 ## Tokens
 
@@ -105,6 +114,8 @@ Color:
 
 - Neutral surfaces should carry most of the UI. Accent color should identify status, route, or priority, not decorate every section.
 - Purple remains the current primary accent, but redesign work should reduce one-note purple/slate dominance by using semantic green, amber, red, cyan, and rose only where they clarify state.
+- Use `MaterialTheme.relateSemanticColors.cardContainer` and `.cardOutline` for reusable card primitives that need the RelateAI card treatment rather than Material's default surface.
+- Use `MaterialTheme.relateSemanticColors.success`, `.warning`, and `.info` plus their `on*` and `*Container` companions for reusable status and feedback UI. Error colors come from `MaterialTheme.colorScheme.error` unless a component explicitly needs an error container.
 - Provider, channel, and status colors must be tokenized before broad reuse.
 - Error/success/warning colors must not be used as decorative accents.
 
@@ -134,6 +145,7 @@ Typography:
 - Use for repeated items, grouped settings, status panels, and compact summaries.
 - Do not nest cards.
 - Keep card radius at `RelateRadius.card`.
+- Card container and border colors come from `MaterialTheme.relateSemanticColors` so future theme modes can replace those values centrally.
 
 `RelatePrimaryButton`:
 
@@ -147,6 +159,7 @@ Typography:
 - Use for setup blockers, warnings, success, and transient feedback.
 - Messages must be redacted and actionable.
 - Live region feedback should stay concise.
+- Shared warning/error/success/info surfaces use `MaterialTheme.relateSemanticColors` or `MaterialTheme.colorScheme.error` so future theme modes can replace palette values centrally.
 
 `StatCard`:
 
@@ -164,6 +177,12 @@ Typography:
 - Use where skeleton shape is known.
 - Prefer skeletons for list/card loading and progress indicators for one-off blocking work.
 - Shimmer colors and alpha values must use theme colors and `RelateAlpha` tokens, not raw grays.
+
+Pager-backed queue/list content:
+
+- Populated list pages should fill the pager page and top-align rows directly below their filters.
+- Centered content is reserved for intentional loading or empty states.
+- Keep pager alignment presentation-only; tabs, filters, selection, and ViewModel state remain owned by the screen.
 
 `RelateAvatar` and `HealthIndicatorDot`:
 
@@ -185,6 +204,7 @@ Typography:
 - Chips/tabs are for filters and modes.
 - Menus are for compact option sets.
 - Buttons execute commands.
+- Use scaffold-reserved bottom action bars for persistent screen commands that must remain available while content scrolls; avoid overlay FABs when they hide list or card content.
 - Destructive actions require confirmation and route through the existing business orchestrator.
 - Automation actions must expose setup blockers before dispatch.
 

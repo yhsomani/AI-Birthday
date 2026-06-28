@@ -332,6 +332,7 @@ internal fun MessagesContent(
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.Top,
                 ) { page ->
                     when (page) {
                         0 -> PendingMessagesList(
@@ -471,6 +472,7 @@ private fun PendingMessagesList(
         EmptyState(message = emptyText)
     } else {
         LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = RelateSpacing.lg),
             verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)
         ) {
@@ -497,6 +499,7 @@ private fun SentMessagesList(messages: List<SentMessageItem>) {
         EmptyState(message = stringResource(R.string.messages_empty_sent))
     } else {
         LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = RelateSpacing.lg),
             verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)
         ) {
@@ -523,6 +526,7 @@ private fun FailedMessagesList(
         EmptyState(message = stringResource(R.string.messages_empty_failed))
     } else {
         LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = RelateSpacing.lg),
             verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)
         ) {
@@ -1122,6 +1126,7 @@ private fun ApprovedMessagesList(
         EmptyState(message = emptyText)
     } else {
         LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = RelateSpacing.lg),
             verticalArrangement = Arrangement.spacedBy(RelateSpacing.md)
         ) {

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.domain.model.ApprovalMode
@@ -52,6 +53,15 @@ class MessagesScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun messagesNeedsReview_typicalPhone() {
+        setMessagesContent(state = messagesState())
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/messages_needs_review_typical_phone.png")
+    }
+
+    @Test
     fun messagesNeedsReview_compactPhoneLargeFont() {
         setMessagesContent(
             state = messagesState(),
@@ -60,6 +70,20 @@ class MessagesScreenshotTest {
 
         composeRule.onRoot()
             .captureRoboImage("src/test/screenshots/baseline/messages_needs_review_compact_phone_large_font.png")
+    }
+
+    @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun messagesNeedsReview_compactPhoneHindiLargeFont() {
+        setMessagesContent(
+            state = messagesState(
+                needsReviewSelectedText = "जन्मदिन मुबारक हो, तारा। उम्मीद है आपका दिन अपनापन, सुकून और छोटी खुशियों से भरा रहे।",
+            ),
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/messages_needs_review_compact_phone_hindi_large_font.png")
     }
 
     @Test
@@ -77,6 +101,75 @@ class MessagesScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun messagesFailedRecovery_typicalPhone() {
+        setMessagesContent(
+            state = messagesState(),
+            initialPage = FailedTabIndex,
+        )
+
+        composeRule.onNodeWithTag(MessagesTestTags.FAILED_RECOVERY_ASSISTANT)
+            .performScrollTo()
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/messages_failed_recovery_typical_phone.png")
+    }
+
+    @Test
+    fun messagesRejectDialog_compactPhone() {
+        setMessagesContent(state = messagesState())
+
+        composeRule.onNodeWithTag(MessagesTestTags.PENDING_REJECT_PREFIX + NeedsReviewId)
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag(MessagesTestTags.REJECT_DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/messages_reject_dialog_compact_phone.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun messagesRejectDialog_typicalPhone() {
+        setMessagesContent(state = messagesState())
+
+        composeRule.onNodeWithTag(MessagesTestTags.PENDING_REJECT_PREFIX + NeedsReviewId)
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag(MessagesTestTags.REJECT_DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/messages_reject_dialog_typical_phone.png")
+    }
+
+    @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun messagesRejectDialog_compactPhoneHindiLargeFont() {
+        setMessagesContent(
+            state = messagesState(),
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(MessagesTestTags.PENDING_REJECT_PREFIX + NeedsReviewId)
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithTag(MessagesTestTags.REJECT_DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/messages_reject_dialog_compact_phone_hindi_large_font.png")
+    }
+
+    @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun messagesFailedRecovery_compactPhoneHindiLargeFont() {
+        setMessagesContent(
+            state = messagesState(
+                failedSelectedText = "जन्मदिन मुबारक हो, फेय। आज आपके लिए थोड़ी अतिरिक्त खुशी और अपनापन भेज रहा हूं।",
+            ),
+            initialPage = FailedTabIndex,
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(MessagesTestTags.FAILED_RECOVERY_ASSISTANT)
+            .performScrollTo()
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/messages_failed_recovery_compact_phone_hindi_large_font.png")
+    }
+
+    @Test
     fun messagesLoading_compactPhone() {
         setMessagesContent(
             state = MessagesUiState(isLoading = true),
@@ -85,6 +178,18 @@ class MessagesScreenshotTest {
 
         composeRule.onRoot()
             .captureRoboImage("src/test/screenshots/baseline/messages_loading_compact_phone.png")
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun messagesLoading_typicalPhone() {
+        setMessagesContent(
+            state = MessagesUiState(isLoading = true),
+            animationFrameMillis = ProgressAnimationFrameMillis,
+        )
+
+        composeRule.onRoot()
+            .captureRoboImage("src/test/screenshots/baseline/messages_loading_typical_phone.png")
     }
 
     private fun setMessagesContent(
@@ -108,7 +213,10 @@ class MessagesScreenshotTest {
         }
     }
 
-    private fun messagesState(): MessagesUiState {
+    private fun messagesState(
+        needsReviewSelectedText: String = "Happy birthday, Tara. I hope your day feels thoughtful, warm, and full of small reminders that you are appreciated.",
+        failedSelectedText: String = "Happy birthday, Faye. Sending a little extra cheer your way today.",
+    ): MessagesUiState {
         return MessagesUiState(
             needsReviewMessages = listOf(
                 pendingItem(
@@ -117,7 +225,7 @@ class MessagesScreenshotTest {
                     contactName = "Tara",
                     channel = MessageChannel.SMS.raw,
                     eventType = "BIRTHDAY",
-                    selectedText = "Happy birthday, Tara. I hope your day feels thoughtful, warm, and full of small reminders that you are appreciated.",
+                    selectedText = needsReviewSelectedText,
                 ),
             ),
             scheduledMessages = listOf(
@@ -153,7 +261,7 @@ class MessagesScreenshotTest {
                     eventType = "BIRTHDAY",
                     status = "FAILED",
                     readiness = MessageReadiness.FAILED_CHECK_SETUP,
-                    selectedText = "Happy birthday, Faye. Sending a little extra cheer your way today.",
+                    selectedText = failedSelectedText,
                 ),
             ),
             isLoading = false,
