@@ -344,10 +344,14 @@ internal fun EventsList(
     } else {
         buildEventTrustStates(events)
     }
-    val groupedEvents = events.groupBy {
+    // Optimization: remember the groupBy result and reuse a single Calendar instance
+    // to avoid O(N) object allocations and heavy recalculations on every recomposition.
+    val groupedEvents = remember(events) {
         val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = it.nextOccurrenceMs
-        cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+        events.groupBy {
+            cal.timeInMillis = it.nextOccurrenceMs
+            cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+        }
     }
 
     LazyColumn(
