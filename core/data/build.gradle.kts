@@ -88,8 +88,6 @@ dependencies {
     implementation(libs.androidx.sqlite.ktx)
 
     // Google APIs
-    implementation(libs.google.api.client)
-    implementation(libs.google.api.people)
     implementation(libs.play.services.auth)
 
     // Email

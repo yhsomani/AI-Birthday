@@ -407,6 +407,10 @@ class HomeViewModel @Inject constructor(
             OccasionType.BIRTHDAY -> string(R.string.event_type_birthday)
             OccasionType.ANNIVERSARY -> string(R.string.event_type_anniversary)
             OccasionType.WORK_ANNIVERSARY -> string(R.string.event_type_work_anniversary)
+            OccasionType.GRADUATION -> string(R.string.event_type_graduation)
+            OccasionType.HOLIDAY -> string(R.string.event_type_holiday)
+            OccasionType.REVIVAL -> string(R.string.event_type_revival)
+            OccasionType.FOLLOW_UP -> string(R.string.event_type_follow_up)
             OccasionType.CUSTOM -> string(R.string.event_type_custom)
             else -> raw.replace("_", " ").lowercase().replaceFirstChar { it.titlecase() }
         }

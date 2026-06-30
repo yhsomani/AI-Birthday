@@ -193,7 +193,8 @@ class EnableFullAutomationUseCaseTest {
     }
 
     @Test
-    fun `invoke leaves low quality routable drafts in review instead of promoting`() = runTest {
+    fun `invoke promotes nonblank fallback drafts when a delivery route exists`() = runTest {
+        val promoted = slot<PendingMessageEntity>()
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
@@ -204,6 +205,35 @@ class EnableFullAutomationUseCaseTest {
                 contactId = "contact_1",
                 selectedText = "Wishing you a very happy birthday! Hope you have a wonderful day!",
                 isUsingFallback = true,
+            ),
+        )
+        coEvery { contactRepository.getMessageDispatchRecipient("contact_1") } returns recipient(
+            id = "contact_1",
+            phone = "+15551234567",
+        )
+
+        val outcome = useCase()
+
+        assertEquals(1, outcome.promotedMessages)
+        assertEquals(0, outcome.skippedWithoutRoute)
+        assertEquals(0, outcome.skippedNeedsReview)
+        coVerify { messageRepository.insertPending(capture(promoted)) }
+        assertEquals(MessageStatus.APPROVED.raw, promoted.captured.status)
+        assertEquals(ApprovalMode.FULLY_AUTO.raw, promoted.captured.approvalMode)
+        verify { schedulerService.scheduleExactSend("generic_1") }
+    }
+
+    @Test
+    fun `invoke leaves blank routable drafts in review instead of promoting`() = runTest {
+        every { preferencesRepository.getChannelBlackout() } returns "[]"
+        every { preferencesRepository.getSenderEmail() } returns ""
+        every { preferencesRepository.getSenderEmailPassword() } returns ""
+        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { messageRepository.getAllPendingSync() } returns listOf(
+            pendingMessage(
+                id = "blank_1",
+                contactId = "contact_1",
+                selectedText = "",
             ),
         )
         coEvery { contactRepository.getMessageDispatchRecipient("contact_1") } returns recipient(

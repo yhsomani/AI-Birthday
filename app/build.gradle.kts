@@ -96,8 +96,8 @@ android {
             }
         }
         debug {
-            // Install validation builds beside production-signed installs without deleting app data.
-            applicationIdSuffix = ".debug"
+            // Keep debug builds on the checked-in Firebase application id so Google sign-in,
+            // Firebase Auth, and People API OAuth can be validated from this repository.
         }
     }
 
@@ -173,8 +173,6 @@ dependencies {
     implementation(libs.androidx.biometric)
     implementation(libs.sun.mail.android)
     implementation(libs.sun.mail.activation)
-    implementation(libs.google.api.client)
-    implementation(libs.google.api.people)
     implementation(libs.play.services.auth)
     implementation(libs.converter.moshi)
     implementation(libs.sqlcipher)

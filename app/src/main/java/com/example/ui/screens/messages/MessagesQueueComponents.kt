@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Cake
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Error
@@ -143,7 +144,11 @@ internal fun MessageEventTypeBadge(
     val eventTypeColor = when (eventType) {
         OccasionType.BIRTHDAY -> MaterialTheme.colorScheme.primary
         OccasionType.ANNIVERSARY -> MaterialTheme.colorScheme.tertiary
-        OccasionType.WORK_ANNIVERSARY -> MaterialTheme.colorScheme.secondary
+        OccasionType.WORK_ANNIVERSARY,
+        OccasionType.GRADUATION -> MaterialTheme.colorScheme.secondary
+        OccasionType.HOLIDAY,
+        OccasionType.FOLLOW_UP -> MaterialTheme.colorScheme.tertiary
+        OccasionType.REVIVAL -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
@@ -151,7 +156,12 @@ internal fun MessageEventTypeBadge(
         OccasionType.BIRTHDAY -> Icons.Filled.Cake
         OccasionType.ANNIVERSARY -> Icons.Filled.Favorite
         OccasionType.WORK_ANNIVERSARY -> Icons.Filled.Work
-        else -> Icons.Filled.Info
+        OccasionType.GRADUATION,
+        OccasionType.HOLIDAY,
+        OccasionType.REVIVAL,
+        OccasionType.FOLLOW_UP,
+        OccasionType.CUSTOM -> Icons.Filled.CalendarMonth
+        OccasionType.UNKNOWN -> Icons.Filled.Info
     }
 
     Surface(
@@ -171,12 +181,27 @@ internal fun MessageEventTypeBadge(
             )
             Spacer(modifier = Modifier.width(RelateSpacing.xs))
             Text(
-                text = eventTypeRaw,
+                text = eventTypeLabel(eventType),
                 style = MaterialTheme.typography.labelSmall,
                 color = eventTypeColor,
                 fontWeight = FontWeight.SemiBold,
             )
         }
+    }
+}
+
+@Composable
+private fun eventTypeLabel(eventType: OccasionType): String {
+    return when (eventType) {
+        OccasionType.BIRTHDAY -> stringResource(R.string.event_type_birthday)
+        OccasionType.ANNIVERSARY -> stringResource(R.string.event_type_anniversary)
+        OccasionType.WORK_ANNIVERSARY -> stringResource(R.string.event_type_work_anniversary)
+        OccasionType.GRADUATION -> stringResource(R.string.event_type_graduation)
+        OccasionType.HOLIDAY -> stringResource(R.string.event_type_holiday)
+        OccasionType.REVIVAL -> stringResource(R.string.event_type_revival)
+        OccasionType.FOLLOW_UP -> stringResource(R.string.event_type_follow_up)
+        OccasionType.CUSTOM -> stringResource(R.string.event_type_custom)
+        OccasionType.UNKNOWN -> OccasionType.UNKNOWN.raw
     }
 }
 

@@ -231,7 +231,7 @@ class RegeneratePendingMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke downgrades fully auto fallback regeneration to manual review without scheduling`() = runTest {
+    fun `invoke schedules fully auto fallback regeneration when route is available`() = runTest {
         val pending = pending(approvalMode = "FULLY_AUTO", status = "APPROVED")
         val contact = ContactEntity(
             id = "c_1",
@@ -279,11 +279,11 @@ class RegeneratePendingMessageUseCaseTest {
         useCase("pm_1", "current draft")
 
         coVerify { messageRepository.insertPending(capture(saved)) }
-        assertEquals("ALWAYS_ASK", saved.captured.approvalMode)
-        assertEquals("PENDING", saved.captured.status)
+        assertEquals("FULLY_AUTO", saved.captured.approvalMode)
+        assertEquals("APPROVED", saved.captured.status)
         assertEquals(35, saved.captured.qualityScore)
         assertTrue(saved.captured.isUsingFallback)
-        verify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
+        verify { schedulerService.scheduleExactSend("pm_1") }
     }
 
     @Test
@@ -491,7 +491,7 @@ class RegeneratePendingMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke does not preserve approved status when regenerated draft is weak`() = runTest {
+    fun `invoke preserves approved status for nonblank fallback fully auto regeneration`() = runTest {
         val pending = pending(approvalMode = "FULLY_AUTO", status = "APPROVED")
         val contact = ContactEntity(
             id = "c_1",
@@ -539,9 +539,9 @@ class RegeneratePendingMessageUseCaseTest {
         useCase("pm_1", "approved draft", preserveApprovedStatus = true)
 
         coVerify { messageRepository.insertPending(capture(saved)) }
-        assertEquals("ALWAYS_ASK", saved.captured.approvalMode)
-        assertEquals("PENDING", saved.captured.status)
+        assertEquals("FULLY_AUTO", saved.captured.approvalMode)
+        assertEquals("APPROVED", saved.captured.status)
         assertEquals(35, saved.captured.qualityScore)
-        verify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
+        verify { schedulerService.scheduleExactSend("pm_1") }
     }
 }

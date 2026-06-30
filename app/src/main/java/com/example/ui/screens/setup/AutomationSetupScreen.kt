@@ -1,10 +1,14 @@
 package com.example.ui.screens.setup
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -49,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
@@ -89,13 +94,28 @@ fun AutomationSetupScreen(
     val context = LocalContext.current
     val isIgnoringBattery = remember { context.isIgnoringBatteryOptimizations() }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        viewModel.syncContacts()
+    }
+    val syncContacts = {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.syncContacts()
+        } else {
+            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        }
+    }
 
     AutomationSetupContent(
         state = state,
         isIgnoringBatteryOptimizations = isIgnoringBattery,
         onBack = onBack,
         onRefresh = viewModel::refreshChecks,
-        onSyncContacts = viewModel::syncContacts,
+        onSyncContacts = syncContacts,
         onDryRun = viewModel::runSafeGenerationCheck,
         onTestAi = viewModel::testAiGeneration,
         onTestEmail = viewModel::testEmailSend,

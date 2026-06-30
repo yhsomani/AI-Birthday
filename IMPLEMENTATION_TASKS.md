@@ -45,7 +45,7 @@ Current environment blocker: the local shell cannot locate a Java runtime. Compl
 | --- | --- | --- | --- | --- |
 | T000 | Environment | Configure JDK 21 so Gradle runs in this shell | `java -version` reports JDK 21 or compatible, Gradle starts | `java -version && ./gradlew --version` |
 | T001 | Test baseline | Run unit test baseline without code changes | Baseline result is recorded with failing tests listed, if any | `./gradlew testDebugUnitTest --no-configuration-cache` |
-| T002 | Docs | Decide whether `docs/startup-idea/product-requirements-document.md` is archived or replaced | Active docs no longer imply LeadRescue AI is this product | `rg -n "LeadRescue|lead response" SSOT.md PLAN.md PRODUCT_BLUEPRINT.md docs` |
+| T002 | Docs | Keep `docs/startup-idea/*` clearly archived as reference-only ideation | Active docs no longer imply LeadRescue AI is this product | Inspect archive notes and search non-archived docs for LeadRescue/product confusion |
 | T003 | Docs | Add a short docs index or update SSOT links to include blueprint and tasks | A reader can find `PLAN.md`, `PRODUCT_BLUEPRINT.md`, and this backlog from canonical docs | Inspect `SSOT.md` or docs index |
 | T004 | Docs | Mark `PLAN.md` P0 items as the release-blocking stabilization scope | P0 items are listed in one place with owner area and tests | Inspect `PLAN.md` |
 | T005 | CI | Confirm CI uses JDK 21 and same Gradle commands | Local and CI validation commands match | Inspect [.github/workflows/android.yml](.github/workflows/android.yml) |
@@ -106,7 +106,7 @@ Current environment blocker: the local shell cannot locate a Java runtime. Compl
 | T308 | Channel | Change `AutoSendChannelSelector` to return typed route result | No available route is representable | Unit test |
 | T309 | Channel | Update generation path to store blocked/no-route readiness instead of fallback SMS | Draft cannot be auto-ready with no route | Use case test |
 | T310 | Dispatcher | Align generation route result with runtime `DeliveryChannelResolver` | Generation and dispatch agree | Unit tests |
-| T311 | Regeneration | Re-run quality gate after regeneration | Fallback/generic regen downgrades automation | Use case test |
+| T311 | Regeneration | Re-run quality gate after regeneration | Quality score and fallback metadata refresh; blank/invalid or no-route regeneration stays review-first while nonblank Fully Auto drafts can remain automatic | Use case test |
 | T312 | Regeneration | Recompute route readiness after regeneration | Stale channel readiness is not preserved | Use case test |
 | T313 | Regeneration | Preserve user edits only when explicitly requested | Regeneration clears stale edited text safely | Use case test |
 | T314 | Contacts sync | Encode People API page and sync tokens | URL is valid for special token characters | Unit test |

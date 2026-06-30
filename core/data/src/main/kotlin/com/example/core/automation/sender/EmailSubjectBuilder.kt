@@ -16,6 +16,9 @@ object EmailSubjectBuilder {
             OccasionType.ANNIVERSARY -> "Happy anniversary, $name!"
             OccasionType.WORK_ANNIVERSARY -> "Congratulations on your work anniversary, $name!"
             OccasionType.GRADUATION -> "Congratulations, $name!"
+            OccasionType.HOLIDAY -> label?.let { "$it wishes for $name" } ?: "Holiday wishes for $name"
+            OccasionType.REVIVAL -> "Checking in, $name"
+            OccasionType.FOLLOW_UP -> "Following up, $name"
             OccasionType.CUSTOM -> label?.let { "$it for $name" } ?: "A note for $name"
             else -> label?.let { "$it for $name" } ?: "A note for $name"
         }

@@ -37,6 +37,22 @@ class EmailSubjectBuilderTest {
     }
 
     @Test
+    fun `build returns explicit subjects for generated relationship event types`() {
+        assertEquals(
+            "Diwali wishes for Riya",
+            EmailSubjectBuilder.build("Riya", "HOLIDAY", "Diwali")
+        )
+        assertEquals(
+            "Checking in, Sam",
+            EmailSubjectBuilder.build("Sam", "REVIVAL")
+        )
+        assertEquals(
+            "Following up, Dev",
+            EmailSubjectBuilder.build("Dev", "FOLLOW_UP")
+        )
+    }
+
+    @Test
     fun `build falls back to neutral subject for unknown event`() {
         assertEquals(
             "A note for Tara",

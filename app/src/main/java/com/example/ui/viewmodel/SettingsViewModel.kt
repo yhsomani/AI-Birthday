@@ -60,7 +60,6 @@ class SettingsViewModel @Inject constructor(
     private val securePrefs: SecurePrefs,
     private val enableFullAutomationUseCase: EnableFullAutomationUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
     private var initializedSettings = false
@@ -150,6 +149,15 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 feedbackEvent = FeedbackEvent(
                     message = UiText.Resource(R.string.settings_email_setup_required),
+                    type = FeedbackType.ERROR,
+                )
+            )
+            return
+        }
+        if (!EMAIL_ADDRESS_PATTERN.matches(email)) {
+            _uiState.value = _uiState.value.copy(
+                feedbackEvent = FeedbackEvent(
+                    message = UiText.Resource(R.string.settings_email_invalid),
                     type = FeedbackType.ERROR,
                 )
             )
@@ -387,6 +395,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     private companion object {
+        val EMAIL_ADDRESS_PATTERN = Regex("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", RegexOption.IGNORE_CASE)
         val CHANNEL_TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")
     }
 }

@@ -77,6 +77,75 @@ Targeted activity-log type scan passed; raw activity-log type writes are removed
 
 Remaining T604 work: Room SQL status predicates/defaults, serialized fixtures, pending-message fixture literals, event-type taxonomy, and broader approval/status/relationship cleanup remain open.
 
+## 2026-06-30 - Audit Stabilization: Auth, Setup Readiness, Events, and Docs
+
+Completed tasks:
+
+- Removed the debug-only application id suffix and aligned the checked-in debug Firebase JSON so local debug builds use one Firebase-compatible application id.
+- Removed hard-coded launcher shortcut package names so shortcuts use their manifest component plus explicit deep-link data.
+- Made onboarding's setup checklist action preserve the intended post-auth destination and open AI Doctor after sign-in.
+- Made AI Doctor Google Contacts readiness depend on the Google Contacts scope or a cached People API token instead of any signed-in Google account.
+- Added Android contacts permission gating before AI Doctor contact sync while preserving Google Contacts sync when the permission is denied.
+- Made AI Doctor email readiness distinguish missing setup, malformed sender email, configured-but-unverified Gmail sender details, and a recent successful self-test.
+- Added sender email syntax validation before Settings persists Gmail sender details.
+- Surfaced graduation, holiday, revival, and follow-up event types in Events filters, manual event creation, Messages badges, Wish Preview labels, Home labels, fallback copy, and email subjects.
+- Removed unused direct Google API client/People dependencies from the app and data modules.
+- Moved widget layout placeholder text into string resources and added Hindi localization coverage for the new visible strings.
+- Updated user, product, SSOT, roadmap, and progress documentation to match the corrected setup and build behavior.
+
+Changed files:
+
+- [app/build.gradle.kts](app/build.gradle.kts)
+- [app/src/debug/google-services.json](app/src/debug/google-services.json)
+- [app/src/main/java/com/example/ui/navigation/NavGraph.kt](app/src/main/java/com/example/ui/navigation/NavGraph.kt)
+- [app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt](app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt)
+- [app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt](app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt)
+- [app/src/main/java/com/example/ui/viewmodel/EventsViewModel.kt](app/src/main/java/com/example/ui/viewmodel/EventsViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/events/EventsScreen.kt](app/src/main/java/com/example/ui/screens/events/EventsScreen.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesQueueComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesQueueComponents.kt)
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt)
+- [app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt](app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt)
+- [core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt](core/data/src/main/kotlin/com/example/core/gemini/ResponseParser.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/EmailSubjectBuilder.kt](core/data/src/main/kotlin/com/example/core/automation/sender/EmailSubjectBuilder.kt)
+- [app/src/main/res/xml/shortcuts.xml](app/src/main/res/xml/shortcuts.xml)
+- [app/src/main/res/layout/widget_birthday.xml](app/src/main/res/layout/widget_birthday.xml)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [gradle/libs.versions.toml](gradle/libs.versions.toml)
+- [docs/user/complete-user-guide.md](docs/user/complete-user-guide.md)
+- [PRODUCT_BLUEPRINT.md](PRODUCT_BLUEPRINT.md)
+- [SSOT.md](SSOT.md)
+- [PLAN.md](PLAN.md)
+- [PRODUCT_UX_WORKFLOW_TECHNICAL_ANALYSIS.md](PRODUCT_UX_WORKFLOW_TECHNICAL_ANALYSIS.md)
+
+Validation:
+
+```bash
+JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/private/tmp/relateai-zscaler-cacerts -Djavax.net.ssl.trustStorePassword=changeit" \
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.sender.EmailSubjectBuilderTest \
+  :app:testDebugUnitTest \
+  --tests com.example.core.gemini.ResponseParserTest \
+  --tests com.example.ui.viewmodel.EventsViewModelTest \
+  --tests com.example.ui.viewmodel.AutomationSetupViewModelTest \
+  --tests com.example.ui.viewmodel.SettingsViewModelTest \
+  --tests com.example.ui.screens.events.EventsScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+```bash
+JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/private/tmp/relateai-zscaler-cacerts -Djavax.net.ssl.trustStorePassword=changeit" \
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
+```
+
+Result: passed.
+
+`git diff --check` passed. Static stale-reference scan passed for the removed debug suffix, hard-coded shortcut package target, removed Google API client aliases, and retired email-ready string id. Gradle needed the temporary `/private/tmp/relateai-zscaler-cacerts` trust store because Maven Central traffic is intercepted by a locally trusted Zscaler certificate that the Homebrew JDK trust store does not include.
+
 ## 2026-06-26 - ActivityLogSeverity Logging and Display
 
 Completed tasks:
@@ -4248,7 +4317,7 @@ Changed files:
 What changed:
 
 - Regeneration now re-resolves the intended approval mode from current contact and global automation preferences.
-- Regenerated text is evaluated through the AI auto-send quality gate, updating approval mode and `qualityScore`.
+- Regenerated text is evaluated through the AI auto-send quality gate, updating approval mode where needed, `qualityScore`, and fallback metadata.
 - Channel readiness is recomputed with `AutoSendChannelSelector.selectRoute()`, updating the saved channel and forcing no-route drafts to `ALWAYS_ASK`.
 - Stale `editedByUser`, `userEditedText`, and user-approved `APPROVED` status are cleared by default.
 - Explicit parameters allow preserving user-edited text or approved status for future workflows that intentionally need that behavior.
@@ -4256,14 +4325,14 @@ What changed:
 
 Why this improves user experience:
 
-- A regenerated generic or fallback draft no longer keeps stale fully automatic eligibility.
+- A regenerated generic or fallback draft no longer hides stale quality metadata; blank/invalid or no-route regenerated drafts are kept review-first.
 - If contact details or channel setup changed since the original draft, regeneration reflects the current delivery reality.
 - Users see safer review states after regeneration instead of hidden stale approval/send state.
 
 How user effort is reduced:
 
 - Users do not need to discover later that a regenerated draft failed because route readiness was outdated.
-- Lower-quality regenerated drafts are automatically placed back into review, reducing manual audit work.
+- Blank/invalid or no-route regenerated drafts are automatically placed back into review, reducing manual audit work.
 
 How user control is preserved:
 

@@ -317,7 +317,7 @@
     <string name="automation_setup_ai_test_success">AI test completed successfully.</string>
     <string name="automation_setup_ai_test_failed">AI test failed. Check connection, API access, and recent activity.</string>
     <string name="automation_setup_check_google_contacts">Google Contacts</string>
-    <string name="automation_setup_google_contacts_ok">Account access is available for contact sync.</string>
+    <string name="automation_setup_google_contacts_ok">Google Contacts scope or a cached People API token is available for contact sync.</string>
     <string name="automation_setup_google_contacts_missing">Sign in with Google and grant Contacts access.</string>
     <string name="automation_setup_check_gemini">Gemini</string>
     <string name="automation_setup_gemini_key_ok">API key configured.</string>
@@ -502,6 +502,10 @@
     <string name="events_filter_birthdays">Birthdays</string>
     <string name="events_filter_anniversaries">Anniversaries</string>
     <string name="events_filter_work">Work</string>
+    <string name="events_filter_graduation">Graduation</string>
+    <string name="events_filter_holidays">Holidays</string>
+    <string name="events_filter_revivals">Revivals</string>
+    <string name="events_filter_follow_ups">Follow-ups</string>
     <string name="events_filter_custom">Custom</string>
     <string name="events_review_send">Review &amp; Send</string>
     
@@ -553,8 +557,8 @@
     <string name="automation_mode_always_ask">Always Ask</string>
     <string name="settings_full_automation_enabled">Full automation enabled. %1$d contact(s) updated and %2$d queued message(s) scheduled for sending.</string>
     <string name="settings_full_automation_enabled_route_blockers">Full automation enabled. %1$d contact(s) updated and %2$d queued message(s) scheduled for sending. %3$d message(s) still need contact details or channel setup.</string>
-    <string name="settings_full_automation_enabled_review_blockers">Full automation enabled. %1$d contact(s) updated and %2$d queued message(s) scheduled for sending. %3$d message(s) still need review because draft quality is not safe for full automation.</string>
-    <string name="settings_full_automation_enabled_route_and_review_blockers">Full automation enabled. %1$d contact(s) updated and %2$d queued message(s) scheduled for sending. %3$d message(s) still need contact details or channel setup. %4$d message(s) still need review because draft quality is not safe for full automation.</string>
+    <string name="settings_full_automation_enabled_review_blockers">Full automation enabled. %1$d contact(s) updated and %2$d queued message(s) scheduled for sending. %3$d blank or invalid message(s) still need review before they can be sent.</string>
+    <string name="settings_full_automation_enabled_route_and_review_blockers">Full automation enabled. %1$d contact(s) updated and %2$d queued message(s) scheduled for sending. %3$d message(s) still need contact details or channel setup. %4$d blank or invalid message(s) still need review before they can be sent.</string>
     <string name="settings_full_automation_failed">Full automation could not be enabled. Review setup and try again.</string>
     <string name="settings_full_automation_failed_with_reason">Full automation could not be enabled. %1$s</string>
     <string name="settings_syncing">Syncing...</string>
@@ -704,6 +708,10 @@
     <string name="event_type_birthday">Birthday</string>
     <string name="event_type_anniversary">Anniversary</string>
     <string name="event_type_work_anniversary">Work anniversary</string>
+    <string name="event_type_graduation">Graduation</string>
+    <string name="event_type_holiday">Holiday</string>
+    <string name="event_type_revival">Revival</string>
+    <string name="event_type_follow_up">Follow-up</string>
     <string name="event_type_custom">Custom</string>
     <string name="events_card_subtitle">%1$s • %2$s</string>
     <string name="event_source_contacts">Imported</string>
@@ -899,6 +907,7 @@
     <string name="wish_why_memories">Memory notes</string>
     <string name="wish_why_gifts">Gift records</string>
     <string name="wish_why_previous">Previous wishes</string>
+    <string name="widget_title_birthdays_today">Birthdays Today</string>
     <string name="widget_no_birthdays_today">No birthdays today</string>
     <string name="widget_birthdays_today">%1$d birthday(s) today</string>
     <string name="widget_unknown_contact">Unknown Contact</string>
@@ -920,13 +929,14 @@
     <string name="onboarding_setup_automation_title">Review automation readiness</string>
     <string name="onboarding_setup_automation_description">Use AI Doctor to test AI, email, contact sync, permissions, and failed-send recovery.</string>
     <string name="onboarding_continue_to_sign_in">Continue to sign in</string>
-    <string name="onboarding_open_setup_checklist">Open setup checklist</string>
+    <string name="onboarding_open_setup_checklist">Sign in and open setup checklist</string>
     <string name="settings_gemini_saved">Gemini API key saved.</string>
     <string name="settings_email_sending_title">Email sending</string>
     <string name="settings_email_sending_help">Required when a contact uses Email as the preferred channel or when you send a test message to yourself.</string>
     <string name="settings_save_email_settings">Save email settings</string>
     <string name="settings_email_saved">Email settings saved.</string>
     <string name="settings_email_setup_required">Enter both Gmail address and app password.</string>
+    <string name="settings_email_invalid">Enter a valid Gmail sender address.</string>
     <string name="settings_quiet_hours_title">Quiet hours</string>
     <string name="settings_quiet_hours_help">Use 24-hour values. Scheduled sends should avoid this window where supported.</string>
     <string name="settings_save_quiet_hours">Save quiet hours</string>
@@ -961,7 +971,9 @@
     <string name="wish_preview_test_failed">Could not send the test message. Check Gmail app password and network access.</string>
     <string name="automation_setup_action_test_email">Test Email</string>
     <string name="automation_setup_check_email">Email Sending</string>
-    <string name="automation_setup_email_ok">Gmail sender details are configured.</string>
+    <string name="automation_setup_email_ok">Gmail sender details were verified by a recent successful test.</string>
+    <string name="automation_setup_email_unverified">Gmail sender details are configured but not verified. Send a test email before relying on automatic Email delivery.</string>
+    <string name="automation_setup_email_invalid">The saved Gmail sender address is invalid. Update it in Settings.</string>
     <string name="automation_setup_email_missing_for_contacts">%1$d contact(s) prefer Email, but Gmail sender setup is missing.</string>
     <string name="automation_setup_email_optional">No email-preferred contacts yet. Configure Gmail only if you plan to send email wishes.</string>
     <string name="automation_setup_email_missing">Add Gmail sender address and app password in Settings.</string>

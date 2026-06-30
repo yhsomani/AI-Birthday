@@ -295,6 +295,33 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
+    fun `buildChecksForTesting requires real Google Contacts token or scope`() = runTest(testDispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val googleContactsCheck = viewModel.buildChecksForTesting()
+            .first { it.title == context.getString(R.string.automation_setup_check_google_contacts) }
+
+        assertEquals(ReadinessStatus.ACTION_REQUIRED, googleContactsCheck.status)
+        assertEquals(AiDoctorAction.SYNC_CONTACTS, googleContactsCheck.action)
+        assertEquals(context.getString(R.string.automation_setup_action_sync_contacts), googleContactsCheck.actionLabel)
+    }
+
+    @Test
+    fun `buildChecksForTesting accepts cached People API token for Google Contacts readiness`() = runTest(testDispatcher) {
+        every { securePrefs.getGoogleOAuthToken() } returns "cached-token"
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val googleContactsCheck = viewModel.buildChecksForTesting()
+            .first { it.title == context.getString(R.string.automation_setup_check_google_contacts) }
+
+        assertEquals(ReadinessStatus.OK, googleContactsCheck.status)
+        assertEquals(AiDoctorAction.NONE, googleContactsCheck.action)
+        assertEquals(context.getString(R.string.automation_setup_google_contacts_ok), googleContactsCheck.detail)
+    }
+
+    @Test
     fun `buildChecksForTesting blocks full automation when event contacts lack delivery routes`() =
         runTest(testDispatcher) {
             coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
@@ -575,6 +602,53 @@ class AutomationSetupViewModelTest {
             context.getString(R.string.automation_setup_email_missing_for_contacts, 1),
             emailCheck.detail,
         )
+    }
+
+    @Test
+    fun `buildChecksForTesting warns when Gmail sender is configured but unverified`() = runTest(testDispatcher) {
+        every { securePrefs.getSenderEmail() } returns "sender@example.com"
+        every { securePrefs.getSenderEmailPassword() } returns "app-password"
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val emailCheck = viewModel.buildChecksForTesting()
+            .first { it.title == context.getString(R.string.automation_setup_check_email) }
+
+        assertEquals(ReadinessStatus.WARNING, emailCheck.status)
+        assertEquals(AiDoctorAction.TEST_EMAIL, emailCheck.action)
+        assertEquals(context.getString(R.string.automation_setup_email_unverified), emailCheck.detail)
+    }
+
+    @Test
+    fun `buildChecksForTesting passes email readiness after matching recent self test`() = runTest(testDispatcher) {
+        every { securePrefs.getSenderEmail() } returns "sender@example.com"
+        every { securePrefs.getSenderEmailPassword() } returns "app-password"
+        every { securePrefs.getLastSuccessfulEmailTestSender() } returns "sender@example.com"
+        every { securePrefs.getLastSuccessfulEmailTestMs() } returns Long.MAX_VALUE
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val emailCheck = viewModel.buildChecksForTesting()
+            .first { it.title == context.getString(R.string.automation_setup_check_email) }
+
+        assertEquals(ReadinessStatus.OK, emailCheck.status)
+        assertEquals(AiDoctorAction.NONE, emailCheck.action)
+        assertEquals(context.getString(R.string.automation_setup_email_ok), emailCheck.detail)
+    }
+
+    @Test
+    fun `buildChecksForTesting blocks invalid saved Gmail sender address`() = runTest(testDispatcher) {
+        every { securePrefs.getSenderEmail() } returns "not-an-email"
+        every { securePrefs.getSenderEmailPassword() } returns "app-password"
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val emailCheck = viewModel.buildChecksForTesting()
+            .first { it.title == context.getString(R.string.automation_setup_check_email) }
+
+        assertEquals(ReadinessStatus.ACTION_REQUIRED, emailCheck.status)
+        assertEquals(AiDoctorAction.OPEN_SETTINGS, emailCheck.action)
+        assertEquals(context.getString(R.string.automation_setup_email_invalid), emailCheck.detail)
     }
 
     @Test

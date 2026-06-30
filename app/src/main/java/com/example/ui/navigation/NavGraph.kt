@@ -6,6 +6,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NamedNavArgument
 import androidx.navigation.NavBackStackEntry
@@ -48,6 +52,8 @@ fun RelateNavGraph(
     startDestination: String = Screen.Splash.route,
     isSignedIn: () -> Boolean = { FirebaseAuth.getInstance().currentUser != null },
 ) {
+    var postAuthDestination by rememberSaveable { mutableStateOf(Screen.Home.route) }
+
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -109,9 +115,13 @@ fun RelateNavGraph(
         composable(Screen.Onboarding.route) {
             OnboardingScreen(
                 onOpenAutomationSetup = {
-                    navController.navigate(Screen.AutomationSetup.route)
+                    postAuthDestination = Screen.AutomationSetup.route
+                    navController.navigate(Screen.Auth.route) {
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
                 },
                 onOnboardingComplete = {
+                    postAuthDestination = Screen.Home.route
                     navController.navigate(Screen.Auth.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
@@ -121,7 +131,9 @@ fun RelateNavGraph(
         composable(Screen.Auth.route) {
             AuthScreen(
                 onAuthComplete = {
-                    navController.navigate(Screen.Home.route) {
+                    val destination = postAuthDestination
+                    postAuthDestination = Screen.Home.route
+                    navController.navigate(destination) {
                         popUpTo(Screen.Auth.route) { inclusive = true }
                     }
                 }

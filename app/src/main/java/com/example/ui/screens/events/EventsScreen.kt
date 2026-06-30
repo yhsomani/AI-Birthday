@@ -96,6 +96,10 @@ private val eventTypeOptions = listOf(
     OccasionType.BIRTHDAY.raw,
     OccasionType.ANNIVERSARY.raw,
     OccasionType.WORK_ANNIVERSARY.raw,
+    OccasionType.GRADUATION.raw,
+    OccasionType.HOLIDAY.raw,
+    OccasionType.REVIVAL.raw,
+    OccasionType.FOLLOW_UP.raw,
     OccasionType.CUSTOM.raw,
 )
 
@@ -104,6 +108,10 @@ private val eventTypeFilters = listOf(
     EventTypeFilter.BIRTHDAY,
     EventTypeFilter.ANNIVERSARY,
     EventTypeFilter.WORK,
+    EventTypeFilter.GRADUATION,
+    EventTypeFilter.HOLIDAY,
+    EventTypeFilter.REVIVAL,
+    EventTypeFilter.FOLLOW_UP,
     EventTypeFilter.CUSTOM,
 )
 
@@ -731,6 +739,10 @@ private fun EventTypeFilter.label(): String = when (this) {
     EventTypeFilter.BIRTHDAY -> stringResource(R.string.events_filter_birthdays)
     EventTypeFilter.ANNIVERSARY -> stringResource(R.string.events_filter_anniversaries)
     EventTypeFilter.WORK -> stringResource(R.string.events_filter_work)
+    EventTypeFilter.GRADUATION -> stringResource(R.string.events_filter_graduation)
+    EventTypeFilter.HOLIDAY -> stringResource(R.string.events_filter_holidays)
+    EventTypeFilter.REVIVAL -> stringResource(R.string.events_filter_revivals)
+    EventTypeFilter.FOLLOW_UP -> stringResource(R.string.events_filter_follow_ups)
     EventTypeFilter.CUSTOM -> stringResource(R.string.events_filter_custom)
 }
 
@@ -747,6 +759,11 @@ private fun eventTypeLabel(type: String): String = when (OccasionType.fromRaw(ty
     OccasionType.BIRTHDAY -> stringResource(R.string.event_type_birthday)
     OccasionType.ANNIVERSARY -> stringResource(R.string.event_type_anniversary)
     OccasionType.WORK_ANNIVERSARY -> stringResource(R.string.event_type_work_anniversary)
+    OccasionType.GRADUATION -> stringResource(R.string.event_type_graduation)
+    OccasionType.HOLIDAY -> stringResource(R.string.event_type_holiday)
+    OccasionType.REVIVAL -> stringResource(R.string.event_type_revival)
+    OccasionType.FOLLOW_UP -> stringResource(R.string.event_type_follow_up)
+    OccasionType.CUSTOM -> stringResource(R.string.event_type_custom)
     else -> stringResource(R.string.event_type_custom)
 }
 

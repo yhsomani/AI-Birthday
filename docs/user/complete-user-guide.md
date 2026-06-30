@@ -132,7 +132,7 @@ You need:
 5. SMS permission if you want RelateAI to send approved SMS messages.
 6. Exact alarm access if you want the most precise scheduled sends and reminders.
 7. Gemini access configured from the signed-in Google/Firebase account or a saved Gemini key, depending on the build.
-8. Gmail sender address and Gmail app password if you want Email delivery or test-send-to-self.
+8. Gmail sender address, Gmail app password, and a successful Test Email if you want Email delivery or test-send-to-self.
 9. WhatsApp or WhatsApp Business plus Accessibility setup if you want WhatsApp automation.
 10. A strong backup passphrase if you want encrypted export and restore.
 
@@ -156,12 +156,12 @@ Use this when testing from the repository.
 
 1. Install JDK 21 and an Android SDK that supports compile SDK 37.
 2. Open the repository root in Android Studio.
-3. Add the correct Firebase `google-services.json` files for the debug or release application id.
+3. Add the correct Firebase `google-services.json` file for the checked-in application id.
 4. Let Gradle sync.
 5. Select the `app` run configuration.
 6. Run on an emulator or physical device.
 
-Debug builds use the debug application id, so Firebase OAuth clients and SHA-1 fingerprints must match the debug package and signing key.
+Repository debug builds use the checked-in application id, so Firebase OAuth clients and SHA-1 fingerprints must match `com.aistudio.relateai.qxtjrk` and the signing key used for the build. If a future local variant reintroduces an application-id suffix, that variant needs its own matching Firebase OAuth client and `google-services.json`.
 
 #### Option C: Command-line debug build
 
@@ -227,7 +227,7 @@ RelateAI uses one real app login path:
 
 1. Tap Sign in with Google.
 2. Choose the Google account you want RelateAI to use.
-3. Grant the requested account and Contacts access when prompted.
+3. Grant the requested account and Google Contacts access when prompted.
 4. Wait for Firebase/Google sign-in to complete.
 
 There is no alternate login, demo login, or fake local account path. If Google sign-in fails, fix the configuration, network, or Firebase issue rather than bypassing authentication.
@@ -237,7 +237,7 @@ There is no alternate login, demo login, or fake local account path. If Google s
 From Home, Settings, AI Doctor, or Contacts:
 
 1. Tap Sync Contacts.
-2. Grant contacts permission when Android asks.
+2. Grant Android contacts permission when Android asks. Google Contacts sync can still use the signed-in Google Contacts scope or cached People API token.
 3. Let RelateAI import Google contacts and/or device contacts.
 4. Review the Contacts list for missing relationship labels, missing channels, low health, VIPs, and contacts needing more context.
 
@@ -343,15 +343,15 @@ Use Email when contacts prefer formal or professional messages.
 2. Open Settings.
 3. Enter the Gmail sender address.
 4. Enter the Gmail app password.
-5. Tap Save email settings.
+5. Tap Save email settings. RelateAI rejects malformed sender addresses before saving.
 6. Open AI Doctor.
-7. Tap Test Email.
+7. Tap Test Email so AI Doctor can verify the saved sender by recording a successful self-test.
 8. Set the contact's preferred channel to Email.
 9. Use Wish Preview to send a test to yourself before the first important real email.
 
 Expected result:
 
-1. Test Email sends to the configured sender address.
+1. Test Email sends to the configured sender address and marks that sender as recently verified.
 2. Real dispatch uses Gmail SMTP with bounded connection, read, and write timeouts.
 3. Invalid sender or contact email addresses fail as setup/data issues instead of retrying as provider outages.
 4. Invalid app passwords, missing network, or SMTP timeouts fail cleanly and move through retry or recovery instead of leaving the worker blocked.
@@ -371,7 +371,7 @@ Expected result:
 
 1. AI Doctor reports Gemini ready.
 2. Wish Preview can generate and regenerate drafts.
-3. If Gemini is unavailable, RelateAI may use fallback copy where supported, but fallback or generic drafts are held for review instead of being promoted to full automation.
+3. If Gemini is unavailable, RelateAI may use fallback copy where supported. In Fully Auto mode, nonblank fallback drafts can still be scheduled and sent automatically when a delivery route is available; AI Doctor and Wish Preview continue to flag quality risks so you can improve them later.
 
 #### Notification, exact alarm, and battery setup runbook
 
@@ -409,7 +409,7 @@ Open Settings, then Automation Mode.
 
 | Mode | Behavior |
 | --- | --- |
-| Fully Auto | Current default for new or unsupported saved global settings. Eligible messages can send without manual approval after all quality, schedule, channel, and permission checks pass. |
+| Fully Auto | Current default for new or unsupported saved global settings. Nonblank messages can send without manual approval after schedule, channel, and permission checks pass. |
 | Smart Approve | Some pending messages can auto-send when due, but review prompts are still used before the scheduled time and where policy requires review. |
 | VIP Approve | VIP-like relationships require approval. If the approval window passes, the message can expire instead of sending late. |
 | Always Ask | RelateAI requires review before sending. |
@@ -422,8 +422,8 @@ When you select Fully Auto in Settings, RelateAI also prepares existing local da
 1. It saves the global mode as Fully Auto.
 2. It clears explicit contact-level automation overrides back to Default.
 3. It clears Skip automatic wishes for contacts that previously blocked automatic wishes.
-4. It promotes queued pending messages to Approved only when they already have an available route and the selected draft still passes the full-automation quality gate.
-5. It leaves fallback, generic, blank, very short, or otherwise low-confidence drafts in review.
+4. It promotes queued pending messages to Approved when they already have an available route and nonblank dispatch text.
+5. It leaves blank or invalid drafts in review because there is no message body to send safely.
 6. It schedules promoted messages for exact send where possible.
 7. It reports how many contacts were updated, how many queued messages were scheduled, how many messages still need contact details or channel setup, and how many messages still need review.
 
@@ -534,7 +534,7 @@ Use this matrix to understand how one workflow can change depending on data qual
 | --- | --- | --- |
 | Contact source | Google contact, device contact, manual contact, restored contact. | Imported contacts may bring phone/email/event data; manual and restored contacts may need route cleanup. |
 | Event source | Imported, manual, calendar, AI inferred, merged, conflict, unknown. | Conflict and duplicate rows should be resolved before automation. |
-| Draft source | Gemini, regenerated Gemini, fallback template, user-edited draft. | Fully automatic promotion is safest for AI/user-edited drafts that pass quality checks; fallback/generic drafts stay review-first. |
+| Draft source | Gemini, regenerated Gemini, fallback template, user-edited draft. | Fully automatic promotion sends nonblank route-ready drafts; fallback or generic drafts are quality warnings, not automatic review blockers. |
 | Automation policy | Fully Auto, Smart Approve, VIP Approve, Always Ask, Default. | Determines whether the draft can dispatch without explicit approval. |
 | Channel route | Preferred route, fallback route, blocked route, unavailable route. | Dispatch tries usable routes only and records a setup reason when none are available. |
 | Schedule state | Future, due, quiet-hours deferred, blackout deferred, expired. | Future/deferred messages wait; expired approval windows require a fresh review or retry. |
@@ -776,7 +776,7 @@ Successful full automation means:
 
 | Mode | Pending message behavior | Review notification | Typical use |
 | --- | --- | --- | --- |
-| Fully Auto | Treated as dispatch-eligible when scheduled time arrives. New generated messages can be stored as Approved when route and quality checks pass. | No review notification for fully automatic drafts. | Users who want end-to-end automatic sending after setup is verified. |
+| Fully Auto | Treated as dispatch-eligible when scheduled time arrives. New generated messages can be stored as Approved when they have nonblank text and an available route. | No review notification for fully automatic drafts. | Users who want end-to-end automatic sending after setup is verified. |
 | Smart Approve | Needs review before the scheduled time. If still pending at or after the scheduled time, eligible messages can send. | Yes. | Lower-friction automation with a chance to review. |
 | VIP Approve | Requires approval before the approval window closes. If the window passes, the message expires. | Yes. | Family, close relationships, sensitive contacts, or anything that should not send late. |
 | Always Ask | Requires manual review and approval. | Yes. | First setup, sensitive messages, professional sends, and recovery after failures. |
@@ -798,7 +798,7 @@ Every automated message goes through the same lifecycle:
 1. Contact and event data are collected from the local database.
 2. Message generation builds context from contact preferences, event type, memories, gift history, style profile, language, channel, and prior feedback.
 3. Gemini generates variants, or RelateAI uses fallback/manual content where supported.
-4. Quality checks downgrade risky automation when the draft is weak, generic, too short, or missing route setup.
+4. Quality checks score the draft and keep blank/invalid drafts in review; Fully Auto still schedules nonblank route-ready drafts even when they are generic or fallback text.
 5. RelateAI creates a pending or approved message record.
 6. The scheduler waits for the selected send time.
 7. Dispatch checks approval mode, quiet hours, blackout dates, message state, duplicate guards, channel availability, permissions, and sender configuration.
@@ -836,12 +836,12 @@ Fully automated sending requires all of these to be true:
 2. The selected channel is enabled and configured.
 3. Required Android permissions or external credentials are available.
 4. The automation mode allows dispatch without review for that contact and event.
-5. The message passes quality and personalization checks.
+5. The message has nonblank dispatch text; quality and personalization checks remain visible improvement signals.
 6. Quiet hours and blackout rules allow the send time.
 7. The message has not already been handled for the same occurrence.
 8. AI Doctor has no required blocker for the selected path.
 
-If any check fails, RelateAI should hold, downgrade to review, defer, expire, or mark the message failed instead of silently sending.
+If any hard check fails, RelateAI should hold, defer, expire, or mark the message failed instead of silently sending. Generic or fallback wording is a quality warning in Fully Auto, not a blocker by itself.
 
 The dispatch policy considers:
 
@@ -961,7 +961,7 @@ Goal: Generate, schedule, send, and audit birthday wishes with minimal intervent
 Success signals:
 
 1. Event-ready contacts have usable routes.
-2. Low-quality drafts stay in review.
+2. Nonblank route-ready drafts are scheduled automatically; quality warnings remain visible for later improvement.
 3. Approved or policy-eligible drafts dispatch once, not multiple times.
 4. Failures show a concrete setup/provider reason.
 
@@ -1092,7 +1092,7 @@ Use this when you want RelateAI to send all eligible messages automatically afte
 | Contacts updated | Old manual overrides were reset to Default. |
 | Queued messages scheduled | Pending routable drafts were promoted to Approved. |
 | Messages needing setup | Contact details or channel setup are still missing. |
-| Messages needing review | Draft quality is not safe for full automation, such as fallback, generic, blank, or too-short text. |
+| Messages needing review | The draft is blank or invalid, or the contact still has an explicit review-first override. |
 
 After enabling Fully Auto, protect special cases explicitly:
 
@@ -1372,7 +1372,7 @@ Root-cause categories:
 | Missing data | Contact, event, phone, email, language, relationship, or memory context is incomplete. | Contacts, Events, Wish Preview. |
 | Permission/setup | Android permission, exact alarm, notification, Accessibility, Gemini, or Gmail setup is missing. | AI Doctor and Settings. |
 | Policy mode | Automation mode, contact override, quiet hours, blackout, or approval window prevents dispatch. | Contact Detail, Settings, Messages. |
-| Draft quality | Draft is blank, too short, fallback, generic, or not personalized enough for automation. | Wish Preview and AI Doctor quality checks. |
+| Draft quality | Draft is blank, too short, fallback, generic, or not personalized. Blank drafts block sending; other quality issues are improvement signals in Fully Auto. | Wish Preview and AI Doctor quality checks. |
 | Provider failure | Gemini, Gmail, carrier SMS, WhatsApp UI, network, or auth failed outside the local database. | Activity History and provider-specific setup. |
 | Recovery state | App/device interruption, restart, update, time change, or stale dispatch changed scheduling state. | Messages, Activity History, AI Doctor recovery group. |
 | Backup/restore | Passphrase, file format, checksum, version, or replace-only restore limitation. | Backup and Restore. |
@@ -1392,7 +1392,7 @@ Root-cause categories:
 | Fully Auto did not schedule some existing drafts | Those pending messages had no available route, such as missing phone, missing email, disabled channel, or missing Gmail setup. | Open Messages for blocked drafts, add contact details or channel setup, then regenerate, approve, or retry. | Before selecting Fully Auto, run AI Doctor and filter Contacts for missing channel details. |
 | A contact changed from manual to automatic after enabling Fully Auto | Enabling Fully Auto clears explicit contact automation overrides back to Default and clears Skip automatic wishes so the global mode can apply. | Reopen the contact and set Always Ask, VIP Approve, or Skip automatic wishes again for protected contacts. | Before enabling Fully Auto, make a short list of people who must remain review-first. |
 | A message sent even though it was still Pending in Smart Approve | Smart Approve permits eligible pending messages to send at or after scheduled time if the user did not act earlier. | Use Always Ask or VIP Approve for contacts that must never send without manual approval. | Treat Smart Approve as timed review, not strict manual approval. |
-| A Fully Auto message still asks for review | The draft failed quality, route, or safety checks, or the contact has a review-first override. | Improve contact context, fix route setup, inspect the approval plan, and remove unintended contact overrides. | Keep personalization data complete and verify contact preferences before important events. |
+| A Fully Auto message still asks for review | The draft is blank or invalid, no route is available, or the contact has a review-first override. | Add message text, fix route setup, inspect the approval plan, and remove unintended contact overrides. | Keep route data complete and verify contact preferences before important events. |
 | Message used a fallback channel | The preferred route was blocked or unusable at dispatch time, so RelateAI tried the next supported route. | Check Disabled channels, phone/email details, Gmail setup, SMS permission, and WhatsApp readiness. | Set the preferred channel carefully and disable fallback channels you do not want used. |
 | VIP message expired | VIP Approve approval window elapsed. | Generate or retry a fresh draft and approve it before the event window closes. | Review VIP pending messages promptly from notifications or Messages. |
 | SMS send fails | SMS permission missing, no phone number, no SIM/carrier support, or channel disabled. | Grant SMS permission, add a phone number, unblock SMS, or choose another channel. | Run AI Doctor and check preferred channel readiness before enabling auto-send. |

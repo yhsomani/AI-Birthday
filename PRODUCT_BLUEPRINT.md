@@ -74,9 +74,9 @@ Supporting surfaces deepen context:
 2. App explains local-first relationship assistance and approval-first automation.
 3. User signs in with Google.
 4. App asks for contacts permission only when sync is requested.
-5. App imports contacts from Google and/or device.
+5. App imports contacts from Google when the signed-in account has the Contacts scope or a cached People API token, and imports device contacts when Android contacts permission is granted.
 6. App discovers birthdays, anniversaries, and work anniversaries.
-7. App shows setup readiness: AI, notifications, SMS, WhatsApp, email, exact alarm, backup.
+7. App shows setup readiness: AI, Google Contacts, device contacts, notifications, SMS, WhatsApp, tested email, exact alarm, backup.
 8. User selects global automation mode, defaulting to Fully Auto in current builds, with review-first modes available for cautious or sensitive workflows.
 9. User completes a first encrypted backup prompt after data import.
 
@@ -116,13 +116,13 @@ Success state:
 2. Message generation builds a context-aware prompt from contact data, event type, style profile, memories, gifts, and prior messages.
 3. Foreground generation and the weekly background generation worker use the same domain generation path for prompt, AI, quality, approval, route-readiness, scheduling, and review notification behavior.
 4. AI returns variants or app uses event-aware fallback copy.
-5. Quality gate checks fallback, generic text, length, personalization, route eligibility, and automation mode.
+5. Quality gate scores fallback, generic text, length, and blank/invalid text while route-readiness and automation mode decide whether the draft can be scheduled.
 6. App creates a pending message with explicit readiness.
 
 Success state:
 
 - Draft is appropriate for event type and relationship.
-- Automation is downgraded when quality or route readiness is weak.
+- Automation is blocked or downgraded when dispatch text is blank/invalid or route readiness is weak; fallback or generic wording remains visible as a quality warning.
 - A failed generated occurrence can be retried by the worker without creating a duplicate pending row.
 
 ### Journey 5: Review and Approval
@@ -250,7 +250,7 @@ Initial implementation:
 
 | Mode | User meaning | Product behavior |
 | --- | --- | --- |
-| Fully Auto | Send good low-risk messages for me | Sends at scheduled time only if quality, schedule, route, and permission gates pass |
+| Fully Auto | Send route-ready messages for me | Sends nonblank messages at scheduled time when route, schedule, and permission gates pass; quality warnings remain visible but do not block by themselves |
 | Smart Approve | Let me review, but do not make me babysit | Shows review prompt; auto-sends at scheduled time if not rejected |
 | VIP Approve | Important people require my explicit approval | Never auto-sends; expires if ignored past approval window |
 | Always Ask | I want full manual control | Never auto-sends; waits for explicit approval |
@@ -281,7 +281,7 @@ Required before broad release:
 - No send without route eligibility.
 - No send when permission is missing.
 - No send during quiet hours or blackout dates.
-- No fully automatic send for fallback/generic low-quality AI output.
+- No fully automatic send for blank/invalid text, missing route setup, missing permission, quiet-hour/blackout blocks, or excluded sensitive context; fallback/generic output must remain clearly flagged as a quality warning.
 - No AI prompt includes user-excluded sensitive memory.
 - No backup contains OAuth tokens, API keys, email passwords, or DB keys.
 - No log contains raw tokens, passphrases, full phone numbers, or full message bodies.

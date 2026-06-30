@@ -41,7 +41,7 @@ There is no custom server in this repository. External network surfaces are Goog
 | Active modules | `:app`, `:core:domain`, `:core:data`, `:core:ui` |
 | Application namespace | `com.example` |
 | Release applicationId | `com.aistudio.relateai.qxtjrk` |
-| Debug applicationId | `com.aistudio.relateai.qxtjrk.debug` |
+| Debug applicationId | `com.aistudio.relateai.qxtjrk` |
 | Min SDK | 24 |
 | Target SDK | 36 |
 | Compile SDK | 37 |
@@ -230,8 +230,8 @@ include(":core:ui")
 
 11. Add Firebase config files:
 
-- `app/google-services.json` for release applicationId `com.aistudio.relateai.qxtjrk`.
-- `app/src/debug/google-services.json` for debug applicationId `com.aistudio.relateai.qxtjrk.debug`.
+- `app/google-services.json` for release applicationId `com.aistudio.relateai.qxtjrk` when a release config is provided.
+- `app/src/debug/google-services.json` for the repository debug build applicationId `com.aistudio.relateai.qxtjrk`.
 - Do not paste API keys into docs. Keep local config files out of public history when possible.
 - Firebase/Google Cloud must enable Auth, Google Sign-In OAuth clients for the correct package/signing SHA-1, People API, and Gemini/Vertex access.
 
@@ -766,7 +766,7 @@ Live validation still needed:
 |---|---|---|
 | Connected app shell smoke | Blocked | Idle, unlocked device; previous run on `1b87b5db` stalled while another app was foregrounded. |
 | Google OAuth and People API | Blocked | Configured Google account, OAuth clients, contacts permission, idle device. |
-| Device ContactsProvider sync | Blocked | Seeded contacts and contact permission on device. |
+| Device ContactsProvider sync | Blocked | Real or manually prepared contacts plus contact permission on device. |
 | Gemini live generation/classification | Blocked | Gemini API key or authenticated Firebase Vertex path, test data. |
 | Gmail SMTP live send | Blocked | Gmail sender and app password. |
 | SMS live send/status | Blocked | SIM/SMS-capable device and safe test recipient. |
@@ -858,7 +858,7 @@ Unreleased changes:
 - Smart Approve generated wishes now schedule exact due-time dispatch while still notifying the user for review before send time.
 - Daily AI message generation now prepares a 7-day queue of upcoming event drafts so automatic sends are scheduled earlier and Smart Approve has more review time.
 - Revival AI reconnect messages now respect contact/global automation modes and schedule automatic send for Fully Auto and Smart Approve.
-- Added AI auto-send quality gate so fallback or generic Fully Auto drafts are downgraded to Smart Approve review before automatic due-time dispatch.
+- Added AI auto-send quality gate so fallback or generic text is scored and surfaced while blank/invalid drafts are held for review before any automatic dispatch.
 - Added post-event AI follow-ups that scan recent unreplied AI wishes, draft a light follow-up, and schedule it with the same automation, quality, quiet-hour, and channel-routing rules.
 - Added fixed-date holiday AI wishes that generate personalized New Year, Republic Day, Women's Day, Independence Day, Gandhi Jayanti, and Christmas messages and schedule them automatically through the same approval and dispatch rules.
 - Added Failed tab recovery assistant in Messages with direct AI Doctor routing while keeping retry manual.
@@ -880,7 +880,7 @@ Unreleased changes:
 - Added AlarmManager-backed event reminders and boot/daily rescheduling.
 - Added event-aware Gmail SMTP subjects.
 - Added localization parity and helper-script portability tests.
-- Added Compose/instrumented smoke coverage and side-by-side debug package.
+- Added Compose/instrumented smoke coverage; debug builds now use the checked-in Firebase-compatible application id.
 - Added screen interaction coverage for home, contacts, messages, wish preview, chat history, analytics, activity history, style coach, memory vault, gift advisor, backup/restore.
 - Added FileProvider CSV sharing for analytics export.
 - Added selected-document backup export/import coverage.
@@ -1018,7 +1018,7 @@ Task status:
 |---|---|
 | F-001-F-003: verify app shell, onboarding, Google auth, and navigation on device. | Blocked by idle unlocked device. |
 | F-001-F-003: add Compose UI smoke coverage for onboarding/auth and app-shell bottom navigation. | Done. |
-| F-001-F-003: make debug UI validation install side-by-side as `com.aistudio.relateai.qxtjrk.debug`. | Done. |
+| F-001-F-003: make debug UI validation install side-by-side with a debug-only suffix. | Superseded by checked-in Firebase-compatible debug application id. |
 | F-004/F-042: implement biometric lock enforcement. | Done. |
 | F-004/F-042: validate biometric lock prompt and resume behavior on device. | Blocked by live device validation. |
 | F-006/F-026: route background contact sync through foreground sync use case. | Done. |
@@ -1433,8 +1433,8 @@ How it works:
 - If the standard variant is too similar to previous sent messages by word-set overlap above 0.65, generation retries up to two times.
 - Approval mode is selected from contact override, global mode, relationship defaults, and skip-auto-wish.
 - Scheduled time is computed from event date plus custom/default send time, then moved out of quiet hours and blackout dates.
-- A pending message is saved as APPROVED for `FULLY_AUTO`; otherwise it is PENDING.
-- Approved messages are scheduled for exact send; pending messages create approval notifications.
+- A pending message is saved as APPROVED for `FULLY_AUTO` when it has nonblank dispatch text and an available route; otherwise it is saved as PENDING for review.
+- Approved messages are scheduled for exact send; review-first pending messages create approval notifications.
 
 Outputs:
 
@@ -1630,7 +1630,7 @@ How it works:
 - Message generation prepares upcoming event drafts 7 days ahead and schedules exact dispatch for `FULLY_AUTO` and `SMART_APPROVE`; Smart Approve also shows a review notification before its due-time auto-send.
 - Revival/reconnect suggestions use the same contact/global automation modes; Fully Auto and Smart Approve revival messages are scheduled automatically.
 - Boot recovery reschedules approved pending messages and pending `SMART_APPROVE` messages that can auto-send at their due time.
-- `AiAutoSendQualityGate` scores generated drafts and downgrades fallback or obviously generic `FULLY_AUTO` drafts to `SMART_APPROVE`, preserving due-time automatic dispatch while adding review visibility.
+- `AiAutoSendQualityGate` scores generated drafts, records fallback/generic/too-short risk, and keeps blank/invalid text out of automatic dispatch. Nonblank `FULLY_AUTO` drafts can remain automatic while still carrying low quality scores and fallback metadata.
 - `AutoSendChannelSelector` chooses the initial pending-message channel from contact availability, channel blackout preferences, Gmail setup, and previous successful delivery history.
 - `HolidayWishWorker` runs in the daily automation chain, checks a fixed-date holiday catalog, asks Gemini for relationship-aware holiday wishes, and creates deterministic `HOLIDAY_<holiday>_<contact>_<year>` pending messages to avoid duplicates.
 - `PostEventFollowUpWorker` runs in the daily automation chain after message generation, finds recent unreplied AI wishes, asks Gemini for a short low-pressure follow-up, and creates deterministic `FOLLOWUP_<sent_message_id>` pending messages to avoid duplicates.
@@ -2413,7 +2413,7 @@ All new messaging features should satisfy this product rule: AI creates or impro
 | Relationship revival cadence | Improve reconnect text using memories, interests, last interaction, and health score. | Initial revival auto-scheduling is implemented; next add user-controlled cadence and per-contact limits. | P1 |
 | Gift-to-message assistant | Turn selected AI gift suggestions into a warm note or reminder message. | Schedule gift reminder or gift-accompanying message before the event. | P2 |
 | Bulk AI wish preparation | Generate messages for upcoming events in a review queue. | Implemented as 7-day AI draft preparation; Smart Approve can auto-send unchanged drafts at due time and Always Ask requires review. | P2 |
-| AI quality gate before auto-send | Initial gate scores fallback, blank, too-short, and generic AI drafts. | Implemented for generated wishes and revival messages by downgrading low-quality Fully Auto drafts to Smart Approve review before due-time automatic dispatch. | P0 |
+| AI quality gate before auto-send | Initial gate scores fallback, blank, too-short, and generic AI drafts. | Implemented for generated wishes, regeneration, holiday, revival, and follow-up paths by preserving low quality scores/fallback metadata while holding blank or invalid text for review before automatic dispatch. | P0 |
 | Smart channel recommendation | Learn which channel works best per contact from delivery history and configured availability. | Implemented for AI-created pending messages via `AutoSendChannelSelector`; dispatcher fallback still handles send-time failures. | P1 |
 
 ### 25.4 User Experience Improvement Plan

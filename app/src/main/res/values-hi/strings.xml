@@ -318,7 +318,7 @@
     <string name="automation_setup_ai_test_success">AI टेस्ट सफल रहा।</string>
     <string name="automation_setup_ai_test_failed">AI टेस्ट विफल रहा। कनेक्शन, API एक्सेस और हाल की गतिविधि जांचें।</string>
     <string name="automation_setup_check_google_contacts">Google संपर्क</string>
-    <string name="automation_setup_google_contacts_ok">संपर्क सिंक के लिए अकाउंट एक्सेस उपलब्ध है।</string>
+    <string name="automation_setup_google_contacts_ok">संपर्क सिंक के लिए Google Contacts scope या कैश किया हुआ People API token उपलब्ध है।</string>
     <string name="automation_setup_google_contacts_missing">Google से साइन इन करें और संपर्क एक्सेस दें।</string>
     <string name="automation_setup_check_gemini">Gemini</string>
     <string name="automation_setup_gemini_key_ok">API कुंजी कॉन्फिगर है।</string>
@@ -503,6 +503,10 @@
     <string name="events_filter_birthdays">जन्मदिन</string>
     <string name="events_filter_anniversaries">सालगिरह</string>
     <string name="events_filter_work">काम</string>
+    <string name="events_filter_graduation">ग्रेजुएशन</string>
+    <string name="events_filter_holidays">त्योहार</string>
+    <string name="events_filter_revivals">फिर जुड़ना</string>
+    <string name="events_filter_follow_ups">फॉलो-अप</string>
     <string name="events_filter_custom">कस्टम</string>
     <string name="events_review_send">समीक्षा करके भेजें</string>
     
@@ -554,8 +558,8 @@
     <string name="automation_mode_always_ask">हमेशा पूछें</string>
     <string name="settings_full_automation_enabled">पूरी ऑटोमेशन चालू है। %1$d संपर्क अपडेट हुए और %2$d कतारबद्ध संदेश भेजने के लिए शेड्यूल हुए।</string>
     <string name="settings_full_automation_enabled_route_blockers">पूरी ऑटोमेशन चालू है। %1$d संपर्क अपडेट हुए और %2$d कतारबद्ध संदेश भेजने के लिए शेड्यूल हुए। %3$d संदेशों को अभी भी संपर्क विवरण या चैनल सेटअप चाहिए।</string>
-    <string name="settings_full_automation_enabled_review_blockers">पूरी ऑटोमेशन चालू है। %1$d संपर्क अपडेट हुए और %2$d कतारबद्ध संदेश भेजने के लिए शेड्यूल हुए। %3$d संदेशों को अभी भी रिव्यू चाहिए क्योंकि ड्राफ्ट गुणवत्ता पूरी ऑटोमेशन के लिए सुरक्षित नहीं है।</string>
-    <string name="settings_full_automation_enabled_route_and_review_blockers">पूरी ऑटोमेशन चालू है। %1$d संपर्क अपडेट हुए और %2$d कतारबद्ध संदेश भेजने के लिए शेड्यूल हुए। %3$d संदेशों को अभी भी संपर्क विवरण या चैनल सेटअप चाहिए। %4$d संदेशों को अभी भी रिव्यू चाहिए क्योंकि ड्राफ्ट गुणवत्ता पूरी ऑटोमेशन के लिए सुरक्षित नहीं है।</string>
+    <string name="settings_full_automation_enabled_review_blockers">पूरी ऑटोमेशन चालू है। %1$d संपर्क अपडेट हुए और %2$d कतारबद्ध संदेश भेजने के लिए शेड्यूल हुए। %3$d खाली या अमान्य संदेशों को भेजने से पहले अभी भी रिव्यू चाहिए।</string>
+    <string name="settings_full_automation_enabled_route_and_review_blockers">पूरी ऑटोमेशन चालू है। %1$d संपर्क अपडेट हुए और %2$d कतारबद्ध संदेश भेजने के लिए शेड्यूल हुए। %3$d संदेशों को अभी भी संपर्क विवरण या चैनल सेटअप चाहिए। %4$d खाली या अमान्य संदेशों को भेजने से पहले अभी भी रिव्यू चाहिए।</string>
     <string name="settings_full_automation_failed">पूरी ऑटोमेशन चालू नहीं हो सकी। सेटअप देखें और फिर कोशिश करें।</string>
     <string name="settings_full_automation_failed_with_reason">पूरी ऑटोमेशन चालू नहीं हो सकी। %1$s</string>
     <string name="settings_syncing">सिंक हो रहा है...</string>
@@ -705,6 +709,10 @@
     <string name="event_type_birthday">जन्मदिन</string>
     <string name="event_type_anniversary">सालगिरह</string>
     <string name="event_type_work_anniversary">काम की सालगिरह</string>
+    <string name="event_type_graduation">ग्रेजुएशन</string>
+    <string name="event_type_holiday">त्योहार</string>
+    <string name="event_type_revival">फिर जुड़ना</string>
+    <string name="event_type_follow_up">फॉलो-अप</string>
     <string name="event_type_custom">कस्टम</string>
     <string name="events_card_subtitle">%1$s • %2$s</string>
     <string name="event_source_contacts">आयातित</string>
@@ -900,6 +908,7 @@
     <string name="wish_why_memories">मेमोरी नोट</string>
     <string name="wish_why_gifts">गिफ्ट रिकॉर्ड</string>
     <string name="wish_why_previous">पिछली शुभकामनाएं</string>
+    <string name="widget_title_birthdays_today">आज के जन्मदिन</string>
     <string name="widget_no_birthdays_today">आज कोई जन्मदिन नहीं</string>
     <string name="widget_birthdays_today">आज %1$d जन्मदिन</string>
     <string name="widget_unknown_contact">अज्ञात संपर्क</string>
@@ -921,13 +930,14 @@
     <string name="onboarding_setup_automation_title">ऑटोमेशन तैयारी समीक्षा करें</string>
     <string name="onboarding_setup_automation_description">AI डॉक्टर से AI, ईमेल, संपर्क सिंक, अनुमतियां और विफल-भेजने की रिकवरी टेस्ट करें।</string>
     <string name="onboarding_continue_to_sign_in">साइन इन जारी रखें</string>
-    <string name="onboarding_open_setup_checklist">सेटअप चेकलिस्ट खोलें</string>
+    <string name="onboarding_open_setup_checklist">साइन इन करके सेटअप चेकलिस्ट खोलें</string>
     <string name="settings_gemini_saved">Gemini API कुंजी सहेजी गई।</string>
     <string name="settings_email_sending_title">ईमेल भेजना</string>
     <string name="settings_email_sending_help">ईमेल चैनल या खुद को टेस्ट संदेश भेजने के लिए Gmail भेजने वाले विवरण चाहिए।</string>
     <string name="settings_save_email_settings">ईमेल सेटिंग्स सहेजें</string>
     <string name="settings_email_saved">ईमेल सेटिंग्स सहेजी गईं।</string>
     <string name="settings_email_setup_required">Gmail पता और ऐप पासवर्ड दोनों डालें।</string>
+    <string name="settings_email_invalid">मान्य Gmail भेजने वाला पता डालें।</string>
     <string name="settings_quiet_hours_title">शांत समय</string>
     <string name="settings_quiet_hours_help">24-घंटे वाला समय इस्तेमाल करें। समर्थित फ्लो इस समय में भेजना टालेंगे।</string>
     <string name="settings_save_quiet_hours">शांत समय सहेजें</string>
@@ -962,7 +972,9 @@
     <string name="wish_preview_test_failed">टेस्ट संदेश नहीं भेजा जा सका। Gmail ऐप पासवर्ड और नेटवर्क जांचें।</string>
     <string name="automation_setup_action_test_email">ईमेल टेस्ट करें</string>
     <string name="automation_setup_check_email">ईमेल भेजना</string>
-    <string name="automation_setup_email_ok">Gmail भेजने वाले विवरण कॉन्फिगर हैं।</string>
+    <string name="automation_setup_email_ok">Gmail भेजने वाले विवरण हाल के सफल टेस्ट से सत्यापित हैं।</string>
+    <string name="automation_setup_email_unverified">Gmail भेजने वाले विवरण कॉन्फिगर हैं लेकिन सत्यापित नहीं हैं। अपने-आप ईमेल भेजने पर भरोसा करने से पहले टेस्ट ईमेल भेजें।</string>
+    <string name="automation_setup_email_invalid">सहेजा गया Gmail भेजने वाला पता अमान्य है। इसे सेटिंग्स में अपडेट करें।</string>
     <string name="automation_setup_email_missing_for_contacts">%1$d संपर्क ईमेल पसंद करते हैं, लेकिन Gmail भेजने वाला सेटअप नहीं है।</string>
     <string name="automation_setup_email_optional">अभी कोई ईमेल-पसंद संपर्क नहीं है। ईमेल शुभकामनाओं के लिए Gmail कॉन्फिगर करें।</string>
     <string name="automation_setup_email_missing">सेटिंग्स में Gmail भेजने वाला पता और ऐप पासवर्ड जोड़ें।</string>

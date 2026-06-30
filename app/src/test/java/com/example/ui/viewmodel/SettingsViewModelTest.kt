@@ -261,6 +261,21 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `saveSenderEmailSettings rejects malformed sender address`() = runTest(testDispatcher) {
+        val viewModel = newViewModel()
+
+        viewModel.onSenderEmailChange("not-an-email")
+        viewModel.onSenderEmailPasswordChange("app-password")
+        viewModel.saveSenderEmailSettings()
+
+        val message = viewModel.uiState.value.feedbackEvent?.message as UiText.Resource
+        assertEquals(R.string.settings_email_invalid, message.resId)
+        assertEquals(FeedbackType.ERROR, viewModel.uiState.value.feedbackEvent?.type)
+        verify(exactly = 0) { securePrefs.setSenderEmail(any()) }
+        verify(exactly = 0) { securePrefs.setSenderEmailPassword(any()) }
+    }
+
+    @Test
     fun `init shows no backup freshness when backup has never run`() = runTest(testDispatcher) {
         val viewModel = newViewModel()
 

@@ -184,13 +184,16 @@ object ResponseParser {
     }
 
     private fun fallbackTextFor(eventType: String): String {
-        if (eventType.equals("REVIVAL", ignoreCase = true)) {
-            return "Hey! It's been a while since we caught up. Hope you're doing great! Let's connect soon."
-        }
         return when (OccasionType.fromRaw(eventType)) {
+            OccasionType.BIRTHDAY -> "Wishing you a very happy birthday! Hope you have a wonderful day!"
             OccasionType.ANNIVERSARY -> "Happy Anniversary! Wishing you both a lifetime of love and happiness."
             OccasionType.WORK_ANNIVERSARY -> "Congratulations on your work anniversary! Thank you for your hard work and dedication."
-            else -> "Wishing you a very happy birthday! Hope you have a wonderful day!"
+            OccasionType.GRADUATION -> "Congratulations on your graduation! Wishing you confidence and success in what comes next."
+            OccasionType.HOLIDAY -> "Warm wishes for the holiday. Hope the day brings peace, joy, and good moments your way."
+            OccasionType.REVIVAL -> "Hey! It's been a while since we caught up. Hope you're doing great! Let's connect soon."
+            OccasionType.FOLLOW_UP -> "Hope your celebration went well. I wanted to check in and hear how it went."
+            OccasionType.CUSTOM -> "Thinking of you today and wishing you a meaningful, happy moment."
+            OccasionType.UNKNOWN -> "Thinking of you today and wishing you a meaningful, happy moment."
         }
     }
 

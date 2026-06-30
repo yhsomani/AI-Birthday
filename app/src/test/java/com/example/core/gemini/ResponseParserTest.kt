@@ -204,6 +204,24 @@ class ResponseParserTest {
     }
 
     @Test
+    fun `parseMessageVariants returns event aware fallbacks for all relationship event types`() {
+        val expectedFallbacks = mapOf(
+            "GRADUATION" to "Congratulations on your graduation! Wishing you confidence and success in what comes next.",
+            "HOLIDAY" to "Warm wishes for the holiday. Hope the day brings peace, joy, and good moments your way.",
+            "REVIVAL" to "Hey! It's been a while since we caught up. Hope you're doing great! Let's connect soon.",
+            "FOLLOW_UP" to "Hope your celebration went well. I wanted to check in and hear how it went.",
+            "CUSTOM" to "Thinking of you today and wishing you a meaningful, happy moment.",
+        )
+
+        expectedFallbacks.forEach { (eventType, expected) ->
+            val variants = ResponseParser.parseMessageVariants("garbage", eventType = eventType)
+
+            assertEquals(expected, variants.standard)
+            assertTrue(variants.isUsingFallback)
+        }
+    }
+
+    @Test
     fun `parseMessageVariants fills missing fields with defaults`() {
         val json = """{"short": "Hey!"}""".trimIndent()
 

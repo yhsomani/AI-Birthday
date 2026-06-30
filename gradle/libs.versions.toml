@@ -88,8 +88,6 @@ androidx-biometric = { group = "androidx.biometric", name = "biometric", version
 sun-mail-android = { group = "com.sun.mail", name = "android-mail", version.ref = "sunMail" }
 sun-mail-activation = { group = "com.sun.mail", name = "android-activation", version.ref = "sunMail" }
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
-google-api-client = { group = "com.google.api-client", name = "google-api-client-android", version="2.2.0" }
-google-api-people = { group = "com.google.apis", name = "google-api-services-people", version="v1-rev20220531-2.0.0" }
 play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version="21.2.0" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }

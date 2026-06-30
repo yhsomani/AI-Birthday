@@ -635,7 +635,12 @@ private fun eventTypeLabel(eventType: String): String = when (OccasionType.fromR
     OccasionType.BIRTHDAY -> stringResource(R.string.event_type_birthday)
     OccasionType.ANNIVERSARY -> stringResource(R.string.event_type_anniversary)
     OccasionType.WORK_ANNIVERSARY -> stringResource(R.string.event_type_work_anniversary)
-    else -> stringResource(R.string.event_type_custom)
+    OccasionType.GRADUATION -> stringResource(R.string.event_type_graduation)
+    OccasionType.HOLIDAY -> stringResource(R.string.event_type_holiday)
+    OccasionType.REVIVAL -> stringResource(R.string.event_type_revival)
+    OccasionType.FOLLOW_UP -> stringResource(R.string.event_type_follow_up)
+    OccasionType.CUSTOM -> stringResource(R.string.event_type_custom)
+    OccasionType.UNKNOWN -> stringResource(R.string.event_type_custom)
 }
 
 @Composable

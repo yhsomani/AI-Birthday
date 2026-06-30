@@ -36,6 +36,8 @@ import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.SyncContactsUseCase
 import com.example.domain.usecase.TestSendUseCase
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.Scope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -154,7 +156,10 @@ class AutomationSetupViewModel @Inject constructor(
         const val PERSONALIZATION_CONFIDENCE_THRESHOLD = 0.6
         const val PERSISTED_HEALTH_SNAPSHOT_TTL_MS = 7L * 24 * 60 * 60 * 1000
         const val CHANNEL_VERIFICATION_WINDOW_MS = 30L * 24 * 60 * 60 * 1000
+        const val GOOGLE_CONTACTS_SCOPE_URI = "https://www.googleapis.com/auth/contacts.readonly"
         val CHANNEL_TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")
+        val EMAIL_ADDRESS_PATTERN = Regex("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", RegexOption.IGNORE_CASE)
+        val GOOGLE_CONTACTS_SCOPE = Scope(GOOGLE_CONTACTS_SCOPE_URI)
     }
 
     private val _uiState = MutableStateFlow(AutomationSetupUiState())
@@ -343,7 +348,7 @@ class AutomationSetupViewModel @Inject constructor(
             styleProfile?.sampleCount ?: 0,
             countJsonArrayItems(styleProfile?.sampleMessagesJson),
         )
-        val hasGoogleAuth = securePrefs.getGoogleOAuthToken().isNotBlank() || currentUser != null
+        val hasGoogleContactsAccess = hasGoogleContactsAccess()
         val hasGeminiAccess = securePrefs.getGeminiApiKey().isNotBlank() || currentUser != null
         val globalAutomationMode = securePrefs.getGlobalApprovalMode()
         val aiEnabled = securePrefs.isAiWishGenerationEnabled()
@@ -360,8 +365,10 @@ class AutomationSetupViewModel @Inject constructor(
         )
         val persistedHealthSnapshot = loadRecentPersistedHealthSnapshot()
         val senderEmail = securePrefs.getSenderEmail().trim()
-        val senderEmailReady = senderEmail.isNotBlank() &&
-            securePrefs.getSenderEmailPassword().isNotBlank()
+        val senderEmailPassword = securePrefs.getSenderEmailPassword().trim()
+        val senderEmailSyntaxValid = senderEmail.isBlank() || isValidEmailAddress(senderEmail)
+        val senderEmailConfigured = senderEmail.isNotBlank() && senderEmailPassword.isNotBlank()
+        val senderEmailReady = senderEmailConfigured && senderEmailSyntaxValid
         val blockedChannels = securePrefs.getChannelBlackout().toChannelSet()
         val selectedChannelCounts = selectedAutomaticChannelCounts(
             contacts = contacts,
@@ -387,14 +394,14 @@ class AutomationSetupViewModel @Inject constructor(
         val checks = listOf(
             ReadinessCheck(
                 text(R.string.automation_setup_check_google_contacts),
-                if (hasGoogleAuth) {
+                if (hasGoogleContactsAccess) {
                     text(R.string.automation_setup_google_contacts_ok)
                 } else {
                     text(R.string.automation_setup_google_contacts_missing)
                 },
-                if (hasGoogleAuth) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
-                actionLabel = if (hasGoogleAuth) null else text(R.string.automation_setup_action_sync_contacts),
-                action = if (hasGoogleAuth) AiDoctorAction.NONE else AiDoctorAction.SYNC_CONTACTS,
+                if (hasGoogleContactsAccess) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = if (hasGoogleContactsAccess) null else text(R.string.automation_setup_action_sync_contacts),
+                action = if (hasGoogleContactsAccess) AiDoctorAction.NONE else AiDoctorAction.SYNC_CONTACTS,
                 group = ReadinessGroup.REQUIRED,
             ),
             ReadinessCheck(
@@ -483,7 +490,9 @@ class AutomationSetupViewModel @Inject constructor(
             ReadinessCheck(
                 text(R.string.automation_setup_check_email),
                 when {
-                    senderEmailReady -> text(R.string.automation_setup_email_ok)
+                    !senderEmailSyntaxValid -> text(R.string.automation_setup_email_invalid)
+                    emailSelfTestVerified -> text(R.string.automation_setup_email_ok)
+                    senderEmailReady -> text(R.string.automation_setup_email_unverified)
                     emailPreferredContacts > 0 -> text(
                         R.string.automation_setup_email_missing_for_contacts,
                         emailPreferredContacts,
@@ -491,12 +500,24 @@ class AutomationSetupViewModel @Inject constructor(
                     else -> text(R.string.automation_setup_email_optional)
                 },
                 when {
-                    senderEmailReady -> ReadinessStatus.OK
+                    !senderEmailSyntaxValid -> ReadinessStatus.ACTION_REQUIRED
+                    emailSelfTestVerified -> ReadinessStatus.OK
+                    senderEmailReady -> ReadinessStatus.WARNING
                     emailPreferredContacts > 0 -> ReadinessStatus.ACTION_REQUIRED
                     else -> ReadinessStatus.WARNING
                 },
-                actionLabel = if (senderEmailReady) text(R.string.automation_setup_action_test_email) else text(R.string.automation_setup_action_open_settings),
-                action = if (senderEmailReady) AiDoctorAction.TEST_EMAIL else AiDoctorAction.OPEN_SETTINGS,
+                actionLabel = when {
+                    !senderEmailSyntaxValid -> text(R.string.automation_setup_action_open_settings)
+                    senderEmailReady && !emailSelfTestVerified -> text(R.string.automation_setup_action_test_email)
+                    senderEmailReady -> null
+                    else -> text(R.string.automation_setup_action_open_settings)
+                },
+                action = when {
+                    !senderEmailSyntaxValid -> AiDoctorAction.OPEN_SETTINGS
+                    senderEmailReady && !emailSelfTestVerified -> AiDoctorAction.TEST_EMAIL
+                    senderEmailReady -> AiDoctorAction.NONE
+                    else -> AiDoctorAction.OPEN_SETTINGS
+                },
                 group = ReadinessGroup.REQUIRED,
             ),
             whatsAppReadinessCheck(
@@ -1138,6 +1159,18 @@ class AutomationSetupViewModel @Inject constructor(
     private fun currentFirebaseUserOrNull() = runCatching {
         com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
     }.getOrNull()
+
+    private fun hasGoogleContactsAccess(): Boolean {
+        if (securePrefs.getGoogleOAuthToken().isNotBlank()) return true
+        val account = runCatching { GoogleSignIn.getLastSignedInAccount(appContext) }.getOrNull()
+            ?: return false
+        return runCatching { GoogleSignIn.hasPermissions(account, GOOGLE_CONTACTS_SCOPE) }
+            .getOrDefault(false)
+    }
+
+    private fun isValidEmailAddress(value: String): Boolean {
+        return EMAIL_ADDRESS_PATTERN.matches(value)
+    }
 
     private fun selectedAutomaticChannelCounts(
         contacts: List<ContactAutomationReadinessProfile>,

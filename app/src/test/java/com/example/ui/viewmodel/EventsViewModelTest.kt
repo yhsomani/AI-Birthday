@@ -355,6 +355,34 @@ class EventsViewModelTest {
         assertEquals(listOf("e1"), viewModel.uiState.value.events.map { it.id.value })
     }
 
+    @Test
+    fun `advanced event type filters select matching generated event types`() = runTest(testDispatcher) {
+        val now = System.currentTimeMillis()
+        val events = listOf(
+            eventListItem(id = "graduation", type = OccasionType.GRADUATION, nextOccurrenceMs = now + 1),
+            eventListItem(id = "holiday", type = OccasionType.HOLIDAY, nextOccurrenceMs = now + 2),
+            eventListItem(id = "revival", type = OccasionType.REVIVAL, nextOccurrenceMs = now + 3),
+            eventListItem(id = "follow_up", type = OccasionType.FOLLOW_UP, nextOccurrenceMs = now + 4),
+        )
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(events)
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(emptyList())
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.selectTypeFilter(EventTypeFilter.GRADUATION)
+        assertEquals(listOf("graduation"), viewModel.uiState.value.events.map { it.id.value })
+
+        viewModel.selectTypeFilter(EventTypeFilter.HOLIDAY)
+        assertEquals(listOf("holiday"), viewModel.uiState.value.events.map { it.id.value })
+
+        viewModel.selectTypeFilter(EventTypeFilter.REVIVAL)
+        assertEquals(listOf("revival"), viewModel.uiState.value.events.map { it.id.value })
+
+        viewModel.selectTypeFilter(EventTypeFilter.FOLLOW_UP)
+        assertEquals(listOf("follow_up"), viewModel.uiState.value.events.map { it.id.value })
+    }
+
     private fun eventListItem(
         id: String,
         contactId: String = "contact_$id",

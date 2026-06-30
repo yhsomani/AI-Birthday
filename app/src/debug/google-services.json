@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:339889410493:android:e6c8650b60dfdc6b8bc2d4",
         "android_client_info": {
-          "package_name": "com.aistudio.relateai.qxtjrk.debug"
+          "package_name": "com.aistudio.relateai.qxtjrk"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "339889410493-6t9vfj0ns1f6ikmgsi10njs4afbkkd2m.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.aistudio.relateai.qxtjrk.debug",
+            "package_name": "com.aistudio.relateai.qxtjrk",
             "certificate_hash": "413ecbc6a3bef23bdadd9632763e08156aa8c392"
           }
         },

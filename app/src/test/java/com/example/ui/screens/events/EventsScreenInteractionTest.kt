@@ -4,6 +4,9 @@ import android.app.Application
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -19,6 +22,7 @@ import com.example.domain.model.occasion.OccasionType
 import com.example.ui.viewmodel.EventTrustConflictState
 import com.example.ui.viewmodel.EventTrustState
 import com.example.ui.viewmodel.EventVerificationState
+import com.example.ui.viewmodel.EventsUiState
 import java.util.Calendar
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -175,6 +179,31 @@ class EventsScreenInteractionTest {
 
         assertEquals(event.id.value, mergedEventId)
         assertEquals(event.id.value, keptEventId)
+    }
+
+    @Test
+    fun manualEventDialogShowsAllSupportedEventTypeOptions() {
+        composeRule.setContent {
+            RelateAITheme {
+                EventsContent(
+                    state = EventsUiState(),
+                    showManualDialog = true,
+                )
+            }
+        }
+
+        assertManualEventTypeOptionIsDisplayed(R.string.event_type_graduation)
+        assertManualEventTypeOptionIsDisplayed(R.string.event_type_holiday)
+        assertManualEventTypeOptionIsDisplayed(R.string.event_type_revival)
+        assertManualEventTypeOptionIsDisplayed(R.string.event_type_follow_up)
+    }
+
+    private fun assertManualEventTypeOptionIsDisplayed(labelRes: Int) {
+        composeRule.onNode(
+            hasText(context.getString(labelRes)) and
+                hasAnyAncestor(hasTestTag(EventsTestTags.MANUAL_FORM_BODY)),
+            useUnmergedTree = true,
+        ).assertIsDisplayed()
     }
 
     private fun event(

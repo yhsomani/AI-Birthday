@@ -22,16 +22,29 @@ class AiAutoSendQualityGateTest {
     }
 
     @Test
-    fun `evaluate downgrades fallback fully auto messages to manual review`() {
+    fun `evaluate keeps fallback fully auto messages automatic while recording low quality score`() {
         val decision = AiAutoSendQualityGate.evaluate(
             requestedMode = ApprovalMode.FULLY_AUTO,
             selectedMessage = "Wishing you a very happy birthday! Hope you have a wonderful day!",
             isUsingFallback = true,
         )
 
+        assertEquals(ApprovalMode.FULLY_AUTO, decision.approvalMode)
+        assertTrue(decision.qualityScore < 70)
+        assertNull(decision.downgradeReason)
+    }
+
+    @Test
+    fun `evaluate still blocks blank fully auto messages from automatic sending`() {
+        val decision = AiAutoSendQualityGate.evaluate(
+            requestedMode = ApprovalMode.FULLY_AUTO,
+            selectedMessage = "",
+            isUsingFallback = false,
+        )
+
         assertEquals(ApprovalMode.ALWAYS_ASK, decision.approvalMode)
         assertTrue(decision.qualityScore < 70)
-        assertEquals("ai_fallback,generic_phrase", decision.downgradeReason)
+        assertEquals("blank_message", decision.downgradeReason)
     }
 
     @Test

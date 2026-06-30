@@ -35,6 +35,10 @@ enum class EventTypeFilter {
     BIRTHDAY,
     ANNIVERSARY,
     WORK,
+    GRADUATION,
+    HOLIDAY,
+    REVIVAL,
+    FOLLOW_UP,
     CUSTOM,
 }
 
@@ -360,6 +364,10 @@ class EventsViewModel @Inject constructor(
             EventTypeFilter.BIRTHDAY -> type == OccasionType.BIRTHDAY
             EventTypeFilter.ANNIVERSARY -> type == OccasionType.ANNIVERSARY
             EventTypeFilter.WORK -> type == OccasionType.WORK_ANNIVERSARY
+            EventTypeFilter.GRADUATION -> type == OccasionType.GRADUATION
+            EventTypeFilter.HOLIDAY -> type == OccasionType.HOLIDAY
+            EventTypeFilter.REVIVAL -> type == OccasionType.REVIVAL
+            EventTypeFilter.FOLLOW_UP -> type == OccasionType.FOLLOW_UP
             EventTypeFilter.CUSTOM -> type == OccasionType.CUSTOM
         }
     }
@@ -414,6 +422,10 @@ class EventsViewModel @Inject constructor(
             OccasionType.BIRTHDAY -> string(R.string.event_type_birthday)
             OccasionType.ANNIVERSARY -> string(R.string.event_type_anniversary)
             OccasionType.WORK_ANNIVERSARY -> string(R.string.event_type_work_anniversary)
+            OccasionType.GRADUATION -> string(R.string.event_type_graduation)
+            OccasionType.HOLIDAY -> string(R.string.event_type_holiday)
+            OccasionType.REVIVAL -> string(R.string.event_type_revival)
+            OccasionType.FOLLOW_UP -> string(R.string.event_type_follow_up)
             OccasionType.CUSTOM -> string(R.string.event_type_custom)
             else -> rawType.replace("_", " ").lowercase().replaceFirstChar { it.titlecase() }
         }

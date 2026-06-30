@@ -230,7 +230,7 @@ class GenerateMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke downgrades fallback fully auto draft to manual review without scheduling`() = runTest {
+    fun `invoke schedules fallback fully auto draft when a route is available`() = runTest {
         val event = occasion(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         val contact = ContactEntity(
             id = "c1",
@@ -264,23 +264,15 @@ class GenerateMessageUseCaseTest {
         val result = useCase("e1")
 
         assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
-        assertEquals(ApprovalMode.ALWAYS_ASK, (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
+        assertEquals(ApprovalMode.FULLY_AUTO, (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
         coVerify { messageRepository.insertPending(capture(pendingSlot)) }
-        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
-        assertEquals("PENDING", pendingSlot.captured.status)
+        assertEquals("FULLY_AUTO", pendingSlot.captured.approvalMode)
+        assertEquals("APPROVED", pendingSlot.captured.status)
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertTrue(pendingSlot.captured.isUsingFallback)
         verify { notificationService.showAiFallbackAlert() }
-        coVerify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
-        coVerify {
-            notificationService.showApprovalNotification(
-                request = match<ApprovalNotificationRequest> {
-                    it.contactId.value == "c1" &&
-                        it.eventId.value == "e1"
-                },
-                variants = variants,
-            )
-        }
+        coVerify { schedulerService.scheduleExactSend(pendingSlot.captured.id) }
+        coVerify(exactly = 0) { notificationService.showApprovalNotification(any(), any()) }
     }
 
     @Test

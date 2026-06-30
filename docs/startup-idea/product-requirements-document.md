@@ -1,5 +1,7 @@
 # Product Requirements Document: LeadRescue AI
 
+Archived reference note: this document is a separate startup-idea artifact, not the implemented RelateAI Android product. It is retained only for historical ideation context and should not be read as an implementation contract for this repository.
+
 Date: 2026-06-25
 
 ## Product Overview

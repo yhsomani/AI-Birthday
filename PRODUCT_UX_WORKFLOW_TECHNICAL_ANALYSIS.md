@@ -25,7 +25,7 @@ The product has enough implemented surface to be more than a birthday reminder, 
 | Area | Current state | Primary files/modules |
 | --- | --- | --- |
 | App shell | Compose app with biometric gate, bottom navigation, permission rationale, deep links | `:app`, `MainActivity`, `RelateAIApp`, navigation |
-| Authentication | Google sign-in, Firebase auth, guest/local mode, sign-out purge | `core/data/auth`, `AuthViewModel` |
+| Authentication | Google sign-in, Firebase auth, no guest/demo bypass, sign-out purge | `core/data/auth`, `AuthViewModel` |
 | Contacts | Google People API sync, device contacts import, dedupe/merge, contact list/detail | contact sync use cases, contacts screens |
 | Events | Birthday, anniversary, work anniversary, manual/custom events, reminders | event use cases, events screen, reminder scheduler |
 | AI personalization | Gemini-backed message generation, classification, style profile, memory, gift history | Gemini service, prompt builder, parser, style/memory/gift flows |
@@ -41,7 +41,7 @@ The product has enough implemented surface to be more than a birthday reminder, 
 
 | Journey | Current flow | Friction |
 | --- | --- | --- |
-| First setup | Onboarding -> auth/guest -> sync -> setup checks -> settings | Setup spans several screens; next step can be unclear |
+| First setup | Onboarding -> Google auth -> sync/manual entry -> setup checks -> settings | Setup spans several screens; next step can be unclear |
 | Daily use | Home -> event/message/setup/contact action | Many cards compete for attention; next best action needs stronger ranking |
 | Contact enrichment | Contacts -> Contact Detail -> preferences/memory/gifts/style | User must know which fields improve AI quality |
 | Event creation | Events -> manual event -> reminder | Duplicate risk and event source trust need clearer feedback |
@@ -55,8 +55,8 @@ The product has enough implemented surface to be more than a birthday reminder, 
 
 | Role/state | Capabilities | Constraints |
 | --- | --- | --- |
-| Signed-out user | Onboarding, auth, guest entry | Cannot sync Google contacts or use authenticated cloud AI path |
-| Guest/local user | Local demo/contact flow, device-only actions where allowed | Needs clear labels for missing Google sync/auth behavior |
+| Signed-out user | Onboarding and Google auth only | Cannot sync contacts, use authenticated cloud AI paths, or enter a guest/demo account |
+| Local-data user | Signed-in user using manual contacts/events or device contacts | Needs clear labels for missing Google contact sync or missing external-service setup |
 | Signed-in user | Google sync, Gemini/Firebase-backed paths, full local relationship data | Still must grant contacts/SMS/notification/exact-alarm/accessibility as needed |
 | Locked user | Biometric/device credential prompt | Deep links and shortcuts must not bypass lock |
 | Automation-enabled user | Scheduled review/send workflows | Critical sends still respect approval mode, schedule, permissions, quiet hours, blackout, route readiness |
@@ -78,7 +78,7 @@ The product has enough implemented surface to be more than a birthday reminder, 
 
 ```mermaid
 flowchart TD
-  Auth[Auth/Guest State] --> Sync[Contact Sync]
+  Auth[Authenticated State] --> Sync[Contact Sync]
   Sync --> Contacts[Contacts DB]
   Contacts --> Events[Event Discovery]
   Contacts --> AI[AI Context Builder]
@@ -104,7 +104,7 @@ flowchart TD
 
 | Integration | Purpose | UX risk | Safeguard |
 | --- | --- | --- | --- |
-| Firebase Auth / Google Sign-In | Identity and auth state | Sign-in failure can block sync | Guest mode, explicit retry, clear account state |
+| Firebase Auth / Google Sign-In | Identity and auth state | Sign-in failure blocks entry | Explicit retry, clear account state, setup guidance |
 | Google People API | Google contacts | Token/sync failures can appear as empty data | Typed sync outcomes and permission/auth messages |
 | Android ContactsProvider | Device contacts | Permission denial can look like no contacts | Permission-specific empty state |
 | Gemini / Google AI | Drafts, classification, gifts, style | Malformed or generic output | Typed contracts, event-aware fallback, quality gate |
@@ -119,7 +119,7 @@ flowchart TD
 | Feature | Current behavior | UX issues | Accessibility issues | Performance concerns | Click/cognitive load | Recommended improvement |
 | --- | --- | --- | --- | --- | --- | --- |
 | Onboarding | Explains setup and links to automation readiness | Setup is spread across auth, permissions, AI Doctor, settings | Progress changes should be announced | Recomputing setup checks can be expensive | User must infer next setup step | Add guided setup resume path with one next fix |
-| Auth/guest | Google sign-in and guest mode exist | Guest limitations may appear only after a blocked action | Auth failures need clear live-region copy | OAuth retries can feel stalled | User may not know why sync/AI is unavailable | Add guest banner and upgrade action on Home |
+| Auth | Google sign-in is required; guest/demo bypass is not available | Auth failures block entry instead of being hidden by local demo data | Auth failures need clear live-region copy | OAuth retries can feel stalled | User may not know which OAuth/Firebase setup failed | Add clearer retry progress and setup-specific errors |
 | Home | Dashboard, setup progress, quick actions, planner | Many competing cards; stale backup not prominent enough | Status must not rely on color | Sync-on-empty must stay bounded | User must choose from many cards | Rank one primary next action plus secondary actions |
 | Contacts list | Search/filter/sort, sync controls | Missing context is not always task-oriented | Filter chips need labels and 48dp targets | Large local filtering may need profiling | User opens each contact to inspect gaps | Add contact quality chips and missing-data filters |
 | Contact detail | Rich profile, automation, memory/gift/chat links | Dense fields and technical automation values | Group headings and controls must be focusable | Loading many sections can grow costly | User must know what improves AI | Essentials first, advanced collapsed, quality impact visible |
@@ -195,7 +195,7 @@ flowchart TD
 | Item | Priority | Impact | Effort | Dependencies | Business value |
 | --- | --- | --- | --- | --- | --- |
 | Fix AI classification schema drift | P0 | High | Low | Prompt/parser tests | Better personalization quality |
-| Fix event-aware AI fallback path | P0 | High | Low | AI service/parser tests | Prevents wrong-event copy |
+| Keep event-aware AI fallback coverage complete | P1 | High | Low | Parser/UI tests | Prevents regressions to wrong-event copy |
 | Add dispatch policy tests for early-send bug | P0 | High | Low | Test environment | Automation trust |
 | Add Home stale-backup prompt model | P1 | Medium | Low | SecurePrefs timestamp | Reduces data loss |
 | Add richer Messages blocked reason text | P1 | High | Medium | readiness helper | Fewer failed retries |
@@ -334,4 +334,3 @@ Expected UX improvement:
 - Contact style defaults become more accurate.
 - Less manual correction is needed.
 - User control is preserved because AI classification and generated drafts remain editable/reviewable.
-
