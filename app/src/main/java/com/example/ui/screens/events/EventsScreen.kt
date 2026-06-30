@@ -347,15 +347,20 @@ internal fun EventsList(
     onMergeEvent: (String) -> Unit = {},
     onKeepSeparateEvent: (String) -> Unit = {},
 ) {
-    val resolvedEventTrust = if (events.all { eventTrust.containsKey(it.id.value) }) {
-        eventTrust
-    } else {
-        buildEventTrustStates(events)
+    val resolvedEventTrust = remember(events, eventTrust) {
+        if (events.all { eventTrust.containsKey(it.id.value) }) {
+            eventTrust
+        } else {
+            buildEventTrustStates(events)
+        }
     }
-    val groupedEvents = events.groupBy {
+
+    val groupedEvents = remember(events) {
         val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = it.nextOccurrenceMs
-        cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+        events.groupBy {
+            cal.timeInMillis = it.nextOccurrenceMs
+            cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+        }
     }
 
     LazyColumn(
