@@ -28,9 +28,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.ui.theme.RelateCard
-import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateSpacing
+import com.example.core.ui.theme.relateSemanticColors
 import com.example.domain.model.contact.ContactPickerItem
 import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.OccasionId
@@ -196,6 +195,48 @@ class EventsScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun eventsManualEventForm_compactPhoneHindiLargeFont() {
+        setManualEventFormContent(
+            useExistingContact = true,
+            selectedContactId = "contact-asha-hi",
+            newContactName = "",
+            eventType = OccasionType.BIRTHDAY.raw,
+            label = "जन्मदिन डिनर",
+            monthText = "04",
+            dayText = "10",
+            yearText = "",
+            duplicateWarning = null,
+            contacts = manualContactsHindi(),
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(EventsTestTags.MANUAL_DIALOG)
+            .captureRoboImage(
+                "src/test/screenshots/baseline/events_manual_event_form_compact_phone_hindi_large_font.png"
+            )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun eventsManualEventForm_typicalPhone() {
+        setManualEventFormContent(
+            useExistingContact = true,
+            selectedContactId = "contact-asha",
+            newContactName = "",
+            eventType = OccasionType.BIRTHDAY.raw,
+            label = "Birthday dinner",
+            monthText = "04",
+            dayText = "10",
+            yearText = "",
+            duplicateWarning = null,
+        )
+
+        composeRule.onNodeWithTag(EventsTestTags.MANUAL_DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/events_manual_event_form_typical_phone.png")
+    }
+
+    @Test
     fun eventsManualEventFormNewContact_compactPhoneLargeFont() {
         setManualEventFormContent(
             useExistingContact = false,
@@ -212,6 +253,48 @@ class EventsScreenshotTest {
 
         composeRule.onNodeWithTag(EventsTestTags.MANUAL_DIALOG)
             .captureRoboImage("src/test/screenshots/baseline/events_manual_event_form_new_contact_compact_phone_large_font.png")
+    }
+
+    @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun eventsManualEventFormNewContact_compactPhoneHindiLargeFont() {
+        setManualEventFormContent(
+            useExistingContact = false,
+            selectedContactId = null,
+            newContactName = "रोहन पटेल",
+            eventType = OccasionType.CUSTOM.raw,
+            label = "गृह प्रवेश",
+            monthText = "08",
+            dayText = "18",
+            yearText = "2026",
+            duplicateWarning = null,
+            contacts = manualContactsHindi(),
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(EventsTestTags.MANUAL_DIALOG)
+            .captureRoboImage(
+                "src/test/screenshots/baseline/events_manual_event_form_new_contact_compact_phone_hindi_large_font.png"
+            )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun eventsManualEventFormNewContact_typicalPhone() {
+        setManualEventFormContent(
+            useExistingContact = false,
+            selectedContactId = null,
+            newContactName = "Rohan Patel",
+            eventType = OccasionType.CUSTOM.raw,
+            label = "Housewarming",
+            monthText = "08",
+            dayText = "18",
+            yearText = "2026",
+            duplicateWarning = null,
+        )
+
+        composeRule.onNodeWithTag(EventsTestTags.MANUAL_DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/events_manual_event_form_new_contact_typical_phone.png")
     }
 
     @Test
@@ -241,6 +324,68 @@ class EventsScreenshotTest {
             .performScrollTo()
         composeRule.onNodeWithTag(EventsTestTags.MANUAL_DIALOG)
             .captureRoboImage("src/test/screenshots/baseline/events_manual_event_form_bottom_compact_phone_large_font.png")
+    }
+
+    @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun eventsManualEventFormBottom_compactPhoneHindiLargeFont() {
+        setManualEventFormContent(
+            useExistingContact = true,
+            selectedContactId = "contact-asha-hi",
+            newContactName = "",
+            eventType = OccasionType.BIRTHDAY.raw,
+            label = "जन्मदिन डिनर",
+            monthText = "04",
+            dayText = "10",
+            yearText = "2026",
+            duplicateWarning = ManualEventDuplicateWarning(
+                contactName = "आशा मेहरा",
+                eventType = OccasionType.BIRTHDAY.raw,
+                month = 4,
+                dayOfMonth = 10,
+                kind = ManualEventWarningKind.DATE_CONFLICT,
+                requestedMonth = 4,
+                requestedDayOfMonth = 12,
+            ),
+            contacts = manualContactsHindi(),
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(EventsTestTags.MANUAL_WARNING)
+            .performScrollTo()
+        composeRule.onNodeWithTag(EventsTestTags.MANUAL_DIALOG)
+            .captureRoboImage(
+                "src/test/screenshots/baseline/events_manual_event_form_bottom_compact_phone_hindi_large_font.png"
+            )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun eventsManualEventFormBottom_typicalPhone() {
+        setManualEventFormContent(
+            useExistingContact = true,
+            selectedContactId = "contact-asha",
+            newContactName = "",
+            eventType = OccasionType.BIRTHDAY.raw,
+            label = "Birthday dinner",
+            monthText = "04",
+            dayText = "10",
+            yearText = "2026",
+            duplicateWarning = ManualEventDuplicateWarning(
+                contactName = "Asha Mehta",
+                eventType = OccasionType.BIRTHDAY.raw,
+                month = 4,
+                dayOfMonth = 10,
+                kind = ManualEventWarningKind.DATE_CONFLICT,
+                requestedMonth = 4,
+                requestedDayOfMonth = 12,
+            ),
+        )
+
+        composeRule.onNodeWithTag(EventsTestTags.MANUAL_WARNING)
+            .performScrollTo()
+        composeRule.onNodeWithTag(EventsTestTags.MANUAL_DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/events_manual_event_form_bottom_typical_phone.png")
     }
 
     private fun setEventsContent(
@@ -273,10 +418,12 @@ class EventsScreenshotTest {
         dayText: String,
         yearText: String,
         duplicateWarning: ManualEventDuplicateWarning?,
+        contacts: List<ContactPickerItem> = manualContacts(),
         fontScale: Float = DefaultFontScale,
     ) {
         composeRule.setRelateScreenshotContent(fontScale = fontScale) {
             ManualEventFormSnapshot(
+                contacts = contacts,
                 useExistingContact = useExistingContact,
                 selectedContactId = selectedContactId,
                 newContactName = newContactName,
@@ -292,6 +439,7 @@ class EventsScreenshotTest {
 
     @Composable
     private fun ManualEventFormSnapshot(
+        contacts: List<ContactPickerItem>,
         useExistingContact: Boolean,
         selectedContactId: String?,
         newContactName: String,
@@ -305,7 +453,7 @@ class EventsScreenshotTest {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(RelateDarkBackground)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(RelateSpacing.screenHorizontal),
             contentAlignment = Alignment.Center,
         ) {
@@ -314,7 +462,7 @@ class EventsScreenshotTest {
                     .fillMaxWidth()
                     .testTag(EventsTestTags.MANUAL_DIALOG),
                 colors = CardDefaults.cardColors(
-                    containerColor = RelateCard,
+                    containerColor = MaterialTheme.relateSemanticColors.cardContainer,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
                 shape = MaterialTheme.shapes.extraLarge,
@@ -330,7 +478,7 @@ class EventsScreenshotTest {
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     ManualEventDialogBody(
-                        contacts = manualContacts(),
+                        contacts = contacts,
                         useExistingContact = useExistingContact,
                         onUseExistingContactChange = {},
                         selectedContactId = selectedContactId,
@@ -401,6 +549,19 @@ class EventsScreenshotTest {
             ContactPickerItem(
                 id = ContactId("contact-dev"),
                 displayName = "Dev Shah",
+            ),
+        )
+    }
+
+    private fun manualContactsHindi(): List<ContactPickerItem> {
+        return listOf(
+            ContactPickerItem(
+                id = ContactId("contact-asha-hi"),
+                displayName = "आशा मेहरा",
+            ),
+            ContactPickerItem(
+                id = ContactId("contact-dev-hi"),
+                displayName = "देव शाह",
             ),
         )
     }

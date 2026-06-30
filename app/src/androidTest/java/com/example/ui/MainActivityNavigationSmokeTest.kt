@@ -32,7 +32,6 @@ class MainActivityNavigationSmokeTest {
         runCatching {
             SecurePrefs(context).apply {
                 setBiometricLockEnabled(false)
-                setGuestMode(false)
             }
         }
     }
@@ -47,30 +46,6 @@ class MainActivityNavigationSmokeTest {
                 .performClick()
 
             waitForText(context.getString(R.string.auth_sign_in_google))
-            composeRule.onNodeWithText(context.getString(R.string.auth_dev_bypass))
-                .assertIsDisplayed()
-        }
-    }
-
-    @Test
-    fun guestModeAppShell_bottomNavigationOpensPrimaryScreens() {
-        seedGuestAppShell()
-
-        ActivityScenario.launch(MainActivity::class.java).use {
-            waitForText(context.getString(R.string.nav_home))
-            clickIfVisible(context.getString(R.string.permission_rationale_not_now))
-
-            listOf(
-                R.string.nav_contacts,
-                R.string.nav_events,
-                R.string.nav_messages,
-                R.string.analytics,
-                R.string.nav_home,
-            ).forEach { labelRes ->
-                val label = context.getString(labelRes)
-                composeRule.onNodeWithText(label).performClick()
-                waitForText(label)
-            }
         }
     }
 
@@ -82,30 +57,10 @@ class MainActivityNavigationSmokeTest {
         }
     }
 
-    private fun seedGuestAppShell() {
-        FirebaseAuth.getInstance().signOut()
-        SecurePrefs(context).apply {
-            clearAll()
-            setOnboardingComplete(true)
-            setGuestMode(true)
-            setBiometricLockEnabled(false)
-            setQuietHoursStart(0)
-            setQuietHoursEnd(0)
-            setBlackoutDates("[]")
-        }
-    }
-
     private fun waitForText(text: String, timeoutMs: Long = 8_000L) {
         composeRule.waitUntil(timeoutMs) {
             composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText(text).assertIsDisplayed()
-    }
-
-    private fun clickIfVisible(text: String) {
-        val nodes = composeRule.onAllNodesWithText(text).fetchSemanticsNodes()
-        if (nodes.isNotEmpty()) {
-            composeRule.onNodeWithText(text).performClick()
-        }
     }
 }

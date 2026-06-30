@@ -8,6 +8,7 @@ import com.example.core.db.entities.StyleProfileHistoryEntity
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.StyleAnalysisUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,19 +34,23 @@ class StyleCoachViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(StyleCoachUiState())
     val uiState: StateFlow<StyleCoachUiState> = _uiState.asStateFlow()
+    private var profileJob: Job? = null
 
     init {
         loadData()
     }
 
     fun loadData() {
-        viewModelScope.launch {
+        profileJob?.cancel()
+        profileJob = viewModelScope.launch {
             styleProfileRepository.getProfile().collect { profile ->
                 val historyList = styleProfileRepository.getHistory()
-                _uiState.value = _uiState.value.copy(
-                    profile = profile,
-                    history = historyList
-                )
+                _uiState.update {
+                    it.copy(
+                        profile = profile,
+                        history = historyList,
+                    )
+                }
             }
         }
     }
@@ -125,13 +130,11 @@ class StyleCoachViewModel @Inject constructor(
         statusIsError: Boolean = _uiState.value.statusIsError,
     ) {
         val historyList = styleProfileRepository.getHistory()
-        val profile = styleProfileRepository.getProfileOnce()
         _uiState.update {
             it.copy(
                 isTraining = isTraining,
                 isAutoAnalyzing = isAutoAnalyzing,
                 trainSuccess = trainSuccess,
-                profile = profile,
                 history = historyList,
                 statusMessageRes = statusMessageRes,
                 statusIsError = statusIsError,

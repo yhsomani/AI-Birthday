@@ -37,6 +37,10 @@ class EventRepositoryImpl @Inject constructor(
 
     override suspend fun countUpcoming(days: Int): Int = eventDao.countUpcoming(days, System.currentTimeMillis())
 
+    override fun countUpcomingFlow(days: Int): Flow<Int> {
+        return getUpcomingPreviewsFlow(days).map { previews -> previews.size }
+    }
+
     override suspend fun getOccasionById(eventId: String): Occasion? {
         return eventDao.getById(eventId)?.toOccasion()
     }
@@ -45,8 +49,25 @@ class EventRepositoryImpl @Inject constructor(
         return eventDao.getTypeById(eventId)?.let { OccasionType.fromRaw(it) }
     }
 
+    override fun getOccasionTypeByIdFlow(eventId: String): Flow<OccasionType?> {
+        return eventDao.getAll().map { events ->
+            events.firstOrNull { it.id == eventId }?.let { OccasionType.fromRaw(it.type) }
+        }
+    }
+
     override suspend fun getUpcomingPreviews(days: Int): List<UpcomingEventPreview> {
         return eventDao.getUpcoming(days, System.currentTimeMillis()).toUpcomingEventPreviews()
+    }
+
+    override fun getUpcomingPreviewsFlow(days: Int): Flow<List<UpcomingEventPreview>> {
+        return eventDao.getAll().map { events ->
+            events
+                .asSequence()
+                .filterUpcomingWithin(days)
+                .sortedBy { it.nextOccurrenceMs }
+                .toList()
+                .toUpcomingEventPreviews()
+        }
     }
 
     override suspend fun getNextUpcomingPreviewForContact(
@@ -58,8 +79,38 @@ class EventRepositoryImpl @Inject constructor(
             ?.toUpcomingEventPreview()
     }
 
+    override fun getNextUpcomingPreviewForContactFlow(
+        contactId: String,
+        days: Int,
+    ): Flow<UpcomingEventPreview?> {
+        return eventDao.getAll().map { events ->
+            events
+                .asSequence()
+                .filterUpcomingWithin(days)
+                .filter { event -> event.contactId == contactId }
+                .minByOrNull { it.nextOccurrenceMs }
+                ?.toUpcomingEventPreview()
+        }
+    }
+
     override suspend fun upsertOccasion(occasion: Occasion) = eventDao.upsert(occasion.toEventEntity())
 
     override suspend fun deactivateContactDerivedOccasion(contactId: ContactId, type: OccasionType) =
         eventDao.deactivateContactDerivedEvent(contactId.value, type.raw)
+
+    private companion object {
+        const val MILLIS_PER_DAY = 86_400_000L
+    }
+
+    private fun Sequence<com.example.core.db.entities.EventEntity>.filterUpcomingWithin(
+        days: Int,
+    ): Sequence<com.example.core.db.entities.EventEntity> {
+        val nowMs = System.currentTimeMillis()
+        val maxMs = nowMs + days.coerceAtLeast(0) * MILLIS_PER_DAY
+        return filter { event ->
+            event.isActive &&
+                event.nextOccurrenceMs >= nowMs &&
+                event.nextOccurrenceMs <= maxMs
+        }
+    }
 }

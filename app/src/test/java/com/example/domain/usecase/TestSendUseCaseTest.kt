@@ -6,6 +6,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -22,6 +23,7 @@ class TestSendUseCaseTest {
 
         assertEquals(TestSendUseCase.Outcome.BlankMessage, outcome)
         coVerify(exactly = 0) { testSendService.sendEmailToSelf(any()) }
+        verify(exactly = 0) { preferencesRepository.setLastSuccessfulEmailTest(any(), any()) }
     }
 
     @Test
@@ -33,6 +35,7 @@ class TestSendUseCaseTest {
 
         assertEquals(TestSendUseCase.Outcome.MissingEmailSetup, outcome)
         coVerify(exactly = 0) { testSendService.sendEmailToSelf(any()) }
+        verify(exactly = 0) { preferencesRepository.setLastSuccessfulEmailTest(any(), any()) }
     }
 
     @Test
@@ -44,6 +47,7 @@ class TestSendUseCaseTest {
 
         assertEquals(TestSendUseCase.Outcome.Sent, outcome)
         coVerify { testSendService.sendEmailToSelf("Happy birthday") }
+        verify { preferencesRepository.setLastSuccessfulEmailTest("sender@gmail.com", any()) }
     }
 
     @Test
@@ -55,5 +59,6 @@ class TestSendUseCaseTest {
         val outcome = useCase("Happy birthday")
 
         assertEquals(TestSendUseCase.Outcome.SendFailed, outcome)
+        verify(exactly = 0) { preferencesRepository.setLastSuccessfulEmailTest(any(), any()) }
     }
 }

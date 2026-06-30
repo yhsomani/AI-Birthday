@@ -7,14 +7,19 @@ import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
+import com.example.domain.usecase.EnableFullAutomationUseCase
 import com.example.domain.usecase.SyncContactsUseCase
+import com.example.ui.feedback.FeedbackType
+import com.example.ui.feedback.UiText
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.*
 import org.junit.*
@@ -40,20 +45,25 @@ class SettingsViewModelTest {
     @RelaxedMockK
     private lateinit var securePrefs: SecurePrefs
 
+    @RelaxedMockK
+    private lateinit var enableFullAutomationUseCase: EnableFullAutomationUseCase
+
     private val testDispatcher = StandardTestDispatcher()
     private val userProfileFlow = MutableStateFlow(UserProfile())
+    private val preferenceChanges = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private val context = io.mockk.mockk<android.content.Context>(relaxed = true)
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         every { authManager.userProfile } returns userProfileFlow
+        every { securePrefs.observeChanges() } returns preferenceChanges
         every { securePrefs.isBirthdayRemindersEnabled() } returns true
         every { securePrefs.isAiWishGenerationEnabled() } returns true
         every { securePrefs.getGeminiApiKey() } returns ""
         every { securePrefs.getSenderEmail() } returns ""
         every { securePrefs.getSenderEmailPassword() } returns ""
-        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.SMART_APPROVE
+        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.FULLY_AUTO
         every { securePrefs.getQuietHoursStart() } returns 22
         every { securePrefs.getQuietHoursEnd() } returns 8
         every { securePrefs.getChannelBlackout() } returns "[]"
@@ -66,6 +76,11 @@ class SettingsViewModelTest {
         every { context.getString(R.string.settings_last_backup_yesterday) } returns "Yesterday"
         every { context.getString(R.string.settings_sync_contacts_failed) } returns "Contact sync failed."
         every { context.getString(R.string.settings_sync_contacts_device_permission_missing) } returns "Contacts permission missing."
+        coEvery { enableFullAutomationUseCase() } returns EnableFullAutomationUseCase.Outcome(
+            updatedContacts = 0,
+            promotedMessages = 0,
+            skippedWithoutRoute = 0,
+        )
     }
 
     @After
@@ -73,9 +88,18 @@ class SettingsViewModelTest {
         Dispatchers.resetMain()
     }
 
+    private fun newViewModel() = SettingsViewModel(
+        context,
+        syncContactsUseCase,
+        contactRepository,
+        authManager,
+        securePrefs,
+        enableFullAutomationUseCase,
+    )
+
     @Test
     fun `toggleBirthdayReminders updates state`() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         viewModel.toggleBirthdayReminders(false)
         assertFalse(viewModel.uiState.value.birthdayReminders)
@@ -88,7 +112,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `toggleAiWishGeneration updates state`() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         viewModel.toggleAiWishGeneration(false)
         assertFalse(viewModel.uiState.value.aiWishGeneration)
@@ -99,23 +123,23 @@ class SettingsViewModelTest {
     fun `init reads typed global automation mode from secure prefs`() = runTest(testDispatcher) {
         every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.VIP_APPROVE
 
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         assertEquals(ApprovalMode.VIP_APPROVE, viewModel.uiState.value.automationMode)
     }
 
     @Test
     fun `init uses secure prefs fallback global automation mode`() = runTest(testDispatcher) {
-        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.SMART_APPROVE
+        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.FULLY_AUTO
 
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
-        assertEquals(ApprovalMode.SMART_APPROVE, viewModel.uiState.value.automationMode)
+        assertEquals(ApprovalMode.FULLY_AUTO, viewModel.uiState.value.automationMode)
     }
 
     @Test
     fun `setAutomationMode stores typed value and updates typed state`() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         viewModel.setAutomationMode(ApprovalMode.ALWAYS_ASK)
 
@@ -124,11 +148,51 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `setAutomationMode full auto promotes queued messages through use case`() = runTest(testDispatcher) {
+        coEvery { enableFullAutomationUseCase() } returns EnableFullAutomationUseCase.Outcome(
+            updatedContacts = 3,
+            promotedMessages = 2,
+            skippedWithoutRoute = 1,
+            skippedNeedsReview = 1,
+        )
+        val viewModel = newViewModel()
+
+        viewModel.setAutomationMode(ApprovalMode.FULLY_AUTO)
+        advanceUntilIdle()
+
+        assertEquals(ApprovalMode.FULLY_AUTO, viewModel.uiState.value.automationMode)
+        val message = viewModel.uiState.value.feedbackEvent?.message as UiText.Resource
+        assertEquals(R.string.settings_full_automation_enabled_route_and_review_blockers, message.resId)
+        assertEquals(listOf(3, 2, 1, 1), message.args)
+        assertEquals(FeedbackType.INFO, viewModel.uiState.value.feedbackEvent?.type)
+        coVerify { enableFullAutomationUseCase() }
+        verify(exactly = 0) { securePrefs.setGlobalApprovalMode(ApprovalMode.FULLY_AUTO) }
+    }
+
+    @Test
+    fun `setAutomationMode full auto reports localized failure feedback`() = runTest(testDispatcher) {
+        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.VIP_APPROVE
+        coEvery { enableFullAutomationUseCase() } throws IllegalStateException("Review setup and try again.")
+        val viewModel = newViewModel()
+
+        viewModel.setAutomationMode(ApprovalMode.FULLY_AUTO)
+        assertEquals(ApprovalMode.VIP_APPROVE, viewModel.uiState.value.automationMode)
+        advanceUntilIdle()
+
+        assertEquals(ApprovalMode.VIP_APPROVE, viewModel.uiState.value.automationMode)
+        val message = viewModel.uiState.value.feedbackEvent?.message as UiText.Resource
+        assertEquals(R.string.settings_full_automation_failed_with_reason, message.resId)
+        assertEquals(listOf("Review setup and try again."), message.args)
+        assertEquals(FeedbackType.ERROR, viewModel.uiState.value.feedbackEvent?.type)
+        verify(exactly = 0) { securePrefs.setGlobalApprovalMode(ApprovalMode.FULLY_AUTO) }
+    }
+
+    @Test
     fun `init maps channel blackout storage to typed settings state`() = runTest(testDispatcher) {
         every { securePrefs.getChannelBlackout() } returns
             """["${MessageChannel.SMS.raw.lowercase()}","LEGACY_CHANNEL","${MessageChannel.EMAIL.raw}"]"""
 
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         assertTrue(viewModel.uiState.value.channelBlackoutSms)
         assertFalse(viewModel.uiState.value.channelBlackoutWhatsApp)
@@ -139,7 +203,7 @@ class SettingsViewModelTest {
     fun `toggleChannelBlackout stores typed channel raw values`() = runTest(testDispatcher) {
         every { securePrefs.getChannelBlackout() } returns
             """["${MessageChannel.SMS.raw.lowercase()}","LEGACY_CHANNEL","${MessageChannel.EMAIL.raw}"]"""
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         viewModel.toggleChannelBlackout(MessageChannel.WHATSAPP, true)
 
@@ -155,7 +219,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `toggleChannelBlackout ignores unknown channel`() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         viewModel.toggleChannelBlackout(MessageChannel.UNKNOWN, true)
 
@@ -167,7 +231,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `syncContacts success flips isSyncing off and updates lastSyncTimestamp`() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         viewModel.syncContacts()
         advanceUntilIdle()
@@ -185,7 +249,7 @@ class SettingsViewModelTest {
             updated = 0,
             deviceContactsPermissionDenied = true,
         )
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         viewModel.syncContacts()
         advanceUntilIdle()
@@ -198,7 +262,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `init shows no backup freshness when backup has never run`() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         assertEquals("Never", viewModel.uiState.value.lastBackupTimestamp)
     }
@@ -206,15 +270,37 @@ class SettingsViewModelTest {
     @Test
     fun `init shows today for fresh backup timestamp`() = runTest(testDispatcher) {
         every { securePrefs.getLastBackupMs() } returns System.currentTimeMillis()
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         assertEquals("Today", viewModel.uiState.value.lastBackupTimestamp)
     }
 
     @Test
+    fun `preference changes immediately refresh settings state`() = runTest(testDispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        assertEquals(ApprovalMode.FULLY_AUTO, viewModel.uiState.value.automationMode)
+        assertTrue(viewModel.uiState.value.aiWishGeneration)
+        assertEquals("Never", viewModel.uiState.value.lastBackupTimestamp)
+
+        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.ALWAYS_ASK
+        every { securePrefs.isAiWishGenerationEnabled() } returns false
+        every { securePrefs.getLastBackupMs() } returns System.currentTimeMillis()
+        every { securePrefs.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
+        preferenceChanges.tryEmit(Unit)
+        advanceUntilIdle()
+
+        assertEquals(ApprovalMode.ALWAYS_ASK, viewModel.uiState.value.automationMode)
+        assertFalse(viewModel.uiState.value.aiWishGeneration)
+        assertEquals("Today", viewModel.uiState.value.lastBackupTimestamp)
+        assertTrue(viewModel.uiState.value.channelBlackoutSms)
+    }
+
+    @Test
     fun `dismissLegacyDbNotice clears persisted notice flag`() = runTest(testDispatcher) {
         every { securePrefs.wasLegacyUnencryptedDbQuarantined() } returns true
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         assertTrue(viewModel.uiState.value.showLegacyDbNotice)
 
@@ -226,7 +312,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `signOut delegates to auth manager without duplicating data wipe`() = runTest(testDispatcher) {
-        val viewModel = SettingsViewModel(context, syncContactsUseCase, contactRepository, authManager, securePrefs)
+        val viewModel = newViewModel()
 
         viewModel.signOut()
 

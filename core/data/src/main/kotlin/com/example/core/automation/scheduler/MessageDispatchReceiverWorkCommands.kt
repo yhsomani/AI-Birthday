@@ -1,6 +1,7 @@
 package com.example.core.automation.scheduler
 
 import android.content.Intent
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import com.example.core.automation.workers.MessageDispatchWorkRequests
@@ -44,7 +45,14 @@ internal fun toMessageDispatchReceiverWorkCommand(
 }
 
 internal fun WorkManager.enqueueMessageDispatchReceiverWork(command: MessageDispatchReceiverWorkCommand) {
-    enqueue(command.toOneTimeWorkRequest())
+    when (command) {
+        is MessageDispatchReceiverWorkCommand.PendingMessage -> enqueueUniquePendingMessageDispatchWork(
+            pendingMessageId = command.messageId.value,
+            eventId = command.occasionId?.value,
+            existingWorkPolicy = ExistingWorkPolicy.KEEP,
+        )
+        is MessageDispatchReceiverWorkCommand.LegacyOccasion -> enqueue(command.toOneTimeWorkRequest())
+    }
 }
 
 internal fun MessageDispatchReceiverWorkCommand.toOneTimeWorkRequest(): OneTimeWorkRequest {
@@ -57,4 +65,25 @@ internal fun MessageDispatchReceiverWorkCommand.toOneTimeWorkRequest(): OneTimeW
             eventId = occasionId.value,
         )
     }
+}
+
+internal fun WorkManager.enqueueUniquePendingMessageDispatchWork(
+    pendingMessageId: String,
+    eventId: String? = null,
+    initialDelayMs: Long = 0L,
+    existingWorkPolicy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP,
+) {
+    beginUniqueWork(
+        pendingMessageDispatchUniqueWorkName(pendingMessageId),
+        existingWorkPolicy,
+        MessageDispatchWorkRequests.create(
+            pendingMessageId = pendingMessageId,
+            eventId = eventId,
+            initialDelayMs = initialDelayMs,
+        ),
+    ).enqueue()
+}
+
+internal fun pendingMessageDispatchUniqueWorkName(pendingMessageId: String): String {
+    return "message_dispatch_$pendingMessageId"
 }

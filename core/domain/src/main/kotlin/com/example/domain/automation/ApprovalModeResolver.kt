@@ -17,7 +17,11 @@ object ApprovalModeResolver {
 
         val global = globalMode
             .takeIf { it.isExplicitAutomationMode() }
-            ?: ApprovalMode.SMART_APPROVE
+            ?: ApprovalMode.FULLY_AUTO
+
+        if (global == ApprovalMode.FULLY_AUTO) {
+            return ApprovalMode.FULLY_AUTO
+        }
 
         return when (relationship?.trim()?.uppercase()) {
             "FAMILY", "BEST_FRIEND" -> ApprovalMode.VIP_APPROVE

@@ -59,6 +59,29 @@ class DeliveryChannelResolverTest {
     }
 
     @Test
+    fun `resolveRoutes skips invalid email addresses before trying email route`() {
+        val invalidRecipientRoutes = DeliveryChannelResolver.resolveRoutes(
+            preferredChannel = MessageChannel.EMAIL,
+            primaryPhone = "+15551234567",
+            primaryEmail = "not an email",
+            senderEmail = "me@example.com",
+            senderEmailPassword = "app-password",
+            blockedChannels = emptySet(),
+        )
+        val invalidSenderRoutes = DeliveryChannelResolver.resolveRoutes(
+            preferredChannel = MessageChannel.EMAIL,
+            primaryPhone = "+15551234567",
+            primaryEmail = "alex@example.com",
+            senderEmail = "not an email",
+            senderEmailPassword = "app-password",
+            blockedChannels = emptySet(),
+        )
+
+        assertEquals(listOf(MessageChannel.SMS, MessageChannel.WHATSAPP), invalidRecipientRoutes)
+        assertEquals(listOf(MessageChannel.SMS, MessageChannel.WHATSAPP), invalidSenderRoutes)
+    }
+
+    @Test
     fun `resolveRoutes respects disabled channels`() {
         val routes = DeliveryChannelResolver.resolveRoutes(
             preferredChannel = MessageChannel.WHATSAPP,

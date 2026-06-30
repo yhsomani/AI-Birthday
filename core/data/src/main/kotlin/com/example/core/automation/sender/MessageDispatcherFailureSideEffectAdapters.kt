@@ -15,6 +15,7 @@ internal fun messageDispatchFailureSideEffects(
     preferredChannel: MessageChannel,
     messageText: String,
     failure: ProviderDispatchFailure,
+    retryCount: Int = 0,
 ): MessageDispatchFailureSideEffects {
     return MessageDispatchFailureSideEffects(
         healthReport = MessageDispatchFailureHealthReport(
@@ -27,7 +28,7 @@ internal fun messageDispatchFailureSideEffects(
                 payload = messageText,
                 errorMessage = failure.redactedErrorMessage,
                 errorType = failure.errorType,
-                retryCount = 0,
+                retryCount = retryCount,
             )
         } else {
             null

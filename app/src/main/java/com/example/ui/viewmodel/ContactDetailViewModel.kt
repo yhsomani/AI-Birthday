@@ -17,6 +17,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -51,31 +52,33 @@ class ContactDetailViewModel @Inject constructor(
     val uiState: StateFlow<ContactDetailUiState> = _uiState.asStateFlow()
 
     init {
-        loadContact()
+        collectContact()
     }
 
-    private fun loadContact() {
+    private fun collectContact() {
         viewModelScope.launch {
             try {
-                val contact = contactRepository.getDetailProfile(contactId)
-                val upcomingEvent = contact?.let { currentContact ->
-                    eventRepository.getNextUpcomingPreviewForContact(currentContact.id.value, 365)
+                combine(
+                    contactRepository.getDetailProfileFlow(contactId),
+                    eventRepository.getNextUpcomingPreviewForContactFlow(contactId, 365),
+                    memoryNoteRepository.getSummaryForContactFlow(contactId),
+                ) { contact, upcomingEvent, memoryNoteSummary ->
+                    val safeMemorySummary = if (contact == null) {
+                        MemoryNoteSummary.EMPTY
+                    } else {
+                        memoryNoteSummary
+                    }
+                    _uiState.value.copy(
+                        contact = contact,
+                        memoryNoteCount = safeMemorySummary.totalCount,
+                        memoryNoteCategorySummary = safeMemorySummary.categoryCounts,
+                        upcomingEventDaysLeft = upcomingEvent?.daysUntil,
+                        upcomingEvent = upcomingEvent,
+                        isLoading = false,
+                    )
+                }.collect { state ->
+                    _uiState.value = state
                 }
-                val memoryNoteSummary = contact?.let { currentContact ->
-                    runCatching {
-                        memoryNoteRepository.getSummaryForContact(currentContact.id.value)
-                    }.getOrDefault(MemoryNoteSummary.EMPTY)
-                } ?: MemoryNoteSummary.EMPTY
-                val daysLeft = upcomingEvent?.daysUntil
-
-                _uiState.value = ContactDetailUiState(
-                    contact = contact,
-                    memoryNoteCount = memoryNoteSummary.totalCount,
-                    memoryNoteCategorySummary = memoryNoteSummary.categoryCounts,
-                    upcomingEventDaysLeft = daysLeft,
-                    upcomingEvent = upcomingEvent,
-                    isLoading = false,
-                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false)
             }
@@ -108,7 +111,6 @@ class ContactDetailViewModel @Inject constructor(
                         preferenceMessageRes = R.string.contact_detail_preferences_saved,
                         preferenceErrorRes = null,
                     )
-                    loadContact()
                 }
             }
         }

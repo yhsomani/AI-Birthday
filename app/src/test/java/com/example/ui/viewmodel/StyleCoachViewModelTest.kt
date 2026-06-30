@@ -45,6 +45,7 @@ class StyleCoachViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        profileFlow.value = null
         every { styleProfileRepository.getProfile() } returns profileFlow
         coEvery { styleProfileRepository.getHistory() } returns emptyList()
         coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileEntity(sampleCount = 3)
@@ -74,6 +75,23 @@ class StyleCoachViewModelTest {
                 "MANUAL_TRAINING",
             )
         }
+    }
+
+    @Test
+    fun `profile flow updates learned style state immediately`() = runTest(testDispatcher) {
+        val viewModel = StyleCoachViewModel(styleProfileRepository, styleAnalysisUseCase)
+        advanceUntilIdle()
+
+        profileFlow.value = StyleProfileEntity(
+            sampleCount = 4,
+            formalityLevel = "FORMAL",
+            preferredLanguage = "hi",
+        )
+        advanceUntilIdle()
+
+        assertEquals(4, viewModel.uiState.value.profile?.sampleCount)
+        assertEquals("FORMAL", viewModel.uiState.value.profile?.formalityLevel)
+        assertEquals("hi", viewModel.uiState.value.profile?.preferredLanguage)
     }
 
     @Test

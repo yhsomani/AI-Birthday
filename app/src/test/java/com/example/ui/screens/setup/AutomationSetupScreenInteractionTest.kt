@@ -11,6 +11,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.ui.theme.RelateAITheme
+import com.example.ui.viewmodel.AiDoctorAction
 import com.example.ui.viewmodel.AiDoctorSummary
 import com.example.ui.viewmodel.AutomationSetupUiState
 import com.example.ui.viewmodel.ReadinessCheck
@@ -61,6 +62,36 @@ class AutomationSetupScreenInteractionTest {
             listOf("refresh", "dryRun", "syncContacts", "testAi", "testEmail"),
             actions,
         )
+    }
+
+    @Test
+    fun readinessRowReviewMessagesActionInvokesCallback() {
+        val actions = mutableListOf<AiDoctorAction>()
+
+        composeRule.setContent {
+            RelateAITheme {
+                AutomationSetupContent(
+                    state = interactionState().copy(
+                        checks = listOf(
+                            ReadinessCheck(
+                                title = "Channel Verification",
+                                detail = "SMS needs a low-risk real send.",
+                                status = ReadinessStatus.WARNING,
+                                actionLabel = context.getString(R.string.automation_setup_action_review_messages),
+                                action = AiDoctorAction.OPEN_MESSAGES,
+                                group = ReadinessGroup.RELIABILITY,
+                            ),
+                        ),
+                    ),
+                    isIgnoringBatteryOptimizations = false,
+                    onAction = { actions += it },
+                )
+            }
+        }
+
+        clickAction(R.string.automation_setup_action_review_messages)
+
+        assertEquals(listOf(AiDoctorAction.OPEN_MESSAGES), actions)
     }
 
     private fun clickAction(labelRes: Int) {

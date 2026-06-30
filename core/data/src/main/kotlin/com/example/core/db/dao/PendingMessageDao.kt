@@ -19,15 +19,18 @@ interface PendingMessageDao {
     """)
     suspend fun getBootRecoverableAutoSends(): List<PendingMessageEntity>
 
+    @Query("SELECT * FROM pending_messages WHERE status = 'DISPATCHING'")
+    suspend fun getDispatchingMessages(): List<PendingMessageEntity>
+
     @Query("SELECT * FROM pending_messages WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): PendingMessageEntity?
-    
+
     @Query("SELECT * FROM pending_messages WHERE eventId = :eventId LIMIT 1")
     suspend fun getByEventId(eventId: String): PendingMessageEntity?
 
     @Query("SELECT * FROM pending_messages WHERE contactId = :contactId AND eventId = :eventId AND scheduledYear = :scheduledYear LIMIT 1")
     suspend fun getPendingMessage(contactId: String, eventId: String, scheduledYear: Int): PendingMessageEntity?
-    
+
     @Query("SELECT EXISTS(SELECT 1 FROM pending_messages WHERE eventId = :eventId)")
     suspend fun existsForEvent(eventId: String): Boolean
 
@@ -39,6 +42,33 @@ interface PendingMessageDao {
 
     @Query("UPDATE pending_messages SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: String, status: String)
+
+    @Query("""
+        UPDATE pending_messages
+        SET status = 'SENT'
+        WHERE id = :id
+          AND status IN ('PENDING', 'APPROVED', 'DISPATCHING', 'SENT')
+    """)
+    suspend fun markSmsHandoffSentIfAwaitingCallback(id: String): Int
+
+    @Query("""
+        UPDATE pending_messages
+        SET status = 'FAILED'
+        WHERE id = :id
+          AND status IN ('PENDING', 'APPROVED', 'DISPATCHING', 'SENT')
+    """)
+    suspend fun markSmsCallbackFailed(id: String): Int
+
+    @Query("""
+        UPDATE pending_messages
+        SET status = :newStatus
+        WHERE id = :id AND status = :expectedStatus
+    """)
+    suspend fun updateStatusIfCurrent(
+        id: String,
+        expectedStatus: String,
+        newStatus: String,
+    ): Int
 
     @Query("UPDATE pending_messages SET scheduledForMs = :scheduledForMs WHERE id = :id")
     suspend fun updateScheduledFor(id: String, scheduledForMs: Long)
@@ -70,6 +100,19 @@ interface PendingMessageDao {
         status: String,
         scheduledForMs: Long,
     )
+
+    @Query("""
+        UPDATE pending_messages
+        SET status = :newStatus,
+            scheduledForMs = :scheduledForMs
+        WHERE id = :id AND status = :expectedStatus
+    """)
+    suspend fun updateStatusAndScheduledForIfCurrent(
+        id: String,
+        expectedStatus: String,
+        newStatus: String,
+        scheduledForMs: Long,
+    ): Int
 
     @Query("UPDATE pending_messages SET status = :status WHERE eventId = :eventId")
     suspend fun updateStatusByEventId(eventId: String, status: String)

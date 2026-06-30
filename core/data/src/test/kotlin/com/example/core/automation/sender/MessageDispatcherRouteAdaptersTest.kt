@@ -137,6 +137,30 @@ class MessageDispatcherRouteAdaptersTest {
     }
 
     @Test
+    fun dispatchWhatsAppRoute_mapsInvalidPhoneNumberToSetupFailure() = runTest {
+        coEvery {
+            anyConstructed<WhatsAppSender>().sendWithResult("not-a-number", "Selected", "event_1")
+        } returns WhatsAppSendResult.Failed(WhatsAppSendFailureReason.INVALID_PHONE_NUMBER)
+
+        val result = context.dispatchWhatsAppRoute(
+            phoneNumber = "not-a-number",
+            messageText = "Selected",
+            eventRef = "event_1",
+        )
+
+        assertFalse(result.sent)
+        assertEquals(
+            DispatchProviderRetryPolicy.ERROR_WHATSAPP_AUTOMATION_UNAVAILABLE,
+            result.failure?.errorType,
+        )
+        assertEquals("WHATSAPP_INVALID_PHONE_NUMBER", result.failure?.errorCode)
+        assertEquals(
+            "Contact phone number is not usable for WhatsApp automation.",
+            result.failure?.redactedErrorMessage,
+        )
+    }
+
+    @Test
     fun dispatchWhatsAppRouteWithFailureLog_recordsFailureLogWhenRouteFails() = runTest {
         coEvery {
             anyConstructed<WhatsAppSender>().sendWithResult("+15551234567", "Selected", "event_1")
@@ -288,6 +312,41 @@ class MessageDispatcherRouteAdaptersTest {
         assertEquals("SMTP_AUTHENTICATION_FAILED", result.failure?.errorCode)
         assertEquals(
             "Email provider rejected configured credentials; setup must be reviewed.",
+            result.failure?.redactedErrorMessage,
+        )
+        assertEquals(exception, result.cause)
+    }
+
+    @Test
+    fun dispatchEmailRoute_mapsInvalidRecipientToFinalProviderFailure() = runTest {
+        val exception = EmailAddressValidationException(EmailAddressField.RECIPIENT)
+        coEvery {
+            anyConstructed<EmailSender>().send(
+                toEmail = "not an email",
+                contactName = "Amit",
+                messageText = "Selected",
+                eventType = "BIRTHDAY",
+                eventLabel = "Birthday",
+                subjectOverride = null,
+            )
+        } throws exception
+
+        val result = prefs.dispatchEmailRoute(
+            toEmail = "not an email",
+            contactName = "Amit",
+            messageText = "Selected",
+            eventType = "BIRTHDAY",
+            eventLabel = "Birthday",
+        )
+
+        assertFalse(result.sent)
+        assertEquals(
+            DispatchProviderRetryPolicy.ERROR_EMAIL_INVALID_ADDRESS,
+            result.failure?.errorType,
+        )
+        assertEquals("EMAIL_INVALID_RECIPIENT_ADDRESS", result.failure?.errorCode)
+        assertEquals(
+            "Contact email address is invalid; update the contact before retry.",
             result.failure?.redactedErrorMessage,
         )
         assertEquals(exception, result.cause)

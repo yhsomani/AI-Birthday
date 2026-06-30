@@ -66,15 +66,10 @@ import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
 import com.example.core.ui.theme.RelateAlpha
-import com.example.core.ui.theme.RelateCard
-import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateElevation
-import com.example.core.ui.theme.RelateError
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSuccess
+import com.example.core.ui.theme.relateSemanticColors
 import com.example.domain.model.gift.GiftHistoryRecord
 import com.example.domain.service.GiftSuggestion
 import com.example.ui.viewmodel.GiftAdvisorUiState
@@ -246,7 +241,7 @@ internal fun GiftAdvisorContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .testTag(GiftAdvisorTestTags.LOADING)
-                    .background(RelateDarkBackground)
+                    .background(MaterialTheme.colorScheme.background)
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center,
             ) {
@@ -254,7 +249,7 @@ internal fun GiftAdvisorContent(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
                 ) {
-                    CircularProgressIndicator(color = RelatePrimary)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     Text(
                         text = stringResource(R.string.gift_advisor_loading),
                         style = MaterialTheme.typography.bodyMedium,
@@ -266,7 +261,7 @@ internal fun GiftAdvisorContent(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(RelateDarkBackground)
+                    .background(MaterialTheme.colorScheme.background)
                     .padding(paddingValues)
                     .padding(RelateSpacing.screenHorizontal),
                 contentPadding = PaddingValues(bottom = RelateSpacing.lg),
@@ -364,7 +359,7 @@ private fun GiftRecordBottomBar(onShowAddDialog: () -> Unit) {
     ) {
         Button(
             onClick = onShowAddDialog,
-            colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             modifier = Modifier.testTag(GiftAdvisorTestTags.RECORD_FAB),
         ) {
             Icon(
@@ -423,7 +418,7 @@ private fun BudgetStatCard(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = RelatePrimary,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(RelateSize.iconLg),
             )
             Spacer(modifier = Modifier.height(RelateSpacing.xs))
@@ -464,13 +459,13 @@ private fun GiftSuggestionsPanel(
                     text = stringResource(R.string.gift_suggestions_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = RelatePrimary,
+                    color = MaterialTheme.colorScheme.primary,
                 )
 
                 Button(
                     onClick = onGenerateSuggestions,
                     enabled = !uiState.isGeneratingSuggestions,
-                    colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.testTag(GiftAdvisorTestTags.GENERATE_SUGGESTIONS_BUTTON),
                 ) {
                     if (uiState.isGeneratingSuggestions) {
@@ -542,7 +537,7 @@ private fun GiftSuggestionCard(
                 Spacer(modifier = Modifier.width(RelateSpacing.md))
                 Text(
                     text = stringResource(R.string.gift_currency_inr_format, suggestion.estimatedCostInr),
-                    color = RelatePrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -564,7 +559,7 @@ private fun GiftHistoryCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = RelateCard),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.relateSemanticColors.cardContainer),
     ) {
         Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
             Column(
@@ -581,14 +576,14 @@ private fun GiftHistoryCard(
                 Text(
                     text = gift.giftCategory,
                     style = MaterialTheme.typography.labelMedium,
-                    color = RelatePrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = stringResource(R.string.gift_occasion_year_format, gift.occasionType, gift.year),
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -600,7 +595,7 @@ private fun GiftHistoryCard(
                 Text(
                     text = stringResource(R.string.gift_currency_inr_format, gift.approxCostInr),
                     style = MaterialTheme.typography.titleMedium,
-                    color = RelatePrimary,
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     GiftFeedbackIcon(receivedWell = gift.receivedWell)
@@ -634,19 +629,19 @@ private fun GiftFeedbackIcon(receivedWell: Boolean?) {
         true -> Icon(
             imageVector = Icons.Filled.ThumbUp,
             contentDescription = stringResource(R.string.gift_feedback_liked),
-            tint = RelateSuccess,
+            tint = MaterialTheme.relateSemanticColors.success,
         )
 
         false -> Icon(
             imageVector = Icons.Filled.ThumbDown,
             contentDescription = stringResource(R.string.gift_feedback_disliked),
-            tint = RelateError,
+            tint = MaterialTheme.colorScheme.error,
         )
 
         null -> Icon(
             imageVector = Icons.Filled.Info,
             contentDescription = stringResource(R.string.gift_feedback_unknown),
-            tint = RelateOnSurfaceVariant,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -809,7 +804,7 @@ internal fun AddGiftDialogBody(
             FeedbackButton(
                 selected = receivedWellState == true,
                 onClick = { onReceivedWellChange(true) },
-                selectedColor = RelateSuccess,
+                selectedColor = MaterialTheme.relateSemanticColors.success,
                 icon = {
                     Icon(
                         imageVector = Icons.Filled.ThumbUp,
@@ -823,7 +818,7 @@ internal fun AddGiftDialogBody(
             FeedbackButton(
                 selected = receivedWellState == false,
                 onClick = { onReceivedWellChange(false) },
-                selectedColor = RelateError,
+                selectedColor = MaterialTheme.colorScheme.error,
                 icon = {
                     Icon(
                         imageVector = Icons.Filled.ThumbDown,
@@ -837,7 +832,7 @@ internal fun AddGiftDialogBody(
             FeedbackButton(
                 selected = receivedWellState == null,
                 onClick = { onReceivedWellChange(null) },
-                selectedColor = RelateOnSurfaceVariant,
+                selectedColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 icon = {
                     Text(text = stringResource(R.string.gift_feedback_unknown_short))
                 },

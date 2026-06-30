@@ -22,21 +22,42 @@ class GetAnalyticsUseCase @Inject constructor(
     operator fun invoke(
         topHealthLimit: Int = DEFAULT_CONTACT_RANKING_LIMIT,
         neglectedLimit: Int = DEFAULT_CONTACT_RANKING_LIMIT,
-    ): Flow<AnalyticsSnapshot> = combine(
-        messageRepository.countAllSent(),
-        messageRepository.countPending(),
-        contactRepository.countAll(),
-        contactRepository.getRelationshipAnalyticsCounts()
-    ) { wishesSent, pending, totalContacts, relCounts ->
-        AnalyticsSnapshot(
-            totalWishesSent = wishesSent,
-            pendingApprovals = pending,
-            totalContacts = totalContacts,
-            relationshipCounts = relCounts,
-            topHealthContacts = contactRepository.getTopHealthSummaries(topHealthLimit),
-            neglectedContacts = contactRepository.getBottomHealthSummaries(neglectedLimit),
-        )
+    ): Flow<AnalyticsSnapshot> {
+        val coreCounts = combine(
+            messageRepository.countAllSent(),
+            messageRepository.countPending(),
+            contactRepository.countAll(),
+            contactRepository.getRelationshipAnalyticsCounts(),
+        ) { wishesSent, pending, totalContacts, relCounts ->
+            CoreAnalyticsCounts(
+                totalWishesSent = wishesSent,
+                pendingApprovals = pending,
+                totalContacts = totalContacts,
+                relationshipCounts = relCounts,
+            )
+        }
+        return combine(
+            coreCounts,
+            contactRepository.getTopHealthSummariesFlow(topHealthLimit),
+            contactRepository.getBottomHealthSummariesFlow(neglectedLimit),
+        ) { counts, topHealthContacts, neglectedContacts ->
+            AnalyticsSnapshot(
+                totalWishesSent = counts.totalWishesSent,
+                pendingApprovals = counts.pendingApprovals,
+                totalContacts = counts.totalContacts,
+                relationshipCounts = counts.relationshipCounts,
+                topHealthContacts = topHealthContacts,
+                neglectedContacts = neglectedContacts,
+            )
+        }
     }
+
+    private data class CoreAnalyticsCounts(
+        val totalWishesSent: Int,
+        val pendingApprovals: Int,
+        val totalContacts: Int,
+        val relationshipCounts: List<RelationshipAnalyticsCount>,
+    )
 
     data class AnalyticsSnapshot(
         val totalWishesSent: Int,

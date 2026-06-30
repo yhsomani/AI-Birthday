@@ -44,9 +44,8 @@ import com.example.ui.screens.giftadvisor.GiftAdvisorContent
 import com.example.ui.screens.giftadvisor.GiftAdvisorTestTags
 import com.example.ui.viewmodel.GiftAdvisorUiState
 import com.example.ui.viewmodel.GiftAdvisorViewModel
-import com.example.core.ui.theme.RelateCard
-import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateSpacing
+import com.example.core.ui.theme.relateSemanticColors
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test
@@ -221,6 +220,41 @@ class GiftAdvisorScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun giftAdvisorAddDialogForm_compactPhoneHindiLargeFont() {
+        setGiftAdvisorAddDialogFormContent(
+            giftName = "वनस्पति नोटबुक सेट",
+            giftCategory = "स्टेशनरी",
+            occasionType = "जन्मदिन",
+            approxCost = "1200",
+            receivedWellState = true,
+            giftNotes = "क्लास और साप्ताहिक नोट्स की योजना बनाने में रोज इस्तेमाल होता है।",
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(GiftAdvisorTestTags.DIALOG)
+            .captureRoboImage(
+                "src/test/screenshots/baseline/gift_advisor_add_dialog_form_compact_phone_hindi_large_font.png"
+            )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun giftAdvisorAddDialogForm_typicalPhone() {
+        setGiftAdvisorAddDialogFormContent(
+            giftName = "Botanical notebook set",
+            giftCategory = "Stationery",
+            occasionType = "Birthday",
+            approxCost = "1200",
+            receivedWellState = true,
+            giftNotes = "Used daily for planning classes and weekly notes.",
+        )
+
+        composeRule.onNodeWithTag(GiftAdvisorTestTags.DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/gift_advisor_add_dialog_form_typical_phone.png")
+    }
+
+    @Test
     fun giftAdvisorAddDialogFormBottom_compactPhoneLargeFont() {
         setGiftAdvisorAddDialogFormContent(
             giftName = "Botanical notebook set",
@@ -236,6 +270,45 @@ class GiftAdvisorScreenshotTest {
             .performScrollTo()
         composeRule.onNodeWithTag(GiftAdvisorTestTags.DIALOG)
             .captureRoboImage("src/test/screenshots/baseline/gift_advisor_add_dialog_form_bottom_compact_phone_large_font.png")
+    }
+
+    @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun giftAdvisorAddDialogFormBottom_compactPhoneHindiLargeFont() {
+        setGiftAdvisorAddDialogFormContent(
+            giftName = "वनस्पति नोटबुक सेट",
+            giftCategory = "स्टेशनरी",
+            occasionType = "जन्मदिन",
+            approxCost = "1200",
+            receivedWellState = true,
+            giftNotes = "क्लास, साप्ताहिक नोट्स, और शांत रचनात्मक समय की योजना बनाने में रोज इस्तेमाल होता है।",
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(GiftAdvisorTestTags.NOTES_FIELD)
+            .performScrollTo()
+        composeRule.onNodeWithTag(GiftAdvisorTestTags.DIALOG)
+            .captureRoboImage(
+                "src/test/screenshots/baseline/gift_advisor_add_dialog_form_bottom_compact_phone_hindi_large_font.png"
+            )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun giftAdvisorAddDialogFormBottom_typicalPhone() {
+        setGiftAdvisorAddDialogFormContent(
+            giftName = "Botanical notebook set",
+            giftCategory = "Stationery",
+            occasionType = "Birthday",
+            approxCost = "1200",
+            receivedWellState = true,
+            giftNotes = "Used daily for planning classes, weekly notes, and quiet creative time.",
+        )
+
+        composeRule.onNodeWithTag(GiftAdvisorTestTags.NOTES_FIELD)
+            .performScrollTo()
+        composeRule.onNodeWithTag(GiftAdvisorTestTags.DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/gift_advisor_add_dialog_form_bottom_typical_phone.png")
     }
 
     @Test
@@ -347,7 +420,7 @@ class GiftAdvisorScreenshotTest {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(RelateDarkBackground)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(RelateSpacing.screenHorizontal),
             contentAlignment = Alignment.Center,
         ) {
@@ -356,7 +429,7 @@ class GiftAdvisorScreenshotTest {
                     .fillMaxWidth()
                     .testTag(GiftAdvisorTestTags.DIALOG),
                 colors = CardDefaults.cardColors(
-                    containerColor = RelateCard,
+                    containerColor = MaterialTheme.relateSemanticColors.cardContainer,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
                 shape = MaterialTheme.shapes.extraLarge,

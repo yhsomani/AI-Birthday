@@ -1,6 +1,5 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ContactEntity
 import com.example.domain.model.contact.ContactSyncRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.service.ContactSyncService
@@ -33,35 +32,32 @@ class SyncContactsUseCaseTest {
     )
 
     @Test
-    fun `invoke in guest mode with empty merged contacts inserts mock contacts`() = runTest {
+    fun `invoke with empty fetched contacts inserts nothing`() = runTest {
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns emptyList()
         coEvery { contactSyncService.fetchDeviceContacts() } returns emptyList()
-        coEvery { preferencesRepository.isGuestMode() } returns true
+        coEvery { contactRepository.getAllSync() } returns emptyList()
         coEvery { contactRepository.getById(any()) } returns null
 
         val outcome = useCase()
 
         assertEquals(0, outcome.googleCount)
         assertEquals(0, outcome.deviceCount)
-        assertEquals(4, outcome.inserted) // Mock contacts list size is 4
-        coVerify(exactly = 4) { contactRepository.upsert(any()) }
+        assertEquals(0, outcome.inserted)
+        coVerify(exactly = 0) { contactRepository.upsert(any()) }
         coVerify { discoverEventsUseCase() }
     }
 
     @Test
-    fun `invoke processes google contacts and deletes mock contacts if not in guest mode`() = runTest {
+    fun `invoke processes google contacts from provider`() = runTest {
         val googleContact = ContactSyncRecord(
             id = "g1",
             displayName = "Alice",
             googleContactId = "google_1",
             primaryEmail = "alice@gmail.com",
         )
-        val existingMock = ContactEntity(id = "mock_amit", name = "Amit")
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
         coEvery { contactSyncService.fetchDeviceContacts() } returns emptyList()
-        coEvery { preferencesRepository.isGuestMode() } returns false
-        coEvery { contactRepository.getAllSync() } returns listOf(existingMock)
         coEvery { contactRepository.getById(any()) } returns null
 
         val outcome = useCase()
@@ -69,7 +65,6 @@ class SyncContactsUseCaseTest {
         assertEquals(1, outcome.googleCount)
         assertEquals(0, outcome.deviceCount)
         assertEquals(1, outcome.inserted)
-        coVerify { contactRepository.delete(existingMock) }
         coVerify { contactRepository.upsert(match { it.name == "Alice" && it.googleContactId == "google_1" && it.primaryEmail == "alice@gmail.com" }) }
         coVerify { discoverEventsUseCase() }
     }
@@ -85,7 +80,6 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns emptyList()
         coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
-        coEvery { preferencesRepository.isGuestMode() } returns false
         coEvery { contactRepository.getAllSync() } returns emptyList()
         coEvery { contactRepository.getById(any()) } returns null
 
@@ -107,7 +101,6 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } throws RuntimeException("auth expired")
         coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
-        coEvery { preferencesRepository.isGuestMode() } returns false
         coEvery { contactRepository.getAllSync() } returns emptyList()
         coEvery { contactRepository.getById(any()) } returns null
 
@@ -130,7 +123,6 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
         coEvery { contactSyncService.fetchDeviceContacts() } throws DeviceContactsPermissionDeniedException()
-        coEvery { preferencesRepository.isGuestMode() } returns false
         coEvery { contactRepository.getAllSync() } returns emptyList()
         coEvery { contactRepository.getById(any()) } returns null
 
@@ -164,7 +156,6 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
         coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
-        coEvery { preferencesRepository.isGuestMode() } returns false
         coEvery { contactRepository.getAllSync() } returns emptyList()
         coEvery { contactRepository.getById(any()) } returns null
 
@@ -195,7 +186,6 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
         coEvery { contactSyncService.fetchDeviceContacts() } returns emptyList()
-        coEvery { preferencesRepository.isGuestMode() } returns false
         coEvery { contactRepository.getAllSync() } returns emptyList()
         coEvery { contactRepository.getById(any()) } returns null
 
@@ -220,7 +210,6 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns emptyList()
         coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
-        coEvery { preferencesRepository.isGuestMode() } returns false
         coEvery { contactRepository.getAllSync() } returns emptyList()
         coEvery { contactRepository.getById(any()) } returns null
 

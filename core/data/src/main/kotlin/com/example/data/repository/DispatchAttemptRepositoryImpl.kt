@@ -34,6 +34,13 @@ class DispatchAttemptRepositoryImpl @Inject constructor(
         return dispatchAttemptDao.getFailureRecoveryQueue(limit).map { it.toDispatchAttempt() }
     }
 
+    override suspend fun getSuccessfulChannelsSince(sinceMs: Long): Set<MessageChannel> {
+        return dispatchAttemptDao.getSuccessfulChannelsSince(sinceMs)
+            .map { MessageChannel.fromRaw(it) }
+            .filter { it != MessageChannel.UNKNOWN }
+            .toSet()
+    }
+
     override suspend fun getLatestFailureForMessageDraft(messageDraftId: MessageDraftId): DispatchAttempt? {
         return dispatchAttemptDao.getLatestFailureForMessageDraft(messageDraftId.value)?.toDispatchAttempt()
     }

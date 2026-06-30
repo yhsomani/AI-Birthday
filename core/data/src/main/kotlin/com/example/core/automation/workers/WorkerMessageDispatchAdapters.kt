@@ -10,6 +10,7 @@ import com.example.core.db.dao.PendingMessageDao
 import com.example.domain.contact.toMessageDispatchRecipient
 import com.example.domain.message.toMessageDispatchState
 import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.MessageStatus
 import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.OccasionId
 import com.example.domain.model.dispatch.DispatchAttemptOutcomeUpdate
@@ -83,6 +84,16 @@ internal fun MessageDispatchState.toExactSendScheduleUpdate(scheduledForMs: Long
         messageId = id,
         scheduledForMs = scheduledForMs,
     )
+}
+
+internal suspend fun PendingMessageDao.claimMessageDispatching(
+    pending: MessageDispatchState,
+): Boolean {
+    return updateStatusIfCurrent(
+        id = pending.id.value,
+        expectedStatus = pending.status.raw,
+        newStatus = MessageStatus.DISPATCHING.raw,
+    ) > 0
 }
 
 internal fun messageDispatchExceptionOutcomeUpdate(

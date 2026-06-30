@@ -76,8 +76,20 @@ class ContactRepositoryImpl @Inject constructor(
         return contactDao.getAllSync().map { it.toAnalyticsProfile() }
     }
 
+    override fun getAnalyticsProfilesFlow(): Flow<List<ContactAnalyticsProfile>> {
+        return contactDao.getAll().map { contacts ->
+            contacts.map { it.toAnalyticsProfile() }
+        }
+    }
+
     override suspend fun getAutomationReadinessProfiles(): List<ContactAutomationReadinessProfile> {
         return contactDao.getAllSync().map { it.toAutomationReadinessProfile() }
+    }
+
+    override fun getAutomationReadinessProfilesFlow(): Flow<List<ContactAutomationReadinessProfile>> {
+        return contactDao.getAll().map { contacts ->
+            contacts.map { it.toAutomationReadinessProfile() }
+        }
     }
 
     override suspend fun getEventDiscoveryProfiles(): List<ContactEventDiscoveryProfile> {
@@ -86,6 +98,12 @@ class ContactRepositoryImpl @Inject constructor(
 
     override suspend fun getHealthProfiles(): List<ContactHealthProfile> {
         return contactDao.getAllSync().map { it.toHealthProfile() }
+    }
+
+    override fun getHealthProfilesFlow(): Flow<List<ContactHealthProfile>> {
+        return contactDao.getAll().map { contacts ->
+            contacts.map { it.toHealthProfile() }
+        }
     }
 
     override suspend fun getById(id: String): ContactEntity? = contactDao.getById(id)
@@ -98,16 +116,32 @@ class ContactRepositoryImpl @Inject constructor(
         return contactDao.getById(id)?.toDetailProfile()
     }
 
+    override fun getDetailProfileFlow(id: String): Flow<ContactDetailProfile?> {
+        return contactDao.getByIdFlow(id).map { contact -> contact?.toDetailProfile() }
+    }
+
     override suspend fun getHeader(id: String): ContactHeader? {
         return contactDao.getById(id)?.toHeader()
+    }
+
+    override fun getHeaderFlow(id: String): Flow<ContactHeader?> {
+        return contactDao.getByIdFlow(id).map { contact -> contact?.toHeader() }
     }
 
     override suspend fun getGiftAdvisorProfile(id: String): ContactGiftAdvisorProfile? {
         return contactDao.getById(id)?.toGiftAdvisorProfile()
     }
 
+    override fun getGiftAdvisorProfileFlow(id: String): Flow<ContactGiftAdvisorProfile?> {
+        return contactDao.getByIdFlow(id).map { contact -> contact?.toGiftAdvisorProfile() }
+    }
+
     override suspend fun getWishContext(id: String): ContactWishContext? {
         return contactDao.getById(id)?.toWishContext()
+    }
+
+    override fun getWishContextFlow(id: String): Flow<ContactWishContext?> {
+        return contactDao.getByIdFlow(id).map { contact -> contact?.toWishContext() }
     }
 
     override suspend fun contactExists(id: String): Boolean = contactDao.getById(id) != null
@@ -180,8 +214,26 @@ class ContactRepositoryImpl @Inject constructor(
         return contactDao.getTopByHealthScore(limit).map { it.toAnalyticsSummary() }
     }
 
+    override fun getTopHealthSummariesFlow(limit: Int): Flow<List<ContactAnalyticsSummary>> {
+        return contactDao.getAll().map { contacts ->
+            contacts
+                .sortedByDescending { it.healthScore }
+                .take(limit)
+                .map { it.toAnalyticsSummary() }
+        }
+    }
+
     override suspend fun getBottomHealthSummaries(limit: Int): List<ContactAnalyticsSummary> {
         return contactDao.getBottomByHealthScore(limit).map { it.toAnalyticsSummary() }
+    }
+
+    override fun getBottomHealthSummariesFlow(limit: Int): Flow<List<ContactAnalyticsSummary>> {
+        return contactDao.getAll().map { contacts ->
+            contacts
+                .sortedBy { it.healthScore }
+                .take(limit)
+                .map { it.toAnalyticsSummary() }
+        }
     }
 
     override suspend fun getTopByHealthScore(limit: Int): List<ContactEntity> = contactDao.getTopByHealthScore(limit)

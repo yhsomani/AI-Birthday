@@ -33,16 +33,16 @@ class ChatHistoryViewModel @Inject constructor(
     val uiState: StateFlow<ChatHistoryUiState> = _uiState.asStateFlow()
 
     init {
-        loadHistory()
+        observeHistory()
     }
 
-    private fun loadHistory() {
+    private fun observeHistory() {
         viewModelScope.launch {
             try {
-                val history = messageRepository.getSentByContact(contactId, 100)
-
-                _uiState.update {
-                    it.copy(isLoading = false, messages = history, errorMessageRes = null)
+                messageRepository.getSentByContactFlow(contactId, 100).collect { history ->
+                    _uiState.update {
+                        it.copy(isLoading = false, messages = history, errorMessageRes = null)
+                    }
                 }
             } catch (e: Exception) {
                 _uiState.update {

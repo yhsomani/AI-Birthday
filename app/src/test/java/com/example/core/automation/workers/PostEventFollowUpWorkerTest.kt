@@ -173,7 +173,7 @@ class PostEventFollowUpWorkerTest {
     }
 
     @Test
-    fun `doWork downgrades fallback fully auto follow-up to smart approve`() = runTest {
+    fun `doWork downgrades fallback fully auto follow-up to manual review`() = runTest {
         val sent = sentMessage(id = "sent1", contactId = "c1", eventType = "event1")
         val contact = ContactEntity(
             id = "c1",
@@ -195,11 +195,11 @@ class PostEventFollowUpWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
-        assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
+        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
         assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertEquals(true, pendingSlot.captured.isUsingFallback)
-        verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
+        verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
         verify {
             NotificationHelper.showApprovalNotification(
                 any(),

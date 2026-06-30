@@ -45,8 +45,8 @@ object AiAutoSendQualityGate {
             reasons += "generic_phrase"
         }
 
-        val finalMode = if (requestedMode == ApprovalMode.FULLY_AUTO && score < FULLY_AUTO_MIN_SCORE) {
-            ApprovalMode.SMART_APPROVE
+        val finalMode = if (requestedMode.schedulesAutomaticDispatch() && score < FULLY_AUTO_MIN_SCORE) {
+            ApprovalMode.ALWAYS_ASK
         } else {
             requestedMode
         }
@@ -68,4 +68,8 @@ object AiAutoSendQualityGate {
         val qualityScore: Int,
         val downgradeReason: String?,
     )
+
+    private fun ApprovalMode.schedulesAutomaticDispatch(): Boolean {
+        return this == ApprovalMode.FULLY_AUTO || this == ApprovalMode.SMART_APPROVE
+    }
 }

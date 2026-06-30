@@ -161,6 +161,33 @@ class AutoSendChannelSelectorTest {
         assertEquals(setOf(NoRouteReason.CHANNEL_BLACKED_OUT), noRoute.reasons)
     }
 
+    @Test
+    fun `selectRoute treats invalid configured sender email as unavailable`() {
+        val contact = contact(
+            preferredChannel = MessageChannel.EMAIL,
+            primaryEmail = "alex@example.com",
+        )
+
+        val result = AutoSendChannelSelector.selectRoute(
+            contact = contact,
+            routeHistory = emptyList(),
+            channelBlackoutJson = blackoutJson(),
+            senderEmail = "not an email",
+            senderEmailPassword = "app-password",
+        )
+
+        assertTrue(result is AutoSendChannelSelector.ChannelSelection.NoAvailableRoute)
+        val noRoute = result as AutoSendChannelSelector.ChannelSelection.NoAvailableRoute
+        assertEquals(MessageChannel.EMAIL, noRoute.channel)
+        assertEquals(
+            setOf(
+                NoRouteReason.MISSING_PHONE,
+                NoRouteReason.EMAIL_SENDER_INVALID,
+            ),
+            noRoute.reasons,
+        )
+    }
+
     private fun contact(
         preferredChannel: MessageChannel,
         primaryPhone: String? = null,
@@ -169,7 +196,7 @@ class AutoSendChannelSelectorTest {
         return ContactDeliveryRouteProfile(
             preferredChannel = preferredChannel,
             hasPrimaryPhone = !primaryPhone.isNullOrBlank(),
-            hasPrimaryEmail = !primaryEmail.isNullOrBlank(),
+            hasPrimaryEmail = EmailAddressSyntaxPolicy.isUsableAddress(primaryEmail),
         )
     }
 

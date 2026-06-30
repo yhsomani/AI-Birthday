@@ -46,9 +46,7 @@ class MessageGenerationWorker @AssistedInject constructor(
         return try {
             // Prepare a week of AI drafts so Smart Approve has a useful review window
             // while exact dispatch still happens at each contact's scheduled send time.
-            val lookaheadEndMs = System.currentTimeMillis() + MESSAGE_GENERATION_LOOKAHEAD_MS
-
-            val upcomingEvents = eventRepository.getOccasionsBefore(lookaheadEndMs)
+            val upcomingEvents = eventRepository.getUpcomingPreviews(MESSAGE_GENERATION_LOOKAHEAD_DAYS)
             StructuredLogger.i(TAG, "Found ${upcomingEvents.size} upcoming events for generation")
 
             coroutineScope {
@@ -100,6 +98,6 @@ class MessageGenerationWorker @AssistedInject constructor(
 
     private companion object {
         const val TAG = "MessageGenerationWorker"
-        const val MESSAGE_GENERATION_LOOKAHEAD_MS = 7L * 24L * 60L * 60L * 1000L
+        const val MESSAGE_GENERATION_LOOKAHEAD_DAYS = 7
     }
 }

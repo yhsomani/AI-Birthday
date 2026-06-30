@@ -6,7 +6,6 @@ import com.example.domain.model.contact.ContactSyncRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.service.ContactSyncService
 import com.example.domain.service.DeviceContactsPermissionDeniedException
-import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,23 +24,6 @@ class SyncContactsUseCase @Inject constructor(
     private val preferencesRepository: com.example.domain.service.PreferencesRepository
 ) {
     suspend operator fun invoke(forceRefresh: Boolean = false): SyncOutcome {
-        val isGuest = preferencesRepository.isGuestMode()
-
-        // Proactively clear mock contacts if the user is not in Guest Mode.
-        // This prevents showing dummy data if the Google Contacts sync subsequently fails.
-        if (!isGuest) {
-            try {
-                val allExisting = contactRepository.getAllSync()
-                allExisting.forEach { existing ->
-                    if (existing.id.startsWith("mock_")) {
-                        contactRepository.delete(existing)
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("SyncContactsUseCase", "Failed to clear mock contacts", e)
-            }
-        }
-
         var googleContacts = emptyList<ContactSyncRecord>()
         var googleError: String? = null
         try {
@@ -67,7 +49,7 @@ class SyncContactsUseCase @Inject constructor(
             deviceError = e.message ?: "Failed to fetch device contacts"
         }
 
-        if (googleError != null && deviceContacts.isEmpty() && !isGuest) {
+        if (googleError != null && deviceContacts.isEmpty()) {
             throw Exception("Google contacts sync failed: $googleError")
         }
         if (googleError == null && deviceError == null) {
@@ -80,12 +62,8 @@ class SyncContactsUseCase @Inject constructor(
             preferencesRepository.setLastSyncError(deviceError)
         }
 
-        var merged = mergeContacts(googleContacts.toEntities(), deviceContacts.toEntities())
+        val merged = mergeContacts(googleContacts.toEntities(), deviceContacts.toEntities())
             .map { it.withRelationshipFromContactGroup() }
-
-        if (merged.isEmpty() && isGuest) {
-            merged = getMockContacts()
-        }
 
         var inserted = 0
         var updated = 0
@@ -186,71 +164,6 @@ class SyncContactsUseCase @Inject constructor(
             else -> "ACQUAINTANCE"
         }
         return copy(relationshipType = relationship)
-    }
-
-    private fun getMockContacts(): List<ContactEntity> {
-        val today = Calendar.getInstance()
-        val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
-        val dayAfterTomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 2) }
-        val nextWeek = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 5) }
-
-        return listOf(
-            ContactEntity(
-                id = "mock_sneha",
-                name = "Sneha Reddy",
-                relationshipType = "FRIEND",
-                birthdayDay = today.get(Calendar.DAY_OF_MONTH),
-                birthdayMonth = today.get(Calendar.MONTH) + 1,
-                birthdayYear = 1998,
-                primaryPhone = "+919876543210",
-                primaryEmail = "sneha.reddy@example.com",
-                healthScore = 85,
-                interactionFrequencyPerMonth = 12f,
-                lastInteractionDate = System.currentTimeMillis() - 2 * 24 * 3600 * 1000L
-            ),
-            ContactEntity(
-                id = "mock_priya",
-                name = "Priya Patel",
-                relationshipType = "FAMILY",
-                birthdayDay = tomorrow.get(Calendar.DAY_OF_MONTH),
-                birthdayMonth = tomorrow.get(Calendar.MONTH) + 1,
-                birthdayYear = 1995,
-                anniversaryDay = dayAfterTomorrow.get(Calendar.DAY_OF_MONTH),
-                anniversaryMonth = dayAfterTomorrow.get(Calendar.MONTH) + 1,
-                anniversaryYear = 2021,
-                primaryPhone = "+919876543211",
-                primaryEmail = "priya.patel@example.com",
-                healthScore = 95,
-                interactionFrequencyPerMonth = 22f,
-                lastInteractionDate = System.currentTimeMillis() - 1 * 24 * 3600 * 1000L
-            ),
-            ContactEntity(
-                id = "mock_amit",
-                name = "Amit Verma",
-                relationshipType = "WORK",
-                workStartDay = nextWeek.get(Calendar.DAY_OF_MONTH),
-                workStartMonth = nextWeek.get(Calendar.MONTH) + 1,
-                workStartYear = 2018,
-                primaryPhone = "+919876543212",
-                primaryEmail = "amit.verma@example.com",
-                healthScore = 60,
-                interactionFrequencyPerMonth = 4f,
-                lastInteractionDate = System.currentTimeMillis() - 8 * 24 * 3600 * 1000L
-            ),
-            ContactEntity(
-                id = "mock_rahul",
-                name = "Rahul Sharma",
-                relationshipType = "FRIEND",
-                birthdayDay = 15,
-                birthdayMonth = 6,
-                birthdayYear = 1996,
-                primaryPhone = "+919876543213",
-                primaryEmail = "rahul.sharma@example.com",
-                healthScore = 40,
-                interactionFrequencyPerMonth = 1f,
-                lastInteractionDate = System.currentTimeMillis() - 25 * 24 * 3600 * 1000L
-            )
-        )
     }
 
     data class SyncOutcome(

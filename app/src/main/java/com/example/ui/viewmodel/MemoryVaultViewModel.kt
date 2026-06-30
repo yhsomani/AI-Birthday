@@ -11,9 +11,11 @@ import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.MemoryNoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -36,22 +38,32 @@ class MemoryVaultViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(MemoryVaultUiState())
     val uiState: StateFlow<MemoryVaultUiState> = _uiState.asStateFlow()
+    private var loadJob: Job? = null
 
     init {
         loadData()
     }
 
     fun loadData() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessageRes = null)
             try {
-                val contact = contactRepository.getHeader(contactId)
-                val notes = memoryNoteRepository.getRecordsByContact(contactId)
-                _uiState.value = MemoryVaultUiState(
-                    contact = contact,
-                    notes = notes.sortedWith(compareByDescending<MemoryNoteRecord> { it.isPinned }.thenByDescending { it.dateMs }),
-                    isLoading = false
-                )
+                combine(
+                    contactRepository.getHeaderFlow(contactId),
+                    memoryNoteRepository.getRecordsByContactFlow(contactId),
+                ) { contact, notes ->
+                    MemoryVaultUiState(
+                        contact = contact,
+                        notes = notes.sortedWith(
+                            compareByDescending<MemoryNoteRecord> { it.isPinned }
+                                .thenByDescending { it.dateMs },
+                        ),
+                        isLoading = false,
+                    )
+                }.collect { state ->
+                    _uiState.value = state
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -83,7 +95,7 @@ class MemoryVaultViewModel @Inject constructor(
                     isPinned = false
                 )
                 memoryNoteRepository.upsertRecord(newNote)
-                loadData()
+                _uiState.value = _uiState.value.copy(errorMessageRes = null)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessageRes = R.string.memory_vault_error_add)
             }
@@ -95,7 +107,7 @@ class MemoryVaultViewModel @Inject constructor(
             try {
                 val updatedNote = note.copy(isPinned = !note.isPinned)
                 memoryNoteRepository.upsertRecord(updatedNote)
-                loadData()
+                _uiState.value = _uiState.value.copy(errorMessageRes = null)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessageRes = R.string.memory_vault_error_pin)
             }
@@ -106,7 +118,7 @@ class MemoryVaultViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 memoryNoteRepository.deleteRecord(note.id)
-                loadData()
+                _uiState.value = _uiState.value.copy(errorMessageRes = null)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessageRes = R.string.memory_vault_error_delete)
             }

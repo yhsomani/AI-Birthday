@@ -52,6 +52,22 @@ class DispatchProviderRetryPolicyTest {
     }
 
     @Test
+    fun `whatsapp invalid phone number failure is final with setup code`() {
+        val failure = DispatchProviderRetryPolicy.whatsAppAutomationFailure(
+            WhatsAppSendFailureReason.INVALID_PHONE_NUMBER
+        )
+
+        assertEquals(DispatchAttemptResult.FAILED_FINAL, failure.result)
+        assertEquals(DispatchProviderRetryPolicy.ERROR_WHATSAPP_AUTOMATION_UNAVAILABLE, failure.errorType)
+        assertEquals("WHATSAPP_INVALID_PHONE_NUMBER", failure.errorCode)
+        assertEquals(
+            "Contact phone number is not usable for WhatsApp automation.",
+            failure.redactedErrorMessage,
+        )
+        assertNull(failure.nextRetryDelayMs)
+    }
+
+    @Test
     fun `whatsapp automation reason failure is final with specific code`() {
         val failure = DispatchProviderRetryPolicy.whatsAppAutomationFailure(
             WhatsAppSendFailureReason.COMPOSE_FIELD_NOT_FOUND
@@ -64,6 +80,22 @@ class DispatchProviderRetryPolicyTest {
     }
 
     @Test
+    fun `whatsapp sender watchdog timeout is final with specific code`() {
+        val failure = DispatchProviderRetryPolicy.whatsAppAutomationFailure(
+            WhatsAppSendFailureReason.SENDER_CALLBACK_TIMEOUT
+        )
+
+        assertEquals(DispatchAttemptResult.FAILED_FINAL, failure.result)
+        assertEquals(DispatchProviderRetryPolicy.ERROR_WHATSAPP_AUTOMATION_FAILURE, failure.errorType)
+        assertEquals("SENDER_CALLBACK_TIMEOUT", failure.errorCode)
+        assertEquals(
+            "WhatsApp automation did not complete before the sender watchdog timeout.",
+            failure.redactedErrorMessage,
+        )
+        assertNull(failure.nextRetryDelayMs)
+    }
+
+    @Test
     fun `email authentication failure is final`() {
         val failure = DispatchProviderRetryPolicy.emailProviderException(
             AuthenticationFailedException("bad credentials"),
@@ -72,6 +104,38 @@ class DispatchProviderRetryPolicyTest {
         assertEquals(DispatchAttemptResult.FAILED_FINAL, failure.result)
         assertEquals(DispatchProviderRetryPolicy.ERROR_EMAIL_AUTHENTICATION_FAILED, failure.errorType)
         assertEquals("SMTP_AUTHENTICATION_FAILED", failure.errorCode)
+        assertNull(failure.nextRetryDelayMs)
+    }
+
+    @Test
+    fun `email invalid sender address failure is final`() {
+        val failure = DispatchProviderRetryPolicy.emailProviderException(
+            EmailAddressValidationException(EmailAddressField.SENDER),
+        )
+
+        assertEquals(DispatchAttemptResult.FAILED_FINAL, failure.result)
+        assertEquals(DispatchProviderRetryPolicy.ERROR_EMAIL_INVALID_ADDRESS, failure.errorType)
+        assertEquals("EMAIL_INVALID_SENDER_ADDRESS", failure.errorCode)
+        assertEquals(
+            "Configured sender email address is invalid; setup must be reviewed.",
+            failure.redactedErrorMessage,
+        )
+        assertNull(failure.nextRetryDelayMs)
+    }
+
+    @Test
+    fun `email invalid recipient address failure is final`() {
+        val failure = DispatchProviderRetryPolicy.emailProviderException(
+            EmailAddressValidationException(EmailAddressField.RECIPIENT),
+        )
+
+        assertEquals(DispatchAttemptResult.FAILED_FINAL, failure.result)
+        assertEquals(DispatchProviderRetryPolicy.ERROR_EMAIL_INVALID_ADDRESS, failure.errorType)
+        assertEquals("EMAIL_INVALID_RECIPIENT_ADDRESS", failure.errorCode)
+        assertEquals(
+            "Contact email address is invalid; update the contact before retry.",
+            failure.redactedErrorMessage,
+        )
         assertNull(failure.nextRetryDelayMs)
     }
 
@@ -96,5 +160,17 @@ class DispatchProviderRetryPolicyTest {
 
         assertEquals(DispatchAttemptResult.FAILED_RETRYABLE, selected.result)
         assertEquals(DispatchProviderRetryPolicy.ERROR_SMS_TRANSIENT_PROVIDER_FAILURE, selected.errorType)
+    }
+
+    @Test
+    fun `automatic retry limit converts retryable failure to final`() {
+        val limited = DispatchProviderRetryPolicy.applyAutomaticRetryLimit(
+            failure = DispatchProviderRetryPolicy.smsProviderException(RuntimeException("radio unavailable")),
+            retryCount = DispatchProviderRetryPolicy.MAX_AUTOMATIC_RETRY_FAILURES,
+        )
+
+        assertEquals(DispatchAttemptResult.FAILED_FINAL, limited.result)
+        assertEquals(DispatchProviderRetryPolicy.ERROR_SMS_TRANSIENT_PROVIDER_FAILURE, limited.errorType)
+        assertNull(limited.nextRetryDelayMs)
     }
 }

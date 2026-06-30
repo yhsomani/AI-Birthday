@@ -12,6 +12,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
@@ -52,24 +53,25 @@ class AnalyticsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            getAnalyticsUseCase().collect { snapshot ->
-                val contactProfiles = contactRepository.getAnalyticsProfiles()
+            val yearStartMs = Calendar.getInstance().apply {
+                set(Calendar.MONTH, Calendar.JANUARY)
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+            combine(
+                getAnalyticsUseCase(),
+                contactRepository.getAnalyticsProfilesFlow(),
+                eventRepository.countUpcomingFlow(30),
+                messageRepository.getSentAnalyticsRecordsSinceFlow(yearStartMs),
+            ) { snapshot, contactProfiles, upcomingCount, sentThisYear ->
                 val healthyCount = contactProfiles.count { it.healthScore >= 70 }
                 val attentionCount = contactProfiles.count { it.healthScore in 30..69 }
                 val atRiskCount = contactProfiles.count { it.healthScore < 30 }
-                val upcomingCount = eventRepository.countUpcoming(30)
 
-                // Monthly chart: group sent messages by month for current year
-                val yearStartMs = Calendar.getInstance().apply {
-                    set(Calendar.MONTH, Calendar.JANUARY)
-                    set(Calendar.DAY_OF_MONTH, 1)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
-
-                val sentThisYear = messageRepository.getSentAnalyticsRecordsSince(yearStartMs)
                 val deliveredOrSent = sentThisYear.count { it.countsAsNonFailedDelivery }
                 val replies = sentThisYear.count { it.replyReceived }
                 val personalizedContacts = contactProfiles.count { it.hasPersonalizationSignals }
@@ -88,7 +90,7 @@ class AnalyticsViewModel @Inject constructor(
                     data.any { it.second > 0f }
                 } ?: emptyList()
 
-                _uiState.value = AnalyticsUiState(
+                AnalyticsUiState(
                     totalWishesSent = snapshot.totalWishesSent,
                     totalContacts = snapshot.totalContacts,
                     pendingApprovals = snapshot.pendingApprovals,
@@ -110,6 +112,8 @@ class AnalyticsViewModel @Inject constructor(
                     },
                     isLoading = false,
                 )
+            }.collect { state ->
+                _uiState.value = state
             }
         }
     }

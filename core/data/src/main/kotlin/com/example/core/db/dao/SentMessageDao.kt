@@ -12,6 +12,12 @@ interface SentMessageDao {
     @Query("SELECT * FROM sent_messages WHERE contactId = :contactId ORDER BY sentAtMs DESC LIMIT :limit")
     suspend fun getByContact(contactId: String, limit: Int = 100): List<SentMessageEntity>
 
+    @Query("SELECT * FROM sent_messages WHERE contactId = :contactId ORDER BY sentAtMs DESC LIMIT :limit")
+    fun getByContactFlow(contactId: String, limit: Int = 100): Flow<List<SentMessageEntity>>
+
+    @Query("SELECT COUNT(*) FROM sent_messages WHERE contactId = :contactId")
+    fun countByContact(contactId: String): Flow<Int>
+
     @Query(
         """
         SELECT EXISTS(
@@ -45,6 +51,39 @@ interface SentMessageDao {
     @Query("UPDATE sent_messages SET deliveryStatus = :status WHERE id = :messageId")
     suspend fun updateDeliveryStatus(messageId: String, status: String)
 
+    @Query(
+        """
+        UPDATE sent_messages
+        SET deliveryStatus = :status
+        WHERE id = :messageId
+          AND channel = 'SMS'
+          AND (
+              :status = 'FAILED'
+              OR (:status = 'DELIVERED' AND deliveryStatus != 'FAILED')
+              OR (:status = 'SENT' AND deliveryStatus NOT IN ('FAILED', 'DELIVERED'))
+              OR (
+                  :status NOT IN ('FAILED', 'DELIVERED', 'SENT')
+                  AND deliveryStatus NOT IN ('FAILED', 'DELIVERED', 'SENT')
+              )
+          )
+        """,
+    )
+    suspend fun updateSmsCallbackDeliveryStatus(messageId: String, status: String): Int
+
+    @Query(
+        """
+        UPDATE sent_messages
+        SET deliveryStatus = :status
+        WHERE channel = 'SMS'
+          AND deliveryStatus = 'PENDING_DELIVERY'
+          AND sentAtMs < :cutoffMs
+        """,
+    )
+    suspend fun markStalePendingSmsDeliveryStatus(
+        cutoffMs: Long,
+        status: String,
+    ): Int
+
     @Query("SELECT * FROM sent_messages")
     suspend fun getAllSync(): List<SentMessageEntity>
 
@@ -53,6 +92,9 @@ interface SentMessageDao {
 
     @Query("SELECT * FROM sent_messages WHERE sentAtMs >= :yearStartMs ORDER BY sentAtMs ASC")
     suspend fun getSentSinceYearStart(yearStartMs: Long): List<SentMessageEntity>
+
+    @Query("SELECT * FROM sent_messages WHERE sentAtMs >= :sinceMs ORDER BY sentAtMs ASC")
+    fun getSentSinceFlow(sinceMs: Long): Flow<List<SentMessageEntity>>
 
     @Query(
         """

@@ -1,6 +1,6 @@
 # RelateAI Design System
 
-Last reviewed: 2026-06-28
+Last reviewed: 2026-06-29
 
 RelateAI is an operational relationship assistant. The UI should feel calm, direct, and efficient: dense enough for repeated work, clear enough for new users, and careful around automation, permissions, and personal data.
 
@@ -16,9 +16,9 @@ RelateAI is an operational relationship assistant. The UI should feel calm, dire
 - Supported production mode: dark theme only.
 - `RelateAITheme` intentionally installs the validated dark color scheme by default, and `RelateThemeContractTest` guards that contract.
 - `RelateAITheme` also provides `MaterialTheme.relateSemanticColors` for card surfaces, card outlines, status accents, and status containers. Shared components and screen-local status accents should read card, success, warning, and info colors from this semantic layer instead of importing dark-specific color exports directly.
-- Splash, Auth, Onboarding, Home, Contact List, Activity History, Backup/Restore, Events, Chat History, Memory Vault, and Style Coach production color roles now read from `MaterialTheme.colorScheme` or `MaterialTheme.relateSemanticColors`; use that pattern when migrating remaining screen-local color reads.
-- Light and dynamic color are deferred because other production screens and screenshot fixtures still import dark-specific color tokens such as `RelateDarkBackground`, `RelateCard`, and `RelateSurfaceVariant` directly. Enabling system light or dynamic color before those surfaces are tokenized and contrast-reviewed would create unverified presentation changes.
-- Future light/dynamic support must first replace dark-specific exported color use with semantic/theme-backed tokens, then add compact-phone, typical-phone, large-font, and Hindi Roborazzi baselines before release.
+- Splash, Auth, Onboarding, AI Doctor, Home, Contact List, Contact Detail, Messages, Settings, Wish Preview, Analytics, Activity History, Backup/Restore, Events, Chat History, Memory Vault, Gift Advisor, Style Coach, and the app shell production color roles now read from `MaterialTheme.colorScheme` or `MaterialTheme.relateSemanticColors`; keep that pattern for new or reworked screen-local color reads.
+- Screenshot fixtures that frame extracted dialog/form bodies now use `MaterialTheme.colorScheme` or `MaterialTheme.relateSemanticColors`; `DesignSystemTokensTest` guards screenshot fixtures against direct dark-specific color exports and raw color literals.
+- Future light/dynamic support must first implement alternate theme schemes, run contrast review, and add compact-phone, typical-phone, large-font, and Hindi Roborazzi baselines before release.
 
 ## Tokens
 
@@ -78,6 +78,7 @@ Elevation:
 
 | Token | Value | Use |
 | --- | ---: | --- |
+| `RelateElevation.flat` | 0 dp | Flat app shell surfaces such as the bottom navigation bar. |
 | `RelateElevation.card` | 2 dp | Subtle separation for focused cards that need lift from the surrounding surface. |
 | `RelateElevation.appBar` | 3 dp | Subtle top app bar surface separation. |
 
@@ -127,6 +128,13 @@ Typography:
 - Use hero-scale type only for true top-level screens; cards and panels use `titleMedium`, `titleSmall`, `bodyMedium`, and `bodySmall`.
 
 ## Components
+
+App shell:
+
+- Owns routed content, primary bottom navigation, the core permission rationale dialog, and the biometric lock gate.
+- Use `MaterialTheme.colorScheme.background` for shell surfaces and `RelateElevation.flat` for the primary bottom navigation bar unless a future reviewed shell elevation is introduced.
+- Bottom navigation remains limited to Home, Contacts, Events, Messages, and Analytics; secondary routes stay contextual.
+- Biometric-lock loading uses `RelateSize.progressIndicator`, and biometric-lock layout spacing uses `RelateSpacing` tokens. Authentication state and prompt behavior remain owned by `MainActivity` and `BiometricLockPolicy`.
 
 `RelateScreen`:
 
@@ -183,6 +191,8 @@ Pager-backed queue/list content:
 - Populated list pages should fill the pager page and top-align rows directly below their filters.
 - Centered content is reserved for intentional loading or empty states.
 - Keep pager alignment presentation-only; tabs, filters, selection, and ViewModel state remain owned by the screen.
+- Repeated queue/list presentation such as pager shells, list shells, list/card composition, tab rows, avatars, selection controls, search/filter/sort controls, selectable card headers, sent-card headers/bodies, pending-card metadata/bodies, review-card bodies/status icons, metadata badges, card text/date labels, action clusters and card action rows, bulk-selection action bars, reject-dialog presentation, recovery/support panels, readiness badges, and approval-status copy should be extracted into screen-local helpers first.
+- Repeated detail-screen presentation such as blocking loading states, profile headers, relationship metadata, health indicators, section shells, contextual action clusters, and preference-form controls should also start as screen-local helpers. Promote to shared `core/ui` components only after multiple screens need the same API and behavior.
 
 `RelateAvatar` and `HealthIndicatorDot`:
 

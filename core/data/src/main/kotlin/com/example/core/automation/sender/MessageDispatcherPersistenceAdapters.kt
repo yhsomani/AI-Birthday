@@ -76,6 +76,7 @@ internal fun failedDispatchAttemptOutcomeUpdate(
     failedAtMs: Long,
     channel: MessageChannel,
     failure: ProviderDispatchFailure,
+    retryCount: Int = 0,
 ): DispatchAttemptOutcomeUpdate? {
     return dispatchAttemptOutcomeUpdate(
         dispatchAttemptId = dispatchAttemptId,
@@ -88,6 +89,7 @@ internal fun failedDispatchAttemptOutcomeUpdate(
         redactedErrorMessage = failure.redactedErrorMessage,
         deadLetteredAtMs = if (failure.result == DispatchAttemptResult.FAILED_FINAL) failedAtMs else null,
         nextRetryAtMs = failure.nextRetryDelayMs?.let { delayMs -> failedAtMs + delayMs },
+        retryCount = retryCount,
     )
 }
 
@@ -102,6 +104,7 @@ internal fun dispatchAttemptOutcomeUpdate(
     redactedErrorMessage: String?,
     deadLetteredAtMs: Long?,
     nextRetryAtMs: Long?,
+    retryCount: Int = 0,
 ): DispatchAttemptOutcomeUpdate? {
     val id = dispatchAttemptId.takeUnless { it.isNullOrBlank() } ?: return null
     return DispatchAttemptOutcomeUpdate(
@@ -115,7 +118,7 @@ internal fun dispatchAttemptOutcomeUpdate(
         errorType = errorType,
         errorCode = errorCode,
         redactedErrorMessage = redactedErrorMessage,
-        retryCount = 0,
+        retryCount = retryCount,
         nextRetryAtMs = nextRetryAtMs,
         deadLetteredAtMs = deadLetteredAtMs,
     )
@@ -139,10 +142,53 @@ internal suspend fun DispatchAttemptDao.saveDispatchAttemptOutcome(update: Dispa
     )
 }
 
+internal suspend fun DispatchAttemptDao.saveInitialSmsHandoffOutcomeIfAwaitingCallback(
+    update: DispatchAttemptOutcomeUpdate,
+) {
+    updateInitialSmsHandoffOutcomeIfAwaitingCallback(
+        id = update.id.value,
+        attemptedAtMs = update.attemptedAtMs,
+        resolvedAtMs = update.resolvedAtMs,
+        result = update.result.raw,
+        channel = update.channel?.raw ?: MessageChannel.SMS.raw,
+        deliveryStatus = update.deliveryStatus.raw,
+        providerMessageId = update.providerMessageId,
+        errorType = update.errorType,
+        errorCode = update.errorCode,
+        redactedErrorMessage = update.redactedErrorMessage,
+        retryCount = update.retryCount,
+        nextRetryAtMs = update.nextRetryAtMs,
+        deadLetteredAtMs = update.deadLetteredAtMs,
+    )
+}
+
 internal suspend fun DispatchAttemptDao?.saveMessageDispatchAttemptOutcome(update: DispatchAttemptOutcomeUpdate?) {
     update ?: return
     runCatching {
         this?.saveDispatchAttemptOutcome(update)
+    }.onFailure { e ->
+        recordMessageDispatchLifecycleLog(
+            messageDispatchAttemptOutcomeUpdateFailedLog(
+                dispatchAttemptId = update.id.value,
+                cause = e,
+            )
+        )
+    }
+}
+
+internal suspend fun DispatchAttemptDao?.saveSuccessfulMessageDispatchAttemptOutcome(
+    update: DispatchAttemptOutcomeUpdate?,
+) {
+    update ?: return
+    runCatching {
+        if (
+            update.channel == MessageChannel.SMS &&
+            update.result == DispatchAttemptResult.PENDING_DELIVERY
+        ) {
+            this?.saveInitialSmsHandoffOutcomeIfAwaitingCallback(update)
+        } else {
+            this?.saveDispatchAttemptOutcome(update)
+        }
     }.onFailure { e ->
         recordMessageDispatchLifecycleLog(
             messageDispatchAttemptOutcomeUpdateFailedLog(

@@ -334,6 +334,32 @@ class MessageRepositoryImplTest {
         assertTrue(records.single().countsAsNonFailedDelivery)
     }
 
+    @Test
+    fun getSentAnalyticsRecordsSinceFlow_mapsRoomMessagesToPureAnalyticsModel() = runTest {
+        every { sentMessageDao.getSentSinceFlow(1_700_000_000_000L) } returns flowOf(
+            listOf(
+                SentMessageEntity(
+                    id = "sent_1",
+                    contactId = "contact_1",
+                    eventType = "BIRTHDAY",
+                    eventYear = 2026,
+                    messageText = "Happy birthday",
+                    channel = MessageChannel.SMS.raw,
+                    sentAtMs = 1_700_000_100_000L,
+                    deliveryStatus = " delivered ",
+                    replyReceived = true,
+                ),
+            ),
+        )
+
+        val records = repository.getSentAnalyticsRecordsSinceFlow(1_700_000_000_000L).first()
+
+        assertEquals(1, records.size)
+        assertEquals(1_700_000_100_000L, records.single().sentAtMs)
+        assertEquals(MessageDeliveryStatus.DELIVERED, records.single().deliveryStatus)
+        assertTrue(records.single().replyReceived)
+    }
+
     private fun pendingMessage(
         id: String = "pm_1",
         contactId: String = "contact_1",

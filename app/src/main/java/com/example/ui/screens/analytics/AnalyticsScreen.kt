@@ -46,18 +46,10 @@ import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
 import com.example.core.ui.components.StatCard
-import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateError
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateRadius
-import com.example.core.ui.theme.RelateSecondary
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSuccess
-import com.example.core.ui.theme.RelateSurfaceVariant
-import com.example.core.ui.theme.RelateTertiary
-import com.example.core.ui.theme.RelateWarning
+import com.example.core.ui.theme.relateSemanticColors
 import com.example.ui.viewmodel.AnalyticsUiState
 import com.example.ui.viewmodel.AnalyticsViewModel
 
@@ -118,7 +110,7 @@ internal fun AnalyticsContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(RelateDarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = RelateSpacing.screenHorizontal)
             .verticalScroll(rememberScrollState()),
     ) {
@@ -141,7 +133,7 @@ internal fun AnalyticsContent(
                     Icon(
                         imageVector = Icons.Filled.History,
                         contentDescription = stringResource(R.string.activity_history_title),
-                        tint = RelateOnSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 IconButton(
@@ -152,7 +144,7 @@ internal fun AnalyticsContent(
                     Icon(
                         imageVector = Icons.Filled.Share,
                         contentDescription = stringResource(R.string.analytics_export_report),
-                        tint = RelatePrimary,
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -166,7 +158,7 @@ internal fun AnalyticsContent(
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(
-                    color = RelatePrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.testTag(AnalyticsScreenTestTags.LOADING),
                 )
             }
@@ -197,7 +189,7 @@ internal fun AnalyticsContent(
                         Text(
                             text = stringResource(R.string.analytics_no_wishes_this_year),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = RelateOnSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
                         BarChart(data = state.monthlyCounts)
@@ -215,12 +207,20 @@ internal fun AnalyticsContent(
                     val closeFriends = state.relationshipCounts["CLOSE_FRIEND"] ?: 0
                     val other = state.relationshipCounts.filterKeys { it !in listOf("FAMILY", "FRIEND", "WORK", "CLOSE_FRIEND") }.values.sum()
 
-                    DistributionRow(stringResource(R.string.contact_filter_family), family, RelatePrimary)
-                    DistributionRow(stringResource(R.string.contact_filter_friends), friends, RelateSecondary)
-                    DistributionRow(stringResource(R.string.contact_filter_work), work, RelateTertiary)
-                    DistributionRow(stringResource(R.string.contact_filter_close_friends), closeFriends, RelateWarning)
+                    DistributionRow(stringResource(R.string.contact_filter_family), family, MaterialTheme.colorScheme.primary)
+                    DistributionRow(stringResource(R.string.contact_filter_friends), friends, MaterialTheme.colorScheme.secondary)
+                    DistributionRow(stringResource(R.string.contact_filter_work), work, MaterialTheme.colorScheme.tertiary)
+                    DistributionRow(
+                        stringResource(R.string.contact_filter_close_friends),
+                        closeFriends,
+                        MaterialTheme.relateSemanticColors.warning,
+                    )
                     if (other > 0) {
-                        DistributionRow(stringResource(R.string.analytics_others), other, RelateOnSurfaceVariant)
+                        DistributionRow(
+                            stringResource(R.string.analytics_others),
+                            other,
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
@@ -233,9 +233,21 @@ internal fun AnalyticsContent(
                     val attention = state.healthCounts["Needs Attention"] ?: 0
                     val atRisk = state.healthCounts["At Risk"] ?: 0
 
-                    HealthTrendRow(stringResource(R.string.analytics_health_healthy), healthy, RelateSuccess)
-                    HealthTrendRow(stringResource(R.string.analytics_health_attention), attention, RelateWarning)
-                    HealthTrendRow(stringResource(R.string.analytics_health_at_risk), atRisk, RelateError)
+                    HealthTrendRow(
+                        stringResource(R.string.analytics_health_healthy),
+                        healthy,
+                        MaterialTheme.relateSemanticColors.success,
+                    )
+                    HealthTrendRow(
+                        stringResource(R.string.analytics_health_attention),
+                        attention,
+                        MaterialTheme.relateSemanticColors.warning,
+                    )
+                    HealthTrendRow(
+                        stringResource(R.string.analytics_health_at_risk),
+                        atRisk,
+                        MaterialTheme.colorScheme.error,
+                    )
                 }
             }
 
@@ -246,19 +258,19 @@ internal fun AnalyticsContent(
                     DistributionRow(
                         stringResource(R.string.analytics_delivery_reliability),
                         state.deliveryReliabilityPercent,
-                        RelateSuccess,
+                        MaterialTheme.relateSemanticColors.success,
                         suffix = "%",
                     )
                     DistributionRow(
                         stringResource(R.string.analytics_response_rate),
                         state.responseRatePercent,
-                        RelateSecondary,
+                        MaterialTheme.colorScheme.secondary,
                         suffix = "%",
                     )
                     DistributionRow(
                         stringResource(R.string.analytics_personalization_coverage),
                         state.personalizationCoveragePercent,
-                        RelatePrimary,
+                        MaterialTheme.colorScheme.primary,
                         suffix = "%",
                     )
                 }
@@ -272,7 +284,7 @@ internal fun AnalyticsContent(
                         Text(
                             text = stringResource(R.string.analytics_no_neglected_contacts),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = RelateOnSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
                         state.topNeglectedContacts.forEach { contact ->
@@ -299,7 +311,7 @@ private fun BarChart(data: List<Pair<String, Float>>) {
         Text(
             text = stringResource(R.string.analytics_no_wishes_this_year),
             style = MaterialTheme.typography.bodyMedium,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         return
     }
@@ -314,7 +326,7 @@ private fun BarChart(data: List<Pair<String, Float>>) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(RelateSpacing.xxl),
                 )
                 Box(
@@ -322,14 +334,14 @@ private fun BarChart(data: List<Pair<String, Float>>) {
                         .weight(1f)
                         .height(RelateSize.chartBarHeight)
                         .clip(RoundedCornerShape(RelateRadius.sm))
-                        .background(RelateSurfaceVariant),
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(value / maxValue)
                             .height(RelateSize.chartBarHeight)
                             .clip(RoundedCornerShape(RelateRadius.sm))
-                            .background(RelatePrimary),
+                            .background(MaterialTheme.colorScheme.primary),
                     )
                 }
                 Spacer(modifier = Modifier.width(RelateSpacing.sm))
@@ -369,7 +381,7 @@ private fun DistributionRow(label: String, count: Int, color: Color, suffix: Str
         Text(
             text = "$count$suffix",
             style = MaterialTheme.typography.bodyMedium,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -398,7 +410,7 @@ private fun HealthTrendRow(label: String, count: Int, color: Color) {
         Text(
             text = count.toString(),
             style = MaterialTheme.typography.bodyMedium,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

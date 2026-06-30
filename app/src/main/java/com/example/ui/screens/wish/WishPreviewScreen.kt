@@ -48,15 +48,10 @@ import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelatePrimaryButton
 import com.example.core.ui.theme.RelateAlpha
-import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateFraction
-import com.example.core.ui.theme.RelateOnBackground
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.occasion.OccasionType
@@ -175,7 +170,7 @@ internal fun WishPreviewScreenContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(RelateDarkBackground),
+            .background(MaterialTheme.colorScheme.background),
     ) {
         Column(
             modifier = Modifier
@@ -194,7 +189,7 @@ internal fun WishPreviewScreenContent(
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.back),
-                        tint = RelateOnBackground,
+                        tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
                 Spacer(modifier = Modifier.width(RelateSpacing.sm))
@@ -210,7 +205,7 @@ internal fun WishPreviewScreenContent(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = RelatePrimary)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else if (state.errorMessageRes != null && state.previewDraft == null) {
                 Box(
@@ -219,7 +214,7 @@ internal fun WishPreviewScreenContent(
                 ) {
                     Text(
                         text = stringResource(state.errorMessageRes ?: R.string.wish_preview_error_unknown),
-                        color = RelateOnSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.testTag(WishPreviewTestTags.ERROR_MESSAGE),
                     )
@@ -269,7 +264,7 @@ internal fun WishPreviewContent(
         Text(
             text = stringResource(R.string.wish_preview_choose_tone),
             style = MaterialTheme.typography.titleSmall,
-            color = RelatePrimary,
+            color = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Row(
@@ -312,7 +307,7 @@ internal fun WishPreviewContent(
         Text(
             text = stringResource(R.string.wish_preview_message_label),
             style = MaterialTheme.typography.titleSmall,
-            color = RelatePrimary,
+            color = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.height(RelateSpacing.sm))
         RelateGlassCard {
@@ -325,12 +320,12 @@ internal fun WishPreviewContent(
                     .testTag(WishPreviewTestTags.MESSAGE_FIELD),
                 textStyle = MaterialTheme.typography.bodyLarge,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = RelatePrimary,
-                    unfocusedBorderColor = RelateSurfaceVariant,
-                    focusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                    unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                    focusedTextColor = RelateOnBackground,
-                    unfocusedTextColor = RelateOnBackground,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                 ),
                 minLines = 4,
                 maxLines = 8,
@@ -346,7 +341,7 @@ internal fun WishPreviewContent(
             Text(
                 text = stringResource(errorRes),
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -355,7 +350,7 @@ internal fun WishPreviewContent(
             Text(
                 text = messageResource(messageRes, state.qualityMessageArgRes),
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -371,7 +366,7 @@ internal fun WishPreviewContent(
         Text(
             text = stringResource(R.string.wish_preview_feedback_title),
             style = MaterialTheme.typography.titleSmall,
-            color = RelatePrimary,
+            color = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.height(RelateSpacing.sm))
         state.feedbackOptions.chunked(2).forEach { rowOptions ->
@@ -399,7 +394,7 @@ internal fun WishPreviewContent(
             Text(
                 text = stringResource(messageRes),
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -412,12 +407,12 @@ internal fun WishPreviewContent(
             enabled = !state.isRegenerating && !state.isApproving && !state.isRejecting && !state.isTestingSend,
             shape = RoundedCornerShape(RelateRadius.control),
             colors = ButtonDefaults.buttonColors(
-                containerColor = RelateSurfaceVariant,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
         ) {
             if (state.isRegenerating) {
                 CircularProgressIndicator(
-                    color = RelateOnBackground,
+                    color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.size(RelateSize.iconSm),
                     strokeWidth = RelateSpacing.xxs,
                 )
@@ -425,13 +420,13 @@ internal fun WishPreviewContent(
                 Icon(
                     Icons.Filled.Refresh,
                     contentDescription = null,
-                    tint = RelateOnBackground,
+                    tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.size(RelateSize.iconSm),
                 )
                 Spacer(modifier = Modifier.width(RelateSpacing.sm))
                 Text(
                     text = stringResource(R.string.wish_preview_regenerate),
-                    color = RelateOnBackground,
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
             }
         }
@@ -445,19 +440,19 @@ internal fun WishPreviewContent(
             enabled = !state.isTestingSend && !state.isRegenerating && !state.isApproving && !state.isRejecting,
             shape = RoundedCornerShape(RelateRadius.control),
             colors = ButtonDefaults.buttonColors(
-                containerColor = RelateSurfaceVariant,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
         ) {
             if (state.isTestingSend) {
                 CircularProgressIndicator(
-                    color = RelateOnBackground,
+                    color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.size(RelateSize.iconSm),
                     strokeWidth = RelateSpacing.xxs,
                 )
             } else {
                 Text(
                     text = stringResource(R.string.wish_preview_send_test),
-                    color = RelateOnBackground,
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
             }
         }
@@ -468,7 +463,7 @@ internal fun WishPreviewContent(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator(color = RelatePrimary)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         } else if (!state.approved && !state.rejected) {
             Row(
@@ -483,13 +478,13 @@ internal fun WishPreviewContent(
                         .testTag(WishPreviewTestTags.REJECT_BUTTON),
                     shape = RoundedCornerShape(RelateRadius.control),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = RelateSurfaceVariant,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     ),
                     enabled = !state.isRejecting,
                 ) {
                     if (state.isRejecting) {
                         CircularProgressIndicator(
-                            color = RelateOnBackground,
+                            color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.size(RelateSize.iconMd),
                             strokeWidth = RelateSpacing.xxs,
                         )
@@ -497,7 +492,7 @@ internal fun WishPreviewContent(
                         Text(
                             text = stringResource(R.string.wish_preview_reject),
                             style = MaterialTheme.typography.labelLarge,
-                            color = RelateOnBackground,
+                            color = MaterialTheme.colorScheme.onBackground,
                         )
                     }
                 }
@@ -545,7 +540,7 @@ private fun DraftReadinessMessage(
         color = if (readiness.blocksApproval()) {
             MaterialTheme.colorScheme.error
         } else {
-            RelateOnSurfaceVariant
+            MaterialTheme.colorScheme.onSurfaceVariant
         },
         modifier = modifier.padding(top = RelateSpacing.sm),
     )
@@ -577,7 +572,7 @@ private fun WishSendSummaryCard(
             Text(
                 text = stringResource(R.string.wish_preview_send_summary_title),
                 style = MaterialTheme.typography.titleSmall,
-                color = RelatePrimary,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
             )
             SendSummaryRow(
@@ -621,7 +616,7 @@ private fun SendSummaryRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(RelateFraction.metadataLabel),
         )
         Text(
@@ -675,7 +670,7 @@ private fun ReviewResultPanel(
         Text(
             text = message,
             style = MaterialTheme.typography.bodyLarge,
-            color = RelatePrimary,
+            color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.testTag(messageTag),
         )
@@ -684,7 +679,7 @@ private fun ReviewResultPanel(
             Text(
                 text = reviewQueueText(state.remainingReviewCount),
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag(WishPreviewTestTags.REVIEW_NEXT_COUNT),
             )
             RelatePrimaryButton(
@@ -728,7 +723,7 @@ private fun FeedbackChip(
             .height(RelateSize.compactButtonHeight)
             .clickable(onClick = onClick)
             .background(
-                color = if (isSelected) RelatePrimary else RelateSurfaceVariant,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(RelateRadius.pill),
             )
             .padding(horizontal = RelateSpacing.md),
@@ -758,7 +753,7 @@ private fun WhyThisMessagePanel(
             Text(
                 text = stringResource(R.string.wish_why_title),
                 style = MaterialTheme.typography.titleSmall,
-                color = RelatePrimary,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
             )
             signals.forEach { signal ->
@@ -770,7 +765,7 @@ private fun WhyThisMessagePanel(
                     Text(
                         text = stringResource(signal.labelRes),
                         style = MaterialTheme.typography.bodySmall,
-                        color = RelateOnSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(RelateFraction.metadataLabel),
                     )
                     Text(
@@ -798,7 +793,7 @@ private fun ToneChip(
         modifier = modifier
             .clickable(onClick = onClick)
             .background(
-                color = if (isSelected) RelatePrimary else RelateSurfaceVariant,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(RelateRadius.pill),
             )
             .padding(horizontal = RelateSpacing.lg, vertical = RelateSpacing.sm),

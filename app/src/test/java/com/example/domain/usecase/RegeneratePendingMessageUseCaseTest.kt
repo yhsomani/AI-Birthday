@@ -175,12 +175,12 @@ class RegeneratePendingMessageUseCaseTest {
         coVerify { messageRepository.insertPending(capture(saved)) }
         assertEquals("pm_1", saved.captured.id)
         assertEquals("fresh emotional", saved.captured.selectedVariantText)
-        assertEquals("SMART_APPROVE", saved.captured.approvalMode)
+        assertEquals("ALWAYS_ASK", saved.captured.approvalMode)
         assertEquals("PENDING", saved.captured.status)
         assertEquals(35, saved.captured.qualityScore)
         assertEquals(false, saved.captured.editedByUser)
         assertEquals(null, saved.captured.userEditedText)
-        verify { schedulerService.scheduleExactSend("pm_1") }
+        verify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
     }
 
     @Test
@@ -197,12 +197,12 @@ class RegeneratePendingMessageUseCaseTest {
             nextOccurrenceMs = 1_700_000_000_000L,
         )
         val variants = MessageVariantsResult(
-            short = "fresh short",
-            standard = "fresh standard",
-            long = "fresh long",
-            formal = "fresh formal",
-            funny = "fresh funny",
-            emotional = "fresh emotional",
+            short = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            standard = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            long = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            formal = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            funny = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            emotional = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
             recommended = "standard",
             isUsingFallback = false,
         )
@@ -231,7 +231,7 @@ class RegeneratePendingMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke downgrades fully auto fallback regeneration through quality gate`() = runTest {
+    fun `invoke downgrades fully auto fallback regeneration to manual review without scheduling`() = runTest {
         val pending = pending(approvalMode = "FULLY_AUTO", status = "APPROVED")
         val contact = ContactEntity(
             id = "c_1",
@@ -279,11 +279,11 @@ class RegeneratePendingMessageUseCaseTest {
         useCase("pm_1", "current draft")
 
         coVerify { messageRepository.insertPending(capture(saved)) }
-        assertEquals("SMART_APPROVE", saved.captured.approvalMode)
+        assertEquals("ALWAYS_ASK", saved.captured.approvalMode)
         assertEquals("PENDING", saved.captured.status)
         assertEquals(35, saved.captured.qualityScore)
         assertTrue(saved.captured.isUsingFallback)
-        verify { schedulerService.scheduleExactSend("pm_1") }
+        verify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
     }
 
     @Test
@@ -355,12 +355,12 @@ class RegeneratePendingMessageUseCaseTest {
             nextOccurrenceMs = 1_700_000_000_000L,
         )
         val variants = MessageVariantsResult(
-            short = "fresh short",
-            standard = "fresh standard",
-            long = "fresh long",
-            formal = "fresh formal",
-            funny = "fresh funny",
-            emotional = "fresh emotional",
+            short = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            standard = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            long = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            formal = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            funny = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            emotional = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
             recommended = "standard",
             isUsingFallback = false,
         )
@@ -385,7 +385,10 @@ class RegeneratePendingMessageUseCaseTest {
         useCase("pm_1", "stale edited draft")
 
         coVerify { messageRepository.insertPending(capture(saved)) }
-        assertEquals("fresh standard", saved.captured.selectedVariantText)
+        assertEquals(
+            "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            saved.captured.selectedVariantText,
+        )
         assertEquals(false, saved.captured.editedByUser)
         assertEquals(null, saved.captured.userEditedText)
     }
@@ -404,12 +407,12 @@ class RegeneratePendingMessageUseCaseTest {
             nextOccurrenceMs = 1_700_000_000_000L,
         )
         val variants = MessageVariantsResult(
-            short = "fresh short",
-            standard = "fresh standard",
-            long = "fresh long",
-            formal = "fresh formal",
-            funny = "fresh funny",
-            emotional = "fresh emotional",
+            short = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            standard = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            long = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            formal = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            funny = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            emotional = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
             recommended = "standard",
             isUsingFallback = false,
         )
@@ -453,12 +456,12 @@ class RegeneratePendingMessageUseCaseTest {
             nextOccurrenceMs = 1_700_000_000_000L,
         )
         val variants = MessageVariantsResult(
-            short = "fresh short",
-            standard = "fresh standard",
-            long = "fresh long",
-            formal = "fresh formal",
-            funny = "fresh funny",
-            emotional = "fresh emotional",
+            short = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            standard = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            long = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            formal = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            funny = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
+            emotional = "Happy birthday Riya, hope your pottery class and Jaipur plans make this week feel special.",
             recommended = "standard",
             isUsingFallback = false,
         )
@@ -485,5 +488,60 @@ class RegeneratePendingMessageUseCaseTest {
         coVerify { messageRepository.insertPending(capture(saved)) }
         assertEquals("APPROVED", saved.captured.status)
         verify { schedulerService.scheduleExactSend("pm_1") }
+    }
+
+    @Test
+    fun `invoke does not preserve approved status when regenerated draft is weak`() = runTest {
+        val pending = pending(approvalMode = "FULLY_AUTO", status = "APPROVED")
+        val contact = ContactEntity(
+            id = "c_1",
+            name = "Riya",
+            primaryPhone = "+15551234567",
+            automationMode = "FULLY_AUTO",
+        )
+        val event = occasion(
+            id = "e_1",
+            contactId = "c_1",
+            type = "BIRTHDAY",
+            label = "Birthday",
+            dayOfMonth = 4,
+            month = 9,
+            nextOccurrenceMs = 1_700_000_000_000L,
+        )
+        val variants = MessageVariantsResult(
+            short = "Wishing you a very happy birthday! Hope you have a wonderful day!",
+            standard = "Wishing you a very happy birthday! Hope you have a wonderful day!",
+            long = "Wishing you a very happy birthday! Hope you have a wonderful day!",
+            formal = "Wishing you a very happy birthday! Hope you have a wonderful day!",
+            funny = "Wishing you a very happy birthday! Hope you have a wonderful day!",
+            emotional = "Wishing you a very happy birthday! Hope you have a wonderful day!",
+            recommended = "standard",
+            isUsingFallback = true,
+        )
+        val saved = slot<PendingMessageEntity>()
+
+        every { preferencesRepository.isAiWishGenerationEnabled() } returns true
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.FULLY_AUTO
+        every { preferencesRepository.getChannelBlackout() } returns "[]"
+        every { preferencesRepository.getSenderEmail() } returns ""
+        every { preferencesRepository.getSenderEmailPassword() } returns ""
+        coEvery { messageRepository.getPendingById("pm_1") } returns pending
+        coEvery { contactRepository.getById("c_1") } returns contact
+        coEvery { eventRepository.getOccasionById("e_1") } returns event
+        coEvery { styleProfileRepository.getProfileOnce() } returns null
+        coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
+        coEvery { memoryNoteRepository.getRecordsByContact("c_1") } returns emptyList()
+        coEvery { giftHistoryRepository.getRecordsByContact("c_1") } returns emptyList()
+        coEvery {
+            aiService.regenerateMessage("approved draft", any(), null)
+        } returns variants
+
+        useCase("pm_1", "approved draft", preserveApprovedStatus = true)
+
+        coVerify { messageRepository.insertPending(capture(saved)) }
+        assertEquals("ALWAYS_ASK", saved.captured.approvalMode)
+        assertEquals("PENDING", saved.captured.status)
+        assertEquals(35, saved.captured.qualityScore)
+        verify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
     }
 }

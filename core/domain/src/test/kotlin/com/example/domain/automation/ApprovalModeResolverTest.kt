@@ -20,29 +20,29 @@ class ApprovalModeResolverTest {
     }
 
     @Test
-    fun `resolve falls back from unknown modes to smart approve`() {
+    fun `resolve falls back from unknown modes to fully auto`() {
         val result = ApprovalModeResolver.resolve(
             relationship = "FRIEND",
             contactOverride = ApprovalMode.UNKNOWN,
             globalMode = ApprovalMode.UNKNOWN,
         )
 
-        assertEquals(ApprovalMode.SMART_APPROVE, result)
+        assertEquals(ApprovalMode.FULLY_AUTO, result)
     }
 
     @Test
-    fun `resolve protects family contacts from global fully auto`() {
+    fun `resolve keeps family contacts fully automatic when global mode is fully auto`() {
         val result = ApprovalModeResolver.resolve(
             relationship = "FAMILY",
             contactOverride = ApprovalMode.DEFAULT,
             globalMode = ApprovalMode.FULLY_AUTO,
         )
 
-        assertEquals(ApprovalMode.VIP_APPROVE, result)
+        assertEquals(ApprovalMode.FULLY_AUTO, result)
     }
 
     @Test
-    fun `resolve keeps close contacts in reviewable smart approval unless global always asks`() {
+    fun `resolve keeps close contacts fully automatic unless global always asks`() {
         val smartResult = ApprovalModeResolver.resolve(
             relationship = "CLOSE_FRIEND",
             contactOverride = ApprovalMode.DEFAULT,
@@ -54,7 +54,7 @@ class ApprovalModeResolverTest {
             globalMode = ApprovalMode.ALWAYS_ASK,
         )
 
-        assertEquals(ApprovalMode.SMART_APPROVE, smartResult)
+        assertEquals(ApprovalMode.FULLY_AUTO, smartResult)
         assertEquals(ApprovalMode.ALWAYS_ASK, alwaysAskResult)
     }
 

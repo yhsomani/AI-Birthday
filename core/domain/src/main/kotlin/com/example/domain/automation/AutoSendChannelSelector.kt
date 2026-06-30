@@ -29,6 +29,7 @@ object AutoSendChannelSelector {
         MISSING_PHONE,
         MISSING_EMAIL,
         EMAIL_SENDER_NOT_CONFIGURED,
+        EMAIL_SENDER_INVALID,
         NO_SUPPORTED_CONTACT_CHANNEL,
     }
 
@@ -111,8 +112,7 @@ object AutoSendChannelSelector {
                     MessageChannel.SMS,
                     MessageChannel.WHATSAPP -> contact.hasPrimaryPhone
                     MessageChannel.EMAIL -> contact.hasPrimaryEmail &&
-                        senderEmail.isNotBlank() &&
-                        senderEmailPassword.isNotBlank()
+                        EmailAddressSyntaxPolicy.isConfiguredSender(senderEmail, senderEmailPassword)
                     MessageChannel.UNKNOWN -> false
                 }
             }
@@ -146,6 +146,8 @@ object AutoSendChannelSelector {
                     }
                     if (senderEmail.isBlank() || senderEmailPassword.isBlank()) {
                         reasons += NoRouteReason.EMAIL_SENDER_NOT_CONFIGURED
+                    } else if (!EmailAddressSyntaxPolicy.isUsableAddress(senderEmail)) {
+                        reasons += NoRouteReason.EMAIL_SENDER_INVALID
                     }
                 }
                 MessageChannel.UNKNOWN -> Unit

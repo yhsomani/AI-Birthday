@@ -195,7 +195,7 @@ class BackupServiceImplTest {
         assertTrue(preferences.has("channelBlackoutJson"))
         assertTrue(preferences.has("globalAutomationMode"))
         assertTrue(preferences.has("whatsAppAutomationConsentGranted"))
-        assertEquals(ApprovalMode.SMART_APPROVE.raw, preferences.getString("globalAutomationMode"))
+        assertEquals(ApprovalMode.FULLY_AUTO.raw, preferences.getString("globalAutomationMode"))
         assertFalse(preferences.getBoolean("whatsAppAutomationConsentGranted"))
 
         assertFalse(decrypted.contains("gemini_key"))

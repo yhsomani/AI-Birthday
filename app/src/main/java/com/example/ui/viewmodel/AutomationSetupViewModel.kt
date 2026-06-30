@@ -14,6 +14,7 @@ import com.example.R
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.core.gemini.GeminiClient
+import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.CircuitState
 import com.example.core.resilience.HealthSnapshot
@@ -21,6 +22,7 @@ import com.example.core.resilience.HealthMonitor
 import com.example.core.resilience.LogEntry
 import com.example.core.resilience.SensitiveLogRedactor
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.DiagnosticSnapshotId
 import com.example.domain.model.contact.ContactAutomationReadinessProfile
@@ -41,7 +43,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -66,6 +72,9 @@ enum class AiDoctorAction {
     OPEN_SETTINGS,
     OPEN_STYLE_COACH,
     OPEN_CONTACTS,
+    OPEN_MESSAGES,
+    OPEN_SMS_MESSAGES,
+    OPEN_WHATSAPP_MESSAGES,
     OPEN_ACTIVITY_HISTORY,
     OPEN_ACCESSIBILITY_SETTINGS,
     OPEN_BATTERY_SETTINGS,
@@ -122,6 +131,13 @@ private data class DispatchRecoverySnapshot(
     val latestPersistedAttempt: DispatchAttempt?,
 )
 
+private data class AiDoctorLiveInputs(
+    val contacts: List<ContactAutomationReadinessProfile>,
+    val styleProfile: StyleProfileEntity?,
+    val persistedRecoveryCount: Int,
+    val persistedDeadLetterCount: Int,
+)
+
 @HiltViewModel
 class AutomationSetupViewModel @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
@@ -137,6 +153,8 @@ class AutomationSetupViewModel @Inject constructor(
     private companion object {
         const val PERSONALIZATION_CONFIDENCE_THRESHOLD = 0.6
         const val PERSISTED_HEALTH_SNAPSHOT_TTL_MS = 7L * 24 * 60 * 60 * 1000
+        const val CHANNEL_VERIFICATION_WINDOW_MS = 30L * 24 * 60 * 60 * 1000
+        val CHANNEL_TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")
     }
 
     private val _uiState = MutableStateFlow(AutomationSetupUiState())
@@ -146,7 +164,7 @@ class AutomationSetupViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             whatsAppAutomationConsentGranted = securePrefs.isWhatsAppAutomationConsentGranted()
         )
-        refreshChecks()
+        observeReadinessInputs()
     }
 
     fun refreshChecks() {
@@ -155,17 +173,56 @@ class AutomationSetupViewModel @Inject constructor(
 
     private fun refreshChecks(clearOperationMessage: Boolean) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                isRefreshing = true,
-                operationMessage = if (clearOperationMessage) null else _uiState.value.operationMessage,
-            )
+            _uiState.update { state ->
+                state.copy(
+                    isRefreshing = true,
+                    operationMessage = if (clearOperationMessage) null else state.operationMessage,
+                )
+            }
             val report = withContext(Dispatchers.IO) { buildReport() }
-            _uiState.value = _uiState.value.copy(
-                isRefreshing = false,
-                checks = report.checks,
-                summary = report.summary,
-                recommendedFix = report.recommendedFix,
-                setupProgress = report.setupProgress,
+            applyReport(report) { state -> state.copy(isRefreshing = false) }
+        }
+    }
+
+    private fun observeReadinessInputs() {
+        viewModelScope.launch {
+            combine(
+                contactRepository.getAutomationReadinessProfilesFlow(),
+                styleProfileRepository.getProfile(),
+                securePrefs.observeChanges().onStart { emit(Unit) },
+                dispatchAttemptRepository.countFailureRecoveryQueue(),
+                dispatchAttemptRepository.countDeadLettered(),
+            ) { contacts, styleProfile, _, persistedRecoveryCount, persistedDeadLetterCount ->
+                AiDoctorLiveInputs(
+                    contacts = contacts,
+                    styleProfile = styleProfile,
+                    persistedRecoveryCount = persistedRecoveryCount,
+                    persistedDeadLetterCount = persistedDeadLetterCount,
+                )
+            }.collectLatest { inputs ->
+                val report = withContext(Dispatchers.IO) { buildReport(inputs) }
+                applyReport(report) { state ->
+                    state.copy(
+                        isRefreshing = false,
+                        whatsAppAutomationConsentGranted = securePrefs.isWhatsAppAutomationConsentGranted(),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun applyReport(
+        report: AiDoctorReport,
+        extraState: (AutomationSetupUiState) -> AutomationSetupUiState = { it },
+    ) {
+        _uiState.update { state ->
+            extraState(
+                state.copy(
+                    checks = report.checks,
+                    summary = report.summary,
+                    recommendedFix = report.recommendedFix,
+                    setupProgress = report.setupProgress,
+                ),
             )
         }
     }
@@ -265,7 +322,7 @@ class AutomationSetupViewModel @Inject constructor(
         refreshChecks(clearOperationMessage = false)
     }
 
-    private suspend fun buildReport(): AiDoctorReport {
+    private suspend fun buildReport(inputs: AiDoctorLiveInputs? = null): AiDoctorReport {
         val workInfos = try {
             WorkManager.getInstance(appContext).getWorkInfosByTag("daily_trigger").get()
         } catch (e: Exception) {
@@ -278,14 +335,17 @@ class AutomationSetupViewModel @Inject constructor(
         val recentErrors = StructuredLogger.getErrors().takeLast(3)
         val currentUser = currentFirebaseUserOrNull()
         val alarmManager = appContext.getSystemService(AlarmManager::class.java)
-        val contacts = runCatching { contactRepository.getAutomationReadinessProfiles() }.getOrDefault(emptyList())
-        val styleProfile = runCatching { styleProfileRepository.getProfileOnce() }.getOrNull()
+        val contacts = inputs?.contacts
+            ?: runCatching { contactRepository.getAutomationReadinessProfiles() }.getOrDefault(emptyList())
+        val styleProfile = inputs?.styleProfile
+            ?: runCatching { styleProfileRepository.getProfileOnce() }.getOrNull()
         val styleSampleCount = maxOf(
             styleProfile?.sampleCount ?: 0,
             countJsonArrayItems(styleProfile?.sampleMessagesJson),
         )
         val hasGoogleAuth = securePrefs.getGoogleOAuthToken().isNotBlank() || currentUser != null
         val hasGeminiAccess = securePrefs.getGeminiApiKey().isNotBlank() || currentUser != null
+        val globalAutomationMode = securePrefs.getGlobalApprovalMode()
         val aiEnabled = securePrefs.isAiWishGenerationEnabled()
         val notificationsAllowed = runCatching { hasNotificationPermission() }.getOrDefault(false)
         val smsAllowed = runCatching { hasSmsPermission() }.getOrDefault(false)
@@ -294,13 +354,32 @@ class AutomationSetupViewModel @Inject constructor(
         val exactSendsAllowed = runCatching {
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
         }.getOrDefault(false)
-        val dispatchRecovery = loadDispatchRecoverySnapshot()
+        val dispatchRecovery = loadDispatchRecoverySnapshot(
+            persistedRecoveryCount = inputs?.persistedRecoveryCount,
+            persistedDeadLetterCount = inputs?.persistedDeadLetterCount,
+        )
         val persistedHealthSnapshot = loadRecentPersistedHealthSnapshot()
-        val senderEmailReady = securePrefs.getSenderEmail().isNotBlank() &&
+        val senderEmail = securePrefs.getSenderEmail().trim()
+        val senderEmailReady = senderEmail.isNotBlank() &&
             securePrefs.getSenderEmailPassword().isNotBlank()
+        val blockedChannels = securePrefs.getChannelBlackout().toChannelSet()
+        val selectedChannelCounts = selectedAutomaticChannelCounts(
+            contacts = contacts,
+            senderEmailReady = senderEmailReady,
+            blockedChannels = blockedChannels,
+        )
+        val selectedChannels = selectedChannelCounts.filterValues { it > 0 }.keys
+        val channelVerificationSinceMs = System.currentTimeMillis() - CHANNEL_VERIFICATION_WINDOW_MS
+        val emailSelfTestVerified = senderEmailReady &&
+            securePrefs.getLastSuccessfulEmailTestMs() >= channelVerificationSinceMs &&
+            securePrefs.getLastSuccessfulEmailTestSender().equals(senderEmail, ignoreCase = true)
+        val successfulChannels = runCatching {
+            dispatchAttemptRepository.getSuccessfulChannelsSince(channelVerificationSinceMs)
+        }.getOrDefault(emptySet()) + if (emailSelfTestVerified) setOf(MessageChannel.EMAIL) else emptySet()
         val emailPreferredContacts = contacts.count {
             it.preferredChannel == MessageChannel.EMAIL
         }
+        val whatsAppInstalled = runCatching { isWhatsAppInstalled() }.getOrDefault(false)
         val hasRecentHealthEvidence = recentErrors.isNotEmpty() ||
             health.recentErrors.isNotEmpty() ||
             persistedHealthSnapshot != null
@@ -337,6 +416,20 @@ class AutomationSetupViewModel @Inject constructor(
                 actionLabel = if (aiEnabled) null else text(R.string.automation_setup_action_open_settings),
                 action = if (aiEnabled) AiDoctorAction.NONE else AiDoctorAction.OPEN_SETTINGS,
                 group = ReadinessGroup.REQUIRED,
+            ),
+            fullAutomationModeCheck(
+                globalAutomationMode = globalAutomationMode,
+                contacts = contacts,
+            ),
+            automatableEventsCheck(contacts),
+            automaticDeliveryRoutesCheck(
+                contacts = contacts,
+                senderEmailReady = senderEmailReady,
+                blockedChannels = blockedChannels,
+            ),
+            channelVerificationCheck(
+                selectedChannels = selectedChannels,
+                successfulChannels = successfulChannels,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_style_coach),
@@ -382,13 +475,10 @@ class AutomationSetupViewModel @Inject constructor(
                 action = if (notificationsAllowed) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
                 group = ReadinessGroup.REQUIRED,
             ),
-            ReadinessCheck(
-                text(R.string.automation_setup_check_sms),
-                if (smsAllowed) text(R.string.automation_setup_sms_ok) else text(R.string.automation_setup_sms_missing),
-                if (smsAllowed) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
-                actionLabel = if (smsAllowed) null else text(R.string.automation_setup_action_app_settings),
-                action = if (smsAllowed) AiDoctorAction.NONE else AiDoctorAction.OPEN_APP_SETTINGS,
-                group = ReadinessGroup.REQUIRED,
+            smsReadinessCheck(
+                smsAllowed = smsAllowed,
+                selectedSmsContactCount = selectedChannelCounts[MessageChannel.SMS] ?: 0,
+                smsDisabled = MessageChannel.SMS in blockedChannels,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_email),
@@ -409,21 +499,12 @@ class AutomationSetupViewModel @Inject constructor(
                 action = if (senderEmailReady) AiDoctorAction.TEST_EMAIL else AiDoctorAction.OPEN_SETTINGS,
                 group = ReadinessGroup.REQUIRED,
             ),
-            ReadinessCheck(
-                text(R.string.automation_setup_check_whatsapp),
-                when {
-                    !whatsAppConsentGranted -> text(R.string.automation_setup_whatsapp_consent_needed)
-                    whatsAppAutomationEnabled -> text(R.string.automation_setup_whatsapp_ok)
-                    else -> text(R.string.automation_setup_whatsapp_missing)
-                },
-                when {
-                    !whatsAppConsentGranted -> ReadinessStatus.ACTION_REQUIRED
-                    whatsAppAutomationEnabled -> ReadinessStatus.OK
-                    else -> ReadinessStatus.WARNING
-                },
-                actionLabel = if (whatsAppAutomationEnabled) null else text(R.string.automation_setup_action_open_accessibility),
-                action = if (whatsAppAutomationEnabled) AiDoctorAction.NONE else AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS,
-                group = ReadinessGroup.RELIABILITY,
+            whatsAppReadinessCheck(
+                consentGranted = whatsAppConsentGranted,
+                accessibilityEnabled = whatsAppAutomationEnabled,
+                whatsAppInstalled = whatsAppInstalled,
+                selectedWhatsAppContactCount = selectedChannelCounts[MessageChannel.WHATSAPP] ?: 0,
+                whatsAppDisabled = MessageChannel.WHATSAPP in blockedChannels,
             ),
             ReadinessCheck(
                 text(R.string.automation_setup_check_exact_sends),
@@ -539,19 +620,22 @@ class AutomationSetupViewModel @Inject constructor(
         ReadinessStatus.ACTION_REQUIRED -> DiagnosticSnapshotStatus.ACTION_REQUIRED
     }
 
-    private suspend fun loadDispatchRecoverySnapshot(): DispatchRecoverySnapshot {
-        val persistedRecoveryCount = runCatching {
+    private suspend fun loadDispatchRecoverySnapshot(
+        persistedRecoveryCount: Int? = null,
+        persistedDeadLetterCount: Int? = null,
+    ): DispatchRecoverySnapshot {
+        val resolvedPersistedRecoveryCount = persistedRecoveryCount ?: runCatching {
             dispatchAttemptRepository.countFailureRecoveryQueue().first()
         }.getOrDefault(0)
-        val persistedDeadLetterCount = runCatching {
+        val resolvedPersistedDeadLetterCount = persistedDeadLetterCount ?: runCatching {
             dispatchAttemptRepository.countDeadLettered().first()
         }.getOrDefault(0)
         val latestPersistedAttempt = runCatching {
             dispatchAttemptRepository.getFailureRecoveryQueue(limit = 1).firstOrNull()
         }.getOrNull()
         return DispatchRecoverySnapshot(
-            persistedRecoveryCount = persistedRecoveryCount,
-            persistedDeadLetterCount = persistedDeadLetterCount,
+            persistedRecoveryCount = resolvedPersistedRecoveryCount,
+            persistedDeadLetterCount = resolvedPersistedDeadLetterCount,
             latestPersistedAttempt = latestPersistedAttempt,
         )
     }
@@ -575,6 +659,279 @@ class AutomationSetupViewModel @Inject constructor(
             latest.result.raw,
             latest.messageDraftId.value,
         )
+    }
+
+    private fun fullAutomationModeCheck(
+        globalAutomationMode: ApprovalMode,
+        contacts: List<ContactAutomationReadinessProfile>,
+    ): ReadinessCheck {
+        val reviewFirstOverrideCount = contacts.count { it.hasReviewFirstAutomationOverride }
+        return when {
+            globalAutomationMode != ApprovalMode.FULLY_AUTO -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_full_automation),
+                detail = text(
+                    R.string.automation_setup_full_automation_disabled,
+                    globalAutomationMode.label(),
+                ),
+                status = ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = text(R.string.automation_setup_action_open_settings),
+                action = AiDoctorAction.OPEN_SETTINGS,
+                group = ReadinessGroup.REQUIRED,
+            )
+            reviewFirstOverrideCount > 0 -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_full_automation),
+                detail = text(
+                    R.string.automation_setup_full_automation_contact_overrides,
+                    reviewFirstOverrideCount,
+                ),
+                status = ReadinessStatus.WARNING,
+                actionLabel = text(R.string.automation_setup_action_review_contacts),
+                action = AiDoctorAction.OPEN_CONTACTS,
+                group = ReadinessGroup.REQUIRED,
+            )
+            else -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_full_automation),
+                detail = text(R.string.automation_setup_full_automation_ok),
+                status = ReadinessStatus.OK,
+                group = ReadinessGroup.REQUIRED,
+            )
+        }
+    }
+
+    private fun automatableEventsCheck(contacts: List<ContactAutomationReadinessProfile>): ReadinessCheck {
+        if (contacts.isEmpty()) {
+            return ReadinessCheck(
+                title = text(R.string.automation_setup_check_automatable_events),
+                detail = text(R.string.automation_setup_automatable_events_empty),
+                status = ReadinessStatus.WARNING,
+                actionLabel = text(R.string.automation_setup_action_sync_contacts),
+                action = AiDoctorAction.SYNC_CONTACTS,
+                group = ReadinessGroup.REQUIRED,
+            )
+        }
+
+        val eventReadyCount = contacts.count { it.hasAutomatableOccasion }
+        return ReadinessCheck(
+            title = text(R.string.automation_setup_check_automatable_events),
+            detail = if (eventReadyCount == contacts.size) {
+                text(R.string.automation_setup_automatable_events_ok, eventReadyCount)
+            } else {
+                text(
+                    R.string.automation_setup_automatable_events_missing,
+                    contacts.size - eventReadyCount,
+                    contacts.size,
+                )
+            },
+            status = when {
+                eventReadyCount == contacts.size -> ReadinessStatus.OK
+                eventReadyCount == 0 -> ReadinessStatus.ACTION_REQUIRED
+                else -> ReadinessStatus.WARNING
+            },
+            actionLabel = if (eventReadyCount == contacts.size) null else text(R.string.automation_setup_action_review_contacts),
+            action = if (eventReadyCount == contacts.size) AiDoctorAction.NONE else AiDoctorAction.OPEN_CONTACTS,
+            group = ReadinessGroup.REQUIRED,
+        )
+    }
+
+    private fun automaticDeliveryRoutesCheck(
+        contacts: List<ContactAutomationReadinessProfile>,
+        senderEmailReady: Boolean,
+        blockedChannels: Set<MessageChannel>,
+    ): ReadinessCheck {
+        val eventContacts = contacts.filter { it.hasAutomatableOccasion }
+        if (eventContacts.isEmpty()) {
+            return ReadinessCheck(
+                title = text(R.string.automation_setup_check_delivery_routes),
+                detail = text(R.string.automation_setup_delivery_routes_no_events),
+                status = ReadinessStatus.WARNING,
+                actionLabel = text(R.string.automation_setup_action_review_contacts),
+                action = AiDoctorAction.OPEN_CONTACTS,
+                group = ReadinessGroup.REQUIRED,
+            )
+        }
+
+        val routableCount = eventContacts.count {
+            it.hasAutomaticDeliveryRoute(
+                senderEmailReady = senderEmailReady,
+                blockedChannels = blockedChannels,
+            )
+        }
+        return ReadinessCheck(
+            title = text(R.string.automation_setup_check_delivery_routes),
+            detail = if (routableCount == eventContacts.size) {
+                text(R.string.automation_setup_delivery_routes_ok, routableCount)
+            } else {
+                text(
+                    R.string.automation_setup_delivery_routes_missing,
+                    eventContacts.size - routableCount,
+                    eventContacts.size,
+                )
+            },
+            status = if (routableCount == eventContacts.size) ReadinessStatus.OK else ReadinessStatus.ACTION_REQUIRED,
+            actionLabel = if (routableCount == eventContacts.size) null else text(R.string.automation_setup_action_review_contacts),
+            action = if (routableCount == eventContacts.size) AiDoctorAction.NONE else AiDoctorAction.OPEN_CONTACTS,
+            group = ReadinessGroup.REQUIRED,
+        )
+    }
+
+    private fun channelVerificationCheck(
+        selectedChannels: Set<MessageChannel>,
+        successfulChannels: Set<MessageChannel>,
+    ): ReadinessCheck {
+        if (selectedChannels.isEmpty()) {
+            return ReadinessCheck(
+                title = text(R.string.automation_setup_check_channel_verification),
+                detail = text(R.string.automation_setup_channel_verification_no_routes),
+                status = ReadinessStatus.WARNING,
+                actionLabel = text(R.string.automation_setup_action_review_contacts),
+                action = AiDoctorAction.OPEN_CONTACTS,
+                group = ReadinessGroup.RELIABILITY,
+            )
+        }
+
+        val unverifiedChannels = selectedChannels - successfulChannels
+        return if (unverifiedChannels.isEmpty()) {
+            ReadinessCheck(
+                title = text(R.string.automation_setup_check_channel_verification),
+                detail = text(
+                    R.string.automation_setup_channel_verification_ok,
+                    selectedChannels.toChannelLabelList(),
+                ),
+                status = ReadinessStatus.OK,
+                group = ReadinessGroup.RELIABILITY,
+            )
+        } else {
+            val canFixWithEmailTest = unverifiedChannels == setOf(MessageChannel.EMAIL)
+            val realMessageProofChannel = when {
+                MessageChannel.SMS in unverifiedChannels -> MessageChannel.SMS
+                MessageChannel.WHATSAPP in unverifiedChannels -> MessageChannel.WHATSAPP
+                else -> null
+            }
+            ReadinessCheck(
+                title = text(R.string.automation_setup_check_channel_verification),
+                detail = text(
+                    R.string.automation_setup_channel_verification_missing,
+                    unverifiedChannels.toChannelLabelList(),
+                ),
+                status = ReadinessStatus.WARNING,
+                actionLabel = if (canFixWithEmailTest) {
+                    text(R.string.automation_setup_action_test_email)
+                } else if (realMessageProofChannel == MessageChannel.SMS) {
+                    text(R.string.automation_setup_action_review_sms_messages)
+                } else if (realMessageProofChannel == MessageChannel.WHATSAPP) {
+                    text(R.string.automation_setup_action_review_whatsapp_messages)
+                } else {
+                    text(R.string.automation_setup_action_view_activity)
+                },
+                action = if (canFixWithEmailTest) {
+                    AiDoctorAction.TEST_EMAIL
+                } else if (realMessageProofChannel == MessageChannel.SMS) {
+                    AiDoctorAction.OPEN_SMS_MESSAGES
+                } else if (realMessageProofChannel == MessageChannel.WHATSAPP) {
+                    AiDoctorAction.OPEN_WHATSAPP_MESSAGES
+                } else {
+                    AiDoctorAction.OPEN_ACTIVITY_HISTORY
+                },
+                group = ReadinessGroup.RELIABILITY,
+            )
+        }
+    }
+
+    private fun smsReadinessCheck(
+        smsAllowed: Boolean,
+        selectedSmsContactCount: Int,
+        smsDisabled: Boolean,
+    ): ReadinessCheck {
+        return when {
+            smsDisabled -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_sms),
+                detail = text(R.string.automation_setup_sms_disabled),
+                status = ReadinessStatus.OK,
+                group = ReadinessGroup.REQUIRED,
+            )
+            selectedSmsContactCount == 0 -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_sms),
+                detail = text(R.string.automation_setup_sms_not_used),
+                status = ReadinessStatus.OK,
+                group = ReadinessGroup.REQUIRED,
+            )
+            smsAllowed -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_sms),
+                detail = text(R.string.automation_setup_sms_ok_for_contacts, selectedSmsContactCount),
+                status = ReadinessStatus.OK,
+                group = ReadinessGroup.REQUIRED,
+            )
+            else -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_sms),
+                detail = text(R.string.automation_setup_sms_missing_for_contacts, selectedSmsContactCount),
+                status = ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = text(R.string.automation_setup_action_app_settings),
+                action = AiDoctorAction.OPEN_APP_SETTINGS,
+                group = ReadinessGroup.REQUIRED,
+            )
+        }
+    }
+
+    private fun whatsAppReadinessCheck(
+        consentGranted: Boolean,
+        accessibilityEnabled: Boolean,
+        whatsAppInstalled: Boolean,
+        selectedWhatsAppContactCount: Int,
+        whatsAppDisabled: Boolean,
+    ): ReadinessCheck {
+        return when {
+            whatsAppDisabled -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_whatsapp),
+                detail = text(R.string.automation_setup_whatsapp_disabled),
+                status = ReadinessStatus.OK,
+                group = ReadinessGroup.RELIABILITY,
+            )
+            selectedWhatsAppContactCount == 0 -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_whatsapp),
+                detail = text(R.string.automation_setup_whatsapp_not_used),
+                status = ReadinessStatus.OK,
+                group = ReadinessGroup.RELIABILITY,
+            )
+            !consentGranted -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_whatsapp),
+                detail = text(
+                    R.string.automation_setup_whatsapp_consent_needed_for_contacts,
+                    selectedWhatsAppContactCount,
+                ),
+                status = ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = text(R.string.automation_setup_action_open_accessibility),
+                action = AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS,
+                group = ReadinessGroup.RELIABILITY,
+            )
+            !whatsAppInstalled -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_whatsapp),
+                detail = text(
+                    R.string.automation_setup_whatsapp_app_missing_for_contacts,
+                    selectedWhatsAppContactCount,
+                ),
+                status = ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = text(R.string.automation_setup_action_open_accessibility),
+                action = AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS,
+                group = ReadinessGroup.RELIABILITY,
+            )
+            !accessibilityEnabled -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_whatsapp),
+                detail = text(
+                    R.string.automation_setup_whatsapp_accessibility_missing_for_contacts,
+                    selectedWhatsAppContactCount,
+                ),
+                status = ReadinessStatus.ACTION_REQUIRED,
+                actionLabel = text(R.string.automation_setup_action_open_accessibility),
+                action = AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS,
+                group = ReadinessGroup.RELIABILITY,
+            )
+            else -> ReadinessCheck(
+                title = text(R.string.automation_setup_check_whatsapp),
+                detail = text(R.string.automation_setup_whatsapp_ok_for_contacts, selectedWhatsAppContactCount),
+                status = ReadinessStatus.OK,
+                group = ReadinessGroup.RELIABILITY,
+            )
+        }
     }
 
     private fun personalizationCheck(contacts: List<ContactAutomationReadinessProfile>): ReadinessCheck {
@@ -768,7 +1125,105 @@ class AutomationSetupViewModel @Inject constructor(
         }
     }
 
+    private fun isWhatsAppInstalled(): Boolean {
+        return isPackageInstalled("com.whatsapp") || isPackageInstalled("com.whatsapp.w4b")
+    }
+
+    private fun isPackageInstalled(packageName: String): Boolean {
+        return runCatching {
+            appContext.packageManager.getPackageInfo(packageName, 0)
+        }.isSuccess
+    }
+
     private fun currentFirebaseUserOrNull() = runCatching {
         com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
     }.getOrNull()
+
+    private fun selectedAutomaticChannelCounts(
+        contacts: List<ContactAutomationReadinessProfile>,
+        senderEmailReady: Boolean,
+        blockedChannels: Set<MessageChannel>,
+    ): Map<MessageChannel, Int> {
+        return contacts.asSequence()
+            .filter { it.hasAutomatableOccasion }
+            .mapNotNull {
+                it.selectedAutomaticChannel(
+                    senderEmailReady = senderEmailReady,
+                    blockedChannels = blockedChannels,
+                )
+            }
+            .groupingBy { it }
+            .eachCount()
+    }
+
+    private fun ContactAutomationReadinessProfile.selectedAutomaticChannel(
+        senderEmailReady: Boolean,
+        blockedChannels: Set<MessageChannel>,
+    ): MessageChannel? {
+        val availableChannels = DEFAULT_ROUTE_ORDER
+            .filterNot { it in blockedChannels }
+            .filter { channel ->
+                when (channel) {
+                    MessageChannel.SMS,
+                    MessageChannel.WHATSAPP -> hasPrimaryPhone
+                    MessageChannel.EMAIL -> hasPrimaryEmail && senderEmailReady
+                    MessageChannel.UNKNOWN -> false
+                }
+            }
+        if (availableChannels.isEmpty()) return null
+        return preferredChannel.takeIf { it in availableChannels }
+            ?: availableChannels.first()
+    }
+
+    private fun ContactAutomationReadinessProfile.hasAutomaticDeliveryRoute(
+        senderEmailReady: Boolean,
+        blockedChannels: Set<MessageChannel>,
+    ): Boolean {
+        return DEFAULT_ROUTE_ORDER.any { channel ->
+            channel !in blockedChannels && when (channel) {
+                MessageChannel.SMS,
+                MessageChannel.WHATSAPP -> hasPrimaryPhone
+                MessageChannel.EMAIL -> hasPrimaryEmail && senderEmailReady
+                MessageChannel.UNKNOWN -> false
+            }
+        }
+    }
+
+    private fun String.toChannelSet(): Set<MessageChannel> {
+        return CHANNEL_TOKEN_PATTERN.findAll(this)
+            .map { MessageChannel.fromRaw(it.groupValues[1]) }
+            .filter { it != MessageChannel.UNKNOWN }
+            .toSet()
+    }
+
+    private fun Set<MessageChannel>.toChannelLabelList(): String {
+        return sortedBy { DEFAULT_ROUTE_ORDER.indexOf(it).takeIf { index -> index >= 0 } ?: DEFAULT_ROUTE_ORDER.size }
+            .joinToString(", ") { it.label() }
+    }
+
+    private fun MessageChannel.label(): String {
+        return when (this) {
+            MessageChannel.SMS -> text(R.string.channel_sms)
+            MessageChannel.WHATSAPP -> text(R.string.channel_whatsapp)
+            MessageChannel.EMAIL -> text(R.string.channel_email)
+            MessageChannel.UNKNOWN -> MessageChannel.UNKNOWN.raw
+        }
+    }
+
+    private fun ApprovalMode.label(): String {
+        return when (this) {
+            ApprovalMode.FULLY_AUTO -> text(R.string.automation_mode_fully_auto)
+            ApprovalMode.SMART_APPROVE -> text(R.string.automation_mode_smart_approve_default)
+            ApprovalMode.VIP_APPROVE -> text(R.string.automation_mode_vip_approve)
+            ApprovalMode.ALWAYS_ASK -> text(R.string.automation_mode_always_ask)
+            ApprovalMode.DEFAULT,
+            ApprovalMode.UNKNOWN -> text(R.string.automation_mode_default)
+        }
+    }
+
+    private val DEFAULT_ROUTE_ORDER = listOf(
+        MessageChannel.SMS,
+        MessageChannel.WHATSAPP,
+        MessageChannel.EMAIL,
+    )
 }

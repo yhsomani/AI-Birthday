@@ -1,5 +1,6 @@
 package com.example.domain.model.contact
 
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.ContactId
 import org.junit.Assert.assertFalse
@@ -34,7 +35,19 @@ class ContactAutomationReadinessProfileTest {
         assertFalse(profile(classificationConfidence = 0.59).hasPersonalizationContextForAi(0.6))
     }
 
+    @Test
+    fun `hasReviewFirstAutomationOverride detects manual automation blockers`() {
+        assertTrue(profile(automationMode = ApprovalMode.ALWAYS_ASK).hasReviewFirstAutomationOverride)
+        assertTrue(profile(automationMode = ApprovalMode.VIP_APPROVE).hasReviewFirstAutomationOverride)
+        assertTrue(profile(automationMode = ApprovalMode.SMART_APPROVE).hasReviewFirstAutomationOverride)
+        assertTrue(profile(skipAutoWish = true).hasReviewFirstAutomationOverride)
+        assertFalse(profile(automationMode = ApprovalMode.DEFAULT).hasReviewFirstAutomationOverride)
+        assertFalse(profile(automationMode = ApprovalMode.FULLY_AUTO).hasReviewFirstAutomationOverride)
+    }
+
     private fun profile(
+        automationMode: ApprovalMode = ApprovalMode.DEFAULT,
+        skipAutoWish: Boolean = false,
         nickname: String? = null,
         notesText: String = "",
         interestsJson: String = "[]",
@@ -44,6 +57,8 @@ class ContactAutomationReadinessProfileTest {
         return ContactAutomationReadinessProfile(
             id = ContactId("contact_1"),
             preferredChannel = MessageChannel.SMS,
+            automationMode = automationMode,
+            skipAutoWish = skipAutoWish,
             nickname = nickname,
             notesText = notesText,
             interestsJson = interestsJson,

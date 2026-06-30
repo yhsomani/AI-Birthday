@@ -15,7 +15,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -85,17 +87,21 @@ class ContactListViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             try {
-                contactRepository.getContactListItems().collect { contacts ->
-                    val lastError = try { preferencesRepository.getLastSyncError() } catch(ex: Exception) { null }
-                    _uiState.value = _uiState.value.withContacts(
-                        allContacts = contacts,
-                        isLoading = false,
-                        syncError = lastError,
-                    )
-                }
+                combine(
+                    contactRepository.getContactListItems(),
+                    preferencesRepository.observeChanges().onStart { emit(Unit) },
+                ) { contacts, _ -> contacts }
+                    .collect { contacts ->
+                        val lastError = try { preferencesRepository.getLastSyncError() } catch (ex: Exception) { null }
+                        _uiState.value = _uiState.value.withContacts(
+                            allContacts = contacts,
+                            isLoading = false,
+                            syncError = lastError,
+                        )
+                    }
             } catch (e: Exception) {
                 StructuredLogger.e(TAG, "Contact collection failed", e)
-                val lastError = try { preferencesRepository.getLastSyncError() } catch(ex: Exception) { null }
+                val lastError = try { preferencesRepository.getLastSyncError() } catch (ex: Exception) { null }
                 _uiState.value = _uiState.value.copy(isLoading = false, syncError = lastError)
             }
         }
@@ -110,7 +116,7 @@ class ContactListViewModel @Inject constructor(
                 syncContactsUseCase(forceRefresh = true)
                 
                 contactRepository.getContactListItems().first().let { contacts ->
-                    val lastError = try { preferencesRepository.getLastSyncError() } catch(ex: Exception) { null }
+                    val lastError = try { preferencesRepository.getLastSyncError() } catch (ex: Exception) { null }
                     _uiState.value = _uiState.value.withContacts(
                         allContacts = contacts,
                         isLoading = false,
@@ -120,7 +126,7 @@ class ContactListViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 StructuredLogger.e(TAG, "Contact refresh failed", e)
-                val lastError = try { preferencesRepository.getLastSyncError() } catch(ex: Exception) { null }
+                val lastError = try { preferencesRepository.getLastSyncError() } catch (ex: Exception) { null }
                 _uiState.value = _uiState.value.copy(
                     isRefreshing = false,
                     syncError = lastError ?: appContext.getString(R.string.contact_list_sync_failed)

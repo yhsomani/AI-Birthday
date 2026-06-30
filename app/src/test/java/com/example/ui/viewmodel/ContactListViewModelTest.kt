@@ -14,6 +14,7 @@ import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
@@ -43,12 +44,17 @@ class ContactListViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var context: Context
+    private lateinit var preferenceChanges: MutableSharedFlow<Unit>
+    private var lastSyncError: String? = null
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         context = ApplicationProvider.getApplicationContext()
-        every { mockPreferencesRepository.getLastSyncError() } returns null
+        preferenceChanges = MutableSharedFlow(extraBufferCapacity = 1)
+        lastSyncError = null
+        every { mockPreferencesRepository.observeChanges() } returns preferenceChanges
+        every { mockPreferencesRepository.getLastSyncError() } answers { lastSyncError }
     }
 
     @After
@@ -69,6 +75,26 @@ class ContactListViewModelTest {
 
         assertEquals(2, viewModel.uiState.value.contacts.size)
         assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    @Test
+    fun `preference changes immediately update sync error state`() = runTest(testDispatcher) {
+        val contacts = MutableStateFlow(
+            listOf(contactListItem(id = "c_1", displayName = "Alice")),
+        )
+        every { contactRepository.getContactListItems() } returns contacts
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.value.syncError)
+
+        lastSyncError = "Contacts permission was denied."
+        preferenceChanges.tryEmit(Unit)
+        advanceUntilIdle()
+
+        assertEquals("Contacts permission was denied.", viewModel.uiState.value.syncError)
+        assertEquals(listOf("Alice"), viewModel.uiState.value.contacts.map { it.displayName })
     }
 
     @Test

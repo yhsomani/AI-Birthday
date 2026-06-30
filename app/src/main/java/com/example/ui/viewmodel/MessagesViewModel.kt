@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -182,7 +183,8 @@ class MessagesViewModel @Inject constructor(
                     messageRepository.getSentListItems(),
                     contactRepository.getMessageContexts(),
                     eventRepository.getEventListItems(),
-                ) { pending, sent, contacts, events ->
+                    securePrefs.observeChanges().onStart { emit(Unit) },
+                ) { pending, sent, contacts, events, _ ->
                     val contactMap = contacts.associateBy { it.id.value }
                     val eventMap = events.associateBy { it.id.value }
 

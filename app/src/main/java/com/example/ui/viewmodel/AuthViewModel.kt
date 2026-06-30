@@ -89,20 +89,6 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun bypassSignIn() {
-        _uiState.value = _uiState.value.copy(isLoading = true)
-        viewModelScope.launch {
-            authManager.bypassSignIn { success ->
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    isSignedIn = success,
-                    error = null,
-                    userProfile = authManager.userProfile.value,
-                )
-            }
-        }
-    }
-
     private fun SignInFailure.toErrorMessage(): String {
         return when (this) {
             SignInFailure.DEVELOPER_CONFIGURATION ->

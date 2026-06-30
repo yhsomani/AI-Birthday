@@ -102,7 +102,7 @@ Release requirements:
 
 ## Device Release Smoke Test
 
-- Fresh install can start in guest mode and signed-in mode.
+- Fresh install can start only through Google sign-in; no alternate, demo, or fake-account path is exposed.
 - Contact sync/import, manual contact creation, event discovery/manual event creation, wish generation, review/edit/regenerate, approval, schedule, send/test, activity history, backup export, restore preview, and AI Doctor all work.
 - Permission denial paths are exercised for contacts, notifications, SMS, exact alarms, and Accessibility.
 - Reboot recovery restores scheduled work without direct send from boot receiver.

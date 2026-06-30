@@ -9,6 +9,7 @@ import com.example.R
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
+import com.example.domain.usecase.EnableFullAutomationUseCase
 import com.example.domain.usecase.SyncContactsUseCase
 import com.example.ui.feedback.FeedbackEvent
 import com.example.ui.feedback.FeedbackType
@@ -38,7 +39,7 @@ data class SettingsUiState(
     val senderEmail: String = "",
     val senderEmailPassword: String = "",
     val senderEmailSaved: Boolean = false,
-    val automationMode: ApprovalMode = ApprovalMode.SMART_APPROVE,
+    val automationMode: ApprovalMode = ApprovalMode.FULLY_AUTO,
     val quietHoursStart: String = "22",
     val quietHoursEnd: String = "8",
     val biometricLockEnabled: Boolean = false,
@@ -57,19 +58,43 @@ class SettingsViewModel @Inject constructor(
     private val contactRepository: ContactRepository,
     private val authManager: AuthManager,
     private val securePrefs: SecurePrefs,
+    private val enableFullAutomationUseCase: EnableFullAutomationUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    private var initializedSettings = false
 
     init {
-        // Load persisted settings
+        refreshPersistedSettings()
+        viewModelScope.launch {
+            securePrefs.observeChanges()
+                .collect {
+                    refreshPersistedSettings()
+                }
+        }
+        viewModelScope.launch {
+            authManager.userProfile.collect { profile ->
+                _uiState.value = _uiState.value.copy(
+                    userName = profile.displayName,
+                    userEmail = profile.email,
+                    userPhotoUrl = profile.photoUrl,
+                )
+            }
+        }
+    }
+
+    private fun refreshPersistedSettings() {
         _uiState.value = _uiState.value.copy(
             geminiApiKey = securePrefs.getGeminiApiKey(),
             senderEmail = securePrefs.getSenderEmail(),
             senderEmailPassword = securePrefs.getSenderEmailPassword(),
             automationMode = securePrefs.getGlobalApprovalMode(),
-            lastSyncTimestamp = appContext.getString(R.string.settings_last_sync_never),
+            lastSyncTimestamp = if (initializedSettings) {
+                _uiState.value.lastSyncTimestamp
+            } else {
+                appContext.getString(R.string.settings_last_sync_never)
+            },
             lastBackupTimestamp = formatLastBackupTimestamp(securePrefs.getLastBackupMs()),
             quietHoursStart = securePrefs.getQuietHoursStart().toString(),
             quietHoursEnd = securePrefs.getQuietHoursEnd().toString(),
@@ -81,15 +106,7 @@ class SettingsViewModel @Inject constructor(
             channelBlackoutEmail = securePrefs.isChannelBlacklisted(MessageChannel.EMAIL),
             showLegacyDbNotice = securePrefs.wasLegacyUnencryptedDbQuarantined(),
         )
-        viewModelScope.launch {
-            authManager.userProfile.collect { profile ->
-                _uiState.value = _uiState.value.copy(
-                    userName = profile.displayName,
-                    userEmail = profile.email,
-                    userPhotoUrl = profile.photoUrl,
-                )
-            }
-        }
+        initializedSettings = true
     }
 
     fun toggleBirthdayReminders(enabled: Boolean) {
@@ -152,8 +169,37 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setAutomationMode(mode: ApprovalMode) {
-        securePrefs.setGlobalApprovalMode(mode)
-        _uiState.value = _uiState.value.copy(automationMode = mode)
+        if (mode == ApprovalMode.FULLY_AUTO) {
+            val previousMode = _uiState.value.automationMode
+            viewModelScope.launch {
+                runCatching { enableFullAutomationUseCase() }
+                    .onSuccess { outcome ->
+                        _uiState.value = _uiState.value.copy(
+                            automationMode = ApprovalMode.FULLY_AUTO,
+                            feedbackEvent = FeedbackEvent(
+                                message = fullAutomationMessage(outcome),
+                                type = if (outcome.skippedWithoutRoute == 0 && outcome.skippedNeedsReview == 0) {
+                                    FeedbackType.SUCCESS
+                                } else {
+                                    FeedbackType.INFO
+                                },
+                            ),
+                        )
+                    }
+                    .onFailure { error ->
+                        _uiState.value = _uiState.value.copy(
+                            automationMode = previousMode,
+                            feedbackEvent = FeedbackEvent(
+                                message = fullAutomationFailureMessage(error),
+                                type = FeedbackType.ERROR,
+                            ),
+                        )
+                    }
+            }
+        } else {
+            _uiState.value = _uiState.value.copy(automationMode = mode)
+            securePrefs.setGlobalApprovalMode(mode)
+        }
     }
 
     fun onQuietHoursStartChange(value: String) {
@@ -294,6 +340,49 @@ class SettingsViewModel @Inject constructor(
             ageDays == 0L -> appContext.getString(R.string.settings_last_backup_today)
             ageDays == 1L -> appContext.getString(R.string.settings_last_backup_yesterday)
             else -> appContext.getString(R.string.settings_last_backup_days_ago, ageDays)
+        }
+    }
+
+    private fun fullAutomationMessage(outcome: EnableFullAutomationUseCase.Outcome): UiText {
+        return when {
+            outcome.skippedWithoutRoute > 0 && outcome.skippedNeedsReview > 0 -> UiText.Resource(
+                R.string.settings_full_automation_enabled_route_and_review_blockers,
+                listOf(
+                    outcome.updatedContacts,
+                    outcome.promotedMessages,
+                    outcome.skippedWithoutRoute,
+                    outcome.skippedNeedsReview,
+                ),
+            )
+            outcome.skippedWithoutRoute > 0 -> UiText.Resource(
+                R.string.settings_full_automation_enabled_route_blockers,
+                listOf(
+                    outcome.updatedContacts,
+                    outcome.promotedMessages,
+                    outcome.skippedWithoutRoute,
+                ),
+            )
+            outcome.skippedNeedsReview > 0 -> UiText.Resource(
+                R.string.settings_full_automation_enabled_review_blockers,
+                listOf(
+                    outcome.updatedContacts,
+                    outcome.promotedMessages,
+                    outcome.skippedNeedsReview,
+                ),
+            )
+            else -> UiText.Resource(
+                R.string.settings_full_automation_enabled,
+                listOf(outcome.updatedContacts, outcome.promotedMessages),
+            )
+        }
+    }
+
+    private fun fullAutomationFailureMessage(error: Throwable): UiText {
+        val reason = error.message?.takeUnless(String::isBlank)
+        return if (reason == null) {
+            UiText.Resource(R.string.settings_full_automation_failed)
+        } else {
+            UiText.Resource(R.string.settings_full_automation_failed_with_reason, listOf(reason))
         }
     }
 

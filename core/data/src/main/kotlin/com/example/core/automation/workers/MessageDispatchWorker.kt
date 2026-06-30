@@ -156,6 +156,14 @@ class MessageDispatchWorker @AssistedInject constructor(
             }
         }
 
+        if (!pendingMessageDao.claimMessageDispatching(pendingMsg)) {
+            StructuredLogger.i(TAG, "Dispatch claim skipped because message state changed", mapOf(
+                "pendingMessageId" to pendingMsg.id.value,
+                "expectedStatus" to pendingMsg.status.raw,
+            ))
+            return Result.success()
+        }
+
         val attemptId = recordDispatchAttempt(
             pending = pendingMsg,
             eligibilityDecision = DispatchEligibilityRecord.SEND_NOW,
@@ -163,9 +171,6 @@ class MessageDispatchWorker @AssistedInject constructor(
             reason = null,
             resolvedAtMs = null,
         )
-
-        // Idempotency: mark status as DISPATCHING immediately
-        pendingMessageDao.saveMessageStatusUpdate(pendingMsg.statusUpdate(MessageStatus.DISPATCHING))
 
         try {
             val dispatcher = MessageDispatcher(

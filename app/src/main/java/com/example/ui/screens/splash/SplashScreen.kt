@@ -32,7 +32,6 @@ import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
 import com.example.ui.viewmodel.SplashDestination
 import com.example.ui.viewmodel.SplashViewModel
-import kotlinx.coroutines.delay
 
 internal object SplashScreenTestTags {
     const val PROGRESS = "splash_progress"
@@ -55,7 +54,6 @@ fun SplashScreen(
 
     LaunchedEffect(Unit) {
         startAnimation = true
-        delay(2000)
         when (viewModel.resolveDestination()) {
             SplashDestination.HOME       -> onNavigateToHome()
             SplashDestination.AUTH       -> onNavigateToAuth()

@@ -5,7 +5,6 @@ import com.example.domain.model.contact.ContactAnalyticsSummary
 import com.example.domain.model.contact.RelationshipAnalyticsCount
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.MessageRepository
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
@@ -48,8 +47,8 @@ class GetAnalyticsUseCaseTest {
                 relationshipType = "FAMILY",
             ),
         )
-        coEvery { contactRepository.getTopHealthSummaries(5) } returns topContacts
-        coEvery { contactRepository.getBottomHealthSummaries(5) } returns neglectedContacts
+        every { contactRepository.getTopHealthSummariesFlow(5) } returns flowOf(topContacts)
+        every { contactRepository.getBottomHealthSummariesFlow(5) } returns flowOf(neglectedContacts)
 
         val snapshot = useCase().first()
 

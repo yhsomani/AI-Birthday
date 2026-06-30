@@ -3,6 +3,8 @@ package com.example.domain.usecase
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,6 +36,28 @@ class GetDashboardMetricsUseCase @Inject constructor(
             contactCount = contactProfiles.size,
             sentCount = sentCount
         )
+    }
+
+    fun observe(): Flow<DashboardMetrics> {
+        return combine(
+            contactRepository.getHealthProfilesFlow(),
+            messageRepository.countPending(),
+            eventRepository.countUpcomingFlow(30),
+            messageRepository.countAllSent(),
+        ) { contactProfiles, pendingCount, upcomingEventsCount, sentCount ->
+            val healthScore = if (contactProfiles.isEmpty()) {
+                0
+            } else {
+                contactProfiles.map { it.currentHealthScore }.average().toInt()
+            }
+            DashboardMetrics(
+                healthScore = healthScore,
+                pendingCount = pendingCount,
+                upcomingEventsCount = upcomingEventsCount,
+                contactCount = contactProfiles.size,
+                sentCount = sentCount,
+            )
+        }
     }
 
     data class DashboardMetrics(

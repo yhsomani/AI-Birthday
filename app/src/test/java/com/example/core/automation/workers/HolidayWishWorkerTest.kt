@@ -122,7 +122,7 @@ class HolidayWishWorkerTest {
     }
 
     @Test
-    fun `doWork downgrades fallback fully auto holiday wish to smart approve`() = runTest {
+    fun `doWork downgrades fallback fully auto holiday wish to manual review`() = runTest {
         val contact = contact(automationMode = "FULLY_AUTO")
         val pendingSlot = slot<PendingMessageEntity>()
 
@@ -134,11 +134,11 @@ class HolidayWishWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
-        assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
+        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
         assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertEquals(true, pendingSlot.captured.isUsingFallback)
-        verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
+        verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
         verify {
             NotificationHelper.showApprovalNotification(
                 any(),

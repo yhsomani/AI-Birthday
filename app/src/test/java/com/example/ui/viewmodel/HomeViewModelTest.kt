@@ -13,13 +13,14 @@ import com.example.domain.model.occasion.UpcomingEventPreview
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.usecase.GetDashboardMetricsUseCase
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -62,6 +63,10 @@ class HomeViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var context: Context
+    private lateinit var metricsFlow: MutableStateFlow<GetDashboardMetricsUseCase.DashboardMetrics>
+    private lateinit var upcomingEventsFlow: MutableStateFlow<List<UpcomingEventPreview>>
+    private lateinit var atRiskContactsFlow: MutableStateFlow<List<ContactAnalyticsSummary>>
+    private lateinit var preferenceChanges: MutableSharedFlow<Unit>
 
     @Before
     fun setUp() {
@@ -74,7 +79,14 @@ class HomeViewModelTest {
         every { mockPreferencesRepository.getGeminiApiKey() } returns "gemini-key"
         every { mockPreferencesRepository.isAiWishGenerationEnabled() } returns true
         every { mockPreferencesRepository.getLastBackupMs() } returns System.currentTimeMillis()
-        coEvery { mockContactRepository.getBottomHealthSummaries(3) } returns emptyList()
+        metricsFlow = MutableStateFlow(dashboardMetrics())
+        upcomingEventsFlow = MutableStateFlow(emptyList())
+        atRiskContactsFlow = MutableStateFlow(emptyList())
+        preferenceChanges = MutableSharedFlow(extraBufferCapacity = 1)
+        every { mockUseCase.observe() } returns metricsFlow
+        every { mockEventRepository.getUpcomingPreviewsFlow(30) } returns upcomingEventsFlow
+        every { mockContactRepository.getBottomHealthSummariesFlow(3) } returns atRiskContactsFlow
+        every { mockPreferencesRepository.observeChanges() } returns preferenceChanges
         every { mockAuthManager.userProfile } returns MutableStateFlow(
             UserProfile(displayName = "TestUser", email = "test@example.com")
         )
@@ -88,14 +100,13 @@ class HomeViewModelTest {
 
     @Test
     fun `loadMetrics emits dashboard metrics`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } returns GetDashboardMetricsUseCase.DashboardMetrics(
+        metricsFlow.value = GetDashboardMetricsUseCase.DashboardMetrics(
             healthScore = 75,
             pendingCount = 3,
             upcomingEventsCount = 5,
             contactCount = 10,
             sentCount = 2,
         )
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         val viewModel = newViewModel()
         advanceUntilIdle()
 
@@ -118,9 +129,45 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `dashboard metric flow update immediately updates Home state`() = runTest(testDispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        metricsFlow.value = dashboardMetrics(
+            pendingCount = 4,
+            contactCount = 14,
+            healthScore = 88,
+            sentCount = 6,
+            upcomingEventsCount = 2,
+        )
+        advanceUntilIdle()
+
+        assertEquals(88, viewModel.uiState.value.healthScore)
+        assertEquals(4, viewModel.uiState.value.pendingCount)
+        assertEquals(14, viewModel.uiState.value.contactCount)
+        assertEquals(6, viewModel.uiState.value.sentCount)
+        assertEquals(2, viewModel.uiState.value.upcomingEventsCount)
+        assertEquals(HomeNextActionKind.REVIEW_PENDING, viewModel.uiState.value.primaryAction?.kind)
+    }
+
+    @Test
+    fun `preference change immediately refreshes Home setup state`() = runTest(testDispatcher) {
+        every { mockPreferencesRepository.getLastBackupMs() } returns 0L
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        assertEquals(BackupFreshnessStatus.NEVER_BACKED_UP, viewModel.uiState.value.backupPrompt?.status)
+
+        every { mockPreferencesRepository.getLastBackupMs() } returns System.currentTimeMillis()
+        preferenceChanges.tryEmit(Unit)
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.backupPrompt)
+    }
+
+    @Test
     fun `loadMetrics handles exception gracefully`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } throws RuntimeException("Simulated failure")
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
+        every { mockUseCase.observe() } returns flow { throw RuntimeException("Simulated failure") }
         val viewModel = newViewModel()
         advanceUntilIdle()
 
@@ -130,8 +177,6 @@ class HomeViewModelTest {
 
     @Test
     fun `never backed up surfaces backup prompt on Home`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getLastBackupMs() } returns 0L
 
         val viewModel = newViewModel()
@@ -144,8 +189,6 @@ class HomeViewModelTest {
 
     @Test
     fun `stale backup surfaces backup prompt on Home`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getLastBackupMs() } returns System.currentTimeMillis() - 31L * DAY_MS
 
         val viewModel = newViewModel()
@@ -159,8 +202,6 @@ class HomeViewModelTest {
 
     @Test
     fun `recent backup does not surface backup prompt on Home`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getLastBackupMs() } returns System.currentTimeMillis() - 2L * DAY_MS
 
         val viewModel = newViewModel()
@@ -172,8 +213,7 @@ class HomeViewModelTest {
 
     @Test
     fun `pending reviews rank above stale backup on Home`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } returns dashboardMetrics(pendingCount = 2)
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
+        metricsFlow.value = dashboardMetrics(pendingCount = 2)
         every { mockPreferencesRepository.getLastBackupMs() } returns System.currentTimeMillis() - 31L * DAY_MS
 
         val viewModel = newViewModel()
@@ -185,8 +225,6 @@ class HomeViewModelTest {
 
     @Test
     fun `contact sync error becomes top setup blocker on Home`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getLastSyncError() } returns "Sync failed"
 
         val viewModel = newViewModel()
@@ -198,8 +236,6 @@ class HomeViewModelTest {
 
     @Test
     fun `missing ai access becomes setup action on Home`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getGeminiApiKey() } returns ""
 
         val viewModel = newViewModel()
@@ -211,8 +247,6 @@ class HomeViewModelTest {
 
     @Test
     fun `disabled ai generation becomes setup action on Home`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.isAiWishGenerationEnabled() } returns false
 
         val viewModel = newViewModel()
@@ -224,9 +258,7 @@ class HomeViewModelTest {
 
     @Test
     fun `low health contact becomes relationship action when operational work is clear`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
-        coEvery { mockContactRepository.getBottomHealthSummaries(3) } returns listOf(
+        atRiskContactsFlow.value = listOf(
             contactSummary(id = "c_low", displayName = "Asha", healthScore = 32),
             contactSummary(id = "c_next", displayName = "Ravi", healthScore = 45),
         )
@@ -243,10 +275,8 @@ class HomeViewModelTest {
 
     @Test
     fun `backup risk ranks above low health relationship action`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } returns dashboardMetrics()
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns emptyList()
         every { mockPreferencesRepository.getLastBackupMs() } returns System.currentTimeMillis() - 31L * DAY_MS
-        coEvery { mockContactRepository.getBottomHealthSummaries(3) } returns listOf(
+        atRiskContactsFlow.value = listOf(
             contactSummary(id = "c_low", displayName = "Asha", healthScore = 32),
         )
 
@@ -259,9 +289,8 @@ class HomeViewModelTest {
 
     @Test
     fun `upcoming event previews populate birthdays and planner items`() = runTest(testDispatcher) {
-        coEvery { mockUseCase() } returns dashboardMetrics()
         val nextBirthdayMs = System.currentTimeMillis() + 7L * DAY_MS
-        coEvery { mockEventRepository.getUpcomingPreviews(30) } returns listOf(
+        upcomingEventsFlow.value = listOf(
             eventPreview(
                 id = "event_birthday",
                 contactId = "contact_birthday",
@@ -289,14 +318,17 @@ class HomeViewModelTest {
     }
 
     private fun dashboardMetrics(
+        healthScore: Int = 75,
         pendingCount: Int = 0,
+        upcomingEventsCount: Int = 0,
         contactCount: Int = 10,
+        sentCount: Int = 2,
     ) = GetDashboardMetricsUseCase.DashboardMetrics(
-        healthScore = 75,
+        healthScore = healthScore,
         pendingCount = pendingCount,
-        upcomingEventsCount = 0,
+        upcomingEventsCount = upcomingEventsCount,
         contactCount = contactCount,
-        sentCount = 2,
+        sentCount = sentCount,
     )
 
     private fun contactSummary(

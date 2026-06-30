@@ -51,6 +51,8 @@ class MessageRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getAllPendingSync(): List<PendingMessageEntity> = pendingMessageDao.getAllSync()
+
     override suspend fun getAllApproved(): List<PendingMessageEntity> = pendingMessageDao.getAllApproved()
 
     override suspend fun getPendingById(id: String): PendingMessageEntity? = pendingMessageDao.getById(id)
@@ -79,6 +81,15 @@ class MessageRepositoryImpl @Inject constructor(
 
     override suspend fun getWishPreviewDraftByEventId(eventId: String): WishPreviewDraft? {
         return pendingMessageDao.getByEventId(eventId)?.toWishPreviewDraft()
+    }
+
+    override fun getWishPreviewDraftByRef(messageRef: String): Flow<WishPreviewDraft?> {
+        return pendingMessageDao.getAll().map { messages ->
+            messages.firstOrNull { it.id == messageRef }
+                ?: messages.firstOrNull { it.eventId == messageRef }
+        }.map { message ->
+            message?.toWishPreviewDraft()
+        }
     }
 
     override suspend fun getPendingForEventOccurrence(
@@ -133,6 +144,12 @@ class MessageRepositoryImpl @Inject constructor(
 
     override suspend fun getSentByContact(contactId: String, limit: Int): List<SentMessageEntity> = sentMessageDao.getByContact(contactId, limit)
 
+    override fun getSentByContactFlow(contactId: String, limit: Int): Flow<List<SentMessageEntity>> {
+        return sentMessageDao.getByContactFlow(contactId, limit)
+    }
+
+    override fun countSentByContact(contactId: String): Flow<Int> = sentMessageDao.countByContact(contactId)
+
     override suspend fun getGenerationHistoryByContact(contactId: String, limit: Int): MessageGenerationHistory {
         return sentMessageDao.getByContact(contactId, limit).toMessageGenerationHistory()
     }
@@ -143,6 +160,12 @@ class MessageRepositoryImpl @Inject constructor(
 
     override suspend fun getSentAnalyticsRecordsSince(sinceMs: Long): List<MessageAnalyticsRecord> {
         return sentMessageDao.getSentSinceYearStart(sinceMs).map { it.toMessageAnalyticsRecord() }
+    }
+
+    override fun getSentAnalyticsRecordsSinceFlow(sinceMs: Long): Flow<List<MessageAnalyticsRecord>> {
+        return sentMessageDao.getSentSinceFlow(sinceMs).map { messages ->
+            messages.map { it.toMessageAnalyticsRecord() }
+        }
     }
 
     override fun countAllSent(): Flow<Int> = sentMessageDao.countAll()

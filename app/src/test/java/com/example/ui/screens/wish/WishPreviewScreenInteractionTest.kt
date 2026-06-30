@@ -133,7 +133,7 @@ class WishPreviewScreenInteractionTest {
         composeRule.onNodeWithText("Approval plan").assertIsDisplayed()
         composeRule.onNodeWithText("Anniversary").assertIsDisplayed()
         composeRule.onNodeWithText("Email").assertIsDisplayed()
-        composeRule.onNodeWithText("Smart Approve (default)").assertIsDisplayed()
+        composeRule.onNodeWithText("Smart Approve").assertIsDisplayed()
         composeRule.onNodeWithText("Template fallback").assertIsDisplayed()
     }
 

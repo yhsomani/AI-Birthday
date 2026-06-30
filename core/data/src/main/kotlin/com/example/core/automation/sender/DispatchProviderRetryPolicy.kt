@@ -21,6 +21,7 @@ data class ProviderDispatchFailure(
 
 object DispatchProviderRetryPolicy {
     const val DEFAULT_RETRY_DELAY_MS: Long = 15 * 60 * 1000L
+    const val MAX_AUTOMATIC_RETRY_FAILURES: Int = 3
 
     const val ERROR_NO_DELIVERY_ROUTE = "NO_DELIVERY_ROUTE"
     const val ERROR_DISPATCH_FAILURE = "DISPATCH_FAILURE"
@@ -29,6 +30,7 @@ object DispatchProviderRetryPolicy {
     const val ERROR_WHATSAPP_CONSENT_REQUIRED = "WHATSAPP_CONSENT_REQUIRED"
     const val ERROR_WHATSAPP_AUTOMATION_UNAVAILABLE = "WHATSAPP_AUTOMATION_UNAVAILABLE"
     const val ERROR_WHATSAPP_AUTOMATION_FAILURE = "WHATSAPP_AUTOMATION_FAILURE"
+    const val ERROR_EMAIL_INVALID_ADDRESS = "EMAIL_INVALID_ADDRESS"
     const val ERROR_EMAIL_AUTHENTICATION_FAILED = "EMAIL_AUTHENTICATION_FAILED"
     const val ERROR_EMAIL_TRANSIENT_PROVIDER_FAILURE = "EMAIL_TRANSIENT_PROVIDER_FAILURE"
 
@@ -91,6 +93,24 @@ object DispatchProviderRetryPolicy {
     }
 
     fun emailProviderException(throwable: Throwable): ProviderDispatchFailure {
+        throwable.findProviderCause { it is EmailAddressValidationException }
+            ?.let { cause ->
+                val validation = cause as EmailAddressValidationException
+                return finalFailure(
+                    errorType = ERROR_EMAIL_INVALID_ADDRESS,
+                    errorCode = when (validation.field) {
+                        EmailAddressField.SENDER -> "EMAIL_INVALID_SENDER_ADDRESS"
+                        EmailAddressField.RECIPIENT -> "EMAIL_INVALID_RECIPIENT_ADDRESS"
+                    },
+                    redactedErrorMessage = when (validation.field) {
+                        EmailAddressField.SENDER ->
+                            "Configured sender email address is invalid; setup must be reviewed."
+                        EmailAddressField.RECIPIENT ->
+                            "Contact email address is invalid; update the contact before retry."
+                    },
+                )
+            }
+
         if (throwable.containsProviderCause<AuthenticationFailedException>()) {
             return finalFailure(
                 errorType = ERROR_EMAIL_AUTHENTICATION_FAILED,
@@ -122,6 +142,20 @@ object DispatchProviderRetryPolicy {
             !current.isRetryable && candidate.isRetryable -> candidate
             else -> candidate
         }
+    }
+
+    fun applyAutomaticRetryLimit(
+        failure: ProviderDispatchFailure,
+        retryCount: Int,
+    ): ProviderDispatchFailure {
+        if (!failure.isRetryable || retryCount < MAX_AUTOMATIC_RETRY_FAILURES) {
+            return failure
+        }
+        return failure.copy(
+            result = DispatchAttemptResult.FAILED_FINAL,
+            redactedErrorMessage = "Automatic retry limit reached after $retryCount retryable failures. Last failure: ${failure.redactedErrorMessage}",
+            nextRetryDelayMs = null,
+        )
     }
 
     private fun retryableFailure(
@@ -161,19 +195,22 @@ object DispatchProviderRetryPolicy {
     private fun WhatsAppSendFailureReason.providerErrorType(): String {
         return when (this) {
             WhatsAppSendFailureReason.SERVICE_DISABLED,
+            WhatsAppSendFailureReason.INVALID_PHONE_NUMBER,
             WhatsAppSendFailureReason.APP_NOT_FOUND -> ERROR_WHATSAPP_AUTOMATION_UNAVAILABLE
             WhatsAppSendFailureReason.DEVICE_LOCKED,
             WhatsAppSendFailureReason.CHAT_OPEN_TIMEOUT,
             WhatsAppSendFailureReason.COMPOSE_FIELD_NOT_FOUND,
             WhatsAppSendFailureReason.TEXT_VERIFICATION_FAILED,
             WhatsAppSendFailureReason.SEND_BUTTON_NOT_FOUND,
-            WhatsAppSendFailureReason.SEND_CONFIRMATION_TIMEOUT -> ERROR_WHATSAPP_AUTOMATION_FAILURE
+            WhatsAppSendFailureReason.SEND_CONFIRMATION_TIMEOUT,
+            WhatsAppSendFailureReason.SENDER_CALLBACK_TIMEOUT -> ERROR_WHATSAPP_AUTOMATION_FAILURE
         }
     }
 
     private fun WhatsAppSendFailureReason.providerErrorCode(): String {
         return when (this) {
             WhatsAppSendFailureReason.SERVICE_DISABLED -> CODE_ACCESSIBILITY_AUTOMATION_UNAVAILABLE
+            WhatsAppSendFailureReason.INVALID_PHONE_NUMBER -> "WHATSAPP_INVALID_PHONE_NUMBER"
             WhatsAppSendFailureReason.APP_NOT_FOUND -> "WHATSAPP_APP_NOT_FOUND"
             WhatsAppSendFailureReason.DEVICE_LOCKED -> "DEVICE_LOCKED"
             WhatsAppSendFailureReason.CHAT_OPEN_TIMEOUT -> "CHAT_OPEN_TIMEOUT"
@@ -181,6 +218,7 @@ object DispatchProviderRetryPolicy {
             WhatsAppSendFailureReason.TEXT_VERIFICATION_FAILED -> "TEXT_VERIFICATION_FAILED"
             WhatsAppSendFailureReason.SEND_BUTTON_NOT_FOUND -> "SEND_BUTTON_NOT_FOUND"
             WhatsAppSendFailureReason.SEND_CONFIRMATION_TIMEOUT -> "SEND_CONFIRMATION_TIMEOUT"
+            WhatsAppSendFailureReason.SENDER_CALLBACK_TIMEOUT -> "SENDER_CALLBACK_TIMEOUT"
         }
     }
 
@@ -188,6 +226,8 @@ object DispatchProviderRetryPolicy {
         return when (this) {
             WhatsAppSendFailureReason.SERVICE_DISABLED ->
                 "WhatsApp Accessibility service is disabled; setup must be reviewed before retry."
+            WhatsAppSendFailureReason.INVALID_PHONE_NUMBER ->
+                "Contact phone number is not usable for WhatsApp automation."
             WhatsAppSendFailureReason.DEVICE_LOCKED ->
                 "Device was locked; WhatsApp automation did not run."
             WhatsAppSendFailureReason.APP_NOT_FOUND ->
@@ -202,6 +242,8 @@ object DispatchProviderRetryPolicy {
                 "WhatsApp send button could not be found."
             WhatsAppSendFailureReason.SEND_CONFIRMATION_TIMEOUT ->
                 "WhatsApp send confirmation timed out before delivery handoff."
+            WhatsAppSendFailureReason.SENDER_CALLBACK_TIMEOUT ->
+                "WhatsApp automation did not complete before the sender watchdog timeout."
         }
     }
 

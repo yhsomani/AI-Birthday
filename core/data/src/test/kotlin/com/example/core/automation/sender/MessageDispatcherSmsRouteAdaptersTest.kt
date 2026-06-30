@@ -91,6 +91,45 @@ class MessageDispatcherSmsRouteAdaptersTest {
     }
 
     @Test
+    fun dispatchSmsRouteWithSentMessageRecord_attachesDispatchAttemptToSmsCallbacks() = runTest {
+        coEvery { sentMessageDao.insert(any()) } just Runs
+        every {
+            anyConstructed<SmsSender>().send(
+                "+15551234567",
+                "Selected",
+                "sent_sms",
+                "attempt_1",
+                "pending_1",
+            )
+        } just Runs
+
+        val outcome = context.dispatchSmsRouteWithSentMessageRecord(
+            sentMessageDao = sentMessageDao,
+            messageId = MessageDraftId("pending_1"),
+            contactId = ContactId("contact_1"),
+            dispatchOccasion = dispatchOccasion(),
+            phoneNumber = "+15551234567",
+            contactDisplayName = "Amit",
+            messageText = "Selected",
+            dispatchAttemptId = "attempt_1",
+            sentMessageId = SentMessageId("sent_sms"),
+            eventYear = 2026,
+            sentAtMs = 1_800_000_000_000L,
+        )
+
+        assertTrue(outcome.sent)
+        verify {
+            anyConstructed<SmsSender>().send(
+                "+15551234567",
+                "Selected",
+                "sent_sms",
+                "attempt_1",
+                "pending_1",
+            )
+        }
+    }
+
+    @Test
     fun dispatchSmsRouteWithSentMessageRecord_marksInsertedRecordFailedWhenProviderFails() = runTest {
         coEvery { sentMessageDao.insert(any()) } just Runs
         every {

@@ -77,15 +77,10 @@ import androidx.compose.runtime.LaunchedEffect
 import com.example.BuildConfig
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
-import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateOnBackground
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSurfaceVariant
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.ui.feedback.asString
@@ -199,7 +194,7 @@ internal fun SettingsContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(RelateDarkBackground)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = RelateSpacing.screenHorizontal),
         ) {
             Spacer(modifier = Modifier.height(RelateSize.minTouchTarget))
@@ -236,12 +231,12 @@ internal fun SettingsContent(
                                     modifier = Modifier
                                         .size(RelateSize.minTouchTarget)
                                         .clip(CircleShape)
-                                        .background(RelateSurfaceVariant),
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         state.userName.take(1).uppercase(),
-                                        color = RelateOnBackground,
+                                        color = MaterialTheme.colorScheme.onBackground,
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.titleMedium,
                                     )
@@ -250,7 +245,7 @@ internal fun SettingsContent(
                             Spacer(modifier = Modifier.width(RelateSpacing.md))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(state.userName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                                Text(state.userEmail, style = MaterialTheme.typography.bodySmall, color = RelateOnSurfaceVariant)
+                                Text(state.userEmail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -310,14 +305,19 @@ internal fun SettingsContent(
                         Text(
                             text = stringResource(R.string.settings_gemini_api_key_help),
                             style = MaterialTheme.typography.bodySmall,
-                            color = RelateOnSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(modifier = Modifier.height(RelateSpacing.sm))
                         OutlinedTextField(
                             value = state.geminiApiKey,
                             onValueChange = onGeminiApiKeyChange,
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text(stringResource(R.string.settings_gemini_api_key_placeholder), color = RelateOnSurfaceVariant) },
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.settings_gemini_api_key_placeholder),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -326,12 +326,12 @@ internal fun SettingsContent(
                                 onSaveGeminiApiKey()
                             }),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = RelatePrimary,
-                                unfocusedBorderColor = RelateSurfaceVariant,
-                                focusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                focusedTextColor = RelateOnBackground,
-                                unfocusedTextColor = RelateOnBackground,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                             ),
                             shape = RoundedCornerShape(RelateRadius.control),
                         )
@@ -341,7 +341,7 @@ internal fun SettingsContent(
                                 focusManager.clearFocus()
                                 onSaveGeminiApiKey()
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(RelateRadius.control),
                         ) {
                             if (state.geminiApiKeySaved) {
@@ -349,19 +349,22 @@ internal fun SettingsContent(
                                     Icons.Filled.Check,
                                     contentDescription = null,
                                     modifier = Modifier.size(RelateSize.iconSm),
-                                    tint = RelateDarkBackground,
+                                    tint = MaterialTheme.colorScheme.background,
                                 )
                                 Spacer(modifier = Modifier.width(RelateSpacing.xs))
-                                Text(stringResource(R.string.saved), color = RelateDarkBackground)
+                                Text(stringResource(R.string.saved), color = MaterialTheme.colorScheme.background)
                             } else {
                                 Icon(
                                     Icons.Filled.Key,
                                     contentDescription = null,
                                     modifier = Modifier.size(RelateSize.iconSm),
-                                    tint = RelateDarkBackground,
+                                    tint = MaterialTheme.colorScheme.background,
                                 )
                                 Spacer(modifier = Modifier.width(RelateSpacing.xs))
-                                Text(stringResource(R.string.settings_save_api_key), color = RelateDarkBackground)
+                                Text(
+                                    stringResource(R.string.settings_save_api_key),
+                                    color = MaterialTheme.colorScheme.background,
+                                )
                             }
                         }
                     }
@@ -375,7 +378,7 @@ internal fun SettingsContent(
                         Text(
                             text = stringResource(R.string.settings_email_sending_help),
                             style = MaterialTheme.typography.bodySmall,
-                            color = RelateOnSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(modifier = Modifier.height(RelateSpacing.sm))
                         OutlinedTextField(
@@ -385,12 +388,12 @@ internal fun SettingsContent(
                             label = { Text(stringResource(R.string.settings_sender_email)) },
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = RelatePrimary,
-                                unfocusedBorderColor = RelateSurfaceVariant,
-                                focusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                focusedTextColor = RelateOnBackground,
-                                unfocusedTextColor = RelateOnBackground,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                             ),
                             shape = RoundedCornerShape(RelateRadius.control),
                         )
@@ -403,12 +406,12 @@ internal fun SettingsContent(
                             visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = RelatePrimary,
-                                unfocusedBorderColor = RelateSurfaceVariant,
-                                focusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                unfocusedContainerColor = RelateSurfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                focusedTextColor = RelateOnBackground,
-                                unfocusedTextColor = RelateOnBackground,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
+                                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                             ),
                             shape = RoundedCornerShape(RelateRadius.control),
                         )
@@ -418,7 +421,7 @@ internal fun SettingsContent(
                                 focusManager.clearFocus()
                                 onSaveSenderEmailSettings()
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(RelateRadius.control),
                         ) {
                             Text(
@@ -427,7 +430,7 @@ internal fun SettingsContent(
                                 } else {
                                     stringResource(R.string.settings_save_email_settings)
                                 },
-                                color = RelateDarkBackground,
+                                color = MaterialTheme.colorScheme.background,
                             )
                         }
                     }
@@ -591,7 +594,7 @@ internal fun SignOutConfirmationDialog(
                 Text(
                     text = stringResource(R.string.settings_sign_out_body),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 SignOutChecklistItem(text = stringResource(R.string.settings_sign_out_check_local_data))
                 SignOutChecklistItem(text = stringResource(R.string.settings_sign_out_check_preferences))
@@ -627,13 +630,13 @@ private fun SignOutChecklistItem(text: String) {
         Icon(
             imageVector = Icons.Filled.Check,
             contentDescription = null,
-            tint = RelatePrimary,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(RelateSize.iconSm),
         )
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
     }
@@ -656,7 +659,7 @@ private fun QuietHoursEditor(
         Text(
             text = stringResource(R.string.settings_quiet_hours_help),
             style = MaterialTheme.typography.bodySmall,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(RelateSpacing.sm))
         Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
@@ -702,7 +705,7 @@ private fun ChannelBlackoutEditor(
         Text(
             text = stringResource(R.string.settings_channel_blackout_help),
             style = MaterialTheme.typography.bodySmall,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ChannelBlackoutRow(stringResource(R.string.channel_sms), smsDisabled, onSmsChange)
         ChannelBlackoutRow(stringResource(R.string.channel_whatsapp), whatsAppDisabled, onWhatsAppChange)
@@ -732,10 +735,10 @@ private fun ChannelBlackoutRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = RelateOnBackground,
-                checkedTrackColor = RelatePrimary,
-                uncheckedThumbColor = RelateOnSurfaceVariant,
-                uncheckedTrackColor = RelateSurfaceVariant,
+                checkedThumbColor = MaterialTheme.colorScheme.onBackground,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
         )
     }
@@ -775,7 +778,7 @@ private fun LegacyDbNotice(onDismiss: () -> Unit) {
                 Text(
                     text = stringResource(R.string.settings_legacy_db_notice_body),
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -797,7 +800,7 @@ private fun SettingsSection(
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall,
-        color = RelatePrimary,
+        color = MaterialTheme.colorScheme.primary,
         modifier = modifier.padding(bottom = RelateSpacing.sm),
     )
     content()
@@ -822,7 +825,7 @@ private fun SettingsRow(icon: ImageVector, title: String, subtitle: String? = nu
         Icon(
             icon,
             contentDescription = null,
-            tint = RelateOnSurfaceVariant,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(RelateSize.iconMd),
         )
         Spacer(modifier = Modifier.width(RelateSpacing.md))
@@ -836,7 +839,7 @@ private fun SettingsRow(icon: ImageVector, title: String, subtitle: String? = nu
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -854,7 +857,7 @@ private fun SettingsToggle(title: String, icon: ImageVector, checked: Boolean, o
         Icon(
             icon,
             contentDescription = null,
-            tint = RelateOnSurfaceVariant,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(RelateSize.iconMd),
         )
         Spacer(modifier = Modifier.width(RelateSpacing.md))
@@ -868,10 +871,10 @@ private fun SettingsToggle(title: String, icon: ImageVector, checked: Boolean, o
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = RelateOnBackground,
-                checkedTrackColor = RelatePrimary,
-                uncheckedThumbColor = RelateOnSurfaceVariant,
-                uncheckedTrackColor = RelateSurfaceVariant,
+                checkedThumbColor = MaterialTheme.colorScheme.onBackground,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
         )
     }
@@ -880,7 +883,7 @@ private fun SettingsToggle(title: String, icon: ImageVector, checked: Boolean, o
 @Composable
 private fun SettingsDivider() {
     HorizontalDivider(
-        color = RelateOnSurfaceVariant.copy(alpha = RelateAlpha.divider),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = RelateAlpha.divider),
         modifier = Modifier.padding(horizontal = RelateSpacing.cardContent),
     )
 }

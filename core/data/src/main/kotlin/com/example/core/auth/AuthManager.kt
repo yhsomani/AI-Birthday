@@ -43,7 +43,6 @@ open class AuthManager @Inject constructor(
     private val securePrefs: SecurePrefs
 ) {
     private val auth by lazy { FirebaseAuth.getInstance() }
-    private var isMocked = false
     private companion object { private const val TAG = "AuthManager" }
 
     private val _userProfile = MutableStateFlow(UserProfile())
@@ -54,14 +53,6 @@ open class AuthManager @Inject constructor(
     }
 
     private fun updateProfileFromFirebaseUser() {
-        if (securePrefs.isGuestMode()) {
-            _userProfile.value = UserProfile(
-                displayName = "Developer User",
-                email = "dev@example.com",
-                photoUrl = null
-            )
-            return
-        }
         val user = auth.currentUser
         _userProfile.value = UserProfile(
             displayName = user?.displayName ?: "User",
@@ -90,7 +81,6 @@ open class AuthManager @Inject constructor(
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         Log.d(TAG, "Firebase Sign-In successful")
-                        securePrefs.setGuestMode(false)
                         updateProfileFromFirebaseUser()
                         onComplete(SignInResult(success = true))
                     } else {
@@ -110,17 +100,6 @@ open class AuthManager @Inject constructor(
             10 -> SignInFailure.DEVELOPER_CONFIGURATION
             else -> SignInFailure.UNKNOWN
         }
-    }
-
-    open fun bypassSignIn(onComplete: (Boolean) -> Unit) {
-        isMocked = true
-        securePrefs.setGuestMode(true)
-        _userProfile.value = UserProfile(
-            displayName = "Developer User",
-            email = "dev@example.com",
-            photoUrl = null
-        )
-        onComplete(true)
     }
 
     open fun signOut() {
@@ -181,11 +160,10 @@ open class AuthManager @Inject constructor(
             Log.e(TAG, "Google Sign-In client revoke failed", e)
         }
 
-        isMocked = false
         _userProfile.value = UserProfile()
     }
 
-    open fun isSignedIn(): Boolean = isMocked || securePrefs.isGuestMode() || auth.currentUser != null
+    open fun isSignedIn(): Boolean = auth.currentUser != null
 
     open fun getCurrentUser() = auth.currentUser
 

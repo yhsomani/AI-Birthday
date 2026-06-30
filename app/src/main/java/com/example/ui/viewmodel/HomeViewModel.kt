@@ -16,9 +16,14 @@ import com.example.domain.usecase.GetDashboardMetricsUseCase
 import com.example.domain.usecase.SyncContactsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -95,6 +100,12 @@ data class HomeUiState(
     val supportingActions: List<HomeNextAction> = emptyList(),
 )
 
+private data class HomeDashboardSnapshot(
+    val metrics: GetDashboardMetricsUseCase.DashboardMetrics,
+    val events: List<UpcomingEventPreview>,
+    val atRiskContacts: List<ContactAnalyticsSummary>,
+)
+
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
@@ -113,6 +124,8 @@ class HomeViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    private val manualRefresh = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private var hasAttemptedInitialSync = false
 
     init {
         viewModelScope.launch {
@@ -124,86 +137,112 @@ class HomeViewModel @Inject constructor(
                 )
             }
         }
-        loadMetrics()
+        observeMetrics()
     }
 
     fun loadMetrics() {
+        hasAttemptedInitialSync = false
+        _uiState.value = _uiState.value.copy(isLoading = true)
+        manualRefresh.tryEmit(Unit)
+    }
+
+    private fun observeMetrics() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
+            combine(
+                getDashboardMetricsUseCase.observe(),
+                eventRepository.getUpcomingPreviewsFlow(30),
+                contactRepository.getBottomHealthSummariesFlow(3),
+                merge(
+                    preferencesRepository.observeChanges(),
+                    manualRefresh,
+                ).onStart { emit(Unit) },
+            ) { metrics, events, atRiskContacts, _ ->
+                HomeDashboardSnapshot(
+                    metrics = metrics,
+                    events = events,
+                    atRiskContacts = atRiskContacts.filter { it.healthScore < 50 },
+                )
+            }
+                .catch { e ->
+                    StructuredLogger.e(TAG, "Dashboard metrics load failed", e)
+                    val lastError = try { preferencesRepository.getLastSyncError() } catch (ex: Exception) { null }
+                    _uiState.value = _uiState.value.copy(isLoading = false, syncError = lastError)
+                }
+                .collect { snapshot ->
+                    maybeRunInitialSync(snapshot.metrics)
+                    _uiState.value = snapshot.toUiState()
+                }
+        }
+    }
+
+    private fun maybeRunInitialSync(metrics: GetDashboardMetricsUseCase.DashboardMetrics) {
+        if (metrics.contactCount != 0 || hasAttemptedInitialSync) return
+        hasAttemptedInitialSync = true
+        viewModelScope.launch {
             try {
-                val lastError = preferencesRepository.getLastSyncError()
-                var metrics = getDashboardMetricsUseCase()
-                if (metrics.contactCount == 0) {
-                    try {
-                        syncContactsUseCase()
-                        metrics = getDashboardMetricsUseCase()
-                    } catch (e: Exception) {
-                        // Ignore sync failures during automatic launch
-                    }
-                }
-                val events = eventRepository.getUpcomingPreviews(30)
-                val atRiskContacts = contactRepository.getBottomHealthSummaries(3)
-                    .filter { it.healthScore < 50 }
-                val birthdayEvents = events.filter { it.type == OccasionType.BIRTHDAY }
-                    .sortedBy { it.daysUntil }
-                val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
-                val birthdays = birthdayEvents.map { event ->
-                    UpcomingBirthday(
-                        name = event.label ?: event.contactId.value,
-                        date = dateFormat.format(Date(event.nextOccurrenceMs)),
-                    )
-                }
-                val profile = authManager.userProfile.value
-                val freshError = preferencesRepository.getLastSyncError()
-                val aiGenerationEnabled = readBooleanPreference {
-                    preferencesRepository.isAiWishGenerationEnabled()
-                }
-                val hasAiAccess = readStringPreference { preferencesRepository.getGeminiApiKey() }.isNotBlank()
-                val lastBackupMs = readLongPreference { preferencesRepository.getLastBackupMs() }
-                val setupProgress = buildHomeSetupProgressSummary(
-                    contactCount = metrics.contactCount,
-                    syncError = freshError ?: lastError,
-                    aiGenerationEnabled = aiGenerationEnabled,
-                    hasAiAccess = hasAiAccess,
-                    pendingCount = metrics.pendingCount,
-                )
-                val backupPrompt = buildBackupFreshnessPrompt(lastBackupMs)
-                val rankedActions = buildRankedNextActions(
-                    contactCount = metrics.contactCount,
-                    syncError = freshError ?: lastError,
-                    aiGenerationEnabled = aiGenerationEnabled,
-                    hasAiAccess = hasAiAccess,
-                    pendingCount = metrics.pendingCount,
-                    backupPrompt = backupPrompt,
-                    atRiskContacts = atRiskContacts,
-                )
-                _uiState.value = HomeUiState(
-                    userName = profile.displayName,
-                    userEmail = profile.email,
-                    userPhotoUrl = profile.photoUrl,
-                    healthScore = metrics.healthScore,
-                    pendingCount = metrics.pendingCount,
-                    upcomingEventsCount = metrics.upcomingEventsCount,
-                    contactCount = metrics.contactCount,
-                    sentCount = metrics.sentCount,
-                    upcomingBirthdays = birthdays,
-                    plannerItems = buildPlannerItems(
-                        atRiskContacts = atRiskContacts.drop(1),
-                        upcomingEvents = events,
-                    ),
-                    isLoading = false,
-                    syncError = freshError ?: lastError,
-                    setupProgress = setupProgress,
-                    backupPrompt = backupPrompt,
-                    primaryAction = rankedActions.firstOrNull(),
-                    supportingActions = rankedActions.drop(1).take(3),
-                ).withReadiness()
+                syncContactsUseCase()
             } catch (e: Exception) {
-                StructuredLogger.e(TAG, "Dashboard metrics load failed", e)
-                val lastError = try { preferencesRepository.getLastSyncError() } catch (ex: Exception) { null }
-                _uiState.value = _uiState.value.copy(isLoading = false, syncError = lastError)
+                // Sync failures are surfaced through the persisted sync-error state.
             }
         }
+    }
+
+    private fun HomeDashboardSnapshot.toUiState(): HomeUiState {
+        val birthdayEvents = events.filter { it.type == OccasionType.BIRTHDAY }
+            .sortedBy { it.daysUntil }
+        val dateFormat = SimpleDateFormat("MMM dd", Locale.getDefault())
+        val birthdays = birthdayEvents.map { event ->
+            UpcomingBirthday(
+                name = event.label ?: event.contactId.value,
+                date = dateFormat.format(Date(event.nextOccurrenceMs)),
+            )
+        }
+        val profile = authManager.userProfile.value
+        val syncError = readPreference<String?>(null) { preferencesRepository.getLastSyncError() }
+        val aiGenerationEnabled = readBooleanPreference {
+            preferencesRepository.isAiWishGenerationEnabled()
+        }
+        val hasAiAccess = readStringPreference { preferencesRepository.getGeminiApiKey() }.isNotBlank()
+        val lastBackupMs = readLongPreference { preferencesRepository.getLastBackupMs() }
+        val setupProgress = buildHomeSetupProgressSummary(
+            contactCount = metrics.contactCount,
+            syncError = syncError,
+            aiGenerationEnabled = aiGenerationEnabled,
+            hasAiAccess = hasAiAccess,
+            pendingCount = metrics.pendingCount,
+        )
+        val backupPrompt = buildBackupFreshnessPrompt(lastBackupMs)
+        val rankedActions = buildRankedNextActions(
+            contactCount = metrics.contactCount,
+            syncError = syncError,
+            aiGenerationEnabled = aiGenerationEnabled,
+            hasAiAccess = hasAiAccess,
+            pendingCount = metrics.pendingCount,
+            backupPrompt = backupPrompt,
+            atRiskContacts = atRiskContacts,
+        )
+        return HomeUiState(
+            userName = profile.displayName,
+            userEmail = profile.email,
+            userPhotoUrl = profile.photoUrl,
+            healthScore = metrics.healthScore,
+            pendingCount = metrics.pendingCount,
+            upcomingEventsCount = metrics.upcomingEventsCount,
+            contactCount = metrics.contactCount,
+            sentCount = metrics.sentCount,
+            upcomingBirthdays = birthdays,
+            plannerItems = buildPlannerItems(
+                atRiskContacts = atRiskContacts.drop(1),
+                upcomingEvents = events,
+            ),
+            isLoading = false,
+            syncError = syncError,
+            setupProgress = setupProgress,
+            backupPrompt = backupPrompt,
+            primaryAction = rankedActions.firstOrNull(),
+            supportingActions = rankedActions.drop(1).take(3),
+        ).withReadiness()
     }
 
     private fun buildPlannerItems(

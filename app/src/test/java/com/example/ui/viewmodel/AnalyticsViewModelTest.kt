@@ -47,23 +47,9 @@ class AnalyticsViewModelTest {
 
     @Test
     fun `zero sent messages keeps monthly chart empty`() = runTest(dispatcher) {
-        every { messageRepository.countAllSent() } returns MutableStateFlow(0)
-        every { messageRepository.countPending() } returns MutableStateFlow(0)
-        every { contactRepository.countAll() } returns MutableStateFlow(0)
-        every { contactRepository.getRelationshipAnalyticsCounts() } returns MutableStateFlow(emptyList())
-        coEvery { contactRepository.getTopHealthSummaries(5) } returns emptyList()
-        coEvery { contactRepository.getBottomHealthSummaries(5) } returns emptyList()
-        coEvery { contactRepository.getAnalyticsProfiles() } returns emptyList()
-        coEvery { eventRepository.countUpcoming(30) } returns 0
-        coEvery { messageRepository.getSentAnalyticsRecordsSince(any()) } returns emptyList()
+        stubEmptyAnalytics()
 
-        val viewModel = AnalyticsViewModel(
-            getAnalyticsUseCase = GetAnalyticsUseCase(contactRepository, messageRepository),
-            contactRepository = contactRepository,
-            eventRepository = eventRepository,
-            messageRepository = messageRepository,
-            analyticsReportService = analyticsReportService,
-        )
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -80,13 +66,7 @@ class AnalyticsViewModelTest {
             content = "section,metric,value\n",
         )
 
-        val viewModel = AnalyticsViewModel(
-            getAnalyticsUseCase = GetAnalyticsUseCase(contactRepository, messageRepository),
-            contactRepository = contactRepository,
-            eventRepository = eventRepository,
-            messageRepository = messageRepository,
-            analyticsReportService = analyticsReportService,
-        )
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         viewModel.exportRelationshipReport()
@@ -102,33 +82,60 @@ class AnalyticsViewModelTest {
         every { messageRepository.countPending() } returns MutableStateFlow(0)
         every { contactRepository.countAll() } returns MutableStateFlow(0)
         every { contactRepository.getRelationshipAnalyticsCounts() } returns MutableStateFlow(emptyList())
-        coEvery { contactRepository.getTopHealthSummaries(5) } returns emptyList()
-        coEvery { contactRepository.getBottomHealthSummaries(5) } returns listOf(
-            ContactAnalyticsSummary(
-                id = ContactId("contact_low"),
-                displayName = "Neha",
-                healthScore = 18,
-                relationshipType = "FRIEND",
+        every { contactRepository.getTopHealthSummariesFlow(5) } returns MutableStateFlow(emptyList())
+        every { contactRepository.getBottomHealthSummariesFlow(5) } returns MutableStateFlow(
+            listOf(
+                ContactAnalyticsSummary(
+                    id = ContactId("contact_low"),
+                    displayName = "Neha",
+                    healthScore = 18,
+                    relationshipType = "FRIEND",
+                ),
             ),
         )
-        coEvery { contactRepository.getAnalyticsProfiles() } returns emptyList()
-        coEvery { eventRepository.countUpcoming(30) } returns 0
-        coEvery { messageRepository.getSentAnalyticsRecordsSince(any()) } returns listOf(
-            sentMessageAnalyticsRecord(deliveryStatus = MessageDeliveryStatus.SENT),
-            sentMessageAnalyticsRecord(deliveryStatus = MessageDeliveryStatus.FAILED),
+        every { contactRepository.getAnalyticsProfilesFlow() } returns MutableStateFlow(emptyList())
+        every { eventRepository.countUpcomingFlow(30) } returns MutableStateFlow(0)
+        every { messageRepository.getSentAnalyticsRecordsSinceFlow(any()) } returns MutableStateFlow(
+            listOf(
+                sentMessageAnalyticsRecord(deliveryStatus = MessageDeliveryStatus.SENT),
+                sentMessageAnalyticsRecord(deliveryStatus = MessageDeliveryStatus.FAILED),
+            ),
         )
 
-        val viewModel = AnalyticsViewModel(
-            getAnalyticsUseCase = GetAnalyticsUseCase(contactRepository, messageRepository),
-            contactRepository = contactRepository,
-            eventRepository = eventRepository,
-            messageRepository = messageRepository,
-            analyticsReportService = analyticsReportService,
-        )
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         assertEquals(50, viewModel.uiState.value.deliveryReliabilityPercent)
         assertEquals(listOf("Neha (18)"), viewModel.uiState.value.topNeglectedContacts)
+    }
+
+    @Test
+    fun `analytics profile flow immediately updates health buckets and coverage`() = runTest(dispatcher) {
+        val analyticsProfiles = MutableStateFlow(emptyList<ContactAnalyticsProfile>())
+        every { messageRepository.countAllSent() } returns MutableStateFlow(0)
+        every { messageRepository.countPending() } returns MutableStateFlow(0)
+        every { contactRepository.countAll() } returns MutableStateFlow(3)
+        every { contactRepository.getRelationshipAnalyticsCounts() } returns MutableStateFlow(emptyList())
+        every { contactRepository.getTopHealthSummariesFlow(5) } returns MutableStateFlow(emptyList())
+        every { contactRepository.getBottomHealthSummariesFlow(5) } returns MutableStateFlow(emptyList())
+        every { contactRepository.getAnalyticsProfilesFlow() } returns analyticsProfiles
+        every { eventRepository.countUpcomingFlow(30) } returns MutableStateFlow(0)
+        every { messageRepository.getSentAnalyticsRecordsSinceFlow(any()) } returns MutableStateFlow(emptyList())
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        analyticsProfiles.value = listOf(
+            analyticsProfile(id = "healthy", healthScore = 80, nickname = "Ash"),
+            analyticsProfile(id = "attention", healthScore = 45, interestsJson = "[\"music\"]"),
+            analyticsProfile(id = "risk", healthScore = 15),
+        )
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.uiState.value.healthCounts["Healthy (70%+)"])
+        assertEquals(1, viewModel.uiState.value.healthCounts["Needs Attention"])
+        assertEquals(1, viewModel.uiState.value.healthCounts["At Risk"])
+        assertEquals(66, viewModel.uiState.value.personalizationCoveragePercent)
     }
 
     @Test
@@ -137,23 +144,19 @@ class AnalyticsViewModelTest {
         every { messageRepository.countPending() } returns MutableStateFlow(0)
         every { contactRepository.countAll() } returns MutableStateFlow(3)
         every { contactRepository.getRelationshipAnalyticsCounts() } returns MutableStateFlow(emptyList())
-        coEvery { contactRepository.getTopHealthSummaries(5) } returns emptyList()
-        coEvery { contactRepository.getBottomHealthSummaries(5) } returns emptyList()
-        coEvery { contactRepository.getAnalyticsProfiles() } returns listOf(
-            analyticsProfile(id = "healthy", healthScore = 80, nickname = "Ash"),
-            analyticsProfile(id = "attention", healthScore = 45, interestsJson = "[\"music\"]"),
-            analyticsProfile(id = "risk", healthScore = 15),
+        every { contactRepository.getTopHealthSummariesFlow(5) } returns MutableStateFlow(emptyList())
+        every { contactRepository.getBottomHealthSummariesFlow(5) } returns MutableStateFlow(emptyList())
+        every { contactRepository.getAnalyticsProfilesFlow() } returns MutableStateFlow(
+            listOf(
+                analyticsProfile(id = "healthy", healthScore = 80, nickname = "Ash"),
+                analyticsProfile(id = "attention", healthScore = 45, interestsJson = "[\"music\"]"),
+                analyticsProfile(id = "risk", healthScore = 15),
+            ),
         )
-        coEvery { eventRepository.countUpcoming(30) } returns 0
-        coEvery { messageRepository.getSentAnalyticsRecordsSince(any()) } returns emptyList()
+        every { eventRepository.countUpcomingFlow(30) } returns MutableStateFlow(0)
+        every { messageRepository.getSentAnalyticsRecordsSinceFlow(any()) } returns MutableStateFlow(emptyList())
 
-        val viewModel = AnalyticsViewModel(
-            getAnalyticsUseCase = GetAnalyticsUseCase(contactRepository, messageRepository),
-            contactRepository = contactRepository,
-            eventRepository = eventRepository,
-            messageRepository = messageRepository,
-            analyticsReportService = analyticsReportService,
-        )
+        val viewModel = newViewModel()
         advanceUntilIdle()
 
         assertEquals(1, viewModel.uiState.value.healthCounts["Healthy (70%+)"])
@@ -167,11 +170,21 @@ class AnalyticsViewModelTest {
         every { messageRepository.countPending() } returns MutableStateFlow(0)
         every { contactRepository.countAll() } returns MutableStateFlow(0)
         every { contactRepository.getRelationshipAnalyticsCounts() } returns MutableStateFlow(emptyList())
-        coEvery { contactRepository.getTopHealthSummaries(5) } returns emptyList()
-        coEvery { contactRepository.getBottomHealthSummaries(5) } returns emptyList()
-        coEvery { contactRepository.getAnalyticsProfiles() } returns emptyList()
-        coEvery { eventRepository.countUpcoming(30) } returns 0
-        coEvery { messageRepository.getSentAnalyticsRecordsSince(any()) } returns emptyList()
+        every { contactRepository.getTopHealthSummariesFlow(5) } returns MutableStateFlow(emptyList())
+        every { contactRepository.getBottomHealthSummariesFlow(5) } returns MutableStateFlow(emptyList())
+        every { contactRepository.getAnalyticsProfilesFlow() } returns MutableStateFlow(emptyList())
+        every { eventRepository.countUpcomingFlow(30) } returns MutableStateFlow(0)
+        every { messageRepository.getSentAnalyticsRecordsSinceFlow(any()) } returns MutableStateFlow(emptyList())
+    }
+
+    private fun newViewModel(): AnalyticsViewModel {
+        return AnalyticsViewModel(
+            getAnalyticsUseCase = GetAnalyticsUseCase(contactRepository, messageRepository),
+            contactRepository = contactRepository,
+            eventRepository = eventRepository,
+            messageRepository = messageRepository,
+            analyticsReportService = analyticsReportService,
+        )
     }
 
     private fun analyticsProfile(

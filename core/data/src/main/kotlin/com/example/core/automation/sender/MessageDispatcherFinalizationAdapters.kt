@@ -5,12 +5,21 @@ import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
 import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.SentMessageId
 import com.example.domain.model.dispatch.MessageDispatchOccasion
 import java.util.Calendar
 import java.util.UUID
+
+internal data class MessageDispatchFinalizationResult(
+    val retryAtMs: Long?,
+    val retryCount: Int,
+) {
+    val shouldScheduleRetry: Boolean
+        get() = retryAtMs != null
+}
 
 internal suspend fun saveMessageDispatchFinalization(
     dispatchAttemptDao: DispatchAttemptDao?,
@@ -26,7 +35,8 @@ internal suspend fun saveMessageDispatchFinalization(
     messageText: String,
     routeLoopState: MessageDispatchRouteLoopState,
     noDeliveryRoute: Boolean,
-) {
+    automaticRetryCount: Int = 1,
+): MessageDispatchFinalizationResult {
     if (routeLoopState.success) {
         saveSuccessfulMessageDispatchFinalization(
             dispatchAttemptDao = dispatchAttemptDao,
@@ -41,8 +51,9 @@ internal suspend fun saveMessageDispatchFinalization(
             messageText = messageText,
             sentMessageAlreadyInserted = routeLoopState.successfulSentMessageInserted,
         )
+        return MessageDispatchFinalizationResult(retryAtMs = null, retryCount = 0)
     } else {
-        saveFailedMessageDispatchFinalization(
+        return saveFailedMessageDispatchFinalization(
             dispatchAttemptDao = dispatchAttemptDao,
             pendingMessageDao = pendingMessageDao,
             messageId = messageId,
@@ -52,6 +63,7 @@ internal suspend fun saveMessageDispatchFinalization(
             messageText = messageText,
             providerFailureSelection = routeLoopState.providerFailureSelection,
             noDeliveryRoute = noDeliveryRoute,
+            automaticRetryCount = automaticRetryCount,
         )
     }
 }
@@ -74,7 +86,7 @@ internal suspend fun saveSuccessfulMessageDispatchFinalization(
     eventYear: Int = Calendar.getInstance().get(Calendar.YEAR),
     sentMessageId: SentMessageId = SentMessageId(UUID.randomUUID().toString()),
 ) {
-    dispatchAttemptDao.saveMessageDispatchAttemptOutcome(
+    dispatchAttemptDao.saveSuccessfulMessageDispatchAttemptOutcome(
         successfulDispatchAttemptOutcomeUpdate(
             dispatchAttemptId = dispatchAttemptId,
             resolvedAtMs = resolvedAtMs,
@@ -87,8 +99,9 @@ internal suspend fun saveSuccessfulMessageDispatchFinalization(
             channel = channel,
         )
     )
-    pendingMessageDao.savePendingMessageDispatchStatusUpdate(
-        sentPendingMessageStatusUpdate(messageId)
+    pendingMessageDao.saveSuccessfulPendingMessageDispatchStatusUpdate(
+        messageId = messageId,
+        channel = channel,
     )
     if (!sentMessageAlreadyInserted) {
         sentMessageDao.saveSentMessageDispatchRecord(
@@ -111,6 +124,17 @@ internal suspend fun saveSuccessfulMessageDispatchFinalization(
     )
 }
 
+internal suspend fun PendingMessageDao.saveSuccessfulPendingMessageDispatchStatusUpdate(
+    messageId: MessageDraftId,
+    channel: MessageChannel,
+) {
+    if (channel == MessageChannel.SMS) {
+        markSmsHandoffSentIfAwaitingCallback(messageId.value)
+    } else {
+        savePendingMessageDispatchStatusUpdate(sentPendingMessageStatusUpdate(messageId))
+    }
+}
+
 internal suspend fun saveFailedMessageDispatchFinalization(
     dispatchAttemptDao: DispatchAttemptDao?,
     pendingMessageDao: PendingMessageDao,
@@ -122,21 +146,37 @@ internal suspend fun saveFailedMessageDispatchFinalization(
     providerFailureSelection: MessageDispatchProviderFailureSelection,
     noDeliveryRoute: Boolean,
     failedAtMs: Long? = null,
-) {
-    pendingMessageDao.savePendingMessageDispatchStatusUpdate(
-        failedPendingMessageStatusUpdate(messageId)
-    )
+    automaticRetryCount: Int = 1,
+): MessageDispatchFinalizationResult {
     val resolvedFailedAtMs = failedAtMs ?: System.currentTimeMillis()
-    val failure = failedMessageDispatchFailure(
+    val baseFailure = failedMessageDispatchFailure(
         providerFailureSelection = providerFailureSelection,
         noDeliveryRoute = noDeliveryRoute,
     )
+    val retryCount = if (baseFailure.isRetryable) automaticRetryCount.coerceAtLeast(1) else 0
+    val failure = DispatchProviderRetryPolicy.applyAutomaticRetryLimit(
+        failure = baseFailure,
+        retryCount = retryCount,
+    )
+    val retryAtMs = failure.nextRetryDelayMs?.let { delayMs -> resolvedFailedAtMs + delayMs }
+    if (failure.isRetryable && retryAtMs != null) {
+        pendingMessageDao.updateRetryState(
+            id = messageId.value,
+            status = MessageStatus.APPROVED.raw,
+            scheduledForMs = retryAtMs,
+        )
+    } else {
+        pendingMessageDao.savePendingMessageDispatchStatusUpdate(
+            failedPendingMessageStatusUpdate(messageId)
+        )
+    }
     dispatchAttemptDao.saveMessageDispatchAttemptOutcome(
         failedDispatchAttemptOutcomeUpdate(
             dispatchAttemptId = dispatchAttemptId,
             failedAtMs = resolvedFailedAtMs,
             channel = finalChannel,
             failure = failure,
+            retryCount = retryCount,
         )
     )
     recordMessageDispatchLifecycleLog(
@@ -152,7 +192,12 @@ internal suspend fun saveFailedMessageDispatchFinalization(
             preferredChannel = preferredChannel,
             messageText = messageText,
             failure = failure,
+            retryCount = retryCount,
         )
+    )
+    return MessageDispatchFinalizationResult(
+        retryAtMs = retryAtMs.takeIf { failure.isRetryable },
+        retryCount = retryCount,
     )
 }
 

@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.core.accessibility.WhatsAppSendFailureReason
 import com.example.core.accessibility.WhatsAppSendResult
 import com.example.core.automation.notifications.NotificationHelper
+import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.data.R
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.DispatchAttemptDao
@@ -60,6 +61,7 @@ class MessageDispatcherTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
+        mockkObject(DailyScheduler)
         DeadLetterQueue.clear()
         mockkObject(NotificationHelper)
         mockkConstructor(SecurePrefs::class)
@@ -74,8 +76,11 @@ class MessageDispatcherTest {
         coEvery { anyConstructed<EmailSender>().send(any(), any(), any(), any(), any(), any()) } returns Unit
         coEvery { anyConstructed<WhatsAppSender>().sendWithResult(any(), any(), any()) } returns WhatsAppSendResult.Sent
         every { anyConstructed<SmsSender>().send(any(), any(), any()) } just Runs
+        every { anyConstructed<SmsSender>().send(any(), any(), any(), any(), any()) } just Runs
+        every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
         every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
         coEvery { sentMessageDao.insert(capture(sentSlot)) } just Runs
+        coEvery { dispatchAttemptDao.getMaxRetryCountForMessageDraft(any()) } returns 0
     }
 
     @After
@@ -104,7 +109,7 @@ class MessageDispatcherTest {
         assertEquals(OccasionType.ANNIVERSARY.raw, sentSlot.captured.eventType)
         assertEquals("Wedding anniversary", sentSlot.captured.occasionLabel)
         coVerify {
-            dispatchAttemptDao.updateOutcome(
+            dispatchAttemptDao.updateInitialSmsHandoffOutcomeIfAwaitingCallback(
                 id = "attempt_1",
                 attemptedAtMs = any(),
                 resolvedAtMs = any(),
@@ -120,7 +125,7 @@ class MessageDispatcherTest {
                 deadLetteredAtMs = null,
             )
         }
-        coVerify { pendingMessageDao.updateStatus("pending_1", "SENT") }
+        coVerify { pendingMessageDao.markSmsHandoffSentIfAwaitingCallback("pending_1") }
         coVerify { contactDao.updateLastWished("contact_1", any()) }
         coVerify { contactDao.incrementConsecutiveYearsWished("contact_1") }
         coVerify { contactDao.updateHealthScoreDelta("contact_1", 5) }
@@ -169,14 +174,23 @@ class MessageDispatcherTest {
     }
 
     @Test
-    fun `dispatch marks attempt retryable when sms provider fails transiently`() = runTest {
+    fun `dispatch schedules automatic retry when sms provider fails transiently`() = runTest {
         every { anyConstructed<SecurePrefs>().getChannelBlackout() } returns "[\"WHATSAPP\"]"
         every { anyConstructed<SmsSender>().send(any(), any(), any()) } throws RuntimeException("radio unavailable")
+        every { anyConstructed<SmsSender>().send(any(), any(), any(), any(), any()) } throws RuntimeException("radio unavailable")
 
         dispatcher().dispatch(dispatchRequest(eventId = "event_1", dispatchAttemptId = "attempt_3"))
 
         coVerify { sentMessageDao.updateDeliveryStatus(any(), MessageDeliveryStatus.FAILED.raw) }
-        coVerify { pendingMessageDao.updateStatus("pending_1", "FAILED") }
+        coVerify {
+            pendingMessageDao.updateRetryState(
+                id = "pending_1",
+                status = "APPROVED",
+                scheduledForMs = any(),
+            )
+        }
+        coVerify(exactly = 0) { pendingMessageDao.updateStatus("pending_1", "FAILED") }
+        verify { DailyScheduler.scheduleExactSend(context, "pending_1") }
         coVerify {
             dispatchAttemptDao.updateOutcome(
                 id = "attempt_3",
@@ -189,7 +203,7 @@ class MessageDispatcherTest {
                 errorType = DispatchProviderRetryPolicy.ERROR_SMS_TRANSIENT_PROVIDER_FAILURE,
                 errorCode = "RuntimeException",
                 redactedErrorMessage = "SMS provider failed before delivery confirmation; retry is allowed.",
-                retryCount = 0,
+                retryCount = 1,
                 nextRetryAtMs = any(),
                 deadLetteredAtMs = null,
             )
@@ -201,6 +215,7 @@ class MessageDispatcherTest {
     fun `dispatch shows setup notification when sms permission is missing`() = runTest {
         every { anyConstructed<SecurePrefs>().getChannelBlackout() } returns "[\"WHATSAPP\"]"
         every { anyConstructed<SmsSender>().send(any(), any(), any()) } throws SecurityException("missing permission")
+        every { anyConstructed<SmsSender>().send(any(), any(), any(), any(), any()) } throws SecurityException("missing permission")
 
         dispatcher().dispatch(dispatchRequest(eventId = "event_1", dispatchAttemptId = "attempt_4"))
 
@@ -233,6 +248,43 @@ class MessageDispatcherTest {
     }
 
     @Test
+    fun `dispatch falls back to whatsapp when sms permission is missing`() = runTest {
+        every { anyConstructed<SmsSender>().send(any(), any(), any()) } throws SecurityException("missing permission")
+        every { anyConstructed<SmsSender>().send(any(), any(), any(), any(), any()) } throws SecurityException("missing permission")
+
+        dispatcher().dispatch(dispatchRequest(eventId = "event_1", dispatchAttemptId = "attempt_sms_fallback"))
+
+        coVerify {
+            anyConstructed<WhatsAppSender>().sendWithResult(
+                "+15551234567",
+                "Selected",
+                "event_1",
+            )
+        }
+        assertEquals(MessageChannel.WHATSAPP.raw, sentSlot.captured.channel)
+        assertEquals(MessageDeliveryStatus.SENT.raw, sentSlot.captured.deliveryStatus)
+        coVerify { pendingMessageDao.updateStatus("pending_1", "SENT") }
+        coVerify {
+            dispatchAttemptDao.updateOutcome(
+                id = "attempt_sms_fallback",
+                attemptedAtMs = any(),
+                resolvedAtMs = any(),
+                result = DispatchAttemptResult.SENT.raw,
+                channel = MessageChannel.WHATSAPP.raw,
+                deliveryStatus = MessageDeliveryStatus.SENT.raw,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        }
+        assertEquals(0, DeadLetterQueue.count())
+    }
+
+    @Test
     fun `dispatch falls back to sms when whatsapp automation is unavailable`() = runTest {
         coEvery {
             anyConstructed<WhatsAppSender>().sendWithResult(any(), any(), any())
@@ -249,7 +301,7 @@ class MessageDispatcherTest {
         assertEquals(MessageChannel.SMS.raw, sentSlot.captured.channel)
         assertEquals(MessageDeliveryStatus.PENDING_DELIVERY.raw, sentSlot.captured.deliveryStatus)
         coVerify {
-            dispatchAttemptDao.updateOutcome(
+            dispatchAttemptDao.updateInitialSmsHandoffOutcomeIfAwaitingCallback(
                 id = "attempt_5",
                 attemptedAtMs = any(),
                 resolvedAtMs = any(),
@@ -265,7 +317,7 @@ class MessageDispatcherTest {
                 deadLetteredAtMs = null,
             )
         }
-        coVerify { pendingMessageDao.updateStatus("pending_1", "SENT") }
+        coVerify { pendingMessageDao.markSmsHandoffSentIfAwaitingCallback("pending_1") }
         assertEquals(0, DeadLetterQueue.count())
     }
 
@@ -286,7 +338,7 @@ class MessageDispatcherTest {
         }
         assertEquals(MessageChannel.SMS.raw, sentSlot.captured.channel)
         coVerify {
-            dispatchAttemptDao.updateOutcome(
+            dispatchAttemptDao.updateInitialSmsHandoffOutcomeIfAwaitingCallback(
                 id = "attempt_5_consent",
                 attemptedAtMs = any(),
                 resolvedAtMs = any(),
@@ -302,6 +354,7 @@ class MessageDispatcherTest {
                 deadLetteredAtMs = null,
             )
         }
+        coVerify { pendingMessageDao.markSmsHandoffSentIfAwaitingCallback("pending_1") }
         assertEquals(0, DeadLetterQueue.count())
     }
 

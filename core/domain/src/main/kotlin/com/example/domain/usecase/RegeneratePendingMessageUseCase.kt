@@ -135,7 +135,11 @@ class RegeneratePendingMessageUseCase @Inject constructor(
         preserveApprovedStatus: Boolean,
     ): MessageStatus {
         if (!hasAvailableRoute) return MessageStatus.PENDING
-        if (preserveApprovedStatus && MessageStatus.fromRaw(previousStatus) == MessageStatus.APPROVED) {
+        if (
+            preserveApprovedStatus &&
+            approvalMode != ApprovalMode.ALWAYS_ASK &&
+            MessageStatus.fromRaw(previousStatus) == MessageStatus.APPROVED
+        ) {
             return MessageStatus.APPROVED
         }
         return if (approvalMode == ApprovalMode.FULLY_AUTO) {

@@ -19,6 +19,7 @@ interface MessageRepository {
     fun getAllPending(): Flow<List<PendingMessageEntity>>
     fun getPendingListItems(): Flow<List<PendingMessageListItem>>
     fun getWishPreviewReviewQueue(): Flow<List<WishPreviewReviewItem>>
+    suspend fun getAllPendingSync(): List<PendingMessageEntity>
     suspend fun getAllApproved(): List<PendingMessageEntity>
     suspend fun getPendingById(id: String): PendingMessageEntity?
     suspend fun getMessageApprovalStateById(id: String): MessageApprovalState?
@@ -28,6 +29,7 @@ interface MessageRepository {
     suspend fun getMessageDispatchStateByEventId(eventId: String): MessageDispatchState?
     suspend fun getWishPreviewDraftById(id: String): WishPreviewDraft?
     suspend fun getWishPreviewDraftByEventId(eventId: String): WishPreviewDraft?
+    fun getWishPreviewDraftByRef(messageRef: String): Flow<WishPreviewDraft?>
     suspend fun getPendingForEventOccurrence(contactId: String, eventId: String, scheduledYear: Int): PendingMessageEntity?
     suspend fun pendingExistsForEvent(eventId: String): Boolean
     suspend fun pendingExistsForEventOccurrence(contactId: String, eventId: String, scheduledYear: Int): Boolean
@@ -40,10 +42,13 @@ interface MessageRepository {
     fun getAllSent(): Flow<List<SentMessageEntity>>
     fun getSentListItems(): Flow<List<SentMessageListItem>>
     suspend fun getSentByContact(contactId: String, limit: Int): List<SentMessageEntity>
+    fun getSentByContactFlow(contactId: String, limit: Int): Flow<List<SentMessageEntity>>
+    fun countSentByContact(contactId: String): Flow<Int>
     suspend fun getGenerationHistoryByContact(contactId: String, limit: Int): MessageGenerationHistory
     suspend fun getRecentForStyleAnalysis(sinceMs: Long, limit: Int = 100): List<SentMessageEntity>
     suspend fun getSentSinceYearStart(yearStartMs: Long): List<SentMessageEntity>
     suspend fun getSentAnalyticsRecordsSince(sinceMs: Long): List<MessageAnalyticsRecord>
+    fun getSentAnalyticsRecordsSinceFlow(sinceMs: Long): Flow<List<MessageAnalyticsRecord>>
     fun countAllSent(): Flow<Int>
     fun countPending(): Flow<Int>
     suspend fun insertSent(message: SentMessageEntity)

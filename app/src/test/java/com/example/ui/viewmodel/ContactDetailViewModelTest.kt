@@ -17,10 +17,13 @@ import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.usecase.GenerateMessageUseCase
 import com.example.domain.usecase.UpdateContactPreferencesUseCase
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -60,7 +63,11 @@ class ContactDetailViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        coEvery { mockMemoryNoteRepository.getSummaryForContact("contact1") } returns MemoryNoteSummary.EMPTY
+        stubContactDetailFlows(
+            contact = contactProfile(),
+            event = null,
+            memorySummary = MemoryNoteSummary.EMPTY,
+        )
     }
 
     @After
@@ -73,13 +80,15 @@ class ContactDetailViewModelTest {
         val contact = contactProfile(displayName = "Alice", healthScore = 80)
         val event = upcomingEventPreview()
 
-        coEvery { mockContactRepo.getDetailProfile("contact1") } returns contact
-        coEvery { mockEventRepo.getNextUpcomingPreviewForContact("contact1", 365) } returns event
-        coEvery { mockMemoryNoteRepository.getSummaryForContact("contact1") } returns MemoryNoteSummary(
-            totalCount = 2,
-            categoryCounts = listOf(
-                MemoryNoteCategoryCount(category = "EVENT", count = 1),
-                MemoryNoteCategoryCount(category = "GIFT", count = 1),
+        stubContactDetailFlows(
+            contact = contact,
+            event = event,
+            memorySummary = MemoryNoteSummary(
+                totalCount = 2,
+                categoryCounts = listOf(
+                    MemoryNoteCategoryCount(category = "EVENT", count = 1),
+                    MemoryNoteCategoryCount(category = "GIFT", count = 1),
+                ),
             ),
         )
 
@@ -112,8 +121,7 @@ class ContactDetailViewModelTest {
         val contact = contactProfile(displayName = "Alice", healthScore = 80)
         val event = upcomingEventPreview()
 
-        coEvery { mockContactRepo.getDetailProfile("contact1") } returns contact
-        coEvery { mockEventRepo.getNextUpcomingPreviewForContact("contact1", 365) } returns event
+        stubContactDetailFlows(contact = contact, event = event)
         coEvery { mockGenerateUseCase("event1") } returns
             GenerateMessageUseCase.GenerationOutcome.Generated("pending1", ApprovalMode.SMART_APPROVE, 0)
 
@@ -140,8 +148,7 @@ class ContactDetailViewModelTest {
         val contact = contactProfile(displayName = "Alice", healthScore = 80)
         val event = upcomingEventPreview(label = null)
 
-        coEvery { mockContactRepo.getDetailProfile("contact1") } returns contact
-        coEvery { mockEventRepo.getNextUpcomingPreviewForContact("contact1", 365) } returns event
+        stubContactDetailFlows(contact = contact, event = event)
         coEvery { mockGenerateUseCase("event1") } returns
             GenerateMessageUseCase.GenerationOutcome.ContactNotFound
 
@@ -169,8 +176,7 @@ class ContactDetailViewModelTest {
         val contact = contactProfile(displayName = "Alice", healthScore = 80)
         val event = upcomingEventPreview(label = null)
 
-        coEvery { mockContactRepo.getDetailProfile("contact1") } returns contact
-        coEvery { mockEventRepo.getNextUpcomingPreviewForContact("contact1", 365) } returns event
+        stubContactDetailFlows(contact = contact, event = event)
         coEvery { mockGenerateUseCase("event1") } returns
             GenerateMessageUseCase.GenerationOutcome.AiDisabled
 
@@ -194,8 +200,7 @@ class ContactDetailViewModelTest {
 
     @Test
     fun `savePreferences maps invalid input reason to resource error`() = runTest(testDispatcher) {
-        coEvery { mockContactRepo.getDetailProfile("contact1") } returns contactProfile(displayName = "Alice")
-        coEvery { mockEventRepo.getNextUpcomingPreviewForContact("contact1", 365) } returns null
+        stubContactDetailFlows(contact = contactProfile(displayName = "Alice"), event = null)
         coEvery { mockUpdateContactPreferencesUseCase(any()) } returns
             UpdateContactPreferencesUseCase.Outcome.InvalidInput(
                 UpdateContactPreferencesUseCase.InvalidInputReason.NEGATIVE_BUDGET,
@@ -222,6 +227,43 @@ class ContactDetailViewModelTest {
 
         assertEquals(R.string.contact_preferences_error_negative_budget, viewModel.uiState.value.preferenceErrorRes)
         assertEquals(false, viewModel.uiState.value.isSavingPreferences)
+    }
+
+    @Test
+    fun `contact flow update immediately updates contact detail state`() = runTest(testDispatcher) {
+        val contactFlow = MutableStateFlow<ContactDetailProfile?>(contactProfile(displayName = "Alice"))
+        every { mockContactRepo.getDetailProfileFlow("contact1") } returns contactFlow
+        every { mockEventRepo.getNextUpcomingPreviewForContactFlow("contact1", 365) } returns flowOf(null)
+        every { mockMemoryNoteRepository.getSummaryForContactFlow("contact1") } returns flowOf(MemoryNoteSummary.EMPTY)
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact1"))
+        val viewModel = ContactDetailViewModel(
+            savedStateHandle = savedStateHandle,
+            contactRepository = mockContactRepo,
+            eventRepository = mockEventRepo,
+            memoryNoteRepository = mockMemoryNoteRepository,
+            generateMessageUseCase = mockGenerateUseCase,
+            updateContactPreferencesUseCase = mockUpdateContactPreferencesUseCase,
+        )
+        advanceUntilIdle()
+
+        assertEquals("Alice", viewModel.uiState.value.contact?.displayName)
+
+        contactFlow.value = contactProfile(displayName = "Alice Updated", healthScore = 90)
+        advanceUntilIdle()
+
+        assertEquals("Alice Updated", viewModel.uiState.value.contact?.displayName)
+        assertEquals(90, viewModel.uiState.value.contact?.healthScore)
+    }
+
+    private fun stubContactDetailFlows(
+        contact: ContactDetailProfile?,
+        event: UpcomingEventPreview?,
+        memorySummary: MemoryNoteSummary = MemoryNoteSummary.EMPTY,
+    ) {
+        every { mockContactRepo.getDetailProfileFlow("contact1") } returns flowOf(contact)
+        every { mockEventRepo.getNextUpcomingPreviewForContactFlow("contact1", 365) } returns flowOf(event)
+        every { mockMemoryNoteRepository.getSummaryForContactFlow("contact1") } returns flowOf(memorySummary)
     }
 
     private fun contactProfile(

@@ -5,11 +5,14 @@ import com.example.R
 import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.model.MessageChannel
 import com.example.domain.repository.MessageRepository
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -31,10 +34,13 @@ class ChatHistoryViewModelTest {
     private lateinit var messageRepository: MessageRepository
 
     private val testDispatcher = StandardTestDispatcher()
+    private lateinit var sentMessages: MutableStateFlow<List<SentMessageEntity>>
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        sentMessages = MutableStateFlow(emptyList())
+        every { messageRepository.getSentByContactFlow("contact_1", 100) } returns sentMessages
     }
 
     @After
@@ -45,7 +51,7 @@ class ChatHistoryViewModelTest {
     @Test
     fun `loadHistory exposes sent messages`() = runTest(testDispatcher) {
         val sentMessage = sentMessage()
-        coEvery { messageRepository.getSentByContact("contact_1", 100) } returns listOf(sentMessage)
+        every { messageRepository.getSentByContactFlow("contact_1", 100) } returns flowOf(listOf(sentMessage))
 
         val viewModel = ChatHistoryViewModel(
             savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1")),
@@ -60,7 +66,9 @@ class ChatHistoryViewModelTest {
 
     @Test
     fun `loadHistory exposes stable error when repository fails`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getSentByContact("contact_1", 100) } throws IllegalStateException("db locked")
+        every { messageRepository.getSentByContactFlow("contact_1", 100) } returns flow {
+            throw IllegalStateException("db locked")
+        }
 
         val viewModel = ChatHistoryViewModel(
             savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1")),
@@ -71,6 +79,23 @@ class ChatHistoryViewModelTest {
         assertEquals(false, viewModel.uiState.value.isLoading)
         assertEquals(emptyList<SentMessageEntity>(), viewModel.uiState.value.messages)
         assertEquals(R.string.chat_history_error_load, viewModel.uiState.value.errorMessageRes)
+    }
+
+    @Test
+    fun `sent message updates immediately refresh chat history`() = runTest(testDispatcher) {
+        val viewModel = ChatHistoryViewModel(
+            savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1")),
+            messageRepository = messageRepository,
+        )
+        advanceUntilIdle()
+        assertEquals(emptyList<SentMessageEntity>(), viewModel.uiState.value.messages)
+
+        val sentMessage = sentMessage()
+        sentMessages.value = listOf(sentMessage)
+        advanceUntilIdle()
+
+        assertEquals(listOf(sentMessage), viewModel.uiState.value.messages)
+        assertEquals(null, viewModel.uiState.value.errorMessageRes)
     }
 
     private fun sentMessage(): SentMessageEntity = SentMessageEntity(

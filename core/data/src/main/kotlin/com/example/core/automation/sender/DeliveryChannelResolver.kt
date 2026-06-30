@@ -1,5 +1,6 @@
 package com.example.core.automation.sender
 
+import com.example.domain.automation.EmailAddressSyntaxPolicy
 import com.example.domain.model.MessageChannel
 
 internal object DeliveryChannelResolver {
@@ -26,9 +27,8 @@ internal object DeliveryChannelResolver {
                 when (it) {
                     MessageChannel.SMS,
                     MessageChannel.WHATSAPP -> !primaryPhone.isNullOrBlank()
-                    MessageChannel.EMAIL -> !primaryEmail.isNullOrBlank() &&
-                        senderEmail.isNotBlank() &&
-                        senderEmailPassword.isNotBlank()
+                    MessageChannel.EMAIL -> EmailAddressSyntaxPolicy.isUsableAddress(primaryEmail) &&
+                        EmailAddressSyntaxPolicy.isConfiguredSender(senderEmail, senderEmailPassword)
                     MessageChannel.UNKNOWN -> false
                 }
             }

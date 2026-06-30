@@ -3,6 +3,7 @@ package com.example.core.automation.scheduler
 import android.content.Context
 import android.util.Log
 import androidx.work.*
+import com.example.core.automation.sender.SmsDeliveryStatusRecovery
 import com.example.core.automation.workers.ContactSyncWorker
 import com.example.core.automation.workers.EventDiscoveryWorker
 import com.example.core.automation.workers.MessageGenerationWorker
@@ -17,7 +18,7 @@ object WorkerScheduler {
 
     fun scheduleAll(context: Context) {
         val workManager = WorkManager.getInstance(context)
-        
+
         val constraints = Constraints.Builder()
             .setRequiresBatteryNotLow(true)
             .setRequiresStorageNotLow(true)
@@ -35,6 +36,9 @@ object WorkerScheduler {
             ExistingPeriodicWorkPolicy.KEEP,
             dailyTrigger
         )
+        ExactSendRecovery.recoverAsync(context)
+        SmsDeliveryStatusRecovery.recoverAsync(context)
+        scheduleDailyAutomationChain(context)
 
         // 2. Revival Worker (every 7 days)
         val revival = PeriodicWorkRequestBuilder<com.example.core.automation.workers.RevivalWorker>(7, TimeUnit.DAYS)

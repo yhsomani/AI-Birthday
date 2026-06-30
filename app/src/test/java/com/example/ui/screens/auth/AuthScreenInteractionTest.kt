@@ -5,10 +5,8 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -37,15 +35,12 @@ class AuthScreenInteractionTest {
     fun authActionsAndStates_renderExpectedControls() {
         val actions = mutableListOf<String>()
         var state by mutableStateOf(AuthUiState())
-        var showDevBypass by mutableStateOf(true)
 
         composeRule.setContent {
             RelateAITheme {
                 AuthContent(
                     state = state,
                     onSignIn = { actions += "signIn" },
-                    onDevBypass = { actions += "bypass" },
-                    showDevBypass = showDevBypass,
                 )
             }
         }
@@ -53,9 +48,6 @@ class AuthScreenInteractionTest {
         composeRule.onNodeWithText(context.getString(R.string.app_name))
             .assertIsDisplayed()
         composeRule.onNodeWithTag(AuthScreenTestTags.SIGN_IN_BUTTON)
-            .assertIsDisplayed()
-            .performClick()
-        composeRule.onNodeWithTag(AuthScreenTestTags.DEV_BYPASS_BUTTON)
             .assertIsDisplayed()
             .performClick()
 
@@ -69,10 +61,6 @@ class AuthScreenInteractionTest {
         composeRule.onNodeWithText("Unable to sign in.")
             .assertIsDisplayed()
 
-        showDevBypass = false
-        composeRule.onAllNodesWithTag(AuthScreenTestTags.DEV_BYPASS_BUTTON)
-            .assertCountEquals(0)
-
-        assertEquals(listOf("signIn", "bypass"), actions)
+        assertEquals(listOf("signIn"), actions)
     }
 }

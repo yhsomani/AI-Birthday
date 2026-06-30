@@ -56,18 +56,15 @@ import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
 import com.example.core.ui.components.RelateStatusBanner
 import com.example.core.ui.theme.RelateAlpha
-import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.RelateSuccess
-import com.example.core.ui.theme.RelateWarning
+import com.example.core.ui.theme.relateSemanticColors
 import com.example.ui.viewmodel.AiDoctorAction
 import com.example.ui.viewmodel.AiDoctorRecommendedFix
 import com.example.ui.viewmodel.AiDoctorSummary
 import com.example.ui.viewmodel.AutomationSetupViewModel
+import com.example.ui.viewmodel.MessageChannelFilter
 import com.example.ui.viewmodel.ReadinessGroup
 import com.example.ui.viewmodel.ReadinessCheck
 import com.example.ui.viewmodel.ReadinessStatus
@@ -85,6 +82,7 @@ fun AutomationSetupScreen(
     onOpenSettings: () -> Unit = {},
     onOpenStyleCoach: () -> Unit = {},
     onOpenContacts: () -> Unit = {},
+    onOpenMessages: (MessageChannelFilter?) -> Unit = {},
     onOpenActivityHistory: () -> Unit = {},
     viewModel: AutomationSetupViewModel = hiltViewModel(),
 ) {
@@ -115,6 +113,7 @@ fun AutomationSetupScreen(
                 onOpenSettings = onOpenSettings,
                 onOpenStyleCoach = onOpenStyleCoach,
                 onOpenContacts = onOpenContacts,
+                onOpenMessages = onOpenMessages,
                 onOpenActivityHistory = onOpenActivityHistory,
             )
         },
@@ -264,14 +263,14 @@ private fun ReadinessDashboard(
                     CircularProgressIndicator(
                         modifier = Modifier.size(RelateSize.iconSm),
                         strokeWidth = RelateSpacing.xxs,
-                        color = RelatePrimary,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
             Text(
                 text = summary.detail,
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             SetupProgressStrip(summary = setupProgress)
@@ -298,7 +297,7 @@ private fun ReadinessDashboard(
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -384,18 +383,18 @@ private fun PrimaryReadinessButton(
             .heightIn(min = RelateSize.primaryButtonHeight),
         enabled = enabled,
         shape = RoundedCornerShape(RelateRadius.control),
-        colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
     ) {
         if (loading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(RelateSize.iconSm),
-                color = RelateDarkBackground,
+                color = MaterialTheme.colorScheme.background,
                 strokeWidth = RelateSpacing.xxs,
             )
         } else {
             Text(
                 text = text,
-                color = RelateDarkBackground,
+                color = MaterialTheme.colorScheme.background,
             )
         }
     }
@@ -463,7 +462,7 @@ private fun SetupProgressStrip(summary: SetupProgressSummary) {
         Text(
             text = detail,
             style = MaterialTheme.typography.bodySmall,
-            color = RelateOnSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -511,7 +510,7 @@ private fun RecommendedFixSection(
                 Text(
                     text = fix.detail,
                     style = MaterialTheme.typography.bodySmall,
-                    color = RelateOnSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -521,11 +520,11 @@ private fun RecommendedFixSection(
                 .fillMaxWidth()
                 .heightIn(min = RelateSize.primaryButtonHeight),
             shape = RoundedCornerShape(RelateRadius.control),
-            colors = ButtonDefaults.buttonColors(containerColor = RelatePrimary),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
         ) {
             Text(
                 text = fix.actionLabel,
-                color = RelateDarkBackground,
+                color = MaterialTheme.colorScheme.background,
             )
         }
     }
@@ -541,7 +540,7 @@ private fun ReadinessGroupSection(
         Text(
             text = group.label(),
             style = MaterialTheme.typography.labelLarge,
-            color = RelatePrimary,
+            color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.SemiBold,
         )
         checks.forEach { check ->
@@ -586,7 +585,7 @@ private fun ReadinessRow(
             Text(
                 text = check.detail,
                 style = MaterialTheme.typography.bodySmall,
-                color = RelateOnSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (check.actionLabel != null && check.action != AiDoctorAction.NONE) {
                 TextButton(
@@ -608,12 +607,12 @@ private data class StatusColors(
 @Composable
 private fun ReadinessStatus.statusColors(): StatusColors = when (this) {
     ReadinessStatus.OK -> StatusColors(
-        container = RelateSuccess.copy(alpha = RelateAlpha.feedbackContainer),
-        content = RelateSuccess,
+        container = MaterialTheme.relateSemanticColors.success.copy(alpha = RelateAlpha.feedbackContainer),
+        content = MaterialTheme.relateSemanticColors.success,
     )
     ReadinessStatus.WARNING -> StatusColors(
-        container = RelateWarning.copy(alpha = RelateAlpha.feedbackContainer),
-        content = RelateWarning,
+        container = MaterialTheme.relateSemanticColors.warning.copy(alpha = RelateAlpha.feedbackContainer),
+        content = MaterialTheme.relateSemanticColors.warning,
     )
     ReadinessStatus.ACTION_REQUIRED -> StatusColors(
         container = MaterialTheme.colorScheme.error.copy(alpha = RelateAlpha.feedbackContainer),
@@ -634,6 +633,7 @@ private fun handleAiDoctorAction(
     onOpenSettings: () -> Unit,
     onOpenStyleCoach: () -> Unit,
     onOpenContacts: () -> Unit,
+    onOpenMessages: (MessageChannelFilter?) -> Unit,
     onOpenActivityHistory: () -> Unit,
 ) {
     when (action) {
@@ -645,6 +645,9 @@ private fun handleAiDoctorAction(
         AiDoctorAction.OPEN_SETTINGS -> onOpenSettings()
         AiDoctorAction.OPEN_STYLE_COACH -> onOpenStyleCoach()
         AiDoctorAction.OPEN_CONTACTS -> onOpenContacts()
+        AiDoctorAction.OPEN_MESSAGES -> onOpenMessages(null)
+        AiDoctorAction.OPEN_SMS_MESSAGES -> onOpenMessages(MessageChannelFilter.SMS)
+        AiDoctorAction.OPEN_WHATSAPP_MESSAGES -> onOpenMessages(MessageChannelFilter.WHATSAPP)
         AiDoctorAction.OPEN_ACTIVITY_HISTORY -> onOpenActivityHistory()
         AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS -> context.safeStartActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         AiDoctorAction.OPEN_BATTERY_SETTINGS -> context.openBatteryOptimizationSettings()
@@ -677,7 +680,7 @@ private fun SetupCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = RelatePrimary,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(RelateSize.iconLg),
                 )
                 Column(modifier = Modifier.weight(1f)) {
@@ -690,7 +693,7 @@ private fun SetupCard(
                     Text(
                         text = body,
                         style = MaterialTheme.typography.bodySmall,
-                        color = RelateOnSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -707,7 +710,7 @@ private fun SetupCard(
                     Text(
                         text = consentText,
                         style = MaterialTheme.typography.bodySmall,
-                        color = RelateOnSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -719,8 +722,16 @@ private fun SetupCard(
                     .heightIn(min = RelateSize.primaryButtonHeight),
                 shape = RoundedCornerShape(RelateRadius.control),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (secondary) MaterialTheme.colorScheme.surfaceVariant else RelatePrimary,
-                    contentColor = if (secondary) MaterialTheme.colorScheme.onSurface else RelateDarkBackground,
+                    containerColor = if (secondary) {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    contentColor = if (secondary) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.background
+                    },
                 ),
             ) {
                 Text(actionText)

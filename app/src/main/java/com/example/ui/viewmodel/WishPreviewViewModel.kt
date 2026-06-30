@@ -16,6 +16,7 @@ import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.contact.ContactWishContext
 import com.example.domain.model.occasion.OccasionType
 import com.example.domain.model.message.WishPreviewDraft
 import com.example.domain.model.message.WishPreviewReviewItem
@@ -27,10 +28,14 @@ import com.example.ui.feedback.FeedbackEvent
 import com.example.ui.feedback.FeedbackType
 import com.example.ui.feedback.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -126,7 +131,26 @@ data class WishPreviewUiState(
     val draftReadiness: WishDraftReadiness = WishDraftReadiness.READY,
 )
 
+private data class WishPreviewLiveData(
+    val draft: WishPreviewDraft?,
+    val contact: ContactWishContext? = null,
+    val memoryCount: Int = 0,
+    val giftCount: Int = 0,
+    val previousWishes: Int = 0,
+    val eventType: OccasionType? = null,
+    val reviewQueue: List<WishPreviewReviewItem> = emptyList(),
+)
+
+private data class WishPreviewContextData(
+    val contact: ContactWishContext?,
+    val memoryCount: Int,
+    val giftCount: Int,
+    val previousWishes: Int,
+    val eventType: OccasionType?,
+)
+
 @HiltViewModel
+@OptIn(ExperimentalCoroutinesApi::class)
 class WishPreviewViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val activityLogRepository: ActivityLogRepository,
@@ -143,39 +167,51 @@ class WishPreviewViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(WishPreviewUiState())
     val uiState: StateFlow<WishPreviewUiState> = _uiState.asStateFlow()
+    private var loadJob: Job? = null
 
     fun loadPending(messageRef: String) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             try {
-                val draft = messageRepository.getWishPreviewDraftById(messageRef)
-                    ?: messageRepository.getWishPreviewDraftByEventId(messageRef)
-                if (draft != null) {
-                    val whySignals = buildWhySignals(draft)
-                    val sendSummary = buildSendSummary(draft)
-                    val reviewQueueState = buildReviewQueueState(draft)
-                    _uiState.value = WishPreviewUiState(
-                        previewDraft = draft,
-                        selectedVariant = draft.selectedVariant,
-                        editedText = draft.selectedVariantText,
-                        isLoading = false,
-                        usedFallback = draft.isUsingFallback,
-                        whySignals = whySignals,
-                        sendSummary = sendSummary,
-                        draftReadiness = draft.evaluateDraftReadiness(draft.selectedVariantText, draft.selectedVariant),
-                        nextReviewTarget = reviewQueueState.nextTarget,
-                        remainingReviewCount = reviewQueueState.remainingReviewCount,
-                        qualityMessageRes = if (draft.isUsingFallback) {
-                            R.string.wish_preview_quality_template_used
+                _uiState.value = _uiState.value.copy(isLoading = true, errorMessageRes = null)
+                messageRepository.getWishPreviewDraftByRef(messageRef)
+                    .flatMapLatest { draft ->
+                        if (draft == null) {
+                            flowOf(WishPreviewLiveData(draft = null))
                         } else {
-                            null
-                        },
-                    )
-                } else {
-                    _uiState.value = WishPreviewUiState(
-                        isLoading = false,
-                        errorMessageRes = R.string.wish_preview_error_message_not_found,
-                    )
-                }
+                            combine(
+                                combine(
+                                    contactRepository.getWishContextFlow(draft.contactId.value),
+                                    memoryNoteRepository.countByContactFlow(draft.contactId.value),
+                                    giftHistoryRepository.countByContactFlow(draft.contactId.value),
+                                    messageRepository.countSentByContact(draft.contactId.value),
+                                    eventRepository.getOccasionTypeByIdFlow(draft.occasionId.value),
+                                ) { contact, memoryCount, giftCount, previousWishes, eventType ->
+                                    WishPreviewContextData(
+                                        contact = contact,
+                                        memoryCount = memoryCount,
+                                        giftCount = giftCount,
+                                        previousWishes = previousWishes,
+                                        eventType = eventType,
+                                    )
+                                },
+                                messageRepository.getWishPreviewReviewQueue(),
+                            ) { context, reviewQueue ->
+                                WishPreviewLiveData(
+                                    draft = draft,
+                                    contact = context.contact,
+                                    memoryCount = context.memoryCount,
+                                    giftCount = context.giftCount,
+                                    previousWishes = context.previousWishes,
+                                    eventType = context.eventType,
+                                    reviewQueue = reviewQueue,
+                                )
+                            }
+                        }
+                    }
+                    .collect { data ->
+                        _uiState.value = data.toUiState(_uiState.value)
+                    }
             } catch (e: Exception) {
                 _uiState.value = WishPreviewUiState(
                     isLoading = false,
@@ -183,6 +219,40 @@ class WishPreviewViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private fun WishPreviewLiveData.toUiState(current: WishPreviewUiState): WishPreviewUiState {
+        val draft = draft ?: return current.copy(
+            previewDraft = null,
+            isLoading = false,
+            errorMessageRes = R.string.wish_preview_error_message_not_found,
+        )
+        val reviewQueueState = buildReviewQueueState(draft, reviewQueue)
+        val preserveEditorState = !current.isLoading && current.previewDraft == draft
+        val selectedVariant = if (preserveEditorState) current.selectedVariant else draft.selectedVariant
+        val editedText = if (preserveEditorState) current.editedText else draft.selectedVariantText
+        val qualityMessageRes = current.qualityMessageRes
+            ?: if (draft.isUsingFallback) R.string.wish_preview_quality_template_used else null
+        return current.copy(
+            previewDraft = draft,
+            selectedVariant = selectedVariant,
+            editedText = editedText,
+            isLoading = false,
+            errorMessageRes = null,
+            usedFallback = draft.isUsingFallback,
+            whySignals = buildWhySignals(
+                draft = draft,
+                contact = contact,
+                memoryCount = memoryCount,
+                giftCount = giftCount,
+                previousWishes = previousWishes,
+            ),
+            sendSummary = buildSendSummary(draft, eventType),
+            draftReadiness = draft.evaluateDraftReadiness(editedText, selectedVariant),
+            nextReviewTarget = reviewQueueState.nextTarget,
+            remainingReviewCount = reviewQueueState.remainingReviewCount,
+            qualityMessageRes = qualityMessageRes,
+        )
     }
 
     fun selectVariant(variant: String) {
@@ -263,42 +333,25 @@ class WishPreviewViewModel @Inject constructor(
                     )
                 }
                 is RegeneratePendingMessageUseCase.Outcome.Regenerated -> {
-                    val updated = messageRepository.getWishPreviewDraftById(result.pendingId)
-                    if (updated != null) {
-                        val feedbackId = messageFeedbackRepository
-                            .getLatestForPendingMessage(pendingId)
-                            ?.takeIf { it.reasonKey == feedback?.key }
-                            ?.id
-                        if (feedbackId != null) {
-                            messageFeedbackRepository.markApplied(feedbackId)
-                        }
-                        _uiState.value = _uiState.value.copy(
-                            previewDraft = updated,
-                            selectedVariant = updated.selectedVariant,
-                            editedText = updated.selectedVariantText,
-                            isRegenerating = false,
-                            usedFallback = result.usedFallback,
-                            whySignals = buildWhySignals(updated),
-                            sendSummary = buildSendSummary(updated),
-                            draftReadiness = updated.evaluateDraftReadiness(
-                                updated.selectedVariantText,
-                                updated.selectedVariant,
-                            ),
-                            qualityMessageRes = if (result.usedFallback) {
-                                R.string.wish_preview_quality_template_used
-                            } else if (feedback != null) {
-                                R.string.wish_preview_quality_regenerated_with_feedback
-                            } else {
-                                R.string.wish_preview_quality_regenerated
-                            },
-                            qualityMessageArgRes = feedback?.labelRes,
-                        )
-                    } else {
-                        _uiState.value = _uiState.value.copy(
-                            isRegenerating = false,
-                            errorMessageRes = R.string.wish_preview_error_message_not_found,
-                        )
+                    val feedbackId = messageFeedbackRepository
+                        .getLatestForPendingMessage(pendingId)
+                        ?.takeIf { it.reasonKey == feedback?.key }
+                        ?.id
+                    if (feedbackId != null) {
+                        messageFeedbackRepository.markApplied(feedbackId)
                     }
+                    _uiState.value = _uiState.value.copy(
+                        isRegenerating = false,
+                        usedFallback = result.usedFallback,
+                        qualityMessageRes = if (result.usedFallback) {
+                            R.string.wish_preview_quality_template_used
+                        } else if (feedback != null) {
+                            R.string.wish_preview_quality_regenerated_with_feedback
+                        } else {
+                            R.string.wish_preview_quality_regenerated
+                        },
+                        qualityMessageArgRes = feedback?.labelRes,
+                    )
                 }
             }
         }
@@ -412,15 +465,13 @@ class WishPreviewViewModel @Inject constructor(
         return aiFeedbackOptions.firstOrNull { it.key == key }
     }
 
-    private suspend fun buildReviewQueueState(current: WishPreviewDraft): ReviewQueueState {
-        val reviewableMessages = runCatching {
-            messageRepository.getWishPreviewReviewQueue()
-                .first()
-                .filter { it.status == MessageStatus.PENDING }
-                .sortedWith(compareBy<WishPreviewReviewItem> { it.scheduledForMs }.thenBy { it.id.value })
-        }.getOrElse {
-            emptyList()
-        }
+    private fun buildReviewQueueState(
+        current: WishPreviewDraft,
+        reviewQueue: List<WishPreviewReviewItem>,
+    ): ReviewQueueState {
+        val reviewableMessages = reviewQueue
+            .filter { it.status == MessageStatus.PENDING }
+            .sortedWith(compareBy<WishPreviewReviewItem> { it.scheduledForMs }.thenBy { it.id.value })
         val remainingReviewCount = reviewableMessages.count { it.id != current.id }
         val currentIndex = reviewableMessages.indexOfFirst { it.id == current.id }
         val nextMessage = when {
@@ -439,17 +490,13 @@ class WishPreviewViewModel @Inject constructor(
         )
     }
 
-    private suspend fun buildWhySignals(draft: WishPreviewDraft): List<WhySignal> {
-        val contact = runCatching {
-            contactRepository.getWishContext(draft.contactId.value)
-        }.getOrNull()
-        val memoryCount = runCatching {
-            memoryNoteRepository.countByContact(draft.contactId.value)
-        }.getOrDefault(0)
-        val giftCount = runCatching {
-            giftHistoryRepository.countByContact(draft.contactId.value)
-        }.getOrDefault(0)
-        val previousWishes = messageRepository.getSentByContact(draft.contactId.value, 10).size
+    private fun buildWhySignals(
+        draft: WishPreviewDraft,
+        contact: ContactWishContext?,
+        memoryCount: Int,
+        giftCount: Int,
+        previousWishes: Int,
+    ): List<WhySignal> {
         return listOf(
             WhySignal(R.string.wish_why_relationship, contact?.relationshipType ?: "UNKNOWN"),
             WhySignal(R.string.wish_why_language, contact?.preferredLanguage ?: "en"),
@@ -461,11 +508,12 @@ class WishPreviewViewModel @Inject constructor(
         )
     }
 
-    private suspend fun buildSendSummary(draft: WishPreviewDraft): WishPreviewSendSummary {
-        val eventType = eventRepository.getOccasionTypeById(draft.occasionId.value)?.raw
-            ?: OccasionType.BIRTHDAY.raw
+    private fun buildSendSummary(
+        draft: WishPreviewDraft,
+        eventType: OccasionType?,
+    ): WishPreviewSendSummary {
         return WishPreviewSendSummary(
-            eventType = eventType,
+            eventType = eventType?.raw ?: OccasionType.BIRTHDAY.raw,
             channel = draft.channel.raw,
             scheduledForMs = draft.scheduledForMs,
             approvalMode = draft.approvalMode.raw,

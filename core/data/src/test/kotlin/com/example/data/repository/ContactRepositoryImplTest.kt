@@ -101,6 +101,30 @@ class ContactRepositoryImplTest {
     }
 
     @Test
+    fun getAnalyticsProfilesFlow_mapsRoomContactsToPureModel() = runTest {
+        every { contactDao.getAll() } returns flowOf(
+            listOf(
+                ContactEntity(
+                    id = "c1",
+                    name = "Asha",
+                    nickname = "Ash",
+                    healthScore = 82,
+                    notesText = "College friend",
+                    interestsJson = "[\"music\"]",
+                    sharedHistoryJson = "[\"met in 2018\"]",
+                ),
+            ),
+        )
+
+        val profiles = repository.getAnalyticsProfilesFlow().first()
+
+        assertEquals(1, profiles.size)
+        assertEquals(ContactId("c1"), profiles.single().id)
+        assertEquals(82, profiles.single().healthScore)
+        assertTrue(profiles.single().hasPersonalizationSignals)
+    }
+
+    @Test
     fun getAutomationReadinessProfiles_mapsRoomContactsToPureModel() = runTest {
         coEvery { contactDao.getAllSync() } returns listOf(
             ContactEntity(

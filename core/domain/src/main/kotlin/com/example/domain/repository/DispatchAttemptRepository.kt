@@ -17,6 +17,8 @@ interface DispatchAttemptRepository {
 
     suspend fun getFailureRecoveryQueue(limit: Int = 100): List<DispatchAttempt>
 
+    suspend fun getSuccessfulChannelsSince(sinceMs: Long): Set<MessageChannel>
+
     suspend fun getLatestFailureForMessageDraft(messageDraftId: MessageDraftId): DispatchAttempt?
 
     suspend fun updateOutcome(

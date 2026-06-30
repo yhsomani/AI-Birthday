@@ -7,6 +7,8 @@ import com.example.domain.gift.toRecord
 import com.example.domain.model.common.GiftHistoryId
 import com.example.domain.model.gift.GiftHistoryRecord
 import com.example.domain.repository.GiftHistoryRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,8 +22,17 @@ class GiftHistoryRepositoryImpl @Inject constructor(
     override suspend fun getRecordsByContact(contactId: String): List<GiftHistoryRecord> =
         giftHistoryDao.getByContact(contactId).map { it.toRecord() }
 
+    override fun getRecordsByContactFlow(contactId: String): Flow<List<GiftHistoryRecord>> {
+        return giftHistoryDao.getByContactFlow(contactId).map { gifts ->
+            gifts.map { it.toRecord() }
+        }
+    }
+
     override suspend fun countByContact(contactId: String): Int =
         giftHistoryDao.countByContact(contactId)
+
+    override fun countByContactFlow(contactId: String): Flow<Int> =
+        giftHistoryDao.countByContactFlow(contactId)
 
     override suspend fun upsert(gift: GiftHistoryEntity) =
         giftHistoryDao.upsert(gift)

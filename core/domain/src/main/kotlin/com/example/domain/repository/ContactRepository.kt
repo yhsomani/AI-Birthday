@@ -28,15 +28,22 @@ interface ContactRepository {
     fun getAllPaged(): Flow<PagingData<ContactEntity>>
     suspend fun getAllSync(): List<ContactEntity>
     suspend fun getAnalyticsProfiles(): List<ContactAnalyticsProfile>
+    fun getAnalyticsProfilesFlow(): Flow<List<ContactAnalyticsProfile>>
     suspend fun getAutomationReadinessProfiles(): List<ContactAutomationReadinessProfile>
+    fun getAutomationReadinessProfilesFlow(): Flow<List<ContactAutomationReadinessProfile>>
     suspend fun getEventDiscoveryProfiles(): List<ContactEventDiscoveryProfile>
     suspend fun getHealthProfiles(): List<ContactHealthProfile>
+    fun getHealthProfilesFlow(): Flow<List<ContactHealthProfile>>
     suspend fun getById(id: String): ContactEntity?
     suspend fun getMessageDispatchRecipient(id: String): MessageDispatchRecipient?
     suspend fun getDetailProfile(id: String): ContactDetailProfile?
+    fun getDetailProfileFlow(id: String): Flow<ContactDetailProfile?>
     suspend fun getHeader(id: String): ContactHeader?
+    fun getHeaderFlow(id: String): Flow<ContactHeader?>
     suspend fun getGiftAdvisorProfile(id: String): ContactGiftAdvisorProfile?
+    fun getGiftAdvisorProfileFlow(id: String): Flow<ContactGiftAdvisorProfile?>
     suspend fun getWishContext(id: String): ContactWishContext?
+    fun getWishContextFlow(id: String): Flow<ContactWishContext?>
     suspend fun contactExists(id: String): Boolean
     suspend fun upsert(contact: ContactEntity)
     suspend fun update(contact: ContactEntity)
@@ -60,7 +67,9 @@ interface ContactRepository {
     fun countByRelationshipType(): Flow<List<com.example.core.db.dao.RelationshipTypeCount>>
     fun getRelationshipAnalyticsCounts(): Flow<List<RelationshipAnalyticsCount>>
     suspend fun getTopHealthSummaries(limit: Int): List<ContactAnalyticsSummary>
+    fun getTopHealthSummariesFlow(limit: Int): Flow<List<ContactAnalyticsSummary>>
     suspend fun getBottomHealthSummaries(limit: Int): List<ContactAnalyticsSummary>
+    fun getBottomHealthSummariesFlow(limit: Int): Flow<List<ContactAnalyticsSummary>>
     suspend fun getTopByHealthScore(limit: Int): List<ContactEntity>
     suspend fun getBottomByHealthScore(limit: Int): List<ContactEntity>
     suspend fun delete(contact: ContactEntity)

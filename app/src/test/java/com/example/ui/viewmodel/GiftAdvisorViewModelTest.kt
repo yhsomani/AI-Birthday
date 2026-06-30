@@ -12,10 +12,13 @@ import com.example.domain.service.AiService
 import com.example.domain.service.GiftSuggestion
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.*
 import org.junit.Assert.assertEquals
@@ -41,6 +44,7 @@ class GiftAdvisorViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        stubGiftAdvisorFlows(contact = contactProfile(), history = emptyList())
     }
 
     @After
@@ -71,8 +75,7 @@ class GiftAdvisorViewModelTest {
             )
         )
 
-        coEvery { contactRepository.getGiftAdvisorProfile("contact_1") } returns contact
-        coEvery { giftHistoryRepository.getRecordsByContact("contact_1") } returns history
+        stubGiftAdvisorFlows(contact = contact, history = history)
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
@@ -87,7 +90,7 @@ class GiftAdvisorViewModelTest {
 
     @Test
     fun `loadData emits stable error when repository fails`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getGiftAdvisorProfile("contact_1") } throws IllegalStateException("boom")
+        every { contactRepository.getGiftAdvisorProfileFlow("contact_1") } throws IllegalStateException("boom")
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
@@ -105,8 +108,7 @@ class GiftAdvisorViewModelTest {
             GiftSuggestion("AI Suggestion 2", "Reason 2", 800)
         )
 
-        coEvery { contactRepository.getGiftAdvisorProfile("contact_1") } returns contact
-        coEvery { giftHistoryRepository.getRecordsByContact("contact_1") } returns emptyList()
+        stubGiftAdvisorFlows(contact = contact, history = emptyList())
         coEvery { aiService.generateGiftSuggestions(any(), any()) } returns suggestions
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
@@ -125,8 +127,7 @@ class GiftAdvisorViewModelTest {
     fun `generateGiftSuggestions exposes stable error when ai fails`() = runTest(testDispatcher) {
         val contact = contactProfile(giftBudgetInr = 1000)
 
-        coEvery { contactRepository.getGiftAdvisorProfile("contact_1") } returns contact
-        coEvery { giftHistoryRepository.getRecordsByContact("contact_1") } returns emptyList()
+        stubGiftAdvisorFlows(contact = contact, history = emptyList())
         coEvery { aiService.generateGiftSuggestions(any(), any()) } throws IllegalStateException("ai down")
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
@@ -144,8 +145,7 @@ class GiftAdvisorViewModelTest {
     fun `addGiftRecord trims input and parses formatted cost`() = runTest(testDispatcher) {
         val contact = contactProfile(giftBudgetInr = 5000)
 
-        coEvery { contactRepository.getGiftAdvisorProfile("contact_1") } returns contact
-        coEvery { giftHistoryRepository.getRecordsByContact("contact_1") } returns emptyList()
+        stubGiftAdvisorFlows(contact = contact, history = emptyList())
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
@@ -178,9 +178,6 @@ class GiftAdvisorViewModelTest {
 
     @Test
     fun `addGiftRecord rejects invalid cost without persisting`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getGiftAdvisorProfile("contact_1") } returns contactProfile()
-        coEvery { giftHistoryRepository.getRecordsByContact("contact_1") } returns emptyList()
-
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
         advanceUntilIdle()
@@ -202,9 +199,6 @@ class GiftAdvisorViewModelTest {
 
     @Test
     fun `addGiftRecord rejects overlong notes without persisting`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getGiftAdvisorProfile("contact_1") } returns contactProfile()
-        coEvery { giftHistoryRepository.getRecordsByContact("contact_1") } returns emptyList()
-
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
         advanceUntilIdle()
@@ -234,8 +228,7 @@ class GiftAdvisorViewModelTest {
             year = Calendar.getInstance().get(Calendar.YEAR),
             approxCostInr = 400,
         )
-        coEvery { contactRepository.getGiftAdvisorProfile("contact_1") } returns contactProfile()
-        coEvery { giftHistoryRepository.getRecordsByContact("contact_1") } returns listOf(gift)
+        stubGiftAdvisorFlows(contact = contactProfile(), history = listOf(gift))
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
@@ -245,13 +238,11 @@ class GiftAdvisorViewModelTest {
         advanceUntilIdle()
 
         coVerify { giftHistoryRepository.deleteRecord(GiftHistoryId("gift_1")) }
-        coVerify(atLeast = 2) { giftHistoryRepository.getRecordsByContact("contact_1") }
     }
 
     @Test
     fun `generateGiftSuggestions without contact exposes stable error`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getGiftAdvisorProfile("contact_1") } returns null
-        coEvery { giftHistoryRepository.getRecordsByContact("contact_1") } returns emptyList()
+        stubGiftAdvisorFlows(contact = null, history = emptyList())
 
         val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
         val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
@@ -262,6 +253,39 @@ class GiftAdvisorViewModelTest {
 
         assertEquals(R.string.gift_advisor_error_missing_contact, viewModel.uiState.value.errorMessageRes)
         coVerify(exactly = 0) { aiService.generateGiftSuggestions(any(), any()) }
+    }
+
+    @Test
+    fun `gift history flow update immediately updates budget state`() = runTest(testDispatcher) {
+        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+        val historyFlow = MutableStateFlow<List<GiftHistoryRecord>>(emptyList())
+        every { contactRepository.getGiftAdvisorProfileFlow("contact_1") } returns flowOf(contactProfile(giftBudgetInr = 1000))
+        every { giftHistoryRepository.getRecordsByContactFlow("contact_1") } returns historyFlow
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
+        advanceUntilIdle()
+
+        assertEquals(0, viewModel.uiState.value.totalSpentThisYear)
+        assertEquals(1000, viewModel.uiState.value.remainingBudget)
+
+        historyFlow.value = listOf(
+            giftRecord(id = "gift_1", year = currentYear, approxCostInr = 350),
+            giftRecord(id = "gift_2", year = currentYear - 1, approxCostInr = 200),
+        )
+        advanceUntilIdle()
+
+        assertEquals(350, viewModel.uiState.value.totalSpentThisYear)
+        assertEquals(650, viewModel.uiState.value.remainingBudget)
+        assertEquals(2, viewModel.uiState.value.giftHistory.size)
+    }
+
+    private fun stubGiftAdvisorFlows(
+        contact: ContactGiftAdvisorProfile?,
+        history: List<GiftHistoryRecord>,
+    ) {
+        every { contactRepository.getGiftAdvisorProfileFlow("contact_1") } returns flowOf(contact)
+        every { giftHistoryRepository.getRecordsByContactFlow("contact_1") } returns flowOf(history)
     }
 
     private fun giftRecord(

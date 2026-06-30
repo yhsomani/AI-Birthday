@@ -1,8 +1,11 @@
 package com.example.domain.service
 
 import com.example.domain.model.ApprovalMode
+import kotlinx.coroutines.flow.Flow
 
 interface PreferencesRepository {
+    fun observeChanges(): Flow<Unit>
+
     fun setGoogleOAuthToken(token: String)
     fun getGoogleOAuthToken(): String
 
@@ -14,6 +17,10 @@ interface PreferencesRepository {
 
     fun setSenderEmailPassword(pw: String)
     fun getSenderEmailPassword(): String
+
+    fun setLastSuccessfulEmailTest(senderEmail: String, timestampMs: Long)
+    fun getLastSuccessfulEmailTestSender(): String
+    fun getLastSuccessfulEmailTestMs(): Long
 
     fun setGlobalAutomationMode(mode: ApprovalMode)
     fun getGlobalAutomationMode(): ApprovalMode
@@ -49,9 +56,6 @@ interface PreferencesRepository {
 
     fun setOnboardingComplete(complete: Boolean)
     fun isOnboardingComplete(): Boolean
-
-    fun setGuestMode(enabled: Boolean)
-    fun isGuestMode(): Boolean
 
     fun setLastSyncError(error: String?)
     fun getLastSyncError(): String?

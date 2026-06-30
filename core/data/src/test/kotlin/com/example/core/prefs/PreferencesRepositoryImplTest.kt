@@ -24,4 +24,20 @@ class PreferencesRepositoryImplTest {
 
         verify { securePrefs.setGlobalApprovalMode(ApprovalMode.ALWAYS_ASK) }
     }
+
+    @Test
+    fun `setLastSuccessfulEmailTest stores sender and timestamp through SecurePrefs`() {
+        repository.setLastSuccessfulEmailTest("sender@example.com", 1234L)
+
+        verify { securePrefs.setLastSuccessfulEmailTest("sender@example.com", 1234L) }
+    }
+
+    @Test
+    fun `getLastSuccessfulEmailTest returns SecurePrefs values`() {
+        every { securePrefs.getLastSuccessfulEmailTestSender() } returns "sender@example.com"
+        every { securePrefs.getLastSuccessfulEmailTestMs() } returns 1234L
+
+        assertEquals("sender@example.com", repository.getLastSuccessfulEmailTestSender())
+        assertEquals(1234L, repository.getLastSuccessfulEmailTestMs())
+    }
 }

@@ -301,6 +301,9 @@
     <string name="automation_setup_action_open_settings">Open Settings</string>
     <string name="automation_setup_action_open_style_coach">Open Style Coach</string>
     <string name="automation_setup_action_review_contacts">Review Contacts</string>
+    <string name="automation_setup_action_review_messages">Review Messages</string>
+    <string name="automation_setup_action_review_sms_messages">Review SMS Messages</string>
+    <string name="automation_setup_action_review_whatsapp_messages">Review WhatsApp Messages</string>
     <string name="automation_setup_action_open_accessibility">Open Accessibility</string>
     <string name="automation_setup_action_open_battery_settings">Open Battery Settings</string>
     <string name="automation_setup_action_app_settings">App Settings</string>
@@ -322,6 +325,22 @@
     <string name="automation_setup_check_ai_wish_generation">AI Wish Generation</string>
     <string name="automation_setup_ai_wish_enabled">Enabled in Settings.</string>
     <string name="automation_setup_ai_wish_disabled">Disabled in Settings.</string>
+    <string name="automation_setup_check_full_automation">Full Automation</string>
+    <string name="automation_setup_full_automation_ok">Fully Auto is enabled for default contacts.</string>
+    <string name="automation_setup_full_automation_disabled">Global mode is %1$s. Select Fully Auto to send eligible messages without review.</string>
+    <string name="automation_setup_full_automation_contact_overrides">Fully Auto is enabled, but %1$d contact(s) still use review-first or skip-auto overrides.</string>
+    <string name="automation_setup_check_automatable_events">Automatable Events</string>
+    <string name="automation_setup_automatable_events_empty">Sync contacts before checking birthdays and events.</string>
+    <string name="automation_setup_automatable_events_ok">%1$d contact(s) have a birthday, anniversary, or work anniversary.</string>
+    <string name="automation_setup_automatable_events_missing">%1$d of %2$d contact(s) do not have a birthday, anniversary, or work anniversary.</string>
+    <string name="automation_setup_check_delivery_routes">Automatic Delivery Routes</string>
+    <string name="automation_setup_delivery_routes_no_events">Add event dates before checking delivery routes.</string>
+    <string name="automation_setup_delivery_routes_ok">%1$d event-ready contact(s) have an automatic delivery route.</string>
+    <string name="automation_setup_delivery_routes_missing">%1$d of %2$d event-ready contact(s) lack a usable route. Add phone/email details, configure Gmail, or remove channel blackouts.</string>
+    <string name="automation_setup_check_channel_verification">Channel Verification</string>
+    <string name="automation_setup_channel_verification_no_routes">No automatic routes are selected yet. Add event-ready contacts and delivery details before testing channels.</string>
+    <string name="automation_setup_channel_verification_ok">Recent successful dispatch evidence exists for selected channel(s): %1$s.</string>
+    <string name="automation_setup_channel_verification_missing">No recent successful dispatch evidence for selected channel(s): %1$s. Send one low-risk real message on each channel before relying on unattended automation.</string>
     <string name="automation_setup_check_style_coach">Style Coach</string>
     <string name="automation_setup_style_trained">Trained with %1$d writing samples.</string>
     <string name="automation_setup_style_needs_more">Add %1$d more writing sample(s) so AI can match your tone.</string>
@@ -344,9 +363,19 @@
     <string name="automation_setup_check_sms">SMS</string>
     <string name="automation_setup_sms_ok">SMS dispatch is allowed.</string>
     <string name="automation_setup_sms_missing">SMS permission is missing.</string>
+    <string name="automation_setup_sms_disabled">SMS is disabled in channel settings and will not be used for automatic sends.</string>
+    <string name="automation_setup_sms_not_used">No event-ready contacts currently select SMS for automatic sends.</string>
+    <string name="automation_setup_sms_ok_for_contacts">SMS permission is available for %1$d SMS-routed event-ready contact(s). Test one low-risk SMS before relying on unattended sends.</string>
+    <string name="automation_setup_sms_missing_for_contacts">SMS is selected for %1$d event-ready contact(s), but SMS permission is missing. Grant SMS permission or disable SMS.</string>
     <string name="automation_setup_check_whatsapp">WhatsApp Automation</string>
     <string name="automation_setup_whatsapp_ok">Accessibility service is enabled.</string>
     <string name="automation_setup_whatsapp_missing">Enable only if you want automatic WhatsApp sends.</string>
+    <string name="automation_setup_whatsapp_disabled">WhatsApp is disabled in channel settings and will not be used for automatic sends.</string>
+    <string name="automation_setup_whatsapp_not_used">No event-ready contacts currently select WhatsApp for automatic sends.</string>
+    <string name="automation_setup_whatsapp_ok_for_contacts">WhatsApp automation is ready for %1$d WhatsApp-routed event-ready contact(s). Test one low-risk WhatsApp send before relying on unattended sends.</string>
+    <string name="automation_setup_whatsapp_consent_needed_for_contacts">WhatsApp is selected for %1$d event-ready contact(s). Confirm consent before this channel can be used.</string>
+    <string name="automation_setup_whatsapp_app_missing_for_contacts">WhatsApp is selected for %1$d event-ready contact(s), but WhatsApp or WhatsApp Business is not installed.</string>
+    <string name="automation_setup_whatsapp_accessibility_missing_for_contacts">WhatsApp is selected for %1$d event-ready contact(s), but the RelateAI Accessibility service is disabled.</string>
     <string name="automation_setup_check_exact_sends">Exact Sends</string>
     <string name="automation_setup_exact_sends_ok">Exact alarm scheduling is available.</string>
     <string name="automation_setup_exact_sends_missing">Exact alarm access is disabled by the system.</string>
@@ -425,7 +454,6 @@
     <string name="auth_error_firebase">Firebase authentication failed. Check OAuth configuration and try again.</string>
     <string name="auth_subtitle">Nurture your connections\nwith AI-powered wishes</string>
     <string name="auth_sign_in_google">Sign in with Google</string>
-    <string name="auth_dev_bypass">Bypass Sign-In (Dev)</string>
     <string name="auth_legal_agreement">By signing in, you agree to our Terms and Privacy Policy</string>
     
     <!-- Common -->
@@ -520,9 +548,15 @@
     <string name="settings_save_api_key">Save API Key</string>
     <string name="settings_automation_mode">Automation Mode</string>
     <string name="automation_mode_fully_auto">Fully Auto</string>
-    <string name="automation_mode_smart_approve_default">Smart Approve (default)</string>
+    <string name="automation_mode_smart_approve_default">Smart Approve</string>
     <string name="automation_mode_vip_approve">VIP Approve</string>
     <string name="automation_mode_always_ask">Always Ask</string>
+    <string name="settings_full_automation_enabled">Full automation enabled. %1$d contact(s) updated and %2$d queued message(s) scheduled for sending.</string>
+    <string name="settings_full_automation_enabled_route_blockers">Full automation enabled. %1$d contact(s) updated and %2$d queued message(s) scheduled for sending. %3$d message(s) still need contact details or channel setup.</string>
+    <string name="settings_full_automation_enabled_review_blockers">Full automation enabled. %1$d contact(s) updated and %2$d queued message(s) scheduled for sending. %3$d message(s) still need review because draft quality is not safe for full automation.</string>
+    <string name="settings_full_automation_enabled_route_and_review_blockers">Full automation enabled. %1$d contact(s) updated and %2$d queued message(s) scheduled for sending. %3$d message(s) still need contact details or channel setup. %4$d message(s) still need review because draft quality is not safe for full automation.</string>
+    <string name="settings_full_automation_failed">Full automation could not be enabled. Review setup and try again.</string>
+    <string name="settings_full_automation_failed_with_reason">Full automation could not be enabled. %1$s</string>
     <string name="settings_syncing">Syncing...</string>
     <string name="settings_last_synced_format">Last synced: %1$s</string>
     <string name="settings_sync_contacts">Sync Contacts</string>
@@ -722,6 +756,9 @@
     <string name="messages_recovery_retry_detail">If setup looks correct, review AI Doctor for recent failures, then retry selected rows.</string>
     <string name="messages_recovery_retry_hint">Retry stays manual after you review the fix.</string>
     <string name="messages_recovery_open_setup">Open AI Doctor</string>
+    <string name="messages_verification_title">Verify %1$s sending</string>
+    <string name="messages_verification_summary">Use one low-risk message first.</string>
+    <string name="messages_verification_detail">Approve or retry one %1$s message. After it succeeds, AI Doctor will count this channel as verified. Avoid bulk actions until the first send is confirmed.</string>
     <string name="messages_auto_sends_minutes">Auto-sends in %1$d mins!</string>
     <string name="messages_hours_left">%1$dh left</string>
     <string name="messages_channel_format">Channel: %1$s</string>

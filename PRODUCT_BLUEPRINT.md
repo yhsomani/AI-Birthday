@@ -72,12 +72,12 @@ Supporting surfaces deepen context:
 
 1. User opens RelateAI.
 2. App explains local-first relationship assistance and approval-first automation.
-3. User signs in with Google or chooses guest/local mode.
+3. User signs in with Google.
 4. App asks for contacts permission only when sync is requested.
 5. App imports contacts from Google and/or device.
 6. App discovers birthdays, anniversaries, and work anniversaries.
 7. App shows setup readiness: AI, notifications, SMS, WhatsApp, email, exact alarm, backup.
-8. User selects global automation mode, defaulting to Smart Approve.
+8. User selects global automation mode, defaulting to Fully Auto in current builds, with review-first modes available for cautious or sensitive workflows.
 9. User completes a first encrypted backup prompt after data import.
 
 Success state:
@@ -316,7 +316,7 @@ Must have:
 - P0 dispatch and AI contract bugs fixed.
 - JDK/test environment working.
 - Unit tests for dispatch policy, AI fallback, classification schema, and event merge.
-- Manual test with fake contacts and no live sends.
+- Manual test with real disposable contacts and no live sends.
 
 ### Private Beta
 

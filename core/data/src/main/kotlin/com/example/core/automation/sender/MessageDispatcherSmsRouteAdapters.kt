@@ -24,6 +24,7 @@ internal suspend fun Context.dispatchSmsRouteWithSentMessageRecord(
     phoneNumber: String,
     contactDisplayName: String,
     messageText: String,
+    dispatchAttemptId: String? = null,
     sentMessageId: SentMessageId = SentMessageId(UUID.randomUUID().toString()),
     eventYear: Int = Calendar.getInstance().get(Calendar.YEAR),
     sentAtMs: Long = System.currentTimeMillis(),
@@ -46,6 +47,8 @@ internal suspend fun Context.dispatchSmsRouteWithSentMessageRecord(
             phoneNumber = phoneNumber,
             messageText = messageText,
             sentMessageId = sentMessageId.value,
+            dispatchAttemptId = dispatchAttemptId,
+            pendingMessageId = messageId.value.takeIf { !dispatchAttemptId.isNullOrBlank() },
         )
         if (routeResult.sent) {
             SmsRouteDispatchOutcome(

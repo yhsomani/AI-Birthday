@@ -28,6 +28,7 @@ import com.example.domain.service.NotificationService
 import com.example.domain.service.PreferencesRepository
 import com.example.domain.service.SchedulerService
 import com.example.domain.service.EventReminderSchedulerService
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.usecase.DiscoverEventsUseCase
 import com.example.domain.usecase.GenerateMessageUseCase
@@ -81,6 +82,7 @@ class AutomationPipelineTest {
         every { preferencesRepository.getQuietHoursEnd() } returns 0
         every { preferencesRepository.getBlackoutDates() } returns "[]"
         every { preferencesRepository.getChannelBlackout() } returns "[]"
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.FULLY_AUTO
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         every { anyConstructed<SecurePrefs>().getQuietHoursStart() } returns 0
@@ -110,7 +112,6 @@ class AutomationPipelineTest {
             relationshipType = "FRIEND",
             primaryPhone = "+15551234567",
             preferredChannel = MessageChannel.SMS.raw,
-            automationMode = "FULLY_AUTO"
         )
         db.contactDao().upsert(contact)
 
@@ -157,6 +158,7 @@ class AutomationPipelineTest {
         val pending = db.pendingMessageDao().getByEventId(event.id)
         assertNotNull(pending)
         assertEquals("APPROVED", pending!!.status)
+        assertEquals("FULLY_AUTO", pending.approvalMode)
         db.pendingMessageDao().insert(pending.copy(scheduledForMs = 0L))
 
         // 4. Dispatch message

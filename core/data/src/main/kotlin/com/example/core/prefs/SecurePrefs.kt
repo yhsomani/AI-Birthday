@@ -7,11 +7,26 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.domain.model.ApprovalMode
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 
 class SecurePrefs(context: Context) {
     private val authPrefs: SharedPreferences by lazy { getSharedAuthInstance(context) }
     private val configPrefs: SharedPreferences by lazy { getSharedConfigInstance(context) }
+
+    fun observeChanges(): Flow<Unit> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            trySend(Unit)
+        }
+        authPrefs.registerOnSharedPreferenceChangeListener(listener)
+        configPrefs.registerOnSharedPreferenceChangeListener(listener)
+        awaitClose {
+            authPrefs.unregisterOnSharedPreferenceChangeListener(listener)
+            configPrefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
 
     companion object {
         @Volatile
@@ -107,10 +122,20 @@ class SecurePrefs(context: Context) {
     fun setSenderEmailPassword(pw: String) = configPrefs.edit().putString("sender_email_pw", pw).apply()
     fun getSenderEmailPassword(): String = configPrefs.getString("sender_email_pw", "") ?: ""
 
+    fun setLastSuccessfulEmailTest(senderEmail: String, timestampMs: Long) =
+        configPrefs.edit()
+            .putString("last_successful_email_test_sender", senderEmail)
+            .putLong("last_successful_email_test_ms", timestampMs)
+            .apply()
+    fun getLastSuccessfulEmailTestSender(): String =
+        configPrefs.getString("last_successful_email_test_sender", "") ?: ""
+    fun getLastSuccessfulEmailTestMs(): Long =
+        configPrefs.getLong("last_successful_email_test_ms", 0L)
+
     fun setGlobalAutomationMode(mode: String) = configPrefs.edit().putString("global_automation_mode", mode).apply()
     fun getGlobalAutomationMode(): String =
-        configPrefs.getString("global_automation_mode", ApprovalMode.SMART_APPROVE.raw)
-            ?: ApprovalMode.SMART_APPROVE.raw
+        configPrefs.getString("global_automation_mode", ApprovalMode.FULLY_AUTO.raw)
+            ?: ApprovalMode.FULLY_AUTO.raw
     fun setGlobalApprovalMode(mode: ApprovalMode) = setGlobalAutomationMode(
         GlobalAutomationModePrefsMapper.toSupportedRaw(mode)
     )
@@ -164,9 +189,6 @@ class SecurePrefs(context: Context) {
 
     fun setOnboardingComplete(complete: Boolean) = configPrefs.edit().putBoolean("onboarding_complete", complete).apply()
     fun isOnboardingComplete(): Boolean = configPrefs.getBoolean("onboarding_complete", false)
-
-    fun setGuestMode(enabled: Boolean) = configPrefs.edit().putBoolean("guest_mode", enabled).apply()
-    fun isGuestMode(): Boolean = configPrefs.getBoolean("guest_mode", false)
 
     fun setFirebaseUid(uid: String) = authPrefs.edit().putString("firebase_uid", uid).apply()
     fun getFirebaseUid(): String = authPrefs.getString("firebase_uid", "") ?: ""

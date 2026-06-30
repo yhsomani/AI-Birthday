@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -312,9 +313,38 @@ class MessagesScreenInteractionTest {
             .assertIsDisplayed()
     }
 
+    @Test
+    fun verificationModeOpensFirstActionableFilteredTab() {
+        val state = messagesState().copy(
+            selectedChannelFilter = MessageChannelFilter.SMS,
+            needsReviewMessages = emptyList(),
+            scheduledMessages = emptyList(),
+            blockedMessages = emptyList(),
+        )
+
+        composeRule.setMessagesContent(
+            state = { state },
+            verificationChannelFilter = MessageChannelFilter.SMS,
+        )
+
+        composeRule.onNodeWithTag(MessagesTestTags.VERIFICATION_ASSISTANT)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Verify SMS sending")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Use one low-risk message first.")
+            .assertIsDisplayed()
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(MessagesTestTags.FAILED_CARD_PREFIX + FAILED_ID)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag(MessagesTestTags.TAB_PREFIX + 4).assertIsSelected()
+    }
+
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.setMessagesContent(
         state: () -> MessagesUiState,
         initialPage: Int = 0,
+        verificationChannelFilter: MessageChannelFilter? = null,
         onNavigateToWish: (String, String) -> Unit = { _, _ -> },
         onNavigateToAutomationSetup: () -> Unit = {},
         onSearchQueryChange: (String) -> Unit = {},
@@ -335,6 +365,7 @@ class MessagesScreenInteractionTest {
                 MessagesContent(
                     state = state(),
                     initialPage = initialPage,
+                    verificationChannelFilter = verificationChannelFilter,
                     onNavigateToWish = onNavigateToWish,
                     onNavigateToAutomationSetup = onNavigateToAutomationSetup,
                     onSearchQueryChange = onSearchQueryChange,

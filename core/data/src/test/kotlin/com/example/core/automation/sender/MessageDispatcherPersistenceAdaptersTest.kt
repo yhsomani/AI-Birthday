@@ -318,6 +318,118 @@ class MessageDispatcherPersistenceAdaptersTest {
     }
 
     @Test
+    fun saveSuccessfulMessageDispatchAttemptOutcome_routesSmsPendingDeliveryThroughGuardedDaoUpdate() = runTest {
+        dispatchAttemptDao.saveSuccessfulMessageDispatchAttemptOutcome(
+            DispatchAttemptOutcomeUpdate(
+                id = DispatchAttemptId("attempt_sms"),
+                attemptedAtMs = 1_800_000_000_000L,
+                resolvedAtMs = 1_800_000_000_500L,
+                result = DispatchAttemptResult.PENDING_DELIVERY,
+                channel = MessageChannel.SMS,
+                deliveryStatus = MessageDeliveryStatus.PENDING_DELIVERY,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        )
+
+        coVerify {
+            dispatchAttemptDao.updateInitialSmsHandoffOutcomeIfAwaitingCallback(
+                id = "attempt_sms",
+                attemptedAtMs = 1_800_000_000_000L,
+                resolvedAtMs = 1_800_000_000_500L,
+                result = DispatchAttemptResult.PENDING_DELIVERY.raw,
+                channel = MessageChannel.SMS.raw,
+                deliveryStatus = MessageDeliveryStatus.PENDING_DELIVERY.raw,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        }
+        coVerify(exactly = 0) {
+            dispatchAttemptDao.updateOutcome(
+                id = "attempt_sms",
+                attemptedAtMs = any(),
+                resolvedAtMs = any(),
+                result = any(),
+                channel = any(),
+                deliveryStatus = any(),
+                providerMessageId = any(),
+                errorType = any(),
+                errorCode = any(),
+                redactedErrorMessage = any(),
+                retryCount = any(),
+                nextRetryAtMs = any(),
+                deadLetteredAtMs = any(),
+            )
+        }
+    }
+
+    @Test
+    fun saveSuccessfulMessageDispatchAttemptOutcome_keepsNonSmsOnStandardDaoUpdate() = runTest {
+        dispatchAttemptDao.saveSuccessfulMessageDispatchAttemptOutcome(
+            DispatchAttemptOutcomeUpdate(
+                id = DispatchAttemptId("attempt_email"),
+                attemptedAtMs = 1_800_000_000_000L,
+                resolvedAtMs = 1_800_000_000_500L,
+                result = DispatchAttemptResult.SENT,
+                channel = MessageChannel.EMAIL,
+                deliveryStatus = MessageDeliveryStatus.SENT,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        )
+
+        coVerify {
+            dispatchAttemptDao.updateOutcome(
+                id = "attempt_email",
+                attemptedAtMs = 1_800_000_000_000L,
+                resolvedAtMs = 1_800_000_000_500L,
+                result = DispatchAttemptResult.SENT.raw,
+                channel = MessageChannel.EMAIL.raw,
+                deliveryStatus = MessageDeliveryStatus.SENT.raw,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        }
+        coVerify(exactly = 0) {
+            dispatchAttemptDao.updateInitialSmsHandoffOutcomeIfAwaitingCallback(
+                id = any(),
+                attemptedAtMs = any(),
+                resolvedAtMs = any(),
+                result = any(),
+                channel = any(),
+                deliveryStatus = any(),
+                providerMessageId = any(),
+                errorType = any(),
+                errorCode = any(),
+                redactedErrorMessage = any(),
+                retryCount = any(),
+                nextRetryAtMs = any(),
+                deadLetteredAtMs = any(),
+            )
+        }
+    }
+
+    @Test
     fun saveMessageDispatchAttemptOutcome_ignoresNullUpdates() = runTest {
         dispatchAttemptDao.saveMessageDispatchAttemptOutcome(null)
 

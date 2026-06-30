@@ -53,6 +53,7 @@ class MessageDispatchWorkerTest {
         every { preferencesRepository.getQuietHoursStart() } returns 0
         every { preferencesRepository.getQuietHoursEnd() } returns 0
         every { preferencesRepository.getBlackoutDates() } returns "[]"
+        coEvery { pendingMessageDao.updateStatusIfCurrent(any(), any(), any()) } returns 1
     }
 
     @After
@@ -124,7 +125,13 @@ class MessageDispatchWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
-        coVerify { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
+        coVerify {
+            pendingMessageDao.updateStatusIfCurrent(
+                id = "msg_1",
+                expectedStatus = "APPROVED",
+                newStatus = "DISPATCHING",
+            )
+        }
         coVerify {
             anyConstructed<MessageDispatcher>().dispatch(match {
                 it.messageId.value == pendingMsg.id &&
@@ -196,7 +203,13 @@ class MessageDispatchWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
-        coVerify { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
+        coVerify {
+            pendingMessageDao.updateStatusIfCurrent(
+                id = "msg_1",
+                expectedStatus = "PENDING",
+                newStatus = "DISPATCHING",
+            )
+        }
         coVerify {
             anyConstructed<MessageDispatcher>().dispatch(match {
                 it.messageId.value == pendingMsg.id &&
@@ -277,7 +290,13 @@ class MessageDispatchWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.failure(), result)
-        coVerify { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
+        coVerify {
+            pendingMessageDao.updateStatusIfCurrent(
+                id = "msg_1",
+                expectedStatus = "APPROVED",
+                newStatus = "DISPATCHING",
+            )
+        }
         coVerify { pendingMessageDao.updateStatus("msg_1", "FAILED") }
         coVerify {
             dispatchAttemptDao.updateOutcome(
@@ -341,6 +360,36 @@ class MessageDispatchWorkerTest {
         coVerify(exactly = 0) { pendingMessageDao.insert(any()) }
         verify { DailyScheduler.scheduleExactSendCommand(any(), match { it.messageId.value == "msg_1" }) }
         coVerify(exactly = 0) { pendingMessageDao.updateStatus("msg_1", "DISPATCHING") }
+        coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any()) }
+    }
+
+    @Test
+    fun `doWork skips dispatch when another worker already claimed the message`() = runTest {
+        coEvery { pendingMessageDao.updateStatusIfCurrent(any(), any(), any()) } returns 0
+        val pendingMsg = PendingMessageEntity(
+            id = "msg_1", contactId = "c1", eventId = "e1",
+            shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
+            formalVariant = "", funnyVariant = "", emotionalVariant = "",
+            selectedVariant = "standard", selectedVariantText = "Happy Birthday",
+            channel = MessageChannel.SMS.raw, scheduledForMs = 0, approvalMode = "FULLY_AUTO",
+            status = "APPROVED"
+        )
+        val contact = ContactEntity(id = "c1", name = "Alice")
+
+        coEvery { pendingMessageDao.getById("msg_1") } returns pendingMsg
+        coEvery { contactDao.getById("c1") } returns contact
+
+        val result = buildWorker("msg_1").doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        coVerify {
+            pendingMessageDao.updateStatusIfCurrent(
+                id = "msg_1",
+                expectedStatus = "APPROVED",
+                newStatus = "DISPATCHING",
+            )
+        }
+        coVerify(exactly = 0) { dispatchAttemptDao.upsert(any()) }
         coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any()) }
     }
 

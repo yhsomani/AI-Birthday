@@ -19,6 +19,9 @@ interface ContactDao {
     @Query("SELECT * FROM contacts WHERE id = :id AND isDeleted = 0")
     suspend fun getById(id: String): ContactEntity?
 
+    @Query("SELECT * FROM contacts WHERE id = :id AND isDeleted = 0")
+    fun getByIdFlow(id: String): Flow<ContactEntity?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(contact: ContactEntity)
 

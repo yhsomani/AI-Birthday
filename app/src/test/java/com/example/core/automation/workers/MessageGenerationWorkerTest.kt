@@ -10,9 +10,8 @@ import com.example.core.automation.notifications.NotificationHelper
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.OccasionId
-import com.example.domain.model.occasion.Occasion
-import com.example.domain.model.occasion.OccasionDate
 import com.example.domain.model.occasion.OccasionType
+import com.example.domain.model.occasion.UpcomingEventPreview
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.PreferencesRepository
 import com.example.domain.usecase.GenerateMessageUseCase
@@ -59,7 +58,7 @@ class MessageGenerationWorkerTest {
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
         every { preferencesRepository.getGeminiApiKey() } returns "mock_key"
         every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
-        coEvery { eventRepository.getOccasionsBefore(any()) } returns emptyList()
+        coEvery { eventRepository.getUpcomingPreviews(any()) } returns emptyList()
         coEvery {
             generateMessageUseCase(any<GenerateMessageUseCase.Request>())
         } returns GenerateMessageUseCase.GenerationOutcome.Generated("pending_1", ApprovalMode.SMART_APPROVE, 0)
@@ -77,7 +76,7 @@ class MessageGenerationWorkerTest {
         val result = buildWorker().doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
-        coVerify(exactly = 0) { eventRepository.getOccasionsBefore(any()) }
+        coVerify(exactly = 0) { eventRepository.getUpcomingPreviews(any()) }
         coVerify(exactly = 0) { generateMessageUseCase(any<GenerateMessageUseCase.Request>()) }
     }
 
@@ -90,14 +89,14 @@ class MessageGenerationWorkerTest {
 
         assertEquals(ListenableWorker.Result.failure(), result)
         verify { NotificationHelper.showSetupNotification(any(), any(), any()) }
-        coVerify(exactly = 0) { eventRepository.getOccasionsBefore(any()) }
+        coVerify(exactly = 0) { eventRepository.getUpcomingPreviews(any()) }
         coVerify(exactly = 0) { generateMessageUseCase(any<GenerateMessageUseCase.Request>()) }
     }
 
     @Test
     fun `doWork proceeds with Firebase auth when API key is missing`() = runTest {
         every { preferencesRepository.getGeminiApiKey() } returns ""
-        coEvery { eventRepository.getOccasionsBefore(any()) } returns listOf(event("e1"))
+        coEvery { eventRepository.getUpcomingPreviews(any()) } returns listOf(event("e1"))
 
         val result = buildWorker().doWork()
 
@@ -113,20 +112,15 @@ class MessageGenerationWorkerTest {
     }
 
     @Test
-    fun `doWork looks ahead seven days and delegates each event to use case`() = runTest {
+    fun `doWork uses upcoming seven day window and delegates each event to use case`() = runTest {
         val events = listOf(event("e1"), event("e2", contactId = "c2"))
-        coEvery { eventRepository.getOccasionsBefore(any()) } returns events
+        coEvery { eventRepository.getUpcomingPreviews(any()) } returns events
 
-        val beforeMs = System.currentTimeMillis()
         val result = buildWorker().doWork()
-        val afterMs = System.currentTimeMillis()
 
         assertEquals(ListenableWorker.Result.success(), result)
-        coVerify {
-            eventRepository.getOccasionsBefore(match { cutoffMs ->
-                cutoffMs in (beforeMs + SEVEN_DAYS_MS)..(afterMs + SEVEN_DAYS_MS)
-            })
-        }
+        coVerify { eventRepository.getUpcomingPreviews(7) }
+        coVerify(exactly = 0) { eventRepository.getOccasionsBefore(any()) }
         coVerify {
             generateMessageUseCase(
                 GenerateMessageUseCase.Request(
@@ -147,7 +141,7 @@ class MessageGenerationWorkerTest {
 
     @Test
     fun `doWork continues across non-generated use case outcomes`() = runTest {
-        coEvery { eventRepository.getOccasionsBefore(any()) } returns listOf(
+        coEvery { eventRepository.getUpcomingPreviews(any()) } returns listOf(
             event("exists"),
             event("missing_contact"),
             event("missing_event"),
@@ -174,7 +168,7 @@ class MessageGenerationWorkerTest {
 
     @Test
     fun `doWork keeps processing remaining events when one generation fails`() = runTest {
-        coEvery { eventRepository.getOccasionsBefore(any()) } returns listOf(event("e1"), event("e2"))
+        coEvery { eventRepository.getUpcomingPreviews(any()) } returns listOf(event("e1"), event("e2"))
         coEvery {
             generateMessageUseCase(GenerateMessageUseCase.Request("e1", regenerateFailedOccurrence = true))
         } throws RuntimeException("generation failed")
@@ -195,7 +189,7 @@ class MessageGenerationWorkerTest {
 
     @Test
     fun `doWork retries when event lookup fails`() = runTest {
-        coEvery { eventRepository.getOccasionsBefore(any()) } throws RuntimeException("database unavailable")
+        coEvery { eventRepository.getUpcomingPreviews(any()) } throws RuntimeException("database unavailable")
 
         val result = buildWorker().doWork()
 
@@ -222,26 +216,13 @@ class MessageGenerationWorkerTest {
             .build()
     }
 
-    private fun event(id: String, contactId: String = "c1"): Occasion {
-        return Occasion(
+    private fun event(id: String, contactId: String = "c1"): UpcomingEventPreview {
+        return UpcomingEventPreview(
             id = OccasionId(id),
             contactId = ContactId(contactId),
             type = OccasionType.BIRTHDAY,
             label = "Birthday",
-            date = OccasionDate(
-                dayOfMonth = 1,
-                month = 1,
-            ),
             nextOccurrenceMs = 1000L,
-            isActive = true,
-            notifyDaysBefore = 1,
-            source = "MANUAL",
-            confidenceScore = 100,
-            isVerified = true,
         )
-    }
-
-    private companion object {
-        const val SEVEN_DAYS_MS = 7L * 24L * 60L * 60L * 1000L
     }
 }

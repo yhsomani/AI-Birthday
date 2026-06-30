@@ -88,7 +88,7 @@ class RevivalWorkerTest {
         )
         val pendingSlot = slot<PendingMessageEntity>()
         coEvery { contactDao.getContactsForRevival(any()) } returns listOf(contact)
-        coEvery { geminiClient.generate(any()) } returns "Hey Priya, it's been a while!"
+        coEvery { geminiClient.generate(any()) } returns "Hey Priya, saw your new design portfolio update and thought it would be nice to catch up over coffee this week."
 
         val worker = TestListenableWorkerBuilder<RevivalWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
@@ -133,7 +133,7 @@ class RevivalWorkerTest {
         )
         val pendingSlot = slot<PendingMessageEntity>()
         coEvery { contactDao.getContactsForRevival(any()) } returns listOf(contact)
-        coEvery { geminiClient.generate(any()) } returns "Hey Priya, it's been a while!"
+        coEvery { geminiClient.generate(any()) } returns "Hey Priya, saw your new design portfolio update and thought it would be nice to catch up over coffee this week."
 
         val worker = TestListenableWorkerBuilder<RevivalWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
@@ -194,7 +194,7 @@ class RevivalWorkerTest {
     }
 
     @Test
-    fun `doWork downgrades fallback fully auto revival to smart approve`() = runTest {
+    fun `doWork downgrades fallback fully auto revival to manual review`() = runTest {
         val contact = ContactEntity(
             id = "c1",
             name = "Priya",
@@ -223,11 +223,11 @@ class RevivalWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
-        assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
+        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
         assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertEquals(true, pendingSlot.captured.isUsingFallback)
-        verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
+        verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
         verify { NotificationHelper.showRevivalNotification(any(), "Priya", any(), pendingSlot.captured.selectedVariantText, "c1") }
     }
 

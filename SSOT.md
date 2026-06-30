@@ -273,7 +273,6 @@ RelateAI
 |   +-- Splash routing
 |   +-- Onboarding setup checklist
 |   +-- Google authentication
-|   +-- Guest/developer bypass
 |   +-- Settings
 |   +-- Sign-out and local data purge
 +-- Relationship Data
@@ -345,7 +344,7 @@ Status definitions:
 |---|---|---|---|
 | F-001 | App shell, navigation, routes, permissions | Fully Implemented | Compose smoke coverage exists for permission rationale and bottom navigation; connected run needs idle device. |
 | F-002 | Splash and onboarding | Fully Implemented | First-run onboarding-to-auth routing covered; connected run needs idle device. |
-| F-003 | Authentication, guest mode, session state | Fully Implemented | Auth ViewModel and smoke action coverage exists; live OAuth requires credentials/device validation. |
+| F-003 | Google authentication and session state | Fully Implemented | Auth ViewModel and smoke action coverage exists; Google/Firebase OAuth requires credentials/device validation. Alternate login paths are not supported. |
 | F-004 | Settings and secure configuration | Fully Implemented | Biometric, quiet-hour, reminder, channel blackout, sync, Gmail, AI, and sign-out settings implemented; live handoffs pending. |
 | F-005 | Home dashboard and relationship planner | Fully Implemented | `HomeScreenInteractionTest` covers dashboard links, sync-error controls, and setup progress routing. |
 | F-006 | Contact sync, import, and deduplication | Fully Implemented | Foreground/background sync share Google + device merge and event discovery. |
@@ -396,7 +395,6 @@ Status definitions:
 | Feature | Depends on | Enables |
 |---|---|---|
 | Google authentication | Firebase Auth, Google Sign-In, People API scope | Google contacts sync, authenticated Gemini path |
-| Guest mode | AuthManager bypass, SecurePrefs guest flag | Local demo flow and mock contacts |
 | Contact sync | Auth, People API, ContactsProvider, Room, dedupe logic | Events, classification, messages, analytics |
 | Event discovery | Contact repository, event repository, date normalization | Message generation, reminders, dashboard |
 | AI classification | Contact sync, Gemini client | Relationship-aware defaults and personalization |
@@ -518,7 +516,6 @@ Important stored values:
 - AI wish generation toggle.
 - Contact sync token.
 - Onboarding completion.
-- Guest mode.
 - Last sync error.
 - Last backup timestamp.
 - Legacy unencrypted DB quarantine notice flag.
@@ -900,7 +897,7 @@ Version 1.0.0, 2026-06-08:
 - Built primary Compose screens for dashboard, contacts, events, messages, analytics, settings, style coach, backup, memory, gifts.
 - Added initial runtime permission flows.
 - Added Room schema v11 migrations.
-- Improved Google sync and mock-contact cleanup.
+- Improved Google sync and cleanup for legacy non-user contact rows.
 - Expanded automated tests to use cases, workers, migrations, and SMS receiver.
 
 Version 0.1.0, 2026-06-07:
@@ -1019,7 +1016,7 @@ Task status:
 
 | Task | Status |
 |---|---|
-| F-001-F-003: verify app shell, onboarding, auth, guest mode, and navigation on device. | Blocked by idle unlocked device. |
+| F-001-F-003: verify app shell, onboarding, Google auth, and navigation on device. | Blocked by idle unlocked device. |
 | F-001-F-003: add Compose UI smoke coverage for onboarding/auth and app-shell bottom navigation. | Done. |
 | F-001-F-003: make debug UI validation install side-by-side as `com.aistudio.relateai.qxtjrk.debug`. | Done. |
 | F-004/F-042: implement biometric lock enforcement. | Done. |
@@ -1092,11 +1089,11 @@ Failure and edge behavior:
 - If biometric/device credential is unavailable while lock is enabled, the app shows an unavailable state instead of exposing data.
 - Permission denial does not block browsing the app, but SMS sends and notifications may fail later and are surfaced by setup diagnostics.
 
-### 24.2 Splash, Onboarding, Authentication, Guest Mode, and Sign-Out
+### 24.2 Splash, Onboarding, Authentication, and Sign-Out
 
 Purpose:
 
-- Decide first screen, complete setup education, authenticate the user, support local guest/demo mode, and securely wipe local data at sign-out.
+- Decide first screen, complete setup education, authenticate the user through Google/Firebase, and securely wipe local data at sign-out.
 
 Main files:
 
@@ -1112,7 +1109,6 @@ Inputs:
 - Firebase/Google sign-in state.
 - Google sign-in result intent and result code.
 - Google web client id resource.
-- Optional developer bypass action.
 - Sign-out action from Settings.
 
 How it works:
@@ -1121,14 +1117,13 @@ How it works:
 - Onboarding marks `onboarding_complete=true` and can open AI Doctor setup checklist.
 - Google sign-in requests email, ID token, and Google Contacts readonly scope.
 - AuthManager signs into Firebase with Google credentials and stores profile state.
-- Guest bypass sets guest mode and a local developer profile.
+- Alternate login, demo login, and fake local account sessions are not supported.
 - Settings shows a destructive-action checklist before sign-out so the user sees what local data, preferences, credentials, and external access state are affected.
 - Sign-out cancels WorkManager jobs, clears notifications, clears Room tables, closes and resets the database, clears encrypted preferences, clears cached DB key material, deletes DB/WAL/SHM files, signs out from Firebase, and revokes Google access.
 
 Outputs:
 
 - Authenticated user profile with display name, email, and optional photo URL.
-- Guest user profile for developer/demo mode.
 - Navigation to Home after successful auth.
 - Full local purge and navigation back to Auth after sign-out.
 
@@ -1249,12 +1244,12 @@ Inputs:
 
 How it works:
 
-- Contact sync clears mock contacts when not in guest mode.
+- Contact sync clears any legacy non-user contact rows before importing fetched contacts.
 - Google contacts are fetched first; sync errors are stored in preferences.
 - Device contacts are fetched separately and can still be imported when Google sync partially fails.
 - Contacts are merged by normalized phone, normalized email, then normalized name. Google rows win conflicts; missing fields are filled from device rows.
 - Contact groups infer relationship defaults when relationship type is still unknown.
-- Guest mode seeds mock contacts if no real contacts are available.
+- If Google and device contact sources are empty, sync imports no contacts rather than creating synthetic contacts.
 - Event discovery runs immediately after sync so birthdays/anniversaries are available.
 - Contact List filters and sorts the current contact stream locally.
 - "Needs details" means nickname is blank, notes are blank, interests/shared history are empty, and classification confidence is below 0.6.
@@ -1275,7 +1270,7 @@ Validation and failure behavior:
 - Custom send time must set both hour and minute, with hour 0-23 and minute 0-59.
 - Budgets cannot be negative.
 - Missing contact returns Contact Not Found.
-- If Google sync fails and no device contacts exist outside guest mode, sync throws a visible error.
+- If Google sync fails and no device contacts exist, sync throws a visible error.
 
 ### 24.5 Contact Classification and Relationship Health
 
@@ -2281,7 +2276,7 @@ Modules and feature groups:
 
 | Module | Features | Primary users | Main output |
 |---|---|---|---|
-| Entry and account | Splash, onboarding, auth, guest mode, biometric lock, sign-out | End user, tester | Authenticated or guest app session |
+| Entry and account | Splash, onboarding, Google auth, biometric lock, sign-out | End user, tester | Authenticated app session |
 | Dashboard | Home metrics, readiness banner, relationship planner, quick actions | End user | Daily relationship command center |
 | Contacts | Google/device sync, dedupe, list filters, contact detail, personalization | End user | Local contact graph with preferences |
 | Events | Discovery, manual event creation, event filters, reminders | End user | Upcoming relationship moments |
@@ -2311,7 +2306,6 @@ Roles and permissions:
 | Role | Capabilities | Limits |
 |---|---|---|
 | Signed-in user | Google contacts sync, authenticated profile, Firebase/Gemini path where configured | Needs OAuth/Firebase configuration and runtime permissions. |
-| Guest/developer user | Local demo flow and mock contacts | No real Google sync; production use should sign in. |
 | App runtime | Background sync, event discovery, generation, reminders, dispatch, boot recovery | Must respect user toggles, permissions, quiet hours, blackout dates, approval mode, and disabled channels. |
 | Platform services | ContactsProvider, AlarmManager, WorkManager, SMS, Accessibility, notifications, FileProvider | Can be unavailable or permission-gated. |
 
@@ -2360,7 +2354,7 @@ Dependencies and integrations:
 | Feature | Current behavior | UX issue | Accessibility issue | Performance concern | Click/cognitive load | Recommended improvement |
 |---|---|---|---|---|---|---|
 | Onboarding and setup | Explains value and links to setup checklist; Home and AI Doctor now show shared setup progress | Setup still spans onboarding, Settings, permissions, Style Coach, and AI Doctor | Progress and blocker changes should be announced, not only visually shown | Rechecking setup state can become expensive if every surface recomputes independently | User must infer which setup step to resume | Extend setup progress into a guided resume flow with exact next actions. |
-| Auth and guest mode | Google sign-in plus developer bypass | Guest mode can hide missing production setup | Auth error text must remain readable and announceable during provider failures | OAuth retries can feel stalled without progress feedback | User may not know guest limits until a sync/generation action fails | Label guest mode clearly and show upgrade-to-sign-in action on dashboard. |
+| Auth | Google sign-in through Firebase/Google only | Missing OAuth/Firebase setup blocks entry instead of being hidden by a bypass | Auth error text must remain readable and announceable during provider failures | OAuth retries can feel stalled without progress feedback | User cannot continue until the real login works | Improve retry progress and route users to exact OAuth/Firebase setup fixes. |
 | Home dashboard | Metrics, ranked next action, supporting actions, setup blocker summary, setup progress, backup freshness, quick actions, planner, birthdays | Initial ranking covers contact sync, AI access, AI generation, approvals, backup, and the lowest-health relationship; failed-delivery and upcoming-event scoring still need refinement | Status cards need non-color status labels and semantic actions | Home can attempt sync on zero contacts; keep bounded to avoid load stalls | Many cards still compete below the primary action on small screens | Extend ranking with failed delivery and upcoming-event urgency signals. |
 | Contacts list | Search, filter, sort, sync error controls, quality labels, and action filters for missing relationship, missing channel, low health, and VIP | Quality labels and filters explain the first missing prerequisite; quick completion actions still need to use those states | Filter chips, quality labels, and search clear controls need labels and 48 dp targets | Large imports may make local filtering slow without profiling | User can scan and filter missing prerequisites, but still opens detail to fix them | Add quick complete-details action. |
 | Contact detail | Essentials, personalization, automation, and history sections with quality card, AI quality impact, generate wish, memory/gift/chat links, and explicit shortcuts | Grouping reduces the mixed-list problem; advanced preference editing is still dense | Dense dialog controls need grouped headings and clear field labels | Loading contact, events, memories, gifts, and history together can grow costly | User can scan by task intent and see why missing context matters, but still needs detail editing for deeper changes | Continue progressive disclosure inside the personalization editor. |

@@ -13,9 +13,11 @@ import com.example.domain.repository.GiftHistoryRepository
 import com.example.domain.service.AiService
 import com.example.domain.service.GiftSuggestion
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -33,6 +35,11 @@ data class GiftAdvisorUiState(
     val errorMessageRes: Int? = null
 )
 
+private data class GiftAdvisorData(
+    val contact: ContactGiftAdvisorProfile?,
+    val history: List<GiftHistoryRecord>,
+)
+
 @HiltViewModel
 class GiftAdvisorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -45,31 +52,38 @@ class GiftAdvisorViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(GiftAdvisorUiState())
     val uiState: StateFlow<GiftAdvisorUiState> = _uiState.asStateFlow()
+    private var loadJob: Job? = null
 
     init {
         loadData()
     }
 
     fun loadData() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessageRes = null)
             try {
-                val contact = contactRepository.getGiftAdvisorProfile(contactId)
-                val history = giftHistoryRepository.getRecordsByContact(contactId)
-                
-                val currentYear = Calendar.getInstance().get(Calendar.YEAR)
-                val spentThisYear = history.filter { it.year == currentYear }.sumOf { it.approxCostInr }
-                val budget = contact?.giftBudgetInr ?: 500
-                val remaining = (budget - spentThisYear).coerceAtLeast(0)
-
-                _uiState.value = _uiState.value.copy(
-                    contact = contact,
-                    giftHistory = history.sortedByDescending { it.year },
-                    totalSpentThisYear = spentThisYear,
-                    remainingBudget = remaining,
-                    isLoading = false,
-                    errorMessageRes = null
-                )
+                combine(
+                    contactRepository.getGiftAdvisorProfileFlow(contactId),
+                    giftHistoryRepository.getRecordsByContactFlow(contactId),
+                ) { contact, history ->
+                    GiftAdvisorData(contact = contact, history = history)
+                }.collect { data ->
+                    val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+                    val spentThisYear = data.history
+                        .filter { it.year == currentYear }
+                        .sumOf { it.approxCostInr }
+                    val budget = data.contact?.giftBudgetInr ?: 500
+                    val remaining = (budget - spentThisYear).coerceAtLeast(0)
+                    _uiState.value = _uiState.value.copy(
+                        contact = data.contact,
+                        giftHistory = data.history.sortedByDescending { it.year },
+                        totalSpentThisYear = spentThisYear,
+                        remainingBudget = remaining,
+                        isLoading = false,
+                        errorMessageRes = null,
+                    )
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -139,7 +153,7 @@ class GiftAdvisorViewModel @Inject constructor(
                     notes = cleanedNotes
                 )
                 giftHistoryRepository.upsertRecord(newGift)
-                loadData()
+                _uiState.value = _uiState.value.copy(errorMessageRes = null)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessageRes = R.string.gift_advisor_error_add)
             }
@@ -151,7 +165,7 @@ class GiftAdvisorViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 giftHistoryRepository.deleteRecord(gift.id)
-                loadData()
+                _uiState.value = _uiState.value.copy(errorMessageRes = null)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(errorMessageRes = R.string.gift_advisor_error_delete)
             }

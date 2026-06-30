@@ -132,8 +132,40 @@ class DesignSystemTokensTest {
 
     @Test
     fun elevationTokens_keepSurfacesSubtle() {
+        assertEquals(0f, RelateElevation.flat.value)
         assertTrue("Card elevation should stay subtle.", RelateElevation.card.value in 0f..3f)
         assertTrue("App bar elevation should stay subtle.", RelateElevation.appBar.value in 0f..4f)
+    }
+
+    @Test
+    fun appShell_usesThemeBackedColorRolesAndTokens() {
+        val source = sourceFile("app/src/main/java/com/example/MainActivity.kt").readText()
+
+        assertTrue(
+            "App shell should resolve colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        assertTrue(
+            "App shell should use design tokens for spacing, sizing, and elevation.",
+            source.contains("RelateSpacing.") &&
+                source.contains("RelateSize.") &&
+                source.contains("RelateElevation."),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSurfaceVariant",
+        ).forEach { rawColor ->
+            assertTrue(
+                "MainActivity should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+        assertTrue(
+            "App shell should avoid local dp dimensions for layout and elevation.",
+            !Regex("""\d+\.dp""").containsMatchIn(source),
+        )
     }
 
     @Test
@@ -482,6 +514,247 @@ class DesignSystemTokensTest {
         }
     }
 
+    @Test
+    fun wishPreviewScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt")
+            .readText()
+
+        assertTrue(
+            "WishPreviewScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateOnBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSurfaceVariant",
+        ).forEach { rawColor ->
+            assertTrue(
+                "WishPreviewScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun automationSetupScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt")
+            .readText()
+
+        assertTrue(
+            "AutomationSetupScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        assertTrue(
+            "AutomationSetupScreen should resolve success and warning readiness colors through MaterialTheme.relateSemanticColors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSuccess",
+            "RelateWarning",
+        ).forEach { rawColor ->
+            assertTrue(
+                "AutomationSetupScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun settingsScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt")
+            .readText()
+
+        assertTrue(
+            "SettingsScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateOnBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSurfaceVariant",
+        ).forEach { rawColor ->
+            assertTrue(
+                "SettingsScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun contactDetailScreen_usesThemeBackedColorRoles() {
+        val sources = sourceDirectory("app/src/main/java/com/example/ui/screens/contacts")
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "kt" && it.name.startsWith("ContactDetail") }
+            .toList()
+        val source = sources.joinToString(separator = "\n") { it.readText() }
+
+        assertTrue(
+            "Contact Detail presentation should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateOnBackground",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSurfaceVariant",
+        ).forEach { rawColor ->
+            assertTrue(
+                "Contact Detail presentation should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun messagesScreen_usesThemeBackedColorRoles() {
+        val sources = sourceDirectory("app/src/main/java/com/example/ui/screens/messages")
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .toList()
+        val source = sources.joinToString(separator = "\n") { it.readText() }
+
+        assertTrue(
+            "Messages screen presentation should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        assertTrue(
+            "Messages screen presentation should resolve success and warning queue colors through MaterialTheme.relateSemanticColors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateError",
+            "RelateOnBackground",
+            "RelateOnPrimary",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSecondary",
+            "RelateSuccess",
+            "RelateSurfaceVariant",
+            "RelateTertiary",
+            "RelateWarning",
+        ).forEach { rawColor ->
+            val offenders = sources
+                .filter { Regex("""\b$rawColor\b""").containsMatchIn(it.readText()) }
+                .map { it.name }
+
+            assertTrue(
+                "Messages screen presentation should not import or reference $rawColor directly: $offenders",
+                offenders.isEmpty(),
+            )
+        }
+    }
+
+    @Test
+    fun analyticsScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt")
+            .readText()
+
+        assertTrue(
+            "AnalyticsScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        assertTrue(
+            "AnalyticsScreen should resolve success and warning reporting colors through MaterialTheme.relateSemanticColors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        listOf(
+            "RelateDarkBackground",
+            "RelateError",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSecondary",
+            "RelateSuccess",
+            "RelateSurfaceVariant",
+            "RelateTertiary",
+            "RelateWarning",
+        ).forEach { rawColor ->
+            assertTrue(
+                "AnalyticsScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun giftAdvisorScreen_usesThemeBackedColorRoles() {
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt")
+            .readText()
+
+        assertTrue(
+            "GiftAdvisorScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            source.contains("MaterialTheme.colorScheme"),
+        )
+        assertTrue(
+            "GiftAdvisorScreen should resolve success and card colors through MaterialTheme.relateSemanticColors.",
+            source.contains("MaterialTheme.relateSemanticColors"),
+        )
+        listOf(
+            "RelateCard",
+            "RelateDarkBackground",
+            "RelateError",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSuccess",
+        ).forEach { rawColor ->
+            assertTrue(
+                "GiftAdvisorScreen should not import or reference $rawColor directly.",
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
+    fun screenshotFixtures_useThemeBackedFixtureSurfaces() {
+        val fixtureFiles = sourceDirectory("app/src/test/java/com/example/ui/screenshots")
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .toList()
+
+        assertTrue("Screenshot fixture sources should be discoverable.", fixtureFiles.isNotEmpty())
+
+        listOf(
+            "RelateCard",
+            "RelateCardBorder",
+            "RelateDarkBackground",
+            "RelateOnBackground",
+            "RelateOnPrimary",
+            "RelateOnSurfaceVariant",
+            "RelatePrimary",
+            "RelateSecondary",
+            "RelateSuccess",
+            "RelateSurfaceVariant",
+            "RelateTertiary",
+            "RelateWarning",
+            "RelateError",
+        ).forEach { rawColor ->
+            val offenders = fixtureFiles
+                .filter { Regex("""\b$rawColor\b""").containsMatchIn(it.readText()) }
+                .map { it.name }
+
+            assertTrue(
+                "Screenshot fixtures should use MaterialTheme color roles instead of $rawColor: $offenders",
+                offenders.isEmpty(),
+            )
+        }
+
+        val rawLiteralOffenders = fixtureFiles
+            .filter { it.readText().contains("Color(0x") }
+            .map { it.name }
+        assertTrue(
+            "Screenshot fixtures should not define raw color literals: $rawLiteralOffenders",
+            rawLiteralOffenders.isEmpty(),
+        )
+    }
+
     private fun sourceFile(rootRelativePath: String): File {
         return listOf(
             File(rootRelativePath),
@@ -489,5 +762,14 @@ class DesignSystemTokensTest {
             File(rootRelativePath.removePrefix("app/")),
         ).firstOrNull { it.exists() }
             ?: error("Could not locate source file $rootRelativePath from ${File(".").absolutePath}")
+    }
+
+    private fun sourceDirectory(rootRelativePath: String): File {
+        return listOf(
+            File(rootRelativePath),
+            File("../$rootRelativePath"),
+            File(rootRelativePath.removePrefix("app/")),
+        ).firstOrNull { it.isDirectory }
+            ?: error("Could not locate source directory $rootRelativePath from ${File(".").absolutePath}")
     }
 }

@@ -57,8 +57,6 @@ class AuthScreenshotTest {
             AuthContent(
                 state = AuthUiState(),
                 onSignIn = {},
-                onDevBypass = {},
-                showDevBypass = true,
             )
         }
     }

@@ -13,8 +13,9 @@ class TestSendUseCase @Inject constructor(
     suspend operator fun invoke(messageText: String): Outcome {
         val cleaned = messageText.trim()
         if (cleaned.isBlank()) return Outcome.BlankMessage
+        val senderEmail = preferencesRepository.getSenderEmail().trim()
         if (
-            preferencesRepository.getSenderEmail().isBlank() ||
+            senderEmail.isBlank() ||
             preferencesRepository.getSenderEmailPassword().isBlank()
         ) {
             return Outcome.MissingEmailSetup
@@ -22,6 +23,10 @@ class TestSendUseCase @Inject constructor(
 
         return try {
             testSendService.sendEmailToSelf(cleaned)
+            preferencesRepository.setLastSuccessfulEmailTest(
+                senderEmail = senderEmail,
+                timestampMs = System.currentTimeMillis(),
+            )
             Outcome.Sent
         } catch (_: Exception) {
             Outcome.SendFailed

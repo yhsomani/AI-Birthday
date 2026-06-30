@@ -79,9 +79,21 @@ internal fun Context.dispatchSmsRoute(
     phoneNumber: String,
     messageText: String,
     sentMessageId: String,
+    dispatchAttemptId: String? = null,
+    pendingMessageId: String? = null,
 ): SmsDispatchRouteResult {
     return try {
-        SmsSender(this).send(phoneNumber, messageText, sentMessageId)
+        if (dispatchAttemptId.isNullOrBlank() && pendingMessageId.isNullOrBlank()) {
+            SmsSender(this).send(phoneNumber, messageText, sentMessageId)
+        } else {
+            SmsSender(this).send(
+                phoneNumber = phoneNumber,
+                message = messageText,
+                sentMessageId = sentMessageId,
+                dispatchAttemptId = dispatchAttemptId,
+                pendingMessageId = pendingMessageId,
+            )
+        }
         SmsDispatchRouteResult(
             sent = true,
             failure = null,

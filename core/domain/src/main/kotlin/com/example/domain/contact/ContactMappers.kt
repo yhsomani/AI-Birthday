@@ -23,6 +23,7 @@ import com.example.domain.model.contact.ContactWishContext
 import com.example.domain.model.contact.RelationshipAnalyticsCount
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.automation.EmailAddressSyntaxPolicy
 import com.example.domain.model.dispatch.MessageDispatchRecipient
 
 fun ContactEntity.toAutomationProfile(): ContactAutomationProfile {
@@ -40,6 +41,11 @@ fun ContactEntity.toAutomationReadinessProfile(): ContactAutomationReadinessProf
     return ContactAutomationReadinessProfile(
         id = ContactId(id),
         preferredChannel = MessageChannel.fromRaw(preferredChannel),
+        automationMode = ApprovalMode.fromRaw(automationMode),
+        skipAutoWish = skipAutoWish,
+        hasPrimaryPhone = !primaryPhone.isNullOrBlank(),
+        hasPrimaryEmail = EmailAddressSyntaxPolicy.isUsableAddress(primaryEmail),
+        hasAutomatableOccasion = hasAutomatableOccasion(),
         nickname = nickname,
         notesText = notesText,
         interestsJson = interestsJson,
@@ -52,7 +58,7 @@ fun ContactEntity.toDeliveryRouteProfile(): ContactDeliveryRouteProfile {
     return ContactDeliveryRouteProfile(
         preferredChannel = MessageChannel.fromRaw(preferredChannel),
         hasPrimaryPhone = !primaryPhone.isNullOrBlank(),
-        hasPrimaryEmail = !primaryEmail.isNullOrBlank(),
+        hasPrimaryEmail = EmailAddressSyntaxPolicy.isUsableAddress(primaryEmail),
     )
 }
 
@@ -263,4 +269,14 @@ fun RelationshipTypeCount.toRelationshipAnalyticsCount(): RelationshipAnalyticsC
         relationshipType = relationshipType,
         count = count,
     )
+}
+
+private fun ContactEntity.hasAutomatableOccasion(): Boolean {
+    return hasCompleteDate(birthdayDay, birthdayMonth) ||
+        hasCompleteDate(anniversaryDay, anniversaryMonth) ||
+        hasCompleteDate(workStartDay, workStartMonth)
+}
+
+private fun hasCompleteDate(day: Int?, month: Int?): Boolean {
+    return day != null && month != null
 }

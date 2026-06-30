@@ -29,9 +29,8 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.ui.theme.RelateCard
-import com.example.core.ui.theme.RelateDarkBackground
 import com.example.core.ui.theme.RelateSpacing
+import com.example.core.ui.theme.relateSemanticColors
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.ContactId
@@ -178,6 +177,42 @@ class ContactDetailScreenshotTest {
     }
 
     @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun contactDetailPreferencesForm_compactPhoneHindiLargeFont() {
+        setContactPreferencesFormContent(
+            contact = contactProfile(
+                displayName = "आशा मेहरा",
+                contactGroup = "करीबी दोस्त",
+                nickname = "आशा",
+                preferredLanguage = "hi",
+                notesText = "व्यक्तिगत याद के साथ छोटा और आत्मीय संदेश पसंद है।",
+            ),
+            interests = "संगीत, कॉफी, सप्ताहांत की सैर",
+            sensitiveTopics = "काम का तनाव",
+            lifePhase = "नया शहर",
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(ContactDetailTestTags.PREFERENCES_DIALOG)
+            .captureRoboImage(
+                "src/test/screenshots/baseline/contact_detail_preferences_form_compact_phone_hindi_large_font.png"
+            )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun contactDetailPreferencesForm_typicalPhone() {
+        setContactPreferencesFormContent(
+            contact = contactProfile(
+                notesText = "Prefers warm, concise wishes with one personal memory and no work reminders.",
+            ),
+        )
+
+        composeRule.onNodeWithTag(ContactDetailTestTags.PREFERENCES_DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/contact_detail_preferences_form_typical_phone.png")
+    }
+
+    @Test
     fun contactDetailPreferencesFormBottom_compactPhoneLargeFont() {
         setContactPreferencesFormContent(
             contact = contactProfile(
@@ -190,6 +225,46 @@ class ContactDetailScreenshotTest {
             .performScrollTo()
         composeRule.onNodeWithTag(ContactDetailTestTags.PREFERENCES_DIALOG)
             .captureRoboImage("src/test/screenshots/baseline/contact_detail_preferences_form_bottom_compact_phone_large_font.png")
+    }
+
+    @Test
+    @Config(qualifiers = "hi-rIN-w360dp-h800dp-xhdpi")
+    fun contactDetailPreferencesFormBottom_compactPhoneHindiLargeFont() {
+        setContactPreferencesFormContent(
+            contact = contactProfile(
+                displayName = "आशा मेहरा",
+                contactGroup = "करीबी दोस्त",
+                nickname = "आशा",
+                preferredLanguage = "hi",
+                notesText = "व्यक्तिगत याद, नरम समापन, और काम की याद दिलाने वाली बातों से बचने वाला संदेश पसंद है।",
+            ),
+            interests = "संगीत, कॉफी, सप्ताहांत की सैर",
+            sensitiveTopics = "काम का तनाव",
+            lifePhase = "नया शहर",
+            fontScale = LargeFontScale,
+        )
+
+        composeRule.onNodeWithTag(ContactDetailTestTags.PREFERENCES_SKIP_AUTO_WISH)
+            .performScrollTo()
+        composeRule.onNodeWithTag(ContactDetailTestTags.PREFERENCES_DIALOG)
+            .captureRoboImage(
+                "src/test/screenshots/baseline/contact_detail_preferences_form_bottom_compact_phone_hindi_large_font.png"
+            )
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-xhdpi")
+    fun contactDetailPreferencesFormBottom_typicalPhone() {
+        setContactPreferencesFormContent(
+            contact = contactProfile(
+                notesText = "Prefers warm, concise wishes with one personal memory, a soft sign-off, and no work reminders.",
+            ),
+        )
+
+        composeRule.onNodeWithTag(ContactDetailTestTags.PREFERENCES_SKIP_AUTO_WISH)
+            .performScrollTo()
+        composeRule.onNodeWithTag(ContactDetailTestTags.PREFERENCES_DIALOG)
+            .captureRoboImage("src/test/screenshots/baseline/contact_detail_preferences_form_bottom_typical_phone.png")
     }
 
     @Test
@@ -225,19 +300,32 @@ class ContactDetailScreenshotTest {
 
     private fun setContactPreferencesFormContent(
         contact: ContactDetailProfile,
+        interests: String = "music, coffee, weekend hikes",
+        sensitiveTopics: String = "work stress",
+        lifePhase: String = "New city",
         fontScale: Float = DefaultFontScale,
     ) {
         composeRule.setRelateScreenshotContent(fontScale = fontScale) {
-            ContactPreferencesFormSnapshot(contact = contact)
+            ContactPreferencesFormSnapshot(
+                contact = contact,
+                interests = interests,
+                sensitiveTopics = sensitiveTopics,
+                lifePhase = lifePhase,
+            )
         }
     }
 
     @Composable
-    private fun ContactPreferencesFormSnapshot(contact: ContactDetailProfile) {
+    private fun ContactPreferencesFormSnapshot(
+        contact: ContactDetailProfile,
+        interests: String,
+        sensitiveTopics: String,
+        lifePhase: String,
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(RelateDarkBackground)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(RelateSpacing.screenHorizontal),
             contentAlignment = Alignment.Center,
         ) {
@@ -246,7 +334,7 @@ class ContactDetailScreenshotTest {
                     .fillMaxWidth()
                     .testTag(ContactDetailTestTags.PREFERENCES_DIALOG),
                 colors = CardDefaults.cardColors(
-                    containerColor = RelateCard,
+                    containerColor = MaterialTheme.relateSemanticColors.cardContainer,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
                 shape = MaterialTheme.shapes.extraLarge,
@@ -282,11 +370,11 @@ class ContactDetailScreenshotTest {
                         onGiftBudgetChange = {},
                         annualBudget = contact.annualBudgetInr.toString(),
                         onAnnualBudgetChange = {},
-                        interests = "music, coffee, weekend hikes",
+                        interests = interests,
                         onInterestsChange = {},
-                        sensitiveTopics = "work stress",
+                        sensitiveTopics = sensitiveTopics,
                         onSensitiveTopicsChange = {},
-                        lifePhase = "New city",
+                        lifePhase = lifePhase,
                         onLifePhaseChange = {},
                         notes = contact.notesText,
                         onNotesChange = {},

@@ -14,9 +14,9 @@ class GlobalAutomationModePrefsMapperTest {
     }
 
     @Test
-    fun `toSupportedApprovalMode falls back to smart approve for unsupported raw values`() {
+    fun `toSupportedApprovalMode falls back to fully auto for unsupported raw values`() {
         assertEquals(
-            ApprovalMode.SMART_APPROVE,
+            ApprovalMode.FULLY_AUTO,
             GlobalAutomationModePrefsMapper.toSupportedApprovalMode("MANUAL")
         )
     }
@@ -30,9 +30,9 @@ class GlobalAutomationModePrefsMapperTest {
     }
 
     @Test
-    fun `toSupportedRaw falls back to smart approve for unsupported modes`() {
+    fun `toSupportedRaw falls back to fully auto for unsupported modes`() {
         assertEquals(
-            ApprovalMode.SMART_APPROVE.raw,
+            ApprovalMode.FULLY_AUTO.raw,
             GlobalAutomationModePrefsMapper.toSupportedRaw(ApprovalMode.UNKNOWN)
         )
     }

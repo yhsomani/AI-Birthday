@@ -8,8 +8,12 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -17,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,7 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -40,10 +44,9 @@ import androidx.navigation.compose.rememberNavController
 import com.example.core.auth.BiometricAuthManager
 import com.example.core.prefs.SecurePrefs
 import com.example.core.ui.theme.RelateAITheme
-import com.example.core.ui.theme.RelateDarkBackground
-import com.example.core.ui.theme.RelateOnSurfaceVariant
-import com.example.core.ui.theme.RelatePrimary
-import com.example.core.ui.theme.RelateSurfaceVariant
+import com.example.core.ui.theme.RelateElevation
+import com.example.core.ui.theme.RelateSize
+import com.example.core.ui.theme.RelateSpacing
 import com.example.ui.navigation.RelateNavGraph
 import com.example.ui.navigation.Screen
 import com.example.ui.navigation.bottomNavItems
@@ -193,22 +196,22 @@ private fun BiometricLockGate(
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = RelateDarkBackground,
+        color = MaterialTheme.colorScheme.background,
     ) {
-        androidx.compose.foundation.layout.Box(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(RelateSpacing.xl),
             contentAlignment = Alignment.Center,
         ) {
-            androidx.compose.foundation.layout.Column(
+            Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
             ) {
                 Text(
                     text = stringResource(R.string.biometric_lock_title),
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                    style = androidx.compose.material3.MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
@@ -218,11 +221,14 @@ private fun BiometricLockGate(
                         is BiometricGateState.Error -> stringResource(R.string.biometric_lock_error, state.message)
                         else -> stringResource(R.string.biometric_lock_message)
                     },
-                    color = RelateOnSurfaceVariant,
-                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
                 if (state == BiometricGateState.Authenticating) {
-                    CircularProgressIndicator(color = RelatePrimary)
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(RelateSize.progressIndicator),
+                    )
                 } else {
                     Button(
                         onClick = onUnlock,
@@ -257,21 +263,23 @@ fun RelateApp(
         Screen.ContactList.route,
         Screen.Events.route,
         Screen.Messages.route,
+        Screen.Messages.filteredRoute,
         Screen.Analytics.route,
     )
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = RelateDarkBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
-                    containerColor = RelateDarkBackground,
-                    tonalElevation = 0.dp,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    tonalElevation = RelateElevation.flat,
                 ) {
                     bottomNavItems.forEach { item ->
                         val selected = currentDestination?.hierarchy?.any {
-                            it.route == item.screen.route
+                            it.route == item.screen.route ||
+                                (item.screen == Screen.Messages && it.route == Screen.Messages.filteredRoute)
                         } == true
                         NavigationBarItem(
                             selected = selected,
@@ -292,11 +300,11 @@ fun RelateApp(
                             },
                             label = { Text(text = stringResource(item.labelRes)) },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = RelatePrimary,
-                                selectedTextColor = RelatePrimary,
-                                unselectedIconColor = RelateOnSurfaceVariant,
-                                unselectedTextColor = RelateOnSurfaceVariant,
-                                indicatorColor = RelateSurfaceVariant,
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
                             ),
                         )
                     }

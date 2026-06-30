@@ -28,6 +28,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -56,15 +57,18 @@ class MessagesViewModelTest {
     private val securePrefs: SecurePrefs = mockk(relaxed = true)
     private val dispatcher = StandardTestDispatcher()
     private lateinit var context: Context
+    private lateinit var preferenceChanges: MutableSharedFlow<Unit>
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         context = ApplicationProvider.getApplicationContext()
+        preferenceChanges = MutableSharedFlow(extraBufferCapacity = 1)
         every { messageRepository.getPendingListItems() } returns MutableStateFlow(emptyList())
         every { messageRepository.getSentListItems() } returns MutableStateFlow(emptyList())
         every { contactRepository.getMessageContexts() } returns MutableStateFlow(emptyList())
         every { eventRepository.getEventListItems() } returns MutableStateFlow(emptyList())
+        every { securePrefs.observeChanges() } returns preferenceChanges
         every { securePrefs.getChannelBlackout() } returns "[]"
         every { securePrefs.getSenderEmail() } returns "sender@example.com"
         every { securePrefs.getSenderEmailPassword() } returns "app-password"
@@ -257,6 +261,42 @@ class MessagesViewModelTest {
         assertEquals(MessageReadiness.MISSING_PHONE, readinessById["pm_sms"])
         assertEquals(MessageReadiness.EMAIL_SETUP_MISSING, readinessById["pm_email"])
         assertEquals(MessageReadiness.CHANNEL_DISABLED, readinessById["pm_whatsapp"])
+    }
+
+    @Test
+    fun `preference changes immediately recalculate message readiness`() = runTest(dispatcher) {
+        val now = System.currentTimeMillis()
+        every { securePrefs.getSenderEmail() } returns ""
+        every { securePrefs.getSenderEmailPassword() } returns ""
+        every { messageRepository.getPendingListItems() } returns MutableStateFlow(
+            listOf(
+                pending("pm_email", "c_email", "e_email", MessageChannel.EMAIL.raw, now + 3 * 86_400_000L),
+            )
+        )
+        every { contactRepository.getMessageContexts() } returns MutableStateFlow(
+            listOf(
+                contact("c_email", "Email Ready", primaryEmail = "ready@example.com"),
+            )
+        )
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(
+            listOf(
+                event("e_email", "c_email", OccasionType.BIRTHDAY, now),
+            )
+        )
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        assertEquals(listOf("pm_email"), viewModel.uiState.value.blockedMessages.map { it.id })
+        assertEquals(emptyList<String>(), viewModel.uiState.value.needsReviewMessages.map { it.id })
+
+        every { securePrefs.getSenderEmail() } returns "sender@example.com"
+        every { securePrefs.getSenderEmailPassword() } returns "app-password"
+        preferenceChanges.tryEmit(Unit)
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), viewModel.uiState.value.blockedMessages.map { it.id })
+        assertEquals(listOf("pm_email"), viewModel.uiState.value.needsReviewMessages.map { it.id })
     }
 
     @Test

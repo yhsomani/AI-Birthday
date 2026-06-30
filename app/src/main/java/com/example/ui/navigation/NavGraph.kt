@@ -4,8 +4,13 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.navigation.NamedNavArgument
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDeepLink
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -13,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import com.example.domain.navigation.RelateDeepLinks
+import com.google.firebase.auth.FirebaseAuth
 import com.example.ui.screens.splash.SplashScreen
 import com.example.ui.screens.onboarding.OnboardingScreen
 import com.example.ui.screens.auth.AuthScreen
@@ -31,6 +37,7 @@ import com.example.ui.screens.backup.BackupRestoreScreen
 import com.example.ui.screens.memoryvault.MemoryVaultScreen
 import com.example.ui.screens.giftadvisor.GiftAdvisorScreen
 import com.example.ui.screens.setup.AutomationSetupScreen
+import com.example.ui.viewmodel.MessageChannelFilter
 
 private const val ANIM_DURATION = 300
 
@@ -39,6 +46,7 @@ fun RelateNavGraph(
     navController: NavHostController,
     modifier: Modifier = Modifier,
     startDestination: String = Screen.Splash.route,
+    isSignedIn: () -> Boolean = { FirebaseAuth.getInstance().currentUser != null },
 ) {
     NavHost(
         navController = navController,
@@ -119,8 +127,10 @@ fun RelateNavGraph(
                 }
             )
         }
-        composable(
+        authenticatedComposable(
             route = Screen.Home.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
             deepLinks = listOf(
                 navDeepLink {
                     uriPattern = RelateDeepLinks.Home.pattern
@@ -154,8 +164,10 @@ fun RelateNavGraph(
                 },
             )
         }
-        composable(
+        authenticatedComposable(
             route = Screen.ContactList.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
             deepLinks = listOf(
                 navDeepLink {
                     uriPattern = RelateDeepLinks.Contacts.pattern
@@ -168,8 +180,10 @@ fun RelateNavGraph(
                 }
             )
         }
-        composable(
+        authenticatedComposable(
             route = Screen.ContactDetail.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
             arguments = listOf(navArgument("contactId") { type = NavType.StringType }),
             deepLinks = listOf(
                 navDeepLink {
@@ -195,8 +209,10 @@ fun RelateNavGraph(
                 }
             )
         }
-        composable(
+        authenticatedComposable(
             route = Screen.WishPreview.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
             arguments = listOf(
                 navArgument("contactId") { type = NavType.StringType },
                 navArgument("messageRef") { type = NavType.StringType },
@@ -224,11 +240,17 @@ fun RelateNavGraph(
                 },
             )
         }
-        composable(Screen.Events.route) {
+        authenticatedComposable(
+            route = Screen.Events.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
+        ) {
             EventsScreen()
         }
-        composable(
+        authenticatedComposable(
             route = Screen.Messages.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
             deepLinks = listOf(
                 navDeepLink {
                     uriPattern = RelateDeepLinks.Messages.pattern
@@ -244,8 +266,29 @@ fun RelateNavGraph(
                 },
             )
         }
-        composable(
+        authenticatedComposable(
+            route = Screen.Messages.filteredRoute,
+            navController = navController,
+            isSignedIn = isSignedIn,
+            arguments = listOf(navArgument(Screen.Messages.channelArg) { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val channel = RouteArgumentCodec.decode(backStackEntry.arguments?.getString(Screen.Messages.channelArg))
+            val channelFilter = channel.toMessageChannelFilter()
+            MessagesScreen(
+                initialChannelFilter = channelFilter,
+                verificationChannelFilter = channelFilter,
+                onNavigateToWish = { contactId, messageRef ->
+                    navController.navigate(Screen.WishPreview.createRoute(contactId, messageRef))
+                },
+                onNavigateToAutomationSetup = {
+                    navController.navigate(Screen.AutomationSetup.route)
+                },
+            )
+        }
+        authenticatedComposable(
             route = Screen.Settings.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
             deepLinks = listOf(
                 navDeepLink {
                     uriPattern = RelateDeepLinks.Settings.pattern
@@ -272,26 +315,40 @@ fun RelateNavGraph(
                 }
             )
         }
-        composable(Screen.Analytics.route) {
+        authenticatedComposable(
+            route = Screen.Analytics.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
+        ) {
             AnalyticsScreen(
                 onNavigateToActivityHistory = {
                     navController.navigate(Screen.ActivityHistory.route)
                 }
             )
         }
-        composable(Screen.ActivityHistory.route) {
+        authenticatedComposable(
+            route = Screen.ActivityHistory.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
+        ) {
             ActivityHistoryScreen(
                 onBack = { navController.popBackStack() },
                 onOpenRoute = { route -> navController.navigate(route) },
             )
         }
-        composable(Screen.StyleCoach.route) {
+        authenticatedComposable(
+            route = Screen.StyleCoach.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
+        ) {
             StyleCoachScreen(
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(
+        authenticatedComposable(
             route = Screen.BackupRestore.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
             deepLinks = listOf(
                 navDeepLink {
                     uriPattern = RelateDeepLinks.BackupRestore.pattern
@@ -302,7 +359,11 @@ fun RelateNavGraph(
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(Screen.AutomationSetup.route) {
+        authenticatedComposable(
+            route = Screen.AutomationSetup.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
+        ) {
             AutomationSetupScreen(
                 onBack = { navController.popBackStack() },
                 onOpenSettings = {
@@ -316,21 +377,31 @@ fun RelateNavGraph(
                 onOpenContacts = {
                     navController.navigate(Screen.ContactList.route)
                 },
+                onOpenMessages = { channelFilter ->
+                    navController.navigate(
+                        channelFilter?.let { Screen.Messages.createFilteredRoute(it.name) }
+                            ?: Screen.Messages.route,
+                    )
+                },
                 onOpenActivityHistory = {
                     navController.navigate(Screen.ActivityHistory.route)
                 },
             )
         }
-        composable(
+        authenticatedComposable(
             route = Screen.ChatHistory.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
             arguments = listOf(navArgument("contactId") { type = NavType.StringType })
         ) {
             ChatHistoryScreen(
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(
+        authenticatedComposable(
             route = Screen.MemoryVault.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
             arguments = listOf(navArgument("contactId") { type = NavType.StringType })
         ) { backStackEntry ->
             val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
@@ -339,8 +410,10 @@ fun RelateNavGraph(
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(
+        authenticatedComposable(
             route = Screen.GiftAdvisor.route,
+            navController = navController,
+            isSignedIn = isSignedIn,
             arguments = listOf(navArgument("contactId") { type = NavType.StringType })
         ) { backStackEntry ->
             val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
@@ -348,6 +421,49 @@ fun RelateNavGraph(
                 contactId = contactId,
                 onBack = { navController.popBackStack() }
             )
+        }
+    }
+}
+
+private fun String.toMessageChannelFilter(): MessageChannelFilter? {
+    return MessageChannelFilter.entries.firstOrNull { it.name.equals(this, ignoreCase = true) }
+}
+
+private fun NavGraphBuilder.authenticatedComposable(
+    route: String,
+    navController: NavHostController,
+    isSignedIn: () -> Boolean,
+    arguments: List<NamedNavArgument> = emptyList(),
+    deepLinks: List<NavDeepLink> = emptyList(),
+    content: @Composable (NavBackStackEntry) -> Unit,
+) {
+    composable(
+        route = route,
+        arguments = arguments,
+        deepLinks = deepLinks,
+    ) { backStackEntry ->
+        RequireSignedIn(
+            navController = navController,
+            isSignedIn = isSignedIn,
+        ) {
+            content(backStackEntry)
+        }
+    }
+}
+
+@Composable
+private fun RequireSignedIn(
+    navController: NavHostController,
+    isSignedIn: () -> Boolean,
+    content: @Composable () -> Unit,
+) {
+    if (isSignedIn()) {
+        content()
+    } else {
+        LaunchedEffect(Unit) {
+            navController.navigate(Screen.Auth.route) {
+                popUpTo(0) { inclusive = true }
+            }
         }
     }
 }

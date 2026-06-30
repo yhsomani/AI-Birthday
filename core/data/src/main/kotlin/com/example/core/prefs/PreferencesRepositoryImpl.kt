@@ -2,6 +2,7 @@ package com.example.core.prefs
 
 import com.example.domain.model.ApprovalMode
 import com.example.domain.service.PreferencesRepository
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -9,6 +10,8 @@ import javax.inject.Singleton
 class PreferencesRepositoryImpl @Inject constructor(
     private val securePrefs: SecurePrefs
 ) : PreferencesRepository {
+
+    override fun observeChanges(): Flow<Unit> = securePrefs.observeChanges()
 
     override fun setGoogleOAuthToken(token: String) = securePrefs.setGoogleOAuthToken(token)
     override fun getGoogleOAuthToken(): String = securePrefs.getGoogleOAuthToken()
@@ -21,6 +24,13 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     override fun setSenderEmailPassword(pw: String) = securePrefs.setSenderEmailPassword(pw)
     override fun getSenderEmailPassword(): String = securePrefs.getSenderEmailPassword()
+
+    override fun setLastSuccessfulEmailTest(senderEmail: String, timestampMs: Long) =
+        securePrefs.setLastSuccessfulEmailTest(senderEmail, timestampMs)
+    override fun getLastSuccessfulEmailTestSender(): String =
+        securePrefs.getLastSuccessfulEmailTestSender()
+    override fun getLastSuccessfulEmailTestMs(): Long =
+        securePrefs.getLastSuccessfulEmailTestMs()
 
     override fun setGlobalAutomationMode(mode: ApprovalMode) = securePrefs.setGlobalApprovalMode(mode)
     override fun getGlobalAutomationMode(): ApprovalMode = securePrefs.getGlobalApprovalMode()
@@ -60,9 +70,6 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     override fun setOnboardingComplete(complete: Boolean) = securePrefs.setOnboardingComplete(complete)
     override fun isOnboardingComplete(): Boolean = securePrefs.isOnboardingComplete()
-
-    override fun setGuestMode(enabled: Boolean) = securePrefs.setGuestMode(enabled)
-    override fun isGuestMode(): Boolean = securePrefs.isGuestMode()
 
     override fun setLastSyncError(error: String?) = securePrefs.setLastSyncError(error)
     override fun getLastSyncError(): String? = securePrefs.getLastSyncError()

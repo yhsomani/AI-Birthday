@@ -302,6 +302,9 @@
     <string name="automation_setup_action_open_settings">सेटिंग्स खोलें</string>
     <string name="automation_setup_action_open_style_coach">स्टाइल कोच खोलें</string>
     <string name="automation_setup_action_review_contacts">संपर्क समीक्षा करें</string>
+    <string name="automation_setup_action_review_messages">संदेश समीक्षा करें</string>
+    <string name="automation_setup_action_review_sms_messages">SMS संदेश समीक्षा करें</string>
+    <string name="automation_setup_action_review_whatsapp_messages">WhatsApp संदेश समीक्षा करें</string>
     <string name="automation_setup_action_open_accessibility">एक्सेसिबिलिटी खोलें</string>
     <string name="automation_setup_action_open_battery_settings">बैटरी सेटिंग्स खोलें</string>
     <string name="automation_setup_action_app_settings">ऐप सेटिंग्स</string>
@@ -323,6 +326,22 @@
     <string name="automation_setup_check_ai_wish_generation">AI शुभकामना निर्माण</string>
     <string name="automation_setup_ai_wish_enabled">सेटिंग्स में चालू है।</string>
     <string name="automation_setup_ai_wish_disabled">सेटिंग्स में बंद है।</string>
+    <string name="automation_setup_check_full_automation">पूर्ण ऑटोमेशन</string>
+    <string name="automation_setup_full_automation_ok">डिफॉल्ट संपर्कों के लिए पूरी तरह ऑटो चालू है।</string>
+    <string name="automation_setup_full_automation_disabled">ग्लोबल मोड %1$s है। बिना रिव्यू पात्र संदेश भेजने के लिए पूरी तरह ऑटो चुनें।</string>
+    <string name="automation_setup_full_automation_contact_overrides">पूरी तरह ऑटो चालू है, लेकिन %1$d संपर्क अभी भी रिव्यू-फर्स्ट या स्किप-ऑटो ओवरराइड इस्तेमाल करते हैं।</string>
+    <string name="automation_setup_check_automatable_events">ऑटोमेट होने वाले इवेंट</string>
+    <string name="automation_setup_automatable_events_empty">जन्मदिन और इवेंट जांचने से पहले संपर्क सिंक करें।</string>
+    <string name="automation_setup_automatable_events_ok">%1$d संपर्कों में जन्मदिन, सालगिरह या काम की सालगिरह है।</string>
+    <string name="automation_setup_automatable_events_missing">%1$d/%2$d संपर्कों में जन्मदिन, सालगिरह या काम की सालगिरह नहीं है।</string>
+    <string name="automation_setup_check_delivery_routes">ऑटोमैटिक डिलीवरी रूट</string>
+    <string name="automation_setup_delivery_routes_no_events">डिलीवरी रूट जांचने से पहले इवेंट तारीखें जोड़ें।</string>
+    <string name="automation_setup_delivery_routes_ok">%1$d इवेंट-तैयार संपर्कों के पास ऑटोमैटिक डिलीवरी रूट है।</string>
+    <string name="automation_setup_delivery_routes_missing">%1$d/%2$d इवेंट-तैयार संपर्कों के पास उपयोगी रूट नहीं है। फोन/ईमेल विवरण जोड़ें, Gmail कॉन्फिगर करें या चैनल ब्लैकआउट हटाएं।</string>
+    <string name="automation_setup_check_channel_verification">चैनल सत्यापन</string>
+    <string name="automation_setup_channel_verification_no_routes">अभी कोई ऑटोमैटिक रूट चुना नहीं गया है। चैनल टेस्ट करने से पहले इवेंट-तैयार संपर्क और डिलीवरी विवरण जोड़ें।</string>
+    <string name="automation_setup_channel_verification_ok">चुने हुए चैनलों के लिए हाल की सफल डिस्पैच पुष्टि मौजूद है: %1$s।</string>
+    <string name="automation_setup_channel_verification_missing">चुने हुए चैनलों के लिए हाल की सफल डिस्पैच पुष्टि नहीं है: %1$s। बिना निगरानी ऑटोमेशन पर भरोसा करने से पहले हर चैनल पर एक कम-जोखिम असली संदेश भेजें।</string>
     <string name="automation_setup_check_style_coach">स्टाइल कोच</string>
     <string name="automation_setup_style_trained">%1$d लेखन नमूनों से प्रशिक्षित है।</string>
     <string name="automation_setup_style_needs_more">%1$d और लेखन नमूने जोड़ें ताकि AI आपका टोन मिला सके।</string>
@@ -345,9 +364,19 @@
     <string name="automation_setup_check_sms">SMS</string>
     <string name="automation_setup_sms_ok">SMS भेजने की अनुमति है।</string>
     <string name="automation_setup_sms_missing">SMS अनुमति नहीं है।</string>
+    <string name="automation_setup_sms_disabled">चैनल सेटिंग्स में SMS बंद है और ऑटोमैटिक भेजाई में उपयोग नहीं होगा।</string>
+    <string name="automation_setup_sms_not_used">अभी कोई इवेंट-तैयार संपर्क ऑटोमैटिक भेजाई के लिए SMS नहीं चुनता।</string>
+    <string name="automation_setup_sms_ok_for_contacts">%1$d SMS-रूटेड इवेंट-तैयार संपर्कों के लिए SMS अनुमति उपलब्ध है। बिना निगरानी भेजाई पर भरोसा करने से पहले एक कम-जोखिम SMS टेस्ट करें।</string>
+    <string name="automation_setup_sms_missing_for_contacts">%1$d इवेंट-तैयार संपर्कों के लिए SMS चुना गया है, लेकिन SMS अनुमति नहीं है। SMS अनुमति दें या SMS बंद करें।</string>
     <string name="automation_setup_check_whatsapp">WhatsApp ऑटोमेशन</string>
     <string name="automation_setup_whatsapp_ok">एक्सेसिबिलिटी सेवा चालू है।</string>
     <string name="automation_setup_whatsapp_missing">अपने-आप WhatsApp भेजना चाहिए हो तभी चालू करें।</string>
+    <string name="automation_setup_whatsapp_disabled">चैनल सेटिंग्स में WhatsApp बंद है और ऑटोमैटिक भेजाई में उपयोग नहीं होगा।</string>
+    <string name="automation_setup_whatsapp_not_used">अभी कोई इवेंट-तैयार संपर्क ऑटोमैटिक भेजाई के लिए WhatsApp नहीं चुनता।</string>
+    <string name="automation_setup_whatsapp_ok_for_contacts">%1$d WhatsApp-रूटेड इवेंट-तैयार संपर्कों के लिए WhatsApp ऑटोमेशन तैयार है। बिना निगरानी भेजाई पर भरोसा करने से पहले एक कम-जोखिम WhatsApp टेस्ट करें।</string>
+    <string name="automation_setup_whatsapp_consent_needed_for_contacts">%1$d इवेंट-तैयार संपर्कों के लिए WhatsApp चुना गया है। इस चैनल का उपयोग करने से पहले सहमति पुष्टि करें।</string>
+    <string name="automation_setup_whatsapp_app_missing_for_contacts">%1$d इवेंट-तैयार संपर्कों के लिए WhatsApp चुना गया है, लेकिन WhatsApp या WhatsApp Business इंस्टॉल नहीं है।</string>
+    <string name="automation_setup_whatsapp_accessibility_missing_for_contacts">%1$d इवेंट-तैयार संपर्कों के लिए WhatsApp चुना गया है, लेकिन RelateAI Accessibility सेवा बंद है।</string>
     <string name="automation_setup_check_exact_sends">सटीक भेजना</string>
     <string name="automation_setup_exact_sends_ok">सटीक अलार्म शेड्यूल उपलब्ध है।</string>
     <string name="automation_setup_exact_sends_missing">सिस्टम ने सटीक अलार्म एक्सेस बंद किया है।</string>
@@ -426,7 +455,6 @@
     <string name="auth_error_firebase">Firebase प्रमाणीकरण विफल रहा। OAuth कॉन्फ़िगरेशन जांचें और फिर कोशिश करें।</string>
     <string name="auth_subtitle">AI-संचालित शुभकामनाओं के साथ\nअपने रिश्ते मजबूत रखें</string>
     <string name="auth_sign_in_google">Google से साइन इन करें</string>
-    <string name="auth_dev_bypass">साइन-इन बायपास करें (Dev)</string>
     <string name="auth_legal_agreement">साइन इन करके आप हमारी शर्तों और गोपनीयता नीति से सहमत होते हैं</string>
     
     <!-- Common -->
@@ -521,9 +549,15 @@
     <string name="settings_save_api_key">API कुंजी सहेजें</string>
     <string name="settings_automation_mode">ऑटोमेशन मोड</string>
     <string name="automation_mode_fully_auto">पूरी तरह ऑटो</string>
-    <string name="automation_mode_smart_approve_default">स्मार्ट अप्रूव (डिफ़ॉल्ट)</string>
+    <string name="automation_mode_smart_approve_default">स्मार्ट अप्रूव</string>
     <string name="automation_mode_vip_approve">VIP अप्रूव</string>
     <string name="automation_mode_always_ask">हमेशा पूछें</string>
+    <string name="settings_full_automation_enabled">पूरी ऑटोमेशन चालू है। %1$d संपर्क अपडेट हुए और %2$d कतारबद्ध संदेश भेजने के लिए शेड्यूल हुए।</string>
+    <string name="settings_full_automation_enabled_route_blockers">पूरी ऑटोमेशन चालू है। %1$d संपर्क अपडेट हुए और %2$d कतारबद्ध संदेश भेजने के लिए शेड्यूल हुए। %3$d संदेशों को अभी भी संपर्क विवरण या चैनल सेटअप चाहिए।</string>
+    <string name="settings_full_automation_enabled_review_blockers">पूरी ऑटोमेशन चालू है। %1$d संपर्क अपडेट हुए और %2$d कतारबद्ध संदेश भेजने के लिए शेड्यूल हुए। %3$d संदेशों को अभी भी रिव्यू चाहिए क्योंकि ड्राफ्ट गुणवत्ता पूरी ऑटोमेशन के लिए सुरक्षित नहीं है।</string>
+    <string name="settings_full_automation_enabled_route_and_review_blockers">पूरी ऑटोमेशन चालू है। %1$d संपर्क अपडेट हुए और %2$d कतारबद्ध संदेश भेजने के लिए शेड्यूल हुए। %3$d संदेशों को अभी भी संपर्क विवरण या चैनल सेटअप चाहिए। %4$d संदेशों को अभी भी रिव्यू चाहिए क्योंकि ड्राफ्ट गुणवत्ता पूरी ऑटोमेशन के लिए सुरक्षित नहीं है।</string>
+    <string name="settings_full_automation_failed">पूरी ऑटोमेशन चालू नहीं हो सकी। सेटअप देखें और फिर कोशिश करें।</string>
+    <string name="settings_full_automation_failed_with_reason">पूरी ऑटोमेशन चालू नहीं हो सकी। %1$s</string>
     <string name="settings_syncing">सिंक हो रहा है...</string>
     <string name="settings_last_synced_format">आखिरी सिंक: %1$s</string>
     <string name="settings_sync_contacts">संपर्क सिंक करें</string>
@@ -723,6 +757,9 @@
     <string name="messages_recovery_retry_detail">अगर सेटअप सही लग रहा है, हाल की विफलताओं के लिए AI डॉक्टर देखें, फिर चुनी गई पंक्तियां फिर कतार में लगाएं।</string>
     <string name="messages_recovery_retry_hint">समाधान समीक्षा करने के बाद फिर कोशिश मैन्युअल ही रहती है।</string>
     <string name="messages_recovery_open_setup">AI डॉक्टर खोलें</string>
+    <string name="messages_verification_title">%1$s भेजाई सत्यापित करें</string>
+    <string name="messages_verification_summary">पहले एक कम-जोखिम संदेश इस्तेमाल करें।</string>
+    <string name="messages_verification_detail">एक %1$s संदेश स्वीकृत करें या फिर कोशिश करें। सफल होने के बाद AI डॉक्टर इस चैनल को सत्यापित मानेगा। पहला भेजना पुष्टि होने तक bulk actions से बचें।</string>
     <string name="messages_auto_sends_minutes">%1$d मिनट में अपने-आप भेजेगा!</string>
     <string name="messages_hours_left">%1$d घंटे बचे</string>
     <string name="messages_channel_format">चैनल: %1$s</string>

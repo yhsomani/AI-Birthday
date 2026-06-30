@@ -28,7 +28,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.BuildConfig
 import com.example.R
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
@@ -38,7 +37,6 @@ import com.example.ui.viewmodel.AuthViewModel
 
 internal object AuthScreenTestTags {
     const val SIGN_IN_BUTTON = "auth_sign_in_button"
-    const val DEV_BYPASS_BUTTON = "auth_dev_bypass_button"
     const val LOADING = "auth_loading"
     const val ERROR = "auth_error"
 }
@@ -65,8 +63,6 @@ fun AuthScreen(
     AuthContent(
         state = state,
         onSignIn = { viewModel.startGoogleSignIn { launcher.launch(it) } },
-        onDevBypass = viewModel::bypassSignIn,
-        showDevBypass = BuildConfig.DEBUG,
     )
 }
 
@@ -74,8 +70,6 @@ fun AuthScreen(
 internal fun AuthContent(
     state: AuthUiState,
     onSignIn: () -> Unit,
-    onDevBypass: () -> Unit,
-    showDevBypass: Boolean,
 ) {
     Column(
         modifier = Modifier
@@ -122,26 +116,6 @@ internal fun AuthContent(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
-            }
-            if (showDevBypass) {
-                Spacer(modifier = Modifier.height(RelateSpacing.lg))
-                Button(
-                    onClick = onDevBypass,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(RelateSize.primaryButtonHeight)
-                        .testTag(AuthScreenTestTags.DEV_BYPASS_BUTTON),
-                    shape = RoundedCornerShape(RelateRadius.control),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                    ),
-                ) {
-                    Text(
-                        text = stringResource(R.string.auth_dev_bypass),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.background,
-                    )
-                }
             }
         }
         state.error?.let { error ->

@@ -30,6 +30,7 @@ import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.*
@@ -84,6 +85,12 @@ class WishPreviewViewModelTest {
         coEvery { memoryNoteRepository.countByContact(any()) } returns 0
         coEvery { giftHistoryRepository.countByContact(any()) } returns 0
         coEvery { messageRepository.getSentByContact(any(), any()) } returns emptyList()
+        every { contactRepository.getWishContextFlow(any()) } returns flowOf(null)
+        every { memoryNoteRepository.countByContactFlow(any()) } returns flowOf(0)
+        every { giftHistoryRepository.countByContactFlow(any()) } returns flowOf(0)
+        every { messageRepository.countSentByContact(any()) } returns flowOf(0)
+        every { eventRepository.getOccasionTypeByIdFlow(any()) } returns flowOf(null)
+        every { messageRepository.getWishPreviewDraftByRef(any()) } returns flowOf(null)
         every { messageRepository.getWishPreviewReviewQueue() } returns flowOf(emptyList())
         coEvery { eventRepository.getOccasionTypeById(any()) } returns null
         coEvery { messageFeedbackRepository.getLatestForPendingMessage(any()) } returns null
@@ -142,9 +149,30 @@ class WishPreviewViewModelTest {
         testSendUseCase = testSendUseCase,
     )
 
+    private fun stubLiveDraft(
+        messageRef: String = "pm_1",
+        draft: WishPreviewDraft? = sampleDraft(),
+        reviewQueue: List<WishPreviewReviewItem> = emptyList(),
+        contact: ContactWishContext? = null,
+        memoryCount: Int = 0,
+        giftCount: Int = 0,
+        previousWishes: Int = 0,
+        eventType: OccasionType? = null,
+    ) {
+        every { messageRepository.getWishPreviewDraftByRef(messageRef) } returns flowOf(draft)
+        every { messageRepository.getWishPreviewReviewQueue() } returns flowOf(reviewQueue)
+        if (draft != null) {
+            every { contactRepository.getWishContextFlow(draft.contactId.value) } returns flowOf(contact)
+            every { memoryNoteRepository.countByContactFlow(draft.contactId.value) } returns flowOf(memoryCount)
+            every { giftHistoryRepository.countByContactFlow(draft.contactId.value) } returns flowOf(giftCount)
+            every { messageRepository.countSentByContact(draft.contactId.value) } returns flowOf(previousWishes)
+            every { eventRepository.getOccasionTypeByIdFlow(draft.occasionId.value) } returns flowOf(eventType)
+        }
+    }
+
     @Test
     fun `loadPending populates state with selected variant text`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
+        stubLiveDraft()
 
         val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
@@ -159,13 +187,48 @@ class WishPreviewViewModelTest {
     }
 
     @Test
-    fun `loadPending exposes approval plan summary`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft().copy(
-            channel = MessageChannel.EMAIL,
-            approvalMode = ApprovalMode.SMART_APPROVE,
-            isUsingFallback = true,
+    fun `draft and review queue flow updates immediately update preview state`() = runTest(testDispatcher) {
+        val draftFlow = MutableStateFlow(sampleDraft())
+        val reviewQueueFlow = MutableStateFlow(
+            listOf(
+                sampleReviewItem(id = "pm_1", contactId = "c_1"),
+            ),
         )
-        coEvery { eventRepository.getOccasionTypeById("e_1") } returns OccasionType.ANNIVERSARY
+        every { messageRepository.getWishPreviewDraftByRef("pm_1") } returns draftFlow
+        every { messageRepository.getWishPreviewReviewQueue() } returns reviewQueueFlow
+
+        val viewModel = createViewModel()
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        assertEquals("Wishing you a happy birthday!", viewModel.uiState.value.editedText)
+        assertEquals(0, viewModel.uiState.value.remainingReviewCount)
+
+        draftFlow.value = sampleDraft().copy(
+            selectedVariantText = "Updated from database",
+            variants = sampleDraft().variants.copy(standard = "Updated from database"),
+        )
+        reviewQueueFlow.value = listOf(
+            sampleReviewItem(id = "pm_1", contactId = "c_1"),
+            sampleReviewItem(id = "pm_2", contactId = "c_2", scheduledForMs = 1_700_000_100_000L),
+        )
+        advanceUntilIdle()
+
+        assertEquals("Updated from database", viewModel.uiState.value.editedText)
+        assertEquals(ReviewNextTarget(contactId = "c_2", messageRef = "pm_2"), viewModel.uiState.value.nextReviewTarget)
+        assertEquals(1, viewModel.uiState.value.remainingReviewCount)
+    }
+
+    @Test
+    fun `loadPending exposes approval plan summary`() = runTest(testDispatcher) {
+        stubLiveDraft(
+            draft = sampleDraft().copy(
+                channel = MessageChannel.EMAIL,
+                approvalMode = ApprovalMode.SMART_APPROVE,
+                isUsingFallback = true,
+            ),
+            eventType = OccasionType.ANNIVERSARY,
+        )
 
         val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
@@ -176,7 +239,6 @@ class WishPreviewViewModelTest {
         assertEquals(MessageChannel.EMAIL.raw, summary?.channel)
         assertEquals("SMART_APPROVE", summary?.approvalMode)
         assertEquals(true, summary?.usesFallback)
-        coVerify { eventRepository.getOccasionTypeById("e_1") }
     }
 
     @Test
@@ -197,8 +259,7 @@ class WishPreviewViewModelTest {
             scheduledForMs = 1_700_000_050_000L,
             status = MessageStatus.APPROVED,
         )
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
-        every { messageRepository.getWishPreviewReviewQueue() } returns flowOf(listOf(current, ignoredApproved, next))
+        stubLiveDraft(reviewQueue = listOf(current, ignoredApproved, next))
 
         val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
@@ -211,9 +272,7 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `loadPending uses count-only context signals`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
-        coEvery { memoryNoteRepository.countByContact("c_1") } returns 3
-        coEvery { giftHistoryRepository.countByContact("c_1") } returns 2
+        stubLiveDraft(memoryCount = 3, giftCount = 2)
 
         val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
@@ -222,17 +281,16 @@ class WishPreviewViewModelTest {
         val signals = viewModel.uiState.value.whySignals.associate { it.labelRes to it.value }
         assertEquals("3", signals[R.string.wish_why_memories])
         assertEquals("2", signals[R.string.wish_why_gifts])
-        coVerify { memoryNoteRepository.countByContact("c_1") }
-        coVerify { giftHistoryRepository.countByContact("c_1") }
     }
 
     @Test
     fun `loadPending uses pure contact wish context for why signals`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
-        coEvery { contactRepository.getWishContext("c_1") } returns ContactWishContext(
-            id = ContactId("c_1"),
-            relationshipType = "FAMILY",
-            preferredLanguage = "hi",
+        stubLiveDraft(
+            contact = ContactWishContext(
+                id = ContactId("c_1"),
+                relationshipType = "FAMILY",
+                preferredLanguage = "hi",
+            ),
         )
 
         val viewModel = createViewModel()
@@ -242,13 +300,11 @@ class WishPreviewViewModelTest {
         val signals = viewModel.uiState.value.whySignals.associate { it.labelRes to it.value }
         assertEquals("FAMILY", signals[R.string.wish_why_relationship])
         assertEquals("hi", signals[R.string.wish_why_language])
-        coVerify { contactRepository.getWishContext("c_1") }
     }
 
     @Test
     fun `loadPending surfaces error when message is missing`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("missing") } returns null
-        coEvery { messageRepository.getWishPreviewDraftByEventId("missing") } returns null
+        stubLiveDraft(messageRef = "missing", draft = null)
 
         val viewModel = createViewModel()
         viewModel.loadPending("missing")
@@ -260,8 +316,7 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `loadPending falls back to event id for legacy preview routes`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("e_1") } returns null
-        coEvery { messageRepository.getWishPreviewDraftByEventId("e_1") } returns sampleDraft()
+        stubLiveDraft(messageRef = "e_1", draft = sampleDraft())
 
         val viewModel = createViewModel()
         viewModel.loadPending("e_1")
@@ -273,7 +328,7 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `selectVariant swaps edited text to that variant`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
+        stubLiveDraft()
 
         val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
@@ -288,7 +343,7 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `updateEditedText sets the local draft text`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
+        stubLiveDraft()
 
         val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
@@ -301,7 +356,7 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `blank edit recalculates readiness and blocks approval`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
+        stubLiveDraft()
 
         val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
@@ -319,7 +374,7 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `short edit recalculates readiness and blocks approval`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
+        stubLiveDraft()
 
         val viewModel = createViewModel()
         viewModel.loadPending("pm_1")
@@ -337,7 +392,7 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `sendTestToMyself surfaces localized success feedback`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
+        stubLiveDraft()
         coEvery { testSendUseCase("Wishing you a happy birthday!") } returns TestSendUseCase.Outcome.Sent
 
         val viewModel = createViewModel()
@@ -355,7 +410,7 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `sendTestToMyself surfaces missing email setup feedback`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
+        stubLiveDraft()
         coEvery { testSendUseCase(any()) } returns TestSendUseCase.Outcome.MissingEmailSetup
 
         val viewModel = createViewModel()
@@ -376,7 +431,8 @@ class WishPreviewViewModelTest {
             variants = sampleDraft().variants.copy(standard = "Fresh AI draft"),
             selectedVariantText = "Fresh AI draft",
         )
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft() andThen regenerated
+        val draftFlow = MutableStateFlow(sampleDraft())
+        every { messageRepository.getWishPreviewDraftByRef("pm_1") } returns draftFlow
         coEvery {
             regeneratePendingMessageUseCase("pm_1", "Wishing you a happy birthday!", null)
         } returns RegeneratePendingMessageUseCase.Outcome.Regenerated("pm_1", usedFallback = false)
@@ -386,6 +442,8 @@ class WishPreviewViewModelTest {
         advanceUntilIdle()
 
         viewModel.regenerate()
+        advanceUntilIdle()
+        draftFlow.value = regenerated
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -401,7 +459,8 @@ class WishPreviewViewModelTest {
             variants = sampleDraft().variants.copy(standard = "Personal fresh draft"),
             selectedVariantText = "Personal fresh draft",
         )
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft() andThen regenerated
+        val draftFlow = MutableStateFlow(sampleDraft())
+        every { messageRepository.getWishPreviewDraftByRef("pm_1") } returns draftFlow
         coEvery {
             regeneratePendingMessageUseCase("pm_1", "Wishing you a happy birthday!", match { it?.contains("more personal") == true })
         } returns RegeneratePendingMessageUseCase.Outcome.Regenerated("pm_1", usedFallback = false)
@@ -414,6 +473,8 @@ class WishPreviewViewModelTest {
         advanceUntilIdle()
         viewModel.regenerate()
         advanceUntilIdle()
+        draftFlow.value = regenerated
+        advanceUntilIdle()
 
         assertEquals("too_generic", viewModel.uiState.value.selectedFeedbackKey)
         assertEquals(R.string.wish_preview_quality_regenerated_with_feedback, viewModel.uiState.value.qualityMessageRes)
@@ -423,7 +484,7 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `approve invokes use case and flips approved flag on success`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
+        stubLiveDraft()
         coEvery { approvePendingMessageUseCase("pm_1", any()) } returns
             ApprovePendingMessageUseCase.ApprovalOutcome.Approved("pm_1", ApprovalMode.VIP_APPROVE)
 
@@ -440,7 +501,7 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `approve surfaces error when pending missing`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
+        stubLiveDraft()
         coEvery { approvePendingMessageUseCase("pm_1", any()) } returns ApprovePendingMessageUseCase.ApprovalOutcome.PendingNotFound
 
         val viewModel = createViewModel()
@@ -457,7 +518,7 @@ class WishPreviewViewModelTest {
 
     @Test
     fun `reject invokes use case and flips rejected flag on success`() = runTest(testDispatcher) {
-        coEvery { messageRepository.getWishPreviewDraftById("pm_1") } returns sampleDraft()
+        stubLiveDraft()
         coEvery { rejectPendingMessageUseCase("pm_1") } returns RejectPendingMessageUseCase.RejectionOutcome.Rejected("pm_1")
 
         val viewModel = createViewModel()

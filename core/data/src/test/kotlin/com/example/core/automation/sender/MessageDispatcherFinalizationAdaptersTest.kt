@@ -73,9 +73,9 @@ class MessageDispatcherFinalizationAdaptersTest {
             noDeliveryRoute = false,
         )
 
-        coVerify { pendingMessageDao.updateStatus("pending_wrapper_success", MessageStatus.SENT.raw) }
+        coVerify { pendingMessageDao.markSmsHandoffSentIfAwaitingCallback("pending_wrapper_success") }
         coVerify {
-            dispatchAttemptDao.updateOutcome(
+            dispatchAttemptDao.updateInitialSmsHandoffOutcomeIfAwaitingCallback(
                 id = "attempt_wrapper_success",
                 attemptedAtMs = any(),
                 resolvedAtMs = any(),
@@ -100,7 +100,7 @@ class MessageDispatcherFinalizationAdaptersTest {
     }
 
     @Test
-    fun saveMessageDispatchFinalization_routesFailedStateToFailedFinalization() = runTest {
+    fun saveMessageDispatchFinalization_routesRetryableFailureToScheduledRetryFinalization() = runTest {
         val providerFailure = ProviderDispatchFailure(
             result = DispatchAttemptResult.FAILED_RETRYABLE,
             errorType = DispatchProviderRetryPolicy.ERROR_EMAIL_TRANSIENT_PROVIDER_FAILURE,
@@ -109,7 +109,7 @@ class MessageDispatcherFinalizationAdaptersTest {
             nextRetryDelayMs = DispatchProviderRetryPolicy.DEFAULT_RETRY_DELAY_MS,
         )
 
-        saveMessageDispatchFinalization(
+        val result = saveMessageDispatchFinalization(
             dispatchAttemptDao = dispatchAttemptDao,
             pendingMessageDao = pendingMessageDao,
             sentMessageDao = sentMessageDao,
@@ -125,7 +125,16 @@ class MessageDispatcherFinalizationAdaptersTest {
             noDeliveryRoute = false,
         )
 
-        coVerify { pendingMessageDao.updateStatus("pending_wrapper_failure", MessageStatus.FAILED.raw) }
+        assertTrue(result.shouldScheduleRetry)
+        assertEquals(1, result.retryCount)
+        coVerify {
+            pendingMessageDao.updateRetryState(
+                id = "pending_wrapper_failure",
+                status = MessageStatus.APPROVED.raw,
+                scheduledForMs = result.retryAtMs ?: error("retryAtMs missing"),
+            )
+        }
+        coVerify(exactly = 0) { pendingMessageDao.updateStatus("pending_wrapper_failure", MessageStatus.FAILED.raw) }
         coVerify {
             dispatchAttemptDao.updateOutcome(
                 id = "attempt_wrapper_failure",
@@ -138,7 +147,7 @@ class MessageDispatcherFinalizationAdaptersTest {
                 errorType = DispatchProviderRetryPolicy.ERROR_EMAIL_TRANSIENT_PROVIDER_FAILURE,
                 errorCode = "MessagingException",
                 redactedErrorMessage = "Email provider failed before accepting the message; retry is allowed.",
-                retryCount = 0,
+                retryCount = 1,
                 nextRetryAtMs = any(),
                 deadLetteredAtMs = null,
             )
@@ -254,7 +263,7 @@ class MessageDispatcherFinalizationAdaptersTest {
         )
 
         coVerify {
-            dispatchAttemptDao.updateOutcome(
+            dispatchAttemptDao.updateInitialSmsHandoffOutcomeIfAwaitingCallback(
                 id = "attempt_sms",
                 attemptedAtMs = 1_800_000_000_000L,
                 resolvedAtMs = 1_800_000_000_000L,
@@ -270,7 +279,7 @@ class MessageDispatcherFinalizationAdaptersTest {
                 deadLetteredAtMs = null,
             )
         }
-        coVerify { pendingMessageDao.updateStatus("pending_sms", MessageStatus.SENT.raw) }
+        coVerify { pendingMessageDao.markSmsHandoffSentIfAwaitingCallback("pending_sms") }
         coVerify(exactly = 0) { sentMessageDao.insert(any()) }
     }
 
@@ -339,7 +348,7 @@ class MessageDispatcherFinalizationAdaptersTest {
             nextRetryDelayMs = DispatchProviderRetryPolicy.DEFAULT_RETRY_DELAY_MS,
         )
 
-        saveFailedMessageDispatchFinalization(
+        val result = saveFailedMessageDispatchFinalization(
             dispatchAttemptDao = dispatchAttemptDao,
             pendingMessageDao = pendingMessageDao,
             messageId = MessageDraftId("pending_retryable"),
@@ -352,7 +361,19 @@ class MessageDispatcherFinalizationAdaptersTest {
             failedAtMs = 1_800_000_000_000L,
         )
 
-        coVerify { pendingMessageDao.updateStatus("pending_retryable", MessageStatus.FAILED.raw) }
+        assertEquals(
+            1_800_000_000_000L + DispatchProviderRetryPolicy.DEFAULT_RETRY_DELAY_MS,
+            result.retryAtMs,
+        )
+        assertEquals(1, result.retryCount)
+        coVerify {
+            pendingMessageDao.updateRetryState(
+                id = "pending_retryable",
+                status = MessageStatus.APPROVED.raw,
+                scheduledForMs = 1_800_000_000_000L + DispatchProviderRetryPolicy.DEFAULT_RETRY_DELAY_MS,
+            )
+        }
+        coVerify(exactly = 0) { pendingMessageDao.updateStatus("pending_retryable", MessageStatus.FAILED.raw) }
         coVerify {
             dispatchAttemptDao.updateOutcome(
                 id = "attempt_retryable",
@@ -365,7 +386,7 @@ class MessageDispatcherFinalizationAdaptersTest {
                 errorType = DispatchProviderRetryPolicy.ERROR_SMS_TRANSIENT_PROVIDER_FAILURE,
                 errorCode = "RuntimeException",
                 redactedErrorMessage = "SMS provider failed before delivery confirmation; retry is allowed.",
-                retryCount = 0,
+                retryCount = 1,
                 nextRetryAtMs = 1_800_000_000_000L + DispatchProviderRetryPolicy.DEFAULT_RETRY_DELAY_MS,
                 deadLetteredAtMs = null,
             )
@@ -379,6 +400,61 @@ class MessageDispatcherFinalizationAdaptersTest {
                 )
             }
         )
+    }
+
+    @Test
+    fun saveFailedMessageDispatchFinalization_stopsAutomaticRetryAtRetryLimit() = runTest {
+        val providerFailure = ProviderDispatchFailure(
+            result = DispatchAttemptResult.FAILED_RETRYABLE,
+            errorType = DispatchProviderRetryPolicy.ERROR_SMS_TRANSIENT_PROVIDER_FAILURE,
+            errorCode = "RuntimeException",
+            redactedErrorMessage = "SMS provider failed before delivery confirmation; retry is allowed.",
+            nextRetryDelayMs = DispatchProviderRetryPolicy.DEFAULT_RETRY_DELAY_MS,
+        )
+
+        val result = saveFailedMessageDispatchFinalization(
+            dispatchAttemptDao = dispatchAttemptDao,
+            pendingMessageDao = pendingMessageDao,
+            messageId = MessageDraftId("pending_retry_limit"),
+            dispatchAttemptId = "attempt_retry_limit",
+            preferredChannel = MessageChannel.SMS,
+            finalChannel = MessageChannel.SMS,
+            messageText = "Selected",
+            providerFailureSelection = messageDispatchProviderFailureSelection().select(providerFailure),
+            noDeliveryRoute = false,
+            failedAtMs = 1_800_000_000_000L,
+            automaticRetryCount = DispatchProviderRetryPolicy.MAX_AUTOMATIC_RETRY_FAILURES,
+        )
+
+        assertEquals(null, result.retryAtMs)
+        assertEquals(DispatchProviderRetryPolicy.MAX_AUTOMATIC_RETRY_FAILURES, result.retryCount)
+        coVerify {
+            pendingMessageDao.updateStatus("pending_retry_limit", MessageStatus.FAILED.raw)
+        }
+        coVerify(exactly = 0) {
+            pendingMessageDao.updateRetryState(any(), any(), any())
+        }
+        coVerify {
+            dispatchAttemptDao.updateOutcome(
+                id = "attempt_retry_limit",
+                attemptedAtMs = 1_800_000_000_000L,
+                resolvedAtMs = 1_800_000_000_000L,
+                result = DispatchAttemptResult.FAILED_FINAL.raw,
+                channel = MessageChannel.SMS.raw,
+                deliveryStatus = MessageDeliveryStatus.FAILED.raw,
+                providerMessageId = null,
+                errorType = DispatchProviderRetryPolicy.ERROR_SMS_TRANSIENT_PROVIDER_FAILURE,
+                errorCode = "RuntimeException",
+                redactedErrorMessage = match { it.contains("Automatic retry limit reached") },
+                retryCount = DispatchProviderRetryPolicy.MAX_AUTOMATIC_RETRY_FAILURES,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = 1_800_000_000_000L,
+            )
+        }
+        val deadLetter = DeadLetterQueue.getAll().single()
+        assertEquals("pending_retry_limit", deadLetter.id)
+        assertEquals(DispatchProviderRetryPolicy.MAX_AUTOMATIC_RETRY_FAILURES, deadLetter.retryCount)
+        assertTrue(deadLetter.errorMessage.contains("Automatic retry limit reached"))
     }
 
     private fun dispatchOccasion(): MessageDispatchOccasion {

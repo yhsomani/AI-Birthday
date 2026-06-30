@@ -105,6 +105,10 @@ Current pilot baselines:
 - `app/src/test/screenshots/baseline/contact_detail_loading_compact_phone.png`
 - `app/src/test/screenshots/baseline/contact_detail_preferences_form_compact_phone_large_font.png`
 - `app/src/test/screenshots/baseline/contact_detail_preferences_form_bottom_compact_phone_large_font.png`
+- `app/src/test/screenshots/baseline/contact_detail_preferences_form_typical_phone.png`
+- `app/src/test/screenshots/baseline/contact_detail_preferences_form_bottom_typical_phone.png`
+- `app/src/test/screenshots/baseline/contact_detail_preferences_form_compact_phone_hindi_large_font.png`
+- `app/src/test/screenshots/baseline/contact_detail_preferences_form_bottom_compact_phone_hindi_large_font.png`
 - `app/src/test/screenshots/baseline/events_schedule_compact_phone.png`
 - `app/src/test/screenshots/baseline/events_schedule_typical_phone.png`
 - `app/src/test/screenshots/baseline/events_conflict_compact_phone_large_font.png`
@@ -117,6 +121,12 @@ Current pilot baselines:
 - `app/src/test/screenshots/baseline/events_manual_event_form_compact_phone_large_font.png`
 - `app/src/test/screenshots/baseline/events_manual_event_form_new_contact_compact_phone_large_font.png`
 - `app/src/test/screenshots/baseline/events_manual_event_form_bottom_compact_phone_large_font.png`
+- `app/src/test/screenshots/baseline/events_manual_event_form_typical_phone.png`
+- `app/src/test/screenshots/baseline/events_manual_event_form_new_contact_typical_phone.png`
+- `app/src/test/screenshots/baseline/events_manual_event_form_bottom_typical_phone.png`
+- `app/src/test/screenshots/baseline/events_manual_event_form_compact_phone_hindi_large_font.png`
+- `app/src/test/screenshots/baseline/events_manual_event_form_new_contact_compact_phone_hindi_large_font.png`
+- `app/src/test/screenshots/baseline/events_manual_event_form_bottom_compact_phone_hindi_large_font.png`
 - `app/src/test/screenshots/baseline/ai_doctor_blockers_compact_phone.png`
 - `app/src/test/screenshots/baseline/ai_doctor_blockers_typical_phone.png`
 - `app/src/test/screenshots/baseline/ai_doctor_blockers_compact_phone_large_font.png`
@@ -195,6 +205,10 @@ Current pilot baselines:
 - `app/src/test/screenshots/baseline/gift_advisor_history_typical_phone.png`
 - `app/src/test/screenshots/baseline/gift_advisor_add_dialog_form_compact_phone_large_font.png`
 - `app/src/test/screenshots/baseline/gift_advisor_add_dialog_form_bottom_compact_phone_large_font.png`
+- `app/src/test/screenshots/baseline/gift_advisor_add_dialog_form_typical_phone.png`
+- `app/src/test/screenshots/baseline/gift_advisor_add_dialog_form_bottom_typical_phone.png`
+- `app/src/test/screenshots/baseline/gift_advisor_add_dialog_form_compact_phone_hindi_large_font.png`
+- `app/src/test/screenshots/baseline/gift_advisor_add_dialog_form_bottom_compact_phone_hindi_large_font.png`
 - `app/src/test/screenshots/baseline/gift_advisor_error_empty_compact_phone.png`
 - `app/src/test/screenshots/baseline/gift_advisor_error_empty_compact_phone_hindi_large_font.png`
 - `app/src/test/screenshots/baseline/gift_advisor_error_empty_typical_phone.png`
@@ -224,8 +238,11 @@ Current pilot baselines:
 - Each screenshot test should also have an interaction or ViewModel test covering behavior; screenshots validate presentation, not business logic.
 - Screenshot tests use the `com.example.ui.screenshots.ScreenshotTests` JUnit category.
 - Normal unit-test commands exclude screenshot tests by default; use `-Pscreenshot` with Roborazzi tasks to include them.
-- Dense text-field form dialogs require their own harness stabilization before Roborazzi coverage. Gift Advisor now covers the shared add-gift form body, Contact Preferences covers the shared preferences form body, and Events covers the shared manual-entry form body through deterministic large-font fixtures because platform `AlertDialog` windows still do not idle reliably under JVM screenshot runs.
-- Theme-token migrations that should be visually equivalent must run the focused screen screenshot test plus the full Roborazzi suite; D-219 Events, D-220 Chat History, D-221 Splash, D-222 Auth, D-223 Onboarding, D-224 Style Coach, D-225 Backup/Restore, D-226 Activity History, D-227 Memory Vault, D-229 Contact List, and D-230 Home use this guardrail for production-screen color-role migrations.
+- Dense text-field form dialogs require their own harness stabilization before Roborazzi coverage. Gift Advisor now covers the shared add-gift form body, Contact Preferences covers the shared preferences form body, and Events covers the shared manual-entry form body through deterministic large-font, Hindi large-font, and typical-phone fixtures because platform `AlertDialog` windows still do not idle reliably under JVM screenshot runs.
+- Shared form-body fixtures that stand in for dense platform dialogs must include typical-phone top and scrolled-bottom coverage when the form can overflow. D-239 adds typical-phone baselines for Contact Preferences top/bottom, Gift Advisor add-gift top/bottom, and Events manual-entry existing-contact/new-contact/scrolled-warning states.
+- Shared form-body fixtures that include dense localized labels or user-entered localized values must include compact-phone Hindi large-font coverage. D-240 adds Hindi large-font baselines for Contact Preferences top/bottom, Gift Advisor add-gift top/bottom, and Events manual-entry existing-contact/new-contact/scrolled-warning states.
+- Theme-token migrations that should be visually equivalent must run the focused screen screenshot test plus the full Roborazzi suite; D-219 Events, D-220 Chat History, D-221 Splash, D-222 Auth, D-223 Onboarding, D-224 Style Coach, D-225 Backup/Restore, D-226 Activity History, D-227 Memory Vault, D-229 Contact List, D-230 Home, D-231 Analytics, D-232 Gift Advisor, D-233 Wish Preview, D-234 AI Doctor, D-235 Settings, D-236 Contact Detail, and D-237 Messages use this guardrail for production-screen color-role migrations.
+- Screenshot fixture wrappers that frame extracted dialog/form bodies must resolve fixture background and card surfaces through `MaterialTheme.colorScheme` or `MaterialTheme.relateSemanticColors`; D-238 guards screenshot fixtures against direct dark-specific color exports and raw color literals.
 
 ## CI Policy
 
@@ -256,6 +273,6 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:verifyRoborazziDebug -Pscr
 
 ## Remaining Implementation
 
-- Expand large-font screenshot variants beyond the current startup, Home including sync-error coverage, Messages, Wish Preview, Contact Detail including the shared preferences form top/bottom fixtures, Events including manual-entry existing/new/bottom fixtures, AI Doctor, Backup/Restore, Settings, Analytics, Activity History, Chat History, Memory Vault, Gift Advisor including the shared add-form top/bottom fixtures, and Style Coach pilots.
-- Expand Hindi screenshot variants beyond the current Onboarding actions, Messages needs-review/failed-recovery/reject-dialog, Wish Preview blocked-review, AI Doctor setup-card, Backup/Restore import-preview, Settings data-tools, Contact Detail personalization, Events conflict, Analytics reporting, Activity History action-card/empty/error, Chat History long-message/empty/error, Memory Vault pinned-note/error-empty, Gift Advisor suggestions/error-empty, and Style Coach learned-profile/auto-error-empty pilots.
-- Expand typical-phone variants beyond the current startup/auth/onboarding defaults/actions, Home populated/loading, Messages needs-review/reject-dialog/failed-recovery/loading, Wish Preview editor/approved/loading, AI Doctor blockers/healthy/refreshing, Backup/Restore passphrase/actions/import-preview/exporting/error, Settings overview/AI configuration/data tools/sign-out dialog, Analytics populated/empty/loading, Activity History populated/empty/error/loading, Contact Detail profile/automation-history plus large-font preferences-form fixtures, Events schedule/conflict/empty/loading plus large-font manual-entry fixtures, Chat History populated/empty/error/loading, Memory Vault notes/error-empty/loading, Gift Advisor suggestions/history/error-empty/generating/loading plus large-font add-form fixtures, and Style Coach training/profile/history/manual-progress/auto-error-empty pilots, especially remaining scrolled edge variants.
+- Expand large-font screenshot variants beyond the current startup, Home including sync-error coverage, Messages, Wish Preview, Contact Detail including shared preferences form top/bottom fixtures, Events including manual-entry existing/new/bottom fixtures, AI Doctor, Backup/Restore, Settings, Analytics, Activity History, Chat History, Memory Vault, Gift Advisor including shared add-form top/bottom fixtures, and Style Coach pilots.
+- Expand Hindi screenshot variants beyond the current Onboarding actions, Messages needs-review/failed-recovery/reject-dialog, Wish Preview blocked-review, AI Doctor setup-card, Backup/Restore import-preview, Settings data-tools, Contact Detail personalization/shared preferences form, Events conflict/shared manual-entry form, Analytics reporting, Activity History action-card/empty/error, Chat History long-message/empty/error, Memory Vault pinned-note/error-empty, Gift Advisor suggestions/error-empty/shared add-form, and Style Coach learned-profile/auto-error-empty pilots.
+- Expand typical-phone variants beyond the current startup/auth/onboarding defaults/actions, Home populated/loading, Messages needs-review/reject-dialog/failed-recovery/loading, Wish Preview editor/approved/loading, AI Doctor blockers/healthy/refreshing, Backup/Restore passphrase/actions/import-preview/exporting/error, Settings overview/AI configuration/data tools/sign-out dialog, Analytics populated/empty/loading, Activity History populated/empty/error/loading, Contact Detail profile/automation-history plus preferences-form fixtures, Events schedule/conflict/empty/loading plus manual-entry fixtures, Chat History populated/empty/error/loading, Memory Vault notes/error-empty/loading, Gift Advisor suggestions/history/error-empty/generating/loading plus add-form fixtures, and Style Coach training/profile/history/manual-progress/auto-error-empty pilots, especially newly discovered scrolled edge variants.

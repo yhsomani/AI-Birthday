@@ -6,14 +6,14 @@ internal object GlobalAutomationModePrefsMapper {
     fun toSupportedApprovalMode(raw: String?): ApprovalMode {
         return ApprovalMode.fromRaw(raw)
             .takeIf { it.isSupportedGlobalMode() }
-            ?: ApprovalMode.SMART_APPROVE
+            ?: ApprovalMode.FULLY_AUTO
     }
 
     fun toSupportedRaw(mode: ApprovalMode): String {
         return mode
             .takeIf { it.isSupportedGlobalMode() }
             ?.raw
-            ?: ApprovalMode.SMART_APPROVE.raw
+            ?: ApprovalMode.FULLY_AUTO.raw
     }
 
     private fun ApprovalMode.isSupportedGlobalMode(): Boolean {

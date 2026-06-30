@@ -4,12 +4,14 @@ import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.R
+import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.resilience.DeadLetterEntry
 import com.example.core.resilience.DeadLetterQueue
 import com.example.core.resilience.HealthMonitor
 import com.example.core.resilience.StructuredLogger
 import com.example.core.gemini.GeminiClient
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.common.ContactId
@@ -42,6 +44,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -88,6 +92,11 @@ class AutomationSetupViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var context: Context
+    private lateinit var readinessProfiles: MutableStateFlow<List<ContactAutomationReadinessProfile>>
+    private lateinit var styleProfile: MutableStateFlow<StyleProfileEntity?>
+    private lateinit var preferenceChanges: MutableSharedFlow<Unit>
+    private lateinit var failureRecoveryCount: MutableStateFlow<Int>
+    private lateinit var deadLetterCount: MutableStateFlow<Int>
 
     @Before
     fun setUp() {
@@ -96,18 +105,31 @@ class AutomationSetupViewModelTest {
         HealthMonitor.clearForTests()
         StructuredLogger.clearForTests()
         context = ApplicationProvider.getApplicationContext()
+        readinessProfiles = MutableStateFlow(emptyList())
+        styleProfile = MutableStateFlow(null)
+        preferenceChanges = MutableSharedFlow(extraBufferCapacity = 1)
+        failureRecoveryCount = MutableStateFlow(0)
+        deadLetterCount = MutableStateFlow(0)
         every { securePrefs.getGoogleOAuthToken() } returns ""
         every { securePrefs.getGeminiApiKey() } returns ""
         every { securePrefs.getSenderEmail() } returns ""
         every { securePrefs.getSenderEmailPassword() } returns ""
+        every { securePrefs.getLastSuccessfulEmailTestSender() } returns ""
+        every { securePrefs.getLastSuccessfulEmailTestMs() } returns 0L
+        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.FULLY_AUTO
+        every { securePrefs.getChannelBlackout() } returns "[]"
         every { securePrefs.isAiWishGenerationEnabled() } returns true
         every { securePrefs.isWhatsAppAutomationConsentGranted() } returns true
+        every { securePrefs.observeChanges() } returns preferenceChanges
         coEvery { contactRepository.getAutomationReadinessProfiles() } returns emptyList()
+        every { contactRepository.getAutomationReadinessProfilesFlow() } returns readinessProfiles
         coEvery { styleProfileRepository.getProfileOnce() } returns null
+        every { styleProfileRepository.getProfile() } returns styleProfile
         coEvery { testSendUseCase(any()) } returns TestSendUseCase.Outcome.MissingEmailSetup
-        every { dispatchAttemptRepository.countFailureRecoveryQueue() } returns flowOf(0)
-        every { dispatchAttemptRepository.countDeadLettered() } returns flowOf(0)
+        every { dispatchAttemptRepository.countFailureRecoveryQueue() } returns failureRecoveryCount
+        every { dispatchAttemptRepository.countDeadLettered() } returns deadLetterCount
         coEvery { dispatchAttemptRepository.getFailureRecoveryQueue(any()) } returns emptyList()
+        coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns emptySet()
         coEvery { diagnosticSnapshotRepository.getLatestBySource(any()) } returns null
         coEvery { diagnosticSnapshotRepository.record(any()) } returns Unit
     }
@@ -170,6 +192,14 @@ class AutomationSetupViewModelTest {
 
         assertEquals(
             ReadinessGroup.REQUIRED,
+            groupsByTitle[context.getString(R.string.automation_setup_check_full_automation)],
+        )
+        assertEquals(
+            ReadinessGroup.REQUIRED,
+            groupsByTitle[context.getString(R.string.automation_setup_check_delivery_routes)],
+        )
+        assertEquals(
+            ReadinessGroup.REQUIRED,
             groupsByTitle[context.getString(R.string.automation_setup_check_sms)],
         )
         assertEquals(
@@ -185,6 +215,311 @@ class AutomationSetupViewModelTest {
             groupsByTitle[context.getString(R.string.automation_setup_check_recent_errors)],
         )
     }
+
+    @Test
+    fun `buildChecksForTesting requires fully auto for unattended message sending`() = runTest(testDispatcher) {
+        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.ALWAYS_ASK
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val fullAutomationCheck = viewModel.buildChecksForTesting()
+            .first { it.title == context.getString(R.string.automation_setup_check_full_automation) }
+
+        assertEquals(ReadinessStatus.ACTION_REQUIRED, fullAutomationCheck.status)
+        assertEquals(AiDoctorAction.OPEN_SETTINGS, fullAutomationCheck.action)
+        assertEquals(context.getString(R.string.automation_setup_action_open_settings), fullAutomationCheck.actionLabel)
+        assertEquals(
+            context.getString(
+                R.string.automation_setup_full_automation_disabled,
+                context.getString(R.string.automation_mode_always_ask),
+            ),
+            fullAutomationCheck.detail,
+        )
+    }
+
+    @Test
+    fun `buildChecksForTesting warns when contacts keep review first overrides under full automation`() =
+        runTest(testDispatcher) {
+            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+                readinessProfile(
+                    id = "manual",
+                    automationMode = ApprovalMode.ALWAYS_ASK,
+                ),
+                readinessProfile(
+                    id = "skip",
+                    skipAutoWish = true,
+                ),
+                readinessProfile(
+                    id = "automatic",
+                    automationMode = ApprovalMode.DEFAULT,
+                ),
+            )
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val fullAutomationCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_full_automation) }
+
+            assertEquals(ReadinessStatus.WARNING, fullAutomationCheck.status)
+            assertEquals(AiDoctorAction.OPEN_CONTACTS, fullAutomationCheck.action)
+            assertEquals(
+                context.getString(R.string.automation_setup_full_automation_contact_overrides, 2),
+                fullAutomationCheck.detail,
+            )
+        }
+
+    @Test
+    fun `buildChecksForTesting surfaces contacts without automatable events`() = runTest(testDispatcher) {
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            readinessProfile(
+                id = "birthday",
+                hasAutomatableOccasion = true,
+            ),
+            readinessProfile(
+                id = "no_event",
+                hasAutomatableOccasion = false,
+            ),
+        )
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val eventsCheck = viewModel.buildChecksForTesting()
+            .first { it.title == context.getString(R.string.automation_setup_check_automatable_events) }
+
+        assertEquals(ReadinessStatus.WARNING, eventsCheck.status)
+        assertEquals(AiDoctorAction.OPEN_CONTACTS, eventsCheck.action)
+        assertEquals(
+            context.getString(R.string.automation_setup_automatable_events_missing, 1, 2),
+            eventsCheck.detail,
+        )
+    }
+
+    @Test
+    fun `buildChecksForTesting blocks full automation when event contacts lack delivery routes`() =
+        runTest(testDispatcher) {
+            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+                readinessProfile(
+                    id = "routable_sms",
+                    hasAutomatableOccasion = true,
+                    hasPrimaryPhone = true,
+                ),
+                readinessProfile(
+                    id = "missing_route",
+                    hasAutomatableOccasion = true,
+                ),
+                readinessProfile(
+                    id = "email_without_sender",
+                    preferredChannel = MessageChannel.EMAIL,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryEmail = true,
+                ),
+            )
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val deliveryRoutesCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_delivery_routes) }
+
+            assertEquals(ReadinessStatus.ACTION_REQUIRED, deliveryRoutesCheck.status)
+            assertEquals(AiDoctorAction.OPEN_CONTACTS, deliveryRoutesCheck.action)
+            assertEquals(
+                context.getString(R.string.automation_setup_delivery_routes_missing, 2, 3),
+                deliveryRoutesCheck.detail,
+            )
+        }
+
+    @Test
+    fun `buildChecksForTesting warns when selected channels have no recent successful dispatch evidence`() =
+        runTest(testDispatcher) {
+            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+                readinessProfile(
+                    id = "sms",
+                    preferredChannel = MessageChannel.SMS,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryPhone = true,
+                ),
+                readinessProfile(
+                    id = "email",
+                    preferredChannel = MessageChannel.EMAIL,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryEmail = true,
+                ),
+            )
+            every { securePrefs.getSenderEmail() } returns "sender@example.com"
+            every { securePrefs.getSenderEmailPassword() } returns "app-password"
+            coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns setOf(MessageChannel.SMS)
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val verificationCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
+
+            assertEquals(ReadinessStatus.WARNING, verificationCheck.status)
+            assertEquals(AiDoctorAction.TEST_EMAIL, verificationCheck.action)
+            assertEquals(context.getString(R.string.automation_setup_action_test_email), verificationCheck.actionLabel)
+            assertEquals(
+                context.getString(R.string.automation_setup_channel_verification_missing, context.getString(R.string.channel_email)),
+                verificationCheck.detail,
+            )
+        }
+
+    @Test
+    fun `buildChecksForTesting passes channel verification when selected channels have recent success`() =
+        runTest(testDispatcher) {
+            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+                readinessProfile(
+                    id = "email",
+                    preferredChannel = MessageChannel.EMAIL,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryEmail = true,
+                ),
+            )
+            every { securePrefs.getSenderEmail() } returns "sender@example.com"
+            every { securePrefs.getSenderEmailPassword() } returns "app-password"
+            coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns setOf(MessageChannel.EMAIL)
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val verificationCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
+
+            assertEquals(ReadinessStatus.OK, verificationCheck.status)
+            assertEquals(AiDoctorAction.NONE, verificationCheck.action)
+            assertEquals(
+                context.getString(R.string.automation_setup_channel_verification_ok, context.getString(R.string.channel_email)),
+                verificationCheck.detail,
+            )
+        }
+
+    @Test
+    fun `buildChecksForTesting counts recent matching email self-test as email channel verification`() =
+        runTest(testDispatcher) {
+            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+                readinessProfile(
+                    id = "email",
+                    preferredChannel = MessageChannel.EMAIL,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryEmail = true,
+                ),
+            )
+            every { securePrefs.getSenderEmail() } returns "sender@example.com"
+            every { securePrefs.getSenderEmailPassword() } returns "app-password"
+            every { securePrefs.getLastSuccessfulEmailTestSender() } returns "sender@example.com"
+            every { securePrefs.getLastSuccessfulEmailTestMs() } returns Long.MAX_VALUE
+            coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns emptySet()
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val verificationCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
+
+            assertEquals(ReadinessStatus.OK, verificationCheck.status)
+            assertEquals(AiDoctorAction.NONE, verificationCheck.action)
+            assertEquals(
+                context.getString(R.string.automation_setup_channel_verification_ok, context.getString(R.string.channel_email)),
+                verificationCheck.detail,
+            )
+        }
+
+    @Test
+    fun `buildChecksForTesting ignores email self-test after sender changes`() =
+        runTest(testDispatcher) {
+            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+                readinessProfile(
+                    id = "email",
+                    preferredChannel = MessageChannel.EMAIL,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryEmail = true,
+                ),
+            )
+            every { securePrefs.getSenderEmail() } returns "new-sender@example.com"
+            every { securePrefs.getSenderEmailPassword() } returns "app-password"
+            every { securePrefs.getLastSuccessfulEmailTestSender() } returns "old-sender@example.com"
+            every { securePrefs.getLastSuccessfulEmailTestMs() } returns Long.MAX_VALUE
+            coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns emptySet()
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val verificationCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
+
+            assertEquals(ReadinessStatus.WARNING, verificationCheck.status)
+            assertEquals(AiDoctorAction.TEST_EMAIL, verificationCheck.action)
+            assertEquals(context.getString(R.string.automation_setup_action_test_email), verificationCheck.actionLabel)
+            assertEquals(
+                context.getString(R.string.automation_setup_channel_verification_missing, context.getString(R.string.channel_email)),
+                verificationCheck.detail,
+            )
+        }
+
+    @Test
+    fun `buildChecksForTesting routes SMS or WhatsApp channel verification to messages`() =
+        runTest(testDispatcher) {
+            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+                readinessProfile(
+                    id = "sms",
+                    preferredChannel = MessageChannel.SMS,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryPhone = true,
+                ),
+                readinessProfile(
+                    id = "email",
+                    preferredChannel = MessageChannel.EMAIL,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryEmail = true,
+                ),
+            )
+            every { securePrefs.getSenderEmail() } returns "sender@example.com"
+            every { securePrefs.getSenderEmailPassword() } returns "app-password"
+            coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns emptySet()
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val verificationCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
+
+            assertEquals(ReadinessStatus.WARNING, verificationCheck.status)
+            assertEquals(AiDoctorAction.OPEN_SMS_MESSAGES, verificationCheck.action)
+            assertEquals(context.getString(R.string.automation_setup_action_review_sms_messages), verificationCheck.actionLabel)
+            assertEquals(
+                context.getString(
+                    R.string.automation_setup_channel_verification_missing,
+                    "${context.getString(R.string.channel_sms)}, ${context.getString(R.string.channel_email)}",
+                ),
+                verificationCheck.detail,
+            )
+        }
+
+    @Test
+    fun `buildChecksForTesting routes WhatsApp channel verification to filtered messages`() =
+        runTest(testDispatcher) {
+            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+                readinessProfile(
+                    id = "whatsapp",
+                    preferredChannel = MessageChannel.WHATSAPP,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryPhone = true,
+                ),
+            )
+            every { securePrefs.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
+            coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns emptySet()
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val verificationCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
+
+            assertEquals(ReadinessStatus.WARNING, verificationCheck.status)
+            assertEquals(AiDoctorAction.OPEN_WHATSAPP_MESSAGES, verificationCheck.action)
+            assertEquals(context.getString(R.string.automation_setup_action_review_whatsapp_messages), verificationCheck.actionLabel)
+            assertEquals(
+                context.getString(
+                    R.string.automation_setup_channel_verification_missing,
+                    context.getString(R.string.channel_whatsapp),
+                ),
+                verificationCheck.detail,
+            )
+        }
 
     @Test
     fun `buildChecksForTesting adds generic message risk diagnostic from personalization context`() = runTest(testDispatcher) {
@@ -243,8 +578,89 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
+    fun `buildChecksForTesting treats SMS as optional when no event-ready contact selects SMS`() =
+        runTest(testDispatcher) {
+            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+                readinessProfile(
+                    id = "email",
+                    preferredChannel = MessageChannel.EMAIL,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryEmail = true,
+                ),
+            )
+            every { securePrefs.getSenderEmail() } returns "sender@example.com"
+            every { securePrefs.getSenderEmailPassword() } returns "app-password"
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val smsCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_sms) }
+
+            assertEquals(ReadinessStatus.OK, smsCheck.status)
+            assertEquals(AiDoctorAction.NONE, smsCheck.action)
+            assertEquals(context.getString(R.string.automation_setup_sms_not_used), smsCheck.detail)
+        }
+
+    @Test
+    fun `buildChecksForTesting requires SMS permission when SMS is selected for event contacts`() =
+        runTest(testDispatcher) {
+            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+                readinessProfile(
+                    id = "sms",
+                    preferredChannel = MessageChannel.SMS,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryPhone = true,
+                ),
+            )
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val smsCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_sms) }
+
+            assertEquals(ReadinessStatus.ACTION_REQUIRED, smsCheck.status)
+            assertEquals(AiDoctorAction.OPEN_APP_SETTINGS, smsCheck.action)
+            assertEquals(
+                context.getString(R.string.automation_setup_sms_missing_for_contacts, 1),
+                smsCheck.detail,
+            )
+        }
+
+    @Test
+    fun `buildChecksForTesting treats disabled SMS as intentionally unused`() =
+        runTest(testDispatcher) {
+            every { securePrefs.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
+            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+                readinessProfile(
+                    id = "sms",
+                    preferredChannel = MessageChannel.SMS,
+                    hasAutomatableOccasion = true,
+                    hasPrimaryPhone = true,
+                ),
+            )
+            val viewModel = newViewModel()
+            advanceUntilIdle()
+
+            val smsCheck = viewModel.buildChecksForTesting()
+                .first { it.title == context.getString(R.string.automation_setup_check_sms) }
+
+            assertEquals(ReadinessStatus.OK, smsCheck.status)
+            assertEquals(AiDoctorAction.NONE, smsCheck.action)
+            assertEquals(context.getString(R.string.automation_setup_sms_disabled), smsCheck.detail)
+        }
+
+    @Test
     fun `buildChecksForTesting requires WhatsApp consent before automation channel is ready`() = runTest(testDispatcher) {
         every { securePrefs.isWhatsAppAutomationConsentGranted() } returns false
+        every { securePrefs.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            readinessProfile(
+                id = "whatsapp",
+                preferredChannel = MessageChannel.WHATSAPP,
+                hasAutomatableOccasion = true,
+                hasPrimaryPhone = true,
+            ),
+        )
         val viewModel = newViewModel()
         advanceUntilIdle()
 
@@ -253,7 +669,7 @@ class AutomationSetupViewModelTest {
 
         assertEquals(ReadinessStatus.ACTION_REQUIRED, whatsAppCheck.status)
         assertEquals(
-            context.getString(R.string.automation_setup_whatsapp_consent_needed),
+            context.getString(R.string.automation_setup_whatsapp_consent_needed_for_contacts, 1),
             whatsAppCheck.detail,
         )
     }
@@ -274,6 +690,60 @@ class AutomationSetupViewModelTest {
             viewModel.uiState.value.operationMessage,
         )
     }
+
+    @Test
+    fun `contact readiness changes immediately refresh AI Doctor personalization checks`() =
+        runTest(testDispatcher) {
+            val viewModel = newViewModel()
+
+            val initialCheck = awaitCheck(
+                viewModel = viewModel,
+                title = context.getString(R.string.automation_setup_check_personalization),
+            ) { it.status == ReadinessStatus.WARNING }
+            assertEquals(ReadinessStatus.WARNING, initialCheck.status)
+
+            readinessProfiles.value = listOf(
+                readinessProfile(
+                    id = "ready",
+                    notesText = "College friend with specific context",
+                ),
+            )
+
+            val updatedCheck = awaitCheck(
+                viewModel = viewModel,
+                title = context.getString(R.string.automation_setup_check_personalization),
+            ) { it.status == ReadinessStatus.OK }
+            assertEquals(ReadinessStatus.OK, updatedCheck.status)
+            assertEquals(
+                context.getString(R.string.automation_setup_personalization_ok, 1, 1),
+                updatedCheck.detail,
+            )
+        }
+
+    @Test
+    fun `preference changes immediately refresh AI Doctor Gemini readiness`() =
+        runTest(testDispatcher) {
+            val viewModel = newViewModel()
+
+            val initialCheck = awaitCheck(
+                viewModel = viewModel,
+                title = context.getString(R.string.automation_setup_check_gemini),
+            ) { it.status == ReadinessStatus.ACTION_REQUIRED }
+            assertEquals(ReadinessStatus.ACTION_REQUIRED, initialCheck.status)
+
+            every { securePrefs.getGeminiApiKey() } returns "real-gemini-key"
+            preferenceChanges.tryEmit(Unit)
+
+            val updatedCheck = awaitCheck(
+                viewModel = viewModel,
+                title = context.getString(R.string.automation_setup_check_gemini),
+            ) { it.status == ReadinessStatus.OK }
+            assertEquals(ReadinessStatus.OK, updatedCheck.status)
+            assertEquals(
+                context.getString(R.string.automation_setup_gemini_key_ok),
+                updatedCheck.detail,
+            )
+        }
 
     @Test
     fun `buildChecksForTesting surfaces persisted dispatch recovery rows`() = runTest(testDispatcher) {
@@ -509,9 +979,32 @@ class AutomationSetupViewModelTest {
         )
     }
 
+    private fun awaitCheck(
+        viewModel: AutomationSetupViewModel,
+        title: String,
+        predicate: (ReadinessCheck) -> Boolean,
+    ): ReadinessCheck {
+        val deadline = System.currentTimeMillis() + 3_000
+        var latest: ReadinessCheck? = null
+        while (System.currentTimeMillis() < deadline) {
+            testDispatcher.scheduler.advanceUntilIdle()
+            latest = viewModel.uiState.value.checks.firstOrNull { it.title == title }
+            if (latest != null && predicate(latest)) {
+                return latest
+            }
+            Thread.sleep(10)
+        }
+        return latest ?: error("No readiness check found for $title")
+    }
+
     private fun readinessProfile(
         id: String,
         preferredChannel: MessageChannel = MessageChannel.SMS,
+        automationMode: ApprovalMode = ApprovalMode.DEFAULT,
+        skipAutoWish: Boolean = false,
+        hasPrimaryPhone: Boolean = false,
+        hasPrimaryEmail: Boolean = false,
+        hasAutomatableOccasion: Boolean = false,
         nickname: String? = null,
         notesText: String = "",
         interestsJson: String = "[]",
@@ -521,6 +1014,11 @@ class AutomationSetupViewModelTest {
         return ContactAutomationReadinessProfile(
             id = ContactId(id),
             preferredChannel = preferredChannel,
+            automationMode = automationMode,
+            skipAutoWish = skipAutoWish,
+            hasPrimaryPhone = hasPrimaryPhone,
+            hasPrimaryEmail = hasPrimaryEmail,
+            hasAutomatableOccasion = hasAutomatableOccasion,
             nickname = nickname,
             notesText = notesText,
             interestsJson = interestsJson,

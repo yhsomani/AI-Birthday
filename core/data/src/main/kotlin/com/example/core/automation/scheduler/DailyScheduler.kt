@@ -7,6 +7,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import androidx.work.ExistingWorkPolicy
+import com.example.core.automation.sender.SmsDeliveryStatusRecovery
 import com.example.core.automation.workers.MessageDispatchWorkRequests
 import com.example.core.data.R
 import com.example.core.db.AppDatabase
@@ -51,11 +53,10 @@ object DailyScheduler {
                 val nowMs = System.currentTimeMillis()
                 if (scheduledForMs <= nowMs) {
                     androidx.work.WorkManager.getInstance(context)
-                        .enqueue(
-                            MessageDispatchWorkRequests.create(
-                                pendingMessageId = scheduleState.messageId.value,
-                                eventId = scheduleState.occasionId.value,
-                            )
+                        .enqueueUniquePendingMessageDispatchWork(
+                            pendingMessageId = scheduleState.messageId.value,
+                            eventId = scheduleState.occasionId.value,
+                            existingWorkPolicy = ExistingWorkPolicy.KEEP,
                         )
                     return@launch
                 }
@@ -72,12 +73,11 @@ object DailyScheduler {
                         context.getString(R.string.notification_setup_exact_alarm_message),
                     )
                     androidx.work.WorkManager.getInstance(context)
-                        .enqueue(
-                            MessageDispatchWorkRequests.create(
-                                pendingMessageId = scheduleState.messageId.value,
-                                eventId = scheduleState.occasionId.value,
-                                initialDelayMs = scheduledForMs - nowMs,
-                            )
+                        .enqueueUniquePendingMessageDispatchWork(
+                            pendingMessageId = scheduleState.messageId.value,
+                            eventId = scheduleState.occasionId.value,
+                            initialDelayMs = scheduledForMs - nowMs,
+                            existingWorkPolicy = ExistingWorkPolicy.REPLACE,
                         )
                 }
             }
@@ -146,27 +146,32 @@ class MessageDispatchReceiver : BroadcastReceiver() {
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            val pendingResult = goAsync()
-            val db = AppDatabase.getInstance(context)
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    // 1. Reschedule alarms that can send without more user action.
-                    val exactSendCommands = db.pendingMessageDao().getBootRecoverableExactSendCommands()
-                    exactSendCommands.forEach { command ->
-                        DailyScheduler.scheduleExactSendCommand(context, command)
-                    }
-                    EventReminderScheduler.scheduleAll(context)
-                    
-                    // 2. Reschedule periodic workers conditionally
-                    val workManager = androidx.work.WorkManager.getInstance(context)
-                    bootRecoveryRecurringWorkCommands().forEach { command ->
-                        workManager.reconcileBootRecoveryRecurringWork(command)
-                    }
-                } finally {
-                    pendingResult.finish()
+        if (!isScheduleRecoveryIntentAction(intent.action)) return
+
+        val pendingResult = goAsync()
+        val db = AppDatabase.getInstance(context)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // 1. Reschedule alarms that can send without more user action.
+                ExactSendRecovery.recover(context, db.pendingMessageDao(), db.dispatchAttemptDao())
+                SmsDeliveryStatusRecovery.recover(db.sentMessageDao())
+                EventReminderScheduler.scheduleAll(context)
+
+                // 2. Reschedule periodic workers conditionally
+                val workManager = androidx.work.WorkManager.getInstance(context)
+                bootRecoveryRecurringWorkCommands().forEach { command ->
+                    workManager.reconcileBootRecoveryRecurringWork(command)
                 }
+            } finally {
+                pendingResult.finish()
             }
         }
     }
+}
+
+internal fun isScheduleRecoveryIntentAction(action: String?): Boolean {
+    return action == Intent.ACTION_BOOT_COMPLETED ||
+        action == Intent.ACTION_MY_PACKAGE_REPLACED ||
+        action == Intent.ACTION_TIME_CHANGED ||
+        action == Intent.ACTION_TIMEZONE_CHANGED
 }

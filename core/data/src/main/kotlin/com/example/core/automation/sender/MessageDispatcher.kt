@@ -1,6 +1,7 @@
 package com.example.core.automation.sender
 
 import android.content.Context
+import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
@@ -27,6 +28,10 @@ class MessageDispatcher(
         val dispatchAttemptId = request.dispatchAttemptId?.value
         val messageText = request.messageText
         val preferredChannel = request.preferredChannel
+        val automaticRetryCount = dispatchAttemptDao
+            ?.getMaxRetryCountForMessageDraft(messageDraftId.value)
+            ?.plus(1)
+            ?: 1
 
         recordMessageDispatchLifecycleLog(
             messageDispatchStartedLog(
@@ -89,6 +94,7 @@ class MessageDispatcher(
                             phoneNumber = primaryPhone,
                             contactDisplayName = request.contactDisplayName,
                             messageText = messageText,
+                            dispatchAttemptId = dispatchAttemptId,
                         )
                         routeLoopState = routeLoopState.applyRouteOutcome(
                             smsOutcome.toMessageDispatchRouteOutcome()
@@ -115,7 +121,7 @@ class MessageDispatcher(
             if (routeLoopState.success) break
         }
 
-        saveMessageDispatchFinalization(
+        val finalization = saveMessageDispatchFinalization(
             dispatchAttemptDao = dispatchAttemptDao,
             pendingMessageDao = pendingMessageDao,
             sentMessageDao = sentMessageDao,
@@ -129,6 +135,10 @@ class MessageDispatcher(
             messageText = messageText,
             routeLoopState = routeLoopState,
             noDeliveryRoute = routePlan.noDeliveryRoute,
+            automaticRetryCount = automaticRetryCount,
         )
+        if (finalization.shouldScheduleRetry) {
+            DailyScheduler.scheduleExactSend(context, messageDraftId.value)
+        }
     }
 }

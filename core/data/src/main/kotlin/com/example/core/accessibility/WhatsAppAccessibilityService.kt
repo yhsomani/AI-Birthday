@@ -19,6 +19,13 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         val pendingQueue: ConcurrentLinkedQueue<WhatsAppSendJob> = ConcurrentLinkedQueue()
         var instance: WhatsAppAccessibilityService? = null
         private val WHATSAPP_PACKAGES = arrayOf("com.whatsapp", "com.whatsapp.w4b")
+
+        internal fun failQueuedJobs(reason: WhatsAppSendFailureReason) {
+            while (true) {
+                val job = pendingQueue.poll() ?: return
+                job.onComplete(WhatsAppSendResult.Failed(reason))
+            }
+        }
     }
 
     data class WhatsAppSendJob(
@@ -48,14 +55,35 @@ class WhatsAppAccessibilityService : AccessibilityService() {
                     AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             packageNames = WHATSAPP_PACKAGES
         }
+        processNextIfIdle()
     }
 
     fun enqueueSend(job: WhatsAppSendJob) {
+        if (instance !== this) {
+            job.onComplete(WhatsAppSendResult.Failed(WhatsAppSendFailureReason.SERVICE_DISABLED))
+            return
+        }
         pendingQueue.add(job)
         processNextIfIdle()
     }
 
+    fun cancelSend(eventId: String, reason: WhatsAppSendFailureReason) {
+        if (currentJob?.eventId == eventId) {
+            failJob(reason)
+            return
+        }
+        pendingQueue.removeIf { job ->
+            if (job.eventId == eventId) {
+                job.onComplete(WhatsAppSendResult.Failed(reason))
+                true
+            } else {
+                false
+            }
+        }
+    }
+
     private fun processNextIfIdle() {
+        if (instance !== this) return
         if (sendState != SendState.IDLE) return
         currentJob = pendingQueue.poll() ?: return
         val job = currentJob ?: return
@@ -121,7 +149,7 @@ class WhatsAppAccessibilityService : AccessibilityService() {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, message)
             }
             inputField.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-            
+
             // Post verification check after 500ms
             mainHandler.postDelayed({
                 verifyTextTyped(message)
@@ -230,8 +258,26 @@ class WhatsAppAccessibilityService : AccessibilityService() {
         return null
     }
 
-    override fun onInterrupt() { instance = null }
-    override fun onDestroy() { super.onDestroy(); instance = null }
+    override fun onInterrupt() {
+        disconnectService()
+    }
+
+    override fun onDestroy() {
+        disconnectService()
+        super.onDestroy()
+    }
+
+    private fun disconnectService() {
+        jobTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        jobTimeoutRunnable = null
+        currentJob?.onComplete(WhatsAppSendResult.Failed(WhatsAppSendFailureReason.SERVICE_DISABLED))
+        currentJob = null
+        sendState = SendState.IDLE
+        failQueuedJobs(WhatsAppSendFailureReason.SERVICE_DISABLED)
+        if (instance === this) {
+            instance = null
+        }
+    }
 
     private fun isDeviceLocked(): Boolean {
         val km = applicationContext.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager ?: return false

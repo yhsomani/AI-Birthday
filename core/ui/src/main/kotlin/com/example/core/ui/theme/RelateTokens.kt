@@ -81,6 +81,7 @@ object RelateFraction {
 }
 
 object RelateElevation {
+    val flat = 0.dp
     val card = 2.dp
     val appBar = 3.dp
 }

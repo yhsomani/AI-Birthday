@@ -19,7 +19,11 @@ sealed class Screen(val route: String) {
         fun createRoute(contactId: String) = "contacts/${RouteArgumentCodec.encode(contactId)}"
     }
     data object Events : Screen("events")
-    data object Messages : Screen("messages")
+    data object Messages : Screen("messages") {
+        const val channelArg = "channel"
+        const val filteredRoute = "messages/filter/{$channelArg}"
+        fun createFilteredRoute(channel: String) = "messages/filter/${RouteArgumentCodec.encode(channel)}"
+    }
     data object Settings : Screen("settings")
     data object Analytics : Screen("analytics")
     data object ActivityHistory : Screen("activity-history")

@@ -53,6 +53,38 @@ class DeepLinkContractTest {
     }
 
     @Test
+    fun navGraphProtectsEverySignedInDestinationWithAuthGate() {
+        val source = rootFile("app/src/main/java/com/example/ui/navigation/NavGraph.kt").readText()
+
+        listOf(
+            "Screen.Home.route",
+            "Screen.ContactList.route",
+            "Screen.ContactDetail.route",
+            "Screen.Events.route",
+            "Screen.Messages.route",
+            "Screen.Settings.route",
+            "Screen.Analytics.route",
+            "Screen.ActivityHistory.route",
+            "Screen.WishPreview.route",
+            "Screen.ChatHistory.route",
+            "Screen.StyleCoach.route",
+            "Screen.BackupRestore.route",
+            "Screen.AutomationSetup.route",
+            "Screen.MemoryVault.route",
+            "Screen.GiftAdvisor.route",
+        ).forEach { routeReference ->
+            val authGateRegistration = Regex(
+                pattern = """authenticatedComposable\(\s*route = ${Regex.escape(routeReference)}\b""",
+                option = RegexOption.MULTILINE,
+            )
+            assertTrue(
+                "NavGraph must register $routeReference through authenticatedComposable",
+                authGateRegistration.containsMatchIn(source),
+            )
+        }
+    }
+
+    @Test
     fun notificationHelperUsesSharedDeepLinksForRoutedNotifications() {
         val source = rootFile("core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt").readText()
 

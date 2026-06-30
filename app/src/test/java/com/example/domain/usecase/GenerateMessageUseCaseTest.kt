@@ -113,7 +113,7 @@ class GenerateMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke with unknown approval mode falls back to smart approval`() = runTest {
+    fun `invoke with unknown approval mode falls back to full automation`() = runTest {
         val event = occasion(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         val contact = ContactEntity(
             id = "c1",
@@ -140,20 +140,11 @@ class GenerateMessageUseCaseTest {
 
         assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
         val generated = result as GenerateMessageUseCase.GenerationOutcome.Generated
-        assertEquals(ApprovalMode.SMART_APPROVE, generated.approvalMode)
+        assertEquals(ApprovalMode.FULLY_AUTO, generated.approvalMode)
         assertEquals(0, generated.retries)
 
         coVerify { messageRepository.insertPending(any()) }
-        coVerify {
-            notificationService.showApprovalNotification(
-                request = match<ApprovalNotificationRequest> {
-                    it.contactId.value == "c1" &&
-                        it.contactDisplayName == "John" &&
-                        it.eventId.value == "e1"
-                },
-                variants = variants,
-            )
-        }
+        coVerify(exactly = 0) { notificationService.showApprovalNotification(any(), any()) }
         coVerify { schedulerService.scheduleExactSend(any()) }
     }
 
@@ -239,7 +230,7 @@ class GenerateMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke downgrades fallback fully auto draft to smart approve before scheduling`() = runTest {
+    fun `invoke downgrades fallback fully auto draft to manual review without scheduling`() = runTest {
         val event = occasion(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         val contact = ContactEntity(
             id = "c1",
@@ -273,14 +264,14 @@ class GenerateMessageUseCaseTest {
         val result = useCase("e1")
 
         assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
-        assertEquals(ApprovalMode.SMART_APPROVE, (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
+        assertEquals(ApprovalMode.ALWAYS_ASK, (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
         coVerify { messageRepository.insertPending(capture(pendingSlot)) }
-        assertEquals("SMART_APPROVE", pendingSlot.captured.approvalMode)
+        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
         assertEquals("PENDING", pendingSlot.captured.status)
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertTrue(pendingSlot.captured.isUsingFallback)
         verify { notificationService.showAiFallbackAlert() }
-        coVerify { schedulerService.scheduleExactSend(any()) }
+        coVerify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
         coVerify {
             notificationService.showApprovalNotification(
                 request = match<ApprovalNotificationRequest> {

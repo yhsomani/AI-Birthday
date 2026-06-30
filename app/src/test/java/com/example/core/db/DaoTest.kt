@@ -292,6 +292,69 @@ class DaoTest {
     }
 
     @Test
+    fun pendingMessageDao_updateStatusIfCurrent_claimsOnlyExpectedState() = runTest {
+        pendingMessageDao.insert(testPending("p1").copy(status = "APPROVED"))
+
+        val firstClaim = pendingMessageDao.updateStatusIfCurrent(
+            id = "p1",
+            expectedStatus = "APPROVED",
+            newStatus = "DISPATCHING",
+        )
+        val secondClaim = pendingMessageDao.updateStatusIfCurrent(
+            id = "p1",
+            expectedStatus = "APPROVED",
+            newStatus = "DISPATCHING",
+        )
+        val pending = pendingMessageDao.getAll().first().single { it.id == "p1" }
+
+        assertEquals(1, firstClaim)
+        assertEquals(0, secondClaim)
+        assertEquals("DISPATCHING", pending.status)
+    }
+
+    @Test
+    fun pendingMessageDao_markSmsHandoffSentIfAwaitingCallback_preservesFailedRows() = runTest {
+        pendingMessageDao.insert(testPending("dispatching", "event_dispatching").copy(status = "DISPATCHING"))
+        pendingMessageDao.insert(testPending("failed", "event_failed").copy(status = "FAILED"))
+        pendingMessageDao.insert(testPending("rejected", "event_rejected").copy(status = "REJECTED"))
+
+        val dispatchingUpdated = pendingMessageDao.markSmsHandoffSentIfAwaitingCallback("dispatching")
+        val failedUpdated = pendingMessageDao.markSmsHandoffSentIfAwaitingCallback("failed")
+        val rejectedUpdated = pendingMessageDao.markSmsHandoffSentIfAwaitingCallback("rejected")
+        val byId = pendingMessageDao.getAll().first().associateBy { it.id }
+
+        assertEquals(1, dispatchingUpdated)
+        assertEquals(0, failedUpdated)
+        assertEquals(0, rejectedUpdated)
+        assertEquals("SENT", byId["dispatching"]?.status)
+        assertEquals("FAILED", byId["failed"]?.status)
+        assertEquals("REJECTED", byId["rejected"]?.status)
+    }
+
+    @Test
+    fun pendingMessageDao_markSmsCallbackFailed_marksOnlySendAttemptRowsFailed() = runTest {
+        pendingMessageDao.insert(testPending("sent", "event_sent").copy(status = "SENT"))
+        pendingMessageDao.insert(testPending("dispatching", "event_dispatching").copy(status = "DISPATCHING"))
+        pendingMessageDao.insert(testPending("approved", "event_approved").copy(status = "APPROVED"))
+        pendingMessageDao.insert(testPending("rejected", "event_rejected").copy(status = "REJECTED"))
+
+        val sentUpdated = pendingMessageDao.markSmsCallbackFailed("sent")
+        val dispatchingUpdated = pendingMessageDao.markSmsCallbackFailed("dispatching")
+        val approvedUpdated = pendingMessageDao.markSmsCallbackFailed("approved")
+        val rejectedUpdated = pendingMessageDao.markSmsCallbackFailed("rejected")
+        val byId = pendingMessageDao.getAll().first().associateBy { it.id }
+
+        assertEquals(1, sentUpdated)
+        assertEquals(1, dispatchingUpdated)
+        assertEquals(1, approvedUpdated)
+        assertEquals(0, rejectedUpdated)
+        assertEquals("FAILED", byId["sent"]?.status)
+        assertEquals("FAILED", byId["dispatching"]?.status)
+        assertEquals("FAILED", byId["approved"]?.status)
+        assertEquals("REJECTED", byId["rejected"]?.status)
+    }
+
+    @Test
     fun pendingMessageDao_getBootRecoverableAutoSends_includesApprovedAndPendingSmartApprove() = runTest {
         pendingMessageDao.insert(
             testPending("approved_full_auto", "event_approved").copy(
@@ -330,11 +393,141 @@ class DaoTest {
     }
 
     @Test
+    fun pendingMessageDao_getDispatchingMessages_returnsOnlyDispatching() = runTest {
+        pendingMessageDao.insert(testPending("dispatching", "event_dispatching").copy(status = "DISPATCHING"))
+        pendingMessageDao.insert(testPending("approved", "event_approved").copy(status = "APPROVED"))
+        pendingMessageDao.insert(testPending("pending", "event_pending").copy(status = "PENDING"))
+
+        val ids = pendingMessageDao.getDispatchingMessages().map { it.id }
+
+        assertEquals(listOf("dispatching"), ids)
+    }
+
+    @Test
+    fun pendingMessageDao_updateStatusAndScheduledForIfCurrent_updatesOnlyExpectedState() = runTest {
+        pendingMessageDao.insert(testPending("p1").copy(status = "DISPATCHING", scheduledForMs = 100L))
+
+        val firstUpdate = pendingMessageDao.updateStatusAndScheduledForIfCurrent(
+            id = "p1",
+            expectedStatus = "DISPATCHING",
+            newStatus = "APPROVED",
+            scheduledForMs = 200L,
+        )
+        val secondUpdate = pendingMessageDao.updateStatusAndScheduledForIfCurrent(
+            id = "p1",
+            expectedStatus = "DISPATCHING",
+            newStatus = "FAILED",
+            scheduledForMs = 300L,
+        )
+        val pending = pendingMessageDao.getById("p1")
+
+        assertEquals(1, firstUpdate)
+        assertEquals(0, secondUpdate)
+        assertEquals("APPROVED", pending?.status)
+        assertEquals(200L, pending?.scheduledForMs)
+    }
+
+    @Test
     fun sentMessageDao_insertAndCount() = runTest {
         sentMessageDao.insert(testSent("s1"))
         sentMessageDao.insert(testSent("s2"))
         val count = sentMessageDao.countAll().first()
         assertEquals(2, count)
+    }
+
+    @Test
+    fun sentMessageDao_markStalePendingSmsDeliveryStatus_updatesOnlyOldPendingSmsRows() = runTest {
+        sentMessageDao.insert(
+            testSent("old_pending_sms").copy(
+                channel = MessageChannel.SMS.raw,
+                sentAtMs = 100L,
+                deliveryStatus = MessageDeliveryStatus.PENDING_DELIVERY.raw,
+            )
+        )
+        sentMessageDao.insert(
+            testSent("fresh_pending_sms").copy(
+                channel = MessageChannel.SMS.raw,
+                sentAtMs = 300L,
+                deliveryStatus = MessageDeliveryStatus.PENDING_DELIVERY.raw,
+            )
+        )
+        sentMessageDao.insert(
+            testSent("old_sent_sms").copy(
+                channel = MessageChannel.SMS.raw,
+                sentAtMs = 100L,
+                deliveryStatus = MessageDeliveryStatus.SENT.raw,
+            )
+        )
+        sentMessageDao.insert(
+            testSent("old_pending_email").copy(
+                channel = MessageChannel.EMAIL.raw,
+                sentAtMs = 100L,
+                deliveryStatus = MessageDeliveryStatus.PENDING_DELIVERY.raw,
+            )
+        )
+
+        val updated = sentMessageDao.markStalePendingSmsDeliveryStatus(
+            cutoffMs = 200L,
+            status = MessageDeliveryStatus.UNKNOWN.raw,
+        )
+        val byId = sentMessageDao.getAll().first().associateBy { it.id }
+
+        assertEquals(1, updated)
+        assertEquals(MessageDeliveryStatus.UNKNOWN.raw, byId["old_pending_sms"]?.deliveryStatus)
+        assertEquals(MessageDeliveryStatus.PENDING_DELIVERY.raw, byId["fresh_pending_sms"]?.deliveryStatus)
+        assertEquals(MessageDeliveryStatus.SENT.raw, byId["old_sent_sms"]?.deliveryStatus)
+        assertEquals(MessageDeliveryStatus.PENDING_DELIVERY.raw, byId["old_pending_email"]?.deliveryStatus)
+    }
+
+    @Test
+    fun sentMessageDao_updateSmsCallbackDeliveryStatus_preservesStrongestCallbackState() = runTest {
+        sentMessageDao.insert(
+            testSent("failed_sms").copy(
+                channel = MessageChannel.SMS.raw,
+                deliveryStatus = MessageDeliveryStatus.FAILED.raw,
+            )
+        )
+        sentMessageDao.insert(
+            testSent("delivered_sms").copy(
+                channel = MessageChannel.SMS.raw,
+                deliveryStatus = MessageDeliveryStatus.DELIVERED.raw,
+            )
+        )
+        sentMessageDao.insert(
+            testSent("sent_sms").copy(
+                channel = MessageChannel.SMS.raw,
+                deliveryStatus = MessageDeliveryStatus.SENT.raw,
+            )
+        )
+        sentMessageDao.insert(
+            testSent("delivered_then_failed_sms").copy(
+                channel = MessageChannel.SMS.raw,
+                deliveryStatus = MessageDeliveryStatus.DELIVERED.raw,
+            )
+        )
+
+        sentMessageDao.updateSmsCallbackDeliveryStatus(
+            "failed_sms",
+            MessageDeliveryStatus.SENT.raw,
+        )
+        sentMessageDao.updateSmsCallbackDeliveryStatus(
+            "delivered_sms",
+            MessageDeliveryStatus.SENT.raw,
+        )
+        sentMessageDao.updateSmsCallbackDeliveryStatus(
+            "sent_sms",
+            MessageDeliveryStatus.DELIVERED.raw,
+        )
+        sentMessageDao.updateSmsCallbackDeliveryStatus(
+            "delivered_then_failed_sms",
+            MessageDeliveryStatus.FAILED.raw,
+        )
+        val byId = sentMessageDao.getAll().first().associateBy { it.id }
+
+        assertEquals(MessageDeliveryStatus.FAILED.raw, byId["failed_sms"]?.deliveryStatus)
+        assertEquals(MessageDeliveryStatus.DELIVERED.raw, byId["delivered_sms"]?.deliveryStatus)
+        assertEquals(MessageDeliveryStatus.DELIVERED.raw, byId["sent_sms"]?.deliveryStatus)
+        assertEquals(MessageDeliveryStatus.FAILED.raw, byId["delivered_then_failed_sms"]?.deliveryStatus)
     }
 
     @Test
@@ -374,6 +567,7 @@ class DaoTest {
         assertEquals(1, dispatchAttemptDao.countFailureRecoveryQueue().first())
         assertEquals(listOf("da1"), dispatchAttemptDao.getFailureRecoveryQueue().map { it.id })
         assertEquals("da1", dispatchAttemptDao.getLatestFailureForMessageDraft("p1")?.id)
+        assertEquals(1, dispatchAttemptDao.getMaxRetryCountForMessageDraft("p1"))
 
         dispatchAttemptDao.updateOutcome(
             id = "da1",
@@ -394,6 +588,239 @@ class DaoTest {
         assertEquals(0, dispatchAttemptDao.countDeadLettered().first())
         assertEquals(0, dispatchAttemptDao.countFailureRecoveryQueue().first())
         assertEquals(null, dispatchAttemptDao.getLatestFailureForMessageDraft("p1"))
+        assertEquals(2, dispatchAttemptDao.getMaxRetryCountForMessageDraft("p1"))
+    }
+
+    @Test
+    fun dispatchAttemptDao_getLatestForMessageDraft_returnsNewestRequestedAt() = runTest {
+        pendingMessageDao.insert(testPending("p1", "e1"))
+        dispatchAttemptDao.upsert(testDispatchAttempt("old", "p1").copy(requestedAtMs = 100L))
+        dispatchAttemptDao.upsert(testDispatchAttempt("new", "p1").copy(requestedAtMs = 200L))
+
+        assertEquals("new", dispatchAttemptDao.getLatestForMessageDraft("p1")?.id)
+    }
+
+    @Test
+    fun dispatchAttemptDao_getSuccessfulChannelsSince_returnsRecentSuccessfulChannelsOnly() = runTest {
+        pendingMessageDao.insert(testPending("p1", "e1"))
+        pendingMessageDao.insert(testPending("p2", "e2"))
+        dispatchAttemptDao.upsert(
+            testDispatchAttempt("sms_success", "p1").copy(
+                channel = MessageChannel.SMS.raw,
+                requestedAtMs = 2_000L,
+                resolvedAtMs = 2_500L,
+                result = DispatchAttemptResult.PENDING_DELIVERY.raw,
+            ),
+        )
+        dispatchAttemptDao.upsert(
+            testDispatchAttempt("email_success", "p1").copy(
+                channel = MessageChannel.EMAIL.raw,
+                requestedAtMs = 3_000L,
+                resolvedAtMs = 3_500L,
+                result = DispatchAttemptResult.SENT.raw,
+            ),
+        )
+        dispatchAttemptDao.upsert(
+            testDispatchAttempt("old_whatsapp_success", "p2").copy(
+                channel = MessageChannel.WHATSAPP.raw,
+                requestedAtMs = 500L,
+                resolvedAtMs = 700L,
+                result = DispatchAttemptResult.SENT.raw,
+            ),
+        )
+        dispatchAttemptDao.upsert(
+            testDispatchAttempt("failed_sms", "p2").copy(
+                channel = MessageChannel.SMS.raw,
+                requestedAtMs = 4_000L,
+                resolvedAtMs = 4_500L,
+                result = DispatchAttemptResult.FAILED_FINAL.raw,
+            ),
+        )
+
+        val channels = dispatchAttemptDao.getSuccessfulChannelsSince(1_000L)
+
+        assertEquals(setOf(MessageChannel.SMS.raw, MessageChannel.EMAIL.raw), channels.toSet())
+    }
+
+    @Test
+    fun dispatchAttemptDao_initialSmsHandoffUpdateDoesNotOverwriteCallbackOutcome() = runTest {
+        pendingMessageDao.insert(testPending("p1", "e1"))
+        dispatchAttemptDao.upsert(
+            testDispatchAttempt("da_pending", "p1").copy(
+                resolvedAtMs = 1_800L,
+            ),
+        )
+        dispatchAttemptDao.upsert(
+            testDispatchAttempt("da_sent", "p1").copy(
+                result = DispatchAttemptResult.SENT.raw,
+                deliveryStatus = MessageDeliveryStatus.SENT.raw,
+                providerMessageId = "sent_sms",
+                resolvedAtMs = 1_900L,
+            ),
+        )
+        dispatchAttemptDao.upsert(
+            testDispatchAttempt("da_failed", "p1").copy(
+                result = DispatchAttemptResult.FAILED_FINAL.raw,
+                deliveryStatus = MessageDeliveryStatus.FAILED.raw,
+                errorType = "SMS_SENT_CALLBACK_FAILED",
+                errorCode = "5",
+                redactedErrorMessage = "Android SMS sent callback reported failure after send handoff.",
+                deadLetteredAtMs = 1_950L,
+                resolvedAtMs = 1_950L,
+            ),
+        )
+
+        listOf("da_pending", "da_sent", "da_failed").forEach { attemptId ->
+            dispatchAttemptDao.updateInitialSmsHandoffOutcomeIfAwaitingCallback(
+                id = attemptId,
+                attemptedAtMs = 2_000L,
+                resolvedAtMs = 2_100L,
+                result = DispatchAttemptResult.PENDING_DELIVERY.raw,
+                channel = MessageChannel.SMS.raw,
+                deliveryStatus = MessageDeliveryStatus.PENDING_DELIVERY.raw,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        }
+
+        val pending = dispatchAttemptDao.getById("da_pending")
+        val sent = dispatchAttemptDao.getById("da_sent")
+        val failed = dispatchAttemptDao.getById("da_failed")
+
+        assertEquals(DispatchAttemptResult.PENDING_DELIVERY.raw, pending?.result)
+        assertEquals(MessageDeliveryStatus.PENDING_DELIVERY.raw, pending?.deliveryStatus)
+        assertEquals(2_100L, pending?.resolvedAtMs)
+
+        assertEquals(DispatchAttemptResult.SENT.raw, sent?.result)
+        assertEquals(MessageDeliveryStatus.SENT.raw, sent?.deliveryStatus)
+        assertEquals("sent_sms", sent?.providerMessageId)
+        assertEquals(1_900L, sent?.resolvedAtMs)
+
+        assertEquals(DispatchAttemptResult.FAILED_FINAL.raw, failed?.result)
+        assertEquals(MessageDeliveryStatus.FAILED.raw, failed?.deliveryStatus)
+        assertEquals("SMS_SENT_CALLBACK_FAILED", failed?.errorType)
+        assertEquals("5", failed?.errorCode)
+        assertEquals(1_950L, failed?.deadLetteredAtMs)
+    }
+
+    @Test
+    fun dispatchAttemptDao_smsCallbackOutcome_preservesStrongestCallbackState() = runTest {
+        pendingMessageDao.insert(testPending("p1", "e1"))
+        dispatchAttemptDao.upsert(
+            testDispatchAttempt("da_failed", "p1").copy(
+                result = DispatchAttemptResult.FAILED_FINAL.raw,
+                deliveryStatus = MessageDeliveryStatus.FAILED.raw,
+                providerMessageId = "failed_sms",
+                errorType = "SMS_DELIVERY_CALLBACK_FAILED",
+                errorCode = "5",
+                redactedErrorMessage = "Delivery failed",
+                deadLetteredAtMs = 1_900L,
+                resolvedAtMs = 1_900L,
+            )
+        )
+        dispatchAttemptDao.upsert(
+            testDispatchAttempt("da_delivered", "p1").copy(
+                result = DispatchAttemptResult.DELIVERED.raw,
+                deliveryStatus = MessageDeliveryStatus.DELIVERED.raw,
+                providerMessageId = "delivered_sms",
+                resolvedAtMs = 1_800L,
+            )
+        )
+        dispatchAttemptDao.upsert(
+            testDispatchAttempt("da_sent", "p1").copy(
+                result = DispatchAttemptResult.SENT.raw,
+                deliveryStatus = MessageDeliveryStatus.SENT.raw,
+                providerMessageId = "sent_sms",
+                resolvedAtMs = 1_700L,
+            )
+        )
+        dispatchAttemptDao.upsert(
+            testDispatchAttempt("da_delivered_then_failed", "p1").copy(
+                result = DispatchAttemptResult.DELIVERED.raw,
+                deliveryStatus = MessageDeliveryStatus.DELIVERED.raw,
+                providerMessageId = "delivered_then_failed_sms",
+                resolvedAtMs = 1_600L,
+            )
+        )
+
+        dispatchAttemptDao.updateSmsCallbackOutcome(
+            id = "da_failed",
+            resolvedAtMs = 2_000L,
+            result = DispatchAttemptResult.SENT.raw,
+            channel = MessageChannel.SMS.raw,
+            deliveryStatus = MessageDeliveryStatus.SENT.raw,
+            providerMessageId = "late_sent_sms",
+            errorType = null,
+            errorCode = null,
+            redactedErrorMessage = null,
+            deadLetteredAtMs = null,
+        )
+        dispatchAttemptDao.updateSmsCallbackOutcome(
+            id = "da_delivered",
+            resolvedAtMs = 2_100L,
+            result = DispatchAttemptResult.SENT.raw,
+            channel = MessageChannel.SMS.raw,
+            deliveryStatus = MessageDeliveryStatus.SENT.raw,
+            providerMessageId = "late_sent_sms",
+            errorType = null,
+            errorCode = null,
+            redactedErrorMessage = null,
+            deadLetteredAtMs = null,
+        )
+        dispatchAttemptDao.updateSmsCallbackOutcome(
+            id = "da_sent",
+            resolvedAtMs = 2_200L,
+            result = DispatchAttemptResult.DELIVERED.raw,
+            channel = MessageChannel.SMS.raw,
+            deliveryStatus = MessageDeliveryStatus.DELIVERED.raw,
+            providerMessageId = "delivered_sms",
+            errorType = null,
+            errorCode = null,
+            redactedErrorMessage = null,
+            deadLetteredAtMs = null,
+        )
+        dispatchAttemptDao.updateSmsCallbackOutcome(
+            id = "da_delivered_then_failed",
+            resolvedAtMs = 2_300L,
+            result = DispatchAttemptResult.FAILED_FINAL.raw,
+            channel = MessageChannel.SMS.raw,
+            deliveryStatus = MessageDeliveryStatus.FAILED.raw,
+            providerMessageId = "failed_sms",
+            errorType = "SMS_DELIVERY_CALLBACK_FAILED",
+            errorCode = "5",
+            redactedErrorMessage = "Delivery failed",
+            deadLetteredAtMs = 2_300L,
+        )
+
+        val failed = dispatchAttemptDao.getById("da_failed")
+        val delivered = dispatchAttemptDao.getById("da_delivered")
+        val sent = dispatchAttemptDao.getById("da_sent")
+        val deliveredThenFailed = dispatchAttemptDao.getById("da_delivered_then_failed")
+
+        assertEquals(DispatchAttemptResult.FAILED_FINAL.raw, failed?.result)
+        assertEquals(MessageDeliveryStatus.FAILED.raw, failed?.deliveryStatus)
+        assertEquals("failed_sms", failed?.providerMessageId)
+        assertEquals(1_900L, failed?.resolvedAtMs)
+
+        assertEquals(DispatchAttemptResult.DELIVERED.raw, delivered?.result)
+        assertEquals(MessageDeliveryStatus.DELIVERED.raw, delivered?.deliveryStatus)
+        assertEquals("delivered_sms", delivered?.providerMessageId)
+        assertEquals(1_800L, delivered?.resolvedAtMs)
+
+        assertEquals(DispatchAttemptResult.DELIVERED.raw, sent?.result)
+        assertEquals(MessageDeliveryStatus.DELIVERED.raw, sent?.deliveryStatus)
+        assertEquals("delivered_sms", sent?.providerMessageId)
+        assertEquals(2_200L, sent?.resolvedAtMs)
+
+        assertEquals(DispatchAttemptResult.FAILED_FINAL.raw, deliveredThenFailed?.result)
+        assertEquals(MessageDeliveryStatus.FAILED.raw, deliveredThenFailed?.deliveryStatus)
+        assertEquals("failed_sms", deliveredThenFailed?.providerMessageId)
+        assertEquals(2_300L, deliveredThenFailed?.deadLetteredAtMs)
     }
 
     @Test
