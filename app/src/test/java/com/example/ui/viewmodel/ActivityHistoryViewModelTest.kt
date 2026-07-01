@@ -1,10 +1,10 @@
 package com.example.ui.viewmodel
 
-import com.example.core.db.entities.ActivityLogEntity
 import com.example.R
 import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
+import com.example.domain.model.activity.ActivityLogRecord
 import com.example.domain.repository.ActivityLogRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -42,14 +42,14 @@ class ActivityHistoryViewModelTest {
         val now = System.currentTimeMillis()
         every { activityLogRepository.getRecent(100) } returns MutableStateFlow(
             listOf(
-                ActivityLogEntity(
+                ActivityLogRecord(
                     id = "a1",
                     type = ActivityLogType.MESSAGE.raw,
                     title = "Message approved",
                     detail = "A message was approved.",
                     createdAtMs = now,
                 ),
-                ActivityLogEntity(
+                ActivityLogRecord(
                     id = "a2",
                     type = ActivityLogType.MESSAGE.raw,
                     title = "Dispatch deferred",
@@ -57,14 +57,14 @@ class ActivityHistoryViewModelTest {
                     metadataJson = "{\"decision\":\"deferred\"}",
                     createdAtMs = now - 1_000L,
                 ),
-                ActivityLogEntity(
+                ActivityLogRecord(
                     id = "a3",
                     type = ActivityLogType.BACKUP.raw,
                     title = "Backup exported",
                     detail = "Encrypted backup created.",
                     createdAtMs = now - 2_000L,
                 ),
-                ActivityLogEntity(
+                ActivityLogRecord(
                     id = "a4",
                     type = ActivityLogType.ANALYTICS.raw,
                     title = "Report exported",
@@ -98,7 +98,7 @@ class ActivityHistoryViewModelTest {
         val now = System.currentTimeMillis()
         every { activityLogRepository.getRecent(100) } returns MutableStateFlow(
             listOf(
-                ActivityLogEntity(
+                ActivityLogRecord(
                     id = "a1",
                     type = ActivityLogType.SYNC.raw,
                     title = "Contacts refreshed",
@@ -108,7 +108,7 @@ class ActivityHistoryViewModelTest {
                     actionRoute = "settings",
                     createdAtMs = now,
                 ),
-                ActivityLogEntity(
+                ActivityLogRecord(
                     id = "a2",
                     type = ActivityLogType.MESSAGE.raw,
                     title = "Message approved",
@@ -133,7 +133,7 @@ class ActivityHistoryViewModelTest {
 
     @Test
     fun `repository failure exposes load error state`() = runTest(dispatcher) {
-        every { activityLogRepository.getRecent(100) } returns flow<List<ActivityLogEntity>> {
+        every { activityLogRepository.getRecent(100) } returns flow<List<ActivityLogRecord>> {
             throw IllegalStateException("database unavailable")
         }
 

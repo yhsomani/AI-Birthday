@@ -1,6 +1,5 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ActivityLogEntity
 import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchDecision
 import com.example.domain.automation.DispatchEligibilityPolicy
@@ -13,6 +12,7 @@ import com.example.domain.model.ActivityLogType
 import com.example.domain.model.DispatchActivityDecision
 import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.activity.ActivityLogRecord
 import com.example.domain.model.common.DispatchAttemptId
 import com.example.domain.model.dispatch.DispatchAttemptCreator
 import com.example.domain.model.dispatch.DispatchAttemptResult
@@ -241,7 +241,7 @@ class DispatchMessageUseCase @Inject constructor(
     ) {
         runCatching {
             activityLogRepository.record(
-                ActivityLogEntity(
+                ActivityLogRecord(
                     id = UUID.randomUUID().toString(),
                     type = ActivityLogType.MESSAGE.raw,
                     title = title,

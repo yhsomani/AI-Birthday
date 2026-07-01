@@ -17,8 +17,8 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.activity.ActivityLogRecord
 import com.example.ui.viewmodel.ActivityHistoryUiState
 import com.example.ui.viewmodel.ActivityLogDateFilter
 import com.example.ui.viewmodel.ActivityLogStatusFilter
@@ -160,7 +160,7 @@ class ActivityHistoryScreenInteractionTest {
         }
     }
 
-    private fun activityLog() = ActivityLogEntity(
+    private fun activityLog() = ActivityLogRecord(
         id = "log_1",
         type = "MESSAGE",
         title = "Message approved",

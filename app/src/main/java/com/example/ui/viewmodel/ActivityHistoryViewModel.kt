@@ -3,9 +3,9 @@ package com.example.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
-import com.example.core.db.entities.ActivityLogEntity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
+import com.example.domain.model.activity.ActivityLogRecord
 import com.example.domain.repository.ActivityLogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,8 +41,8 @@ enum class ActivityLogStatusFilter {
 }
 
 data class ActivityHistoryUiState(
-    val allEntries: List<ActivityLogEntity> = emptyList(),
-    val entries: List<ActivityLogEntity> = emptyList(),
+    val allEntries: List<ActivityLogRecord> = emptyList(),
+    val entries: List<ActivityLogRecord> = emptyList(),
     val selectedTypeFilter: ActivityLogTypeFilter = ActivityLogTypeFilter.ALL,
     val selectedDateFilter: ActivityLogDateFilter = ActivityLogDateFilter.ALL,
     val selectedStatusFilter: ActivityLogStatusFilter = ActivityLogStatusFilter.ALL,
@@ -122,7 +122,7 @@ class ActivityHistoryViewModel @Inject constructor(
         return copy(entries = filtered)
     }
 
-    private fun ActivityLogTypeFilter.matches(entry: ActivityLogEntity): Boolean {
+    private fun ActivityLogTypeFilter.matches(entry: ActivityLogRecord): Boolean {
         if (this == ActivityLogTypeFilter.ALL) return true
         val type = ActivityLogType.fromRaw(entry.type)
         return when (this) {

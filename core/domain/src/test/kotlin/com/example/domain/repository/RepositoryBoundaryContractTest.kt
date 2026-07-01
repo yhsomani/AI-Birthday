@@ -9,6 +9,7 @@ class RepositoryBoundaryContractTest {
     @Test
     fun repositoriesWithPureContracts_doNotExposeRoomEntityTypes() {
         listOf(
+            "core/domain/src/main/kotlin/com/example/domain/repository/ActivityLogRepository.kt",
             "core/domain/src/main/kotlin/com/example/domain/repository/MemoryNoteRepository.kt",
             "core/domain/src/main/kotlin/com/example/domain/repository/GiftHistoryRepository.kt",
             "core/domain/src/main/kotlin/com/example/domain/repository/MessageFeedbackRepository.kt",
@@ -18,6 +19,7 @@ class RepositoryBoundaryContractTest {
             assertFalse(
                 "$relativePath should expose pure domain models, not Room entities.",
                 source.contains("com.example.core.db.entities") ||
+                    source.contains("ActivityLogEntity") ||
                     source.contains("MemoryNoteEntity") ||
                     source.contains("GiftHistoryEntity") ||
                     source.contains("MessageFeedbackEntity"),

@@ -42,7 +42,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
-import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
 import com.example.core.ui.components.RelateGlassCard
@@ -52,6 +51,7 @@ import com.example.core.ui.theme.relateSemanticColors
 import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
+import com.example.domain.model.activity.ActivityLogRecord
 import com.example.ui.viewmodel.ActivityHistoryUiState
 import com.example.ui.viewmodel.ActivityHistoryViewModel
 import com.example.ui.viewmodel.ActivityLogDateFilter
@@ -213,7 +213,7 @@ private fun <T> FilterRow(
 
 @Composable
 private fun ActivityLogCard(
-    entry: ActivityLogEntity,
+    entry: ActivityLogRecord,
     onOpenRoute: (String) -> Unit,
 ) {
     val dateFormat = rememberActivityDateFormat()

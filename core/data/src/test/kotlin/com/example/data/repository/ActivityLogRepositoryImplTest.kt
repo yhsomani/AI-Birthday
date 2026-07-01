@@ -2,6 +2,7 @@ package com.example.data.repository
 
 import com.example.core.db.dao.ActivityLogDao
 import com.example.core.db.entities.ActivityLogEntity
+import com.example.domain.model.activity.ActivityLogRecord
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -28,12 +29,12 @@ class ActivityLogRepositoryImplTest {
         )
         every { dao.getByType("MESSAGE", 5) } returns MutableStateFlow(entries)
 
-        assertEquals(entries, repository.getByType("MESSAGE", 5).first())
+        assertEquals("a1", repository.getByType("MESSAGE", 5).first().single().id)
     }
 
     @Test
     fun `record and prune delegate to dao`() = runTest {
-        val entry = ActivityLogEntity(
+        val entry = ActivityLogRecord(
             id = "a1",
             type = "SYNC",
             title = "Contacts synced",
@@ -44,7 +45,12 @@ class ActivityLogRepositoryImplTest {
         repository.deleteOlderThan(123L)
 
         coVerify {
-            dao.insert(entry)
+            dao.insert(match {
+                it.id == "a1" &&
+                    it.type == "SYNC" &&
+                    it.title == "Contacts synced" &&
+                    it.detail == "Contacts were refreshed."
+            })
             dao.deleteOlderThan(123L)
         }
     }

@@ -3,7 +3,6 @@ package com.example.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
-import com.example.core.db.entities.ActivityLogEntity
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
@@ -15,6 +14,7 @@ import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.activity.ActivityLogRecord
 import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.MessageFeedbackId
 import com.example.domain.model.contact.ContactWishContext
@@ -383,7 +383,7 @@ class WishPreviewViewModel @Inject constructor(
                     )
                 )
                 activityLogRepository.record(
-                    ActivityLogEntity(
+                    ActivityLogRecord(
                         id = UUID.randomUUID().toString(),
                         type = ActivityLogType.AI.raw,
                         title = "AI feedback saved",

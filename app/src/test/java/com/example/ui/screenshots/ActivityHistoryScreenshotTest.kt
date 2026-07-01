@@ -5,10 +5,10 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.ActivityLogEntity
 import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
+import com.example.domain.model.activity.ActivityLogRecord
 import com.example.ui.screens.activity.ActivityHistoryContent
 import com.example.ui.viewmodel.ActivityHistoryUiState
 import com.example.ui.viewmodel.ActivityLogDateFilter
@@ -275,7 +275,7 @@ class ActivityHistoryScreenshotTest {
         actionRoute: String?,
         createdAtMs: Long,
         metadataJson: String = "{}",
-    ) = ActivityLogEntity(
+    ) = ActivityLogRecord(
         id = id,
         type = type,
         title = title,

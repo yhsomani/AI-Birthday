@@ -5,7 +5,6 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
-import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.automation.AutomationSchedulePolicy
@@ -13,6 +12,7 @@ import com.example.domain.model.ActivityLogType
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.activity.ActivityLogRecord
 import com.example.domain.model.contact.ContactMessageContext
 import com.example.domain.model.message.PendingMessageListItem
 import com.example.domain.model.message.SentMessageListItem
@@ -600,7 +600,7 @@ class MessagesViewModel @Inject constructor(
         detail: String,
         messageId: String?,
     ) {
-        val entry = ActivityLogEntity(
+        val entry = ActivityLogRecord(
             id = UUID.randomUUID().toString(),
             type = ActivityLogType.MESSAGE.raw,
             title = title,

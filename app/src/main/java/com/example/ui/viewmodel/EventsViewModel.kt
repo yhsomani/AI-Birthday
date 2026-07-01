@@ -5,12 +5,12 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
-import com.example.core.db.entities.ActivityLogEntity
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.event.EventConflictKind
 import com.example.domain.event.EventResolutionPolicy
 import com.example.domain.event.toOccasion
 import com.example.domain.model.ActivityLogType
+import com.example.domain.model.activity.ActivityLogRecord
 import com.example.domain.model.contact.ContactPickerItem
 import com.example.domain.model.occasion.EventListItem
 import com.example.domain.model.occasion.OccasionType
@@ -182,7 +182,7 @@ class EventsViewModel @Inject constructor(
                 is SaveManualEventUseCase.Outcome.Saved -> {
                     val eventTypeLabel = eventTypeLabel(outcome.event.type.raw)
                     recordActivity(
-                        ActivityLogEntity(
+                        ActivityLogRecord(
                             id = UUID.randomUUID().toString(),
                             type = ActivityLogType.EVENT.raw,
                             title = string(R.string.events_saved_activity_title),
@@ -382,7 +382,7 @@ class EventsViewModel @Inject constructor(
         return nowMs + days * 86_400_000L
     }
 
-    private suspend fun recordActivity(entry: ActivityLogEntity) {
+    private suspend fun recordActivity(entry: ActivityLogRecord) {
         try {
             activityLogRepository.record(entry)
         } catch (e: Exception) {
@@ -392,7 +392,7 @@ class EventsViewModel @Inject constructor(
 
     private suspend fun recordEventResolution(outcome: ResolveEventConflictUseCase.Outcome.Resolved) {
         recordActivity(
-            ActivityLogEntity(
+            ActivityLogRecord(
                 id = UUID.randomUUID().toString(),
                 type = ActivityLogType.EVENT.raw,
                 title = when (outcome.action) {
