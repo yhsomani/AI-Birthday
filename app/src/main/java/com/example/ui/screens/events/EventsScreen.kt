@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -347,15 +348,21 @@ internal fun EventsList(
     onMergeEvent: (String) -> Unit = {},
     onKeepSeparateEvent: (String) -> Unit = {},
 ) {
-    val resolvedEventTrust = if (events.all { eventTrust.containsKey(it.id.value) }) {
-        eventTrust
-    } else {
-        buildEventTrustStates(events)
+    // ⚡ Bolt: Cache event trust resolution to prevent recalculation on every recomposition
+    val resolvedEventTrust = remember(events, eventTrust) {
+        if (events.all { eventTrust.containsKey(it.id.value) }) {
+            eventTrust
+        } else {
+            buildEventTrustStates(events)
+        }
     }
-    val groupedEvents = events.groupBy {
-        val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = it.nextOccurrenceMs
-        cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+    // ⚡ Bolt: Cache expensive grouping and Calendar instantiation to prevent UI stutter
+    val groupedEvents = remember(events) {
+        events.groupBy {
+            val cal = java.util.Calendar.getInstance()
+            cal.timeInMillis = it.nextOccurrenceMs
+            cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+        }
     }
 
     LazyColumn(
@@ -366,17 +373,18 @@ internal fun EventsList(
             item(key = month) {
                 SectionHeader(title = month)
             }
-            monthEvents.forEach { event ->
-                item(key = event.id.value) {
-                    EventCard(
-                        event = event,
-                        trustState = resolvedEventTrust.getValue(event.id.value),
-                        isResolving = resolvingEventId == event.id.value,
-                        currentTimeMillis = currentTimeMillis,
-                        onMerge = { onMergeEvent(event.id.value) },
-                        onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
-                    )
-                }
+            items(
+                items = monthEvents,
+                key = { it.id.value }
+            ) { event ->
+                EventCard(
+                    event = event,
+                    trustState = resolvedEventTrust.getValue(event.id.value),
+                    isResolving = resolvingEventId == event.id.value,
+                    currentTimeMillis = currentTimeMillis,
+                    onMerge = { onMergeEvent(event.id.value) },
+                    onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
+                )
             }
         }
         item {
