@@ -1,7 +1,7 @@
 package com.example.ui.viewmodel
 
 import com.example.R
-import com.example.core.db.entities.StyleProfileEntity
+import com.example.domain.model.style.StyleProfileRecord
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.StyleAnalysisUseCase
 import io.mockk.Runs
@@ -40,7 +40,7 @@ class StyleCoachViewModelTest {
     private lateinit var styleAnalysisUseCase: StyleAnalysisUseCase
 
     private val testDispatcher = StandardTestDispatcher()
-    private val profileFlow = MutableStateFlow<StyleProfileEntity?>(null)
+    private val profileFlow = MutableStateFlow<StyleProfileRecord?>(null)
 
     @Before
     fun setUp() {
@@ -48,7 +48,7 @@ class StyleCoachViewModelTest {
         profileFlow.value = null
         every { styleProfileRepository.getProfile() } returns profileFlow
         coEvery { styleProfileRepository.getHistory() } returns emptyList()
-        coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileEntity(sampleCount = 3)
+        coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileRecord(sampleCount = 3)
     }
 
     @After
@@ -82,7 +82,7 @@ class StyleCoachViewModelTest {
         val viewModel = StyleCoachViewModel(styleProfileRepository, styleAnalysisUseCase)
         advanceUntilIdle()
 
-        profileFlow.value = StyleProfileEntity(
+        profileFlow.value = StyleProfileRecord(
             sampleCount = 4,
             formalityLevel = "FORMAL",
             preferredLanguage = "hi",

@@ -12,8 +12,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.StyleProfileEntity
-import com.example.core.db.entities.StyleProfileHistoryEntity
+import com.example.domain.model.style.StyleProfileHistoryRecord
+import com.example.domain.model.style.StyleProfileRecord
 import com.example.ui.screens.stylecoach.StyleCoachContent
 import com.example.ui.screens.stylecoach.StyleCoachTestTags
 import com.example.ui.viewmodel.StyleCoachUiState
@@ -258,7 +258,7 @@ class StyleCoachScreenshotTest {
         statusIsError = false,
     )
 
-    private fun styleProfile() = StyleProfileEntity(
+    private fun styleProfile() = StyleProfileRecord(
         usesEmoji = false,
         avgMessageLength = 68,
         commonGreetingsJson = """["Hey there","Namaste","Hope you are well"]""",
@@ -280,7 +280,7 @@ class StyleCoachScreenshotTest {
         ),
     )
 
-    private fun styleProfileHindi() = StyleProfileEntity(
+    private fun styleProfileHindi() = StyleProfileRecord(
         usesEmoji = false,
         avgMessageLength = 68,
         commonGreetingsJson = """["नमस्ते","कैसे हैं","आपका दिन शुभ हो"]""",
@@ -295,7 +295,7 @@ class StyleCoachScreenshotTest {
         id: Int,
         source: String,
         profileJson: String,
-    ) = StyleProfileHistoryEntity(
+    ) = StyleProfileHistoryRecord(
         id = id,
         profileJson = profileJson,
         savedAtMs = 1_767_688_200_000L + id,

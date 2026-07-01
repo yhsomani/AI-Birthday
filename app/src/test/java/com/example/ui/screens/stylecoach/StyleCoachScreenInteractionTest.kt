@@ -20,9 +20,9 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.StyleProfileEntity
-import com.example.core.db.entities.StyleProfileHistoryEntity
 import com.example.core.ui.theme.RelateAITheme
+import com.example.domain.model.style.StyleProfileHistoryRecord
+import com.example.domain.model.style.StyleProfileRecord
 import com.example.ui.viewmodel.StyleCoachUiState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -161,7 +161,7 @@ class StyleCoachScreenInteractionTest {
         onNodeWithTag(tag).assertIsDisplayed()
     }
 
-    private fun styleProfile() = StyleProfileEntity(
+    private fun styleProfile() = StyleProfileRecord(
         usesEmoji = false,
         avgMessageLength = 42,
         commonGreetingsJson = """["Hey","Namaste"]""",
@@ -171,7 +171,7 @@ class StyleCoachScreenInteractionTest {
         sampleCount = 6,
     )
 
-    private fun styleHistory() = StyleProfileHistoryEntity(
+    private fun styleHistory() = StyleProfileHistoryRecord(
         id = 7,
         profileJson = """{"formalityLevel":"CASUAL","preferredLanguage":"hi","avgMessageLength":42}""",
         savedAtMs = 1_700_000_000_000L,

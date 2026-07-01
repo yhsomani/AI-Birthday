@@ -1,8 +1,8 @@
 package com.example.domain.usecase
 
 import com.example.core.db.entities.SentMessageEntity
-import com.example.core.db.entities.StyleProfileEntity
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.style.StyleProfileRecord
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.StyleProfileRepository
 import io.mockk.coEvery
@@ -49,7 +49,7 @@ class StyleAnalysisUseCaseTest {
                 deliveryStatus = "SENT",
             ),
         )
-        coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileEntity()
+        coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileRecord()
 
         val analyzed = useCase()
 
@@ -71,7 +71,7 @@ class StyleAnalysisUseCaseTest {
         // No devanagari characters -> "en"
         // No emojis -> usesEmoji = false
 
-        coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileEntity()
+        coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileRecord()
 
         useCase.analyzeAndSave(texts, "TEST_SOURCE")
 
@@ -99,7 +99,7 @@ class StyleAnalysisUseCaseTest {
             "शुभकामनाएं!",
             "बधाई!"
         )
-        coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileEntity()
+        coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileRecord()
 
         useCase.analyzeAndSave(texts, "TEST_SOURCE")
 

@@ -14,7 +14,6 @@ import com.example.R
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.core.gemini.GeminiClient
-import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.CircuitState
 import com.example.core.resilience.HealthSnapshot
@@ -30,6 +29,7 @@ import com.example.domain.model.diagnostic.DiagnosticSnapshot
 import com.example.domain.model.diagnostic.DiagnosticSnapshotSource
 import com.example.domain.model.diagnostic.DiagnosticSnapshotStatus
 import com.example.domain.model.dispatch.DispatchAttempt
+import com.example.domain.model.style.StyleProfileRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.DiagnosticSnapshotRepository
 import com.example.domain.repository.DispatchAttemptRepository
@@ -135,7 +135,7 @@ private data class DispatchRecoverySnapshot(
 
 private data class AiDoctorLiveInputs(
     val contacts: List<ContactAutomationReadinessProfile>,
-    val styleProfile: StyleProfileEntity?,
+    val styleProfile: StyleProfileRecord?,
     val persistedRecoveryCount: Int,
     val persistedDeadLetterCount: Int,
 )

@@ -1,6 +1,7 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.StyleProfileEntity
+import com.example.domain.model.style.StyleProfileHistoryRecord
+import com.example.domain.model.style.StyleProfileRecord
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.StyleProfileRepository
 import kotlinx.coroutines.flow.first
@@ -131,7 +132,7 @@ class StyleAnalysisUseCase @Inject constructor(
         }
 
         val toneDescriptorsJson = org.json.JSONArray(toneList.distinct()).toString()
-        val currentProfile = styleProfileRepository.getProfileOnce() ?: StyleProfileEntity()
+        val currentProfile = styleProfileRepository.getProfileOnce() ?: StyleProfileRecord()
 
         val newProfile = currentProfile.copy(
             sampleMessagesJson = augmentSamplesWithAnalysis(currentProfile.sampleMessagesJson, texts),
@@ -157,13 +158,13 @@ class StyleAnalysisUseCase @Inject constructor(
             put("commonPhrases", org.json.JSONArray(topPhrases))
         }.toString()
 
-        val historyEntity = com.example.core.db.entities.StyleProfileHistoryEntity(
+        val history = StyleProfileHistoryRecord(
             profileJson = profileJson,
             savedAtMs = System.currentTimeMillis(),
             source = source
         )
 
-        styleProfileRepository.upsertWithHistory(newProfile, historyEntity)
+        styleProfileRepository.upsertWithHistory(newProfile, history)
     }
 
     private fun findCommonPhrases(texts: List<String>): List<String> {

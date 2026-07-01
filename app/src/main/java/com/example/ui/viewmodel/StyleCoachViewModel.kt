@@ -3,8 +3,8 @@ package com.example.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
-import com.example.core.db.entities.StyleProfileEntity
-import com.example.core.db.entities.StyleProfileHistoryEntity
+import com.example.domain.model.style.StyleProfileHistoryRecord
+import com.example.domain.model.style.StyleProfileRecord
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.usecase.StyleAnalysisUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,8 +17,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class StyleCoachUiState(
-    val profile: StyleProfileEntity? = null,
-    val history: List<StyleProfileHistoryEntity> = emptyList(),
+    val profile: StyleProfileRecord? = null,
+    val history: List<StyleProfileHistoryRecord> = emptyList(),
     val isTraining: Boolean = false,
     val isAutoAnalyzing: Boolean = false,
     val trainSuccess: Boolean = false,

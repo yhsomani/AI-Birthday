@@ -13,6 +13,7 @@ class RepositoryBoundaryContractTest {
             "core/domain/src/main/kotlin/com/example/domain/repository/MemoryNoteRepository.kt",
             "core/domain/src/main/kotlin/com/example/domain/repository/GiftHistoryRepository.kt",
             "core/domain/src/main/kotlin/com/example/domain/repository/MessageFeedbackRepository.kt",
+            "core/domain/src/main/kotlin/com/example/domain/repository/StyleProfileRepository.kt",
         ).forEach { relativePath ->
             val source = rootFile(relativePath).readText()
 
@@ -22,7 +23,9 @@ class RepositoryBoundaryContractTest {
                     source.contains("ActivityLogEntity") ||
                     source.contains("MemoryNoteEntity") ||
                     source.contains("GiftHistoryEntity") ||
-                    source.contains("MessageFeedbackEntity"),
+                    source.contains("MessageFeedbackEntity") ||
+                    source.contains("StyleProfileEntity") ||
+                    source.contains("StyleProfileHistoryEntity"),
             )
         }
     }

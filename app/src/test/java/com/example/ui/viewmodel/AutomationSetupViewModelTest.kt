@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.R
-import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.resilience.DeadLetterEntry
 import com.example.core.resilience.DeadLetterQueue
 import com.example.core.resilience.HealthMonitor
@@ -26,6 +25,7 @@ import com.example.domain.model.dispatch.DispatchAttempt
 import com.example.domain.model.dispatch.DispatchAttemptCreator
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.DispatchEligibilityRecord
+import com.example.domain.model.style.StyleProfileRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.DiagnosticSnapshotRepository
 import com.example.domain.repository.DispatchAttemptRepository
@@ -93,7 +93,7 @@ class AutomationSetupViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var context: Context
     private lateinit var readinessProfiles: MutableStateFlow<List<ContactAutomationReadinessProfile>>
-    private lateinit var styleProfile: MutableStateFlow<StyleProfileEntity?>
+    private lateinit var styleProfile: MutableStateFlow<StyleProfileRecord?>
     private lateinit var preferenceChanges: MutableSharedFlow<Unit>
     private lateinit var failureRecoveryCount: MutableStateFlow<Int>
     private lateinit var deadLetterCount: MutableStateFlow<Int>

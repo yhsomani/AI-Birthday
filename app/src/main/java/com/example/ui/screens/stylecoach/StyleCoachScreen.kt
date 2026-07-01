@@ -49,14 +49,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
-import com.example.core.db.entities.StyleProfileEntity
-import com.example.core.db.entities.StyleProfileHistoryEntity
 import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateElevation
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.relateSemanticColors
+import com.example.domain.model.style.StyleProfileHistoryRecord
+import com.example.domain.model.style.StyleProfileRecord
 import com.example.ui.viewmodel.StyleCoachUiState
 import com.example.ui.viewmodel.StyleCoachViewModel
 import java.text.DateFormat
@@ -337,7 +337,7 @@ private fun StatusMessage(
 
 @Composable
 private fun LearnedProfileCard(
-    profile: StyleProfileEntity,
+    profile: StyleProfileRecord,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -482,7 +482,7 @@ private fun EmptyHistoryRow() {
 
 @Composable
 private fun HistorySnapshotCard(
-    snapshot: StyleProfileHistoryEntity,
+    snapshot: StyleProfileHistoryRecord,
     savedAt: String,
     modifier: Modifier = Modifier,
 ) {

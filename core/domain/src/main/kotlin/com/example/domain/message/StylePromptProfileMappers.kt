@@ -1,9 +1,9 @@
 package com.example.domain.message
 
-import com.example.core.db.entities.StyleProfileEntity
 import com.example.domain.model.message.StylePromptProfile
+import com.example.domain.model.style.StyleProfileRecord
 
-fun StyleProfileEntity.toStylePromptProfile(): StylePromptProfile {
+fun StyleProfileRecord.toStylePromptProfile(): StylePromptProfile {
     return StylePromptProfile(
         sampleMessagesJson = sampleMessagesJson,
         usesEmoji = usesEmoji,
