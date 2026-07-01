@@ -4,6 +4,577 @@ Version: 1.0.0
 Date: 2026-06-26
 Source backlog: [IMPLEMENTATION_TASKS.md](IMPLEMENTATION_TASKS.md)
 
+## 2026-07-01 - Memory Vault Edit Notes
+
+Completed tasks:
+
+- P2 Memory Vault UX slice: let users correct saved relationship notes without deleting and recreating them.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/MemoryVaultViewModel.kt](app/src/main/java/com/example/ui/viewmodel/MemoryVaultViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt](app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/MemoryVaultViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/MemoryVaultViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/memoryvault/MemoryVaultScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/memoryvault/MemoryVaultScreenInteractionTest.kt)
+- [app/src/test/java/com/example/ui/screenshots/MemoryVaultScreenshotTest.kt](app/src/test/java/com/example/ui/screenshots/MemoryVaultScreenshotTest.kt)
+- [app/src/test/java/com/example/ui/LocalizationParityTest.kt](app/src/test/java/com/example/ui/LocalizationParityTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `MemoryVaultViewModel.updateNote(...)` edits note text/category through the existing repository upsert path.
+- Inline Memory Vault edit mode lets users change note text and category from the note row.
+- Edit uses the same blank, length, trim, and category-normalization rules as add while preserving note id, contact id, timestamp, and pin state.
+
+Why this improves UX:
+
+- Users can fix typos, update relationship facts, or recategorize a memory without deleting and recreating it.
+- Private-note behavior remains explicit because the same category controls and AI-use copy are shown during edit.
+
+Validation:
+
+```bash
+git diff --check
+xmllint --noout app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml
+rg -n "updateNote|memory_vault_edit_note|EDIT_BUTTON_PREFIX|EDIT_SAVE_PREFIX|UX-031|Memory Vault notes can be edited" app/src/main app/src/test SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "inline edit|prompt preview|use-for-AI toggle|UX-031" CODEBASE_AUDIT_REPORT_2026-07-01.md SSOT.md IMPLEMENTATION_PROGRESS.md
+```
+
+Result: passed. Static diff checks are clean, XML resources parse, Memory Vault edit wiring is present in ViewModel, UI, tests, localization, and docs, and stale no-edit audit wording is gone.
+
+Pending Gradle validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.MemoryVaultViewModelTest \
+  --tests com.example.ui.screens.memoryvault.MemoryVaultScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: not run because Gradle escalation is currently blocked by the approval system.
+
+## 2026-07-01 - Memory Vault Search
+
+Completed tasks:
+
+- P2 Memory Vault UX slice: make saved relationship notes searchable instead of requiring users to scan the full journal.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/MemoryVaultViewModel.kt](app/src/main/java/com/example/ui/viewmodel/MemoryVaultViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt](app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/MemoryVaultViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/MemoryVaultViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/memoryvault/MemoryVaultScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/memoryvault/MemoryVaultScreenInteractionTest.kt)
+- [app/src/test/java/com/example/ui/screenshots/MemoryVaultScreenshotTest.kt](app/src/test/java/com/example/ui/screenshots/MemoryVaultScreenshotTest.kt)
+- [app/src/test/java/com/example/ui/LocalizationParityTest.kt](app/src/test/java/com/example/ui/LocalizationParityTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `MemoryVaultUiState` now keeps the raw sorted note list and exposes `visibleNotes` filtered by the current search query.
+- `MemoryVaultViewModel` tracks search query updates without changing repository/storage behavior.
+- Memory Vault now shows a localized search field with search/clear icons when notes exist and a distinct localized no-results state when a query has no matches.
+
+Why this improves UX:
+
+- Users can find saved facts by note text or category without manually scanning older notes.
+- Empty-vault and empty-search states now communicate different problems.
+
+Validation:
+
+```bash
+git diff --check
+xmllint --noout app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml
+rg -n "visibleNotes|updateSearchQuery|memory_vault_search_label|SEARCH_CLEAR|SEARCH_EMPTY_STATE|UX-030|Memory Vault note search" app/src/main app/src/test SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+```
+
+Result: passed. Static diff checks are clean, XML resources parse, Memory Vault search/clear wiring is present in ViewModel, UI, tests, localization, and docs, and stale no-search audit wording is gone.
+
+Pending Gradle validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.MemoryVaultViewModelTest \
+  --tests com.example.ui.screens.memoryvault.MemoryVaultScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: not run because Gradle escalation is currently blocked by the approval system.
+
+## 2026-07-01 - Analytics Neglected Contact Actions
+
+Completed tasks:
+
+- P2 Analytics UX slice: make the top-neglected-contact insight actionable instead of rendering it as a plain string.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/AnalyticsViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AnalyticsViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt](app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt)
+- [app/src/main/java/com/example/ui/navigation/NavGraph.kt](app/src/main/java/com/example/ui/navigation/NavGraph.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/AnalyticsViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/AnalyticsViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/analytics/AnalyticsScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/analytics/AnalyticsScreenInteractionTest.kt)
+- [app/src/test/java/com/example/ui/screenshots/AnalyticsScreenshotTest.kt](app/src/test/java/com/example/ui/screenshots/AnalyticsScreenshotTest.kt)
+- [app/src/test/java/com/example/ui/LocalizationParityTest.kt](app/src/test/java/com/example/ui/LocalizationParityTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `AnalyticsUiState.topNeglectedContacts` now carries typed contact id, display name, and health score instead of preformatted strings.
+- The Analytics neglected-contact row shows the existing label plus a localized Open contact action.
+- `NavGraph` routes Analytics neglected-contact actions to Contact Detail.
+
+Why this improves UX:
+
+- Users can act on the neglected-contact insight directly instead of manually switching to Contacts and searching for the person.
+- This establishes a small typed action pattern for future Analytics recommendations.
+
+Validation:
+
+```bash
+git diff --check
+xmllint --noout app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml
+rg -n "AnalyticsNeglectedContactItem|analytics_open_contact|onNavigateToContact|displayLabel" app/src/main/java app/src/test/java SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+```
+
+Result: passed. Static diff checks are clean, XML resources parse, stale Analytics wording is gone, and typed neglected-contact action wiring is present in ViewModel, UI, navigation, tests, and docs.
+
+Pending Gradle validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.AnalyticsViewModelTest \
+  --tests com.example.ui.screens.analytics.AnalyticsScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: not run because Gradle escalation is currently blocked by the approval system.
+
+## 2026-07-01 - AI Quality Gate Audit Correction
+
+Completed tasks:
+
+- P0 quality-gate audit reconciliation: verified automatic AI quality downgrades are already implemented and corrected stale audit/SSOT text that still described the old defect.
+
+Changed files:
+
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [SSOT.md](SSOT.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- The audit report now marks the automatic AI quality-gate defect as resolved instead of listing it as an active P0.
+- The AI Message Generation feature analysis now describes the current downgrade behavior and keeps richer quality explanations as follow-up work.
+- `SSOT.md` now states that nonblank fallback or generic `FULLY_AUTO` drafts must not remain automatic merely because text exists.
+
+Evidence checked:
+
+- `AiAutoSendQualityGate.evaluate(...)` downgrades `FULLY_AUTO` and `SMART_APPROVE` to `ALWAYS_ASK` when score is below `FULLY_AUTO_MIN_SCORE`.
+- Focused tests already cover fallback/generic/SMART_APPROVE downgrade and related generation/promotion paths.
+
+Validation:
+
+```bash
+git diff --check
+rg -n "Fully automatic AI quality gate|AiAutoSendQualityGate|Nonblank fallback|Done on 2026-07-01: `AiAutoSendQualityGate`" CODEBASE_AUDIT_REPORT_2026-07-01.md SSOT.md IMPLEMENTATION_PROGRESS.md
+```
+
+Result: passed. Static diff checks are clean, the audit now marks the quality-gate defect as resolved, stale “fix quality gate” roadmap language is gone, and SSOT describes the current downgrade contract.
+
+## 2026-07-01 - Shared Delivery Route Readiness Policy
+
+Completed tasks:
+
+- P1 readiness consistency slice: move message route prerequisite checks out of `MessagesViewModel` into a shared domain policy also used by automatic channel selection.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/DeliveryRouteReadinessPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/DeliveryRouteReadinessPolicy.kt)
+- [core/domain/src/main/kotlin/com/example/domain/automation/AutoSendChannelSelector.kt](core/domain/src/main/kotlin/com/example/domain/automation/AutoSendChannelSelector.kt)
+- [app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt](app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/DeliveryRouteReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/DeliveryRouteReadinessPolicyTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `DeliveryRouteReadinessPolicy` for contact missing, channel disabled, missing phone/email, invalid contact email, missing Gmail sender setup, invalid sender email, and unsupported channels.
+- `AutoSendChannelSelector` now uses that policy for available-channel selection while preserving multi-reason no-route diagnostics.
+- Messages readiness labels now map from the same domain route policy instead of duplicating route checks in the ViewModel.
+- Messages now blocks invalid contact email syntax as missing email, matching automatic route selection.
+
+Why this reduces readiness drift:
+
+- Route prerequisites now have one domain rule set across the review queue and automatic channel choice.
+- The broader P1 readiness model is still open for schedule timing, approval, quality, permissions, AI Doctor setup, notification actions, and recovery.
+
+Validation:
+
+```bash
+git diff --check
+rg -n "DeliveryRouteReadinessPolicy|DeliveryRouteBlockReason|DeliveryRouteReadiness|blockedReasons|toMessageReadiness|pm_bad_email" core/domain/src/main/kotlin/com/example/domain/automation app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt core/domain/src/test/kotlin/com/example/domain/automation app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt
+```
+
+Result: passed. Static diff checks are clean, the shared policy is wired into route selection and Messages, and stale Messages imports for direct route prerequisite checks are gone.
+
+Pending Gradle validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.automation.DeliveryRouteReadinessPolicyTest \
+  --tests com.example.domain.automation.AutoSendChannelSelectorTest \
+  --no-configuration-cache
+
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.MessagesViewModelTest \
+  --no-configuration-cache
+```
+
+Result: not run because Gradle escalation is currently blocked by the approval system.
+
+## 2026-07-01 - Dispatch Quiet-Hours Audit Correction
+
+Completed tasks:
+
+- P1 dispatch-safety audit reconciliation: verified foreground/manual dispatch already enforces quiet hours and blackout dates through the shared dispatch eligibility policy.
+
+Changed files:
+
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- The audit report now marks the manual/foreground quiet-hours finding as resolved instead of listing it as an active P1 gap.
+- Evidence now points to `DispatchMessageUseCase`, `DispatchMessageUseCaseTest`, `DispatchEligibilityPolicy`, and `MessageDispatchWorker`.
+
+Validation:
+
+```bash
+git diff --check
+rg -n "Manual/Foreground Dispatch Quiet-Hours Enforcement|Dispatch Quiet-Hours Audit Correction|DispatchMessageUseCaseTest.kt:228" CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+```
+
+Result: passed. The audit no longer lists manual/foreground quiet-hours enforcement as an active P1, and the resolved finding points to existing dispatch policy/use-case coverage.
+
+## 2026-07-01 - Memory Vault Private Prompt Category
+
+Completed tasks:
+
+- P2 privacy/personalization slice: let users keep specific Memory Vault notes out of AI writing context.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/memory/MemoryNotePromptPolicy.kt](core/domain/src/main/kotlin/com/example/domain/memory/MemoryNotePromptPolicy.kt)
+- [core/domain/src/main/kotlin/com/example/domain/message/MessagePromptContextMappers.kt](core/domain/src/main/kotlin/com/example/domain/message/MessagePromptContextMappers.kt)
+- [app/src/main/java/com/example/ui/viewmodel/MemoryVaultViewModel.kt](app/src/main/java/com/example/ui/viewmodel/MemoryVaultViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt](app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/core/gemini/PromptBuilderTest.kt](app/src/test/java/com/example/core/gemini/PromptBuilderTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/MemoryVaultViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/MemoryVaultViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/memoryvault/MemoryVaultScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/memoryvault/MemoryVaultScreenInteractionTest.kt)
+- [app/src/test/java/com/example/ui/LocalizationParityTest.kt](app/src/test/java/com/example/ui/LocalizationParityTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Memory Vault now offers a localized Private category.
+- Private notes stay in the vault but are filtered out before `MessagePromptContext` is built for AI writing.
+- The Memory Vault add form explains that Private notes are not used for AI writing.
+
+Why this improves privacy and trust:
+
+- Users can save sensitive relationship context for themselves without sending it into generated-message prompts.
+- The prompt exclusion rule lives in domain code instead of relying on UI-only behavior.
+
+Validation:
+
+```bash
+git diff --check
+xmllint --noout app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml
+rg -n "MemoryNotePromptPolicy|PRIVATE_REFERENCE_CATEGORY|CATEGORY_PRIVATE|memory_vault_ai_usage_note|memory_category_private|canUseInAiPrompts" core/domain/src/main app/src/main app/src/test
+```
+
+Result: passed. Static diff checks are clean, XML resources parse, private-category wiring is present in domain/UI/tests, and Hindi parity includes the new privacy copy.
+
+Pending Gradle validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.core.gemini.PromptBuilderTest \
+  --tests com.example.ui.viewmodel.MemoryVaultViewModelTest \
+  --tests com.example.ui.screens.memoryvault.MemoryVaultScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: not run because Gradle escalation is currently blocked by the approval system.
+
+## 2026-07-01 - Structured Logging Guardrail
+
+Completed tasks:
+
+- P2 security/privacy slice: remove production direct Android `Log` usage outside the logger backend and guard against reintroduction.
+
+Changed files:
+
+- [app/src/main/java/com/example/SecurityChecks.kt](app/src/main/java/com/example/SecurityChecks.kt)
+- [app/src/main/java/com/example/widget/BirthdayWidgetProvider.kt](app/src/main/java/com/example/widget/BirthdayWidgetProvider.kt)
+- [app/src/test/java/com/example/ProductionReadinessConfigTest.kt](app/src/test/java/com/example/ProductionReadinessConfigTest.kt)
+- [core/data/src/main/kotlin/com/example/core/auth/AuthManager.kt](core/data/src/main/kotlin/com/example/core/auth/AuthManager.kt)
+- [core/data/src/main/kotlin/com/example/core/contacts/GoogleContactsSync.kt](core/data/src/main/kotlin/com/example/core/contacts/GoogleContactsSync.kt)
+- [core/data/src/main/kotlin/com/example/core/db/AppDatabase.kt](core/data/src/main/kotlin/com/example/core/db/AppDatabase.kt)
+- [core/data/src/main/kotlin/com/example/core/db/DatabaseKeyDerivation.kt](core/data/src/main/kotlin/com/example/core/db/DatabaseKeyDerivation.kt)
+- [core/data/src/main/kotlin/com/example/core/prefs/SecurePrefs.kt](core/data/src/main/kotlin/com/example/core/prefs/SecurePrefs.kt)
+- [core/data/src/main/kotlin/com/example/core/resilience/CircuitBreaker.kt](core/data/src/main/kotlin/com/example/core/resilience/CircuitBreaker.kt)
+- [core/data/src/main/kotlin/com/example/core/resilience/DeadLetterQueue.kt](core/data/src/main/kotlin/com/example/core/resilience/DeadLetterQueue.kt)
+- [core/data/src/main/kotlin/com/example/core/resilience/Fallback.kt](core/data/src/main/kotlin/com/example/core/resilience/Fallback.kt)
+- [core/data/src/main/kotlin/com/example/core/resilience/HealthMonitor.kt](core/data/src/main/kotlin/com/example/core/resilience/HealthMonitor.kt)
+- [core/data/src/main/kotlin/com/example/core/resilience/Retry.kt](core/data/src/main/kotlin/com/example/core/resilience/Retry.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/scheduler/WorkerScheduler.kt](core/data/src/main/kotlin/com/example/core/automation/scheduler/WorkerScheduler.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/SyncContactsUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/SyncContactsUseCase.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- App/data operational logging now routes through `StructuredLogger`, preserving redaction and recent-log diagnostics.
+- `SyncContactsUseCase` no longer calls Android logging from the domain layer; it continues to persist stable sync error state through preferences.
+- `ProductionReadinessConfigTest` now fails if production app/core sources use `android.util.Log` directly outside `StructuredLogger`.
+
+Why this improves privacy and release readiness:
+
+- Contact sync, auth, database, secure preference, widget, resilience, and release-readiness logs use the same redaction path.
+- Future code has a static guardrail against bypassing structured logging.
+
+Validation:
+
+```bash
+git diff --check
+rg -n "import android\\.util\\.Log|android\\.util\\.Log\\.|\\bLog\\.(d|i|w|e|v)\\(" app/src/main core/data/src/main core/domain/src/main core/model/src/main
+rg -n "productionCode_usesStructuredLoggerInsteadOfDirectAndroidLog|PRODUCTION_SOURCE_DIRS|allowedDirectLogFiles" app/src/test/java/com/example/ProductionReadinessConfigTest.kt
+```
+
+Result: passed. Static diff checks are clean, direct Android logging remains only inside `StructuredLogger`, and the production-readiness guard is present.
+
+Pending Gradle validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ProductionReadinessConfigTest \
+  --no-configuration-cache
+```
+
+Result: not run because Gradle escalation is currently blocked by the approval system.
+
+## 2026-07-01 - Secure Preferences Recovery Notice
+
+Completed tasks:
+
+- P3 security/reliability UX slice: make encrypted-preference rebuilds visible when secure storage recovery clears protected setup values.
+
+Changed files:
+
+- [core/data/src/main/kotlin/com/example/core/prefs/SecurePrefs.kt](core/data/src/main/kotlin/com/example/core/prefs/SecurePrefs.kt)
+- [app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt](app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt](app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/SettingsViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/SettingsViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/settings/SettingsScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/settings/SettingsScreenInteractionTest.kt)
+- [app/src/test/java/com/example/ui/LocalizationParityTest.kt](app/src/test/java/com/example/ui/LocalizationParityTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `SecurePrefs` now records a recovery notice flag when encrypted preferences are rebuilt after initialization failure.
+- Settings state reads that flag and exposes a localized, dismissible recovery notice in Data & Sync.
+- The notice tells users to re-enter protected Gemini, Gmail, sync, biometric, and automation setup, then run AI Doctor and create a fresh encrypted backup.
+
+Why this improves reliability and security:
+
+- Secure storage still fails securely and never falls back to plaintext preferences.
+- Users now get explicit recovery guidance instead of silently discovering missing credentials or setup changes later.
+
+Validation:
+
+```bash
+git diff --check
+xmllint --noout app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml
+rg -n "secure_prefs_rebuilt_notice_pending|isSecurePrefsRebuiltNoticePending|setSecurePrefsRebuiltNoticePending|showSecurePrefsRecoveryNotice|settings_secure_prefs_recovery_notice" core/data/src/main app/src/main app/src/test
+```
+
+Result: passed. Static diff checks are clean, XML resources parse, the recovery flag is wired from secure storage to Settings, and English/Hindi notice resources are covered by localization parity.
+
+Pending Gradle validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.SettingsViewModelTest \
+  --tests com.example.ui.screens.settings.SettingsScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: not run because Gradle escalation is currently blocked by the approval system.
+
+## 2026-07-01 - Certificate Pin Rotation Release Task
+
+Completed tasks:
+
+- P3 security/release-readiness slice: turn the certificate pin expiry audit finding into an explicit release checklist action before it becomes a P1 near-expiry risk.
+
+Changed files:
+
+- [docs/operations/release-checklist.md](docs/operations/release-checklist.md)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- The release checklist now requires network pin rotation to be scheduled no later than `2027-04-01` for the current `2027-06-01` pin-set expiration.
+- Releases after `2027-04-01` must include refreshed pins or explicit release-owner signoff accepting the remaining pin lifetime.
+- `SSOT.md` now points release owners to the checklist for the pin-rotation deadline.
+
+Why this improves release readiness:
+
+- The existing automated 60-day release gate catches late pin expiry, but this adds an earlier planning deadline.
+- Release owners get a concrete calendar action before pin expiry becomes urgent.
+
+Validation:
+
+```bash
+git diff --check
+rg -n "2027-04-01|2027-06-01|pin rotation|network pin rotation" docs/operations/release-checklist.md SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+```
+
+Result: passed. Static diff checks are clean, the release checklist, SSOT, and audit report all reference the `2027-04-01` rotation deadline, and the app still declares the current `2027-06-01` pin-set expiration covered by readiness tests.
+
+## 2026-07-01 - Settings Gmail App Password Safety Copy
+
+Completed tasks:
+
+- P2 Settings/security UX slice: make Gmail app-password setup expectations explicit before users save email sender credentials.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt](app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/screens/settings/SettingsScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/settings/SettingsScreenInteractionTest.kt)
+- [app/src/test/java/com/example/ui/LocalizationParityTest.kt](app/src/test/java/com/example/ui/LocalizationParityTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Settings now shows a localized note below the Gmail app-password field.
+- The note tells users to use a Gmail app password rather than their Google account password.
+- The note explains encrypted local storage, AI Doctor email-test verification, and revoking the app password from Google when email sending is no longer used.
+
+Why this improves user experience and security:
+
+- Users get risk and recovery guidance at the point where they enter a high-value credential.
+- The Settings email setup path now matches the AI Doctor expectation that email sending should be verified before relying on automatic delivery.
+
+Validation:
+
+```bash
+git diff --check
+xmllint --noout app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml
+rg -n "settings_email_app_password_security_note" app/src/main app/src/test app/src/main/res/values app/src/main/res/values-hi
+rg -n "Use a Gmail app password|Google अकाउंट पासवर्ड" app/src/main/java app/src/test/java core || true
+```
+
+Result: passed. XML resources parse, the Settings note is resource-backed in English and Hindi, localization parity includes the new key, and the new user-facing copy is not hardcoded in Kotlin sources.
+
+Pending Gradle validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.screens.settings.SettingsScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: not run because Gradle escalation is currently blocked by the approval system.
+
+## 2026-07-01 - Analytics Growth Metric Denominators
+
+Completed tasks:
+
+- P2 Analytics UX slice: explain what the reliability, response, and personalization percentages are measured against.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/AnalyticsViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AnalyticsViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt](app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/AnalyticsViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/AnalyticsViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/analytics/AnalyticsScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/analytics/AnalyticsScreenInteractionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `AnalyticsUiState` now carries the sent-message count used by delivery reliability and response rate.
+- `AnalyticsUiState` now carries the contact-profile count used by personalization coverage.
+- The Growth Metrics section now shows localized denominator notes below the percentage rows.
+
+Why this improves user experience:
+
+- Users can tell whether a percentage is based on enough data to trust.
+- Analytics no longer shows percentages without explaining the measurement population.
+
+Validation:
+
+```bash
+git diff --check
+xmllint --noout app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml
+rg -n "Delivery and response use|Personalization uses|डिलीवरी और जवाब दर|व्यक्तिकरण .* आधारित" app/src/main/java app/src/test/java core || true
+comm -23 <(rg -o 'name="[^"]+"' app/src/main/res/values/strings.xml | sed 's/name="//;s/"//' | sort) <(rg -o 'name="[^"]+"' app/src/main/res/values-hi/strings.xml | sed 's/name="//;s/"//' | sort) | rg '^analytics_growth_denominator|^analytics_' || true
+```
+
+Result: passed. XML resources parse, new Analytics copy is resource-backed, and the new Analytics keys are present in Hindi.
+
+Pending validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.AnalyticsViewModelTest \
+  --tests com.example.ui.screens.analytics.AnalyticsScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: not run because the required Gradle escalation was rejected by the approval system.
+
 ## 2026-07-01 - Chat History Search Filter
 
 Completed tasks:

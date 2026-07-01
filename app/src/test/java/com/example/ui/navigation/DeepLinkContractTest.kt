@@ -1,6 +1,7 @@
 package com.example.ui.navigation
 
 import com.example.domain.navigation.RelateDeepLinks
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.w3c.dom.Element
@@ -82,6 +83,18 @@ class DeepLinkContractTest {
                 authGateRegistration.containsMatchIn(source),
             )
         }
+    }
+
+    @Test
+    fun contactDetailRouteCanOpenPreferencesFromInternalActions() {
+        assertEquals(
+            "contacts/contact_1?openPreferences=true",
+            Screen.ContactDetail.createRoute(contactId = "contact_1", openPreferences = true),
+        )
+        assertEquals(
+            "contacts/contact_1",
+            Screen.ContactDetail.createRoute(contactId = "contact_1"),
+        )
     }
 
     @Test

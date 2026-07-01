@@ -85,6 +85,7 @@ Release requirements:
 ## Security Gate
 
 - Network security pins are valid beyond the release support window. CI runs `ProductionReadinessConfigTest`, which fails release readiness when the soonest `network_security_config.xml` pin expiration is within 60 days.
+- Network pin rotation task is scheduled no later than 2027-04-01 for the current `2027-06-01` pin-set expiration. Each release after 2027-04-01 must either include refreshed pins with a new expiration date or attach explicit release-owner signoff accepting the remaining pin lifetime.
 - Dependency changes pass the CI dependency-review gate, and the final release branch has no unresolved dependency graph or Dependabot security alerts.
 - No API keys, OAuth tokens, SMTP passwords, database keys, phone/email fixtures, raw AI responses, or message bodies appear in logs, test output, backups, or analytics exports outside explicit user export flows.
 - SQLCipher key strategy and backup recovery limitations are reviewed.

@@ -7,8 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
-import com.example.domain.automation.AutomationSchedulePolicy
-import com.example.domain.automation.EmailAddressSyntaxPolicy
+import com.example.domain.automation.DeliveryRouteBlockReason
+import com.example.domain.automation.DeliveryRouteReadiness
+import com.example.domain.automation.DeliveryRouteReadinessPolicy
 import com.example.domain.model.ActivityLogType
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
@@ -557,27 +558,15 @@ class MessagesViewModel @Inject constructor(
     private fun PendingMessageListItem.readinessFor(
         contact: ContactMessageContext?,
     ): MessageReadiness {
-        if (contact == null) return MessageReadiness.CONTACT_MISSING
-        if (AutomationSchedulePolicy.isChannelBlocked(channel, securePrefs.getChannelBlackout())) {
-            return MessageReadiness.CHANNEL_DISABLED
-        }
-
-        when (channel) {
-            MessageChannel.SMS,
-            MessageChannel.WHATSAPP -> {
-                if (contact.primaryPhone.isNullOrBlank()) return MessageReadiness.MISSING_PHONE
-            }
-            MessageChannel.EMAIL -> {
-                if (contact.primaryEmail.isNullOrBlank()) return MessageReadiness.MISSING_EMAIL
-                if (!EmailAddressSyntaxPolicy.isConfiguredSender(
-                        securePrefs.getSenderEmail(),
-                        securePrefs.getSenderEmailPassword(),
-                    )
-                ) {
-                    return MessageReadiness.EMAIL_SETUP_MISSING
-                }
-            }
-            MessageChannel.UNKNOWN -> return MessageReadiness.CHANNEL_DISABLED
+        val routeReadiness = DeliveryRouteReadinessPolicy.evaluate(
+            channel = channel,
+            contact = contact,
+            channelBlackoutJson = securePrefs.getChannelBlackout(),
+            senderEmail = securePrefs.getSenderEmail(),
+            senderEmailPassword = securePrefs.getSenderEmailPassword(),
+        )
+        if (routeReadiness is DeliveryRouteReadiness.Blocked) {
+            return routeReadiness.reason.toMessageReadiness()
         }
 
         return when (status) {
@@ -598,6 +587,18 @@ class MessagesViewModel @Inject constructor(
         MessageReadiness.APPROVED_SCHEDULED,
         MessageReadiness.SENDING_NOW,
         MessageReadiness.FAILED_CHECK_SETUP -> false
+    }
+
+    private fun DeliveryRouteBlockReason.toMessageReadiness(): MessageReadiness {
+        return when (this) {
+            DeliveryRouteBlockReason.CONTACT_MISSING -> MessageReadiness.CONTACT_MISSING
+            DeliveryRouteBlockReason.CHANNEL_DISABLED,
+            DeliveryRouteBlockReason.UNSUPPORTED_CHANNEL -> MessageReadiness.CHANNEL_DISABLED
+            DeliveryRouteBlockReason.MISSING_PHONE -> MessageReadiness.MISSING_PHONE
+            DeliveryRouteBlockReason.MISSING_EMAIL -> MessageReadiness.MISSING_EMAIL
+            DeliveryRouteBlockReason.EMAIL_SENDER_NOT_CONFIGURED,
+            DeliveryRouteBlockReason.EMAIL_SENDER_INVALID -> MessageReadiness.EMAIL_SETUP_MISSING
+        }
     }
 
     private suspend fun recordMessageActivity(

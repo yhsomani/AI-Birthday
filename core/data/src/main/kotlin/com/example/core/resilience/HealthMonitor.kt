@@ -1,7 +1,5 @@
 package com.example.core.resilience
 
-import android.util.Log
-
 data class HealthSnapshot(
     val circuitBreakerStates: Map<String, CircuitState> = emptyMap(),
     val deadLetterCount: Int = 0,
@@ -31,7 +29,7 @@ object HealthMonitor {
                 recentErrors.removeAt(0)
             }
         }
-        Log.w(TAG, "Error recorded: [$safeContext] $safeError")
+        StructuredLogger.w(TAG, "Error recorded: [$safeContext] $safeError")
         notifySnapshotSinks()
     }
 
@@ -81,7 +79,7 @@ object HealthMonitor {
         val sinks = synchronized(snapshotSinks) { snapshotSinks.values.toList() }
         sinks.forEach { sink ->
             runCatching { sink(snapshot) }
-                .onFailure { Log.e(TAG, "Failed to notify health snapshot sink", it) }
+                .onFailure { StructuredLogger.e(TAG, "Failed to notify health snapshot sink", it) }
         }
     }
 }

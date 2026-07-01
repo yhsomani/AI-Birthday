@@ -369,6 +369,7 @@ class GiftAdvisorScreenshotTest {
                 onGiftNotesChange = {},
                 attemptedSubmit = attemptedSubmit,
                 onBack = {},
+                onAdjustBudget = {},
                 onShowAddDialog = {},
                 onDismissDialog = {},
                 onSaveGift = {},

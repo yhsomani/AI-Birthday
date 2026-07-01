@@ -69,6 +69,7 @@ class SettingsViewModelTest {
         every { securePrefs.getChannelBlackout() } returns "[]"
         every { securePrefs.isBiometricLockEnabled() } returns false
         every { securePrefs.wasLegacyUnencryptedDbQuarantined() } returns false
+        every { securePrefs.isSecurePrefsRebuiltNoticePending() } returns false
         every { securePrefs.getLastBackupMs() } returns 0L
         every { context.getString(R.string.settings_last_sync_never) } returns "Never"
         every { context.getString(R.string.settings_last_sync_just_now) } returns "Just now"
@@ -328,6 +329,19 @@ class SettingsViewModelTest {
 
         assertFalse(viewModel.uiState.value.showLegacyDbNotice)
         verify { securePrefs.setLegacyUnencryptedDbQuarantined(false) }
+    }
+
+    @Test
+    fun `dismissSecurePrefsRecoveryNotice clears persisted recovery flag`() = runTest(testDispatcher) {
+        every { securePrefs.isSecurePrefsRebuiltNoticePending() } returns true
+        val viewModel = newViewModel()
+
+        assertTrue(viewModel.uiState.value.showSecurePrefsRecoveryNotice)
+
+        viewModel.dismissSecurePrefsRecoveryNotice()
+
+        assertFalse(viewModel.uiState.value.showSecurePrefsRecoveryNotice)
+        verify { securePrefs.setSecurePrefsRebuiltNoticePending(false) }
     }
 
     @Test

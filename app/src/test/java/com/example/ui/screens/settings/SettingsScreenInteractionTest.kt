@@ -62,6 +62,36 @@ class SettingsScreenInteractionTest {
     }
 
     @Test
+    fun securePrefsRecoveryNotice_showsRecoveryGuidanceAndDispatchesDismiss() {
+        val actions = mutableListOf<String>()
+
+        composeRule.setContent {
+            RelateAITheme {
+                val snackbarHostState = remember { SnackbarHostState() }
+                SettingsContent(
+                    state = SettingsUiState(
+                        userName = "Yash Somani",
+                        userEmail = "yash@example.com",
+                        showSecurePrefsRecoveryNotice = true,
+                    ),
+                    snackbarHostState = snackbarHostState,
+                    onDismissSecurePrefsRecoveryNotice = { actions += "dismiss_secure_prefs_recovery" },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(context.getString(R.string.settings_secure_prefs_recovery_notice_title))
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.settings_secure_prefs_recovery_notice_body))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.settings_secure_prefs_recovery_notice_dismiss))
+            .performClick()
+
+        assertEquals(listOf("dismiss_secure_prefs_recovery"), actions)
+    }
+
+    @Test
     fun contentActions_dispatchConfiguredCallbacks() {
         val actions = mutableListOf<String>()
 
@@ -100,6 +130,9 @@ class SettingsScreenInteractionTest {
         composeRule.onNodeWithText(context.getString(R.string.settings_save_api_key))
             .performScrollTo()
             .performClick()
+        composeRule.onNodeWithText(context.getString(R.string.settings_email_app_password_security_note))
+            .performScrollTo()
+            .assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.settings_save_email_settings))
             .performScrollTo()
             .performClick()

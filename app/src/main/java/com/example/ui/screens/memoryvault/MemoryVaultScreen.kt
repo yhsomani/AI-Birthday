@@ -17,8 +17,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -32,6 +35,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.surfaceColorAtElevation
@@ -57,6 +61,7 @@ import com.example.core.ui.theme.RelateElevation
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.relateSemanticColors
+import com.example.domain.memory.MemoryNotePromptPolicy
 import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.ui.viewmodel.MemoryVaultUiState
 import com.example.ui.viewmodel.MemoryVaultViewModel
@@ -71,6 +76,11 @@ private data class MemoryCategoryOption(
 
 private val memoryCategoryOptions = listOf(
     MemoryCategoryOption("GENERAL", R.string.memory_category_general_short, R.string.memory_category_general),
+    MemoryCategoryOption(
+        MemoryNotePromptPolicy.PRIVATE_REFERENCE_CATEGORY,
+        R.string.memory_category_private_short,
+        R.string.memory_category_private,
+    ),
     MemoryCategoryOption("PREFERENCE", R.string.memory_category_preference_short, R.string.memory_category_preference),
     MemoryCategoryOption("EVENT", R.string.memory_category_event_short, R.string.memory_category_event),
     MemoryCategoryOption("GIFT", R.string.memory_category_gift_short, R.string.memory_category_gift),
@@ -94,13 +104,21 @@ private val memoryPromptOptions = listOf(
 internal object MemoryVaultTestTags {
     const val LOADING = "memory_vault_loading"
     const val NOTE_FIELD = "memory_vault_note_field"
+    const val SEARCH_FIELD = "memory_vault_search_field"
+    const val SEARCH_CLEAR = "memory_vault_search_clear"
     const val PROMPT_PREFIX = "memory_vault_prompt_"
     const val CATEGORY_PREFIX = "memory_vault_category_"
     const val ADD_BUTTON = "memory_vault_add_button"
     const val ERROR_CARD = "memory_vault_error_card"
     const val EMPTY_STATE = "memory_vault_empty_state"
+    const val SEARCH_EMPTY_STATE = "memory_vault_search_empty_state"
     const val JOURNAL_HEADER = "memory_vault_journal_header"
     const val NOTE_CARD_PREFIX = "memory_vault_note_"
+    const val EDIT_BUTTON_PREFIX = "memory_vault_edit_"
+    const val EDIT_FIELD_PREFIX = "memory_vault_edit_field_"
+    const val EDIT_CATEGORY_PREFIX = "memory_vault_edit_category_"
+    const val EDIT_SAVE_PREFIX = "memory_vault_edit_save_"
+    const val EDIT_CANCEL_PREFIX = "memory_vault_edit_cancel_"
     const val PIN_BUTTON_PREFIX = "memory_vault_pin_"
     const val DELETE_BUTTON_PREFIX = "memory_vault_delete_"
 }
@@ -116,11 +134,17 @@ fun MemoryVaultScreen(
 
     var newNoteText by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(MemoryVaultViewModel.CATEGORY_GENERAL) }
+    var editingNoteId by remember { mutableStateOf<String?>(null) }
+    var editNoteText by remember { mutableStateOf("") }
+    var editCategory by remember { mutableStateOf(MemoryVaultViewModel.CATEGORY_GENERAL) }
 
     MemoryVaultContent(
         uiState = uiState,
         newNoteText = newNoteText,
         selectedCategory = selectedCategory,
+        editingNoteId = editingNoteId,
+        editNoteText = editNoteText,
+        editCategory = editCategory,
         onNoteChange = { nextText ->
             if (nextText.length <= MemoryVaultViewModel.MAX_NOTE_LENGTH) {
                 newNoteText = nextText
@@ -136,6 +160,30 @@ fun MemoryVaultScreen(
             newNoteText = ""
         },
         onBack = onBack,
+        onSearchQueryChange = viewModel::updateSearchQuery,
+        onEditStart = { note ->
+            editingNoteId = note.id.value
+            editNoteText = note.noteText
+            editCategory = note.category.takeIf { it in MemoryVaultViewModel.ALLOWED_CATEGORIES }
+                ?: MemoryVaultViewModel.CATEGORY_GENERAL
+        },
+        onEditTextChange = { nextText ->
+            if (nextText.length <= MemoryVaultViewModel.MAX_NOTE_LENGTH) {
+                editNoteText = nextText
+            }
+        },
+        onEditCategoryChange = { editCategory = it },
+        onEditCancel = {
+            editingNoteId = null
+            editNoteText = ""
+            editCategory = MemoryVaultViewModel.CATEGORY_GENERAL
+        },
+        onEditSave = { note ->
+            viewModel.updateNote(note, editNoteText, editCategory)
+            editingNoteId = null
+            editNoteText = ""
+            editCategory = MemoryVaultViewModel.CATEGORY_GENERAL
+        },
         onTogglePin = viewModel::togglePin,
         onDelete = viewModel::deleteNote,
     )
@@ -147,11 +195,20 @@ internal fun MemoryVaultContent(
     uiState: MemoryVaultUiState,
     newNoteText: String,
     selectedCategory: String,
+    editingNoteId: String?,
+    editNoteText: String,
+    editCategory: String,
     onNoteChange: (String) -> Unit,
     onPromptSelected: (String, String) -> Unit,
     onCategoryChange: (String) -> Unit,
     onAdd: () -> Unit,
     onBack: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onEditStart: (MemoryNoteRecord) -> Unit,
+    onEditTextChange: (String) -> Unit,
+    onEditCategoryChange: (String) -> Unit,
+    onEditCancel: () -> Unit,
+    onEditSave: (MemoryNoteRecord) -> Unit,
     onTogglePin: (MemoryNoteRecord) -> Unit,
     onDelete: (MemoryNoteRecord) -> Unit,
 ) {
@@ -237,14 +294,74 @@ internal fun MemoryVaultContent(
                         )
                     }
                 } else {
-                    items(uiState.notes, key = { it.id.value }) { note ->
-                        MemoryNoteCard(
-                            note = note,
-                            date = dateFormat.format(Date(note.dateMs)),
-                            onTogglePin = { onTogglePin(note) },
-                            onDelete = { onDelete(note) },
-                            modifier = Modifier.testTag(MemoryVaultTestTags.NOTE_CARD_PREFIX + note.id.value),
+                    item {
+                        OutlinedTextField(
+                            value = uiState.searchQuery,
+                            onValueChange = onSearchQueryChange,
+                            label = { Text(stringResource(R.string.memory_vault_search_label)) },
+                            placeholder = { Text(stringResource(R.string.memory_vault_search_placeholder)) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Filled.Search,
+                                    contentDescription = stringResource(R.string.search),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            trailingIcon = {
+                                if (uiState.searchQuery.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { onSearchQueryChange("") },
+                                        modifier = Modifier.testTag(MemoryVaultTestTags.SEARCH_CLEAR),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Close,
+                                            contentDescription = stringResource(R.string.clear_search),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag(MemoryVaultTestTags.SEARCH_FIELD),
+                            singleLine = true,
                         )
+                    }
+
+                    if (uiState.visibleNotes.isEmpty()) {
+                        item {
+                            EmptyState(
+                                message = stringResource(R.string.memory_vault_no_search_results),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag(MemoryVaultTestTags.SEARCH_EMPTY_STATE)
+                                    .height(RelateSize.actionCardMinHeight),
+                            )
+                        }
+                    }
+
+                    items(uiState.visibleNotes, key = { it.id.value }) { note ->
+                        if (editingNoteId == note.id.value) {
+                            EditMemoryNoteCard(
+                                note = note,
+                                editNoteText = editNoteText,
+                                editCategory = editCategory,
+                                onEditTextChange = onEditTextChange,
+                                onEditCategoryChange = onEditCategoryChange,
+                                onSave = { onEditSave(note) },
+                                onCancel = onEditCancel,
+                                modifier = Modifier.testTag(MemoryVaultTestTags.NOTE_CARD_PREFIX + note.id.value),
+                            )
+                        } else {
+                            MemoryNoteCard(
+                                note = note,
+                                date = dateFormat.format(Date(note.dateMs)),
+                                onEdit = { onEditStart(note) },
+                                onTogglePin = { onTogglePin(note) },
+                                onDelete = { onDelete(note) },
+                                modifier = Modifier.testTag(MemoryVaultTestTags.NOTE_CARD_PREFIX + note.id.value),
+                            )
+                        }
                     }
                 }
             }
@@ -335,6 +452,12 @@ private fun AddMemoryCard(
                 }
             }
 
+            Text(
+                text = stringResource(R.string.memory_vault_ai_usage_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             Button(
                 onClick = onAdd,
                 enabled = newNoteText.isNotBlank(),
@@ -369,6 +492,7 @@ private fun ErrorCard(message: String) {
 private fun MemoryNoteCard(
     note: MemoryNoteRecord,
     date: String,
+    onEdit: () -> Unit,
     onTogglePin: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -394,6 +518,16 @@ private fun MemoryNoteCard(
                     label = { Text(memoryCategoryLabel(note.category)) },
                 )
                 Row {
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.testTag(MemoryVaultTestTags.EDIT_BUTTON_PREFIX + note.id.value),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Edit,
+                            contentDescription = stringResource(R.string.memory_vault_edit_note),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = RelateAlpha.subtle),
+                        )
+                    }
                     IconButton(
                         onClick = onTogglePin,
                         modifier = Modifier.testTag(MemoryVaultTestTags.PIN_BUTTON_PREFIX + note.id.value),
@@ -436,6 +570,103 @@ private fun MemoryNoteCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EditMemoryNoteCard(
+    note: MemoryNoteRecord,
+    editNoteText: String,
+    editCategory: String,
+    onEditTextChange: (String) -> Unit,
+    onEditCategoryChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val noteHasOnlyWhitespace = editNoteText.isNotEmpty() && editNoteText.isBlank()
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.relateSemanticColors.cardContainer),
+    ) {
+        Column(
+            modifier = Modifier.padding(RelateSpacing.cardContent),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
+        ) {
+            Text(
+                text = stringResource(R.string.memory_vault_edit_note),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+
+            OutlinedTextField(
+                value = editNoteText,
+                onValueChange = onEditTextChange,
+                placeholder = { Text(stringResource(R.string.memory_vault_note_placeholder)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(MemoryVaultTestTags.EDIT_FIELD_PREFIX + note.id.value),
+                minLines = 2,
+                maxLines = 4,
+                isError = noteHasOnlyWhitespace,
+                supportingText = {
+                    if (noteHasOnlyWhitespace) {
+                        Text(text = stringResource(R.string.memory_vault_error_blank_note))
+                    } else {
+                        Text(
+                            text = stringResource(
+                                R.string.memory_vault_note_counter,
+                                editNoteText.length,
+                                MemoryVaultViewModel.MAX_NOTE_LENGTH,
+                            ),
+                        )
+                    }
+                },
+            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+                verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+            ) {
+                memoryCategoryOptions.forEach { option ->
+                    FilterChip(
+                        label = stringResource(option.shortLabelRes),
+                        isSelected = editCategory == option.value,
+                        onClick = { onEditCategoryChange(option.value) },
+                        modifier = Modifier.testTag(MemoryVaultTestTags.EDIT_CATEGORY_PREFIX + option.value),
+                    )
+                }
+            }
+
+            Text(
+                text = stringResource(R.string.memory_vault_ai_usage_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = onCancel,
+                    modifier = Modifier.testTag(MemoryVaultTestTags.EDIT_CANCEL_PREFIX + note.id.value),
+                ) {
+                    Text(stringResource(R.string.memory_vault_cancel_edit))
+                }
+                Button(
+                    onClick = onSave,
+                    enabled = editNoteText.isNotBlank(),
+                    modifier = Modifier.testTag(MemoryVaultTestTags.EDIT_SAVE_PREFIX + note.id.value),
+                ) {
+                    Text(stringResource(R.string.memory_vault_save_edit))
+                }
+            }
         }
     }
 }

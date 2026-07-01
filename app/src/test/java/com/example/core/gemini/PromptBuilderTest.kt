@@ -2,6 +2,7 @@ package com.example.core.gemini
 
 import com.example.core.db.entities.ContactEntity
 import com.example.domain.contact.toMessagePromptContact
+import com.example.domain.memory.MemoryNotePromptPolicy
 import com.example.domain.message.buildMessagePromptContext
 import com.example.domain.model.contact.ContactClassificationPromptContext
 import com.example.domain.model.contact.ContactRelationshipPromptContext
@@ -275,6 +276,52 @@ class PromptBuilderTest {
             ctx.memoryNotes.first(),
         )
         assertEquals("2025: Tea sampler (Food, liked: true)", ctx.giftHistory.single())
+    }
+
+    @Test
+    fun `buildMessagePromptContext excludes private memory notes from AI context`() {
+        val contact = ContactEntity(
+            id = "private_memory_contact",
+            name = "Nina",
+            interestsJson = "[]",
+            sharedHistoryJson = "[]",
+        )
+        val event = occasion(
+            id = "private_memory_event",
+            contactId = "private_memory_contact",
+            type = "BIRTHDAY",
+            dayOfMonth = 5,
+            month = 5,
+            nextOccurrenceMs = System.currentTimeMillis() + 86400000,
+        )
+        val memoryNotes = listOf(
+            MemoryNoteRecord(
+                id = MemoryNoteId("note_private"),
+                contactId = ContactId("private_memory_contact"),
+                noteText = "Private family health context",
+                category = MemoryNotePromptPolicy.PRIVATE_REFERENCE_CATEGORY,
+                dateMs = 2_000L,
+                isPinned = true,
+            ),
+            MemoryNoteRecord(
+                id = MemoryNoteId("note_public"),
+                contactId = ContactId("private_memory_contact"),
+                noteText = "Favorite tea",
+                category = "PREFERENCE",
+                dateMs = 1_000L,
+                isPinned = false,
+            ),
+        )
+
+        val ctx = buildMessagePromptContext(
+            contact = contact.toMessagePromptContact(),
+            event = event,
+            styleProfile = null,
+            previousWishes = emptyList(),
+            memoryNotes = memoryNotes,
+        )
+
+        assertEquals(listOf("PREFERENCE: Favorite tea"), ctx.memoryNotes)
     }
 
     @Test

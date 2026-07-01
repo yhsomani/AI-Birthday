@@ -1,6 +1,7 @@
 package com.example.domain.message
 
 import com.example.domain.model.MessageChannel
+import com.example.domain.memory.MemoryNotePromptPolicy
 import com.example.domain.model.contact.ContactMessagePromptContext
 import com.example.domain.model.gift.GiftHistoryRecord
 import com.example.domain.model.memory.MemoryNoteRecord
@@ -56,6 +57,7 @@ fun buildMessagePromptContext(
         previousWishes = previousWishes,
         formalityLevel = contact.formalityLevel,
         memoryNotes = memoryNotes
+            .filter(MemoryNotePromptPolicy::canUseInAiPrompts)
             .sortedWith(compareByDescending<MemoryNoteRecord> { it.isPinned }.thenByDescending { it.dateMs })
             .take(6)
             .map { "${it.category}: ${sanitizeNotes(it.noteText).take(180)}" },

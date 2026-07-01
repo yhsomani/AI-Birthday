@@ -9,6 +9,7 @@ import android.net.Uri
 import android.widget.RemoteViews
 import com.example.R
 import com.example.core.db.AppDatabase
+import com.example.core.resilience.StructuredLogger
 import com.example.domain.contact.toHeader
 import com.example.domain.event.toOccasions
 import com.example.domain.model.MessageStatus
@@ -82,11 +83,15 @@ class BirthdayWidgetProvider : AppWidgetProvider() {
                     appWidgetManager.updateAppWidget(appWidgetId, views)
                 }
             } catch (e: Exception) {
-                android.util.Log.e("BirthdayWidgetProvider", "Failed to update widget", e)
+                StructuredLogger.e(TAG, "Failed to update widget", e)
             } finally {
                 pendingResult.finish()
             }
         }
+    }
+
+    private companion object {
+        const val TAG = "BirthdayWidgetProvider"
     }
 }
 

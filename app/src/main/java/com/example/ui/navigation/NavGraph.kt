@@ -196,7 +196,13 @@ fun RelateNavGraph(
             route = Screen.ContactDetail.route,
             navController = navController,
             isSignedIn = isSignedIn,
-            arguments = listOf(navArgument("contactId") { type = NavType.StringType }),
+            arguments = listOf(
+                navArgument("contactId") { type = NavType.StringType },
+                navArgument(Screen.ContactDetail.openPreferencesArg) {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
+            ),
             deepLinks = listOf(
                 navDeepLink {
                     uriPattern = RelateDeepLinks.Contact.pattern
@@ -204,8 +210,12 @@ fun RelateNavGraph(
             )
         ) { backStackEntry ->
             val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
+            val openPreferences = backStackEntry.arguments
+                ?.getBoolean(Screen.ContactDetail.openPreferencesArg)
+                ?: false
             ContactDetailScreen(
                 contactId = contactId,
+                openPreferencesOnStart = openPreferences,
                 onBack = { navController.popBackStack() },
                 onNavigateToWish = { pendingMessageId ->
                     navController.navigate(Screen.WishPreview.createRoute(contactId, pendingMessageId))
@@ -335,7 +345,10 @@ fun RelateNavGraph(
             AnalyticsScreen(
                 onNavigateToActivityHistory = {
                     navController.navigate(Screen.ActivityHistory.route)
-                }
+                },
+                onNavigateToContact = { contactId ->
+                    navController.navigate(Screen.ContactDetail.createRoute(contactId))
+                },
             )
         }
         authenticatedComposable(
@@ -431,7 +444,15 @@ fun RelateNavGraph(
             val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
             GiftAdvisorScreen(
                 contactId = contactId,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onAdjustBudget = {
+                    navController.navigate(
+                        Screen.ContactDetail.createRoute(
+                            contactId = contactId,
+                            openPreferences = true,
+                        ),
+                    )
+                },
             )
         }
     }

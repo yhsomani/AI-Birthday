@@ -105,17 +105,15 @@ object AutoSendChannelSelector {
         senderEmail: String,
         senderEmailPassword: String,
     ): Set<MessageChannel> {
-        val blocked = channelBlackoutJson.toChannelSet()
-        return defaultOrder.filterNot { it in blocked }
-            .filter {
-                when (it) {
-                    MessageChannel.SMS,
-                    MessageChannel.WHATSAPP -> contact.hasPrimaryPhone
-                    MessageChannel.EMAIL -> contact.hasPrimaryEmail &&
-                        EmailAddressSyntaxPolicy.isConfiguredSender(senderEmail, senderEmailPassword)
-                    MessageChannel.UNKNOWN -> false
-                }
-            }
+        return defaultOrder.filter {
+            DeliveryRouteReadinessPolicy.evaluate(
+                channel = it,
+                contact = contact,
+                channelBlackoutJson = channelBlackoutJson,
+                senderEmail = senderEmail,
+                senderEmailPassword = senderEmailPassword,
+            ) is DeliveryRouteReadiness.Ready
+        }
             .toSet()
     }
 
@@ -125,36 +123,31 @@ object AutoSendChannelSelector {
         senderEmail: String,
         senderEmailPassword: String,
     ): Set<NoRouteReason> {
-        val blocked = channelBlackoutJson.toChannelSet()
         val reasons = mutableSetOf<NoRouteReason>()
 
         defaultOrder.forEach { channel ->
-            if (channel in blocked) {
-                reasons += NoRouteReason.CHANNEL_BLACKED_OUT
-                return@forEach
-            }
-            when (channel) {
-                MessageChannel.SMS,
-                MessageChannel.WHATSAPP -> {
-                    if (!contact.hasPrimaryPhone) {
-                        reasons += NoRouteReason.MISSING_PHONE
-                    }
-                }
-                MessageChannel.EMAIL -> {
-                    if (!contact.hasPrimaryEmail) {
-                        reasons += NoRouteReason.MISSING_EMAIL
-                    }
-                    if (senderEmail.isBlank() || senderEmailPassword.isBlank()) {
-                        reasons += NoRouteReason.EMAIL_SENDER_NOT_CONFIGURED
-                    } else if (!EmailAddressSyntaxPolicy.isUsableAddress(senderEmail)) {
-                        reasons += NoRouteReason.EMAIL_SENDER_INVALID
-                    }
-                }
-                MessageChannel.UNKNOWN -> Unit
-            }
+            DeliveryRouteReadinessPolicy.blockedReasons(
+                channel = channel,
+                contact = contact,
+                channelBlackoutJson = channelBlackoutJson,
+                senderEmail = senderEmail,
+                senderEmailPassword = senderEmailPassword,
+            ).mapTo(reasons) { it.toNoRouteReason() }
         }
 
         return reasons.ifEmpty { setOf(NoRouteReason.NO_SUPPORTED_CONTACT_CHANNEL) }
+    }
+
+    private fun DeliveryRouteBlockReason.toNoRouteReason(): NoRouteReason {
+        return when (this) {
+            DeliveryRouteBlockReason.CHANNEL_DISABLED -> NoRouteReason.CHANNEL_BLACKED_OUT
+            DeliveryRouteBlockReason.MISSING_PHONE -> NoRouteReason.MISSING_PHONE
+            DeliveryRouteBlockReason.MISSING_EMAIL -> NoRouteReason.MISSING_EMAIL
+            DeliveryRouteBlockReason.EMAIL_SENDER_NOT_CONFIGURED -> NoRouteReason.EMAIL_SENDER_NOT_CONFIGURED
+            DeliveryRouteBlockReason.EMAIL_SENDER_INVALID -> NoRouteReason.EMAIL_SENDER_INVALID
+            DeliveryRouteBlockReason.CONTACT_MISSING,
+            DeliveryRouteBlockReason.UNSUPPORTED_CHANNEL -> NoRouteReason.NO_SUPPORTED_CONTACT_CHANNEL
+        }
     }
 
     private fun fallbackChannel(contact: ContactDeliveryRouteProfile): MessageChannel {
@@ -169,13 +162,5 @@ object AutoSendChannelSelector {
         return defaultOrder.size - index
     }
 
-    private fun String.toChannelSet(): Set<MessageChannel> {
-        return CHANNEL_PATTERN.findAll(this)
-            .map { MessageChannel.fromRaw(it.groupValues[1]) }
-            .filter { it != MessageChannel.UNKNOWN }
-            .toSet()
-    }
-
     private val defaultOrder = listOf(MessageChannel.SMS, MessageChannel.WHATSAPP, MessageChannel.EMAIL)
-    private val CHANNEL_PATTERN = Regex("\"([A-Za-z_]+)\"")
 }

@@ -29,12 +29,23 @@ data class AnalyticsUiState(
     val deliveryReliabilityPercent: Int = 0,
     val responseRatePercent: Int = 0,
     val personalizationCoveragePercent: Int = 0,
-    val topNeglectedContacts: List<String> = emptyList(),
+    val sentMessagesThisYearCount: Int = 0,
+    val analyticsProfileCount: Int = 0,
+    val topNeglectedContacts: List<AnalyticsNeglectedContactItem> = emptyList(),
     val exportReport: AnalyticsReport? = null,
     val isLoading: Boolean = true,
     val isExporting: Boolean = false,
     val exportError: Boolean = false,
 )
+
+data class AnalyticsNeglectedContactItem(
+    val contactId: String,
+    val displayName: String,
+    val healthScore: Int,
+) {
+    val displayLabel: String
+        get() = "$displayName ($healthScore)"
+}
 
 @HiltViewModel
 class AnalyticsViewModel @Inject constructor(
@@ -107,8 +118,14 @@ class AnalyticsViewModel @Inject constructor(
                     deliveryReliabilityPercent = percent(deliveredOrSent, sentThisYear.size),
                     responseRatePercent = percent(replies, sentThisYear.size),
                     personalizationCoveragePercent = percent(personalizedContacts, contactProfiles.size),
+                    sentMessagesThisYearCount = sentThisYear.size,
+                    analyticsProfileCount = contactProfiles.size,
                     topNeglectedContacts = snapshot.neglectedContacts.map {
-                        "${it.displayName} (${it.healthScore})"
+                        AnalyticsNeglectedContactItem(
+                            contactId = it.id.value,
+                            displayName = it.displayName,
+                            healthScore = it.healthScore,
+                        )
                     },
                     isLoading = false,
                 )

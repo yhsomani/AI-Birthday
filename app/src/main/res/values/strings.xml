@@ -51,9 +51,13 @@
     <string name="memory_prompt_gift_preference">Gift preference</string>
     <string name="memory_prompt_gift_preference_template">Gift preference: </string>
     <string name="memory_vault_note_counter">%1$d/%2$d characters</string>
+    <string name="memory_vault_ai_usage_note">AI use: Private notes stay in Memory Vault and are not used for AI writing.</string>
     <string name="memory_vault_add_button">Add to Vault</string>
     <string name="memory_vault_journal_title">Relationship Journal</string>
     <string name="memory_vault_empty_message">No memories recorded yet. Add one above to enrich the AI writer.</string>
+    <string name="memory_vault_search_label">Search memories</string>
+    <string name="memory_vault_search_placeholder">Search by note or category</string>
+    <string name="memory_vault_no_search_results">No memories match this search.</string>
     <string name="memory_vault_error_load">Could not load the memory vault. Try again.</string>
     <string name="memory_vault_error_add">Could not add the note. Try again.</string>
     <string name="memory_vault_error_pin">Could not update the pinned state. Try again.</string>
@@ -62,13 +66,19 @@
     <string name="memory_vault_error_note_too_long">Memory notes must be 500 characters or fewer.</string>
     <string name="memory_vault_pin_note">Pin note</string>
     <string name="memory_vault_unpin_note">Unpin note</string>
+    <string name="memory_vault_edit_note">Edit note</string>
+    <string name="memory_vault_save_edit">Save changes</string>
+    <string name="memory_vault_cancel_edit">Cancel edit</string>
     <string name="memory_vault_delete_note">Delete note</string>
+    <string name="memory_vault_error_update">Could not update the note. Try again.</string>
     <string name="memory_category_general">General</string>
+    <string name="memory_category_private">Private (not used by AI)</string>
     <string name="memory_category_preference">Preference</string>
     <string name="memory_category_event">Event</string>
     <string name="memory_category_gift">Gift</string>
     <string name="memory_category_milestone">Milestone</string>
     <string name="memory_category_general_short">Gen</string>
+    <string name="memory_category_private_short">Priv</string>
     <string name="memory_category_preference_short">Pref</string>
     <string name="memory_category_event_short">Event</string>
     <string name="memory_category_gift_short">Gift</string>
@@ -88,6 +98,7 @@
     <string name="gift_year_format">%1$d</string>
     <string name="gift_advisor_title_with_contact">Gift Advisor: %1$s</string>
     <string name="gift_advisor_record_gift">Record gift</string>
+    <string name="gift_advisor_adjust_budget">Adjust budget</string>
     <string name="gift_advisor_loading">Loading gift history</string>
     <string name="gift_stat_annual_budget">Annual Budget</string>
     <string name="gift_stat_total_spent">Spent</string>
@@ -570,6 +581,9 @@
     <string name="settings_legacy_db_notice_title">Legacy data preserved</string>
     <string name="settings_legacy_db_notice_body">An older unencrypted database was found and moved to protected app storage for support recovery. RelateAI started a fresh encrypted database.</string>
     <string name="settings_legacy_db_notice_dismiss">Dismiss</string>
+    <string name="settings_secure_prefs_recovery_notice_title">Secure settings recovered</string>
+    <string name="settings_secure_prefs_recovery_notice_body">RelateAI rebuilt encrypted settings after secure storage could not be opened. Re-enter Gemini, Gmail, sync, biometric, and automation settings, then run AI Doctor and create a fresh encrypted backup.</string>
+    <string name="settings_secure_prefs_recovery_notice_dismiss">I reviewed setup</string>
     <string name="settings_default_send_time">Default Send Time</string>
     <string name="settings_default_time_value">9:00 AM</string>
     <string name="settings_style_coach_subtitle">Train your writing style</string>
@@ -871,8 +885,11 @@
     <string name="analytics_delivery_reliability">Delivery reliability</string>
     <string name="analytics_response_rate">Response rate</string>
     <string name="analytics_personalization_coverage">Personalization coverage</string>
+    <string name="analytics_growth_denominator_sent">Delivery and response use %1$d sent message(s) from this year.</string>
+    <string name="analytics_growth_denominator_personalization">Personalization uses %1$d contact profile(s).</string>
     <string name="analytics_top_neglected">Top Neglected Contacts</string>
     <string name="analytics_no_neglected_contacts">No neglected contacts yet</string>
+    <string name="analytics_open_contact">Open contact</string>
 
     <!-- Activity history -->
     <string name="activity_history_title">Activity History</string>
@@ -973,6 +990,7 @@
     <string name="settings_gemini_saved">Gemini API key saved.</string>
     <string name="settings_email_sending_title">Email sending</string>
     <string name="settings_email_sending_help">Required when a contact uses Email as the preferred channel or when you send a test message to yourself.</string>
+    <string name="settings_email_app_password_security_note">Use a Gmail app password, not your Google account password. RelateAI stores it encrypted, but you should verify it with AI Doctor's Test Email action and revoke it from Google if you stop using email sending.</string>
     <string name="settings_save_email_settings">Save email settings</string>
     <string name="settings_email_saved">Email settings saved.</string>
     <string name="settings_email_setup_required">Enter both Gmail address and app password.</string>

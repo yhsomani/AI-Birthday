@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.ui.screens.analytics.AnalyticsContent
 import com.example.ui.screens.analytics.AnalyticsScreenTestTags
+import com.example.ui.viewmodel.AnalyticsNeglectedContactItem
 import com.example.ui.viewmodel.AnalyticsUiState
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -66,9 +67,9 @@ class AnalyticsScreenshotTest {
         setAnalyticsContent(
             state = populatedAnalyticsState().copy(
                 topNeglectedContacts = listOf(
-                    "रिया मेहता (24)",
-                    "अर्जुन राव (31)",
-                    "माया पटेल (36)",
+                    AnalyticsNeglectedContactItem("contact_riya", "रिया मेहता", 24),
+                    AnalyticsNeglectedContactItem("contact_arjun", "अर्जुन राव", 31),
+                    AnalyticsNeglectedContactItem("contact_maya", "माया पटेल", 36),
                 ),
             ),
             fontScale = LargeFontScale,
@@ -133,6 +134,7 @@ class AnalyticsScreenshotTest {
             AnalyticsContent(
                 state = state,
                 onNavigateToActivityHistory = {},
+                onNavigateToContact = {},
                 onExportReport = {},
             )
         }
@@ -175,10 +177,12 @@ class AnalyticsScreenshotTest {
             deliveryReliabilityPercent = 92,
             responseRatePercent = 64,
             personalizationCoveragePercent = 78,
+            sentMessagesThisYearCount = 33,
+            analyticsProfileCount = 18,
             topNeglectedContacts = listOf(
-                "Riya Mehta (24)",
-                "Arjun Rao (31)",
-                "Maya Patel (36)",
+                AnalyticsNeglectedContactItem("contact_riya", "Riya Mehta", 24),
+                AnalyticsNeglectedContactItem("contact_arjun", "Arjun Rao", 31),
+                AnalyticsNeglectedContactItem("contact_maya", "Maya Patel", 36),
             ),
             isLoading = false,
         )

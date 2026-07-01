@@ -2,10 +2,10 @@ package com.example.core.auth
 
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import com.example.core.db.AppDatabase
 import com.example.core.db.DatabaseKeyDerivation
 import com.example.core.prefs.SecurePrefs
+import com.example.core.resilience.StructuredLogger
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
@@ -67,7 +67,7 @@ open class AuthManager @Inject constructor(
             val account = try {
                 task.getResult(ApiException::class.java)
             } catch (e: ApiException) {
-                Log.e(TAG, "Google Sign-In failed: statusCode=${e.statusCode}", e)
+                StructuredLogger.e(TAG, "Google Sign-In failed", e, extras = mapOf("statusCode" to e.statusCode.toString()))
                 onComplete(SignInResult(success = false, failure = e.toSignInFailure()))
                 return
             }
@@ -80,16 +80,16 @@ open class AuthManager @Inject constructor(
             auth.signInWithCredential(credential)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
-                        Log.d(TAG, "Firebase Sign-In successful")
+                        StructuredLogger.d(TAG, "Firebase Sign-In successful")
                         updateProfileFromFirebaseUser()
                         onComplete(SignInResult(success = true))
                     } else {
-                        Log.e(TAG, "Firebase Sign-In failed", task.exception)
+                        StructuredLogger.e(TAG, "Firebase Sign-In failed", task.exception)
                         onComplete(SignInResult(success = false, failure = SignInFailure.FIREBASE_AUTH))
                     }
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Google Sign-In failed", e)
+            StructuredLogger.e(TAG, "Google Sign-In failed", e)
             onComplete(SignInResult(success = false, failure = SignInFailure.UNKNOWN))
         }
     }
@@ -103,7 +103,7 @@ open class AuthManager @Inject constructor(
     }
 
     open fun signOut() {
-        Log.i("AuthManager", "Initiating secure sign-out sequence")
+        StructuredLogger.i(TAG, "Initiating secure sign-out sequence")
         // The calling ViewModel handles navigation to AuthScreen after
         // signOut() completes, clearing the back stack (handled in SettingsScreen.kt).
 
@@ -119,7 +119,7 @@ open class AuthManager @Inject constructor(
             try {
                 database.clearAllTables()
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to clear tables before close", e)
+                StructuredLogger.e(TAG, "Failed to clear tables before close", e)
             }
 
             // Close and reset database instance to release files and prevent reuse of stale connection
@@ -135,10 +135,10 @@ open class AuthManager @Inject constructor(
                 .filter { it.exists() }
                 .forEach { file ->
                     val deleted = file.delete()
-                    Log.d(TAG, "Delete ${file.name}: success=$deleted")
+                    StructuredLogger.d(TAG, "Deleted local database file", mapOf("fileName" to file.name, "success" to deleted.toString()))
                 }
         } catch (e: Exception) {
-            Log.e(TAG, "Sign-out data wipe failed — continuing with auth sign-out anyway", e)
+            StructuredLogger.e(TAG, "Sign-out data wipe failed; continuing with auth sign-out anyway", e)
         }
 
         // Steps 6–7 always execute regardless of errors in steps 1–5
@@ -146,7 +146,7 @@ open class AuthManager @Inject constructor(
             // Step 6: Firebase sign-out
             auth.signOut()
         } catch (e: Exception) {
-            Log.e(TAG, "Firebase Auth sign-out failed", e)
+            StructuredLogger.e(TAG, "Firebase Auth sign-out failed", e)
         }
 
         try {
@@ -157,7 +157,7 @@ open class AuthManager @Inject constructor(
             val googleSignInClient = GoogleSignIn.getClient(context, gso)
             googleSignInClient.revokeAccess()
         } catch (e: Exception) {
-            Log.e(TAG, "Google Sign-In client revoke failed", e)
+            StructuredLogger.e(TAG, "Google Sign-In client revoke failed", e)
         }
 
         _userProfile.value = UserProfile()

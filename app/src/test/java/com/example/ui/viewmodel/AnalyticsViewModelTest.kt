@@ -106,7 +106,9 @@ class AnalyticsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(50, viewModel.uiState.value.deliveryReliabilityPercent)
-        assertEquals(listOf("Neha (18)"), viewModel.uiState.value.topNeglectedContacts)
+        assertEquals(2, viewModel.uiState.value.sentMessagesThisYearCount)
+        assertEquals("contact_low", viewModel.uiState.value.topNeglectedContacts.single().contactId)
+        assertEquals("Neha (18)", viewModel.uiState.value.topNeglectedContacts.single().displayLabel)
     }
 
     @Test
@@ -136,6 +138,7 @@ class AnalyticsViewModelTest {
         assertEquals(1, viewModel.uiState.value.healthCounts["Needs Attention"])
         assertEquals(1, viewModel.uiState.value.healthCounts["At Risk"])
         assertEquals(66, viewModel.uiState.value.personalizationCoveragePercent)
+        assertEquals(3, viewModel.uiState.value.analyticsProfileCount)
     }
 
     @Test

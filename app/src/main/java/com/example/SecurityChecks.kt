@@ -1,6 +1,6 @@
 package com.example
 
-import android.util.Log
+import com.example.core.resilience.StructuredLogger
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
@@ -14,13 +14,13 @@ object SecurityChecks {
         try {
             val daysUntilExpiry = daysUntilCertificatePinExpiry()
             if (daysUntilExpiry <= PIN_EXPIRY_RELEASE_GATE_DAYS) {
-                Log.w(
+                StructuredLogger.w(
                     TAG,
                     certificatePinExpiryMessage(daysUntilExpiry),
                 )
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking certificate pin expiry", e)
+            StructuredLogger.e(TAG, "Error checking certificate pin expiry", e)
         }
     }
 

@@ -2,9 +2,9 @@ package com.example.core.prefs
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.example.core.resilience.StructuredLogger
 import com.example.domain.model.ApprovalMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -33,6 +33,7 @@ class SecurePrefs(context: Context) {
         private var authInstance: SharedPreferences? = null
         @Volatile
         private var configInstance: SharedPreferences? = null
+        private const val TAG = "SecurePrefs"
         private val lockAuth = Any()
         private val lockConfig = Any()
 
@@ -64,9 +65,9 @@ class SecurePrefs(context: Context) {
                 val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
                 keyStore.load(null)
                 keyStore.deleteEntry(keyAlias)
-                Log.i("SecurePrefs", "Deleted master key '$keyAlias' from AndroidKeyStore")
+                StructuredLogger.i(TAG, "Deleted master key from AndroidKeyStore", mapOf("keyAlias" to keyAlias))
             } catch (e: Exception) {
-                Log.e("SecurePrefs", "Failed to delete master key '$keyAlias' from AndroidKeyStore", e)
+                StructuredLogger.e(TAG, "Failed to delete master key from AndroidKeyStore", e, extras = mapOf("keyAlias" to keyAlias))
             }
         }
 
@@ -83,11 +84,11 @@ class SecurePrefs(context: Context) {
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
             } catch (e: Exception) {
-                Log.e("SecurePrefs", "Failed to create encrypted prefs for $fileName, clearing and retrying", e)
+                StructuredLogger.e(TAG, "Failed to create encrypted prefs; clearing and retrying", e, extras = mapOf("fileName" to fileName))
                 try {
                     context.getSharedPreferences(fileName, Context.MODE_PRIVATE).edit().clear().commit()
                 } catch (ex: Exception) {
-                    Log.e("SecurePrefs", "Failed to clear shared preferences", ex)
+                    StructuredLogger.e(TAG, "Failed to clear shared preferences", ex)
                 }
                 deleteMasterKey(keyAlias)
                 context.deleteSharedPreferences(fileName)
@@ -101,13 +102,17 @@ class SecurePrefs(context: Context) {
                         masterKey,
                         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                    )
+                    ).also { recoveredPrefs ->
+                        recoveredPrefs.edit().putBoolean(KEY_SECURE_PREFS_REBUILT, true).commit()
+                    }
                 } catch (retryEx: Exception) {
-                    Log.e("SecurePrefs", "Retry also failed for $fileName, failing securely", retryEx)
+                    StructuredLogger.e(TAG, "Retry also failed for encrypted prefs; failing securely", retryEx, extras = mapOf("fileName" to fileName))
                     throw SecurityException("Failed to initialize EncryptedSharedPreferences securely", retryEx)
                 }
             }
         }
+
+        private const val KEY_SECURE_PREFS_REBUILT = "secure_prefs_rebuilt_notice_pending"
     }
 
     fun setGoogleOAuthToken(token: String) = authPrefs.edit().putString("oauth_token", token).apply()
@@ -209,6 +214,15 @@ class SecurePrefs(context: Context) {
         configPrefs.edit().putBoolean("legacy_unencrypted_db_quarantined", quarantined).apply()
     fun wasLegacyUnencryptedDbQuarantined(): Boolean =
         configPrefs.getBoolean("legacy_unencrypted_db_quarantined", false)
+
+    fun setSecurePrefsRebuiltNoticePending(pending: Boolean) {
+        authPrefs.edit().putBoolean(KEY_SECURE_PREFS_REBUILT, pending).apply()
+        configPrefs.edit().putBoolean(KEY_SECURE_PREFS_REBUILT, pending).apply()
+    }
+
+    fun isSecurePrefsRebuiltNoticePending(): Boolean =
+        authPrefs.getBoolean(KEY_SECURE_PREFS_REBUILT, false) ||
+            configPrefs.getBoolean(KEY_SECURE_PREFS_REBUILT, false)
 
     fun clearAll() {
         authPrefs.edit().clear().apply()

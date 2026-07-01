@@ -1,7 +1,5 @@
 package com.example.core.resilience
 
-import android.util.Log
-
 interface FallbackProvider<T> {
     suspend fun primary(): T
     suspend fun fallback(): T
@@ -18,12 +16,12 @@ class FallbackOrchestrator<T>(
             try {
                 val result = if (index == 0) provider.primary() else provider.fallback()
                 if (index > 0) {
-                    Log.i(tag, "Used fallback provider $index")
+                    StructuredLogger.i(tag, "Used fallback provider $index")
                 }
                 return result
             } catch (e: Exception) {
                 val safeMessage = SensitiveLogRedactor.redact(e.message ?: e.javaClass.simpleName)
-                Log.w(tag, "Provider $index failed: $safeMessage")
+                StructuredLogger.w(tag, "Provider $index failed: $safeMessage")
             }
         }
         throw FallbackExhaustedException(name, providers.size)

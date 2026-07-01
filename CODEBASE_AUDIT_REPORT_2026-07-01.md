@@ -15,9 +15,9 @@ The codebase is broadly functional and has a serious test culture, but the audit
 
 | Priority | Finding | Impact | Primary evidence |
 | --- | --- | --- | --- |
-| P0 | Fully automatic AI quality gate does not downgrade fallback/generic/low-quality nonblank messages. | Fallback or generic content can be approved for full automation, undermining trust in the core automation promise. | `core/domain/src/main/kotlin/com/example/domain/automation/AiAutoSendQualityGate.kt:48` |
-| P1 | Foreground/manual dispatch path does not pass quiet hours or blackout dates into shared dispatch eligibility. | A manual/domain dispatch caller can send during a blocked window even though worker dispatch respects it. | `DispatchMessageUseCase.kt:49`, `DispatchEligibilityPolicy.kt:118`, `MessageDispatchWorker.kt:71` |
-| P1 | The operational readiness model is duplicated across Messages, AI Doctor, channel selection, and dispatch policy. | Users can see one screen say "ready" while another path defers, blocks, or requires setup. | `MessagesViewModel.kt:556`, `AutomationSetupViewModel.kt`, `AutoSendChannelSelector`, `DispatchEligibilityPolicy` |
+| Resolved P0 | Fully automatic AI quality gate previously did not downgrade fallback/generic/low-quality nonblank messages. | Resolved on 2026-07-01: fallback, generic, blank, short, or otherwise low-score generated text in automatic modes downgrades to manual review. | `AiAutoSendQualityGate.kt:48`, `AiAutoSendQualityGateTest`, `GenerateMessageUseCaseTest`, `EnableFullAutomationUseCaseTest` |
+| Resolved P1 | Foreground/manual dispatch path previously risked bypassing quiet hours or blackout dates. | Resolved on 2026-07-01: manual/domain dispatch and worker dispatch both pass quiet hours and blackout dates into shared dispatch eligibility. | `DispatchMessageUseCase.kt:51`, `DispatchMessageUseCaseTest.kt:228`, `DispatchEligibilityPolicy.kt:118`, `MessageDispatchWorker.kt:71` |
+| P1 | The operational readiness model is still distributed across AI Doctor, scheduling, and several UI surfaces. | Users can still see one screen say "ready" while another path defers, blocks, or requires setup. Route prerequisites now have a shared domain policy, but the full readiness model is not yet single-source. | `DeliveryRouteReadinessPolicy`, `AutomationSetupViewModel`, `DispatchEligibilityPolicy`, `MessagesViewModel` |
 | P1 | Repository contains tracked local/generated artifacts and an over-broad `.gitignore` that ignores valid app assets. | Builds and reviews are noisier; real assets appear as ignored/tracked; private diagnostic logs are in git history. | `.gitignore`, `git ls-files -i -c --exclude-standard` |
 | P1 | Documentation is materially stale. | Product and architecture docs describe older modules and Room schema v13 while code is at five modules and schema v16. | `settings.gradle.kts`, `AppDatabase.kt`, `SSOT.md` |
 | P2 | Domain module contains Room entities and some UI paths consume data entities directly. | Module boundaries are not clean; future feature modules and testing get harder. | `core/domain/src/main/kotlin/com/example/core/db/entities/*`, `ChatHistoryViewModel.kt:7` |
@@ -38,6 +38,16 @@ Implementation update on 2026-07-01:
 - Added a local dismiss/ignore action for Gift Advisor AI suggestions so irrelevant ideas can be cleared from the review list.
 - Added a Style Coach message-style preview so users can see the learned opening, tone, length, and emoji rules that will influence generated messages.
 - Added Chat History search/filter across message text and channel so users can find prior sent messages without scanning the whole history.
+- Added Analytics growth-metric denominator explanations for delivery reliability, response rate, and personalization coverage.
+- Added Settings Gmail app-password safety copy explaining app-password use, encrypted storage, AI Doctor email verification, and Google revocation.
+- Added a release-checklist pin-rotation deadline for the current `2027-06-01` network pin expiration.
+- Added a Settings recovery notice when encrypted preferences are rebuilt after secure storage initialization failure.
+- Migrated production direct Android `Log` calls to `StructuredLogger` or removed them from the domain layer; release-readiness tests now allow direct Android logging only inside `StructuredLogger`.
+- Added a private Memory Vault category that stays out of AI prompt context while remaining visible in the user's vault.
+- Extracted delivery route readiness into a shared domain policy used by both Messages readiness labels and automatic channel selection.
+- Made Analytics neglected-contact rows actionable by preserving contact ids and routing rows to Contact Detail.
+- Added Memory Vault search with a clear action and distinct no-results state so saved notes can be found by note text or category without scanning the whole journal.
+- Added inline Memory Vault note editing so users can correct saved text/category without deleting and recreating notes.
 - Remaining open work: decide repository policy for tracked Google/Firebase service config files, and consolidate readiness state across feature surfaces.
 
 ## 2. Product Assessment
@@ -275,11 +285,11 @@ Migration sequence:
 | Purpose | Generate personalized message variants from contacts, events, style, memory, gifts, and previous wishes. |
 | Business goal | Deliver differentiated AI value. |
 | User goal | Get a message that feels personal and safe to send. |
-| Current implementation | `GenerateMessageUseCase` prevents duplicate pending messages, loads personalization context, retries if generated text is too similar to previous wishes, shows fallback alerts, selects a route, schedules exact sends, and inserts pending drafts. |
-| Critical issue | `AiAutoSendQualityGate` scores fallback/generic/short text down but keeps `FULLY_AUTO` when the message is merely nonblank. A fallback message can become approved and scheduled automatically. |
-| Missing functionality | Hard contract that fallback, generic, very short, or low-score messages always require review in automatic modes. |
-| Suggested redesign | Make quality gate return a typed `requiresReview` decision with reasons. Add tests for FULLY_AUTO fallback, generic phrase, too short, blank, edited-by-user, and route unavailable cases. |
-| Priority | P0 |
+| Current implementation | `GenerateMessageUseCase` prevents duplicate pending messages, loads personalization context, retries if generated text is too similar to previous wishes, shows fallback alerts, selects a route, applies `AiAutoSendQualityGate`, schedules exact sends, and inserts pending drafts. Fallback, generic, too-short, blank, or low-score automatic drafts are downgraded to `ALWAYS_ASK`. |
+| Critical issue | Resolved on 2026-07-01: automatic-send eligibility now follows the computed quality score threshold instead of preserving `FULLY_AUTO` for merely nonblank generated text. |
+| Missing functionality | Richer user-facing quality explanations and a typed quality decision model that can be displayed consistently in generation, regeneration, Wish Preview, and AI Doctor. |
+| Suggested redesign | Evolve the existing quality gate into a typed `requiresReview`/`sendable` decision with localized reasons and examples, while preserving the current downgrade contract and tests. |
+| Priority | Resolved P0; follow-up P2 for richer quality explanations |
 | Related files | `AiAutoSendQualityGate.kt`, `GenerateMessageUseCase.kt`, `RegeneratePendingMessageUseCase.kt`, `EnableFullAutomationUseCase.kt` |
 
 ### 4.8 Messages Queue
@@ -331,12 +341,12 @@ Migration sequence:
 | Purpose | Send approved or fully automatic messages at the right time through available channels. |
 | Business goal | Reliably deliver relationship messages without unsafe automation. |
 | User goal | Trust that messages are sent only when allowed. |
-| Current implementation | Worker dispatch uses `DispatchEligibilityPolicy` with quiet hours and blackout dates. `DailyScheduler` adjusts scheduled times and uses exact alarms or WorkManager fallback. Route selection considers SMS, WhatsApp, email setup, channel blackout, contact availability, and history. |
-| Critical issue | `DispatchMessageUseCase` calls `DispatchEligibilityPolicy.evaluate(draft = pending.draft)` without quiet hours or blackout dates, so policy defaults can return `SendNow`. |
-| Missing functionality | A single dispatch entry point that always receives current preferences and route readiness. |
-| Suggested redesign | Inject `PreferencesRepository` into `DispatchMessageUseCase` or route all sends through a dispatch coordinator that supplies current preferences. Add regression tests that manual/foreground dispatch defers during quiet hours and blackout dates. |
+| Current implementation | Worker and foreground/domain dispatch use `DispatchEligibilityPolicy` with quiet hours and blackout dates. `DailyScheduler` adjusts scheduled times and uses exact alarms or WorkManager fallback. Route selection considers SMS, WhatsApp, email setup, channel blackout, contact availability, and history through shared route-readiness policy. |
+| Critical issue | Resolved on 2026-07-01: foreground/manual dispatch now supplies current quiet-hour and blackout preferences, and tests cover blocked windows. |
+| Missing functionality | A single dispatch readiness output that combines route prerequisites, approval status, quality, schedule timing, recovery, and user-facing explanation text. |
+| Suggested redesign | Continue toward a dispatch coordinator/readiness model that returns one typed decision for UI labels, notification actions, route selection, scheduling, and final dispatch. |
 | Priority | P1 |
-| Related files | `DispatchMessageUseCase.kt:49`, `DispatchEligibilityPolicy.kt:118`, `MessageDispatchWorker.kt:71`, `DailyScheduler` |
+| Related files | `DispatchMessageUseCase`, `DispatchEligibilityPolicy`, `DeliveryRouteReadinessPolicy`, `MessageDispatchWorker`, `DailyScheduler` |
 
 ### 4.12 Activity History
 
@@ -359,10 +369,10 @@ Migration sequence:
 | Purpose | Show relationship health, personalization coverage, reliability, response rate, and neglected contacts. |
 | Business goal | Turn automation data into habit-forming insight. |
 | User goal | Know which relationship needs attention next. |
-| Current implementation | Builds totals, relationship counts, health counts, monthly trends, reliability/response/personalization percentages, top neglected contacts, and export report. |
-| UX issues | Insights are mostly descriptive and not directly actionable. Top neglected contacts are strings rather than clickable models. |
-| Missing functionality | Insight-to-action routing and explanation of metric denominators. |
-| Suggested redesign | Convert analytics cards into typed insights with target route, severity, and recommended action. |
+| Current implementation | Builds totals, relationship counts, health counts, monthly trends, reliability/response/personalization percentages, denominator explanations, typed top-neglected-contact rows with Contact Detail routing, and export report. |
+| UX issues | Some insights remain descriptive; neglected contacts are now actionable, but health, reliability, response, and personalization metrics still do not produce typed recommended actions. |
+| Missing functionality | Insight-to-action routing for non-neglected metrics, severity labels, and suggested next actions. |
+| Suggested redesign | Convert analytics cards into typed insights with target route, severity, and recommended action; keep neglected-contact rows as the first implemented action pattern. |
 | Priority | P2 |
 | Related files | `AnalyticsViewModel`, analytics repositories/use cases |
 
@@ -387,10 +397,10 @@ Migration sequence:
 | Purpose | Store relationship details that improve personalization. |
 | Business goal | Increase AI quality and user lock-in through private context. |
 | User goal | Capture preferences, milestones, gifts, and private notes. |
-| Current implementation | Supports categories, notes, pin/unpin, delete, and contact header context. |
-| UX issues | No edit flow, no search, no sensitivity labels, and no per-note prompt eligibility. |
-| Missing functionality | Privacy controls for AI prompt inclusion. |
-| Suggested redesign | Add note edit/search and a sensitivity toggle such as "use for AI suggestions" vs "private reference only." |
+| Current implementation | Supports categories, notes, inline edit, search by note text/category with a clear action, filtered no-results feedback, pin/unpin, delete, contact header context, and a Private category that is excluded from AI prompt context. |
+| UX issues | The initial privacy control is category-based rather than a separate per-note sensitivity toggle. |
+| Missing functionality | Full prompt data preview and a richer sensitivity model that can combine topic category with AI eligibility. |
+| Suggested redesign | Add prompt preview and a separate "use for AI suggestions" toggle while preserving the Private reference category, search, and edit flow. |
 | Priority | P2 |
 | Related files | `MemoryVaultViewModel`, memory repositories, prompt context builders |
 
@@ -444,7 +454,7 @@ Migration sequence:
 | Purpose | Configure account, AI, email, automation, quiet hours, biometric lock, channel blackout, sync, and sign-out. |
 | Business goal | Centralize high-risk configuration. |
 | User goal | Safely control automation and delivery channels. |
-| Current implementation | Settings reads/writes encrypted prefs, supports full automation enablement, email settings, quiet hours, blackout, biometric, sync, backup timestamps, and sign-out. Resolved 2026-07-01: transient Settings UI state and missing/unsupported global automation preferences now default to `ALWAYS_ASK` instead of `FULLY_AUTO`. |
+| Current implementation | Settings reads/writes encrypted prefs, supports full automation enablement, email settings, quiet hours, blackout, biometric, sync, backup timestamps, secure-storage recovery notices, and sign-out. Resolved 2026-07-01: transient Settings UI state and missing/unsupported global automation preferences now default to `ALWAYS_ASK` instead of `FULLY_AUTO`; Gmail app-password setup copy now explains app-password use, encrypted storage, AI Doctor email verification, and Google revocation; encrypted preference rebuilds now leave a dismissible Settings notice that tells users to re-enter setup and create a fresh encrypted backup. |
 | UX issues | It is a dense, high-risk screen. The riskiest default-display problem is resolved, but enabling full automation is still a high-stakes setting that would benefit from a guided preflight path. |
 | Missing functionality | Safer progressive automation setup and clearer "test before enabling" path. |
 | Suggested redesign | Split Settings into Account, Automation, Channels, Privacy/Security, Backup. Make automation escalation a guided flow through AI Doctor. |
@@ -542,61 +552,65 @@ Ideal flow: Home/Settings show backup age, record counts, and "last restore prev
 
 ### P0. Fully Automatic Quality Gate Does Not Downgrade Bad AI Output
 
+Status on 2026-07-01: resolved.
+
 Evidence:
 
 - `AiAutoSendQualityGate.evaluate` scores fallback text to 35 and generic phrases to 55.
-- Its final mode logic returns `FULLY_AUTO` for any nonblank message when requested mode is `FULLY_AUTO`.
-- `GenerateMessageUseCase` sets pending status to `APPROVED` when the chosen approval mode is `FULLY_AUTO`.
-- `EnableFullAutomationUseCase` promotes pending messages by reusing the same flawed gate.
+- Its final mode logic now downgrades `FULLY_AUTO` or `SMART_APPROVE` to `ALWAYS_ASK` when the score is below `FULLY_AUTO_MIN_SCORE`.
+- `GenerateMessageUseCase`, `RegeneratePendingMessageUseCase`, and `EnableFullAutomationUseCase` reuse the gate before preserving or promoting automatic approval.
+- `AiAutoSendQualityGateTest`, `GenerateMessageUseCaseTest`, `RegeneratePendingMessageUseCaseTest`, worker tests, and `EnableFullAutomationUseCaseTest` cover fallback/manual-review behavior.
 
 Impact:
 
-- AI fallback, generic, or very short content can be automatically approved and scheduled.
-- This contradicts the product's trust model.
+- Low-quality generated text no longer remains fully automatic only because it is nonblank.
+- The remaining product gap is explainability: users should see clearer review reasons and examples across every generation surface.
 
 Recommendation:
 
-- Change quality gate logic so any `score < FULLY_AUTO_MIN_SCORE` or `isUsingFallback` downgrades automatic modes to `ALWAYS_ASK`.
-- Keep an explicit exception only for user-edited or user-approved messages, not raw AI fallback.
-- Add unit tests covering FULLY_AUTO fallback, generic phrase, short text, blank text, SMART_APPROVE downgrade, and high-quality pass.
+- Keep the downgrade contract guarded by focused unit tests and worker/use-case coverage.
+- Add localized, typed quality reasons to Wish Preview, Messages, and AI Doctor so manual review explains why automatic send was blocked.
 
-### P1. Manual/Foreground Dispatch Does Not Enforce Quiet Hours or Blackout
+### P1. Manual/Foreground Dispatch Quiet-Hours Enforcement
+
+Status on 2026-07-01: resolved.
 
 Evidence:
 
-- `DispatchMessageUseCase` calls `DispatchEligibilityPolicy.evaluate(draft = pending.draft)` without current preferences.
-- `DispatchEligibilityPolicy` returns `SendNow` when quiet hours or blackout JSON are null.
-- `MessageDispatchWorker` correctly passes `preferencesRepository.getQuietHoursStart()`, `getQuietHoursEnd()`, and `getBlackoutDates()`.
+- `DispatchMessageUseCase` passes `preferencesRepository.getQuietHoursStart()`, `getQuietHoursEnd()`, and `getBlackoutDates()` into `DispatchEligibilityPolicy.evaluate`.
+- `MessageDispatchWorker` passes the same preference inputs into the shared policy.
+- `DispatchMessageUseCaseTest` covers approved, fully automatic pending, and blackout-date deferral paths and verifies the dispatcher is not called during blocked windows.
+- `DispatchEligibilityPolicyTest` covers the shared quiet-hour decision.
 
 Impact:
 
-- Worker sends are time-safe; other dispatch callers can bypass user quiet hours/blackout settings.
+- User quiet hours and blackout dates now apply consistently across worker dispatch and foreground/manual domain dispatch.
 
 Recommendation:
 
-- Inject `PreferencesRepository` into `DispatchMessageUseCase`.
-- Supply quiet hours and blackout dates in every call to `DispatchEligibilityPolicy`.
-- Add tests for both approved and FULLY_AUTO pending messages during blocked windows.
+- Keep this behavior guarded by the existing dispatch use-case and policy tests.
+- Continue consolidating readiness and dispatch explanations so every UI surface describes the same defer/block reason.
 
 ### P1. Readiness State Is Not Single-Source
 
-Status on 2026-07-01: partially addressed. Messages now uses `EmailAddressSyntaxPolicy.isConfiguredSender(...)` for email sender readiness, matching route selection/generation for that rule. A complete shared readiness output across Home, Messages, Wish Preview, AI Doctor, notifications, and dispatch is still open.
+Status on 2026-07-01: partially addressed. Messages and automatic channel selection now share `DeliveryRouteReadinessPolicy` for route prerequisites: missing contact, disabled channel, missing phone/email, invalid contact email, and Gmail sender setup. A complete shared readiness output across Home, Wish Preview, AI Doctor, notifications, route selection, and dispatch timing is still open.
 
 Evidence:
 
-- Messages readiness is screen-local and only checks route basics.
+- Messages route-readiness labels map from the shared domain policy instead of duplicating channel prerequisite checks in the ViewModel.
+- `AutoSendChannelSelector` uses the same policy for available-channel selection and no-route diagnostics.
 - AI Doctor has a broader setup model.
 - Dispatch policy owns schedule/time eligibility.
-- Channel selector owns route availability.
 
 Impact:
 
-- A user can see inconsistent "ready", "blocked", "scheduled", or "needs setup" states across screens.
+- Route prerequisite drift is reduced between Messages and automatic channel selection.
+- A user can still see inconsistent "ready", "blocked", "scheduled", or "needs setup" states when the reason depends on broader setup, permissions, schedule timing, approval state, quality, or recovery.
 
 Recommendation:
 
 - Create one domain readiness output that includes route, permission, schedule, approval, quality, and recovery decisions.
-- Use it in Home, Messages, Wish Preview, AI Doctor, notifications, and dispatch.
+- Use it in Home, Messages, Wish Preview, AI Doctor, notifications, route selection, and dispatch.
 
 ### P1. Repository Hygiene and Ignore Rules Are Unsafe
 
@@ -690,9 +704,9 @@ Impact:
 
 Recommendation:
 
-- Add per-note/per-category prompt eligibility.
+- Add per-note/per-category prompt eligibility. Initial mitigation on 2026-07-01: the Private Memory Vault category is filtered out before AI prompt context is built.
 - Add a privacy review screen that explains what data can enter AI prompts.
-- Expand structured logger redaction to names where practical or avoid logging names entirely.
+- Direct Android `Log` usage is now blocked outside `StructuredLogger`; continue avoiding contact names and personal relationship context in structured extras and prompt traces.
 
 ### P3. Unused Helper in Style Analysis
 
@@ -802,11 +816,11 @@ Add end-to-end or integration tests for:
 | Risk | Priority | Recommendation |
 | --- | --- | --- |
 | Checked-in Firebase/Google service config may be inappropriate for a public repo. | P1 if public, P3 if private | Decide policy. If public, rotate and move config to secret/local generation. |
-| Direct `Log` usage and operational metadata may include contact names/context. | P2 | Prefer structured logger everywhere and avoid logging names. |
-| Memory notes have no prompt-eligibility privacy control. | P2 | Add "use for AI" controls and prompt data preview. |
-| Gmail app password storage is encrypted but high-risk. | P2 | Make setup copy explicit, require test send, and explain revocation. |
-| Certificate pins expire on 2027-06-01. | P3 now, P1 near expiry | Add calendar/release task before 2027-04-01. |
-| Encrypted prefs corruption handling can clear setup state. | P3 | Add user-facing recovery message when secure prefs are rebuilt. |
+| Direct `Log` usage and operational metadata may include contact names/context. | P2 | Resolved for direct Android logging on 2026-07-01: production source now routes logging through `StructuredLogger`, domain sync no longer logs through Android, and `ProductionReadinessConfigTest` blocks direct `android.util.Log` outside `StructuredLogger`. Continue avoiding names and personal relationship context in structured extras. |
+| Memory notes have no prompt-eligibility privacy control. | P2 | Partially mitigated on 2026-07-01: Memory Vault now has a Private category that remains in the vault but is filtered out of AI prompt context. Next step is a separate per-note "use for AI" toggle and prompt data preview. |
+| Gmail app password storage is encrypted but high-risk. | P2 | Partially mitigated on 2026-07-01: Settings setup copy now explains app-password use, encrypted storage, AI Doctor email verification, and Google revocation. Keep AI Doctor test-email enforcement visible before automatic Email delivery. |
+| Certificate pins expire on 2027-06-01. | P3 now, P1 near expiry | Resolved as a release-process task on 2026-07-01: `docs/operations/release-checklist.md` now requires network pin rotation to be scheduled by 2027-04-01 and release-owner signoff for any release after that date without refreshed pins. |
+| Encrypted prefs corruption handling can clear setup state. | P3 | Partially mitigated on 2026-07-01: encrypted preference rebuilds now set a recovery notice flag, and Settings shows localized guidance to re-enter Gemini/Gmail/sync/biometric/automation setup, run AI Doctor, and create a fresh encrypted backup. |
 
 ## 10. Accessibility Review
 
@@ -840,10 +854,10 @@ Add end-to-end or integration tests for:
 
 ### Immediate Fixes (P0/P1)
 
-1. Fix `AiAutoSendQualityGate` so fallback/generic/short/low-score content cannot remain fully automatic.
-2. Add tests for quality-gate downgrade and `EnableFullAutomationUseCase` promotion behavior.
-3. Make `DispatchMessageUseCase` pass quiet hours and blackout dates.
-4. Add dispatch tests for manual/foreground blocked windows.
+1. Done on 2026-07-01: `AiAutoSendQualityGate` prevents fallback/generic/short/low-score automatic drafts from remaining fully automatic.
+2. Done on 2026-07-01: quality-gate downgrade and `EnableFullAutomationUseCase` promotion behavior have focused regression coverage.
+3. Done on 2026-07-01: `DispatchMessageUseCase` passes quiet hours and blackout dates.
+4. Done on 2026-07-01: dispatch tests cover manual/foreground blocked windows.
 5. Make missing/unsupported global automation defaults review-first instead of fully automatic.
 6. Define a shared readiness model and start by replacing Messages readiness.
 7. Clean tracked local artifacts and narrow `.gitignore`.
@@ -882,9 +896,10 @@ Add end-to-end or integration tests for:
 
 Scope:
 
-- Fix `AiAutoSendQualityGate`.
-- Add quality gate tests.
-- Add `GenerateMessageUseCase` and `EnableFullAutomationUseCase` tests for fallback/generic behavior.
+- Completed on 2026-07-01: fix `AiAutoSendQualityGate` so low-quality automatic drafts downgrade to review.
+- Completed on 2026-07-01: add quality gate tests.
+- Completed on 2026-07-01: add `GenerateMessageUseCase` and `EnableFullAutomationUseCase` tests for fallback/generic behavior.
+- Follow-up: expose typed, localized quality reasons wherever automatic send is downgraded.
 
 Acceptance criteria:
 
@@ -949,4 +964,4 @@ RelateAI has a strong feature foundation and a serious amount of production-read
 
 The top technical priority is to make automatic sending impossible unless the message is high-quality, route-ready, approval-safe, and schedule-safe. The top product priority is to convert scattered readiness, analytics, recovery, and setup signals into one clear action system.
 
-After the P0/P1 fixes, the next major engineering investment should be boundary cleanup: move Room entities out of domain, stop exposing database entities to UI, and consolidate readiness/action policies into shared domain use cases. That will reduce regression risk and make the product easier to evolve into a trustworthy daily relationship command center.
+After the completed P0 quality-gate fix and the partial P1 readiness fixes, the next major engineering investment should be boundary cleanup: move Room entities out of domain, stop exposing database entities to UI, and consolidate readiness/action policies into shared domain use cases. That will reduce regression risk and make the product easier to evolve into a trustworthy daily relationship command center.

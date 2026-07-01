@@ -19,6 +19,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
 import com.example.core.ui.theme.RelateAITheme
+import com.example.ui.viewmodel.AnalyticsNeglectedContactItem
 import com.example.ui.viewmodel.AnalyticsUiState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -43,6 +44,7 @@ class AnalyticsScreenInteractionTest {
         composeRule.setAnalyticsContent(
             state = { populatedState() },
             onNavigateToActivityHistory = { actions += "activity" },
+            onNavigateToContact = { contactId -> actions += "contact:$contactId" },
             onExportReport = { actions += "export" },
         )
 
@@ -61,10 +63,17 @@ class AnalyticsScreenInteractionTest {
         composeRule.onNodeWithText(context.getString(R.string.contact_filter_family)).assertIsDisplayed()
         composeRule.assertTaggedSectionVisible(AnalyticsScreenTestTags.GROWTH_SECTION)
         composeRule.onNodeWithText(context.getString(R.string.analytics_delivery_reliability)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.analytics_growth_denominator_sent, 10))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.analytics_growth_denominator_personalization, 12))
+            .assertIsDisplayed()
         composeRule.assertTaggedSectionVisible(AnalyticsScreenTestTags.NEGLECTED_SECTION)
         composeRule.onNodeWithText("Riya (24)").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.analytics_open_contact))
+            .assertIsDisplayed()
+            .performClick()
 
-        assertEquals(listOf("activity", "export"), actions)
+        assertEquals(listOf("activity", "export", "contact:contact_riya"), actions)
     }
 
     @Test
@@ -92,6 +101,7 @@ class AnalyticsScreenInteractionTest {
     private fun ComposeContentTestRule.setAnalyticsContent(
         state: () -> AnalyticsUiState,
         onNavigateToActivityHistory: () -> Unit = {},
+        onNavigateToContact: (String) -> Unit = {},
         onExportReport: () -> Unit = {},
     ) {
         setContent {
@@ -99,6 +109,7 @@ class AnalyticsScreenInteractionTest {
                 AnalyticsContent(
                     state = state(),
                     onNavigateToActivityHistory = onNavigateToActivityHistory,
+                    onNavigateToContact = onNavigateToContact,
                     onExportReport = onExportReport,
                 )
             }
@@ -130,7 +141,15 @@ class AnalyticsScreenInteractionTest {
         deliveryReliabilityPercent = 88,
         responseRatePercent = 50,
         personalizationCoveragePercent = 75,
-        topNeglectedContacts = listOf("Riya (24)"),
+        sentMessagesThisYearCount = 10,
+        analyticsProfileCount = 12,
+        topNeglectedContacts = listOf(
+            AnalyticsNeglectedContactItem(
+                contactId = "contact_riya",
+                displayName = "Riya",
+                healthScore = 24,
+            )
+        ),
         isLoading = false,
     )
 }

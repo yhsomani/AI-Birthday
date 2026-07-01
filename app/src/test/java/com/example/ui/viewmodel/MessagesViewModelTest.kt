@@ -235,6 +235,7 @@ class MessagesViewModelTest {
                 pending("pm_sms", "c_sms", "e_sms", MessageChannel.SMS.raw, now + 2 * 86_400_000L),
                 pending("pm_email", "c_email", "e_email", MessageChannel.EMAIL.raw, now + 3 * 86_400_000L),
                 pending("pm_whatsapp", "c_whatsapp", "e_whatsapp", MessageChannel.WHATSAPP.raw, now + 4 * 86_400_000L),
+                pending("pm_bad_email", "c_bad_email", "e_bad_email", MessageChannel.EMAIL.raw, now + 5 * 86_400_000L),
             )
         )
         every { contactRepository.getMessageContexts() } returns MutableStateFlow(
@@ -242,6 +243,7 @@ class MessagesViewModelTest {
                 contact("c_sms", "No Phone"),
                 contact("c_email", "No Gmail", primaryEmail = "no-gmail@example.com"),
                 contact("c_whatsapp", "Blocked WA", primaryPhone = "+919999900000"),
+                contact("c_bad_email", "Bad Email", primaryEmail = "bad email"),
             )
         )
         every { eventRepository.getEventListItems() } returns MutableStateFlow(
@@ -249,6 +251,7 @@ class MessagesViewModelTest {
                 event("e_sms", "c_sms", OccasionType.BIRTHDAY, now),
                 event("e_email", "c_email", OccasionType.BIRTHDAY, now),
                 event("e_whatsapp", "c_whatsapp", OccasionType.BIRTHDAY, now),
+                event("e_bad_email", "c_bad_email", OccasionType.BIRTHDAY, now),
             )
         )
 
@@ -261,6 +264,7 @@ class MessagesViewModelTest {
         assertEquals(MessageReadiness.MISSING_PHONE, readinessById["pm_sms"])
         assertEquals(MessageReadiness.EMAIL_SETUP_MISSING, readinessById["pm_email"])
         assertEquals(MessageReadiness.CHANNEL_DISABLED, readinessById["pm_whatsapp"])
+        assertEquals(MessageReadiness.MISSING_EMAIL, readinessById["pm_bad_email"])
     }
 
     @Test

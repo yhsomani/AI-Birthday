@@ -8,6 +8,7 @@ import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.MemoryNoteId
 import com.example.domain.model.contact.ContactHeader
 import com.example.domain.model.memory.MemoryNoteRecord
+import com.example.domain.memory.MemoryNotePromptPolicy
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.MemoryNoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,9 +24,21 @@ import javax.inject.Inject
 data class MemoryVaultUiState(
     val contact: ContactHeader? = null,
     val notes: List<MemoryNoteRecord> = emptyList(),
+    val searchQuery: String = "",
     val isLoading: Boolean = true,
     val errorMessageRes: Int? = null
-)
+) {
+    val visibleNotes: List<MemoryNoteRecord>
+        get() {
+            val normalizedQuery = searchQuery.trim()
+            if (normalizedQuery.isEmpty()) return notes
+
+            return notes.filter { note ->
+                note.noteText.contains(normalizedQuery, ignoreCase = true) ||
+                    note.category.contains(normalizedQuery, ignoreCase = true)
+            }
+        }
+}
 
 @HiltViewModel
 class MemoryVaultViewModel @Inject constructor(
@@ -62,7 +75,7 @@ class MemoryVaultViewModel @Inject constructor(
                         isLoading = false,
                     )
                 }.collect { state ->
-                    _uiState.value = state
+                    _uiState.value = state.copy(searchQuery = _uiState.value.searchQuery)
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -71,6 +84,10 @@ class MemoryVaultViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    fun updateSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
     }
 
     fun addNote(text: String, category: String) {
@@ -114,6 +131,32 @@ class MemoryVaultViewModel @Inject constructor(
         }
     }
 
+    fun updateNote(note: MemoryNoteRecord, text: String, category: String) {
+        val cleanedText = text.trim()
+        if (cleanedText.isBlank()) {
+            _uiState.value = _uiState.value.copy(errorMessageRes = R.string.memory_vault_error_blank_note)
+            return
+        }
+        if (cleanedText.length > MAX_NOTE_LENGTH) {
+            _uiState.value = _uiState.value.copy(errorMessageRes = R.string.memory_vault_error_note_too_long)
+            return
+        }
+        val safeCategory = category.takeIf { it in ALLOWED_CATEGORIES } ?: CATEGORY_GENERAL
+        viewModelScope.launch {
+            try {
+                memoryNoteRepository.upsertRecord(
+                    note.copy(
+                        noteText = cleanedText,
+                        category = safeCategory,
+                    ),
+                )
+                _uiState.value = _uiState.value.copy(errorMessageRes = null)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessageRes = R.string.memory_vault_error_update)
+            }
+        }
+    }
+
     fun deleteNote(note: MemoryNoteRecord) {
         viewModelScope.launch {
             try {
@@ -128,12 +171,14 @@ class MemoryVaultViewModel @Inject constructor(
     companion object {
         const val MAX_NOTE_LENGTH = 500
         const val CATEGORY_GENERAL = "GENERAL"
+        const val CATEGORY_PRIVATE = MemoryNotePromptPolicy.PRIVATE_REFERENCE_CATEGORY
         private const val CATEGORY_PREFERENCE = "PREFERENCE"
         private const val CATEGORY_EVENT = "EVENT"
         private const val CATEGORY_GIFT = "GIFT"
         private const val CATEGORY_MILESTONE = "MILESTONE"
         val ALLOWED_CATEGORIES = setOf(
             CATEGORY_GENERAL,
+            CATEGORY_PRIVATE,
             CATEGORY_PREFERENCE,
             CATEGORY_EVENT,
             CATEGORY_GIFT,

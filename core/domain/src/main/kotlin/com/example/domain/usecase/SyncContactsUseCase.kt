@@ -30,7 +30,6 @@ class SyncContactsUseCase @Inject constructor(
             googleContacts = contactSyncService.fetchGoogleContacts(forceRefresh)
             preferencesRepository.setLastSyncError(null)
         } catch (e: Exception) {
-            android.util.Log.e("SyncContactsUseCase", "Google contacts sync failed", e)
             googleError = e.message ?: "Failed to fetch Google contacts"
             preferencesRepository.setLastSyncError(googleError)
         }
@@ -41,11 +40,9 @@ class SyncContactsUseCase @Inject constructor(
         try {
             deviceContacts = contactSyncService.fetchDeviceContacts()
         } catch (e: DeviceContactsPermissionDeniedException) {
-            android.util.Log.w("SyncContactsUseCase", "Device contacts permission denied", e)
             deviceContactsPermissionDenied = true
             deviceError = e.message ?: DEVICE_CONTACTS_PERMISSION_ERROR
         } catch (e: Exception) {
-            android.util.Log.e("SyncContactsUseCase", "Device contacts sync failed", e)
             deviceError = e.message ?: "Failed to fetch device contacts"
         }
 

@@ -52,9 +52,13 @@
     <string name="memory_prompt_gift_preference">गिफ्ट पसंद</string>
     <string name="memory_prompt_gift_preference_template">गिफ्ट पसंद: </string>
     <string name="memory_vault_note_counter">%1$d/%2$d अक्षर</string>
+    <string name="memory_vault_ai_usage_note">AI उपयोग: निजी नोट मेमोरी वॉल्ट में रहते हैं और AI लेखन में इस्तेमाल नहीं होते।</string>
     <string name="memory_vault_add_button">वॉल्ट में जोड़ें</string>
     <string name="memory_vault_journal_title">रिश्ते की डायरी</string>
     <string name="memory_vault_empty_message">अभी कोई मेमोरी दर्ज नहीं है। एआई लेखक को बेहतर बनाने के लिए ऊपर एक जोड़ें।</string>
+    <string name="memory_vault_search_label">मेमोरी खोजें</string>
+    <string name="memory_vault_search_placeholder">नोट या श्रेणी से खोजें</string>
+    <string name="memory_vault_no_search_results">इस खोज से कोई मेमोरी नहीं मिली।</string>
     <string name="memory_vault_error_load">मेमोरी वॉल्ट लोड नहीं हो सका। फिर कोशिश करें।</string>
     <string name="memory_vault_error_add">नोट जोड़ नहीं सका। फिर कोशिश करें।</string>
     <string name="memory_vault_error_pin">पिन स्थिति अपडेट नहीं हो सकी। फिर कोशिश करें।</string>
@@ -63,13 +67,19 @@
     <string name="memory_vault_error_note_too_long">मेमोरी नोट 500 अक्षर या कम होने चाहिए।</string>
     <string name="memory_vault_pin_note">नोट पिन करें</string>
     <string name="memory_vault_unpin_note">नोट अनपिन करें</string>
+    <string name="memory_vault_edit_note">नोट संपादित करें</string>
+    <string name="memory_vault_save_edit">बदलाव सहेजें</string>
+    <string name="memory_vault_cancel_edit">संपादन रद्द करें</string>
     <string name="memory_vault_delete_note">नोट हटाएं</string>
+    <string name="memory_vault_error_update">नोट अपडेट नहीं हो सका। फिर कोशिश करें।</string>
     <string name="memory_category_general">सामान्य</string>
+    <string name="memory_category_private">निजी (AI में इस्तेमाल नहीं)</string>
     <string name="memory_category_preference">पसंद</string>
     <string name="memory_category_event">इवेंट</string>
     <string name="memory_category_gift">गिफ्ट</string>
     <string name="memory_category_milestone">माइलस्टोन</string>
     <string name="memory_category_general_short">सामान्य</string>
+    <string name="memory_category_private_short">निजी</string>
     <string name="memory_category_preference_short">पसंद</string>
     <string name="memory_category_event_short">इवेंट</string>
     <string name="memory_category_gift_short">गिफ्ट</string>
@@ -89,6 +99,7 @@
     <string name="gift_year_format">%1$d</string>
     <string name="gift_advisor_title_with_contact">गिफ्ट सलाहकार: %1$s</string>
     <string name="gift_advisor_record_gift">गिफ्ट रिकॉर्ड करें</string>
+    <string name="gift_advisor_adjust_budget">बजट बदलें</string>
     <string name="gift_advisor_loading">गिफ्ट इतिहास लोड हो रहा है</string>
     <string name="gift_stat_annual_budget">वार्षिक बजट</string>
     <string name="gift_stat_total_spent">खर्च</string>
@@ -571,6 +582,9 @@
     <string name="settings_legacy_db_notice_title">पुराना डेटा सुरक्षित रखा गया</string>
     <string name="settings_legacy_db_notice_body">एक पुराना अनएन्क्रिप्टेड डेटाबेस मिला और सपोर्ट रिकवरी के लिए सुरक्षित ऐप स्टोरेज में ले जाया गया। RelateAI ने नया एन्क्रिप्टेड डेटाबेस शुरू किया।</string>
     <string name="settings_legacy_db_notice_dismiss">हटाएं</string>
+    <string name="settings_secure_prefs_recovery_notice_title">सुरक्षित सेटिंग्स रिकवर हुईं</string>
+    <string name="settings_secure_prefs_recovery_notice_body">सुरक्षित स्टोरेज नहीं खुल सका, इसलिए RelateAI ने एन्क्रिप्टेड सेटिंग्स फिर बनाईं। Gemini, Gmail, सिंक, बायोमेट्रिक और ऑटोमेशन सेटिंग्स दोबारा दर्ज करें, फिर AI डॉक्टर चलाएं और नया एन्क्रिप्टेड बैकअप बनाएं।</string>
+    <string name="settings_secure_prefs_recovery_notice_dismiss">मैंने सेटअप जांच लिया</string>
     <string name="settings_default_send_time">डिफॉल्ट भेजने का समय</string>
     <string name="settings_default_time_value">9:00 AM</string>
     <string name="settings_style_coach_subtitle">अपनी लेखन शैली ट्रेन करें</string>
@@ -872,8 +886,11 @@
     <string name="analytics_delivery_reliability">डिलीवरी भरोसेमंदी</string>
     <string name="analytics_response_rate">जवाब दर</string>
     <string name="analytics_personalization_coverage">व्यक्तिकरण कवरेज</string>
+    <string name="analytics_growth_denominator_sent">डिलीवरी और जवाब दर इस साल भेजे गए %1$d संदेशों पर आधारित हैं।</string>
+    <string name="analytics_growth_denominator_personalization">व्यक्तिकरण %1$d संपर्क प्रोफ़ाइल पर आधारित है।</string>
     <string name="analytics_top_neglected">सबसे उपेक्षित संपर्क</string>
     <string name="analytics_no_neglected_contacts">अभी कोई उपेक्षित संपर्क नहीं</string>
+    <string name="analytics_open_contact">संपर्क खोलें</string>
 
     <!-- Activity history -->
     <string name="activity_history_title">गतिविधि इतिहास</string>
@@ -974,6 +991,7 @@
     <string name="settings_gemini_saved">Gemini API कुंजी सहेजी गई।</string>
     <string name="settings_email_sending_title">ईमेल भेजना</string>
     <string name="settings_email_sending_help">ईमेल चैनल या खुद को टेस्ट संदेश भेजने के लिए Gmail भेजने वाले विवरण चाहिए।</string>
+    <string name="settings_email_app_password_security_note">Google अकाउंट पासवर्ड नहीं, Gmail ऐप पासवर्ड इस्तेमाल करें। RelateAI इसे एन्क्रिप्ट करके रखता है, लेकिन AI डॉक्टर की ईमेल टेस्ट कार्रवाई से जांचें और ईमेल भेजना बंद करने पर इसे Google से revoke करें।</string>
     <string name="settings_save_email_settings">ईमेल सेटिंग्स सहेजें</string>
     <string name="settings_email_saved">ईमेल सेटिंग्स सहेजी गईं।</string>
     <string name="settings_email_setup_required">Gmail पता और ऐप पासवर्ड दोनों डालें।</string>

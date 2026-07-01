@@ -1,7 +1,6 @@
 package com.example.core.automation.scheduler
 
 import android.content.Context
-import android.util.Log
 import androidx.work.*
 import com.example.core.automation.sender.SmsDeliveryStatusRecovery
 import com.example.core.automation.workers.ContactSyncWorker

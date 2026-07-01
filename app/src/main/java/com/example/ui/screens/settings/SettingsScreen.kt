@@ -151,6 +151,7 @@ fun SettingsScreen(
         onSaveQuietHours = viewModel::saveQuietHours,
         onChannelBlackoutChange = viewModel::toggleChannelBlackout,
         onDismissLegacyDbNotice = viewModel::dismissLegacyDbNotice,
+        onDismissSecurePrefsRecoveryNotice = viewModel::dismissSecurePrefsRecoveryNotice,
         onSyncContacts = syncContacts,
         onNavigateToBackupRestore = onNavigateToBackupRestore,
         onNavigateToActivityHistory = onNavigateToActivityHistory,
@@ -181,6 +182,7 @@ internal fun SettingsContent(
     onSaveQuietHours: () -> Unit = {},
     onChannelBlackoutChange: (MessageChannel, Boolean) -> Unit = { _, _ -> },
     onDismissLegacyDbNotice: () -> Unit = {},
+    onDismissSecurePrefsRecoveryNotice: () -> Unit = {},
     onSyncContacts: () -> Unit = {},
     onNavigateToBackupRestore: () -> Unit = {},
     onNavigateToActivityHistory: () -> Unit = {},
@@ -415,6 +417,12 @@ internal fun SettingsContent(
                             ),
                             shape = RoundedCornerShape(RelateRadius.control),
                         )
+                        Text(
+                            text = stringResource(R.string.settings_email_app_password_security_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = RelateSpacing.xs),
+                        )
                         Spacer(modifier = Modifier.height(RelateSpacing.sm))
                         Button(
                             onClick = {
@@ -491,6 +499,10 @@ internal fun SettingsContent(
                 SettingsCard {
                     if (state.showLegacyDbNotice) {
                         LegacyDbNotice(onDismiss = onDismissLegacyDbNotice)
+                        SettingsDivider()
+                    }
+                    if (state.showSecurePrefsRecoveryNotice) {
+                        SecurePrefsRecoveryNotice(onDismiss = onDismissSecurePrefsRecoveryNotice)
                         SettingsDivider()
                     }
                     val subtitle = if (state.isSyncing) {
@@ -787,6 +799,41 @@ private fun LegacyDbNotice(onDismiss: () -> Unit) {
             modifier = Modifier.align(Alignment.End),
         ) {
             Text(text = stringResource(R.string.settings_legacy_db_notice_dismiss))
+        }
+    }
+}
+
+@Composable
+private fun SecurePrefsRecoveryNotice(onDismiss: () -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                Icons.Filled.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(RelateSize.iconMd),
+            )
+            Spacer(modifier = Modifier.width(RelateSpacing.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_secure_prefs_recovery_notice_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                )
+                Spacer(modifier = Modifier.height(RelateSpacing.xs))
+                Text(
+                    text = stringResource(R.string.settings_secure_prefs_recovery_notice_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        TextButton(
+            onClick = onDismiss,
+            modifier = Modifier.align(Alignment.End),
+        ) {
+            Text(text = stringResource(R.string.settings_secure_prefs_recovery_notice_dismiss))
         }
     }
 }

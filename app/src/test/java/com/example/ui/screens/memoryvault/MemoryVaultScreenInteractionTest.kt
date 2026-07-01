@@ -52,6 +52,9 @@ class MemoryVaultScreenInteractionTest {
         val actions = mutableListOf<String>()
         var noteText by mutableStateOf("")
         var selectedCategory by mutableStateOf(MemoryVaultViewModel.CATEGORY_GENERAL)
+        var editingNoteId by mutableStateOf<String?>(null)
+        var editNoteText by mutableStateOf("")
+        var editCategory by mutableStateOf(MemoryVaultViewModel.CATEGORY_GENERAL)
 
         composeRule.setMemoryVaultContent(
             state = {
@@ -67,7 +70,7 @@ class MemoryVaultScreenInteractionTest {
                         memoryNote(
                             id = "note_plain",
                             noteText = "Likes mango lassi",
-                            category = "GIFT",
+                            category = MemoryVaultViewModel.CATEGORY_PRIVATE,
                         ),
                     ),
                     isLoading = false,
@@ -75,6 +78,9 @@ class MemoryVaultScreenInteractionTest {
             },
             noteText = { noteText },
             selectedCategory = { selectedCategory },
+            editingNoteId = { editingNoteId },
+            editNoteText = { editNoteText },
+            editCategory = { editCategory },
             onNoteChange = { noteText = it },
             onCategoryChange = {
                 selectedCategory = it
@@ -85,6 +91,19 @@ class MemoryVaultScreenInteractionTest {
                 noteText = ""
             },
             onBack = { actions += "back" },
+            onEditStart = {
+                editingNoteId = it.id.value
+                editNoteText = it.noteText
+                editCategory = it.category
+            },
+            onEditTextChange = { editNoteText = it },
+            onEditCategoryChange = { editCategory = it },
+            onEditSave = {
+                actions += "edit:${it.id.value}:$editNoteText:$editCategory"
+                editingNoteId = null
+                editNoteText = ""
+                editCategory = MemoryVaultViewModel.CATEGORY_GENERAL
+            },
             onTogglePin = { actions += "pin:${it.id.value}:${it.isPinned}" },
             onDelete = { actions += "delete:${it.id.value}" },
         )
@@ -95,7 +114,9 @@ class MemoryVaultScreenInteractionTest {
         composeRule.onNodeWithTag(MemoryVaultTestTags.NOTE_FIELD)
             .assertIsDisplayed()
             .performTextInput("Met at Jaipur trip")
-        composeRule.onNodeWithTag(MemoryVaultTestTags.CATEGORY_PREFIX + "GIFT")
+        composeRule.onNodeWithText(context.getString(R.string.memory_vault_ai_usage_note))
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(MemoryVaultTestTags.CATEGORY_PREFIX + MemoryVaultViewModel.CATEGORY_PRIVATE)
             .assertIsDisplayed()
             .performClick()
         composeRule.assertLazyItemVisible(MemoryVaultTestTags.ADD_BUTTON)
@@ -106,6 +127,21 @@ class MemoryVaultScreenInteractionTest {
         composeRule.assertLazyItemVisible(MemoryVaultTestTags.NOTE_CARD_PREFIX + "note_pinned")
         composeRule.onNodeWithText("Call every Sunday")
             .assertIsDisplayed()
+        composeRule.assertLazyItemVisible(MemoryVaultTestTags.NOTE_CARD_PREFIX + "note_plain")
+        composeRule.onNodeWithText(context.getString(R.string.memory_category_private))
+            .assertIsDisplayed()
+        composeRule.clickLazyTag(MemoryVaultTestTags.EDIT_BUTTON_PREFIX + "note_plain")
+        composeRule.onNodeWithTag(MemoryVaultTestTags.EDIT_FIELD_PREFIX + "note_plain")
+            .assertTextContains("Likes mango lassi")
+            .performTextClearance()
+        composeRule.onNodeWithTag(MemoryVaultTestTags.EDIT_FIELD_PREFIX + "note_plain")
+            .performTextInput("Likes kesar chai")
+        composeRule.onNodeWithTag(MemoryVaultTestTags.EDIT_CATEGORY_PREFIX + "GIFT")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag(MemoryVaultTestTags.EDIT_SAVE_PREFIX + "note_plain")
+            .assertIsEnabled()
+            .performClick()
         composeRule.clickLazyTag(MemoryVaultTestTags.PIN_BUTTON_PREFIX + "note_plain")
         composeRule.clickLazyTag(MemoryVaultTestTags.PIN_BUTTON_PREFIX + "note_pinned")
         composeRule.clickLazyTag(MemoryVaultTestTags.DELETE_BUTTON_PREFIX + "note_plain")
@@ -113,14 +149,62 @@ class MemoryVaultScreenInteractionTest {
         assertEquals(
             listOf(
                 "back",
-                "category:GIFT",
-                "add:Met at Jaipur trip:GIFT",
+                "category:PRIVATE",
+                "add:Met at Jaipur trip:PRIVATE",
+                "edit:note_plain:Likes kesar chai:GIFT",
                 "pin:note_plain:false",
                 "pin:note_pinned:true",
                 "delete:note_plain",
             ),
             actions,
         )
+    }
+
+    @Test
+    fun searchFiltersNotesAndShowsFilteredEmptyState() {
+        var searchQuery by mutableStateOf("")
+
+        composeRule.setMemoryVaultContent(
+            state = {
+                MemoryVaultUiState(
+                    contact = ContactHeader(id = ContactId("contact_1"), displayName = "Asha"),
+                    notes = listOf(
+                        memoryNote(
+                            id = "note_pinned",
+                            noteText = "Call every Sunday",
+                            category = "PREFERENCE",
+                            isPinned = true,
+                        ),
+                        memoryNote(
+                            id = "note_plain",
+                            noteText = "Likes mango lassi",
+                            category = MemoryVaultViewModel.CATEGORY_PRIVATE,
+                        ),
+                    ),
+                    searchQuery = searchQuery,
+                    isLoading = false,
+                )
+            },
+            noteText = { "" },
+            onSearchQueryChange = { searchQuery = it },
+        )
+
+        composeRule.assertLazyItemVisible(MemoryVaultTestTags.SEARCH_FIELD)
+        composeRule.onNodeWithTag(MemoryVaultTestTags.SEARCH_FIELD)
+            .performTextInput("mango")
+        composeRule.assertLazyItemVisible(MemoryVaultTestTags.NOTE_CARD_PREFIX + "note_plain")
+        composeRule.onNodeWithText("Likes mango lassi")
+            .assertIsDisplayed()
+
+        composeRule.assertLazyItemVisible(MemoryVaultTestTags.SEARCH_FIELD)
+        composeRule.onNodeWithTag(MemoryVaultTestTags.SEARCH_CLEAR)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag(MemoryVaultTestTags.SEARCH_FIELD)
+            .performTextInput("zzz")
+        composeRule.assertLazyItemVisible(MemoryVaultTestTags.SEARCH_EMPTY_STATE)
+        composeRule.onNodeWithText(context.getString(R.string.memory_vault_no_search_results))
+            .assertIsDisplayed()
     }
 
     @Test
@@ -233,11 +317,20 @@ class MemoryVaultScreenInteractionTest {
         state: () -> MemoryVaultUiState,
         noteText: () -> String,
         selectedCategory: () -> String = { MemoryVaultViewModel.CATEGORY_GENERAL },
+        editingNoteId: () -> String? = { null },
+        editNoteText: () -> String = { "" },
+        editCategory: () -> String = { MemoryVaultViewModel.CATEGORY_GENERAL },
         onNoteChange: (String) -> Unit = {},
         onPromptSelected: (String, String) -> Unit = { _, _ -> },
         onCategoryChange: (String) -> Unit = {},
         onAdd: () -> Unit = {},
         onBack: () -> Unit = {},
+        onSearchQueryChange: (String) -> Unit = {},
+        onEditStart: (MemoryNoteRecord) -> Unit = {},
+        onEditTextChange: (String) -> Unit = {},
+        onEditCategoryChange: (String) -> Unit = {},
+        onEditCancel: () -> Unit = {},
+        onEditSave: (MemoryNoteRecord) -> Unit = {},
         onTogglePin: (MemoryNoteRecord) -> Unit = {},
         onDelete: (MemoryNoteRecord) -> Unit = {},
     ) {
@@ -247,11 +340,20 @@ class MemoryVaultScreenInteractionTest {
                     uiState = state(),
                     newNoteText = noteText(),
                     selectedCategory = selectedCategory(),
+                    editingNoteId = editingNoteId(),
+                    editNoteText = editNoteText(),
+                    editCategory = editCategory(),
                     onNoteChange = onNoteChange,
                     onPromptSelected = onPromptSelected,
                     onCategoryChange = onCategoryChange,
                     onAdd = onAdd,
                     onBack = onBack,
+                    onSearchQueryChange = onSearchQueryChange,
+                    onEditStart = onEditStart,
+                    onEditTextChange = onEditTextChange,
+                    onEditCategoryChange = onEditCategoryChange,
+                    onEditCancel = onEditCancel,
+                    onEditSave = onEditSave,
                     onTogglePin = onTogglePin,
                     onDelete = onDelete,
                 )

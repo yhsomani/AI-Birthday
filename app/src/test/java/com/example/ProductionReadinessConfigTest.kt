@@ -108,6 +108,42 @@ class ProductionReadinessConfigTest {
     }
 
     @Test
+    fun productionCode_usesStructuredLoggerInsteadOfDirectAndroidLog() {
+        val root = projectRoot()
+        val allowedDirectLogFiles = setOf(
+            "core/data/src/main/kotlin/com/example/core/resilience/StructuredLogger.kt",
+        )
+        val directLogCall = Regex("""\bLog\.(d|i|w|e|v)\(""")
+        val offenders = PRODUCTION_SOURCE_DIRS.flatMap { relativeDir ->
+            val dir = File(root, relativeDir)
+            if (!dir.exists()) {
+                emptyList()
+            } else {
+                dir.walkTopDown()
+                    .filter { it.isFile && it.extension == "kt" }
+                    .mapNotNull { file ->
+                        val relativePath = file.relativeTo(root).path.replace(File.separatorChar, '/')
+                        if (relativePath in allowedDirectLogFiles) {
+                            null
+                        } else {
+                            val source = file.readText()
+                            val hasDirectLog = source.contains("import android.util.Log") ||
+                                source.contains("android.util.Log.") ||
+                                directLogCall.containsMatchIn(source)
+                            relativePath.takeIf { hasDirectLog }
+                        }
+                    }
+                    .toList()
+            }
+        }
+
+        assertTrue(
+            "Production code should route logging through StructuredLogger:\n${offenders.joinToString("\n")}",
+            offenders.isEmpty(),
+        )
+    }
+
+    @Test
     fun ciWorkflow_keepsReleaseReadinessGuardrails() {
         val workflow = rootFile(".github/workflows/android.yml").readText()
 
@@ -205,5 +241,11 @@ class ProductionReadinessConfigTest {
 
     private companion object {
         const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
+        val PRODUCTION_SOURCE_DIRS = listOf(
+            "app/src/main/java",
+            "core/data/src/main/kotlin",
+            "core/domain/src/main/kotlin",
+            "core/model/src/main/kotlin",
+        )
     }
 }

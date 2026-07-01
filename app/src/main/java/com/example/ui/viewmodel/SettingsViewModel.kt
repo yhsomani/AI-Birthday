@@ -50,6 +50,7 @@ data class SettingsUiState(
     val syncError: String? = null,
     val feedbackEvent: FeedbackEvent? = null,
     val showLegacyDbNotice: Boolean = false,
+    val showSecurePrefsRecoveryNotice: Boolean = false,
 )
 
 @HiltViewModel
@@ -105,6 +106,7 @@ class SettingsViewModel @Inject constructor(
             channelBlackoutWhatsApp = securePrefs.isChannelBlacklisted(MessageChannel.WHATSAPP),
             channelBlackoutEmail = securePrefs.isChannelBlacklisted(MessageChannel.EMAIL),
             showLegacyDbNotice = securePrefs.wasLegacyUnencryptedDbQuarantined(),
+            showSecurePrefsRecoveryNotice = securePrefs.isSecurePrefsRebuiltNoticePending(),
         )
         initializedSettings = true
     }
@@ -315,6 +317,11 @@ class SettingsViewModel @Inject constructor(
     fun dismissLegacyDbNotice() {
         securePrefs.setLegacyUnencryptedDbQuarantined(false)
         _uiState.value = _uiState.value.copy(showLegacyDbNotice = false)
+    }
+
+    fun dismissSecurePrefsRecoveryNotice() {
+        securePrefs.setSecurePrefsRebuiltNoticePending(false)
+        _uiState.value = _uiState.value.copy(showSecurePrefsRecoveryNotice = false)
     }
 
     fun signOut() {

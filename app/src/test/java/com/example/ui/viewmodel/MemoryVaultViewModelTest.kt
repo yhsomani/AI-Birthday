@@ -64,6 +64,7 @@ class MemoryVaultViewModelTest {
         // Check order: Pinned note should come first
         assertEquals(MemoryNoteId("note_2"), viewModel.uiState.value.notes[0].id)
         assertEquals(MemoryNoteId("note_1"), viewModel.uiState.value.notes[1].id)
+        assertEquals(viewModel.uiState.value.notes, viewModel.uiState.value.visibleNotes)
         assertEquals(false, viewModel.uiState.value.isLoading)
     }
 
@@ -98,6 +99,27 @@ class MemoryVaultViewModelTest {
             )
         }
     }
+
+    @Test
+    fun `addNote preserves private category for AI prompt exclusion`() = runTest(testDispatcher) {
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
+        advanceUntilIdle()
+
+        viewModel.addNote("Keep this out of AI", MemoryVaultViewModel.CATEGORY_PRIVATE)
+        advanceUntilIdle()
+
+        coVerify {
+            memoryNoteRepository.upsertRecord(
+                match {
+                    it.contactId == ContactId("contact_1") &&
+                        it.noteText == "Keep this out of AI" &&
+                        it.category == MemoryVaultViewModel.CATEGORY_PRIVATE
+                },
+            )
+        }
+    }
+
 
     @Test
     fun `addNote rejects blank note with validation error`() = runTest(testDispatcher) {
@@ -151,6 +173,56 @@ class MemoryVaultViewModelTest {
     }
 
     @Test
+    fun `updateNote trims text and defaults unknown category`() = runTest(testDispatcher) {
+        val note = memoryNote(
+            id = "note_1",
+            noteText = "Old note",
+            category = "PREFERENCE",
+            isPinned = true,
+        )
+        stubMemoryVaultFlows(contact = contactHeader(), notes = listOf(note))
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
+        advanceUntilIdle()
+
+        viewModel.updateNote(note, "  Updated note  ", "UNKNOWN")
+        advanceUntilIdle()
+
+        coVerify {
+            memoryNoteRepository.upsertRecord(
+                match {
+                    it.id == MemoryNoteId("note_1") &&
+                        it.contactId == ContactId("contact_1") &&
+                        it.noteText == "Updated note" &&
+                        it.category == MemoryVaultViewModel.CATEGORY_GENERAL &&
+                        it.dateMs == note.dateMs &&
+                        it.isPinned
+                },
+            )
+        }
+    }
+
+    @Test
+    fun `updateNote rejects blank note with validation error`() = runTest(testDispatcher) {
+        val note = memoryNote(id = "note_1", noteText = "Old note")
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
+        advanceUntilIdle()
+
+        viewModel.updateNote(note, "   ", MemoryVaultViewModel.CATEGORY_GENERAL)
+        advanceUntilIdle()
+
+        assertEquals(R.string.memory_vault_error_blank_note, viewModel.uiState.value.errorMessageRes)
+        coVerify(exactly = 0) {
+            memoryNoteRepository.upsertRecord(
+                match { it.id == MemoryNoteId("note_1") },
+            )
+        }
+    }
+
+    @Test
     fun `deleteNote deletes note and reloads notes`() = runTest(testDispatcher) {
         val note = memoryNote(
             id = "note_1",
@@ -188,6 +260,44 @@ class MemoryVaultViewModelTest {
 
         assertEquals(2, viewModel.uiState.value.notes.size)
         assertEquals(MemoryNoteId("note_2"), viewModel.uiState.value.notes.first().id)
+    }
+
+    @Test
+    fun `updateSearchQuery filters visible notes without changing stored notes`() = runTest(testDispatcher) {
+        val notes = listOf(
+            memoryNote(id = "note_1", noteText = "Prefers loose-leaf tea", category = "GIFT"),
+            memoryNote(id = "note_2", noteText = "Met at Jaipur trip", category = "EVENT"),
+            memoryNote(
+                id = "note_3",
+                noteText = "Sensitive family context",
+                category = MemoryVaultViewModel.CATEGORY_PRIVATE,
+            ),
+        )
+        stubMemoryVaultFlows(contact = contactHeader(), notes = notes)
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = MemoryVaultViewModel(savedStateHandle, contactRepository, memoryNoteRepository)
+        advanceUntilIdle()
+
+        viewModel.updateSearchQuery("tea")
+
+        assertEquals("tea", viewModel.uiState.value.searchQuery)
+        assertEquals(3, viewModel.uiState.value.notes.size)
+        assertEquals(
+            listOf(MemoryNoteId("note_1")),
+            viewModel.uiState.value.visibleNotes.map { it.id },
+        )
+
+        viewModel.updateSearchQuery("private")
+
+        assertEquals(
+            listOf(MemoryNoteId("note_3")),
+            viewModel.uiState.value.visibleNotes.map { it.id },
+        )
+
+        viewModel.updateSearchQuery("   ")
+
+        assertEquals(viewModel.uiState.value.notes, viewModel.uiState.value.visibleNotes)
     }
 
     private fun stubMemoryVaultFlows(

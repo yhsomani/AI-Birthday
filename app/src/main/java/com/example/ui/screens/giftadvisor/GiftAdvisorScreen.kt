@@ -81,6 +81,7 @@ internal object GiftAdvisorTestTags {
     const val LOADING = "gift_advisor_loading"
     const val RECORD_FAB = "gift_advisor_record_fab"
     const val STATS = "gift_advisor_stats"
+    const val ADJUST_BUDGET_BUTTON = "gift_advisor_adjust_budget"
     const val GENERATE_SUGGESTIONS_BUTTON = "gift_advisor_generate_suggestions_button"
     const val SUGGESTIONS_PROGRESS = "gift_advisor_suggestions_progress"
     const val SUGGESTIONS_EMPTY = "gift_advisor_suggestions_empty"
@@ -110,6 +111,7 @@ internal object GiftAdvisorTestTags {
 fun GiftAdvisorScreen(
     contactId: String,
     onBack: () -> Unit,
+    onAdjustBudget: () -> Unit = {},
     viewModel: GiftAdvisorViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -162,6 +164,7 @@ fun GiftAdvisorScreen(
         },
         attemptedSubmit = attemptedSubmit,
         onBack = onBack,
+        onAdjustBudget = onAdjustBudget,
         onShowAddDialog = { showAddDialog = true },
         onDismissDialog = {
             showAddDialog = false
@@ -217,6 +220,7 @@ internal fun GiftAdvisorContent(
     onGiftNotesChange: (String) -> Unit,
     attemptedSubmit: Boolean,
     onBack: () -> Unit,
+    onAdjustBudget: () -> Unit,
     onShowAddDialog: () -> Unit,
     onDismissDialog: () -> Unit,
     onSaveGift: () -> Unit,
@@ -287,6 +291,7 @@ internal fun GiftAdvisorContent(
                 item {
                     BudgetStats(
                         uiState = uiState,
+                        onAdjustBudget = onAdjustBudget,
                         modifier = Modifier.testTag(GiftAdvisorTestTags.STATS),
                     )
                 }
@@ -395,30 +400,50 @@ private fun GiftRecordBottomBar(onShowAddDialog: () -> Unit) {
 @Composable
 private fun BudgetStats(
     uiState: GiftAdvisorUiState,
+    onAdjustBudget: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
     ) {
-        BudgetStatCard(
-            label = stringResource(R.string.gift_stat_annual_budget),
-            value = stringResource(R.string.gift_currency_inr_format, uiState.contact?.giftBudgetInr ?: 500),
-            icon = Icons.Filled.CardGiftcard,
-            modifier = Modifier.weight(1f),
-        )
-        BudgetStatCard(
-            label = stringResource(R.string.gift_stat_total_spent),
-            value = stringResource(R.string.gift_currency_inr_format, uiState.totalSpentThisYear),
-            icon = Icons.Filled.ShoppingCart,
-            modifier = Modifier.weight(1f),
-        )
-        BudgetStatCard(
-            label = stringResource(R.string.gift_stat_remaining),
-            value = stringResource(R.string.gift_currency_inr_format, uiState.remainingBudget),
-            icon = Icons.Filled.AttachMoney,
-            modifier = Modifier.weight(1f),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        ) {
+            BudgetStatCard(
+                label = stringResource(R.string.gift_stat_annual_budget),
+                value = stringResource(R.string.gift_currency_inr_format, uiState.contact?.giftBudgetInr ?: 500),
+                icon = Icons.Filled.CardGiftcard,
+                modifier = Modifier.weight(1f),
+            )
+            BudgetStatCard(
+                label = stringResource(R.string.gift_stat_total_spent),
+                value = stringResource(R.string.gift_currency_inr_format, uiState.totalSpentThisYear),
+                icon = Icons.Filled.ShoppingCart,
+                modifier = Modifier.weight(1f),
+            )
+            BudgetStatCard(
+                label = stringResource(R.string.gift_stat_remaining),
+                value = stringResource(R.string.gift_currency_inr_format, uiState.remainingBudget),
+                icon = Icons.Filled.AttachMoney,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        TextButton(
+            onClick = onAdjustBudget,
+            modifier = Modifier
+                .align(Alignment.End)
+                .testTag(GiftAdvisorTestTags.ADJUST_BUDGET_BUTTON),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.AttachMoney,
+                contentDescription = null,
+                modifier = Modifier.size(RelateSize.iconSm),
+            )
+            Spacer(modifier = Modifier.width(RelateSpacing.xs))
+            Text(text = stringResource(R.string.gift_advisor_adjust_budget))
+        }
     }
 }
 

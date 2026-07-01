@@ -1,7 +1,5 @@
 package com.example.core.resilience
 
-import android.util.Log
-
 data class DeadLetterEntry(
     val id: String,
     val payload: String,
@@ -19,7 +17,7 @@ object DeadLetterQueue {
         synchronized(entries) {
             entries.add(entry)
         }
-        Log.w(TAG, "DLQ: Enqueued ${entry.id} (${entry.errorType}) after ${entry.retryCount} retries")
+        StructuredLogger.w(TAG, "DLQ: Enqueued ${entry.id} (${entry.errorType}) after ${entry.retryCount} retries")
     }
 
     fun dequeue(id: String): DeadLetterEntry? {

@@ -1,6 +1,5 @@
 package com.example.core.resilience
 
-import android.util.Log
 import kotlinx.coroutines.delay
 import kotlin.math.pow
 
@@ -26,14 +25,14 @@ object Retry {
             try {
                 return block()
             } catch (e: CircuitBreakerOpenException) {
-                Log.w(TAG, "$safeDescription: Circuit breaker open, not retrying")
+                StructuredLogger.w(TAG, "$safeDescription: Circuit breaker open, not retrying")
                 throw e
             } catch (e: Exception) {
                 lastException = e
                 if (attempt < config.maxRetries) {
                     val delayMs = calculateDelay(attempt, config)
                     val safeMessage = SensitiveLogRedactor.redact(e.message ?: e.javaClass.simpleName)
-                    Log.w(TAG, "$safeDescription: Attempt ${attempt + 1} failed, retrying in ${delayMs}ms: $safeMessage")
+                    StructuredLogger.w(TAG, "$safeDescription: Attempt ${attempt + 1} failed, retrying in ${delayMs}ms: $safeMessage")
                     delay(delayMs)
                 }
             }
@@ -51,11 +50,11 @@ object Retry {
         } catch (e: RetryExhaustedException) {
             val safeDescription = SensitiveLogRedactor.redact(description)
             val causeName = e.cause?.javaClass?.simpleName ?: "UnknownException"
-            Log.e(TAG, "$safeDescription: All retries exhausted ($causeName)")
+            StructuredLogger.e(TAG, "$safeDescription: All retries exhausted ($causeName)")
             null
         } catch (e: Exception) {
             val safeDescription = SensitiveLogRedactor.redact(description)
-            Log.e(TAG, "$safeDescription: Non-retryable failure (${e.javaClass.simpleName})")
+            StructuredLogger.e(TAG, "$safeDescription: Non-retryable failure (${e.javaClass.simpleName})")
             null
         }
     }

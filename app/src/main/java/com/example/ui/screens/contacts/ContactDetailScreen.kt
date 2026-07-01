@@ -61,6 +61,7 @@ internal object ContactDetailTestTags {
 @Composable
 fun ContactDetailScreen(
     contactId: String,
+    openPreferencesOnStart: Boolean = false,
     onBack: () -> Unit = {},
     onNavigateToWish: (String) -> Unit = {},
     onNavigateToMemoryVault: (String) -> Unit = {},
@@ -69,7 +70,9 @@ fun ContactDetailScreen(
     viewModel: ContactDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var showPreferencesEditor by remember { mutableStateOf(false) }
+    var showPreferencesEditor by remember(contactId, openPreferencesOnStart) {
+        mutableStateOf(openPreferencesOnStart)
+    }
 
     LaunchedEffect(state.generationResult) {
         state.generationResult?.let { pendingId ->

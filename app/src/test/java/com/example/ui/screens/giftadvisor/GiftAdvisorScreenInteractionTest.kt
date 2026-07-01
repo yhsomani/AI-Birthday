@@ -95,6 +95,7 @@ class GiftAdvisorScreenInteractionTest {
             notes = { notes },
             onNotesChange = { notes = it },
             onBack = { actions += "back" },
+            onAdjustBudget = { actions += "adjustBudget" },
             onShowDialog = {
                 showDialog = true
                 actions += "dialog"
@@ -125,6 +126,9 @@ class GiftAdvisorScreenInteractionTest {
         )
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.back))
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag(GiftAdvisorTestTags.ADJUST_BUDGET_BUTTON)
             .assertIsDisplayed()
             .performClick()
         composeRule.onNodeWithTag(GiftAdvisorTestTags.GENERATE_SUGGESTIONS_BUTTON)
@@ -175,6 +179,7 @@ class GiftAdvisorScreenInteractionTest {
         assertEquals(
             listOf(
                 "back",
+                "adjustBudget",
                 "suggest",
                 "dismissSuggestion:0",
                 "recordSuggestion:Noise-canceling headphones",
@@ -258,6 +263,7 @@ class GiftAdvisorScreenInteractionTest {
         onNotesChange: (String) -> Unit = {},
         attemptedSubmit: () -> Boolean = { false },
         onBack: () -> Unit = {},
+        onAdjustBudget: () -> Unit = {},
         onShowDialog: () -> Unit = {},
         onDismissDialog: () -> Unit = {},
         onSaveGift: () -> Unit = {},
@@ -285,6 +291,7 @@ class GiftAdvisorScreenInteractionTest {
                     onGiftNotesChange = onNotesChange,
                     attemptedSubmit = attemptedSubmit(),
                     onBack = onBack,
+                    onAdjustBudget = onAdjustBudget,
                     onShowAddDialog = onShowDialog,
                     onDismissDialog = onDismissDialog,
                     onSaveGift = onSaveGift,

@@ -5,9 +5,9 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.provider.Settings
 import android.util.Base64
-import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.example.core.resilience.StructuredLogger
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -60,7 +60,7 @@ object DatabaseKeyDerivation {
             val cachedSource = prefs.getString(PREF_DB_KEY_SOURCE, null)
             val bytes = decodeStoredKeyHex(cachedHex)
             if (bytes != null) {
-                Log.d(TAG, "DB key loaded from EncryptedSharedPreferences")
+                StructuredLogger.d(TAG, "DB key loaded from EncryptedSharedPreferences")
                 return sqlCipherPassphraseBytes(bytes, cachedSource)
             }
             prefs.edit()
@@ -73,11 +73,11 @@ object DatabaseKeyDerivation {
         val strategy = missingCachedKeyStrategy(hasExistingDatabaseFiles(context))
         val derived = when (strategy) {
             MissingCachedKeyStrategy.GENERATE_RANDOM -> {
-                Log.i(TAG, "Generating new random DB key for fresh encrypted database")
+                StructuredLogger.i(TAG, "Generating new random DB key for fresh encrypted database")
                 generateRandomKey()
             }
             MissingCachedKeyStrategy.RECOVER_LEGACY_IDENTIFIER_KEY -> {
-                Log.w(TAG, "Recovering legacy identifier-derived DB key for existing database")
+                StructuredLogger.w(TAG, "Recovering legacy identifier-derived DB key for existing database")
                 computeLegacyIdentifierKey(context)
             }
         }
@@ -86,7 +86,7 @@ object DatabaseKeyDerivation {
             .putString(PREF_DB_KEY_SOURCE, strategy.toStoredSource())
             .putInt(PREF_DB_KEY_VERSION, CURRENT_KEY_VERSION)
             .apply()
-        Log.d(TAG, "DB key cached in EncryptedSharedPreferences")
+        StructuredLogger.d(TAG, "DB key cached in EncryptedSharedPreferences")
         return sqlCipherPassphraseBytes(derived, strategy.toStoredSource())
     }
 
@@ -203,7 +203,7 @@ object DatabaseKeyDerivation {
                 val prefs = createEncryptedPrefs(it.applicationContext)
                 prefs.edit().clear().apply()
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to clear DB key preferences on sign-out", e)
+                StructuredLogger.e(TAG, "Failed to clear DB key preferences on sign-out", e)
             }
         }
     }
@@ -221,11 +221,11 @@ object DatabaseKeyDerivation {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to create encrypted prefs for DB key, clearing and retrying", e)
+            StructuredLogger.e(TAG, "Failed to create encrypted prefs for DB key, clearing and retrying", e)
             try {
                 context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
             } catch (ex: Exception) {
-                Log.e(TAG, "Failed to clear shared preferences", ex)
+                StructuredLogger.e(TAG, "Failed to clear shared preferences", ex)
             }
             deleteMasterKey()
             context.deleteSharedPreferences(PREFS_NAME)
@@ -241,7 +241,7 @@ object DatabaseKeyDerivation {
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
             } catch (retryEx: Exception) {
-                Log.e(TAG, "Retry also failed, failing securely", retryEx)
+                StructuredLogger.e(TAG, "Retry also failed, failing securely", retryEx)
                 throw SecurityException("Failed to initialize EncryptedSharedPreferences for DB key securely", retryEx)
             }
         }
@@ -252,9 +252,9 @@ object DatabaseKeyDerivation {
             val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
             keyStore.load(null)
             keyStore.deleteEntry("relateai_db_key_v1")
-            Log.i(TAG, "Deleted master key 'relateai_db_key_v1' from AndroidKeyStore")
+            StructuredLogger.i(TAG, "Deleted DB key master key from AndroidKeyStore")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to delete master key from AndroidKeyStore", e)
+            StructuredLogger.e(TAG, "Failed to delete master key from AndroidKeyStore", e)
         }
     }
 

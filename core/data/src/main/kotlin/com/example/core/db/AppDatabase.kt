@@ -1,7 +1,6 @@
 package com.example.core.db
 
 import android.content.Context
-import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -31,6 +30,7 @@ import com.example.core.db.entities.SentMessageEntity
 import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.db.entities.StyleProfileHistoryEntity
 import com.example.core.prefs.SecurePrefs
+import com.example.core.resilience.StructuredLogger
 import net.sqlcipher.database.SupportFactory
 
 @Database(
@@ -646,7 +646,7 @@ abstract class AppDatabase : RoomDatabase() {
                     try {
                         db.close()
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error closing database", e)
+                        StructuredLogger.e(TAG, "Error closing database", e)
                     }
                 }
                 INSTANCE = null
@@ -657,11 +657,15 @@ abstract class AppDatabase : RoomDatabase() {
             return INSTANCE ?: synchronized(this) {
                 val quarantineResult = LegacyDatabaseQuarantine.quarantineIfPlaintext(context.applicationContext)
                 if (quarantineResult.quarantined) {
-                    Log.w(TAG, "Quarantined legacy unencrypted DB at ${quarantineResult.directory?.absolutePath}")
+                    StructuredLogger.w(
+                        TAG,
+                        "Quarantined legacy unencrypted database",
+                        extras = mapOf("directoryPresent" to (quarantineResult.directory != null).toString()),
+                    )
                     try {
                         SecurePrefs(context.applicationContext).setLegacyUnencryptedDbQuarantined(true)
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to persist legacy DB quarantine notice", e)
+                        StructuredLogger.e(TAG, "Failed to persist legacy DB quarantine notice", e)
                     }
                 }
 

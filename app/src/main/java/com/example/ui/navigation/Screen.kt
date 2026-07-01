@@ -15,8 +15,16 @@ sealed class Screen(val route: String) {
     data object Auth : Screen("auth")
     data object Home : Screen("home")
     data object ContactList : Screen("contacts")
-    data object ContactDetail : Screen("contacts/{contactId}") {
-        fun createRoute(contactId: String) = "contacts/${RouteArgumentCodec.encode(contactId)}"
+    data object ContactDetail : Screen("contacts/{contactId}?openPreferences={openPreferences}") {
+        const val openPreferencesArg = "openPreferences"
+        fun createRoute(contactId: String, openPreferences: Boolean = false): String {
+            val route = "contacts/${RouteArgumentCodec.encode(contactId)}"
+            return if (openPreferences) {
+                "$route?$openPreferencesArg=true"
+            } else {
+                route
+            }
+        }
     }
     data object Events : Screen("events")
     data object Messages : Screen("messages") {

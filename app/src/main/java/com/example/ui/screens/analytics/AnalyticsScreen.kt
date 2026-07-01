@@ -29,6 +29,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,6 +68,7 @@ internal object AnalyticsScreenTestTags {
 @Composable
 fun AnalyticsScreen(
     onNavigateToActivityHistory: () -> Unit = {},
+    onNavigateToContact: (String) -> Unit = {},
     viewModel: AnalyticsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -97,6 +99,7 @@ fun AnalyticsScreen(
     AnalyticsContent(
         state = state,
         onNavigateToActivityHistory = onNavigateToActivityHistory,
+        onNavigateToContact = onNavigateToContact,
         onExportReport = viewModel::exportRelationshipReport,
     )
 }
@@ -105,6 +108,7 @@ fun AnalyticsScreen(
 internal fun AnalyticsContent(
     state: AnalyticsUiState,
     onNavigateToActivityHistory: () -> Unit,
+    onNavigateToContact: (String) -> Unit,
     onExportReport: () -> Unit,
 ) {
     Column(
@@ -273,6 +277,19 @@ internal fun AnalyticsContent(
                         MaterialTheme.colorScheme.primary,
                         suffix = "%",
                     )
+                    Spacer(modifier = Modifier.height(RelateSpacing.sm))
+                    AnalyticsMetricDenominator(
+                        text = stringResource(
+                            R.string.analytics_growth_denominator_sent,
+                            state.sentMessagesThisYearCount,
+                        ),
+                    )
+                    AnalyticsMetricDenominator(
+                        text = stringResource(
+                            R.string.analytics_growth_denominator_personalization,
+                            state.analyticsProfileCount,
+                        ),
+                    )
                 }
             }
 
@@ -288,12 +305,25 @@ internal fun AnalyticsContent(
                         )
                     } else {
                         state.topNeglectedContacts.forEach { contact ->
-                            Text(
-                                text = contact,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(vertical = RelateSpacing.xs),
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = RelateSpacing.xs),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = contact.displayLabel,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                TextButton(
+                                    onClick = { onNavigateToContact(contact.contactId) },
+                                ) {
+                                    Text(stringResource(R.string.analytics_open_contact))
+                                }
+                            }
                         }
                     }
                 }
@@ -302,6 +332,16 @@ internal fun AnalyticsContent(
             Spacer(modifier = Modifier.height(RelateSpacing.xl))
         }
     }
+}
+
+@Composable
+private fun AnalyticsMetricDenominator(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = RelateSpacing.xxs),
+    )
 }
 
 @Composable

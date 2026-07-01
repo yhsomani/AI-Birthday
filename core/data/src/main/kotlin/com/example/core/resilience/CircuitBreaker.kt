@@ -1,6 +1,5 @@
 package com.example.core.resilience
 
-import android.util.Log
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -26,7 +25,7 @@ class CircuitBreaker(
 
     suspend fun <T> call(block: suspend () -> T): T {
         if (!canProceed()) {
-            Log.w(TAG, "$name: Circuit is $state, call rejected")
+            StructuredLogger.w(TAG, "$name: Circuit is $state, call rejected")
             throw CircuitBreakerOpenException(name, state)
         }
         return try {
@@ -47,7 +46,7 @@ class CircuitBreaker(
                     state = CircuitState.HALF_OPEN
                     halfOpenCalls = 0
                     successCount = 0
-                    Log.i(TAG, "$name: Circuit transitioning OPEN -> HALF_OPEN")
+                    StructuredLogger.i(TAG, "$name: Circuit transitioning OPEN -> HALF_OPEN")
                     true
                 } else false
             }
@@ -70,7 +69,7 @@ class CircuitBreaker(
                     failureCount = 0
                     successCount = 0
                     halfOpenCalls = 0
-                    Log.i(TAG, "$name: Circuit recovered HALF_OPEN -> CLOSED")
+                    StructuredLogger.i(TAG, "$name: Circuit recovered HALF_OPEN -> CLOSED")
                 }
             }
             CircuitState.OPEN -> { }
@@ -84,7 +83,7 @@ class CircuitBreaker(
                 if (failureCount >= config.failureThreshold) {
                     state = CircuitState.OPEN
                     lastFailureTime = System.currentTimeMillis()
-                    Log.w(TAG, "$name: Circuit tripped CLOSED -> OPEN (failures=$failureCount)")
+                    StructuredLogger.w(TAG, "$name: Circuit tripped CLOSED -> OPEN (failures=$failureCount)")
                 }
             }
             CircuitState.HALF_OPEN -> {
@@ -92,7 +91,7 @@ class CircuitBreaker(
                 lastFailureTime = System.currentTimeMillis()
                 halfOpenCalls = 0
                 successCount = 0
-                Log.w(TAG, "$name: Circuit re-opened HALF_OPEN -> OPEN")
+                StructuredLogger.w(TAG, "$name: Circuit re-opened HALF_OPEN -> OPEN")
             }
             CircuitState.OPEN -> {
                 lastFailureTime = System.currentTimeMillis()

@@ -362,7 +362,7 @@ Status definitions:
 | F-014 | Analytics and CSV export | Fully Implemented | Screen interaction and FileProvider CSV attachment tests exist; live share sheet pending. |
 | F-015 | Activity history and audit log | Fully Implemented | Screen/ViewModel/repository coverage exists; live real-data validation pending. |
 | F-016 | Style Coach | Fully Implemented | Manual and recent-message analysis paths covered; live AI quality pending. |
-| F-017 | Memory Vault | Fully Implemented | Screen and ViewModel tests cover add, validation, pin/unpin, delete, error states. |
+| F-017 | Memory Vault | Fully Implemented | Screen and ViewModel tests cover add, edit, validation, search/clear, pin/unpin, delete, and error states. |
 | F-018 | Gift Advisor | Fully Implemented | Screen and ViewModel tests cover records, AI suggestions, feedback, validation, errors. |
 | F-019 | Encrypted backup and restore | Fully Implemented | UI and selected-document service tests exist; live document picker pending. |
 | F-020 | Automation setup / AI Doctor | Fully Implemented | Diagnostics and actions implemented; live system-setting handoffs pending. |
@@ -382,7 +382,7 @@ Status definitions:
 | F-034 | Widget, deep links, shortcuts | Fully Implemented | Manifest/widget/shortcut entries exist; live launcher/deep-link validation pending. |
 | F-035 | Security, privacy, and local encryption | Fully Implemented | SQLCipher, encrypted prefs, backup exclusion, pinning, redaction tests. |
 | F-036 | Sign-out data purge | Fully Implemented | AuthManager and settings flow clear local app data; test only with disposable data. |
-| F-037 | Resilience, logging, health, dead-letter queue | Fully Implemented | Retry, circuit breaker, fallback, redaction, health, dead-letter coverage exists. |
+| F-037 | Resilience, logging, health, dead-letter queue | Fully Implemented | Retry, circuit breaker, fallback, redaction, health, dead-letter coverage exists; production logging routes through `StructuredLogger`. |
 | F-038 | External API and service interfaces | Fully Implemented | Domain/data boundaries exist for all integrations. |
 | F-039 | Build, CI, release guard, coverage | Fully Implemented | CI runs test/lint/assemble/coverage and release-signing guard. |
 | F-040 | Design system and localization | Fully Implemented | Shared theme/components and English/Hindi resource parity tests. |
@@ -523,6 +523,7 @@ Important stored values:
 - Last sync error.
 - Last backup timestamp.
 - Legacy unencrypted DB quarantine notice flag.
+- Secure preferences rebuild recovery notice flag.
 
 Defaults:
 
@@ -536,6 +537,7 @@ Defaults:
 Security rule:
 
 - Secure storage initialization must fail securely. Do not fall back to plaintext `Context.MODE_PRIVATE` preferences when encrypted storage fails.
+- If encrypted preferences must be rebuilt after secure storage initialization failure, Settings must show a dismissible recovery notice telling the user to re-enter protected setup values, run AI Doctor, and create a fresh encrypted backup.
 
 ## 12. AI and Message Generation
 
@@ -627,8 +629,9 @@ Implemented controls:
 - Auto Backup disabled and sensitive files excluded in legacy and API 31+ backup rules.
 - Explicit encrypted backup/restore with passphrase, bounded import reads, transaction rollback, and stable failure reasons.
 - Network pinning for Google/Firebase/Gmail-related hosts with expiration `2027-06-01`.
+- Release owners must schedule network pin rotation no later than `2027-04-01`; see `docs/operations/release-checklist.md`.
 - Release signing guard requiring production signing variables.
-- Sensitive log redaction for emails, tokens, API keys, passphrases, phone-like values, People API URLs, and fallback/provider errors.
+- Sensitive log redaction for emails, tokens, API keys, passphrases, phone-like values, People API URLs, and fallback/provider errors. Production direct Android logging is limited to `StructuredLogger` by release-readiness tests.
 - Biometric app lock gate on cold start/resume when enabled.
 - Dead-letter queue, health monitor, retry, circuit breaker, and fallback primitives.
 
@@ -1412,7 +1415,7 @@ Inputs:
 - Quiet hours and blackout dates.
 - Style profile.
 - Last 10 sent messages for the contact.
-- Memory notes for the contact.
+- Non-private Memory Vault notes for the contact.
 - Gift history for the contact.
 - Gemini response.
 
@@ -1559,6 +1562,7 @@ Inputs:
 How it works:
 
 - Pending rows are grouped into Needs review, Scheduled, Blocked, and Failed task queues.
+- Contact/channel/setup route prerequisites are evaluated through `DeliveryRouteReadinessPolicy`, shared with automatic channel selection.
 - Needs review contains PENDING/UNKNOWN messages whose contact, channel, and setup prerequisites are currently satisfied.
 - Scheduled contains APPROVED/DISPATCHING messages whose contact, channel, and setup prerequisites are currently satisfied.
 - Blocked contains PENDING/UNKNOWN/APPROVED/DISPATCHING messages with missing contact, disabled channel, missing phone/email, missing email setup, or unknown channel prerequisites.
@@ -1634,7 +1638,7 @@ How it works:
 - Message generation prepares upcoming event drafts 7 days ahead and schedules exact dispatch for `FULLY_AUTO` and `SMART_APPROVE`; Smart Approve also shows a review notification before its due-time auto-send.
 - Revival/reconnect suggestions use the same contact/global automation modes; Fully Auto and Smart Approve revival messages are scheduled automatically.
 - Boot recovery reschedules approved pending messages and pending `SMART_APPROVE` messages that can auto-send at their due time.
-- `AiAutoSendQualityGate` scores generated drafts, records fallback/generic/too-short risk, and keeps blank/invalid text out of automatic dispatch. Nonblank `FULLY_AUTO` drafts can remain automatic while still carrying low quality scores and fallback metadata.
+- `AiAutoSendQualityGate` scores generated drafts, records fallback/generic/too-short risk, and downgrades automatic modes to review when the score is below the automatic-send threshold. Nonblank fallback or generic `FULLY_AUTO` drafts must not remain automatic merely because text exists.
 - `AutoSendChannelSelector` chooses the initial pending-message channel from contact availability, channel blackout preferences, Gmail setup, and previous successful delivery history.
 - `HolidayWishWorker` runs in the daily automation chain, checks a fixed-date holiday catalog, asks Gemini for relationship-aware holiday wishes, and creates deterministic `HOLIDAY_<holiday>_<contact>_<year>` pending messages to avoid duplicates.
 - `PostEventFollowUpWorker` runs in the daily automation chain after message generation, finds recent unreplied AI wishes, asks Gemini for a short low-pressure follow-up, and creates deterministic `FOLLOWUP_<sent_message_id>` pending messages to avoid duplicates.
@@ -1781,7 +1785,7 @@ Outputs:
   - delivery reliability;
   - response rate;
   - personalization coverage;
-  - top neglected contacts.
+  - top neglected contacts with Contact Detail actions.
 - `AnalyticsReport` with filename `relateai-relationship-report-YYYYMMDD-HHmm.csv`, MIME type `text/csv`, and CSV content.
 - Share intent through FileProvider.
 
@@ -1894,28 +1898,35 @@ Inputs:
 
 - Contact id route argument.
 - Note text.
-- Category: `GENERAL`, `PREFERENCE`, `EVENT`, `GIFT`, `MILESTONE`.
+- Search query.
+- Category: `GENERAL`, `PRIVATE`, `PREFERENCE`, `EVENT`, `GIFT`, `MILESTONE`.
+- Edit text/category for an existing note.
 - Pin/unpin and delete actions.
 
 How it works:
 
 - Screen loads contact and notes by contact id.
 - Notes are sorted with pinned notes first, then newest first.
-- Add note trims text, rejects blank input silently, rejects text longer than 500 chars, and normalizes unknown category to GENERAL.
+- Search filters the visible list by note text or category while preserving the underlying sorted notes.
+- Add note trims text, disables/guards blank input with validation feedback, rejects text longer than 500 chars, and normalizes unknown category to GENERAL.
+- Edit note reuses the same trim, category normalization, blank, and length validation while preserving the note id, contact id, timestamp, and pin state.
+- Private notes remain in Memory Vault but are excluded from AI message prompt context.
 - Pin toggles `isPinned`.
 - Delete removes the note.
-- Prompt building takes up to six notes, pinned first/newest first, and redacts email/phone-like content before sending to AI.
+- Prompt building takes up to six non-private notes, pinned first/newest first, and redacts email/phone-like content before sending to AI.
 
 Outputs:
 
 - `MemoryNoteEntity` rows with id, contact id, text, category, timestamp, and pin state.
-- Memory list, empty state, and error states.
+- Memory list, inline edit form, filtered no-results state, empty state, and error states.
 - Better AI personalization in wish generation/regeneration.
 
 Failure and edge behavior:
 
 - Load/add/pin/delete failures show specific error messages.
 - Notes over 500 characters are blocked.
+- Blank edits are blocked before persistence and surface the same validation copy as blank adds.
+- Blank search shows the full sorted list; unmatched search shows a no-results state without deleting notes.
 
 ### 24.16 Gift Advisor
 
@@ -2249,10 +2260,11 @@ How it works:
 
 - Room stores the active entity model under SQLCipher.
 - EncryptedSharedPreferences stores credentials/configuration in separate auth and config files.
-- If encrypted prefs initialization fails, files and AndroidKeyStore aliases are cleared and retried; plaintext fallback is forbidden.
+- If encrypted prefs initialization fails, files and AndroidKeyStore aliases are cleared and retried; plaintext fallback is forbidden. A successful rebuild sets a Settings recovery notice so the user can re-enter protected setup values and refresh their encrypted backup.
 - Legacy plaintext DB files are quarantined instead of silently reused.
 - Backup encryption uses AES/GCM/NoPadding with a PBKDF2WithHmacSHA256 256-bit key, 65,536 iterations, 16-byte salt, 12-byte IV, and 128-bit tag.
 - SensitiveLogRedactor removes secrets and PII-like values from logs and diagnostics.
+- Production code must route operational logging through `StructuredLogger`; `ProductionReadinessConfigTest` allows direct Android `Log` calls only inside the logger backend.
 - HealthMonitor records recent errors and circuit breaker states.
 - DeadLetterQueue stores failed dispatch payload metadata for troubleshooting.
 
@@ -2363,13 +2375,13 @@ Dependencies and integrations:
 | Contacts list | Search, filter, sort, sync error controls, quality labels, and action filters for missing relationship, missing channel, low health, and VIP | Quality labels and filters explain the first missing prerequisite; quick completion actions still need to use those states | Filter chips, quality labels, and search clear controls need labels and 48 dp targets | Large imports may make local filtering slow without profiling | User can scan and filter missing prerequisites, but still opens detail to fix them | Add quick complete-details action. |
 | Contact detail | Essentials, personalization, automation, and history sections with quality card, AI quality impact, generate wish, memory/gift/chat links, and explicit shortcuts | Grouping reduces the mixed-list problem; advanced preference editing is still dense | Dense dialog controls need grouped headings and clear field labels | Loading contact, events, memories, gifts, and history together can grow costly | User can scan by task intent and see why missing context matters, but still needs detail editing for deeper changes | Continue progressive disclosure inside the personalization editor. |
 | Event list | Search/filter/horizon, manual event creation with duplicate/date-conflict warning, row trust labels, and explicit Merge here / Keep separate controls for duplicate or conflicting event families | Existing/new-contact choice can appear before impact is clear | Date inputs, duplicate warnings, and row action feedback need clear focus and error announcement | Duplicate checks should stay indexed as event volume grows | Manual event creation has several required decisions, but saved conflicts can now be resolved from the list | Add smarter contact suggestions, edit-date shortcuts, and source-history details. |
-| Messages inbox | Needs review/Scheduled/Blocked/Sent/Failed task tabs, bulk actions, readiness labels, failed recovery assistant | Blocked and failed rows still need deeper direct fix targets | Status labels must not rely on color alone; bulk selection needs clear selected-state labels | Large message queues need stable keys and incremental filtering | User can start from the task queue, but still needs setup/detail navigation to fix blockers | Improve failure reason depth and direct fix-and-retry paths. |
+| Messages inbox | Needs review/Scheduled/Blocked/Sent/Failed task tabs, bulk actions, shared route-readiness labels, failed recovery assistant | Blocked and failed rows still need deeper direct fix targets beyond route prerequisites | Status labels must not rely on color alone; bulk selection needs clear selected-state labels | Large message queues need stable keys and incremental filtering | User can start from the task queue, but still needs setup/detail navigation to fix blockers | Improve failure reason depth and direct fix-and-retry paths. |
 | Wish preview | Variant tabs, approval-plan summary, edit-readiness message, feedback, why signals, approve/reject/test, review-next | High-value screen is dense; feedback only applies after regenerate | Long editable draft and result actions need clear focus order and button labels | Regeneration and queue lookup must stay cancellable/fail-soft | User can see approval context and edit readiness before acting, but still decides among edit, test, feedback, regenerate, approve, reject | Group actions by intent and show selected feedback as pending regeneration input. |
 | Scheduling/delivery | Honors approvals, quiet hours, blackout dates, disabled channels | Some channel readiness can still be discovered late | Permission and channel blockers need screen-reader-readable reason text | Exact alarms and workers must avoid duplicate scheduling under retries | User may approve before seeing every delivery constraint | Show pre-send readiness on pending rows and Contact Detail before approval. |
-| Analytics | Metrics, charts, export | Metrics are not directly actionable | Charts need text alternatives and non-color bucket labels | Large sent histories may require DAO aggregates instead of recomputing flows | User must translate insight into the next relationship task | Attach recommended actions to low health, failed channels, and neglected contacts. |
+| Analytics | Metrics, charts, export, actionable neglected-contact rows | Reliability, response, and personalization metrics still need direct actions | Charts need text alternatives and non-color bucket labels | Large sent histories may require DAO aggregates instead of recomputing flows | User can jump from a neglected contact insight to Contact Detail, but must still translate other metrics into tasks | Attach recommended actions to low personalization, failed channels, and response-rate drops. |
 | Activity history | Filtered log with optional action route and task filters for Dispatch, AI, Sync, Backup, Settings, Messages, Events, and Analytics | Operational language can still be too technical | Log severity and status should be textual, not color-only | Long logs need pagination or indexed filtering over time | User can isolate key operational areas, but still has to interpret whether action is required | Convert common entries into user-facing task names and safe resolve/mark-reviewed actions. |
 | Style Coach | Manual and auto style analysis | Users may not know how many samples are enough | Sample quality messages need concise labels and not just progress colors | Recent-message analysis can grow expensive with large histories | User may paste text repeatedly without knowing readiness | Show sample count target, quality state, and examples of what AI learned. |
-| Memory Vault | Add/pin/delete memory notes with inline blank validation | Categories and memory usefulness may still be unclear | Validation errors should be near the field and announced | Memory lists should keep stable keys as notes grow | User has to invent useful memory content | Add category descriptions and suggested memory prompts. |
+| Memory Vault | Add/edit/pin/delete/search memory notes with inline blank validation, clear-search control, and a Private category excluded from AI prompts | Categories and memory usefulness may still be unclear; privacy is category-based rather than a separate toggle | Validation, edit controls, search empty state, clear-search action, and AI-use copy should stay near the related controls and be announced | Memory lists should keep stable keys as notes grow | User can find and correct saved facts by note text or category and keep private notes out of AI writing, but still has to invent useful content | Add prompt preview, category descriptions, and a separate use-for-AI toggle. |
 | Gift Advisor | Gift history, budget, AI suggestions | Contact-level budget source may not be discoverable | Budget and suggestion cards need readable labels and affordances | AI suggestions should not block local gift history browsing | User may leave to Contact Detail to adjust budget | Add budget edit shortcut and avoid-repeat explanation. |
 | Backup/Restore | Secure passphrase export/import with last-backup freshness in Home and Settings | Strong security creates anxiety around passphrase loss | Password visibility, strength, and status messages need clear announcements | Large exports/imports need progress and must stay off the UI thread | User must remember passphrase implications | Add restore rehearsal checklist and recovery guidance. |
 | AI Doctor | Diagnostic checklist grouped by Required, Quality, Reliability, Recovery, with one ranked recommended fix and generic-message risk from personalization context | Diagnostic terminology can still overwhelm non-technical users | Check status should be textual and grouped for screen-reader navigation | WorkManager/permission checks should stay cancellable and cached where safe | User gets one starting point and a generic-message explanation, but may still need to inspect grouped details for follow-up fixes | Extend the recommendation into a guided fix sequence after the first issue is resolved. |
@@ -2485,7 +2497,7 @@ Medium-term, 2-6 weeks:
 |---|---|---|---|---|---|
 | Smart channel recommendation engine | P1 | High | Medium | Sent history, contact capabilities | Better deliverability |
 | Batch approval mode with per-message transparency | P1 | High | High | Messages/Wish Preview state | Power-user efficiency |
-| Relationship action recommendations in Analytics | P2 | Medium | Medium | Analytics action model | Converts insights into retention |
+| Relationship action recommendations in Analytics | P2 | Medium | Medium | Analytics action model | Initial neglected-contact action implemented; next convert reliability, response, and personalization insights into retention actions |
 | Backup restore rehearsal and export health | P2 | Medium | Medium | Backup metadata | Trust and safety |
 
 Long-term strategic improvements:
@@ -2584,11 +2596,15 @@ Analytics and tracking recommendations:
 | UX-010 | Add Wish Preview review-next queue | P2 | Implemented initial explicit Review next action after approval/rejection. |
 | UX-011 | Add Memory Vault inline validation for blank notes | P2 | Implemented. |
 | UX-012 | Add sign-out destructive-action checklist | P2 | Implemented Settings confirmation checklist. |
+| UX-030 | Add Memory Vault note search | P2 | Implemented note/category search with clear and distinct no-results states. |
+| UX-031 | Add Memory Vault note editing | P2 | Implemented inline text/category editing with existing validation rules. |
 
 ### 25.8 Incremental Implementation Log
 
 | Change | Why it improves UX | User effort reduction | User control preserved | Validation |
 |---|---|---|---|---|
+| UX-031: Memory Vault notes can be edited inline. | Users can correct or recategorize saved relationship facts without deleting and recreating the note. | Reduces repair work from delete/re-add to one in-place edit. | Edit preserves note id, contact id, timestamp, pin state, private category behavior, search, add, pin, and delete semantics. | Static validation passed on 2026-07-01: `git diff --check`, XML parsing, focused Memory Vault edit wiring scans, and stale no-edit wording scan. Gradle target remains pending because escalation is blocked. |
+| UX-030: Memory Vault now supports note/category search with clear and no-results states. | Users can find saved relationship facts without scanning the full journal. | Reduces repeated scrolling when a contact has many saved memories. | Search only changes the visible list; add, pin, delete, privacy category, and AI prompt eligibility behavior remain explicit and unchanged. | Static validation passed on 2026-07-01: `git diff --check`, XML parsing, focused Memory Vault wiring scans, and stale no-search wording scan. Gradle target remains pending because escalation is blocked. |
 | ARCH-046: Activity-log producers and filters now use `ActivityLogType`. | Dispatch, analytics, event, message, and AI-feedback activity producers share one log-type model with Activity History filters and icons. | Users get more reliable Activity History filtering and scanning across message, event, AI, analytics, backup, sync, settings, and dispatch records. | Room still stores raw activity-log type strings, and Activity History search/filter semantics, dispatch detection, logging, analytics export, event save/resolution, feedback, and message activity behavior are unchanged. | Focused ActivityLogType, analytics report, Activity History ViewModel, dispatch, Wish Preview, Messages, and Events tests plus targeted scans and `git diff --check` passed on 2026-06-26. |
 | ARCH-045: Activity-log severity now uses `ActivityLogSeverity`. | Dispatch logs, Wish Preview feedback logs, entity defaults, and Activity History color mapping share one typed info/warning/error severity model. | Users get clearer and more consistent visual priority cues while scanning Activity History. | Room still stores raw activity-log severity strings, and dispatch, approval, scheduling, feedback, retry, filtering, and navigation behavior are unchanged. | Focused ActivityLogSeverity, dispatch use-case, and Wish Preview ViewModel tests plus targeted scans and `git diff --check` passed on 2026-06-26. |
 | ARCH-044: Dispatch audit metadata decisions now use `DispatchActivityDecision`. | Dispatch activity recording shares one typed decision vocabulary for deferred, approval-gated, expired, blocked, and sent outcomes. | Users get more reliable Activity History explanations when reviewing why dispatch was delayed, blocked, expired, or sent. | Activity metadata JSON still stores the same raw decision labels, and dispatch eligibility, approval, scheduling, sending, and retry behavior are unchanged. | Focused DispatchActivityDecision and dispatch use-case tests plus targeted scans and `git diff --check` passed on 2026-06-26. |
