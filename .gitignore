@@ -58,6 +58,9 @@ google-services.json
 # Agent/IDE metadata
 .jules/
 .kiro/
+.codepulse/
+.intelligence/
+.gradle-user-home/
 
 # Reports (generated)
 /reports/
@@ -72,6 +75,9 @@ google-services.json
 app_logs*.txt
 logcat*.txt
 lint_baseline_pre_fixes.txt
+
+# One-off migration/patch helpers
+patch_*.py
 
 # Approved UI screenshot baselines
 !/app/src/test/screenshots/baseline/

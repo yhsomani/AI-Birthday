@@ -3,10 +3,13 @@ package com.example.ui.viewmodel
 import com.example.R
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
 import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MessageFeedbackId
 import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.OccasionId
 import com.example.domain.model.contact.ContactWishContext
+import com.example.domain.model.message.MessageFeedbackRecord
 import com.example.domain.model.message.WishPreviewDraft
 import com.example.domain.model.message.WishPreviewReviewItem
 import com.example.domain.model.message.WishPreviewVariants
@@ -18,7 +21,6 @@ import com.example.domain.repository.GiftHistoryRepository
 import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.repository.MessageFeedbackRepository
 import com.example.domain.repository.MessageRepository
-import com.example.domain.model.MessageStatus
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RegeneratePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
@@ -479,7 +481,47 @@ class WishPreviewViewModelTest {
         assertEquals("too_generic", viewModel.uiState.value.selectedFeedbackKey)
         assertEquals(R.string.wish_preview_quality_regenerated_with_feedback, viewModel.uiState.value.qualityMessageRes)
         assertEquals(R.string.wish_feedback_too_generic, viewModel.uiState.value.qualityMessageArgRes)
+        coVerify {
+            messageFeedbackRepository.record(
+                match {
+                    it.pendingMessageId == MessageDraftId("pm_1") &&
+                        it.contactId == ContactId("c_1") &&
+                        it.occasionId == OccasionId("e_1") &&
+                        it.reasonKey == "too_generic" &&
+                        it.instruction.contains("more personal")
+                }
+            )
+        }
         coVerify { activityLogRepository.record(match { it.type == "AI" && it.messageId == "pm_1" }) }
+    }
+
+    @Test
+    fun `regenerate marks matching feedback record as applied`() = runTest(testDispatcher) {
+        stubLiveDraft()
+        coEvery {
+            regeneratePendingMessageUseCase("pm_1", "Wishing you a happy birthday!", match { it?.contains("more personal") == true })
+        } returns RegeneratePendingMessageUseCase.Outcome.Regenerated("pm_1", usedFallback = false)
+        coEvery { messageFeedbackRepository.getLatestForPendingMessage(MessageDraftId("pm_1")) } returns MessageFeedbackRecord(
+            id = MessageFeedbackId("feedback_1"),
+            pendingMessageId = MessageDraftId("pm_1"),
+            contactId = ContactId("c_1"),
+            occasionId = OccasionId("e_1"),
+            reasonKey = "too_generic",
+            instruction = "Make it more personal.",
+            draftText = "Wishing you a happy birthday!",
+            createdAtMs = 1_700_000_000_000L,
+        )
+
+        val viewModel = createViewModel()
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        viewModel.submitFeedback("too_generic")
+        advanceUntilIdle()
+        viewModel.regenerate()
+        advanceUntilIdle()
+
+        coVerify { messageFeedbackRepository.markApplied(MessageFeedbackId("feedback_1")) }
     }
 
     @Test

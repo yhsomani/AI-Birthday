@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.core.db.entities.ActivityLogEntity
-import com.example.core.db.entities.MessageFeedbackEntity
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
@@ -16,8 +15,11 @@ import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.common.MessageFeedbackId
 import com.example.domain.model.contact.ContactWishContext
 import com.example.domain.model.occasion.OccasionType
+import com.example.domain.model.message.MessageFeedbackRecord
 import com.example.domain.model.message.WishPreviewDraft
 import com.example.domain.model.message.WishPreviewReviewItem
 import com.example.domain.usecase.ApprovePendingMessageUseCase
@@ -334,7 +336,7 @@ class WishPreviewViewModel @Inject constructor(
                 }
                 is RegeneratePendingMessageUseCase.Outcome.Regenerated -> {
                     val feedbackId = messageFeedbackRepository
-                        .getLatestForPendingMessage(pendingId)
+                        .getLatestForPendingMessage(MessageDraftId(pendingId))
                         ?.takeIf { it.reasonKey == feedback?.key }
                         ?.id
                     if (feedbackId != null) {
@@ -369,14 +371,15 @@ class WishPreviewViewModel @Inject constructor(
         if (draft != null) {
             viewModelScope.launch {
                 messageFeedbackRepository.record(
-                    MessageFeedbackEntity(
-                        id = UUID.randomUUID().toString(),
-                        pendingMessageId = draft.id.value,
-                        contactId = draft.contactId.value,
-                        eventId = draft.occasionId.value,
+                    MessageFeedbackRecord(
+                        id = MessageFeedbackId(UUID.randomUUID().toString()),
+                        pendingMessageId = draft.id,
+                        contactId = draft.contactId,
+                        occasionId = draft.occasionId,
                         reasonKey = option.key,
                         instruction = option.instruction,
                         draftText = _uiState.value.editedText,
+                        createdAtMs = System.currentTimeMillis(),
                     )
                 )
                 activityLogRepository.record(

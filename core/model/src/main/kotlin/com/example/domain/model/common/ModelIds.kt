@@ -16,6 +16,9 @@ value class DispatchAttemptId(val value: String)
 value class MessageDraftId(val value: String)
 
 @JvmInline
+value class MessageFeedbackId(val value: String)
+
+@JvmInline
 value class OccasionId(val value: String)
 
 @JvmInline
