@@ -28,8 +28,9 @@ import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.GiftHistoryId
 import com.example.domain.model.contact.ContactGiftAdvisorProfile
 import com.example.domain.model.gift.GiftHistoryRecord
-import com.example.domain.service.GiftSuggestion
 import com.example.ui.viewmodel.GiftAdvisorUiState
+import com.example.ui.viewmodel.GiftSuggestionBudgetStatus
+import com.example.ui.viewmodel.GiftSuggestionUiModel
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -63,10 +64,13 @@ class GiftAdvisorScreenInteractionTest {
                     contact = contact(),
                     giftHistory = listOf(giftRecord()),
                     suggestions = listOf(
-                        GiftSuggestion(
+                        GiftSuggestionUiModel(
                             name = "Noise-canceling headphones",
                             reason = "Useful for commute and work calls",
                             estimatedCostInr = 2500,
+                            confidencePercent = 85,
+                            budgetStatus = GiftSuggestionBudgetStatus.WITHIN_REMAINING_BUDGET,
+                            checkedAgainstHistory = true,
                         )
                     ),
                     totalSpentThisYear = 1200,
@@ -95,13 +99,29 @@ class GiftAdvisorScreenInteractionTest {
                 showDialog = true
                 actions += "dialog"
             },
-            onDismissDialog = { showDialog = false },
+            onDismissDialog = {
+                showDialog = false
+                giftName = ""
+                giftCategory = ""
+                occasion = ""
+                cost = ""
+                receivedWell = null
+                notes = ""
+            },
             onSaveGift = {
                 actions += "save:$giftName|$giftCategory|$occasion|$cost|$receivedWell|$notes"
                 showDialog = false
             },
             onDeleteGift = { actions += "delete:${it.id.value}" },
             onGenerateSuggestions = { actions += "suggest" },
+            onDismissSuggestion = { actions += "dismissSuggestion:$it" },
+            onRecordSuggestion = {
+                actions += "recordSuggestion:${it.name}"
+                giftName = it.name
+                cost = it.estimatedCostInr.toString()
+                notes = it.reason
+                showDialog = true
+            },
         )
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.back))
@@ -113,6 +133,14 @@ class GiftAdvisorScreenInteractionTest {
         composeRule.assertLazyItemVisible(GiftAdvisorTestTags.SUGGESTION_CARD_PREFIX + 0)
         composeRule.onNodeWithText("Noise-canceling headphones")
             .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.gift_suggestion_confidence, 85))
+            .assertIsDisplayed()
+        composeRule.clickLazyTag(GiftAdvisorTestTags.SUGGESTION_DISMISS_BUTTON_PREFIX + 0)
+        composeRule.clickLazyTag(GiftAdvisorTestTags.SUGGESTION_RECORD_BUTTON_PREFIX + 0)
+        composeRule.onNodeWithTag(GiftAdvisorTestTags.DIALOG)
+            .assertIsDisplayed()
+        composeRule.onNodeWithTag(GiftAdvisorTestTags.CANCEL_BUTTON)
+            .performClick()
 
         composeRule.onNodeWithTag(GiftAdvisorTestTags.RECORD_FAB)
             .assertIsDisplayed()
@@ -148,6 +176,8 @@ class GiftAdvisorScreenInteractionTest {
             listOf(
                 "back",
                 "suggest",
+                "dismissSuggestion:0",
+                "recordSuggestion:Noise-canceling headphones",
                 "dialog",
                 "feedback:true",
                 "feedback:false",
@@ -233,6 +263,8 @@ class GiftAdvisorScreenInteractionTest {
         onSaveGift: () -> Unit = {},
         onDeleteGift: (GiftHistoryRecord) -> Unit = {},
         onGenerateSuggestions: () -> Unit = {},
+        onDismissSuggestion: (Int) -> Unit = {},
+        onRecordSuggestion: (GiftSuggestionUiModel) -> Unit = {},
     ) {
         setContent {
             RelateAITheme {
@@ -258,6 +290,8 @@ class GiftAdvisorScreenInteractionTest {
                     onSaveGift = onSaveGift,
                     onDeleteGift = onDeleteGift,
                     onGenerateSuggestions = onGenerateSuggestions,
+                    onDismissSuggestion = onDismissSuggestion,
+                    onRecordSuggestion = onRecordSuggestion,
                 )
             }
         }

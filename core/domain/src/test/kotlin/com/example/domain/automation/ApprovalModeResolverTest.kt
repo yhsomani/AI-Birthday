@@ -20,14 +20,14 @@ class ApprovalModeResolverTest {
     }
 
     @Test
-    fun `resolve falls back from unknown modes to fully auto`() {
+    fun `resolve falls back from unknown modes to manual review`() {
         val result = ApprovalModeResolver.resolve(
             relationship = "FRIEND",
             contactOverride = ApprovalMode.UNKNOWN,
             globalMode = ApprovalMode.UNKNOWN,
         )
 
-        assertEquals(ApprovalMode.FULLY_AUTO, result)
+        assertEquals(ApprovalMode.ALWAYS_ASK, result)
     }
 
     @Test

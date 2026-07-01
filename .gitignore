@@ -23,12 +23,6 @@ out/
 app_logs*.txt
 logcat*.txt
 lint_baseline*.txt
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.svg
-*.webp
 *.mp4
 *.mp3
 *.wav
@@ -69,6 +63,20 @@ google-services.json
 
 # Reports (generated)
 /reports/
+/exports/
+/tmp/
+
+# Generated screenshot/report media. App assets and approved baselines stay trackable.
+/app/build/reports/
+/app/build/outputs/
+/core/**/build/reports/
+/core/**/build/outputs/
+/app/src/test/screenshots/diff/
+/app/src/test/screenshots/output/
+
+# Legacy/local generated artifacts that should not be versioned.
+/app/schemas/
+/app/src/test/screenshots/greeting.png
 
 # OpenCode
 /opencode.json

@@ -32,3 +32,10 @@ data class SentMessageListItem(
     val sentAtMs: Long,
     val deliveryStatus: MessageDeliveryStatus,
 )
+
+data class ChatHistoryMessageItem(
+    val id: SentMessageId,
+    val messageText: String,
+    val channel: MessageChannel,
+    val sentAtMs: Long,
+)

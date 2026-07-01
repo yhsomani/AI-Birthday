@@ -1,6 +1,6 @@
 # RelateAI Single Source of Truth
 
-Last updated: 2026-06-26
+Last updated: 2026-07-01
 
 This is the canonical product and technical source of truth for this repository. It consolidates the former `features.md`, `SSOT_CONSOLIDATED.md`, `AUDIT_REPORT.md`, `CHANGELOG.md`, `docs/BRANCHING.md`, `docs/UI_VALIDATION.md`, `.kiro/steering/*.md`, `.kiro/specs/**/*.md`, and `.Jules/*.md` content.
 
@@ -38,7 +38,7 @@ There is no custom server in this repository. External network surfaces are Goog
 | Area | Current value |
 |---|---|
 | Root Gradle project | `RelateAI` |
-| Active modules | `:app`, `:core:domain`, `:core:data`, `:core:ui` |
+| Active modules | `:app`, `:core:model`, `:core:domain`, `:core:data`, `:core:ui` |
 | Application namespace | `com.example` |
 | Release applicationId | `com.aistudio.relateai.qxtjrk` |
 | Debug applicationId | `com.aistudio.relateai.qxtjrk` |
@@ -52,7 +52,7 @@ There is no custom server in this repository. External network surfaces are Goog
 | JVM bytecode target | 17 |
 | Compose BOM | 2024.12.01 |
 | Room | 2.7.0 |
-| Room schema version | 13 |
+| Room schema version | 16 |
 | Hilt | 2.59.2 |
 | WorkManager | 2.9.0 |
 | SQLCipher | 4.5.4 |
@@ -65,7 +65,7 @@ Core stack:
 
 - Jetpack Compose and Material 3 for UI.
 - Hilt for dependency injection.
-- Clean Architecture split into UI, domain, data, and shared UI modules.
+- Clean Architecture split into UI, pure/shared model, domain, data, and shared UI modules.
 - Room with SQLCipher for encrypted local database storage.
 - EncryptedSharedPreferences for auth/config/preferences.
 - WorkManager and AlarmManager for recurring automation and exact message/reminder scheduling.
@@ -81,6 +81,7 @@ Core stack:
 .
 +-- app/                         Android app, Compose screens, ViewModels, manifest, resources
 +-- core/
+|   +-- model/                   Pure Kotlin shared model/value types
 |   +-- domain/                  Domain models, repository/service contracts, use cases, policies
 |   +-- data/                    Room, repositories, integrations, workers, senders, prefs, backup
 |   +-- ui/                      Shared Compose theme and reusable components
@@ -98,6 +99,7 @@ app/src/main/java/com/example/ui/navigation/
 app/src/main/java/com/example/ui/screens/
 app/src/main/java/com/example/ui/viewmodel/
 app/src/main/res/
+core/model/src/main/kotlin/com/example/domain/model/
 core/domain/src/main/kotlin/com/example/domain/
 core/domain/src/main/kotlin/com/example/core/db/entities/
 core/data/src/main/kotlin/com/example/core/
@@ -123,8 +125,9 @@ Shared UI components/theme (:core:ui) are used by :app.
 
 Dependency rules:
 
-- `:app` depends on `:core:domain`, `:core:data`, and `:core:ui`.
+- `:app` depends on `:core:model`, `:core:domain`, `:core:data`, and `:core:ui`.
 - `:core:data` exposes `api(project(":core:domain"))`.
+- `:core:domain` exposes `api(project(":core:model"))` for compatibility while model extraction continues.
 - `:core:domain` should not depend on app or data implementation classes, except current Room entity files are physically located under `core/domain/src/main/kotlin/com/example/core/db/entities`.
 - `:core:ui` contains shared Compose primitives and must stay independent of domain/data implementation details.
 
@@ -170,6 +173,7 @@ chmod +x gradlew
 
 ```kotlin
 include(":app")
+include(":core:model")
 include(":core:domain")
 include(":core:data")
 include(":core:ui")
@@ -188,7 +192,7 @@ include(":core:ui")
 
 6. Create module Gradle files:
 
-- `app/build.gradle.kts`: Android application, Kotlin Compose, KSP, Hilt, Google Services, baseline profile, namespace `com.example`, applicationId `com.aistudio.relateai.qxtjrk`, debug suffix `.debug`, compileSdk 37, minSdk 24, targetSdk 36, versionCode 1, versionName `1.0`, Room schema export to `app/schemas`, release minify/shrink, release signing guard, Compose enabled.
+- `app/build.gradle.kts`: Android application, Kotlin Compose, KSP, Hilt, Google Services, baseline profile, namespace `com.example`, applicationId `com.aistudio.relateai.qxtjrk`, debug suffix `.debug`, compileSdk 37, minSdk 24, targetSdk 36, versionCode 1, versionName `1.0`, release minify/shrink, release signing guard, Compose enabled. The app module still has a legacy Room schema export argument, but active database schemas are owned by `:core:data`.
 - `core/domain/build.gradle.kts`: Android library, namespace `com.example.core.domain`, compileSdk 37, minSdk 24, Java 17, dependencies for coroutines, Room runtime, Paging, javax.inject, tests.
 - `core/data/build.gradle.kts`: Android library, KSP, Hilt, namespace `com.example.core.data`, compileSdk 37, minSdk 24, Room schema export to `core/data/schemas`, test assets from schemas, dependencies for domain, Room, Hilt, WorkManager, security crypto, SQLCipher, Google APIs, Firebase, JavaMail, networking, tests.
 - `core/ui/build.gradle.kts`: Android library, Kotlin Compose, namespace `com.example.core.ui`, compileSdk 37, minSdk 24, Compose enabled, Material 3, Navigation Compose, lifecycle Compose, Coil.
@@ -425,8 +429,8 @@ Primary entities:
 Database facts:
 
 - Active Room database: `AppDatabase`.
-- Active schema version: 13.
-- Exported schema location: `core/data/schemas/com.example.core.db.AppDatabase/13.json`; `app/schemas` also contains older app-level exports.
+- Active schema version: 16.
+- Exported schema location: `core/data/schemas/com.example.core.db.AppDatabase/16.json`. Legacy local `app/schemas/` exports are ignored and not part of the tracked source of truth.
 - SQLCipher is used through Room SupportFactory.
 - Destructive migration fallback must stay disabled.
 - Legacy plaintext `relateai.db`, WAL, and SHM files are quarantined under protected no-backup storage before encrypted open.

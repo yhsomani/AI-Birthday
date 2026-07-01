@@ -124,6 +124,72 @@ class GiftAdvisorViewModelTest {
     }
 
     @Test
+    fun `generateGiftSuggestions annotates duplicate and budget evidence`() = runTest(testDispatcher) {
+        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+        val contact = contactProfile(giftBudgetInr = 1000)
+        val history = listOf(
+            giftRecord(
+                id = "gift_1",
+                giftName = "Noise-canceling headphones",
+                year = currentYear,
+                approxCostInr = 800,
+            ),
+        )
+        val suggestions = listOf(
+            GiftSuggestion(
+                name = "Noise canceling headphones",
+                reason = "They would help with commute and work calls.",
+                estimatedCostInr = 1200,
+            ),
+        )
+
+        stubGiftAdvisorFlows(contact = contact, history = history)
+        coEvery { aiService.generateGiftSuggestions(any(), any()) } returns suggestions
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
+        advanceUntilIdle()
+
+        viewModel.generateGiftSuggestions()
+        advanceUntilIdle()
+
+        val suggestion = viewModel.uiState.value.suggestions.single()
+        assertEquals("Noise canceling headphones", suggestion.name)
+        assertEquals("Noise-canceling headphones", suggestion.duplicateGiftName)
+        assertEquals(GiftSuggestionBudgetStatus.OVER_REMAINING_BUDGET, suggestion.budgetStatus)
+        assertEquals(1000, suggestion.budgetOverageInr)
+        assertEquals(true, suggestion.checkedAgainstHistory)
+        assertEquals(40, suggestion.confidencePercent)
+    }
+
+    @Test
+    fun `dismissGiftSuggestion removes selected suggestion without affecting others`() = runTest(testDispatcher) {
+        val contact = contactProfile(giftBudgetInr = 1000)
+        val suggestions = listOf(
+            GiftSuggestion("AI Suggestion 1", "Reason 1", 500),
+            GiftSuggestion("AI Suggestion 2", "Reason 2", 800),
+        )
+
+        stubGiftAdvisorFlows(contact = contact, history = emptyList())
+        coEvery { aiService.generateGiftSuggestions(any(), any()) } returns suggestions
+
+        val savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1"))
+        val viewModel = GiftAdvisorViewModel(savedStateHandle, contactRepository, giftHistoryRepository, aiService)
+        advanceUntilIdle()
+        viewModel.generateGiftSuggestions()
+        advanceUntilIdle()
+
+        viewModel.dismissGiftSuggestion(0)
+
+        assertEquals(1, viewModel.uiState.value.suggestions.size)
+        assertEquals("AI Suggestion 2", viewModel.uiState.value.suggestions.single().name)
+
+        viewModel.dismissGiftSuggestion(10)
+
+        assertEquals(1, viewModel.uiState.value.suggestions.size)
+    }
+
+    @Test
     fun `generateGiftSuggestions exposes stable error when ai fails`() = runTest(testDispatcher) {
         val contact = contactProfile(giftBudgetInr = 1000)
 

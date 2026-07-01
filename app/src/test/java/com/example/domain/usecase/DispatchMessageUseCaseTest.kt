@@ -21,10 +21,14 @@ import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.MessageDispatcherService
+import com.example.domain.service.PreferencesRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import java.util.Calendar
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,12 +40,14 @@ class DispatchMessageUseCaseTest {
     private val messageDispatcherService: MessageDispatcherService = mockk(relaxed = true)
     private val activityLogRepository: ActivityLogRepository = mockk(relaxed = true)
     private val dispatchAttemptRepository: DispatchAttemptRepository = mockk(relaxed = true)
+    private val preferencesRepository: PreferencesRepository = mockk(relaxed = true)
     private val useCase = DispatchMessageUseCase(
         messageRepository,
         contactRepository,
         messageDispatcherService,
         activityLogRepository,
         dispatchAttemptRepository,
+        preferencesRepository,
     )
 
     @Test
@@ -214,6 +220,99 @@ class DispatchMessageUseCaseTest {
             activityLogRepository.record(match {
                 it.title == "Dispatch sent" &&
                     it.metadataJson.contains("\"approvalMode\":\"SMART_APPROVE\"")
+            })
+        }
+    }
+
+    @Test
+    fun `invoke with due approved message defers during quiet hours`() = runTest {
+        val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val quietEnd = (currentHour + 1) % 24
+        val pendingMsg = dispatchMessage(status = MessageStatus.APPROVED)
+
+        every { preferencesRepository.getQuietHoursStart() } returns currentHour
+        every { preferencesRepository.getQuietHoursEnd() } returns quietEnd
+        every { preferencesRepository.getBlackoutDates() } returns "[]"
+        coEvery { messageRepository.getMessageDispatchStateById("msg_1") } returns pendingMsg
+
+        val result = useCase("msg_1")
+
+        assertTrue(result is DispatchMessageUseCase.DispatchOutcome.Deferred)
+        assertTrue(
+            (result as DispatchMessageUseCase.DispatchOutcome.Deferred).scheduledForMs > pendingMsg.draft.scheduledForMs
+        )
+        coVerify(exactly = 0) { messageDispatcherService.dispatch(any()) }
+        coVerify {
+            dispatchAttemptRepository.upsert(match {
+                it.messageDraftId.value == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.DEFERRED &&
+                    it.result == DispatchAttemptResult.DEFERRED &&
+                    it.blockOrDeferReason == "QUIET_HOURS_OR_BLACKOUT_DATE"
+            })
+        }
+    }
+
+    @Test
+    fun `invoke with due fully auto pending message defers during quiet hours`() = runTest {
+        val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val quietEnd = (currentHour + 1) % 24
+        val pendingMsg = dispatchMessage(
+            approvalMode = ApprovalMode.FULLY_AUTO,
+            status = MessageStatus.PENDING,
+        )
+
+        every { preferencesRepository.getQuietHoursStart() } returns currentHour
+        every { preferencesRepository.getQuietHoursEnd() } returns quietEnd
+        every { preferencesRepository.getBlackoutDates() } returns "[]"
+        coEvery { messageRepository.getMessageDispatchStateById("msg_1") } returns pendingMsg
+
+        val result = useCase("msg_1")
+
+        assertTrue(result is DispatchMessageUseCase.DispatchOutcome.Deferred)
+        assertTrue(
+            (result as DispatchMessageUseCase.DispatchOutcome.Deferred).scheduledForMs > pendingMsg.draft.scheduledForMs
+        )
+        coVerify(exactly = 0) { messageDispatcherService.dispatch(any()) }
+        coVerify {
+            dispatchAttemptRepository.upsert(match {
+                it.messageDraftId.value == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.DEFERRED &&
+                    it.result == DispatchAttemptResult.DEFERRED &&
+                    it.blockOrDeferReason == "QUIET_HOURS_OR_BLACKOUT_DATE"
+            })
+        }
+    }
+
+    @Test
+    fun `invoke with due approved message defers during blackout date`() = runTest {
+        val today = Calendar.getInstance().let {
+            "%04d-%02d-%02d".format(
+                Locale.US,
+                it.get(Calendar.YEAR),
+                it.get(Calendar.MONTH) + 1,
+                it.get(Calendar.DAY_OF_MONTH),
+            )
+        }
+        val pendingMsg = dispatchMessage(status = MessageStatus.APPROVED)
+
+        every { preferencesRepository.getQuietHoursStart() } returns 0
+        every { preferencesRepository.getQuietHoursEnd() } returns 0
+        every { preferencesRepository.getBlackoutDates() } returns """["$today"]"""
+        coEvery { messageRepository.getMessageDispatchStateById("msg_1") } returns pendingMsg
+
+        val result = useCase("msg_1")
+
+        assertTrue(result is DispatchMessageUseCase.DispatchOutcome.Deferred)
+        assertTrue(
+            (result as DispatchMessageUseCase.DispatchOutcome.Deferred).scheduledForMs > pendingMsg.draft.scheduledForMs
+        )
+        coVerify(exactly = 0) { messageDispatcherService.dispatch(any()) }
+        coVerify {
+            dispatchAttemptRepository.upsert(match {
+                it.messageDraftId.value == "msg_1" &&
+                    it.eligibilityDecision == DispatchEligibilityRecord.DEFERRED &&
+                    it.result == DispatchAttemptResult.DEFERRED &&
+                    it.blockOrDeferReason == "QUIET_HOURS_OR_BLACKOUT_DATE"
             })
         }
     }

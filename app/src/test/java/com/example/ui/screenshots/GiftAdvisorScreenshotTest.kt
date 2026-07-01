@@ -38,12 +38,13 @@ import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.GiftHistoryId
 import com.example.domain.model.contact.ContactGiftAdvisorProfile
 import com.example.domain.model.gift.GiftHistoryRecord
-import com.example.domain.service.GiftSuggestion
 import com.example.ui.screens.giftadvisor.AddGiftDialogBody
 import com.example.ui.screens.giftadvisor.GiftAdvisorContent
 import com.example.ui.screens.giftadvisor.GiftAdvisorTestTags
 import com.example.ui.viewmodel.GiftAdvisorUiState
 import com.example.ui.viewmodel.GiftAdvisorViewModel
+import com.example.ui.viewmodel.GiftSuggestionBudgetStatus
+import com.example.ui.viewmodel.GiftSuggestionUiModel
 import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.relateSemanticColors
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -373,6 +374,8 @@ class GiftAdvisorScreenshotTest {
                 onSaveGift = {},
                 onDeleteGift = {},
                 onGenerateSuggestions = {},
+                onDismissSuggestion = {},
+                onRecordSuggestion = {},
             )
         }
         if (animationFrameMillis != null) {
@@ -524,15 +527,22 @@ class GiftAdvisorScreenshotTest {
                 ),
             ),
             suggestions = listOf(
-                GiftSuggestion(
+                GiftSuggestionUiModel(
                     name = "Weekend pottery class",
                     reason = "Matches her recent interest in slow, hands-on creative hobbies.",
                     estimatedCostInr = 3_200,
+                    confidencePercent = 95,
+                    budgetStatus = GiftSuggestionBudgetStatus.WITHIN_REMAINING_BUDGET,
+                    checkedAgainstHistory = true,
                 ),
-                GiftSuggestion(
+                GiftSuggestionUiModel(
                     name = "Botanical desk calendar",
                     reason = "Useful, low-fragrance, and aligned with her stationery preferences.",
                     estimatedCostInr = 850,
+                    confidencePercent = 65,
+                    budgetStatus = GiftSuggestionBudgetStatus.WITHIN_REMAINING_BUDGET,
+                    duplicateGiftName = "Botanical notebook set",
+                    checkedAgainstHistory = true,
                 ),
             ),
             totalSpentThisYear = 2_100,
@@ -567,15 +577,22 @@ class GiftAdvisorScreenshotTest {
                 ),
             ),
             suggestions = listOf(
-                GiftSuggestion(
+                GiftSuggestionUiModel(
                     name = "वीकेंड पॉटरी क्लास",
                     reason = "धीमे, हाथों से किए जाने वाले रचनात्मक शौक में उनकी हाल की रुचि से मेल खाता है।",
                     estimatedCostInr = 3_200,
+                    confidencePercent = 95,
+                    budgetStatus = GiftSuggestionBudgetStatus.WITHIN_REMAINING_BUDGET,
+                    checkedAgainstHistory = true,
                 ),
-                GiftSuggestion(
+                GiftSuggestionUiModel(
                     name = "बॉटैनिकल डेस्क कैलेंडर",
                     reason = "उपयोगी, कम खुशबू वाला और स्टेशनरी पसंद के अनुरूप।",
                     estimatedCostInr = 850,
+                    confidencePercent = 65,
+                    budgetStatus = GiftSuggestionBudgetStatus.WITHIN_REMAINING_BUDGET,
+                    duplicateGiftName = "बॉटैनिकल नोटबुक सेट",
+                    checkedAgainstHistory = true,
                 ),
             ),
             totalSpentThisYear = 2_100,

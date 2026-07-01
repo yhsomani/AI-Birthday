@@ -10,6 +10,10 @@ class RepositoryHygieneTest {
     @Test
     fun gitignore_excludesLocalGeneratedArtifactsButKeepsApprovedScreenshotBaselines() {
         val gitignore = rootFile(".gitignore").readText()
+        val gitignoreLines = gitignore.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("#") }
+            .toSet()
 
         listOf(
             ".codepulse/",
@@ -23,7 +27,27 @@ class RepositoryHygieneTest {
             assertTrue(".gitignore should ignore local artifact pattern $pattern", gitignore.contains(pattern))
         }
 
-        assertTrue(gitignore.contains("*.png"))
+        listOf("*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.webp").forEach { pattern ->
+            assertFalse(
+                ".gitignore should not hide app asset changes with global media pattern $pattern",
+                gitignoreLines.contains(pattern),
+            )
+        }
+
+        listOf(
+            "/reports/",
+            "/exports/",
+            "/tmp/",
+            "/app/build/reports/",
+            "/app/build/outputs/",
+            "/core/**/build/reports/",
+            "/core/**/build/outputs/",
+            "/app/src/test/screenshots/diff/",
+            "/app/src/test/screenshots/output/",
+        ).forEach { pattern ->
+            assertTrue(".gitignore should scope generated media/output ignores with $pattern", gitignore.contains(pattern))
+        }
+
         assertTrue(gitignore.contains("!/app/src/test/screenshots/baseline/"))
         assertTrue(gitignore.contains("!/app/src/test/screenshots/baseline/*.png"))
     }

@@ -98,6 +98,11 @@ class SettingsViewModelTest {
     )
 
     @Test
+    fun `settings ui state defaults to manual review before persisted settings load`() {
+        assertEquals(ApprovalMode.ALWAYS_ASK, SettingsUiState().automationMode)
+    }
+
+    @Test
     fun `toggleBirthdayReminders updates state`() = runTest(testDispatcher) {
         val viewModel = newViewModel()
 

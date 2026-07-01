@@ -4,6 +4,523 @@ Version: 1.0.0
 Date: 2026-06-26
 Source backlog: [IMPLEMENTATION_TASKS.md](IMPLEMENTATION_TASKS.md)
 
+## 2026-07-01 - Chat History Search Filter
+
+Completed tasks:
+
+- P2 Chat History UX slice: help users find prior sent messages without manually scanning the full contact history.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/chat/ChatHistoryViewModel.kt](app/src/main/java/com/example/ui/screens/chat/ChatHistoryViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/chat/ChatHistoryScreen.kt](app/src/main/java/com/example/ui/screens/chat/ChatHistoryScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/screens/chat/ChatHistoryViewModelTest.kt](app/src/test/java/com/example/ui/screens/chat/ChatHistoryViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/chat/ChatHistoryScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/chat/ChatHistoryScreenInteractionTest.kt)
+- [app/src/test/java/com/example/ui/screenshots/ChatHistoryScreenshotTest.kt](app/src/test/java/com/example/ui/screenshots/ChatHistoryScreenshotTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `ChatHistoryUiState` now tracks `searchQuery` and the total loaded message count separately from visible filtered messages.
+- `ChatHistoryViewModel` filters loaded history by message text or channel and reapplies the active query when repository updates arrive.
+- Chat History UI now includes a localized search field, clear action, and distinct no-results empty state.
+
+Why this improves user experience:
+
+- Users can quickly find a prior message or channel-specific send instead of scanning every sent item.
+- Empty history and empty search results now communicate different states.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.screens.chat.ChatHistoryViewModelTest \
+  --tests com.example.ui.screens.chat.ChatHistoryScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-01 - Style Coach Message Style Preview
+
+Completed tasks:
+
+- P3 Style Coach UX slice: show concrete examples of how the learned style profile affects future generated messages.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt](app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/screens/stylecoach/StyleCoachScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/stylecoach/StyleCoachScreenInteractionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Style Coach now shows a separate message-style preview below the learned profile.
+- The preview derives an opening example, tone, target length, and emoji guidance from the saved profile.
+- English and Hindi resources were added, and interaction coverage verifies the preview values render.
+
+Why this improves user experience:
+
+- Users can see what the style profile will do instead of only reading raw metrics.
+- The preview makes style training feedback more actionable before a larger before/after generation comparison is built.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.screens.stylecoach.StyleCoachScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-01 - Gift Advisor Suggestion Dismiss Action
+
+Completed tasks:
+
+- P2 Gift Advisor UX slice: let users clear irrelevant AI gift suggestions from the current review list.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/GiftAdvisorViewModel.kt](app/src/main/java/com/example/ui/viewmodel/GiftAdvisorViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt](app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/GiftAdvisorViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/GiftAdvisorViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreenInteractionTest.kt)
+- [app/src/test/java/com/example/ui/screenshots/GiftAdvisorScreenshotTest.kt](app/src/test/java/com/example/ui/screenshots/GiftAdvisorScreenshotTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `GiftAdvisorViewModel` now exposes `dismissGiftSuggestion(index)` and removes the selected suggestion without affecting the remaining ideas.
+- Gift suggestion cards now show a localized dismiss icon action alongside `Record`.
+- Interaction and screenshot test helpers now wire the dismiss callback, and view-model coverage verifies invalid indexes are ignored.
+
+Why this improves user experience:
+
+- Users can remove irrelevant AI ideas instead of repeatedly scanning past them.
+- Suggestion review now supports both positive action (`Record`) and negative action (`Dismiss`) in the same place.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.GiftAdvisorViewModelTest \
+  --tests com.example.ui.screens.giftadvisor.GiftAdvisorScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-01 - Chat History Domain UI State
+
+Completed tasks:
+
+- P2 architecture cleanup slice: stop Chat History UI state from exposing the Room-backed `SentMessageEntity`.
+
+Changed files:
+
+- [core/model/src/main/kotlin/com/example/domain/model/message/MessageListItems.kt](core/model/src/main/kotlin/com/example/domain/model/message/MessageListItems.kt)
+- [core/domain/src/main/kotlin/com/example/domain/message/SentMessageMappers.kt](core/domain/src/main/kotlin/com/example/domain/message/SentMessageMappers.kt)
+- [app/src/main/java/com/example/ui/screens/chat/ChatHistoryViewModel.kt](app/src/main/java/com/example/ui/screens/chat/ChatHistoryViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/chat/ChatHistoryScreen.kt](app/src/main/java/com/example/ui/screens/chat/ChatHistoryScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/screens/chat/ChatHistoryViewModelTest.kt](app/src/test/java/com/example/ui/screens/chat/ChatHistoryViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/chat/ChatHistoryScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/chat/ChatHistoryScreenInteractionTest.kt)
+- [app/src/test/java/com/example/ui/screenshots/ChatHistoryScreenshotTest.kt](app/src/test/java/com/example/ui/screenshots/ChatHistoryScreenshotTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `ChatHistoryMessageItem` as the domain-facing model for chat history rows.
+- Added sent-message mapper functions that convert repository entities into chat-history items.
+- `ChatHistoryUiState.messages` now exposes `List<ChatHistoryMessageItem>` instead of `List<SentMessageEntity>`.
+- Chat History UI and screenshot fixtures now use typed `MessageChannel` values and a localized unknown-channel label.
+
+Why this improves user experience and architecture:
+
+- Chat History rendering is insulated from Room schema details.
+- Future search, resend, regenerate, and paging work can build from a screen-specific domain item instead of a persistence entity.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.screens.chat.ChatHistoryViewModelTest \
+  --tests com.example.ui.screens.chat.ChatHistoryScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-01 - Manual Event Type Validation
+
+Completed tasks:
+
+- P2 Events correctness slice: prevent unsupported manual event type input from being persisted as `UNKNOWN`.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/usecase/SaveManualEventUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/SaveManualEventUseCase.kt)
+- [app/src/main/java/com/example/ui/viewmodel/EventsViewModel.kt](app/src/main/java/com/example/ui/viewmodel/EventsViewModel.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/domain/usecase/SaveManualEventUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/SaveManualEventUseCaseTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/EventsViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/EventsViewModelTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `SaveManualEventUseCase` now returns `InvalidInputReason.UNSUPPORTED_EVENT_TYPE` for unsupported nonblank event type input.
+- Unsupported event types are rejected before contact lookup, contact persistence, event persistence, or reminder scheduling.
+- Events UI now maps that reason to localized English and Hindi copy.
+
+Why this improves user experience:
+
+- Users get a clear validation error instead of creating an event that later appears as an ambiguous custom/unknown occasion.
+- The event store stays cleaner because manual saves can only persist supported occasion types.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.domain.usecase.SaveManualEventUseCaseTest \
+  --tests com.example.ui.viewmodel.EventsViewModelTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-01 - Review-First Automation Defaults
+
+Completed tasks:
+
+- P1 Settings/automation safety slice: prevent missing, unsupported, or not-yet-loaded automation state from displaying or resolving as fully automatic.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt](app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt)
+- [core/data/src/main/kotlin/com/example/core/prefs/GlobalAutomationModePrefsMapper.kt](core/data/src/main/kotlin/com/example/core/prefs/GlobalAutomationModePrefsMapper.kt)
+- [core/data/src/main/kotlin/com/example/core/prefs/SecurePrefs.kt](core/data/src/main/kotlin/com/example/core/prefs/SecurePrefs.kt)
+- [core/domain/src/main/kotlin/com/example/domain/automation/ApprovalModeResolver.kt](core/domain/src/main/kotlin/com/example/domain/automation/ApprovalModeResolver.kt)
+- [app/src/test/java/com/example/ui/viewmodel/SettingsViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/SettingsViewModelTest.kt)
+- [app/src/test/java/com/example/domain/usecase/GenerateMessageUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/GenerateMessageUseCaseTest.kt)
+- [core/data/src/test/kotlin/com/example/core/prefs/GlobalAutomationModePrefsMapperTest.kt](core/data/src/test/kotlin/com/example/core/prefs/GlobalAutomationModePrefsMapperTest.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/ApprovalModeResolverTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/ApprovalModeResolverTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `SettingsUiState` now defaults to `ALWAYS_ASK`, so Settings does not transiently expose `FULLY_AUTO` before persisted preferences load.
+- Missing or unsupported stored global automation values now map to `ALWAYS_ASK`.
+- `ApprovalModeResolver` now treats unknown global automation modes as `ALWAYS_ASK`, so corrupt or legacy state cannot silently schedule automatic sends.
+- Message generation now covers the unknown-mode path with a reviewable draft and approval notification instead of exact-send scheduling.
+
+Why this improves user experience:
+
+- Users only get fully automatic behavior after an explicit supported setting has been persisted.
+- Automation trust improves because missing or malformed settings fail closed into manual review.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew \
+  :core:data:testDebugUnitTest \
+  :core:domain:testDebugUnitTest \
+  :app:testDebugUnitTest \
+  --tests com.example.core.prefs.GlobalAutomationModePrefsMapperTest \
+  --tests com.example.domain.automation.ApprovalModeResolverTest \
+  --tests com.example.domain.usecase.GenerateMessageUseCaseTest \
+  --tests com.example.ui.viewmodel.SettingsViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-01 - Gift Advisor Suggestion Trust and Record Shortcut
+
+Completed tasks:
+
+- P2 Gift Advisor UX slice: make AI suggestions explainable and actionable before a larger screen redesign.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/GiftAdvisorViewModel.kt](app/src/main/java/com/example/ui/viewmodel/GiftAdvisorViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt](app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/GiftAdvisorViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/GiftAdvisorViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreenInteractionTest.kt)
+- [app/src/test/java/com/example/ui/screenshots/GiftAdvisorScreenshotTest.kt](app/src/test/java/com/example/ui/screenshots/GiftAdvisorScreenshotTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `GiftAdvisorViewModel` now enriches raw AI gift suggestions into UI models with confidence percent, budget-fit status, budget overage, duplicate-history warning, and history-check evidence.
+- Gift suggestion cards now show that evidence and expose a visible `Record` action.
+- Tapping `Record` pre-fills the existing gift-history form with the suggestion name, cost, and reason notes.
+- Dismissing the gift form now discards the draft so a later manual record starts clean.
+
+Why this improves user experience:
+
+- Users can see why a suggestion is trustworthy, whether it fits the remaining budget, and whether it risks repeating a previous gift.
+- The record shortcut reduces the effort of turning a useful suggestion into persistent history.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.GiftAdvisorViewModelTest \
+  --tests com.example.ui.screens.giftadvisor.GiftAdvisorScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-01 - Style Coach Confidence Metric
+
+Completed tasks:
+
+- P3 Style Coach UX slice: show a user-facing style confidence level and learned sample count on the learned profile card.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt](app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/screens/stylecoach/StyleCoachScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/stylecoach/StyleCoachScreenInteractionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Learned profile cards now show `Style Confidence` and `Samples Learned`.
+- Confidence is derived from cumulative `sampleCount`: untrained, starting, growing, or strong.
+- English and Hindi resources were added with interaction and localization coverage.
+
+Why this improves user experience:
+
+- Users can now understand whether the app has enough writing evidence to personalize reliably.
+- The confidence signal turns the cumulative sample count into an actionable training state.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.screens.stylecoach.StyleCoachScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-01 - Style Coach Cumulative Sample Count
+
+Completed tasks:
+
+- P3 Style Coach UX/data-quality slice: make style profile `sampleCount` accumulate analyzed message evidence instead of resetting to the current batch size.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/usecase/StyleAnalysisUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/StyleAnalysisUseCase.kt)
+- [app/src/test/java/com/example/domain/usecase/StyleAnalysisUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/StyleAnalysisUseCaseTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `StyleAnalysisUseCase` now stores `currentProfile.sampleCount + texts.size` for each analysis run.
+- Existing sample text augmentation still deduplicates retained examples, while `sampleCount` now better represents the amount of training evidence seen over time.
+
+Why this improves user experience:
+
+- Style Coach can present a more accurate confidence/training signal after repeated manual or automatic analysis runs.
+- Users are less likely to see the style profile appear to lose evidence after a smaller later analysis batch.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.domain.usecase.StyleAnalysisUseCaseTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-01 - Style Analysis Dead Code Cleanup
+
+Completed tasks:
+
+- P3 dead-code cleanup slice: removed the unused private `StyleAnalysisUseCase.findCommonPhrases(...)` helper after verifying it had no callers.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/usecase/StyleAnalysisUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/StyleAnalysisUseCase.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Removed a stale word-frequency phrase extractor that was not wired into style profile generation.
+- Kept the active bigram-based `topPhrases` path unchanged, so generated `commonPhrasesJson` behavior stays covered by existing style analysis tests.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.domain.usecase.StyleAnalysisUseCaseTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-01 - Repository Hygiene Cleanup
+
+Completed tasks:
+
+- P1 repository hygiene slice: untracked verified local/generated artifacts while keeping local copies on disk.
+- Updated `.gitignore` and `RepositoryHygieneTest` so generated output folders stay ignored without hiding real app media assets.
+- Left Google/Firebase config files tracked because the audit marks them as a repository policy decision rather than a safe generated-artifact cleanup.
+
+Changed files:
+
+- [.gitignore](.gitignore)
+- [app/src/test/java/com/example/RepositoryHygieneTest.kt](app/src/test/java/com/example/RepositoryHygieneTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+Removed from git tracking:
+
+- `.codepulse/workflow/events.json`
+- `.gradle-user-home/**`
+- `.intelligence/enterprise-diagnostics/*.json`
+- `app_logs*.txt`
+- `logcat_*.txt`
+- `lint_baseline_pre_fixes.txt`
+- `app/src/test/screenshots/greeting.png`
+- `app/schemas/**`
+
+What changed:
+
+- These files remain available locally but are no longer versioned.
+- `app/schemas` is now treated as a legacy/local generated path; active Room schemas remain under `core/data/schemas`.
+- `git ls-files -i -c --exclude-standard` now reports only `app/google-services.json` and `app/src/debug/google-services.json`, which need an explicit public/private repository policy decision.
+
+Validation:
+
+```bash
+git ls-files -i -c --exclude-standard
+
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.RepositoryHygieneTest \
+  --no-configuration-cache
+```
+
+Result: passed. The ignored-tracked scan now reports only the tracked Google/Firebase service config files that require a separate repository policy decision.
+
+## 2026-07-01 - Messages Readiness Sender Validation
+
+Completed tasks:
+
+- P1 readiness consistency slice: Messages now uses the shared domain email sender validation rule instead of a screen-local blank-only credential check.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt](app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt)
+- [app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Email pending-message readiness now calls `EmailAddressSyntaxPolicy.isConfiguredSender(...)`, the same domain rule used by route selection and generation paths.
+- The Messages ViewModel test now proves an invalid configured sender email keeps an email draft in the blocked queue until a syntactically valid sender is configured.
+
+Why this improves user experience:
+
+- Users no longer see email drafts as ready for review/sending when SMTP credentials are present but the sender address is not usable.
+- Messages, generation, and route selection now agree on one more setup-readiness rule.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.MessagesViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-01 - Automation Quality Gate, Dispatch Windows, and Docs Alignment
+
+Completed tasks:
+
+- P0 quality gate slice: downgrade fallback, generic, blank, or otherwise low-quality automatic AI messages to manual review instead of preserving fully automatic dispatch.
+- T113 follow-up: pass global quiet hours and blackout dates into the foreground/manual `DispatchMessageUseCase` policy path so it matches worker dispatch behavior.
+- P0/P1 docs alignment: update the canonical module/schema facts and record current audit status.
+- Repository hygiene slice: narrow `.gitignore` media rules so valid Android assets are no longer hidden by global image-extension ignores.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/AiAutoSendQualityGate.kt](core/domain/src/main/kotlin/com/example/domain/automation/AiAutoSendQualityGate.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/DispatchMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/DispatchMessageUseCase.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/AiAutoSendQualityGateTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/AiAutoSendQualityGateTest.kt)
+- [app/src/test/java/com/example/domain/usecase/DispatchMessageUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/DispatchMessageUseCaseTest.kt)
+- [.gitignore](.gitignore)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `AiAutoSendQualityGate` now lets the computed quality score control automatic-send eligibility for `FULLY_AUTO` and `SMART_APPROVE`; fallback/generic content below the threshold becomes `ALWAYS_ASK`.
+- `DispatchMessageUseCase` now supplies `PreferencesRepository` quiet-hours and blackout-date values to `DispatchEligibilityPolicy`, adding manual/foreground deferral coverage for blocked send windows.
+- `.gitignore` no longer ignores all `*.png`, `*.jpg`, `*.svg`, or `*.webp` files globally, so launcher icons and future app assets remain visible to git.
+- `SSOT.md` now lists `:core:model` as an active module and Room schema version 16.
+
+Why this improves user experience:
+
+- Fully automatic sends no longer allow generic fallback copy through without review.
+- Manual or foreground dispatch attempts now respect the same quiet-hours and blackout-date constraints as background workers.
+- Contributors can see legitimate asset changes and current architecture facts instead of relying on stale documentation.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.automation.AiAutoSendQualityGateTest \
+  --tests com.example.domain.automation.DispatchEligibilityPolicyTest \
+  --tests com.example.domain.usecase.DispatchMessageUseCaseTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Remaining work:
+
+- Decide repository policy for tracked Google/Firebase service config files.
+- Continue consolidating readiness state across Home, Messages, Wish Preview, AI Doctor, notifications, and dispatch.
+
 ## 2026-06-26 - ActivityLogType Producers and Filters
 
 Completed tasks:

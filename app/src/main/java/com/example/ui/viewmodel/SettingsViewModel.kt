@@ -40,7 +40,7 @@ data class SettingsUiState(
     val senderEmail: String = "",
     val senderEmailPassword: String = "",
     val senderEmailSaved: Boolean = false,
-    val automationMode: ApprovalMode = ApprovalMode.FULLY_AUTO,
+    val automationMode: ApprovalMode = ApprovalMode.ALWAYS_ASK,
     val quietHoursStart: String = "22",
     val quietHoursEnd: String = "8",
     val biometricLockEnabled: Boolean = false,

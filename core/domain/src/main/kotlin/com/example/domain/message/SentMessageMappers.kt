@@ -5,6 +5,7 @@ import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.SentMessageId
+import com.example.domain.model.message.ChatHistoryMessageItem
 import com.example.domain.model.message.DeliveryRouteHistoryRecord
 import com.example.domain.model.message.MessageAnalyticsRecord
 import com.example.domain.model.message.MessageGenerationHistory
@@ -30,6 +31,15 @@ fun SentMessageEntity.toSentMessageListItem(): SentMessageListItem {
     )
 }
 
+fun SentMessageEntity.toChatHistoryMessageItem(): ChatHistoryMessageItem {
+    return ChatHistoryMessageItem(
+        id = SentMessageId(id),
+        messageText = messageText,
+        channel = MessageChannel.fromRaw(channel),
+        sentAtMs = sentAtMs,
+    )
+}
+
 fun SentMessageEntity.toDeliveryRouteHistoryRecord(): DeliveryRouteHistoryRecord {
     return DeliveryRouteHistoryRecord(
         channel = MessageChannel.fromRaw(channel),
@@ -39,6 +49,10 @@ fun SentMessageEntity.toDeliveryRouteHistoryRecord(): DeliveryRouteHistoryRecord
 
 fun Iterable<SentMessageEntity>.toSentMessageListItems(): List<SentMessageListItem> {
     return map { it.toSentMessageListItem() }
+}
+
+fun Iterable<SentMessageEntity>.toChatHistoryMessageItems(): List<ChatHistoryMessageItem> {
+    return map { it.toChatHistoryMessageItem() }
 }
 
 fun Iterable<SentMessageEntity>.toDeliveryRouteHistoryRecords(): List<DeliveryRouteHistoryRecord> {

@@ -414,6 +414,9 @@ class EventsViewModel @Inject constructor(
         return when (this) {
             SaveManualEventUseCase.InvalidInputReason.MISSING_CONTACT -> string(R.string.events_error_missing_contact)
             SaveManualEventUseCase.InvalidInputReason.INVALID_DATE -> string(R.string.events_error_invalid_date)
+            SaveManualEventUseCase.InvalidInputReason.UNSUPPORTED_EVENT_TYPE -> string(
+                R.string.events_error_unsupported_event_type,
+            )
         }
     }
 

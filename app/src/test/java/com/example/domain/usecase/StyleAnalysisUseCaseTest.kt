@@ -112,4 +112,24 @@ class StyleAnalysisUseCaseTest {
             )
         }
     }
+
+    @Test
+    fun `analyzeAndSave accumulates sample count across analysis runs`() = runTest {
+        val texts = listOf(
+            "Hey Maya, loved catching up today.",
+            "Hey Rohan, wishing you a great week.",
+        )
+        coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileRecord(sampleCount = 7)
+
+        useCase.analyzeAndSave(texts, "TEST_SOURCE")
+
+        coVerify {
+            styleProfileRepository.upsertWithHistory(
+                match { profile ->
+                    profile.sampleCount == 9
+                },
+                any()
+            )
+        }
+    }
 }

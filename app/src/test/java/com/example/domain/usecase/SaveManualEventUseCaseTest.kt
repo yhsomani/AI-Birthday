@@ -117,6 +117,28 @@ class SaveManualEventUseCaseTest {
     }
 
     @Test
+    fun `unsupported event type does not persist anything`() = runTest {
+        val outcome = useCase(
+            SaveManualEventUseCase.Request(
+                existingContactId = "c1",
+                eventType = "TEAM_OUTING",
+                month = 6,
+                dayOfMonth = 12,
+            )
+        )
+
+        assertTrue(outcome is SaveManualEventUseCase.Outcome.InvalidInput)
+        assertEquals(
+            SaveManualEventUseCase.InvalidInputReason.UNSUPPORTED_EVENT_TYPE,
+            (outcome as SaveManualEventUseCase.Outcome.InvalidInput).reason,
+        )
+        coVerify(exactly = 0) { contactRepository.getById(any()) }
+        coVerify(exactly = 0) { contactRepository.upsert(any()) }
+        coVerify(exactly = 0) { eventRepository.upsertOccasion(any()) }
+        coVerify(exactly = 0) { eventReminderSchedulerService.scheduleReminder(any()) }
+    }
+
+    @Test
     fun `duplicate existing event returns warning before persisting`() = runTest {
         val contact = ContactEntity(id = "c1", name = "Alice")
         val existingEvent = event(

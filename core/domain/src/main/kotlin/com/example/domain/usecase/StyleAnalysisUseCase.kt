@@ -144,7 +144,7 @@ class StyleAnalysisUseCase @Inject constructor(
             preferredLanguage = preferredLanguage,
             emojiSetJson = emojiSetJson,
             toneDescriptors = toneDescriptorsJson,
-            sampleCount = texts.size,
+            sampleCount = currentProfile.sampleCount.coerceAtLeast(0) + texts.size,
             updatedAtMs = System.currentTimeMillis()
         )
 
@@ -165,19 +165,6 @@ class StyleAnalysisUseCase @Inject constructor(
         )
 
         styleProfileRepository.upsertWithHistory(newProfile, history)
-    }
-
-    private fun findCommonPhrases(texts: List<String>): List<String> {
-        val wordFreq = mutableMapOf<String, Int>()
-        texts.forEach { text ->
-            text.lowercase().split(Regex("\\s+")).distinct().forEach { word ->
-                val cleanWord = word.replace(Regex("[^a-zA-Z0-9]"), "")
-                if (cleanWord.length > 3) {
-                    wordFreq[cleanWord] = wordFreq.getOrDefault(cleanWord, 0) + 1
-                }
-            }
-        }
-        return wordFreq.filter { it.value > texts.size * 0.2 }.keys.toList()
     }
 
     private fun findTopEmojis(texts: List<String>): List<String> {

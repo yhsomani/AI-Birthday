@@ -113,7 +113,7 @@ class GenerateMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke with unknown approval mode falls back to full automation`() = runTest {
+    fun `invoke with unknown approval mode falls back to manual review`() = runTest {
         val event = occasion(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         val contact = ContactEntity(
             id = "c1",
@@ -140,12 +140,12 @@ class GenerateMessageUseCaseTest {
 
         assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
         val generated = result as GenerateMessageUseCase.GenerationOutcome.Generated
-        assertEquals(ApprovalMode.FULLY_AUTO, generated.approvalMode)
+        assertEquals(ApprovalMode.ALWAYS_ASK, generated.approvalMode)
         assertEquals(0, generated.retries)
 
         coVerify { messageRepository.insertPending(any()) }
-        coVerify(exactly = 0) { notificationService.showApprovalNotification(any(), any()) }
-        coVerify { schedulerService.scheduleExactSend(any()) }
+        coVerify { notificationService.showApprovalNotification(any(), any()) }
+        coVerify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
     }
 
     @Test
@@ -230,7 +230,7 @@ class GenerateMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke schedules fallback fully auto draft when a route is available`() = runTest {
+    fun `invoke forces review for fallback fully auto draft even when a route is available`() = runTest {
         val event = occasion(id = "e1", contactId = "c1", type = "BIRTHDAY", label = "Test", dayOfMonth = 1, month = 1, nextOccurrenceMs = 1000L)
         val contact = ContactEntity(
             id = "c1",
@@ -264,15 +264,15 @@ class GenerateMessageUseCaseTest {
         val result = useCase("e1")
 
         assertTrue(result is GenerateMessageUseCase.GenerationOutcome.Generated)
-        assertEquals(ApprovalMode.FULLY_AUTO, (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
+        assertEquals(ApprovalMode.ALWAYS_ASK, (result as GenerateMessageUseCase.GenerationOutcome.Generated).approvalMode)
         coVerify { messageRepository.insertPending(capture(pendingSlot)) }
-        assertEquals("FULLY_AUTO", pendingSlot.captured.approvalMode)
-        assertEquals("APPROVED", pendingSlot.captured.status)
+        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
+        assertEquals("PENDING", pendingSlot.captured.status)
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertTrue(pendingSlot.captured.isUsingFallback)
         verify { notificationService.showAiFallbackAlert() }
-        coVerify { schedulerService.scheduleExactSend(pendingSlot.captured.id) }
-        coVerify(exactly = 0) { notificationService.showApprovalNotification(any(), any()) }
+        coVerify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
+        coVerify { notificationService.showApprovalNotification(any(), variants) }
     }
 
     @Test

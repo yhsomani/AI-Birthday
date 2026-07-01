@@ -22,6 +22,7 @@ import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.MessageDispatcherService
+import com.example.domain.service.PreferencesRepository
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -40,6 +41,7 @@ class DispatchMessageUseCase @Inject constructor(
     private val messageDispatcherService: MessageDispatcherService,
     private val activityLogRepository: ActivityLogRepository,
     private val dispatchAttemptRepository: DispatchAttemptRepository,
+    private val preferencesRepository: PreferencesRepository,
 ) {
     suspend operator fun invoke(messageRef: String): DispatchOutcome {
         val pending = messageRepository.getMessageDispatchStateById(messageRef)
@@ -48,6 +50,9 @@ class DispatchMessageUseCase @Inject constructor(
 
         when (val decision = DispatchEligibilityPolicy.evaluate(
             draft = pending.draft,
+            quietHoursStart = preferencesRepository.getQuietHoursStart(),
+            quietHoursEnd = preferencesRepository.getQuietHoursEnd(),
+            blackoutDatesJson = preferencesRepository.getBlackoutDates(),
         )) {
             DispatchDecision.SendNow -> Unit
             is DispatchDecision.DeferUntil -> {

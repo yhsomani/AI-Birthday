@@ -134,8 +134,10 @@ class SecurePrefs(context: Context) {
 
     fun setGlobalAutomationMode(mode: String) = configPrefs.edit().putString("global_automation_mode", mode).apply()
     fun getGlobalAutomationMode(): String =
-        configPrefs.getString("global_automation_mode", ApprovalMode.FULLY_AUTO.raw)
-            ?: ApprovalMode.FULLY_AUTO.raw
+        configPrefs.getString(
+            "global_automation_mode",
+            GlobalAutomationModePrefsMapper.DEFAULT_GLOBAL_AUTOMATION_MODE.raw,
+        ) ?: GlobalAutomationModePrefsMapper.DEFAULT_GLOBAL_AUTOMATION_MODE.raw
     fun setGlobalApprovalMode(mode: ApprovalMode) = setGlobalAutomationMode(
         GlobalAutomationModePrefsMapper.toSupportedRaw(mode)
     )

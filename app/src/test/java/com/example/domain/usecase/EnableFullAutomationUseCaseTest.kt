@@ -193,8 +193,7 @@ class EnableFullAutomationUseCaseTest {
     }
 
     @Test
-    fun `invoke promotes nonblank fallback drafts when a delivery route exists`() = runTest {
-        val promoted = slot<PendingMessageEntity>()
+    fun `invoke leaves fallback drafts in review even when a delivery route exists`() = runTest {
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
@@ -214,13 +213,11 @@ class EnableFullAutomationUseCaseTest {
 
         val outcome = useCase()
 
-        assertEquals(1, outcome.promotedMessages)
+        assertEquals(0, outcome.promotedMessages)
         assertEquals(0, outcome.skippedWithoutRoute)
-        assertEquals(0, outcome.skippedNeedsReview)
-        coVerify { messageRepository.insertPending(capture(promoted)) }
-        assertEquals(MessageStatus.APPROVED.raw, promoted.captured.status)
-        assertEquals(ApprovalMode.FULLY_AUTO.raw, promoted.captured.approvalMode)
-        verify { schedulerService.scheduleExactSend("generic_1") }
+        assertEquals(1, outcome.skippedNeedsReview)
+        coVerify(exactly = 0) { messageRepository.insertPending(any()) }
+        verify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
     }
 
     @Test

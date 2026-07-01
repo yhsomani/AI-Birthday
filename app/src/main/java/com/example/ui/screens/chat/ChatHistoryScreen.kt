@@ -5,6 +5,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,7 +28,10 @@ import java.util.Date
 internal object ChatHistoryTestTags {
     const val LOADING = "chat_history_loading"
     const val EMPTY = "chat_history_empty"
+    const val EMPTY_SEARCH = "chat_history_empty_search"
     const val ERROR = "chat_history_error"
+    const val SEARCH_FIELD = "chat_history_search_field"
+    const val SEARCH_CLEAR = "chat_history_search_clear"
     const val MESSAGE_PREFIX = "chat_history_message_"
 }
 
@@ -40,6 +45,7 @@ fun ChatHistoryScreen(
     ChatHistoryContent(
         uiState = uiState,
         onBack = onBack,
+        onSearchQueryChange = viewModel::updateSearchQuery,
     )
 }
 
@@ -47,6 +53,7 @@ fun ChatHistoryScreen(
 internal fun ChatHistoryContent(
     uiState: ChatHistoryUiState,
     onBack: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
 ) {
     RelateScreen(
         title = stringResource(R.string.chat_history_title),
@@ -69,7 +76,7 @@ internal fun ChatHistoryContent(
                     .fillMaxSize()
                     .testTag(ChatHistoryTestTags.ERROR),
             )
-        } else if (uiState.messages.isEmpty()) {
+        } else if (uiState.totalMessageCount == 0) {
             EmptyState(
                 message = stringResource(R.string.chat_history_empty),
                 modifier = Modifier
@@ -83,9 +90,28 @@ internal fun ChatHistoryContent(
                     .padding(bottom = RelateSpacing.lg),
                 verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)
             ) {
-                items(uiState.messages, key = { it.id }) { message ->
+                item {
+                    ChatHistorySearchField(
+                        query = uiState.searchQuery,
+                        onQueryChange = onSearchQueryChange,
+                    )
+                }
+
+                if (uiState.messages.isEmpty()) {
+                    item {
+                        EmptyState(
+                            message = stringResource(R.string.chat_history_search_empty),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = RelateSpacing.xl)
+                                .testTag(ChatHistoryTestTags.EMPTY_SEARCH),
+                        )
+                    }
+                }
+
+                items(uiState.messages, key = { it.id.value }) { message ->
                     RelateGlassCard(
-                        modifier = Modifier.testTag(ChatHistoryTestTags.MESSAGE_PREFIX + message.id),
+                        modifier = Modifier.testTag(ChatHistoryTestTags.MESSAGE_PREFIX + message.id.value),
                     ) {
                         Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
                             Text(
@@ -115,9 +141,45 @@ internal fun ChatHistoryContent(
 }
 
 @Composable
-private fun channelLabel(channel: String): String = when (MessageChannel.fromRaw(channel)) {
+private fun ChatHistorySearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        label = { Text(stringResource(R.string.chat_history_search_label)) },
+        placeholder = { Text(stringResource(R.string.chat_history_search_placeholder)) },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = null,
+            )
+        },
+        trailingIcon = {
+            if (query.isNotBlank()) {
+                IconButton(
+                    onClick = { onQueryChange("") },
+                    modifier = Modifier.testTag(ChatHistoryTestTags.SEARCH_CLEAR),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.chat_history_search_clear),
+                    )
+                }
+            }
+        },
+        singleLine = true,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(ChatHistoryTestTags.SEARCH_FIELD),
+    )
+}
+
+@Composable
+private fun channelLabel(channel: MessageChannel): String = when (channel) {
     MessageChannel.SMS -> stringResource(R.string.channel_sms)
     MessageChannel.WHATSAPP -> stringResource(R.string.channel_whatsapp)
     MessageChannel.EMAIL -> stringResource(R.string.channel_email)
-    MessageChannel.UNKNOWN -> channel
+    MessageChannel.UNKNOWN -> stringResource(R.string.channel_unknown)
 }

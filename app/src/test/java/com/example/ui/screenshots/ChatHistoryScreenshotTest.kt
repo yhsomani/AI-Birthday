@@ -5,8 +5,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
-import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.SentMessageId
+import com.example.domain.model.message.ChatHistoryMessageItem
 import com.example.ui.screens.chat.ChatHistoryContent
 import com.example.ui.screens.chat.ChatHistoryUiState
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -58,7 +59,7 @@ class ChatHistoryScreenshotTest {
                     sentMessage(
                         id = "sent_long",
                         messageText = "Wishing you a calm, joyful birthday and a year full of steady wins, warm people, and time for the things you care about most.",
-                        channel = MessageChannel.EMAIL.raw,
+                        channel = MessageChannel.EMAIL,
                         sentAtMs = 1_767_688_200_000L,
                     ),
                 ),
@@ -84,7 +85,7 @@ class ChatHistoryScreenshotTest {
                         sentMessage(
                             id = "sent_long_hi",
                             messageText = "आपके जन्मदिन पर ढेर सारी शुभकामनाएं। उम्मीद है आपका दिन शांत, खुशियों भरा और अपने लोगों के साथ यादगार रहे।",
-                            channel = MessageChannel.EMAIL.raw,
+                            channel = MessageChannel.EMAIL,
                             sentAtMs = 1_767_688_200_000L,
                         ),
                     ),
@@ -227,6 +228,7 @@ class ChatHistoryScreenshotTest {
             ChatHistoryContent(
                 uiState = state,
                 onBack = {},
+                onSearchQueryChange = {},
             )
         }
         if (animationFrameMillis != null) {
@@ -243,22 +245,20 @@ class ChatHistoryScreenshotTest {
                 sentMessage(
                     id = "sent_whatsapp",
                     messageText = "Happy birthday, Riya. Hope your day feels easy, bright, and full of people who make you smile.",
-                    channel = MessageChannel.WHATSAPP.raw,
+                    channel = MessageChannel.WHATSAPP,
                     sentAtMs = 1_767_688_200_000L,
                 ),
                 sentMessage(
                     id = "sent_sms",
                     messageText = "Thinking of you on your milestone day. Have a wonderful celebration.",
-                    channel = MessageChannel.SMS.raw,
+                    channel = MessageChannel.SMS,
                     sentAtMs = 1_764_582_600_000L,
-                    occasionType = "ANNIVERSARY",
                 ),
                 sentMessage(
                     id = "sent_email",
                     messageText = "Congratulations on the new role. Wishing you a strong start.",
-                    channel = MessageChannel.EMAIL.raw,
+                    channel = MessageChannel.EMAIL,
                     sentAtMs = 1_760_176_800_000L,
-                    occasionType = "MILESTONE",
                 ),
             ),
         )
@@ -267,19 +267,13 @@ class ChatHistoryScreenshotTest {
     private fun sentMessage(
         id: String,
         messageText: String,
-        channel: String,
+        channel: MessageChannel,
         sentAtMs: Long,
-        occasionType: String = "BIRTHDAY",
-    ) = SentMessageEntity(
-        id = id,
-        contactId = ContactId,
-        eventType = occasionType,
-        occasionType = occasionType,
-        eventYear = 2026,
+    ) = ChatHistoryMessageItem(
+        id = SentMessageId(id),
         messageText = messageText,
         channel = channel,
         sentAtMs = sentAtMs,
-        deliveryStatus = "SENT",
     )
 
     private companion object {

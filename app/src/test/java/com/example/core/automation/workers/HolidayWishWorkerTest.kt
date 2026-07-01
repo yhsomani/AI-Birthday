@@ -122,7 +122,7 @@ class HolidayWishWorkerTest {
     }
 
     @Test
-    fun `doWork schedules fallback fully auto holiday wish when route is available`() = runTest {
+    fun `doWork forces review for fallback fully auto holiday wish when route is available`() = runTest {
         val contact = contact(automationMode = "FULLY_AUTO")
         val pendingSlot = slot<PendingMessageEntity>()
 
@@ -134,12 +134,12 @@ class HolidayWishWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.insert(capture(pendingSlot)) }
-        assertEquals("FULLY_AUTO", pendingSlot.captured.approvalMode)
-        assertEquals(MessageStatus.APPROVED.raw, pendingSlot.captured.status)
+        assertEquals("ALWAYS_ASK", pendingSlot.captured.approvalMode)
+        assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertEquals(true, pendingSlot.captured.isUsingFallback)
-        verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
-        verify(exactly = 0) { NotificationHelper.showApprovalNotification(any(), any(), any()) }
+        verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
+        verify { NotificationHelper.showApprovalNotification(any(), any(), any()) }
     }
 
     @Test

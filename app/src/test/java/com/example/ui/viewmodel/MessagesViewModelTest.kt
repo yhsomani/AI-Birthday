@@ -290,6 +290,14 @@ class MessagesViewModelTest {
         assertEquals(listOf("pm_email"), viewModel.uiState.value.blockedMessages.map { it.id })
         assertEquals(emptyList<String>(), viewModel.uiState.value.needsReviewMessages.map { it.id })
 
+        every { securePrefs.getSenderEmail() } returns "not-an-email"
+        every { securePrefs.getSenderEmailPassword() } returns "app-password"
+        preferenceChanges.tryEmit(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf("pm_email"), viewModel.uiState.value.blockedMessages.map { it.id })
+        assertEquals(emptyList<String>(), viewModel.uiState.value.needsReviewMessages.map { it.id })
+
         every { securePrefs.getSenderEmail() } returns "sender@example.com"
         every { securePrefs.getSenderEmailPassword() } returns "app-password"
         preferenceChanges.tryEmit(Unit)

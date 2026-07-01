@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -71,9 +72,10 @@ import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.relateSemanticColors
 import com.example.domain.model.gift.GiftHistoryRecord
-import com.example.domain.service.GiftSuggestion
 import com.example.ui.viewmodel.GiftAdvisorUiState
 import com.example.ui.viewmodel.GiftAdvisorViewModel
+import com.example.ui.viewmodel.GiftSuggestionBudgetStatus
+import com.example.ui.viewmodel.GiftSuggestionUiModel
 
 internal object GiftAdvisorTestTags {
     const val LOADING = "gift_advisor_loading"
@@ -83,6 +85,8 @@ internal object GiftAdvisorTestTags {
     const val SUGGESTIONS_PROGRESS = "gift_advisor_suggestions_progress"
     const val SUGGESTIONS_EMPTY = "gift_advisor_suggestions_empty"
     const val SUGGESTION_CARD_PREFIX = "gift_advisor_suggestion_"
+    const val SUGGESTION_RECORD_BUTTON_PREFIX = "gift_advisor_suggestion_record_"
+    const val SUGGESTION_DISMISS_BUTTON_PREFIX = "gift_advisor_suggestion_dismiss_"
     const val ERROR_CARD = "gift_advisor_error_card"
     const val EMPTY_HISTORY = "gift_advisor_empty_history"
     const val HISTORY_HEADER = "gift_advisor_history_header"
@@ -161,7 +165,7 @@ fun GiftAdvisorScreen(
         onShowAddDialog = { showAddDialog = true },
         onDismissDialog = {
             showAddDialog = false
-            attemptedSubmit = false
+            resetGiftForm()
         },
         onSaveGift = {
             attemptedSubmit = true
@@ -180,6 +184,17 @@ fun GiftAdvisorScreen(
         },
         onDeleteGift = viewModel::deleteGiftRecord,
         onGenerateSuggestions = viewModel::generateGiftSuggestions,
+        onDismissSuggestion = viewModel::dismissGiftSuggestion,
+        onRecordSuggestion = { suggestion ->
+            giftName = suggestion.name
+            giftCategory = ""
+            occasionType = ""
+            approxCost = suggestion.estimatedCostInr.takeIf { it > 0 }?.toString().orEmpty()
+            receivedWellState = null
+            giftNotes = suggestion.reason.take(GiftAdvisorViewModel.MAX_NOTES_LENGTH)
+            attemptedSubmit = false
+            showAddDialog = true
+        },
     )
 }
 
@@ -207,6 +222,8 @@ internal fun GiftAdvisorContent(
     onSaveGift: () -> Unit,
     onDeleteGift: (GiftHistoryRecord) -> Unit,
     onGenerateSuggestions: () -> Unit,
+    onDismissSuggestion: (Int) -> Unit,
+    onRecordSuggestion: (GiftSuggestionUiModel) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -284,6 +301,8 @@ internal fun GiftAdvisorContent(
                     GiftSuggestionsPanel(
                         uiState = uiState,
                         onGenerateSuggestions = onGenerateSuggestions,
+                        onDismissSuggestion = onDismissSuggestion,
+                        onRecordSuggestion = onRecordSuggestion,
                     )
                 }
 
@@ -444,6 +463,8 @@ private fun BudgetStatCard(
 private fun GiftSuggestionsPanel(
     uiState: GiftAdvisorUiState,
     onGenerateSuggestions: () -> Unit,
+    onDismissSuggestion: (Int) -> Unit,
+    onRecordSuggestion: (GiftSuggestionUiModel) -> Unit,
 ) {
     RelateGlassCard {
         Column(
@@ -500,7 +521,15 @@ private fun GiftSuggestionsPanel(
                     uiState.suggestions.forEachIndexed { index, suggestion ->
                         GiftSuggestionCard(
                             suggestion = suggestion,
+                            onDismissSuggestion = { onDismissSuggestion(index) },
+                            onRecordSuggestion = { onRecordSuggestion(suggestion) },
                             modifier = Modifier.testTag(GiftAdvisorTestTags.SUGGESTION_CARD_PREFIX + index),
+                            recordButtonModifier = Modifier.testTag(
+                                GiftAdvisorTestTags.SUGGESTION_RECORD_BUTTON_PREFIX + index,
+                            ),
+                            dismissButtonModifier = Modifier.testTag(
+                                GiftAdvisorTestTags.SUGGESTION_DISMISS_BUTTON_PREFIX + index,
+                            ),
                         )
                     }
                 }
@@ -511,8 +540,12 @@ private fun GiftSuggestionsPanel(
 
 @Composable
 private fun GiftSuggestionCard(
-    suggestion: GiftSuggestion,
+    suggestion: GiftSuggestionUiModel,
+    onDismissSuggestion: () -> Unit,
+    onRecordSuggestion: () -> Unit,
     modifier: Modifier = Modifier,
+    recordButtonModifier: Modifier = Modifier,
+    dismissButtonModifier: Modifier = Modifier,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -526,20 +559,50 @@ private fun GiftSuggestionCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top,
             ) {
-                Text(
-                    text = suggestion.name,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = suggestion.name,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = stringResource(R.string.gift_currency_inr_format, suggestion.estimatedCostInr),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
                 Spacer(modifier = Modifier.width(RelateSpacing.md))
-                Text(
-                    text = stringResource(R.string.gift_currency_inr_format, suggestion.estimatedCostInr),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = onDismissSuggestion,
+                        modifier = dismissButtonModifier,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = stringResource(
+                                R.string.gift_suggestion_dismiss,
+                                suggestion.name,
+                            ),
+                        )
+                    }
+                    Button(
+                        onClick = onRecordSuggestion,
+                        modifier = recordButtonModifier,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CardGiftcard,
+                            contentDescription = null,
+                            modifier = Modifier.size(RelateSize.iconSm),
+                        )
+                        Spacer(modifier = Modifier.width(RelateSpacing.xs))
+                        Text(text = stringResource(R.string.gift_suggestion_record_button))
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(RelateSpacing.xs))
             Text(
@@ -547,8 +610,61 @@ private fun GiftSuggestionCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
+            GiftSuggestionEvidence(suggestion = suggestion)
         }
     }
+}
+
+@Composable
+private fun GiftSuggestionEvidence(suggestion: GiftSuggestionUiModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.xxs)) {
+        GiftSuggestionEvidenceLine(
+            text = stringResource(R.string.gift_suggestion_confidence, suggestion.confidencePercent),
+            color = MaterialTheme.colorScheme.primary,
+        )
+
+        when (suggestion.budgetStatus) {
+            GiftSuggestionBudgetStatus.WITHIN_REMAINING_BUDGET -> GiftSuggestionEvidenceLine(
+                text = stringResource(R.string.gift_suggestion_budget_within),
+                color = MaterialTheme.relateSemanticColors.success,
+            )
+
+            GiftSuggestionBudgetStatus.OVER_REMAINING_BUDGET -> GiftSuggestionEvidenceLine(
+                text = stringResource(R.string.gift_suggestion_budget_over, suggestion.budgetOverageInr),
+                color = MaterialTheme.colorScheme.error,
+            )
+
+            GiftSuggestionBudgetStatus.UNKNOWN -> Unit
+        }
+
+        val duplicateName = suggestion.duplicateGiftName
+        if (duplicateName != null) {
+            GiftSuggestionEvidenceLine(
+                text = stringResource(R.string.gift_suggestion_duplicate_warning, duplicateName),
+                color = MaterialTheme.colorScheme.error,
+            )
+        } else if (suggestion.checkedAgainstHistory) {
+            GiftSuggestionEvidenceLine(
+                text = stringResource(R.string.gift_suggestion_history_checked),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GiftSuggestionEvidenceLine(
+    text: String,
+    color: Color,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = color,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable

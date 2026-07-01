@@ -185,6 +185,23 @@ class EventsViewModelTest {
     }
 
     @Test
+    fun `saveManualEvent unsupported event type exposes error`() = runTest(testDispatcher) {
+        every { eventRepository.getEventListItems() } returns MutableStateFlow(emptyList())
+        every { contactRepository.getContactPickerItems() } returns MutableStateFlow(emptyList())
+        coEvery { saveManualEventUseCase(any()) } returns SaveManualEventUseCase.Outcome.InvalidInput(
+            SaveManualEventUseCase.InvalidInputReason.UNSUPPORTED_EVENT_TYPE,
+        )
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+        viewModel.saveManualEvent("c1", null, "TEAM_OUTING", null, 6, 5, null)
+        advanceUntilIdle()
+
+        assertEquals(context.getString(R.string.events_error_unsupported_event_type), viewModel.uiState.value.error)
+        assertFalse(viewModel.uiState.value.isSavingManualEvent)
+    }
+
+    @Test
     fun `saveManualEvent duplicate exposes warning without snackbar error`() = runTest(testDispatcher) {
         val contact = contactHeader(id = "c1", displayName = "Alice")
         val event = eventListItem(

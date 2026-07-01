@@ -491,7 +491,7 @@ class RegeneratePendingMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke preserves approved status for nonblank fallback fully auto regeneration`() = runTest {
+    fun `invoke sends fallback fully auto regeneration back to review`() = runTest {
         val pending = pending(approvalMode = "FULLY_AUTO", status = "APPROVED")
         val contact = ContactEntity(
             id = "c_1",
@@ -539,9 +539,9 @@ class RegeneratePendingMessageUseCaseTest {
         useCase("pm_1", "approved draft", preserveApprovedStatus = true)
 
         coVerify { messageRepository.insertPending(capture(saved)) }
-        assertEquals("FULLY_AUTO", saved.captured.approvalMode)
-        assertEquals("APPROVED", saved.captured.status)
+        assertEquals("ALWAYS_ASK", saved.captured.approvalMode)
+        assertEquals("PENDING", saved.captured.status)
         assertEquals(35, saved.captured.qualityScore)
-        verify { schedulerService.scheduleExactSend("pm_1") }
+        verify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
     }
 }

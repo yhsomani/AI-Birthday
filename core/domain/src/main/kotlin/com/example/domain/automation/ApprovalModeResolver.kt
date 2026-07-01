@@ -17,7 +17,7 @@ object ApprovalModeResolver {
 
         val global = globalMode
             .takeIf { it.isExplicitAutomationMode() }
-            ?: ApprovalMode.FULLY_AUTO
+            ?: ApprovalMode.ALWAYS_ASK
 
         if (global == ApprovalMode.FULLY_AUTO) {
             return ApprovalMode.FULLY_AUTO

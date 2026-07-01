@@ -46,7 +46,6 @@ object AiAutoSendQualityGate {
         }
 
         val finalMode = when {
-            requestedMode == ApprovalMode.FULLY_AUTO && trimmed.isNotBlank() -> ApprovalMode.FULLY_AUTO
             requestedMode.schedulesAutomaticDispatch() && score < FULLY_AUTO_MIN_SCORE -> ApprovalMode.ALWAYS_ASK
             else -> requestedMode
         }

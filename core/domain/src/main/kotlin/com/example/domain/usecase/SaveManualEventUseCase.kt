@@ -31,6 +31,7 @@ class SaveManualEventUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(request: Request): Outcome {
         val eventType = request.eventType.normalizedOccasionTypeOrDefault(OccasionType.BIRTHDAY)
+            ?: return Outcome.InvalidInput(InvalidInputReason.UNSUPPORTED_EVENT_TYPE)
         val normalizedLabel = request.label?.trim()?.ifBlank { null }
         val contact = when {
             request.existingContactId != null -> {
@@ -192,6 +193,7 @@ class SaveManualEventUseCase @Inject constructor(
     enum class InvalidInputReason {
         MISSING_CONTACT,
         INVALID_DATE,
+        UNSUPPORTED_EVENT_TYPE,
     }
 
     private suspend fun existingOccasions(): List<Occasion> {
@@ -218,9 +220,9 @@ class SaveManualEventUseCase @Inject constructor(
         }
     }
 
-    private fun String.normalizedOccasionTypeOrDefault(defaultType: OccasionType): OccasionType {
+    private fun String.normalizedOccasionTypeOrDefault(defaultType: OccasionType): OccasionType? {
         val normalized = trim().uppercase(Locale.US)
         if (normalized.isBlank()) return defaultType
-        return OccasionType.fromRaw(normalized).takeUnless { it == OccasionType.UNKNOWN } ?: OccasionType.UNKNOWN
+        return OccasionType.fromRaw(normalized).takeUnless { it == OccasionType.UNKNOWN }
     }
 }

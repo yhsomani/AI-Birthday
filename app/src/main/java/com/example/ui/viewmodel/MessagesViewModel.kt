@@ -8,6 +8,7 @@ import com.example.R
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.automation.AutomationSchedulePolicy
+import com.example.domain.automation.EmailAddressSyntaxPolicy
 import com.example.domain.model.ActivityLogType
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
@@ -568,7 +569,11 @@ class MessagesViewModel @Inject constructor(
             }
             MessageChannel.EMAIL -> {
                 if (contact.primaryEmail.isNullOrBlank()) return MessageReadiness.MISSING_EMAIL
-                if (securePrefs.getSenderEmail().isBlank() || securePrefs.getSenderEmailPassword().isBlank()) {
+                if (!EmailAddressSyntaxPolicy.isConfiguredSender(
+                        securePrefs.getSenderEmail(),
+                        securePrefs.getSenderEmailPassword(),
+                    )
+                ) {
                     return MessageReadiness.EMAIL_SETUP_MISSING
                 }
             }

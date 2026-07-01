@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import com.example.R
 import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.SentMessageId
+import com.example.domain.model.message.ChatHistoryMessageItem
 import com.example.domain.repository.MessageRepository
 import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
@@ -60,7 +62,8 @@ class ChatHistoryViewModelTest {
         advanceUntilIdle()
 
         assertEquals(false, viewModel.uiState.value.isLoading)
-        assertEquals(listOf(sentMessage), viewModel.uiState.value.messages)
+        assertEquals(listOf(sentMessage.toChatHistoryItem()), viewModel.uiState.value.messages)
+        assertEquals(1, viewModel.uiState.value.totalMessageCount)
         assertEquals(null, viewModel.uiState.value.errorMessageRes)
     }
 
@@ -77,7 +80,8 @@ class ChatHistoryViewModelTest {
         advanceUntilIdle()
 
         assertEquals(false, viewModel.uiState.value.isLoading)
-        assertEquals(emptyList<SentMessageEntity>(), viewModel.uiState.value.messages)
+        assertEquals(emptyList<ChatHistoryMessageItem>(), viewModel.uiState.value.messages)
+        assertEquals(0, viewModel.uiState.value.totalMessageCount)
         assertEquals(R.string.chat_history_error_load, viewModel.uiState.value.errorMessageRes)
     }
 
@@ -88,24 +92,79 @@ class ChatHistoryViewModelTest {
             messageRepository = messageRepository,
         )
         advanceUntilIdle()
-        assertEquals(emptyList<SentMessageEntity>(), viewModel.uiState.value.messages)
+        assertEquals(emptyList<ChatHistoryMessageItem>(), viewModel.uiState.value.messages)
 
         val sentMessage = sentMessage()
         sentMessages.value = listOf(sentMessage)
         advanceUntilIdle()
 
-        assertEquals(listOf(sentMessage), viewModel.uiState.value.messages)
+        assertEquals(listOf(sentMessage.toChatHistoryItem()), viewModel.uiState.value.messages)
+        assertEquals(1, viewModel.uiState.value.totalMessageCount)
         assertEquals(null, viewModel.uiState.value.errorMessageRes)
     }
 
-    private fun sentMessage(): SentMessageEntity = SentMessageEntity(
-        id = "sent_1",
+    @Test
+    fun `updateSearchQuery filters visible messages and survives history updates`() = runTest(testDispatcher) {
+        val birthday = sentMessage(
+            id = "sent_1",
+            messageText = "Happy birthday!",
+            channel = MessageChannel.WHATSAPP.raw,
+        )
+        val project = sentMessage(
+            id = "sent_2",
+            messageText = "Project milestone note",
+            channel = MessageChannel.EMAIL.raw,
+        )
+        sentMessages.value = listOf(birthday, project)
+        val viewModel = ChatHistoryViewModel(
+            savedStateHandle = SavedStateHandle(mapOf("contactId" to "contact_1")),
+            messageRepository = messageRepository,
+        )
+        advanceUntilIdle()
+
+        viewModel.updateSearchQuery("project")
+
+        assertEquals("project", viewModel.uiState.value.searchQuery)
+        assertEquals(2, viewModel.uiState.value.totalMessageCount)
+        assertEquals(listOf(project.toChatHistoryItem()), viewModel.uiState.value.messages)
+
+        val projectFollowUp = sentMessage(
+            id = "sent_3",
+            messageText = "Project celebration follow-up",
+            channel = MessageChannel.SMS.raw,
+        )
+        sentMessages.value = listOf(birthday, project, projectFollowUp)
+        advanceUntilIdle()
+
+        assertEquals("project", viewModel.uiState.value.searchQuery)
+        assertEquals(3, viewModel.uiState.value.totalMessageCount)
+        assertEquals(
+            listOf(project.toChatHistoryItem(), projectFollowUp.toChatHistoryItem()),
+            viewModel.uiState.value.messages,
+        )
+    }
+
+    private fun sentMessage(
+        id: String = "sent_1",
+        messageText: String = "Happy birthday!",
+        channel: String = MessageChannel.WHATSAPP.raw,
+    ): SentMessageEntity = SentMessageEntity(
+        id = id,
         contactId = "contact_1",
         eventType = "BIRTHDAY",
         eventYear = 2026,
-        messageText = "Happy birthday!",
-        channel = MessageChannel.WHATSAPP.raw,
+        messageText = messageText,
+        channel = channel,
         sentAtMs = 1_700_000_000_000L,
         deliveryStatus = "SENT",
     )
+
+    private fun SentMessageEntity.toChatHistoryItem(): ChatHistoryMessageItem {
+        return ChatHistoryMessageItem(
+            id = SentMessageId(id),
+            messageText = messageText,
+            channel = MessageChannel.fromRaw(channel),
+            sentAtMs = sentAtMs,
+        )
+    }
 }
