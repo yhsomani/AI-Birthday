@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.auth.AuthManager
 import com.example.core.prefs.SecurePrefs
 import com.example.R
+import com.example.domain.automation.EmailAddressSyntaxPolicy
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.repository.ContactRepository
@@ -154,7 +155,7 @@ class SettingsViewModel @Inject constructor(
             )
             return
         }
-        if (!EMAIL_ADDRESS_PATTERN.matches(email)) {
+        if (!EmailAddressSyntaxPolicy.isUsableAddress(email)) {
             _uiState.value = _uiState.value.copy(
                 feedbackEvent = FeedbackEvent(
                     message = UiText.Resource(R.string.settings_email_invalid),
@@ -395,7 +396,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     private companion object {
-        val EMAIL_ADDRESS_PATTERN = Regex("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", RegexOption.IGNORE_CASE)
         val CHANNEL_TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")
     }
 }

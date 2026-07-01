@@ -179,6 +179,12 @@
     <string name="wish_preview_approve_schedule">स्वीकृत करें और शेड्यूल करें</string>
     <string name="wish_preview_approved">शुभकामना स्वीकृत और शेड्यूल हो गई।</string>
     <string name="wish_preview_rejected">शुभकामना अस्वीकार हो गई।</string>
+    <string name="wish_preview_confirm_approve_title">इस शुभकामना को स्वीकृत करें?</string>
+    <string name="wish_preview_confirm_approve_body">संदेश डिलीवरी के लिए शेड्यूल किया जाएगा। यह क्रिया पूर्ववत नहीं की जा सकती।</string>
+    <string name="wish_preview_confirm_approve_action">स्वीकृत करें</string>
+    <string name="wish_preview_confirm_reject_title">इस शुभकामना को अस्वीकार करें?</string>
+    <string name="wish_preview_confirm_reject_body">संदेश हटा दिया जाएगा और भेजा नहीं जाएगा। आप बाद में नया ड्राफ्ट बना सकते हैं।</string>
+    <string name="wish_preview_confirm_reject_action">अस्वीकार करें</string>
     <string name="wish_preview_review_next">अगली समीक्षा करें</string>
     <string name="wish_preview_review_next_count_one">1 लंबित शुभकामना बची है।</string>
     <string name="wish_preview_review_next_count_many">%1$d लंबित शुभकामनाएं बची हैं।</string>

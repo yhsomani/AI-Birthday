@@ -18,6 +18,11 @@ gen/
 out/
 *.log
 *.hprof
+
+# Diagnostic log dumps
+app_logs*.txt
+logcat*.txt
+lint_baseline*.txt
 *.png
 *.jpg
 *.jpeg

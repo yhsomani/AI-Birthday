@@ -21,6 +21,7 @@ import com.example.core.resilience.HealthMonitor
 import com.example.core.resilience.LogEntry
 import com.example.core.resilience.SensitiveLogRedactor
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.automation.EmailAddressSyntaxPolicy
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.DiagnosticSnapshotId
@@ -158,7 +159,6 @@ class AutomationSetupViewModel @Inject constructor(
         const val CHANNEL_VERIFICATION_WINDOW_MS = 30L * 24 * 60 * 60 * 1000
         const val GOOGLE_CONTACTS_SCOPE_URI = "https://www.googleapis.com/auth/contacts.readonly"
         val CHANNEL_TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")
-        val EMAIL_ADDRESS_PATTERN = Regex("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", RegexOption.IGNORE_CASE)
         val GOOGLE_CONTACTS_SCOPE = Scope(GOOGLE_CONTACTS_SCOPE_URI)
     }
 
@@ -1169,7 +1169,7 @@ class AutomationSetupViewModel @Inject constructor(
     }
 
     private fun isValidEmailAddress(value: String): Boolean {
-        return EMAIL_ADDRESS_PATTERN.matches(value)
+        return EmailAddressSyntaxPolicy.isUsableAddress(value)
     }
 
     private fun selectedAutomaticChannelCounts(

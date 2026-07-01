@@ -178,6 +178,12 @@
     <string name="wish_preview_approve_schedule">Approve &amp; Schedule</string>
     <string name="wish_preview_approved">Wish approved and scheduled.</string>
     <string name="wish_preview_rejected">Wish rejected.</string>
+    <string name="wish_preview_confirm_approve_title">Approve this wish?</string>
+    <string name="wish_preview_confirm_approve_body">The message will be scheduled for delivery. This action cannot be undone.</string>
+    <string name="wish_preview_confirm_approve_action">Approve</string>
+    <string name="wish_preview_confirm_reject_title">Reject this wish?</string>
+    <string name="wish_preview_confirm_reject_body">The message will be discarded and will not be sent. You can regenerate a new draft later.</string>
+    <string name="wish_preview_confirm_reject_action">Reject</string>
     <string name="wish_preview_review_next">Review next</string>
     <string name="wish_preview_review_next_count_one">1 pending wish remains.</string>
     <string name="wish_preview_review_next_count_many">%1$d pending wishes remain.</string>

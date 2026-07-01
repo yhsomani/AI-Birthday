@@ -159,6 +159,9 @@ internal fun ContactListContent(
         OutlinedTextField(
             value = state.searchQuery,
             onValueChange = onSearchQueryChange,
+            label = {
+                Text(stringResource(R.string.contacts_search_placeholder))
+            },
             placeholder = {
                 Text(
                     stringResource(R.string.contacts_search_placeholder),

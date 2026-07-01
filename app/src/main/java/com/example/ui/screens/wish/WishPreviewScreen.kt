@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,10 +30,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -93,6 +97,12 @@ internal object WishPreviewTestTags {
     const val CONTENT_BOTTOM = "wish_preview_content_bottom"
     const val VARIANT_PREFIX = "wish_preview_variant_"
     const val FEEDBACK_PREFIX = "wish_preview_feedback_"
+    const val CONFIRM_APPROVE_DIALOG = "wish_preview_confirm_approve_dialog"
+    const val CONFIRM_APPROVE_ACTION = "wish_preview_confirm_approve_action"
+    const val CONFIRM_APPROVE_CANCEL = "wish_preview_confirm_approve_cancel"
+    const val CONFIRM_REJECT_DIALOG = "wish_preview_confirm_reject_dialog"
+    const val CONFIRM_REJECT_ACTION = "wish_preview_confirm_reject_action"
+    const val CONFIRM_REJECT_CANCEL = "wish_preview_confirm_reject_cancel"
 }
 
 @Composable
@@ -255,6 +265,29 @@ internal fun WishPreviewContent(
     onApprove: () -> Unit = {},
     onReviewNext: (ReviewNextTarget) -> Unit = {},
 ) {
+    var showApproveDialog by remember { mutableStateOf(false) }
+    var showRejectDialog by remember { mutableStateOf(false) }
+
+    if (showApproveDialog) {
+        WishPreviewConfirmApproveDialog(
+            onConfirm = {
+                showApproveDialog = false
+                onApprove()
+            },
+            onDismiss = { showApproveDialog = false },
+        )
+    }
+
+    if (showRejectDialog) {
+        WishPreviewConfirmRejectDialog(
+            onConfirm = {
+                showRejectDialog = false
+                onReject()
+            },
+            onDismiss = { showRejectDialog = false },
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -314,6 +347,9 @@ internal fun WishPreviewContent(
             OutlinedTextField(
                 value = state.editedText,
                 onValueChange = onEditedTextChange,
+                label = {
+                    Text(stringResource(R.string.wish_preview_message_label))
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(RelateSpacing.sm)
@@ -471,7 +507,7 @@ internal fun WishPreviewContent(
                 horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
             ) {
                 Button(
-                    onClick = onReject,
+                    onClick = { showRejectDialog = true },
                     modifier = Modifier
                         .weight(1f)
                         .height(RelateSize.primaryButtonHeight)
@@ -498,7 +534,7 @@ internal fun WishPreviewContent(
                 }
                 RelatePrimaryButton(
                     text = stringResource(R.string.wish_preview_approve_schedule),
-                    onClick = onApprove,
+                    onClick = { showApproveDialog = true },
                     modifier = Modifier
                         .weight(1f)
                         .testTag(WishPreviewTestTags.APPROVE_BUTTON),
@@ -810,4 +846,88 @@ private fun ToneChip(
             else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+@Composable
+private fun WishPreviewConfirmApproveDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        modifier = Modifier.testTag(WishPreviewTestTags.CONFIRM_APPROVE_DIALOG),
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(R.string.wish_preview_confirm_approve_title),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.wish_preview_confirm_approve_body),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                modifier = Modifier.testTag(WishPreviewTestTags.CONFIRM_APPROVE_ACTION),
+                onClick = onConfirm,
+            ) {
+                Text(
+                    text = stringResource(R.string.wish_preview_confirm_approve_action),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                modifier = Modifier.testTag(WishPreviewTestTags.CONFIRM_APPROVE_CANCEL),
+                onClick = onDismiss,
+            ) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun WishPreviewConfirmRejectDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        modifier = Modifier.testTag(WishPreviewTestTags.CONFIRM_REJECT_DIALOG),
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(R.string.wish_preview_confirm_reject_title),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.wish_preview_confirm_reject_body),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                modifier = Modifier.testTag(WishPreviewTestTags.CONFIRM_REJECT_ACTION),
+                onClick = onConfirm,
+            ) {
+                Text(
+                    text = stringResource(R.string.wish_preview_confirm_reject_action),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                modifier = Modifier.testTag(WishPreviewTestTags.CONFIRM_REJECT_CANCEL),
+                onClick = onDismiss,
+            ) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
 }
