@@ -90,6 +90,7 @@ class WishPreviewScreenInteractionTest {
         composeRule.onNodeWithTag(WishPreviewTestTags.SEND_SUMMARY)
             .performScrollTo()
             .assertIsDisplayed()
+        composeRule.waitForIdle()
         clickScrollableTag(WishPreviewTestTags.FEEDBACK_PREFIX + "too_generic")
         clickScrollableTag(WishPreviewTestTags.REGENERATE_BUTTON)
         clickScrollableTag(WishPreviewTestTags.TEST_SEND_BUTTON)
