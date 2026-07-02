@@ -279,11 +279,11 @@ class RegeneratePendingMessageUseCaseTest {
         useCase("pm_1", "current draft")
 
         coVerify { messageRepository.insertPending(capture(saved)) }
-        assertEquals("FULLY_AUTO", saved.captured.approvalMode)
-        assertEquals("APPROVED", saved.captured.status)
+        assertEquals("ALWAYS_ASK", saved.captured.approvalMode)
+        assertEquals("PENDING", saved.captured.status)
         assertEquals(35, saved.captured.qualityScore)
         assertTrue(saved.captured.isUsingFallback)
-        verify { schedulerService.scheduleExactSend("pm_1") }
+        verify(exactly = 0) { schedulerService.scheduleExactSend("pm_1") }
     }
 
     @Test

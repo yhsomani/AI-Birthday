@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Work
@@ -264,6 +265,17 @@ internal fun EventsContent(
                 label = { Text(stringResource(R.string.search)) },
                 placeholder = { Text(stringResource(R.string.events_search_placeholder)) },
                 singleLine = true,
+                trailingIcon = {
+                    if (state.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { onSearchQueryChanged("") }) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = stringResource(R.string.clear_search),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                },
                 colors = relateTextFieldColors(),
             )
             Spacer(modifier = Modifier.height(RelateSpacing.md))
