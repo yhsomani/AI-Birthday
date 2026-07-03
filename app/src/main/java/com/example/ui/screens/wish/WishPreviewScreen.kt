@@ -56,12 +56,25 @@ import com.example.core.ui.theme.RelateFraction
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
+import com.example.domain.message.WishPreviewDeviceSetupContext
+import com.example.domain.message.WishPreviewDeviceSetupReason
+import com.example.domain.message.WishPreviewDeviceSetupState
+import com.example.domain.message.WishPreviewDispatchContext
+import com.example.domain.message.WishPreviewDispatchReason
+import com.example.domain.message.WishPreviewDispatchState
+import com.example.domain.message.WishPreviewRouteContext
+import com.example.domain.message.WishPreviewRouteReason
+import com.example.domain.message.WishPreviewRouteSelectionContext
+import com.example.domain.message.WishPreviewRouteSelectionState
+import com.example.domain.message.WishPreviewRouteState
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.occasion.OccasionType
+import com.example.domain.readiness.RelationshipActionReadiness
+import com.example.domain.readiness.RelationshipReadinessReason
+import com.example.domain.readiness.RelationshipReadinessState
 import com.example.ui.feedback.asString
 import com.example.ui.viewmodel.ReviewNextTarget
-import com.example.ui.viewmodel.WishDraftReadiness
 import com.example.ui.viewmodel.WishPreviewSendSummary
 import com.example.ui.viewmodel.WishPreviewUiState
 import com.example.ui.viewmodel.WishPreviewViewModel
@@ -332,6 +345,7 @@ internal fun WishPreviewContent(
             Spacer(modifier = Modifier.height(RelateSpacing.lg))
             WishSendSummaryCard(
                 summary = summary,
+                readiness = state.sendActionReadiness,
                 modifier = Modifier.testTag(WishPreviewTestTags.SEND_SUMMARY),
             )
         }
@@ -368,7 +382,7 @@ internal fun WishPreviewContent(
             )
         }
         DraftReadinessMessage(
-            readiness = state.draftReadiness,
+            readiness = state.draftActionReadiness,
             modifier = Modifier.testTag(WishPreviewTestTags.DRAFT_READINESS),
         )
 
@@ -538,7 +552,7 @@ internal fun WishPreviewContent(
                     modifier = Modifier
                         .weight(1f)
                         .testTag(WishPreviewTestTags.APPROVE_BUTTON),
-                    enabled = !state.draftReadiness.blocksApproval(),
+                    enabled = !state.blocksApproval,
                 )
             }
         } else if (state.approved) {
@@ -567,13 +581,13 @@ internal fun WishPreviewContent(
 
 @Composable
 private fun DraftReadinessMessage(
-    readiness: WishDraftReadiness,
+    readiness: RelationshipActionReadiness,
     modifier: Modifier = Modifier,
 ) {
     Text(
         text = readiness.label(),
         style = MaterialTheme.typography.bodySmall,
-        color = if (readiness.blocksApproval()) {
+        color = if (readiness.state == RelationshipReadinessState.ACTION_REQUIRED) {
             MaterialTheme.colorScheme.error
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
@@ -583,20 +597,18 @@ private fun DraftReadinessMessage(
 }
 
 @Composable
-private fun WishDraftReadiness.label(): String = when (this) {
-    WishDraftReadiness.READY -> stringResource(R.string.wish_preview_readiness_ready)
-    WishDraftReadiness.EDITED_READY -> stringResource(R.string.wish_preview_readiness_edited)
-    WishDraftReadiness.TOO_SHORT -> stringResource(R.string.wish_preview_readiness_short)
-    WishDraftReadiness.BLANK -> stringResource(R.string.wish_preview_readiness_blank)
-}
-
-private fun WishDraftReadiness.blocksApproval(): Boolean {
-    return this == WishDraftReadiness.BLANK || this == WishDraftReadiness.TOO_SHORT
+private fun RelationshipActionReadiness.label(): String = when (primaryReason) {
+    RelationshipReadinessReason.DRAFT_READY -> stringResource(R.string.wish_preview_readiness_ready)
+    RelationshipReadinessReason.DRAFT_EDITED_READY -> stringResource(R.string.wish_preview_readiness_edited)
+    RelationshipReadinessReason.DRAFT_TOO_SHORT -> stringResource(R.string.wish_preview_readiness_short)
+    RelationshipReadinessReason.DRAFT_BLANK -> stringResource(R.string.wish_preview_readiness_blank)
+    else -> stringResource(R.string.wish_preview_readiness_ready)
 }
 
 @Composable
 private fun WishSendSummaryCard(
     summary: WishPreviewSendSummary,
+    readiness: RelationshipActionReadiness?,
     modifier: Modifier = Modifier,
 ) {
     val dateFormat = remember { SimpleDateFormat("MMM dd, h:mm a", Locale.getDefault()) }
@@ -608,7 +620,7 @@ private fun WishSendSummaryCard(
             Text(
                 text = stringResource(R.string.wish_preview_send_summary_title),
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = readiness?.state?.sendSummaryTitleColor() ?: MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
             )
             SendSummaryRow(
@@ -619,6 +631,24 @@ private fun WishSendSummaryCard(
                 label = stringResource(R.string.wish_preview_summary_route),
                 value = channelLabel(summary.channel),
             )
+            summary.routeSelectionContext?.let { routeSelectionContext ->
+                SendSummaryRow(
+                    label = stringResource(R.string.wish_preview_summary_route_choice),
+                    value = routeSelectionContextLabel(routeSelectionContext),
+                )
+            }
+            summary.routeContext?.let { routeContext ->
+                SendSummaryRow(
+                    label = stringResource(R.string.wish_preview_summary_route_setup),
+                    value = routeContextLabel(routeContext),
+                )
+            }
+            summary.deviceSetupContext?.let { deviceSetupContext ->
+                SendSummaryRow(
+                    label = stringResource(R.string.wish_preview_summary_device_setup),
+                    value = deviceSetupContextLabel(deviceSetupContext),
+                )
+            }
             SendSummaryRow(
                 label = stringResource(R.string.wish_preview_summary_schedule),
                 value = dateFormat.format(Date(summary.scheduledForMs)),
@@ -626,6 +656,10 @@ private fun WishSendSummaryCard(
             SendSummaryRow(
                 label = stringResource(R.string.wish_preview_summary_approval),
                 value = approvalModeLabel(summary.approvalMode),
+            )
+            SendSummaryRow(
+                label = stringResource(R.string.wish_preview_summary_dispatch),
+                value = dispatchContextLabel(summary.dispatchContext),
             )
             SendSummaryRow(
                 label = stringResource(R.string.wish_preview_summary_quality),
@@ -637,6 +671,16 @@ private fun WishSendSummaryCard(
             )
         }
     }
+}
+
+@Composable
+private fun RelationshipReadinessState.sendSummaryTitleColor() = when (this) {
+    RelationshipReadinessState.ACTION_REQUIRED -> MaterialTheme.colorScheme.error
+    RelationshipReadinessState.WARNING -> MaterialTheme.colorScheme.tertiary
+    RelationshipReadinessState.WAITING -> MaterialTheme.colorScheme.secondary
+    RelationshipReadinessState.READY,
+    RelationshipReadinessState.NEEDS_REVIEW,
+    RelationshipReadinessState.IN_PROGRESS -> MaterialTheme.colorScheme.primary
 }
 
 @Composable
@@ -663,6 +707,115 @@ private fun SendSummaryRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(RelateFraction.metadataValue),
         )
+    }
+}
+
+@Composable
+private fun routeSelectionContextLabel(
+    context: WishPreviewRouteSelectionContext,
+): String {
+    return when (context.state) {
+        WishPreviewRouteSelectionState.PREFERRED_ROUTE ->
+            stringResource(R.string.wish_preview_summary_route_choice_preferred)
+        WishPreviewRouteSelectionState.FALLBACK_ROUTE ->
+            stringResource(
+                R.string.wish_preview_summary_route_choice_fallback,
+                channelLabel(context.preferredChannel),
+            )
+    }
+}
+
+@Composable
+private fun deviceSetupContextLabel(
+    context: WishPreviewDeviceSetupContext,
+): String {
+    return when (context.state) {
+        WishPreviewDeviceSetupState.READY -> when (context.reason) {
+            WishPreviewDeviceSetupReason.WHATSAPP_READY ->
+                stringResource(R.string.wish_preview_summary_device_whatsapp_ready)
+            else -> stringResource(R.string.wish_preview_summary_device_sms_ready)
+        }
+        WishPreviewDeviceSetupState.NOT_REQUIRED -> when (context.reason) {
+            WishPreviewDeviceSetupReason.WHATSAPP_DISABLED ->
+                stringResource(R.string.wish_preview_summary_device_whatsapp_disabled)
+            else -> stringResource(R.string.wish_preview_summary_device_sms_disabled)
+        }
+        WishPreviewDeviceSetupState.ACTION_REQUIRED -> when (context.reason) {
+            WishPreviewDeviceSetupReason.SMS_PERMISSION_MISSING ->
+                stringResource(R.string.wish_preview_summary_device_sms_permission_missing)
+            WishPreviewDeviceSetupReason.WHATSAPP_CONSENT_REQUIRED ->
+                stringResource(R.string.wish_preview_summary_device_whatsapp_consent_required)
+            WishPreviewDeviceSetupReason.WHATSAPP_APP_MISSING ->
+                stringResource(R.string.wish_preview_summary_device_whatsapp_app_missing)
+            WishPreviewDeviceSetupReason.WHATSAPP_ACCESSIBILITY_MISSING ->
+                stringResource(R.string.wish_preview_summary_device_whatsapp_accessibility_missing)
+            WishPreviewDeviceSetupReason.SMS_READY,
+            WishPreviewDeviceSetupReason.SMS_DISABLED,
+            WishPreviewDeviceSetupReason.WHATSAPP_READY,
+            WishPreviewDeviceSetupReason.WHATSAPP_DISABLED ->
+                stringResource(R.string.wish_preview_summary_device_setup_required)
+        }
+    }
+}
+
+@Composable
+private fun routeContextLabel(
+    context: WishPreviewRouteContext,
+): String {
+    return when (context.state) {
+        WishPreviewRouteState.READY -> stringResource(R.string.wish_preview_summary_route_ready)
+        WishPreviewRouteState.BLOCKED -> when (context.reason) {
+            WishPreviewRouteReason.READY -> stringResource(R.string.wish_preview_summary_route_ready)
+            WishPreviewRouteReason.CONTACT_MISSING ->
+                stringResource(R.string.wish_preview_summary_route_contact_missing)
+            WishPreviewRouteReason.CHANNEL_DISABLED ->
+                stringResource(R.string.wish_preview_summary_route_channel_disabled)
+            WishPreviewRouteReason.MISSING_PHONE ->
+                stringResource(R.string.wish_preview_summary_route_missing_phone)
+            WishPreviewRouteReason.MISSING_EMAIL ->
+                stringResource(R.string.wish_preview_summary_route_missing_email)
+            WishPreviewRouteReason.EMAIL_SETUP_MISSING ->
+                stringResource(R.string.wish_preview_summary_route_email_setup_missing)
+            WishPreviewRouteReason.EMAIL_SENDER_INVALID ->
+                stringResource(R.string.wish_preview_summary_route_email_sender_invalid)
+            WishPreviewRouteReason.UNSUPPORTED_CHANNEL ->
+                stringResource(R.string.wish_preview_summary_route_unsupported)
+        }
+    }
+}
+
+@Composable
+private fun dispatchContextLabel(
+    context: WishPreviewDispatchContext,
+): String {
+    return when (context.state) {
+        WishPreviewDispatchState.NEEDS_APPROVAL ->
+            stringResource(R.string.wish_preview_summary_dispatch_needs_approval)
+        WishPreviewDispatchState.READY_TO_SEND ->
+            stringResource(R.string.wish_preview_summary_dispatch_ready)
+        WishPreviewDispatchState.SCHEDULED ->
+            stringResource(R.string.wish_preview_summary_dispatch_scheduled)
+        WishPreviewDispatchState.DEFERRED ->
+            stringResource(R.string.wish_preview_summary_dispatch_deferred)
+        WishPreviewDispatchState.EXPIRED ->
+            stringResource(R.string.wish_preview_summary_dispatch_expired)
+        WishPreviewDispatchState.BLOCKED -> when (context.reason) {
+            WishPreviewDispatchReason.ALREADY_HANDLED ->
+                stringResource(R.string.wish_preview_summary_dispatch_handled)
+            WishPreviewDispatchReason.REJECTED ->
+                stringResource(R.string.wish_preview_summary_dispatch_rejected)
+            WishPreviewDispatchReason.EXPIRED,
+            WishPreviewDispatchReason.APPROVAL_WINDOW_ELAPSED ->
+                stringResource(R.string.wish_preview_summary_dispatch_expired)
+            WishPreviewDispatchReason.FAILED ->
+                stringResource(R.string.wish_preview_summary_dispatch_failed)
+            WishPreviewDispatchReason.UNSUPPORTED_STATE,
+            WishPreviewDispatchReason.APPROVAL_REQUIRED,
+            WishPreviewDispatchReason.READY_NOW,
+            WishPreviewDispatchReason.BEFORE_SCHEDULED_TIME,
+            WishPreviewDispatchReason.QUIET_HOURS_OR_BLACKOUT_DATE ->
+                stringResource(R.string.wish_preview_summary_dispatch_blocked)
+        }
     }
 }
 

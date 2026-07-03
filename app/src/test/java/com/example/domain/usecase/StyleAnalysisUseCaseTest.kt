@@ -1,7 +1,10 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.SentMessageId
+import com.example.domain.model.message.SentMessageRecord
 import com.example.domain.model.style.StyleProfileRecord
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.StyleProfileRepository
@@ -38,15 +41,15 @@ class StyleAnalysisUseCaseTest {
     @Test
     fun `invoke with recent messages performs analysis`() = runTest {
         coEvery { messageRepository.getRecentForStyleAnalysis(any(), 100) } returns listOf(
-            SentMessageEntity(
-                id = "sent_1",
-                contactId = "contact_1",
+            SentMessageRecord(
+                id = SentMessageId("sent_1"),
+                contactId = ContactId("contact_1"),
                 eventType = "BIRTHDAY",
                 eventYear = 2026,
                 messageText = "Dear John, wishing you a very happy birthday. Warm regards.",
-                channel = MessageChannel.SMS.raw,
+                channel = MessageChannel.SMS,
                 sentAtMs = 1L,
-                deliveryStatus = "SENT",
+                deliveryStatus = MessageDeliveryStatus.SENT,
             ),
         )
         coEvery { styleProfileRepository.getProfileOnce() } returns StyleProfileRecord()

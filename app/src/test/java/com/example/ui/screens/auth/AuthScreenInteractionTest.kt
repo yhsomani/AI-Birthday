@@ -41,6 +41,7 @@ class AuthScreenInteractionTest {
                 AuthContent(
                     state = state,
                     onSignIn = { actions += "signIn" },
+                    onContinueLocalOnly = { actions += "local" },
                 )
             }
         }
@@ -50,6 +51,11 @@ class AuthScreenInteractionTest {
         composeRule.onNodeWithTag(AuthScreenTestTags.SIGN_IN_BUTTON)
             .assertIsDisplayed()
             .performClick()
+        composeRule.onNodeWithTag(AuthScreenTestTags.LOCAL_MODE_BUTTON)
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText(context.getString(R.string.auth_local_only_note))
+            .assertIsDisplayed()
 
         state = AuthUiState(isLoading = true)
         composeRule.onNodeWithTag(AuthScreenTestTags.LOADING)
@@ -61,6 +67,6 @@ class AuthScreenInteractionTest {
         composeRule.onNodeWithText("Unable to sign in.")
             .assertIsDisplayed()
 
-        assertEquals(listOf("signIn"), actions)
+        assertEquals(listOf("signIn", "local"), actions)
     }
 }

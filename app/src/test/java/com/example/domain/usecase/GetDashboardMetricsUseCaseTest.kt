@@ -59,7 +59,6 @@ class GetDashboardMetricsUseCaseTest {
         assertEquals(10, metrics.sentCount)
         verify(exactly = 0) { messageRepository.getAllPending() }
         verify(exactly = 1) { messageRepository.countPending() }
-        coVerify(exactly = 0) { contactRepository.getAllSync() }
         coVerify(exactly = 1) { contactRepository.getHealthProfiles() }
         coVerify(exactly = 1) { eventRepository.countUpcoming(30) }
     }

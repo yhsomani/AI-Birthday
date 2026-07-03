@@ -4,9 +4,10 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.core.automation.notifications.NotificationHelper
+import com.example.core.automation.notifications.showRevivalNotification
 import com.example.core.automation.scheduler.DailyScheduler
-import com.example.core.data.R
+import com.example.core.automation.sender.setupNotificationRequest
+import com.example.core.automation.sender.showSetupNotification
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
@@ -18,6 +19,7 @@ import com.example.core.gemini.PromptBuilder
 import com.example.core.gemini.RateLimiter
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
+import com.example.data.repository.toPendingMessageRecord
 import com.example.domain.automation.AiAutoSendQualityGate
 import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.ApprovalModeResolver
@@ -25,6 +27,7 @@ import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.domain.automation.RevivalCadencePolicy
 import com.example.domain.contact.toAutomationProfile
 import com.example.domain.contact.toDeliveryRouteProfile
+import com.example.domain.contact.toHeader
 import com.example.domain.contact.toRelationshipPromptContext
 import com.example.domain.event.toEventEntity
 import com.example.domain.message.toMessageDraft
@@ -32,9 +35,11 @@ import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
 import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.OccasionId
+import com.example.domain.model.notification.SetupNotificationReason
 import com.example.domain.model.occasion.Occasion
 import com.example.domain.model.occasion.OccasionDate
 import com.example.domain.model.occasion.OccasionType
+import com.example.domain.notification.buildRevivalNotificationRequest
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.Calendar
@@ -61,10 +66,10 @@ class RevivalWorker @AssistedInject constructor(
         val firebaseUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
         if (apiKey.isNullOrBlank() && firebaseUser == null) {
             StructuredLogger.w(TAG, "Gemini API key not configured and user not authenticated — skipping worker")
-            com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
-                applicationContext,
-                applicationContext.getString(R.string.notification_setup_ai_title),
-                applicationContext.getString(R.string.notification_setup_revival_ai_message),
+            applicationContext.showSetupNotification(
+                setupNotificationRequest(
+                    reason = SetupNotificationReason.REVIVAL_AI_PROVIDER_MISSING,
+                )
             )
             return Result.failure()
         }
@@ -84,7 +89,7 @@ class RevivalWorker @AssistedInject constructor(
                 val existingRevival = pendingMessageDao.getPendingMessage(contact.id, revivalEventId, scheduledYear)
                 val cadenceDecision = RevivalCadencePolicy.evaluate(
                     contact = contact.toAutomationProfile(),
-                    existingSameYearRevival = existingRevival?.toMessageDraft(),
+                    existingSameYearRevival = existingRevival?.toPendingMessageRecord()?.toMessageDraft(),
                     nowMs = now,
                 )
                 if (!cadenceDecision.shouldCreate) {
@@ -174,12 +179,12 @@ class RevivalWorker @AssistedInject constructor(
                 }
 
                 if (ApprovalModeResolver.needsReviewNotification(approvalMode)) {
-                    NotificationHelper.showRevivalNotification(
-                        context = applicationContext,
-                        contactName = contact.name,
-                        daysSinceContact = days,
-                        suggestionText = suggestion.text,
-                        contactId = contact.id
+                    applicationContext.showRevivalNotification(
+                        request = buildRevivalNotificationRequest(
+                            contact = contact.toHeader(),
+                            daysSinceContact = days,
+                            suggestionText = suggestion.text,
+                        ),
                     )
                 }
             }

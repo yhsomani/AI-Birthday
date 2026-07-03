@@ -7,14 +7,14 @@ import com.example.core.automation.sender.saveDispatchAttemptOutcome
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.PendingMessageDao
+import com.example.domain.dispatch.DispatchExceptionFailurePolicy
 import com.example.domain.contact.toMessageDispatchRecipient
+import com.example.data.repository.toPendingMessageRecord
 import com.example.domain.message.toMessageDispatchState
-import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.MessageStatus
 import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.OccasionId
 import com.example.domain.model.dispatch.DispatchAttemptOutcomeUpdate
-import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.MessageDispatchRecipient
 import com.example.domain.model.message.ExactSendCommand
 import com.example.domain.model.message.ExactSendScheduleUpdate
@@ -66,7 +66,7 @@ internal suspend fun PendingMessageDao.getMessageDispatchState(
         is MessageDispatchWorkerInputCommand.PendingMessage -> getById(command.messageId.value)
         is MessageDispatchWorkerInputCommand.LegacyOccasion -> getByEventId(command.occasionId.value)
     }
-    return message?.toMessageDispatchState()
+    return message?.toPendingMessageRecord()?.toMessageDispatchState()
 }
 
 internal suspend fun PendingMessageDao.saveMessageDispatchDeferralScheduleUpdate(
@@ -101,17 +101,18 @@ internal fun messageDispatchExceptionOutcomeUpdate(
     failedAtMs: Long,
     exception: Exception,
 ): DispatchAttemptOutcomeUpdate {
+    val failure = DispatchExceptionFailurePolicy.evaluate(exception)
     return requireNotNull(
         dispatchAttemptOutcomeUpdate(
             dispatchAttemptId = dispatchAttemptId,
             resolvedAtMs = failedAtMs,
-            result = DispatchAttemptResult.FAILED_FINAL,
+            result = failure.result,
             channel = null,
-            deliveryStatus = MessageDeliveryStatus.FAILED,
-            errorType = exception::class.simpleName ?: "DISPATCH_EXCEPTION",
-            errorCode = null,
-            redactedErrorMessage = "Dispatcher failed before completing send.",
-            deadLetteredAtMs = failedAtMs,
+            deliveryStatus = failure.deliveryStatus,
+            errorType = failure.errorType,
+            errorCode = failure.errorCode,
+            redactedErrorMessage = failure.redactedErrorMessage,
+            deadLetteredAtMs = if (failure.deadLetter) failedAtMs else null,
             nextRetryAtMs = null,
         )
     )

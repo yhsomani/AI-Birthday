@@ -8,7 +8,8 @@ import android.os.Build
 import com.example.core.automation.notifications.EventReminderReceiver
 import com.example.core.db.AppDatabase
 import com.example.core.prefs.SecurePrefs
-import com.example.domain.automation.AutomationSchedulePolicy
+import com.example.domain.automation.EventReminderScheduleDecision
+import com.example.domain.automation.EventReminderSchedulePolicy
 import com.example.domain.event.toOccasion
 import com.example.domain.model.notification.EventReminderScheduleRequest
 import com.example.domain.notification.buildEventReminderScheduleRequest
@@ -27,23 +28,20 @@ object EventReminderScheduler {
     fun schedule(context: Context, request: EventReminderScheduleRequest) {
         val prefs = SecurePrefs(context)
         val eventId = request.eventId.value
-        if (!request.isActive || !prefs.isBirthdayRemindersEnabled()) {
-            cancel(context, eventId)
-            return
-        }
-
         val nowMs = System.currentTimeMillis()
-        if (request.nextOccurrenceMs < nowMs) {
-            cancel(context, eventId)
-            return
-        }
-
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val triggerAtMs = AutomationSchedulePolicy.reminderTimeMs(
-            eventOccurrenceMs = request.nextOccurrenceMs,
-            notifyDaysBefore = request.notifyDaysBefore,
+        val decision = EventReminderSchedulePolicy.decide(
+            request = request,
+            remindersEnabled = prefs.isBirthdayRemindersEnabled(),
+            canScheduleExactAlarm = canScheduleExactAlarms(alarmManager),
             nowMs = nowMs,
         )
+        if (decision == EventReminderScheduleDecision.Cancel) {
+            cancel(context, eventId)
+            return
+        }
+        decision as EventReminderScheduleDecision.Schedule
+
         val pendingIntent = buildPendingIntent(
             context = context,
             eventId = eventId,
@@ -51,16 +49,16 @@ object EventReminderScheduler {
             flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         ) ?: return
 
-        if (canScheduleExactAlarms(alarmManager)) {
+        if (decision.exact) {
             alarmManager.setExactAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
-                triggerAtMs,
+                decision.triggerAtMs,
                 pendingIntent,
             )
         } else {
             alarmManager.setAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
-                triggerAtMs,
+                decision.triggerAtMs,
                 pendingIntent,
             )
         }

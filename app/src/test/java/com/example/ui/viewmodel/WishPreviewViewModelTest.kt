@@ -8,6 +8,7 @@ import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.MessageFeedbackId
 import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.OccasionId
+import com.example.domain.model.contact.ContactMessageContext
 import com.example.domain.model.contact.ContactWishContext
 import com.example.domain.model.message.MessageFeedbackRecord
 import com.example.domain.model.message.WishPreviewDraft
@@ -21,6 +22,10 @@ import com.example.domain.repository.GiftHistoryRepository
 import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.repository.MessageFeedbackRepository
 import com.example.domain.repository.MessageRepository
+import com.example.domain.readiness.RelationshipReadinessAction
+import com.example.domain.readiness.RelationshipReadinessReason
+import com.example.domain.readiness.RelationshipReadinessState
+import com.example.domain.service.PreferencesRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RegeneratePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
@@ -35,6 +40,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
+import java.util.Calendar
 import org.junit.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -67,6 +73,12 @@ class WishPreviewViewModelTest {
     private lateinit var giftHistoryRepository: GiftHistoryRepository
 
     @RelaxedMockK
+    private lateinit var preferencesRepository: PreferencesRepository
+
+    @RelaxedMockK
+    private lateinit var deviceReadinessReader: WishPreviewDeviceReadinessReader
+
+    @RelaxedMockK
     private lateinit var approvePendingMessageUseCase: ApprovePendingMessageUseCase
 
     @RelaxedMockK
@@ -94,6 +106,20 @@ class WishPreviewViewModelTest {
         every { eventRepository.getOccasionTypeByIdFlow(any()) } returns flowOf(null)
         every { messageRepository.getWishPreviewDraftByRef(any()) } returns flowOf(null)
         every { messageRepository.getWishPreviewReviewQueue() } returns flowOf(emptyList())
+        every { contactRepository.getMessageContexts() } returns flowOf(emptyList())
+        every { preferencesRepository.observeChanges() } returns flowOf(Unit)
+        every { preferencesRepository.getChannelBlackout() } returns "[]"
+        every { preferencesRepository.getBlackoutDates() } returns "[]"
+        every { preferencesRepository.getQuietHoursStart() } returns 22
+        every { preferencesRepository.getQuietHoursEnd() } returns 8
+        every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
+        every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
+        every { deviceReadinessReader.snapshot() } returns WishPreviewDeviceReadinessSnapshot(
+            smsAllowed = true,
+            whatsAppConsentGranted = true,
+            whatsAppAccessibilityEnabled = true,
+            whatsAppInstalled = true,
+        )
         coEvery { eventRepository.getOccasionTypeById(any()) } returns null
         coEvery { messageFeedbackRepository.getLatestForPendingMessage(any()) } returns null
         coEvery { testSendUseCase(any()) } returns TestSendUseCase.Outcome.Sent
@@ -137,6 +163,19 @@ class WishPreviewViewModelTest {
         status = status,
     )
 
+    private fun sampleMessageContact(
+        primaryPhone: String? = "+15555550101",
+        primaryEmail: String? = "friend@example.com",
+        preferredChannel: MessageChannel = MessageChannel.SMS,
+    ) = ContactMessageContext(
+        id = ContactId("c_1"),
+        displayName = "Taylor",
+        avatarUrl = null,
+        primaryPhone = primaryPhone,
+        primaryEmail = primaryEmail,
+        preferredChannel = preferredChannel,
+    )
+
     private fun createViewModel() = WishPreviewViewModel(
         messageRepository = messageRepository,
         activityLogRepository = activityLogRepository,
@@ -145,6 +184,8 @@ class WishPreviewViewModelTest {
         eventRepository = eventRepository,
         memoryNoteRepository = memoryNoteRepository,
         giftHistoryRepository = giftHistoryRepository,
+        preferencesRepository = preferencesRepository,
+        deviceReadinessReader = deviceReadinessReader,
         approvePendingMessageUseCase = approvePendingMessageUseCase,
         rejectPendingMessageUseCase = rejectPendingMessageUseCase,
         regeneratePendingMessageUseCase = regeneratePendingMessageUseCase,
@@ -160,11 +201,13 @@ class WishPreviewViewModelTest {
         giftCount: Int = 0,
         previousWishes: Int = 0,
         eventType: OccasionType? = null,
+        messageContact: ContactMessageContext? = null,
     ) {
         every { messageRepository.getWishPreviewDraftByRef(messageRef) } returns flowOf(draft)
         every { messageRepository.getWishPreviewReviewQueue() } returns flowOf(reviewQueue)
         if (draft != null) {
             every { contactRepository.getWishContextFlow(draft.contactId.value) } returns flowOf(contact)
+            every { contactRepository.getMessageContexts() } returns flowOf(listOfNotNull(messageContact))
             every { memoryNoteRepository.countByContactFlow(draft.contactId.value) } returns flowOf(memoryCount)
             every { giftHistoryRepository.countByContactFlow(draft.contactId.value) } returns flowOf(giftCount)
             every { messageRepository.countSentByContact(draft.contactId.value) } returns flowOf(previousWishes)
@@ -186,6 +229,12 @@ class WishPreviewViewModelTest {
         assertEquals("Wishing you a happy birthday!", state.editedText)
         assertEquals(false, state.isLoading)
         assertTrue(state.errorMessageRes == null)
+        assertEquals(RelationshipReadinessState.READY, state.draftActionReadiness.state)
+        assertEquals(RelationshipReadinessReason.DRAFT_READY, state.draftActionReadiness.primaryReason)
+        assertEquals(RelationshipReadinessAction.NONE, state.draftActionReadiness.primaryAction)
+        assertEquals("pm_1", state.draftActionReadiness.relatedMessageId)
+        assertEquals("c_1", state.draftActionReadiness.relatedContactId)
+        assertEquals("e_1", state.draftActionReadiness.relatedEventId)
     }
 
     @Test
@@ -227,9 +276,11 @@ class WishPreviewViewModelTest {
             draft = sampleDraft().copy(
                 channel = MessageChannel.EMAIL,
                 approvalMode = ApprovalMode.SMART_APPROVE,
+                scheduledForMs = Long.MAX_VALUE,
                 isUsingFallback = true,
             ),
             eventType = OccasionType.ANNIVERSARY,
+            messageContact = sampleMessageContact(primaryEmail = "friend@example.com"),
         )
 
         val viewModel = createViewModel()
@@ -241,6 +292,134 @@ class WishPreviewViewModelTest {
         assertEquals(MessageChannel.EMAIL.raw, summary?.channel)
         assertEquals("SMART_APPROVE", summary?.approvalMode)
         assertEquals(true, summary?.usesFallback)
+        assertEquals(
+            com.example.domain.message.WishPreviewDispatchState.NEEDS_APPROVAL,
+            summary?.dispatchContext?.state,
+        )
+        assertEquals(
+            com.example.domain.message.WishPreviewRouteState.READY,
+            summary?.routeContext?.state,
+        )
+        assertEquals(
+            com.example.domain.message.WishPreviewRouteReason.READY,
+            summary?.routeContext?.reason,
+        )
+        val sendReadiness = viewModel.uiState.value.sendActionReadiness
+        assertEquals(RelationshipReadinessState.NEEDS_REVIEW, sendReadiness?.state)
+        assertEquals(RelationshipReadinessReason.MESSAGE_NEEDS_REVIEW, sendReadiness?.primaryReason)
+        assertEquals(RelationshipReadinessAction.REVIEW_MESSAGE, sendReadiness?.primaryAction)
+        assertEquals("pm_1", sendReadiness?.relatedMessageId)
+        assertEquals("c_1", sendReadiness?.relatedContactId)
+        assertEquals("e_1", sendReadiness?.relatedEventId)
+    }
+
+    @Test
+    fun `loadPending exposes blocked route setup context`() = runTest(testDispatcher) {
+        stubLiveDraft(
+            draft = sampleDraft().copy(channel = MessageChannel.SMS),
+            messageContact = sampleMessageContact(primaryPhone = null),
+        )
+
+        val viewModel = createViewModel()
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        val routeContext = viewModel.uiState.value.sendSummary?.routeContext
+        assertEquals(com.example.domain.message.WishPreviewRouteState.BLOCKED, routeContext?.state)
+        assertEquals(com.example.domain.message.WishPreviewRouteReason.MISSING_PHONE, routeContext?.reason)
+        val sendReadiness = viewModel.uiState.value.sendActionReadiness
+        assertEquals(RelationshipReadinessState.ACTION_REQUIRED, sendReadiness?.state)
+        assertEquals(RelationshipReadinessReason.MISSING_PHONE, sendReadiness?.primaryReason)
+        assertEquals(RelationshipReadinessAction.CONFIGURE_CHANNEL, sendReadiness?.primaryAction)
+    }
+
+    @Test
+    fun `loadPending exposes fallback route choice context`() = runTest(testDispatcher) {
+        stubLiveDraft(
+            draft = sampleDraft().copy(channel = MessageChannel.SMS),
+            messageContact = sampleMessageContact(
+                primaryPhone = "+15555550101",
+                preferredChannel = MessageChannel.EMAIL,
+            ),
+        )
+
+        val viewModel = createViewModel()
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        val routeSelectionContext = viewModel.uiState.value.sendSummary?.routeSelectionContext
+        assertEquals(
+            com.example.domain.message.WishPreviewRouteSelectionState.FALLBACK_ROUTE,
+            routeSelectionContext?.state,
+        )
+        assertEquals(MessageChannel.EMAIL.raw, routeSelectionContext?.preferredChannel)
+        assertEquals(MessageChannel.SMS.raw, routeSelectionContext?.selectedChannel)
+    }
+
+    @Test
+    fun `loadPending passes timing preferences into dispatch context`() = runTest(testDispatcher) {
+        val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        every { preferencesRepository.getQuietHoursStart() } returns currentHour
+        every { preferencesRepository.getQuietHoursEnd() } returns ((currentHour + 2) % 24)
+        every { preferencesRepository.getBlackoutDates() } returns "[]"
+        stubLiveDraft(
+            draft = sampleDraft().copy(
+                approvalMode = ApprovalMode.FULLY_AUTO,
+                scheduledForMs = 0L,
+                status = MessageStatus.APPROVED,
+            ),
+            messageContact = sampleMessageContact(primaryPhone = "+15555550101"),
+        )
+
+        val viewModel = createViewModel()
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        val dispatchContext = viewModel.uiState.value.sendSummary?.dispatchContext
+        assertEquals(
+            com.example.domain.message.WishPreviewDispatchState.DEFERRED,
+            dispatchContext?.state,
+        )
+        assertEquals(
+            com.example.domain.message.WishPreviewDispatchReason.QUIET_HOURS_OR_BLACKOUT_DATE,
+            dispatchContext?.reason,
+        )
+        val sendReadiness = viewModel.uiState.value.sendActionReadiness
+        assertEquals(RelationshipReadinessState.WAITING, sendReadiness?.state)
+        assertEquals(RelationshipReadinessReason.WAITING_FOR_ALLOWED_WINDOW, sendReadiness?.primaryReason)
+        assertEquals(RelationshipReadinessAction.NONE, sendReadiness?.primaryAction)
+    }
+
+    @Test
+    fun `loadPending exposes SMS device setup context when permission is missing`() = runTest(testDispatcher) {
+        every { deviceReadinessReader.snapshot() } returns WishPreviewDeviceReadinessSnapshot(
+            smsAllowed = false,
+            whatsAppConsentGranted = true,
+            whatsAppAccessibilityEnabled = true,
+            whatsAppInstalled = true,
+        )
+        stubLiveDraft(
+            draft = sampleDraft().copy(channel = MessageChannel.SMS),
+            messageContact = sampleMessageContact(primaryPhone = "+15555550101"),
+        )
+
+        val viewModel = createViewModel()
+        viewModel.loadPending("pm_1")
+        advanceUntilIdle()
+
+        val deviceContext = viewModel.uiState.value.sendSummary?.deviceSetupContext
+        assertEquals(
+            com.example.domain.message.WishPreviewDeviceSetupState.ACTION_REQUIRED,
+            deviceContext?.state,
+        )
+        assertEquals(
+            com.example.domain.message.WishPreviewDeviceSetupReason.SMS_PERMISSION_MISSING,
+            deviceContext?.reason,
+        )
+        val sendReadiness = viewModel.uiState.value.sendActionReadiness
+        assertEquals(RelationshipReadinessState.ACTION_REQUIRED, sendReadiness?.state)
+        assertEquals(RelationshipReadinessReason.CHANNEL_DISABLED, sendReadiness?.primaryReason)
+        assertEquals(RelationshipReadinessAction.CONFIGURE_CHANNEL, sendReadiness?.primaryAction)
     }
 
     @Test
@@ -352,8 +531,13 @@ class WishPreviewViewModelTest {
         advanceUntilIdle()
 
         viewModel.updateEditedText("Custom draft text")
-        assertEquals("Custom draft text", viewModel.uiState.value.editedText)
-        assertEquals(WishDraftReadiness.EDITED_READY, viewModel.uiState.value.draftReadiness)
+        val state = viewModel.uiState.value
+        assertEquals("Custom draft text", state.editedText)
+        assertEquals(WishDraftReadiness.EDITED_READY, state.draftReadiness)
+        assertEquals(RelationshipReadinessState.READY, state.draftActionReadiness.state)
+        assertEquals(RelationshipReadinessReason.DRAFT_EDITED_READY, state.draftActionReadiness.primaryReason)
+        assertEquals(RelationshipReadinessAction.NONE, state.draftActionReadiness.primaryAction)
+        assertEquals(false, state.blocksApproval)
     }
 
     @Test
@@ -368,9 +552,14 @@ class WishPreviewViewModelTest {
         viewModel.approve()
         advanceUntilIdle()
 
-        assertEquals(WishDraftReadiness.BLANK, viewModel.uiState.value.draftReadiness)
-        assertEquals(R.string.wish_preview_readiness_blank, viewModel.uiState.value.errorMessageRes)
-        assertEquals(false, viewModel.uiState.value.approved)
+        val state = viewModel.uiState.value
+        assertEquals(WishDraftReadiness.BLANK, state.draftReadiness)
+        assertEquals(RelationshipReadinessState.ACTION_REQUIRED, state.draftActionReadiness.state)
+        assertEquals(RelationshipReadinessReason.DRAFT_BLANK, state.draftActionReadiness.primaryReason)
+        assertEquals(RelationshipReadinessAction.EDIT_DRAFT, state.draftActionReadiness.primaryAction)
+        assertEquals(true, state.blocksApproval)
+        assertEquals(R.string.wish_preview_readiness_blank, state.errorMessageRes)
+        assertEquals(false, state.approved)
         coVerify(exactly = 0) { approvePendingMessageUseCase(any(), any()) }
     }
 
@@ -386,9 +575,14 @@ class WishPreviewViewModelTest {
         viewModel.approve()
         advanceUntilIdle()
 
-        assertEquals(WishDraftReadiness.TOO_SHORT, viewModel.uiState.value.draftReadiness)
-        assertEquals(R.string.wish_preview_readiness_short, viewModel.uiState.value.errorMessageRes)
-        assertEquals(false, viewModel.uiState.value.approved)
+        val state = viewModel.uiState.value
+        assertEquals(WishDraftReadiness.TOO_SHORT, state.draftReadiness)
+        assertEquals(RelationshipReadinessState.ACTION_REQUIRED, state.draftActionReadiness.state)
+        assertEquals(RelationshipReadinessReason.DRAFT_TOO_SHORT, state.draftActionReadiness.primaryReason)
+        assertEquals(RelationshipReadinessAction.EDIT_DRAFT, state.draftActionReadiness.primaryAction)
+        assertEquals(true, state.blocksApproval)
+        assertEquals(R.string.wish_preview_readiness_short, state.errorMessageRes)
+        assertEquals(false, state.approved)
         coVerify(exactly = 0) { approvePendingMessageUseCase(any(), any()) }
     }
 

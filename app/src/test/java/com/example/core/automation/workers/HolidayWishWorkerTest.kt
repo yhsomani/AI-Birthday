@@ -83,7 +83,7 @@ class HolidayWishWorkerTest {
         coEvery { sentMessageDao.getByContact(any()) } returns emptyList()
         every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
         every { NotificationHelper.showApprovalNotification(any(), any(), any()) } just Runs
-        every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
+        every { NotificationHelper.showSetupNotification(any(), any()) } just Runs
     }
 
     @After

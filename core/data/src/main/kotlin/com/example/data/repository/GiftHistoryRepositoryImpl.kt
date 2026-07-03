@@ -1,8 +1,6 @@
 package com.example.data.repository
 
 import com.example.core.db.dao.GiftHistoryDao
-import com.example.domain.gift.toEntity
-import com.example.domain.gift.toRecord
 import com.example.domain.model.common.GiftHistoryId
 import com.example.domain.model.gift.GiftHistoryRecord
 import com.example.domain.repository.GiftHistoryRepository

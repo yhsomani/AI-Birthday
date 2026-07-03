@@ -4,12 +4,11 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.auth.AuthManager
-import com.example.core.prefs.SecurePrefs
 import com.example.R
 import com.example.domain.automation.EmailAddressSyntaxPolicy
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
-import com.example.domain.repository.ContactRepository
+import com.example.domain.service.PreferencesRepository
 import com.example.domain.usecase.EnableFullAutomationUseCase
 import com.example.domain.usecase.SyncContactsUseCase
 import com.example.ui.feedback.FeedbackEvent
@@ -57,9 +56,8 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
     private val syncContactsUseCase: SyncContactsUseCase,
-    private val contactRepository: ContactRepository,
     private val authManager: AuthManager,
-    private val securePrefs: SecurePrefs,
+    private val preferencesRepository: PreferencesRepository,
     private val enableFullAutomationUseCase: EnableFullAutomationUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -69,7 +67,7 @@ class SettingsViewModel @Inject constructor(
     init {
         refreshPersistedSettings()
         viewModelScope.launch {
-            securePrefs.observeChanges()
+            preferencesRepository.observeChanges()
                 .collect {
                     refreshPersistedSettings()
                 }
@@ -87,37 +85,37 @@ class SettingsViewModel @Inject constructor(
 
     private fun refreshPersistedSettings() {
         _uiState.value = _uiState.value.copy(
-            geminiApiKey = securePrefs.getGeminiApiKey(),
-            senderEmail = securePrefs.getSenderEmail(),
-            senderEmailPassword = securePrefs.getSenderEmailPassword(),
-            automationMode = securePrefs.getGlobalApprovalMode(),
+            geminiApiKey = preferencesRepository.getGeminiApiKey(),
+            senderEmail = preferencesRepository.getSenderEmail(),
+            senderEmailPassword = preferencesRepository.getSenderEmailPassword(),
+            automationMode = preferencesRepository.getGlobalAutomationMode(),
             lastSyncTimestamp = if (initializedSettings) {
                 _uiState.value.lastSyncTimestamp
             } else {
                 appContext.getString(R.string.settings_last_sync_never)
             },
-            lastBackupTimestamp = formatLastBackupTimestamp(securePrefs.getLastBackupMs()),
-            quietHoursStart = securePrefs.getQuietHoursStart().toString(),
-            quietHoursEnd = securePrefs.getQuietHoursEnd().toString(),
-            biometricLockEnabled = securePrefs.isBiometricLockEnabled(),
-            birthdayReminders = securePrefs.isBirthdayRemindersEnabled(),
-            aiWishGeneration = securePrefs.isAiWishGenerationEnabled(),
-            channelBlackoutSms = securePrefs.isChannelBlacklisted(MessageChannel.SMS),
-            channelBlackoutWhatsApp = securePrefs.isChannelBlacklisted(MessageChannel.WHATSAPP),
-            channelBlackoutEmail = securePrefs.isChannelBlacklisted(MessageChannel.EMAIL),
-            showLegacyDbNotice = securePrefs.wasLegacyUnencryptedDbQuarantined(),
-            showSecurePrefsRecoveryNotice = securePrefs.isSecurePrefsRebuiltNoticePending(),
+            lastBackupTimestamp = formatLastBackupTimestamp(preferencesRepository.getLastBackupMs()),
+            quietHoursStart = preferencesRepository.getQuietHoursStart().toString(),
+            quietHoursEnd = preferencesRepository.getQuietHoursEnd().toString(),
+            biometricLockEnabled = preferencesRepository.isBiometricLockEnabled(),
+            birthdayReminders = preferencesRepository.isBirthdayRemindersEnabled(),
+            aiWishGeneration = preferencesRepository.isAiWishGenerationEnabled(),
+            channelBlackoutSms = preferencesRepository.isChannelBlacklisted(MessageChannel.SMS),
+            channelBlackoutWhatsApp = preferencesRepository.isChannelBlacklisted(MessageChannel.WHATSAPP),
+            channelBlackoutEmail = preferencesRepository.isChannelBlacklisted(MessageChannel.EMAIL),
+            showLegacyDbNotice = preferencesRepository.wasLegacyUnencryptedDbQuarantined(),
+            showSecurePrefsRecoveryNotice = preferencesRepository.isSecurePrefsRebuiltNoticePending(),
         )
         initializedSettings = true
     }
 
     fun toggleBirthdayReminders(enabled: Boolean) {
-        securePrefs.setBirthdayRemindersEnabled(enabled)
+        preferencesRepository.setBirthdayRemindersEnabled(enabled)
         _uiState.value = _uiState.value.copy(birthdayReminders = enabled)
     }
 
     fun toggleAiWishGeneration(enabled: Boolean) {
-        securePrefs.setAiWishGenerationEnabled(enabled)
+        preferencesRepository.setAiWishGenerationEnabled(enabled)
         _uiState.value = _uiState.value.copy(aiWishGeneration = enabled)
     }
 
@@ -127,7 +125,7 @@ class SettingsViewModel @Inject constructor(
 
     fun saveGeminiApiKey() {
         val key = _uiState.value.geminiApiKey.trim()
-        securePrefs.setGeminiApiKey(key)
+        preferencesRepository.setGeminiApiKey(key)
         _uiState.value = _uiState.value.copy(
             geminiApiKeySaved = true,
             feedbackEvent = FeedbackEvent(
@@ -166,8 +164,8 @@ class SettingsViewModel @Inject constructor(
             )
             return
         }
-        securePrefs.setSenderEmail(email)
-        securePrefs.setSenderEmailPassword(password)
+        preferencesRepository.setSenderEmail(email)
+        preferencesRepository.setSenderEmailPassword(password)
         _uiState.value = _uiState.value.copy(
             senderEmail = email,
             senderEmailPassword = password,
@@ -209,7 +207,7 @@ class SettingsViewModel @Inject constructor(
             }
         } else {
             _uiState.value = _uiState.value.copy(automationMode = mode)
-            securePrefs.setGlobalApprovalMode(mode)
+            preferencesRepository.setGlobalAutomationMode(mode)
         }
     }
 
@@ -233,8 +231,8 @@ class SettingsViewModel @Inject constructor(
             )
             return
         }
-        securePrefs.setQuietHoursStart(start ?: 22)
-        securePrefs.setQuietHoursEnd(end ?: 8)
+        preferencesRepository.setQuietHoursStart(start ?: 22)
+        preferencesRepository.setQuietHoursEnd(end ?: 8)
         _uiState.value = _uiState.value.copy(
             feedbackEvent = FeedbackEvent(
                 message = UiText.Resource(R.string.settings_quiet_hours_saved),
@@ -244,7 +242,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun toggleBiometricLock(enabled: Boolean) {
-        securePrefs.setBiometricLockEnabled(enabled)
+        preferencesRepository.setBiometricLockEnabled(enabled)
         _uiState.value = _uiState.value.copy(
             biometricLockEnabled = enabled,
             feedbackEvent = FeedbackEvent(
@@ -259,10 +257,10 @@ class SettingsViewModel @Inject constructor(
     fun toggleChannelBlackout(channel: MessageChannel, disabled: Boolean) {
         if (channel == MessageChannel.UNKNOWN) return
 
-        val next = securePrefs.getChannelBlackout().toMutableChannelSet().apply {
+        val next = preferencesRepository.getChannelBlackout().toMutableChannelSet().apply {
             if (disabled) add(channel) else remove(channel)
         }
-        securePrefs.setChannelBlackout(next.toJsonArray())
+        preferencesRepository.setChannelBlackout(next.toJsonArray())
         _uiState.value = _uiState.value.copy(
             channelBlackoutSms = MessageChannel.SMS in next,
             channelBlackoutWhatsApp = MessageChannel.WHATSAPP in next,
@@ -315,12 +313,12 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun dismissLegacyDbNotice() {
-        securePrefs.setLegacyUnencryptedDbQuarantined(false)
+        preferencesRepository.setLegacyUnencryptedDbQuarantined(false)
         _uiState.value = _uiState.value.copy(showLegacyDbNotice = false)
     }
 
     fun dismissSecurePrefsRecoveryNotice() {
-        securePrefs.setSecurePrefsRebuiltNoticePending(false)
+        preferencesRepository.setSecurePrefsRebuiltNoticePending(false)
         _uiState.value = _uiState.value.copy(showSecurePrefsRecoveryNotice = false)
     }
 
@@ -328,7 +326,7 @@ class SettingsViewModel @Inject constructor(
         authManager.signOut()
     }
 
-    private fun SecurePrefs.isChannelBlacklisted(channel: MessageChannel): Boolean {
+    private fun PreferencesRepository.isChannelBlacklisted(channel: MessageChannel): Boolean {
         return channel in getChannelBlackout().toMutableChannelSet()
     }
 

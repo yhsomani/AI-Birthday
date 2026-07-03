@@ -9,6 +9,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.automation.scheduler.WorkerScheduler
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.model.notification.SystemAlertNotificationReason
 import com.example.domain.service.EventReminderSchedulerService
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
@@ -34,7 +35,7 @@ class DailyTriggerWorkerTest {
         mockkObject(WorkerScheduler)
         mockkObject(NotificationHelper)
         every { WorkerScheduler.scheduleDailyAutomationChain(any()) } just Runs
-        every { NotificationHelper.showSystemAlert(any(), any(), any()) } just Runs
+        every { NotificationHelper.showSystemAlert(any(), any()) } just Runs
     }
 
     @After
@@ -64,7 +65,7 @@ class DailyTriggerWorkerTest {
         assertEquals(ListenableWorker.Result.success(), result)
         verify(exactly = 0) { prefs.setLastBackupMs(any()) }
         verify { prefs.setLastBackupReminderMs(any()) }
-        verify(exactly = 0) { NotificationHelper.showSystemAlert(any(), any(), any()) }
+        verify(exactly = 0) { NotificationHelper.showSystemAlert(any(), any()) }
     }
 
     @Test
@@ -76,7 +77,12 @@ class DailyTriggerWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
-        verify { NotificationHelper.showSystemAlert(any(), any(), any()) }
+        verify {
+            NotificationHelper.showSystemAlert(
+                any(),
+                match { it.reason == SystemAlertNotificationReason.BACKUP_STALE },
+            )
+        }
         verify { prefs.setLastBackupReminderMs(any()) }
     }
 

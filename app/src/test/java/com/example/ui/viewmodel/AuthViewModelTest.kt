@@ -9,8 +9,10 @@ import com.example.core.auth.SignInResult
 import com.example.core.auth.UserProfile
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
+import io.mockk.justRun
 import io.mockk.junit4.MockKRule
 import io.mockk.slot
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -101,6 +103,21 @@ class AuthViewModelTest {
             viewModel.uiState.value.error,
         )
         assertFalse(viewModel.uiState.value.isSignedIn)
+    }
+
+    @Test
+    fun `continueLocalOnly enables local mode and completes auth state`() = runTest(testDispatcher) {
+        every { mockAuthManager.isSignedIn() } returns false
+        justRun { mockAuthManager.enableLocalOnlyMode() }
+        userProfileFlow.value = UserProfile(displayName = "Local user")
+        val viewModel = AuthViewModel(mockApplicationContext(), mockAuthManager)
+
+        viewModel.continueLocalOnly()
+        advanceUntilIdle()
+
+        verify { mockAuthManager.enableLocalOnlyMode() }
+        assertTrue(viewModel.uiState.value.isSignedIn)
+        assertEquals("Local user", viewModel.uiState.value.userProfile.displayName)
     }
 
     @Test

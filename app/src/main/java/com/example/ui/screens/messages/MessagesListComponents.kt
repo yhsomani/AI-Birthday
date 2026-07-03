@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.theme.RelateSpacing
+import com.example.ui.viewmodel.MessageActionRoute
 import com.example.ui.viewmodel.PendingMessageItem
 import com.example.ui.viewmodel.SentMessageItem
 
@@ -24,6 +25,8 @@ internal fun PendingMessagesList(
     onApprove: (String) -> Unit,
     onReject: (String) -> Unit,
     onEdit: (String, String) -> Unit,
+    onOpenContact: (String) -> Unit,
+    onOpenAutomationSetup: () -> Unit,
     approvingMessageId: String?,
     selectedMessageIds: Set<String>,
     onToggleSelection: (String) -> Unit,
@@ -40,6 +43,8 @@ internal fun PendingMessagesList(
             onApprove = onApprove,
             onReject = onReject,
             onEdit = onEdit,
+            onOpenContact = onOpenContact,
+            onOpenAutomationSetup = onOpenAutomationSetup,
             isApproving = approvingMessageId == item.id,
             selected = item.id in selectedMessageIds,
             onToggleSelection = onToggleSelection,
@@ -132,6 +137,8 @@ private fun PendingMessageCard(
     onApprove: (String) -> Unit,
     onReject: (String) -> Unit,
     onEdit: (String, String) -> Unit,
+    onOpenContact: (String) -> Unit,
+    onOpenAutomationSetup: () -> Unit,
     isApproving: Boolean,
     selected: Boolean,
     onToggleSelection: (String) -> Unit,
@@ -163,8 +170,11 @@ private fun PendingMessageCard(
 
             MessagePendingCardBody(
                 reviewPreviewText = item.reviewPreviewText,
-                readiness = item.readiness,
+                readiness = item.actionReadiness,
                 readinessTestTag = MessagesTestTags.READINESS_PREFIX + item.id,
+                qualityScore = item.qualityScore,
+                isUsingFallback = item.isUsingFallback,
+                sourceTestTag = MessagesTestTags.SOURCE_PREFIX + item.id,
             )
 
             Spacer(modifier = Modifier.height(RelateSpacing.md))
@@ -176,6 +186,20 @@ private fun PendingMessageCard(
                 rejectTestTag = MessagesTestTags.PENDING_REJECT_PREFIX + item.id,
                 onEdit = { onEdit(item.contactId, item.id) },
                 editTestTag = MessagesTestTags.PENDING_EDIT_PREFIX + item.id,
+                primaryActionRoute = if (showApproveAction) {
+                    MessageActionRoute.NONE
+                } else {
+                    item.primaryActionRoute
+                },
+                onPrimaryAction = {
+                    when (item.primaryActionRoute) {
+                        MessageActionRoute.WISH -> onEdit(item.contactId, item.id)
+                        MessageActionRoute.CONTACT -> onOpenContact(item.contactId)
+                        MessageActionRoute.AUTOMATION_SETUP -> onOpenAutomationSetup()
+                        MessageActionRoute.NONE -> Unit
+                    }
+                },
+                primaryActionTestTag = MessagesTestTags.BLOCKED_PRIMARY_ACTION_PREFIX + item.id,
                 isApproving = isApproving,
                 showApproveAction = showApproveAction,
                 onApprove = { onApprove(item.id) },
@@ -243,8 +267,11 @@ private fun FailedMessageCard(
             )
             MessageReviewCardBody(
                 messageText = item.messageText,
-                readiness = item.readiness,
+                readiness = item.actionReadiness,
                 readinessTestTag = MessagesTestTags.READINESS_PREFIX + item.id,
+                qualityScore = item.qualityScore,
+                isUsingFallback = item.isUsingFallback,
+                sourceTestTag = MessagesTestTags.SOURCE_PREFIX + item.id,
             )
 
             Spacer(modifier = Modifier.height(RelateSpacing.md))
@@ -285,8 +312,11 @@ private fun ApprovedMessageCard(
             )
             MessageReviewCardBody(
                 messageText = item.messageText,
-                readiness = item.readiness,
+                readiness = item.actionReadiness,
                 readinessTestTag = MessagesTestTags.READINESS_PREFIX + item.id,
+                qualityScore = item.qualityScore,
+                isUsingFallback = item.isUsingFallback,
+                sourceTestTag = MessagesTestTags.SOURCE_PREFIX + item.id,
             )
 
             Spacer(modifier = Modifier.height(RelateSpacing.md))

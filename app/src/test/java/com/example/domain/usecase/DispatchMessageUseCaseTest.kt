@@ -5,6 +5,7 @@ import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.DispatchActivityDecision
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.MessageStatus
 import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.MessageDraftId
@@ -158,6 +159,37 @@ class DispatchMessageUseCaseTest {
                     !it.detail.contains("hi") &&
                     !it.metadataJson.contains("hi")
             })
+        }
+    }
+
+    @Test
+    fun `invoke records final failure outcome when dispatcher throws`() = runTest {
+        val pendingMsg = dispatchMessage(status = MessageStatus.APPROVED)
+        val recipient = dispatchRecipient()
+        coEvery { messageRepository.getMessageDispatchStateById("e1") } returns null
+        coEvery { messageRepository.getMessageDispatchStateByEventId("e1") } returns pendingMsg
+        coEvery { contactRepository.getMessageDispatchRecipient("c1") } returns recipient
+        coEvery { messageDispatcherService.dispatch(any()) } throws IllegalStateException("provider crashed")
+
+        val failure = runCatching { useCase("e1") }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
+        coVerify {
+            dispatchAttemptRepository.updateOutcome(
+                id = any(),
+                attemptedAtMs = any(),
+                resolvedAtMs = any(),
+                result = DispatchAttemptResult.FAILED_FINAL,
+                channel = null,
+                deliveryStatus = MessageDeliveryStatus.FAILED,
+                providerMessageId = null,
+                errorType = "IllegalStateException",
+                errorCode = null,
+                redactedErrorMessage = "Dispatcher failed before completing send.",
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = any(),
+            )
         }
     }
 

@@ -10,6 +10,9 @@ import com.example.domain.model.common.OccasionId
 import com.example.domain.model.contact.ContactAnalyticsSummary
 import com.example.domain.model.occasion.OccasionType
 import com.example.domain.model.occasion.UpcomingEventPreview
+import com.example.domain.readiness.RelationshipReadinessAction
+import com.example.domain.readiness.RelationshipReadinessReason
+import com.example.domain.readiness.RelationshipReadinessState
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.usecase.GetDashboardMetricsUseCase
@@ -123,8 +126,17 @@ class HomeViewModelTest {
         assertEquals(0, viewModel.uiState.value.setupProgress.actionRequiredCount)
         assertEquals(1, viewModel.uiState.value.setupProgress.warningCount)
         assertEquals(HomeActionTarget.Messages, viewModel.uiState.value.readinessAction)
+        assertEquals(
+            RelationshipReadinessReason.PENDING_MESSAGES,
+            viewModel.uiState.value.readinessActionReadiness?.primaryReason,
+        )
         assertEquals(HomeNextActionKind.REVIEW_PENDING, viewModel.uiState.value.primaryAction?.kind)
         assertEquals(HomeActionTarget.Messages, viewModel.uiState.value.primaryAction?.actionTarget)
+        assertEquals(RelationshipReadinessState.NEEDS_REVIEW, viewModel.uiState.value.primaryAction?.actionReadiness?.state)
+        assertEquals(
+            RelationshipReadinessAction.REVIEW_MESSAGES,
+            viewModel.uiState.value.primaryAction?.actionReadiness?.primaryAction,
+        )
         assertEquals(false, viewModel.uiState.value.isLoading)
     }
 
@@ -198,6 +210,15 @@ class HomeViewModelTest {
         assertEquals(31L, viewModel.uiState.value.backupPrompt?.daysSinceBackup)
         assertEquals(HomeNextActionKind.REFRESH_BACKUP, viewModel.uiState.value.primaryAction?.kind)
         assertEquals(31L, viewModel.uiState.value.primaryAction?.daysSinceBackup)
+        assertEquals(RelationshipReadinessState.WARNING, viewModel.uiState.value.primaryAction?.actionReadiness?.state)
+        assertEquals(
+            RelationshipReadinessReason.BACKUP_STALE,
+            viewModel.uiState.value.primaryAction?.actionReadiness?.primaryReason,
+        )
+        assertEquals(
+            RelationshipReadinessAction.REFRESH_BACKUP,
+            viewModel.uiState.value.primaryAction?.actionReadiness?.primaryAction,
+        )
     }
 
     @Test
@@ -232,6 +253,22 @@ class HomeViewModelTest {
 
         assertEquals(HomeNextActionKind.FIX_CONTACT_SYNC, viewModel.uiState.value.primaryAction?.kind)
         assertEquals(HomeActionTarget.AutomationSetup, viewModel.uiState.value.primaryAction?.actionTarget)
+        assertEquals(
+            RelationshipReadinessState.ACTION_REQUIRED,
+            viewModel.uiState.value.primaryAction?.actionReadiness?.state,
+        )
+        assertEquals(
+            RelationshipReadinessReason.CONTACT_SYNC_FAILED,
+            viewModel.uiState.value.primaryAction?.actionReadiness?.primaryReason,
+        )
+        assertEquals(
+            RelationshipReadinessAction.FIX_CONTACT_SYNC,
+            viewModel.uiState.value.primaryAction?.actionReadiness?.primaryAction,
+        )
+        assertEquals(
+            RelationshipReadinessReason.CONTACT_SYNC_FAILED,
+            viewModel.uiState.value.readinessActionReadiness?.primaryReason,
+        )
     }
 
     @Test

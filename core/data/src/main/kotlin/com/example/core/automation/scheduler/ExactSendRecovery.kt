@@ -6,7 +6,9 @@ import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.entities.DispatchAttemptEntity
 import com.example.core.db.entities.PendingMessageEntity
-import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.automation.ExactSendRecoveryAction
+import com.example.domain.automation.ExactSendRecoveryFailure
+import com.example.domain.automation.ExactSendRecoveryPolicy
 import com.example.domain.model.MessageStatus
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import kotlinx.coroutines.CoroutineScope
@@ -15,9 +17,6 @@ import kotlinx.coroutines.launch
 
 internal object ExactSendRecovery {
     private const val STALE_DISPATCHING_GRACE_MS = 30 * 60 * 1000L
-    private const val INTERRUPTED_DISPATCH_ERROR_TYPE = "INTERRUPTED_DISPATCH"
-    private const val INTERRUPTED_DISPATCH_MESSAGE =
-        "Dispatch was interrupted before RelateAI could confirm provider outcome. Review before retrying to avoid duplicate sends."
 
     fun recoverAsync(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -60,10 +59,8 @@ internal object ExactSendRecovery {
         nowMs: Long,
         staleDispatchingGraceMs: Long,
     ) {
-        val staleAttemptCutoffMs = nowMs - staleDispatchingGraceMs.coerceAtLeast(0L)
         pendingMessageDao.getDispatchingMessages().forEach { pending ->
             val latestAttempt = dispatchAttemptDao.getLatestForMessageDraft(pending.id) ?: return@forEach
-            if (latestAttempt.requestedAtMs > staleAttemptCutoffMs) return@forEach
 
             recoverInterruptedDispatch(
                 pendingMessageDao = pendingMessageDao,
@@ -71,6 +68,7 @@ internal object ExactSendRecovery {
                 pending = pending,
                 latestAttempt = latestAttempt,
                 nowMs = nowMs,
+                staleDispatchingGraceMs = staleDispatchingGraceMs,
             )
         }
     }
@@ -81,57 +79,52 @@ internal object ExactSendRecovery {
         pending: PendingMessageEntity,
         latestAttempt: DispatchAttemptEntity,
         nowMs: Long,
+        staleDispatchingGraceMs: Long,
     ) {
-        when (DispatchAttemptResult.fromRaw(latestAttempt.result)) {
-            DispatchAttemptResult.SENT,
-            DispatchAttemptResult.DELIVERED,
-            DispatchAttemptResult.PENDING_DELIVERY -> {
+        val decision = ExactSendRecoveryPolicy.evaluateInterruptedDispatch(
+            result = DispatchAttemptResult.fromRaw(latestAttempt.result),
+            requestedAtMs = latestAttempt.requestedAtMs,
+            nowMs = nowMs,
+            staleDispatchingGraceMs = staleDispatchingGraceMs,
+            nextRetryAtMs = latestAttempt.nextRetryAtMs,
+        )
+
+        when (decision.action) {
+            ExactSendRecoveryAction.WAIT_FOR_RECOVERY_GRACE -> Unit
+
+            ExactSendRecoveryAction.MARK_SENT -> {
                 pendingMessageDao.updateStatusIfCurrent(
                     id = pending.id,
                     expectedStatus = MessageStatus.DISPATCHING.raw,
-                    newStatus = MessageStatus.SENT.raw,
+                    newStatus = requireNotNull(decision.messageStatus).raw,
                 )
             }
 
-            DispatchAttemptResult.RETRY_QUEUED,
-            DispatchAttemptResult.FAILED_RETRYABLE -> {
-                latestAttempt.nextRetryAtMs?.let { retryAtMs ->
-                    pendingMessageDao.updateStatusAndScheduledForIfCurrent(
-                        id = pending.id,
-                        expectedStatus = MessageStatus.DISPATCHING.raw,
-                        newStatus = MessageStatus.APPROVED.raw,
-                        scheduledForMs = retryAtMs,
-                    )
-                } ?: failInterruptedDispatch(
-                    pendingMessageDao = pendingMessageDao,
-                    dispatchAttemptDao = dispatchAttemptDao,
-                    pending = pending,
-                    latestAttempt = latestAttempt,
-                    nowMs = nowMs,
+            ExactSendRecoveryAction.RESCHEDULE_RETRY -> {
+                pendingMessageDao.updateStatusAndScheduledForIfCurrent(
+                    id = pending.id,
+                    expectedStatus = MessageStatus.DISPATCHING.raw,
+                    newStatus = requireNotNull(decision.messageStatus).raw,
+                    scheduledForMs = requireNotNull(decision.scheduledForMs),
                 )
             }
 
-            DispatchAttemptResult.EXPIRED -> {
+            ExactSendRecoveryAction.MARK_EXPIRED -> {
                 pendingMessageDao.updateStatusIfCurrent(
                     id = pending.id,
                     expectedStatus = MessageStatus.DISPATCHING.raw,
-                    newStatus = MessageStatus.EXPIRED.raw,
+                    newStatus = requireNotNull(decision.messageStatus).raw,
                 )
             }
 
-            DispatchAttemptResult.QUEUED,
-            DispatchAttemptResult.DEFERRED,
-            DispatchAttemptResult.NEEDS_APPROVAL,
-            DispatchAttemptResult.BLOCKED,
-            DispatchAttemptResult.FAILED_FINAL,
-            DispatchAttemptResult.CANCELLED,
-            DispatchAttemptResult.UNKNOWN -> {
+            ExactSendRecoveryAction.FAIL_FOR_REVIEW -> {
                 failInterruptedDispatch(
                     pendingMessageDao = pendingMessageDao,
                     dispatchAttemptDao = dispatchAttemptDao,
                     pending = pending,
                     latestAttempt = latestAttempt,
                     nowMs = nowMs,
+                    failure = requireNotNull(decision.failure),
                 )
             }
         }
@@ -143,6 +136,7 @@ internal object ExactSendRecovery {
         pending: PendingMessageEntity,
         latestAttempt: DispatchAttemptEntity,
         nowMs: Long,
+        failure: ExactSendRecoveryFailure,
     ) {
         pendingMessageDao.updateStatusIfCurrent(
             id = pending.id,
@@ -153,16 +147,16 @@ internal object ExactSendRecovery {
             id = latestAttempt.id,
             attemptedAtMs = latestAttempt.attemptedAtMs ?: latestAttempt.requestedAtMs,
             resolvedAtMs = nowMs,
-            result = DispatchAttemptResult.FAILED_FINAL.raw,
+            result = failure.result.raw,
             channel = null,
-            deliveryStatus = MessageDeliveryStatus.FAILED.raw,
+            deliveryStatus = failure.deliveryStatus.raw,
             providerMessageId = latestAttempt.providerMessageId,
-            errorType = latestAttempt.errorType ?: INTERRUPTED_DISPATCH_ERROR_TYPE,
+            errorType = latestAttempt.errorType ?: failure.errorType,
             errorCode = latestAttempt.errorCode,
-            redactedErrorMessage = latestAttempt.redactedErrorMessage ?: INTERRUPTED_DISPATCH_MESSAGE,
+            redactedErrorMessage = latestAttempt.redactedErrorMessage ?: failure.redactedErrorMessage,
             retryCount = latestAttempt.retryCount,
             nextRetryAtMs = null,
-            deadLetteredAtMs = nowMs,
+            deadLetteredAtMs = if (failure.deadLetter) nowMs else null,
         )
     }
 }

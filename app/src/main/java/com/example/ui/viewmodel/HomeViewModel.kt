@@ -7,9 +7,19 @@ import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.core.auth.AuthManager
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.home.BackupFreshnessPrompt as DomainBackupFreshnessPrompt
+import com.example.domain.home.BackupFreshnessStatus as DomainBackupFreshnessStatus
+import com.example.domain.home.HomeNextActionCandidate
+import com.example.domain.home.HomeNextActionKind as DomainHomeNextActionKind
+import com.example.domain.home.HomeNextActionPolicy
+import com.example.domain.home.HomeNextActionTargetKind
+import com.example.domain.home.HomeReadinessBannerCandidate
 import com.example.domain.model.contact.ContactAnalyticsSummary
 import com.example.domain.model.occasion.OccasionType
 import com.example.domain.model.occasion.UpcomingEventPreview
+import com.example.domain.readiness.RelationshipActionReadiness
+import com.example.domain.readiness.RelationshipActionReadinessPolicy
+import com.example.domain.readiness.RelationshipReadinessReason
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.usecase.GetDashboardMetricsUseCase
@@ -30,6 +40,10 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 
+typealias BackupFreshnessStatus = DomainBackupFreshnessStatus
+typealias BackupFreshnessPrompt = DomainBackupFreshnessPrompt
+typealias HomeNextActionKind = DomainHomeNextActionKind
+
 data class UpcomingBirthday(
     val name: String,
     val date: String,
@@ -41,25 +55,11 @@ data class RelationshipPlannerItem(
     val actionTarget: HomeActionTarget,
 )
 
-enum class BackupFreshnessStatus {
-    NEVER_BACKED_UP,
-    STALE,
-}
-
-data class BackupFreshnessPrompt(
-    val status: BackupFreshnessStatus,
-    val daysSinceBackup: Long? = null,
-)
-
-enum class HomeNextActionKind {
-    SYNC_CONTACTS,
-    FIX_CONTACT_SYNC,
-    CONNECT_AI,
-    ENABLE_AI_GENERATION,
-    REVIEW_PENDING,
-    CREATE_BACKUP,
-    REFRESH_BACKUP,
-    RECONNECT_CONTACT,
+sealed interface HomeActionTarget {
+    data object AutomationSetup : HomeActionTarget
+    data object BackupRestore : HomeActionTarget
+    data object Messages : HomeActionTarget
+    data class ContactDetail(val contactId: String) : HomeActionTarget
 }
 
 data class HomeNextAction(
@@ -69,14 +69,11 @@ data class HomeNextAction(
     val daysSinceBackup: Long? = null,
     val contactName: String? = null,
     val healthScore: Int? = null,
+    val actionReadiness: RelationshipActionReadiness = RelationshipActionReadinessPolicy.fromHomeNextAction(
+        kind = kind,
+        relatedContactId = (actionTarget as? HomeActionTarget.ContactDetail)?.contactId,
+    ),
 )
-
-sealed interface HomeActionTarget {
-    data object AutomationSetup : HomeActionTarget
-    data object BackupRestore : HomeActionTarget
-    data object Messages : HomeActionTarget
-    data class ContactDetail(val contactId: String) : HomeActionTarget
-}
 
 data class HomeUiState(
     val userName: String = "",
@@ -93,6 +90,7 @@ data class HomeUiState(
     val readinessTitle: String? = null,
     val readinessDetail: String? = null,
     val readinessAction: HomeActionTarget? = null,
+    val readinessActionReadiness: RelationshipActionReadiness? = null,
     val setupProgress: SetupProgressSummary = SetupProgressSummary(),
     val plannerItems: List<RelationshipPlannerItem> = emptyList(),
     val backupPrompt: BackupFreshnessPrompt? = null,
@@ -118,8 +116,6 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
     private companion object {
         const val TAG = "HomeViewModel"
-        const val STALE_BACKUP_DAYS = 30L
-        const val DAY_MS = 24L * 60 * 60 * 1000L
     }
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -268,18 +264,10 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun buildBackupFreshnessPrompt(lastBackupMs: Long): BackupFreshnessPrompt? {
-        if (lastBackupMs <= 0L) {
-            return BackupFreshnessPrompt(status = BackupFreshnessStatus.NEVER_BACKED_UP)
-        }
-        val daysSinceBackup = ((System.currentTimeMillis() - lastBackupMs).coerceAtLeast(0L)) / DAY_MS
-        return if (daysSinceBackup >= STALE_BACKUP_DAYS) {
-            BackupFreshnessPrompt(
-                status = BackupFreshnessStatus.STALE,
-                daysSinceBackup = daysSinceBackup,
-            )
-        } else {
-            null
-        }
+        return HomeNextActionPolicy.backupFreshnessPrompt(
+            lastBackupMs = lastBackupMs,
+            nowMs = System.currentTimeMillis(),
+        )
     }
 
     private fun buildRankedNextActions(
@@ -291,89 +279,63 @@ class HomeViewModel @Inject constructor(
         backupPrompt: BackupFreshnessPrompt?,
         atRiskContacts: List<ContactAnalyticsSummary>,
     ): List<HomeNextAction> {
-        val rankedActions = mutableListOf<Pair<Int, HomeNextAction>>()
-        val contactSetupAction = when {
-            syncError != null -> HomeNextAction(
-                kind = HomeNextActionKind.FIX_CONTACT_SYNC,
-                actionTarget = HomeActionTarget.AutomationSetup,
-            )
-            contactCount == 0 -> HomeNextAction(
-                kind = HomeNextActionKind.SYNC_CONTACTS,
-                actionTarget = HomeActionTarget.AutomationSetup,
-            )
-            else -> null
-        }
-        contactSetupAction?.let { rankedActions += 100 to it }
-        if (pendingCount > 0) {
-            rankedActions += 90 to HomeNextAction(
-                kind = HomeNextActionKind.REVIEW_PENDING,
-                actionTarget = HomeActionTarget.Messages,
-                count = pendingCount,
-            )
-        }
-        if (!hasAiAccess) {
-            rankedActions += 80 to HomeNextAction(
-                kind = HomeNextActionKind.CONNECT_AI,
-                actionTarget = HomeActionTarget.AutomationSetup,
-            )
-        }
-        if (!aiGenerationEnabled) {
-            rankedActions += 75 to HomeNextAction(
-                kind = HomeNextActionKind.ENABLE_AI_GENERATION,
-                actionTarget = HomeActionTarget.AutomationSetup,
-            )
-        }
-        when (backupPrompt?.status) {
-            BackupFreshnessStatus.NEVER_BACKED_UP -> {
-                rankedActions += 70 to HomeNextAction(
-                    kind = HomeNextActionKind.CREATE_BACKUP,
-                    actionTarget = HomeActionTarget.BackupRestore,
-                )
-            }
-            BackupFreshnessStatus.STALE -> {
-                rankedActions += 60 to HomeNextAction(
-                    kind = HomeNextActionKind.REFRESH_BACKUP,
-                    actionTarget = HomeActionTarget.BackupRestore,
-                    daysSinceBackup = backupPrompt.daysSinceBackup,
-                )
-            }
-            null -> Unit
-        }
-        atRiskContacts.firstOrNull()?.let { contact ->
-            rankedActions += 50 to HomeNextAction(
-                kind = HomeNextActionKind.RECONNECT_CONTACT,
-                actionTarget = HomeActionTarget.ContactDetail(contact.id.value),
-                contactName = contact.displayName,
-                healthScore = contact.healthScore,
-            )
-        }
-        return rankedActions
-            .sortedByDescending { it.first }
-            .map { it.second }
+        return HomeNextActionPolicy.rankNextActions(
+            contactCount = contactCount,
+            syncError = syncError,
+            aiGenerationEnabled = aiGenerationEnabled,
+            hasAiAccess = hasAiAccess,
+            pendingCount = pendingCount,
+            backupPrompt = backupPrompt,
+            atRiskContacts = atRiskContacts,
+        ).map { it.toUiAction() }
     }
 
     private fun HomeUiState.withReadiness(): HomeUiState {
-        return when {
-            syncError != null -> copy(
+        val banner = HomeNextActionPolicy.readinessBanner(
+            contactCount = contactCount,
+            syncError = syncError,
+            pendingCount = pendingCount,
+        ) ?: return copy(
+            readinessTitle = null,
+            readinessDetail = null,
+            readinessAction = null,
+            readinessActionReadiness = null,
+        )
+        val readiness = RelationshipActionReadinessPolicy.fromHomeReadinessBanner(banner)
+        return when (readiness.primaryReason) {
+            RelationshipReadinessReason.CONTACT_SYNC_FAILED -> copy(
                 readinessTitle = string(R.string.home_readiness_setup_attention_title),
                 readinessDetail = string(R.string.home_next_action_fix_contact_sync_detail),
-                readinessAction = HomeActionTarget.AutomationSetup,
+                readinessAction = banner.toUiActionTarget(),
+                readinessActionReadiness = readiness,
             )
-            contactCount == 0 -> copy(
+            RelationshipReadinessReason.CONTACTS_MISSING -> copy(
                 readinessTitle = string(R.string.home_next_action_sync_contacts_title),
                 readinessDetail = string(R.string.home_next_action_sync_contacts_detail),
-                readinessAction = HomeActionTarget.AutomationSetup,
+                readinessAction = banner.toUiActionTarget(),
+                readinessActionReadiness = readiness,
             )
-            pendingCount > 0 -> copy(
+            RelationshipReadinessReason.PENDING_MESSAGES -> copy(
                 readinessTitle = string(R.string.home_readiness_approvals_waiting_title),
-                readinessDetail = string(R.string.home_next_action_review_pending_detail, pendingCount),
-                readinessAction = HomeActionTarget.Messages,
+                readinessDetail = string(R.string.home_next_action_review_pending_detail, banner.count),
+                readinessAction = banner.toUiActionTarget(),
+                readinessActionReadiness = readiness,
             )
             else -> copy(
                 readinessTitle = null,
                 readinessDetail = null,
                 readinessAction = null,
+                readinessActionReadiness = null,
             )
+        }
+    }
+
+    private fun HomeReadinessBannerCandidate.toUiActionTarget(): HomeActionTarget {
+        return when (targetKind) {
+            HomeNextActionTargetKind.AUTOMATION_SETUP -> HomeActionTarget.AutomationSetup
+            HomeNextActionTargetKind.BACKUP_RESTORE -> HomeActionTarget.BackupRestore
+            HomeNextActionTargetKind.MESSAGES -> HomeActionTarget.Messages
+            HomeNextActionTargetKind.CONTACT_DETAIL -> error("Home readiness banner cannot target a contact without an id")
         }
     }
 
@@ -418,5 +380,22 @@ class HomeViewModel @Inject constructor(
 
     private fun string(@StringRes resId: Int, vararg args: Any): String {
         return appContext.getString(resId, *args)
+    }
+
+    private fun HomeNextActionCandidate.toUiAction(): HomeNextAction {
+        return HomeNextAction(
+            kind = kind,
+            actionTarget = when (targetKind) {
+                HomeNextActionTargetKind.AUTOMATION_SETUP -> HomeActionTarget.AutomationSetup
+                HomeNextActionTargetKind.BACKUP_RESTORE -> HomeActionTarget.BackupRestore
+                HomeNextActionTargetKind.MESSAGES -> HomeActionTarget.Messages
+                HomeNextActionTargetKind.CONTACT_DETAIL -> HomeActionTarget.ContactDetail(requireNotNull(contactId))
+            },
+            count = count,
+            daysSinceBackup = daysSinceBackup,
+            contactName = contactName,
+            healthScore = healthScore,
+            actionReadiness = RelationshipActionReadinessPolicy.fromHomeNextActionCandidate(this),
+        )
     }
 }

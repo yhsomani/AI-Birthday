@@ -174,14 +174,11 @@ dependencies {
     implementation(libs.sun.mail.android)
     implementation(libs.sun.mail.activation)
     implementation(libs.play.services.auth)
-    implementation(libs.converter.moshi)
     implementation(libs.sqlcipher)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.logging.interceptor)
     implementation(libs.moshi.kotlin)
     implementation(libs.okhttp)
-    implementation(libs.retrofit)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
@@ -211,10 +208,6 @@ dependencies {
 
     // Image loading
     implementation(libs.coil.compose)
-
-    // Paging
-    implementation(libs.androidx.paging.runtime)
-    testImplementation(libs.androidx.paging.runtime)
 
     // Testing
     testImplementation(libs.junit)

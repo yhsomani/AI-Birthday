@@ -1,0 +1,12 @@
+package com.example.core.automation.sender
+
+import com.example.core.db.dao.SentMessageDao
+import com.example.data.repository.toSentMessageRecords
+import com.example.domain.message.toDeliveryRouteHistoryRecords
+import com.example.domain.model.message.DeliveryRouteHistoryRecord
+
+internal suspend fun SentMessageDao.messageDispatchRouteHistoryByContact(
+    contactId: String,
+): List<DeliveryRouteHistoryRecord> {
+    return getByContact(contactId).toSentMessageRecords().toDeliveryRouteHistoryRecords()
+}

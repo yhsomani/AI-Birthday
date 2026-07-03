@@ -65,6 +65,7 @@ import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.relateSemanticColors
+import com.example.domain.readiness.RelationshipReadinessState
 import com.example.ui.viewmodel.AiDoctorAction
 import com.example.ui.viewmodel.AiDoctorRecommendedFix
 import com.example.ui.viewmodel.AiDoctorSummary
@@ -169,11 +170,11 @@ internal fun AutomationSetupContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
         ) {
-            val summaryColors = state.summary.status.statusColors()
+            val summaryColors = state.setupActionReadiness.state.statusColors()
             RelateStatusBanner(
                 title = state.summary.title,
                 message = state.summary.detail,
-                icon = state.summary.status.statusIcon(),
+                icon = state.setupActionReadiness.state.statusIcon(),
                 containerColor = summaryColors.container,
                 contentColor = summaryColors.content,
             )
@@ -640,10 +641,38 @@ private fun ReadinessStatus.statusColors(): StatusColors = when (this) {
     )
 }
 
+@Composable
+private fun RelationshipReadinessState.statusColors(): StatusColors = when (this) {
+    RelationshipReadinessState.READY,
+    RelationshipReadinessState.NEEDS_REVIEW,
+    RelationshipReadinessState.IN_PROGRESS -> StatusColors(
+        container = MaterialTheme.relateSemanticColors.success.copy(alpha = RelateAlpha.feedbackContainer),
+        content = MaterialTheme.relateSemanticColors.success,
+    )
+    RelationshipReadinessState.WARNING,
+    RelationshipReadinessState.WAITING -> StatusColors(
+        container = MaterialTheme.relateSemanticColors.warning.copy(alpha = RelateAlpha.feedbackContainer),
+        content = MaterialTheme.relateSemanticColors.warning,
+    )
+    RelationshipReadinessState.ACTION_REQUIRED -> StatusColors(
+        container = MaterialTheme.colorScheme.error.copy(alpha = RelateAlpha.feedbackContainer),
+        content = MaterialTheme.colorScheme.error,
+    )
+}
+
 private fun ReadinessStatus.statusIcon(): ImageVector = when (this) {
     ReadinessStatus.OK -> Icons.Filled.CheckCircle
     ReadinessStatus.WARNING -> Icons.Filled.Warning
     ReadinessStatus.ACTION_REQUIRED -> Icons.Filled.Error
+}
+
+private fun RelationshipReadinessState.statusIcon(): ImageVector = when (this) {
+    RelationshipReadinessState.READY,
+    RelationshipReadinessState.NEEDS_REVIEW,
+    RelationshipReadinessState.IN_PROGRESS -> Icons.Filled.CheckCircle
+    RelationshipReadinessState.WARNING,
+    RelationshipReadinessState.WAITING -> Icons.Filled.Warning
+    RelationshipReadinessState.ACTION_REQUIRED -> Icons.Filled.Error
 }
 
 private fun handleAiDoctorAction(

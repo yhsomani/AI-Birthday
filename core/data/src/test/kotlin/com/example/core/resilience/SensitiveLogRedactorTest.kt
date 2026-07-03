@@ -38,6 +38,26 @@ class SensitiveLogRedactorTest {
     }
 
     @Test
+    fun redact_removesInlineMessageBodyAssignments() {
+        val input = "messageText=\"Happy birthday Aarav, I hope your family dinner is warm\" " +
+            "draftText=Personalized-memory-note recommendedVariantText=\"Private selected wish\" " +
+            "payload='Private recovery wish text' messageId=msg_1 recommendedVariantName=standard"
+
+        val redacted = SensitiveLogRedactor.redact(input)
+
+        assertFalse(redacted.contains("Happy birthday Aarav"))
+        assertFalse(redacted.contains("Personalized-memory-note"))
+        assertFalse(redacted.contains("Private selected wish"))
+        assertFalse(redacted.contains("Private recovery wish text"))
+        assertTrue(redacted.contains("messageText=[REDACTED_MESSAGE_BODY]"))
+        assertTrue(redacted.contains("draftText=[REDACTED_MESSAGE_BODY]"))
+        assertTrue(redacted.contains("recommendedVariantText=[REDACTED_MESSAGE_BODY]"))
+        assertTrue(redacted.contains("payload=[REDACTED_MESSAGE_BODY]"))
+        assertTrue(redacted.contains("messageId=msg_1"))
+        assertTrue(redacted.contains("recommendedVariantName=standard"))
+    }
+
+    @Test
     fun googleContactsHttpErrorSummary_returnsSafeGenericMessages() {
         assertEquals(
             "HTTP 403: Google Contacts access is disabled or permission was denied",
@@ -91,6 +111,32 @@ class SensitiveLogRedactorTest {
         assertTrue(flattened.contains("apiKey=[REDACTED]"))
         assertTrue(flattened.contains("password=[REDACTED]"))
         assertTrue(flattened.contains("[REDACTED_EMAIL]"))
+    }
+
+    @Test
+    fun structuredLogger_redactsMessageBodyExtrasByKey() {
+        StructuredLogger.clearForTests()
+
+        StructuredLogger.i(
+            tag = "SensitiveLogRedactorTest",
+            message = "Dispatch payload prepared",
+            extras = mapOf(
+                "messageText" to "Happy birthday Aarav, your private family note is included.",
+                "recommendedVariantText" to "Aarav, your private memory means a lot.",
+                "recommendedVariantName" to "emotional",
+                "messageId" to "msg_1",
+            ),
+        )
+
+        val entry = StructuredLogger.getRecent(1).single()
+
+        assertEquals("[REDACTED_MESSAGE_BODY]", entry.extras["messageText"])
+        assertEquals("[REDACTED_MESSAGE_BODY]", entry.extras["recommendedVariantText"])
+        assertEquals("emotional", entry.extras["recommendedVariantName"])
+        assertEquals("msg_1", entry.extras["messageId"])
+        assertFalse(entry.extras.values.joinToString(" ").contains("Happy birthday Aarav"))
+        assertFalse(entry.extras.values.joinToString(" ").contains("private family note"))
+        assertFalse(entry.extras.values.joinToString(" ").contains("private memory"))
     }
 
     @Test

@@ -26,9 +26,8 @@ class EventReminderReceiver : BroadcastReceiver() {
                 val contact = db.contactDao().getById(contactId)
                 val event = db.eventDao().getById(eventId)
                 if (contact != null && event != null && event.isActive) {
-                    NotificationHelper.showEventReminderNotification(
-                        context = context,
-                        request = buildEventReminderNotificationRequest(contact.toHeader(), event.toOccasion()),
+                    context.showEventReminderNotification(
+                        buildEventReminderNotificationRequest(contact.toHeader(), event.toOccasion()),
                     )
                 }
             } finally {

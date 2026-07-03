@@ -48,6 +48,9 @@ build/
 *.secret.*
 secrets.*
 google-services.json
+# Approved Firebase/Google client configs are intentionally tracked.
+!/app/google-services.json
+!/app/src/debug/google-services.json
 *.keystore
 *.jks
 *.p12

@@ -10,6 +10,7 @@ import com.example.domain.repository.GiftHistoryRepository
 import com.example.domain.repository.MemoryNoteRepository
 import com.example.domain.repository.MessageFeedbackRepository
 import com.example.domain.repository.MessageRepository
+import com.example.domain.service.PreferencesRepository
 import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
@@ -17,11 +18,20 @@ import com.example.domain.model.MessageStatus
 import com.example.domain.model.activity.ActivityLogRecord
 import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.MessageFeedbackId
+import com.example.domain.model.contact.ContactMessageContext
 import com.example.domain.model.contact.ContactWishContext
 import com.example.domain.model.occasion.OccasionType
 import com.example.domain.model.message.MessageFeedbackRecord
 import com.example.domain.model.message.WishPreviewDraft
 import com.example.domain.model.message.WishPreviewReviewItem
+import com.example.domain.message.WishDraftReadiness as DomainWishDraftReadiness
+import com.example.domain.message.WishDraftReadinessPolicy
+import com.example.domain.message.WishPreviewSendSummary as DomainWishPreviewSendSummary
+import com.example.domain.message.WishPreviewSendSummaryPolicy
+import com.example.domain.readiness.RelationshipActionReadiness
+import com.example.domain.readiness.RelationshipActionReadinessPolicy
+import com.example.domain.readiness.RelationshipReadinessAction
+import com.example.domain.readiness.RelationshipReadinessState
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RegeneratePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
@@ -38,9 +48,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
+
+typealias WishDraftReadiness = DomainWishDraftReadiness
+typealias WishPreviewSendSummary = DomainWishPreviewSendSummary
 
 data class AiFeedbackOption(
     val key: String,
@@ -57,21 +71,6 @@ data class ReviewNextTarget(
     val contactId: String,
     val messageRef: String,
 )
-
-data class WishPreviewSendSummary(
-    val eventType: String,
-    val channel: String,
-    val scheduledForMs: Long,
-    val approvalMode: String,
-    val usesFallback: Boolean,
-)
-
-enum class WishDraftReadiness {
-    READY,
-    EDITED_READY,
-    TOO_SHORT,
-    BLANK,
-}
 
 private val aiFeedbackOptions = listOf(
     AiFeedbackOption(
@@ -131,7 +130,42 @@ data class WishPreviewUiState(
     val remainingReviewCount: Int = 0,
     val sendSummary: WishPreviewSendSummary? = null,
     val draftReadiness: WishDraftReadiness = WishDraftReadiness.READY,
-)
+) {
+    val draftActionReadiness: RelationshipActionReadiness
+        get() = draftReadiness.toDraftActionReadiness(previewDraft)
+
+    val sendActionReadiness: RelationshipActionReadiness?
+        get() = sendSummary?.toSendActionReadiness(previewDraft)
+
+    val blocksApproval: Boolean
+        get() = draftActionReadiness.blocksDraftApproval
+}
+
+private fun WishDraftReadiness.toDraftActionReadiness(
+    previewDraft: WishPreviewDraft?,
+): RelationshipActionReadiness {
+    return RelationshipActionReadinessPolicy.fromWishDraftReadiness(
+        readiness = this,
+        relatedMessageId = previewDraft?.id?.value,
+        relatedContactId = previewDraft?.contactId?.value,
+        relatedEventId = previewDraft?.occasionId?.value,
+    )
+}
+
+private fun WishPreviewSendSummary.toSendActionReadiness(
+    previewDraft: WishPreviewDraft?,
+): RelationshipActionReadiness {
+    return RelationshipActionReadinessPolicy.fromWishPreviewSendSummary(
+        summary = this,
+        relatedMessageId = previewDraft?.id?.value,
+        relatedContactId = previewDraft?.contactId?.value,
+        relatedEventId = previewDraft?.occasionId?.value,
+    )
+}
+
+private val RelationshipActionReadiness.blocksDraftApproval: Boolean
+    get() = state == RelationshipReadinessState.ACTION_REQUIRED &&
+        primaryAction == RelationshipReadinessAction.EDIT_DRAFT
 
 private data class WishPreviewLiveData(
     val draft: WishPreviewDraft?,
@@ -140,6 +174,14 @@ private data class WishPreviewLiveData(
     val giftCount: Int = 0,
     val previousWishes: Int = 0,
     val eventType: OccasionType? = null,
+    val routeContact: ContactMessageContext? = null,
+    val channelBlackoutJson: String? = null,
+    val blackoutDatesJson: String? = null,
+    val quietHoursStart: Int? = null,
+    val quietHoursEnd: Int? = null,
+    val senderEmail: String? = null,
+    val senderEmailPassword: String? = null,
+    val deviceReadiness: WishPreviewDeviceReadinessSnapshot? = null,
     val reviewQueue: List<WishPreviewReviewItem> = emptyList(),
 )
 
@@ -161,6 +203,8 @@ class WishPreviewViewModel @Inject constructor(
     private val eventRepository: EventRepository,
     private val memoryNoteRepository: MemoryNoteRepository,
     private val giftHistoryRepository: GiftHistoryRepository,
+    private val preferencesRepository: PreferencesRepository,
+    private val deviceReadinessReader: WishPreviewDeviceReadinessReader,
     private val approvePendingMessageUseCase: ApprovePendingMessageUseCase,
     private val rejectPendingMessageUseCase: RejectPendingMessageUseCase,
     private val regeneratePendingMessageUseCase: RegeneratePendingMessageUseCase,
@@ -198,7 +242,9 @@ class WishPreviewViewModel @Inject constructor(
                                     )
                                 },
                                 messageRepository.getWishPreviewReviewQueue(),
-                            ) { context, reviewQueue ->
+                                contactRepository.getMessageContexts(),
+                                preferencesRepository.observeChanges().onStart { emit(Unit) },
+                            ) { context, reviewQueue, messageContacts, _ ->
                                 WishPreviewLiveData(
                                     draft = draft,
                                     contact = context.contact,
@@ -206,6 +252,16 @@ class WishPreviewViewModel @Inject constructor(
                                     giftCount = context.giftCount,
                                     previousWishes = context.previousWishes,
                                     eventType = context.eventType,
+                                    routeContact = messageContacts.firstOrNull {
+                                        it.id == draft.contactId
+                                    },
+                                    channelBlackoutJson = preferencesRepository.getChannelBlackout(),
+                                    blackoutDatesJson = preferencesRepository.getBlackoutDates(),
+                                    quietHoursStart = preferencesRepository.getQuietHoursStart(),
+                                    quietHoursEnd = preferencesRepository.getQuietHoursEnd(),
+                                    senderEmail = preferencesRepository.getSenderEmail(),
+                                    senderEmailPassword = preferencesRepository.getSenderEmailPassword(),
+                                    deviceReadiness = deviceReadinessReader.snapshot(),
                                     reviewQueue = reviewQueue,
                                 )
                             }
@@ -249,7 +305,18 @@ class WishPreviewViewModel @Inject constructor(
                 giftCount = giftCount,
                 previousWishes = previousWishes,
             ),
-            sendSummary = buildSendSummary(draft, eventType),
+            sendSummary = buildSendSummary(
+                draft = draft,
+                eventType = eventType,
+                routeContact = routeContact,
+                channelBlackoutJson = channelBlackoutJson,
+                blackoutDatesJson = blackoutDatesJson,
+                quietHoursStart = quietHoursStart,
+                quietHoursEnd = quietHoursEnd,
+                senderEmail = senderEmail,
+                senderEmailPassword = senderEmailPassword,
+                deviceReadiness = deviceReadiness,
+            ),
             draftReadiness = draft.evaluateDraftReadiness(editedText, selectedVariant),
             nextReviewTarget = reviewQueueState.nextTarget,
             remainingReviewCount = reviewQueueState.remainingReviewCount,
@@ -406,7 +473,7 @@ class WishPreviewViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             editedText = text,
             draftReadiness = draft?.evaluateDraftReadiness(text, _uiState.value.selectedVariant)
-                ?: text.evaluateDraftReadinessAgainst(""),
+                ?: WishDraftReadinessPolicy.evaluate(draftText = text, sourceText = ""),
         )
     }
 
@@ -414,8 +481,9 @@ class WishPreviewViewModel @Inject constructor(
         val pendingId = _uiState.value.previewDraft?.id?.value ?: return
         val draftReadiness = _uiState.value.previewDraft
             ?.evaluateDraftReadiness(_uiState.value.editedText, _uiState.value.selectedVariant)
-            ?: _uiState.value.editedText.evaluateDraftReadinessAgainst("")
-        if (draftReadiness == WishDraftReadiness.BLANK || draftReadiness == WishDraftReadiness.TOO_SHORT) {
+            ?: WishDraftReadinessPolicy.evaluate(draftText = _uiState.value.editedText, sourceText = "")
+        val actionReadiness = draftReadiness.toDraftActionReadiness(_uiState.value.previewDraft)
+        if (actionReadiness.blocksDraftApproval) {
             _uiState.value = _uiState.value.copy(
                 draftReadiness = draftReadiness,
                 errorMessageRes = draftReadiness.errorMessageRes(),
@@ -514,13 +582,30 @@ class WishPreviewViewModel @Inject constructor(
     private fun buildSendSummary(
         draft: WishPreviewDraft,
         eventType: OccasionType?,
+        routeContact: ContactMessageContext?,
+        channelBlackoutJson: String?,
+        blackoutDatesJson: String?,
+        quietHoursStart: Int?,
+        quietHoursEnd: Int?,
+        senderEmail: String?,
+        senderEmailPassword: String?,
+        deviceReadiness: WishPreviewDeviceReadinessSnapshot?,
     ): WishPreviewSendSummary {
-        return WishPreviewSendSummary(
-            eventType = eventType?.raw ?: OccasionType.BIRTHDAY.raw,
-            channel = draft.channel.raw,
-            scheduledForMs = draft.scheduledForMs,
-            approvalMode = draft.approvalMode.raw,
-            usesFallback = draft.isUsingFallback,
+        return WishPreviewSendSummaryPolicy.build(
+            draft = draft,
+            eventType = eventType,
+            quietHoursStart = quietHoursStart,
+            quietHoursEnd = quietHoursEnd,
+            blackoutDatesJson = blackoutDatesJson,
+            routeContact = routeContact,
+            channelBlackoutJson = channelBlackoutJson,
+            senderEmail = senderEmail,
+            senderEmailPassword = senderEmailPassword,
+            preferredChannel = routeContact?.preferredChannel,
+            smsAllowed = deviceReadiness?.smsAllowed,
+            whatsAppConsentGranted = deviceReadiness?.whatsAppConsentGranted,
+            whatsAppAccessibilityEnabled = deviceReadiness?.whatsAppAccessibilityEnabled,
+            whatsAppInstalled = deviceReadiness?.whatsAppInstalled,
         )
     }
 
@@ -528,17 +613,10 @@ class WishPreviewViewModel @Inject constructor(
         draft: String,
         variant: String,
     ): WishDraftReadiness {
-        return draft.evaluateDraftReadinessAgainst(variantText(variant))
-    }
-
-    private fun String.evaluateDraftReadinessAgainst(sourceText: String): WishDraftReadiness {
-        val trimmed = trim()
-        return when {
-            trimmed.isBlank() -> WishDraftReadiness.BLANK
-            trimmed.length < MIN_REVIEWED_DRAFT_LENGTH -> WishDraftReadiness.TOO_SHORT
-            this != sourceText -> WishDraftReadiness.EDITED_READY
-            else -> WishDraftReadiness.READY
-        }
+        return WishDraftReadinessPolicy.evaluate(
+            draftText = draft,
+            sourceText = variantText(variant),
+        )
     }
 
     private fun WishDraftReadiness.errorMessageRes(): Int {
@@ -555,7 +633,4 @@ class WishPreviewViewModel @Inject constructor(
         val remainingReviewCount: Int = 0,
     )
 
-    private companion object {
-        const val MIN_REVIEWED_DRAFT_LENGTH = 12
-    }
 }

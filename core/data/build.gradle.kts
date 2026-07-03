@@ -58,11 +58,7 @@ dependencies {
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    implementation(libs.androidx.room.paging)
     ksp(libs.androidx.room.compiler)
-
-    // Paging
-    implementation(libs.androidx.paging.runtime)
 
     // Hilt
     implementation(libs.hilt.android)
@@ -72,9 +68,6 @@ dependencies {
 
     // Network
     implementation(libs.okhttp)
-    implementation(libs.logging.interceptor)
-    implementation(libs.retrofit)
-    implementation(libs.converter.moshi)
     implementation(libs.moshi.kotlin)
     ksp(libs.moshi.kotlin.codegen)
 

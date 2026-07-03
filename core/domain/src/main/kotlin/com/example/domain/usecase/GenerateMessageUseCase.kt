@@ -1,18 +1,16 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.automation.AiAutoSendQualityGate
 import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutomationSchedulePolicy
-import com.example.domain.contact.toHeader
-import com.example.domain.contact.toDeliveryRouteProfile
-import com.example.domain.contact.toMessagePromptContact
 import com.example.domain.notification.buildApprovalNotificationRequest
 import com.example.domain.message.buildMessagePromptContext
 import com.example.domain.message.toStylePromptProfile
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.message.PendingMessageRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.GiftHistoryRepository
@@ -32,7 +30,7 @@ import java.util.UUID
  * Generates a personalised birthday/event message for a contact using Gemini.
  * - Loads contact, event, style profile, and previous messages for context
  * - Calls Gemini with anti-repetition guard (up to 2 retries)
- * - Persists a PendingMessageEntity in APPROVED or PENDING state based on approval mode
+ * - Persists a pending message in APPROVED or PENDING state based on approval mode
  * - Schedules exact-time dispatch for fully automatic and smart-approve messages
  * - Posts a notification for user review if pending
  */
@@ -66,20 +64,21 @@ class GenerateMessageUseCase @Inject constructor(
         val pendingId = when {
             existingPending == null -> UUID.randomUUID().toString()
             request.regenerateFailedOccurrence &&
-                MessageStatus.fromRaw(existingPending.status) == MessageStatus.FAILED -> existingPending.id
+                existingPending.status == MessageStatus.FAILED -> existingPending.id.value
             else -> return GenerationOutcome.AlreadyExists
         }
 
-        val contact = contactRepository.getById(event.contactId.value) ?: return GenerationOutcome.ContactNotFound
+        val contact = contactRepository.getMessageGenerationProfile(event.contactId.value)
+            ?: return GenerationOutcome.ContactNotFound
         if (!preferencesRepository.isAiWishGenerationEnabled()) {
             return GenerationOutcome.AiDisabled
         }
         val styleProfile = styleProfileRepository.getProfileOnce()
-        val generationHistory = messageRepository.getGenerationHistoryByContact(contact.id, 10)
-        val memoryNotes = memoryNoteRepository.getRecordsByContact(contact.id)
-        val giftHistory = giftHistoryRepository.getRecordsByContact(contact.id)
+        val generationHistory = messageRepository.getGenerationHistoryByContact(contact.id.value, 10)
+        val memoryNotes = memoryNoteRepository.getRecordsByContact(contact.id.value)
+        val giftHistory = giftHistoryRepository.getRecordsByContact(contact.id.value)
         val promptContext = buildMessagePromptContext(
-            contact = contact.toMessagePromptContact(),
+            contact = contact.promptContext,
             event = event,
             styleProfile = styleProfile?.toStylePromptProfile(),
             previousWishes = generationHistory.previousWishes,
@@ -106,7 +105,7 @@ class GenerateMessageUseCase @Inject constructor(
         val globalMode = preferencesRepository.getGlobalAutomationMode()
         val requestedApprovalMode = ApprovalModeResolver.resolve(
             relationship = contact.relationshipType,
-            contactOverride = ApprovalMode.fromRaw(contact.automationMode),
+            contactOverride = contact.automationMode,
             globalMode = globalMode,
             skipAutoWish = contact.skipAutoWish,
         )
@@ -117,7 +116,7 @@ class GenerateMessageUseCase @Inject constructor(
             isUsingFallback = variants.isUsingFallback,
         )
         val channelSelection = AutoSendChannelSelector.selectRoute(
-            contact = contact.toDeliveryRouteProfile(),
+            contact = contact.deliveryRouteProfile,
             routeHistory = generationHistory.routeHistory,
             channelBlackoutJson = preferencesRepository.getChannelBlackout(),
             senderEmail = preferencesRepository.getSenderEmail(),
@@ -137,10 +136,10 @@ class GenerateMessageUseCase @Inject constructor(
             blackoutDatesJson = preferencesRepository.getBlackoutDates(),
         )
 
-        val pending = PendingMessageEntity(
-            id = pendingId,
+        val pending = PendingMessageRecord(
+            id = MessageDraftId(pendingId),
             contactId = contact.id,
-            eventId = event.id.value,
+            occasionId = event.id,
             shortVariant = variants.short,
             standardVariant = variants.standard,
             longVariant = variants.long,
@@ -149,10 +148,10 @@ class GenerateMessageUseCase @Inject constructor(
             emotionalVariant = variants.emotional,
             selectedVariant = variants.recommended,
             selectedVariantText = selectedVariantText,
-            channel = channelSelection.channel.raw,
+            channel = channelSelection.channel,
             scheduledForMs = scheduledForMs,
-            approvalMode = approvalMode.raw,
-            status = if (approvalMode == ApprovalMode.FULLY_AUTO) MessageStatus.APPROVED.raw else MessageStatus.PENDING.raw,
+            approvalMode = approvalMode,
+            status = if (approvalMode == ApprovalMode.FULLY_AUTO) MessageStatus.APPROVED else MessageStatus.PENDING,
             qualityScore = qualityDecision.qualityScore,
             scheduledYear = scheduledYear,
             isUsingFallback = variants.isUsingFallback
@@ -160,16 +159,16 @@ class GenerateMessageUseCase @Inject constructor(
         messageRepository.insertPending(pending)
 
         if (ApprovalModeResolver.schedulesAutomaticDispatch(approvalMode)) {
-            schedulerService.scheduleExactSend(pending.id)
+            schedulerService.scheduleExactSend(pending.id.value)
         }
         if (ApprovalModeResolver.needsReviewNotification(approvalMode)) {
             notificationService.showApprovalNotification(
-                request = buildApprovalNotificationRequest(contact.toHeader(), event, pending.id),
+                request = buildApprovalNotificationRequest(contact.header, event, pending.id.value),
                 variants = variants,
             )
         }
 
-        return GenerationOutcome.Generated(pending.id, approvalMode, retries)
+        return GenerationOutcome.Generated(pending.id.value, approvalMode, retries)
     }
 
     data class Request(

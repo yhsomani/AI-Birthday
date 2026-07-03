@@ -57,6 +57,7 @@ class AuthScreenshotTest {
             AuthContent(
                 state = AuthUiState(),
                 onSignIn = {},
+                onContinueLocalOnly = {},
             )
         }
     }

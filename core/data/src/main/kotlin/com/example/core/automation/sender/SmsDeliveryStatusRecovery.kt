@@ -4,14 +4,13 @@ import android.content.Context
 import com.example.core.db.AppDatabase
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.resilience.StructuredLogger
-import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.automation.SmsDeliveryStatusRecoveryPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 internal object SmsDeliveryStatusRecovery {
     private const val TAG = "SmsDeliveryStatusRecovery"
-    private const val STALE_PENDING_DELIVERY_MS = 24L * 60 * 60 * 1000
 
     fun recoverAsync(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -27,12 +26,15 @@ internal object SmsDeliveryStatusRecovery {
     suspend fun recover(
         sentMessageDao: SentMessageDao,
         nowMs: Long = System.currentTimeMillis(),
-        stalePendingDeliveryMs: Long = STALE_PENDING_DELIVERY_MS,
+        stalePendingDeliveryMs: Long = SmsDeliveryStatusRecoveryPolicy.DEFAULT_STALE_PENDING_DELIVERY_MS,
     ): Int {
-        val cutoffMs = nowMs - stalePendingDeliveryMs.coerceAtLeast(0L)
+        val decision = SmsDeliveryStatusRecoveryPolicy.stalePendingDeliveryDecision(
+            nowMs = nowMs,
+            stalePendingDeliveryMs = stalePendingDeliveryMs,
+        )
         val recovered = sentMessageDao.markStalePendingSmsDeliveryStatus(
-            cutoffMs = cutoffMs,
-            status = MessageDeliveryStatus.UNKNOWN.raw,
+            cutoffMs = decision.cutoffMs,
+            status = decision.recoveredStatus.raw,
         )
         if (recovered > 0) {
             StructuredLogger.w(

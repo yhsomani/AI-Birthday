@@ -1,6 +1,6 @@
 # Privacy and Permissions
 
-Last reviewed: 2026-06-27
+Last reviewed: 2026-07-03
 
 This document records the production privacy and permissions contract for RelateAI. It is not legal advice; the Play Console release owner must verify every declaration against the final build, store listing, privacy policy, and current Google Play policy before release.
 
@@ -10,6 +10,21 @@ This document records the production privacy and permissions contract for Relate
 - Google Play AccessibilityService API policy: https://support.google.com/googleplay/android-developer/answer/10964491
 - Google Play Permissions and APIs that Access Sensitive Information: https://support.google.com/googleplay/android-developer/answer/16558241
 - Android AccessibilityService reference: https://developer.android.com/reference/android/accessibilityservice/AccessibilityService
+
+## Provider Configuration Policy
+
+Approved tracked client config files:
+
+- `app/google-services.json`
+- `app/src/debug/google-services.json`
+
+Repository policy:
+
+- These two files are the only Firebase/Google client config files approved for tracking.
+- `.gitignore` ignores other `google-services.json` files and explicitly allowlists the approved app/debug paths.
+- Do not commit service account JSON, private keys, OAuth access or refresh tokens, client secrets, signing material, SMTP credentials, Gemini keys, or local project variants.
+- If the Firebase project, app id, OAuth client, or signing certificate changes, update the approved config files intentionally and verify the matching OAuth/SHA setup before release.
+- `RepositoryHygieneTest.providerConfigs_areAllowlistedAndDoNotContainServerSecrets` protects the allowlist and checks the approved config files for server-side secret markers.
 
 ## Current Manifest Surface
 
@@ -64,7 +79,7 @@ Data types currently in scope for the Play Data Safety form and privacy policy r
 
 - Contact info: names, phone numbers, email addresses, birthdays/events, relationship labels, notes, and personalization metadata.
 - User-generated content: message drafts, approved messages, feedback, history, backup files, and manual contact/event entries.
-- Account/auth data: Firebase/Google auth identifiers and OAuth/session state.
+- Account/auth data: Firebase/Google auth identifiers and OAuth/session state when Google sign-in is used; local-only mode stores a local mode preference instead of Google account identifiers.
 - App activity/diagnostics: dispatch attempts, delivery state, setup checks, local redacted diagnostic snapshots, recovery diagnostics, and non-sensitive analytics summaries.
 - AI data: prompts and generated responses may include contact/event/message context. They must be disclosed as sent to the AI provider if enabled.
 - Email/SMS send data: recipient address/number, subject where applicable, and body.
@@ -75,6 +90,7 @@ Sensitive data handling requirements:
 - Auto backup remains disabled or sensitive stores remain excluded.
 - User backup/export must be explicit, encrypted where implemented, and documented with restore limitations.
 - Live SQLCipher database key material is separate from backup passphrases. Fresh installs use random local key material stored in Keystore-backed encrypted preferences and formatted as SQLCipher raw-key literals; backup passphrases only protect exported backup files.
+- Local-only mode does not send contacts to Google Contacts sync. Manual contacts, device-imported contacts, events, drafts, and activity remain local unless the user uses an external provider feature such as Gemini, Gmail, SMS, WhatsApp, or encrypted backup export.
 - Sign-out must clear local data through the single auth-layer orchestrator.
 - Logs, analytics exports, backup manifests, and provider failure metadata must redact tokens, credentials, raw AI responses, raw screen contents, and message bodies where not explicitly user-exported.
 - Diagnostic snapshots are local troubleshooting evidence. They must stay redacted, must not contain raw message bodies or secrets, and are excluded from user backup export/import.

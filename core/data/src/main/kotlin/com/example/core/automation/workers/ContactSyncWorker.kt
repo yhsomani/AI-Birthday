@@ -38,11 +38,10 @@ class ContactSyncWorker @AssistedInject constructor(
             if (!canClassify) {
                 StructuredLogger.i(TAG, "No Gemini API key or authenticated user; skipping AI classification")
             } else {
-                val unknownContacts = contactRepository.getAllSync()
-                    .filter { it.relationshipType == "UNKNOWN" }
-                StructuredLogger.i(TAG, "Classifying ${unknownContacts.size} unknown contacts")
-                unknownContacts.forEach { contact ->
-                    classifyContactUseCase(contact.id)
+                val unclassifiedContactIds = contactRepository.getUnclassifiedContactIds()
+                StructuredLogger.i(TAG, "Classifying ${unclassifiedContactIds.size} unknown contacts")
+                unclassifiedContactIds.forEach { contactId ->
+                    classifyContactUseCase(contactId.value)
                 }
             }
 

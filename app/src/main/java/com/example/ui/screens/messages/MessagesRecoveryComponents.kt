@@ -24,7 +24,6 @@ import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.ui.viewmodel.MessageReadiness
 import com.example.ui.viewmodel.MessageChannelFilter
 import com.example.ui.viewmodel.PendingMessageItem
 
@@ -84,7 +83,7 @@ internal fun FailedRecoveryAssistant(
     onOpenAutomationSetup: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val setupBlockers = messages.count { it.readiness.requiresContactOrChannelFix() }
+    val setupBlockers = messages.count { it.requiresContactOrChannelFix }
     val detail = if (setupBlockers > 0) {
         stringResource(R.string.messages_recovery_setup_detail, setupBlockers)
     } else {
@@ -140,16 +139,4 @@ internal fun FailedRecoveryAssistant(
             )
         }
     }
-}
-
-private fun MessageReadiness.requiresContactOrChannelFix(): Boolean = when (this) {
-    MessageReadiness.CONTACT_MISSING,
-    MessageReadiness.CHANNEL_DISABLED,
-    MessageReadiness.MISSING_PHONE,
-    MessageReadiness.MISSING_EMAIL,
-    MessageReadiness.EMAIL_SETUP_MISSING -> true
-    MessageReadiness.READY_FOR_REVIEW,
-    MessageReadiness.APPROVED_SCHEDULED,
-    MessageReadiness.SENDING_NOW,
-    MessageReadiness.FAILED_CHECK_SETUP -> false
 }

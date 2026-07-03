@@ -6,7 +6,6 @@ import com.example.core.accessibility.WhatsAppSendFailureReason
 import com.example.core.accessibility.WhatsAppSendResult
 import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.automation.scheduler.DailyScheduler
-import com.example.core.data.R
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.EventDao
@@ -24,6 +23,7 @@ import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.OccasionId
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.MessageDispatchRequest
+import com.example.domain.model.notification.SetupNotificationReason
 import com.example.domain.model.occasion.OccasionType
 import io.mockk.Runs
 import io.mockk.coEvery
@@ -78,8 +78,9 @@ class MessageDispatcherTest {
         every { anyConstructed<SmsSender>().send(any(), any(), any()) } just Runs
         every { anyConstructed<SmsSender>().send(any(), any(), any(), any(), any()) } just Runs
         every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
-        every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
+        every { NotificationHelper.showSetupNotification(any(), any()) } just Runs
         coEvery { sentMessageDao.insert(capture(sentSlot)) } just Runs
+        coEvery { sentMessageDao.getByContact(any(), any()) } returns emptyList()
         coEvery { dispatchAttemptDao.getMaxRetryCountForMessageDraft(any()) } returns 0
     }
 
@@ -222,8 +223,10 @@ class MessageDispatcherTest {
         verify {
             NotificationHelper.showSetupNotification(
                 context,
-                context.getString(R.string.notification_setup_sms_permission_title),
-                context.getString(R.string.notification_setup_sms_permission_message, "Amit"),
+                match {
+                    it.reason == SetupNotificationReason.SMS_PERMISSION_MISSING &&
+                        it.contactDisplayName == "Amit"
+                },
             )
         }
         coVerify { sentMessageDao.updateDeliveryStatus(any(), MessageDeliveryStatus.FAILED.raw) }
@@ -395,6 +398,69 @@ class MessageDispatcherTest {
         assertEquals(0, DeadLetterQueue.count())
     }
 
+    @Test
+    fun `dispatch orders final routes from successful delivery history`() = runTest {
+        every { anyConstructed<SecurePrefs>().getSenderEmail() } returns "sender@example.com"
+        every { anyConstructed<SecurePrefs>().getSenderEmailPassword() } returns "app-password"
+        coEvery { sentMessageDao.getByContact("contact_1", any()) } returns listOf(
+            sentHistory(
+                id = "history_email_1",
+                channel = MessageChannel.EMAIL,
+                deliveryStatus = MessageDeliveryStatus.DELIVERED,
+            ),
+            sentHistory(
+                id = "history_email_2",
+                channel = MessageChannel.EMAIL,
+                deliveryStatus = MessageDeliveryStatus.SENT,
+            ),
+            sentHistory(
+                id = "history_sms_1",
+                channel = MessageChannel.SMS,
+                deliveryStatus = MessageDeliveryStatus.FAILED,
+            ),
+        )
+
+        dispatcher().dispatch(
+            dispatchRequest(
+                eventId = "event_1",
+                preferredChannel = MessageChannel.SMS,
+                primaryEmail = "amit@example.com",
+                dispatchAttemptId = "attempt_history",
+            )
+        )
+
+        coVerify {
+            anyConstructed<EmailSender>().send(
+                toEmail = "amit@example.com",
+                contactName = "Amit",
+                messageText = "Selected",
+                eventType = OccasionType.UNKNOWN.raw,
+                eventLabel = any(),
+                subjectOverride = any(),
+            )
+        }
+        assertEquals(MessageChannel.EMAIL.raw, sentSlot.captured.channel)
+        assertEquals(MessageDeliveryStatus.SENT.raw, sentSlot.captured.deliveryStatus)
+        coVerify {
+            dispatchAttemptDao.updateOutcome(
+                id = "attempt_history",
+                attemptedAtMs = any(),
+                resolvedAtMs = any(),
+                result = DispatchAttemptResult.SENT.raw,
+                channel = MessageChannel.EMAIL.raw,
+                deliveryStatus = MessageDeliveryStatus.SENT.raw,
+                providerMessageId = null,
+                errorType = null,
+                errorCode = null,
+                redactedErrorMessage = null,
+                retryCount = 0,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = null,
+            )
+        }
+        assertEquals(0, DeadLetterQueue.count())
+    }
+
     private fun dispatcher(): MessageDispatcher {
         return MessageDispatcher(context, pendingMessageDao, sentMessageDao, contactDao, eventDao, dispatchAttemptDao)
     }
@@ -416,6 +482,23 @@ class MessageDispatcherTest {
             primaryPhone = primaryPhone,
             primaryEmail = primaryEmail,
             dispatchAttemptId = dispatchAttemptId?.let(::DispatchAttemptId),
+        )
+    }
+
+    private fun sentHistory(
+        id: String,
+        channel: MessageChannel,
+        deliveryStatus: MessageDeliveryStatus,
+    ): SentMessageEntity {
+        return SentMessageEntity(
+            id = id,
+            contactId = "contact_1",
+            eventType = OccasionType.BIRTHDAY.raw,
+            eventYear = 2026,
+            messageText = "History",
+            channel = channel.raw,
+            sentAtMs = 1_800_000_000_000,
+            deliveryStatus = deliveryStatus.raw,
         )
     }
 }

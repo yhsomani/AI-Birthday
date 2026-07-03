@@ -7,6 +7,7 @@ import com.example.domain.model.contact.ContactAnalyticsProfile
 import com.example.domain.model.contact.ContactAnalyticsSummary
 import com.example.domain.model.contact.ContactAutomationProfile
 import com.example.domain.model.contact.ContactAutomationReadinessProfile
+import com.example.domain.model.contact.ContactClassificationProfile
 import com.example.domain.model.contact.ContactClassificationPromptContext
 import com.example.domain.model.contact.ContactDeliveryRouteProfile
 import com.example.domain.model.contact.ContactDetailProfile
@@ -16,6 +17,7 @@ import com.example.domain.model.contact.ContactHealthProfile
 import com.example.domain.model.contact.ContactHeader
 import com.example.domain.model.contact.ContactListItem
 import com.example.domain.model.contact.ContactMessagePromptContext
+import com.example.domain.model.contact.ContactMessageGenerationProfile
 import com.example.domain.model.contact.ContactMessageContext
 import com.example.domain.model.contact.ContactPickerItem
 import com.example.domain.model.contact.ContactRelationshipPromptContext
@@ -68,6 +70,14 @@ fun ContactEntity.toClassificationPromptContext(): ContactClassificationPromptCo
         displayName = name,
         notesText = notesText,
         interactionFrequencyPerMonth = interactionFrequencyPerMonth,
+    )
+}
+
+fun ContactEntity.toClassificationProfile(): ContactClassificationProfile {
+    return ContactClassificationProfile(
+        id = ContactId(id),
+        relationshipType = relationshipType,
+        promptContext = toClassificationPromptContext(),
     )
 }
 
@@ -211,6 +221,20 @@ fun ContactEntity.toMessagePromptContact(): ContactMessagePromptContext {
     )
 }
 
+fun ContactEntity.toMessageGenerationProfile(): ContactMessageGenerationProfile {
+    return ContactMessageGenerationProfile(
+        id = ContactId(id),
+        relationshipType = relationshipType,
+        automationMode = ApprovalMode.fromRaw(automationMode),
+        skipAutoWish = skipAutoWish,
+        deliveryRouteProfile = toDeliveryRouteProfile(),
+        promptContext = toMessagePromptContact(),
+        header = toHeader(),
+        customSendTimeHour = customSendTimeHour,
+        customSendTimeMinute = customSendTimeMinute,
+    )
+}
+
 fun ContactEntity.toListItem(): ContactListItem {
     return ContactListItem(
         id = ContactId(id),
@@ -252,6 +276,7 @@ fun ContactEntity.toMessageContext(): ContactMessageContext {
         avatarUrl = profilePhotoUri,
         primaryPhone = primaryPhone,
         primaryEmail = primaryEmail,
+        preferredChannel = MessageChannel.fromRaw(preferredChannel),
     )
 }
 

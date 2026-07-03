@@ -6,8 +6,8 @@ import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
-import com.example.core.db.entities.ContactEntity
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.model.common.ContactId
 import com.example.domain.repository.ContactRepository
 import com.example.domain.usecase.ClassifyContactUseCase
 import com.example.domain.usecase.SyncContactsUseCase
@@ -62,15 +62,12 @@ class ContactSyncWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { syncContactsUseCase(forceRefresh = false) }
-        coVerify(exactly = 0) { contactRepository.getAllSync() }
+        coVerify(exactly = 0) { contactRepository.getUnclassifiedContactIds() }
         coVerify(exactly = 0) { classifyContactUseCase(any()) }
     }
 
     @Test
     fun `doWork classifies unknown contacts after successful sync when AI is configured`() = runTest {
-        val unknownContact = ContactEntity(id = "contact_1", name = "Unknown", relationshipType = "UNKNOWN")
-        val knownContact = ContactEntity(id = "contact_2", name = "Known", relationshipType = "FRIEND")
-
         coEvery { syncContactsUseCase(forceRefresh = false) } returns SyncContactsUseCase.SyncOutcome(
             googleCount = 0,
             deviceCount = 2,
@@ -78,7 +75,7 @@ class ContactSyncWorkerTest {
             updated = 0
         )
         every { prefs.getGeminiApiKey() } returns "gemini-key"
-        coEvery { contactRepository.getAllSync() } returns listOf(unknownContact, knownContact)
+        coEvery { contactRepository.getUnclassifiedContactIds() } returns listOf(ContactId("contact_1"))
 
         val result = worker().doWork()
 
@@ -97,9 +94,7 @@ class ContactSyncWorkerTest {
             inserted = 1,
             updated = 0
         )
-        coEvery { contactRepository.getAllSync() } returns listOf(
-            ContactEntity(id = "contact_1", name = "Unknown", relationshipType = "UNKNOWN")
-        )
+        coEvery { contactRepository.getUnclassifiedContactIds() } returns listOf(ContactId("contact_1"))
 
         val result = worker().doWork()
 

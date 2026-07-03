@@ -197,6 +197,11 @@ class SecurePrefs(context: Context) {
     fun setOnboardingComplete(complete: Boolean) = configPrefs.edit().putBoolean("onboarding_complete", complete).apply()
     fun isOnboardingComplete(): Boolean = configPrefs.getBoolean("onboarding_complete", false)
 
+    fun setLocalOnlyModeEnabled(enabled: Boolean) =
+        configPrefs.edit().putBoolean("local_only_mode_enabled", enabled).apply()
+    fun isLocalOnlyModeEnabled(): Boolean =
+        configPrefs.getBoolean("local_only_mode_enabled", false)
+
     fun setFirebaseUid(uid: String) = authPrefs.edit().putString("firebase_uid", uid).apply()
     fun getFirebaseUid(): String = authPrefs.getString("firebase_uid", "") ?: ""
 

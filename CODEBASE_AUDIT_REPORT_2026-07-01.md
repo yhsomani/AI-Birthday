@@ -17,7 +17,7 @@ The codebase is broadly functional and has a serious test culture, but the audit
 | --- | --- | --- | --- |
 | Resolved P0 | Fully automatic AI quality gate previously did not downgrade fallback/generic/low-quality nonblank messages. | Resolved on 2026-07-01: fallback, generic, blank, short, or otherwise low-score generated text in automatic modes downgrades to manual review. | `AiAutoSendQualityGate.kt:48`, `AiAutoSendQualityGateTest`, `GenerateMessageUseCaseTest`, `EnableFullAutomationUseCaseTest` |
 | Resolved P1 | Foreground/manual dispatch path previously risked bypassing quiet hours or blackout dates. | Resolved on 2026-07-01: manual/domain dispatch and worker dispatch both pass quiet hours and blackout dates into shared dispatch eligibility. | `DispatchMessageUseCase.kt:51`, `DispatchMessageUseCaseTest.kt:228`, `DispatchEligibilityPolicy.kt:118`, `MessageDispatchWorker.kt:71` |
-| P1 | The operational readiness model is still distributed across AI Doctor, scheduling, and several UI surfaces. | Users can still see one screen say "ready" while another path defers, blocks, or requires setup. Route prerequisites now have a shared domain policy, but the full readiness model is not yet single-source. | `DeliveryRouteReadinessPolicy`, `AutomationSetupViewModel`, `DispatchEligibilityPolicy`, `MessagesViewModel` |
+| P1 | The operational readiness model is still distributed across AI Doctor, scheduling, and several UI surfaces. | Users can still see one screen say "ready" while another path defers, blocks, or requires setup. Route prerequisites, history-aware route selection/fallback, Messages route/status/scheduled-time/allowed-window readiness, exact-send scheduling, exact-send stale-dispatch recovery classification, SMS stale delivery-status recovery, event-reminder scheduling classification, foreground/worker dispatch exception final-failure classification, SMS callback delivery/attempt outcome mapping, Wish Preview draft text readiness/send summary/route choice/route setup/device setup/quiet-hours and blackout dispatch context, approval notification actions, setup notification request reasons/helper payloads for dispatch/AI provider/revival AI provider/exact alarms, system alert request reasons/helper payloads for AI fallback/stale backup, revival notification payloads, AI Doctor account/provider readiness, AI Doctor automation prerequisites, SMS/WhatsApp setup readiness, channel verification routing, AI Doctor email setup readiness, AI Doctor quality readiness, AI Doctor system readiness, setup summary/progress, AI Doctor fix ranking, Home readiness banner, and Home next-action ranking now have shared domain/model policies or contracts, but the full readiness model is not yet single-source. | `MessageOperationalReadinessPolicy`, `DispatchEligibilityPolicy`, `ExactSendSchedulePolicy`, `ExactSendRecoveryPolicy`, `SmsDeliveryStatusRecoveryPolicy`, `EventReminderSchedulePolicy`, `DispatchExceptionFailurePolicy`, `SmsCallbackOutcomePolicy`, `WishDraftReadinessPolicy`, `WishPreviewSendSummaryPolicy`, `ApprovalNotificationActionPolicy`, `SetupNotificationRequest`, `SystemAlertNotificationRequest`, `RevivalNotificationRequest`, `SetupAccountProviderReadinessPolicy`, `SetupAutomationReadinessPolicy`, `SetupChannelReadinessPolicy`, `SetupEmailReadinessPolicy`, `SetupQualityReadinessPolicy`, `SetupSystemReadinessPolicy`, `SetupReadinessSummaryPolicy`, `SetupReadinessProgressPolicy`, `SetupReadinessRecommendationPolicy`, `HomeNextActionPolicy`, `DeliveryRouteReadinessPolicy`, `AutoSendChannelSelector`, `ExactSendRecovery`, `SmsDeliveryStatusRecovery`, `EventReminderScheduler`, `SmsStatusReceiver`, `NotificationHelper`, `RevivalWorker`, `DispatchMessageUseCase`, `WorkerMessageDispatchAdapters`, `AutomationSetupViewModel`, `MessagesViewModel`, `WishPreviewViewModel`, `WishPreviewDeviceReadinessReader`, `HomeViewModel` |
 | P1 | Repository contains tracked local/generated artifacts and an over-broad `.gitignore` that ignores valid app assets. | Builds and reviews are noisier; real assets appear as ignored/tracked; private diagnostic logs are in git history. | `.gitignore`, `git ls-files -i -c --exclude-standard` |
 | P1 | Documentation is materially stale. | Product and architecture docs describe older modules and Room schema v13 while code is at five modules and schema v16. | `settings.gradle.kts`, `AppDatabase.kt`, `SSOT.md` |
 | P2 | Domain module contains Room entities and some UI paths consume data entities directly. | Module boundaries are not clean; future feature modules and testing get harder. | `core/domain/src/main/kotlin/com/example/core/db/entities/*`, `ChatHistoryViewModel.kt:7` |
@@ -42,13 +42,15 @@ Implementation update on 2026-07-01:
 - Added Settings Gmail app-password safety copy explaining app-password use, encrypted storage, AI Doctor email verification, and Google revocation.
 - Added a release-checklist pin-rotation deadline for the current `2027-06-01` network pin expiration.
 - Added a Settings recovery notice when encrypted preferences are rebuilt after secure storage initialization failure.
-- Migrated production direct Android `Log` calls to `StructuredLogger` or removed them from the domain layer; release-readiness tests now allow direct Android logging only inside `StructuredLogger`.
+- Migrated production direct Android `Log` calls to `StructuredLogger` or removed them from the domain layer; release-readiness tests now allow direct Android logging only inside `StructuredLogger`; message-body fields are redacted by key and inline assignment.
 - Added a private Memory Vault category that stays out of AI prompt context while remaining visible in the user's vault.
 - Extracted delivery route readiness into a shared domain policy used by both Messages readiness labels and automatic channel selection.
 - Made Analytics neglected-contact rows actionable by preserving contact ids and routing rows to Contact Detail.
 - Added Memory Vault search with a clear action and distinct no-results state so saved notes can be found by note text or category without scanning the whole journal.
 - Added inline Memory Vault note editing so users can correct saved text/category without deleting and recreating notes.
-- Remaining open work: decide repository policy for tracked Google/Firebase service config files, and consolidate readiness state across feature surfaces.
+- Added a Gift Advisor Adjust budget action that routes to Contact Detail with the existing preferences editor open.
+- Remaining open work: consolidate readiness state across remaining notification surfaces outside typed approval/setup/system-alert/revival/event-reminder requests and dispatch/recovery timing surfaces outside Messages scheduled readiness, exact-send scheduling, exact-send stale-dispatch recovery, SMS stale delivery-status recovery, event-reminder scheduling, foreground/worker dispatch exception failure, SMS callback outcome mapping, and the Wish Preview review summary. Updated 2026-07-03: tracked Google/Firebase client config policy is now explicit in `.gitignore`, release/security docs, SSOT, and `RepositoryHygieneTest`; Messages route/status readiness now uses `MessageOperationalReadinessPolicy`; Messages scheduled-time and allowed-window readiness now reuses `DispatchEligibilityPolicy`; exact-send scheduling now uses `ExactSendSchedulePolicy`; exact-send stale-dispatch recovery classification now uses `ExactSendRecoveryPolicy`; SMS stale pending-delivery recovery cutoff and recovered status now use `SmsDeliveryStatusRecoveryPolicy`; event-reminder cancel/exact/inexact scheduling now uses `EventReminderSchedulePolicy`; foreground and worker dispatcher exception outcomes now use `DispatchExceptionFailurePolicy`; SMS callback delivery/attempt outcome mapping now uses `SmsCallbackOutcomePolicy`; Wish Preview draft text readiness now uses `WishDraftReadinessPolicy`; Wish Preview event/channel/route choice/route setup/device setup/schedule/approval/fallback summary and quiet-hours/blackout dispatch context now use `WishPreviewSendSummaryPolicy`; approval notification approve/schedule/dispatch/expire/block decisions now use domain `ApprovalNotificationActionPolicy`; dispatch, AI-provider, revival-AI-provider, and exact-alarm setup notification request reasons and helper rendering now use shared `SetupNotificationRequest`; AI-fallback and stale-backup system alert reasons and helper rendering now use shared `SystemAlertNotificationRequest`; revival review notification payloads now use shared `RevivalNotificationRequest`; route selection and final dispatch fallback ordering now use the shared history-aware `AutoSendChannelSelector`; AI Doctor Google Contacts access, Gemini access, AI wish-generation toggle, and Gemini circuit checks now use `SetupAccountProviderReadinessPolicy`; AI Doctor full-automation, event, route, and selected-channel count decisions now use `SetupAutomationReadinessPolicy`; SMS/WhatsApp setup readiness and channel verification routing now use `SetupChannelReadinessPolicy`; AI Doctor email setup readiness now uses `SetupEmailReadinessPolicy`; AI Doctor Style Coach, personalization, and generic-message risk checks now use `SetupQualityReadinessPolicy`; AI Doctor notification permission, exact-send permission, daily scheduler, recent-health, and dispatch-recovery checks now use `SetupSystemReadinessPolicy`; setup summary/progress now uses `SetupReadinessSummaryPolicy` and `SetupReadinessProgressPolicy`; AI Doctor recommended-fix ranking now uses `SetupReadinessRecommendationPolicy`; Home readiness banner, backup freshness, and next-action ranking now use `HomeNextActionPolicy`.
+- Current working-tree update: exact-send enqueue-now/exact-alarm/WorkManager-fallback scheduling now uses `ExactSendSchedulePolicy`; already-handled `SENT`/`DISPATCHING` dispatch blockers are covered through `DispatchEligibilityPolicy`; initial recurring automation scheduling and boot recovery now share `BootRecoveryRecurringWorkCommand`; approval, revival, and event-reminder notification copy/helper rendering now use `ApprovalNotificationAdapters`, `RevivalNotificationAdapters`, `EventReminderNotificationAdapters`, and typed notification requests; People API contact fetches now use the injected shared `OkHttpClient` and `PeopleConnectionsRequestFactory` instead of inline request/client construction; remaining dispatch/notification debt excludes those covered helper paths.
 
 ## 2. Product Assessment
 
@@ -199,7 +201,7 @@ Migration sequence:
 | Purpose | Provide authenticated app entry, bottom navigation, deep links, biometric lock, and runtime permission prompts. |
 | Business goal | Keep the app secure while making the main relationship workflows reachable. |
 | User goal | Open the app, unlock if needed, and reach Home, Contacts, Events, Messages, or Analytics quickly. |
-| Current implementation | `MainActivity` gates UI with biometric settings, shows bottom navigation for Home/Contacts/Events/Messages/Analytics, and requests SMS/notification permissions from primary routes. `NavGraph` protects authenticated routes with Firebase auth. |
+| Current implementation | `MainActivity` gates UI with biometric settings before rendering the nav graph, shows bottom navigation for Home/Contacts/Events/Messages/Analytics, and requests SMS/notification permissions from primary routes. `NavGraph` protects authenticated routes with Firebase auth, and `DeepLinkContractTest` covers external deep-link registration plus auth/biometric gate placement. |
 | UX issues | Contacts permission is not requested in the same central shell path; users may discover it through sync failures or setup. Settings and recovery surfaces are deeper routes even though they are operationally important. |
 | Accessibility | Bottom nav labels are present; permission rationale is explicit. Continue checking all icon buttons in secondary screens. |
 | Missing functionality | A single system-readiness entry point reachable from every blocked message state. |
@@ -313,7 +315,7 @@ Migration sequence:
 | Purpose | Review, explain, edit, test, regenerate, approve, or reject a generated draft. |
 | Business goal | Make AI output trustworthy before delivery. |
 | User goal | Understand why the draft was generated and decide quickly. |
-| Current implementation | Wish Preview loads variants, contact/event context, memory/gift/previous-wish signals, quality/fallback state, review-next support, test send, regeneration, feedback, approve, and reject. |
+| Current implementation | Wish Preview loads variants, contact/event context, memory/gift/previous-wish signals, quality/fallback state, domain-derived route choice, route/device setup, and quiet-hours/blackout-aware dispatch summary rows, review-next support, test send, regeneration, feedback, approve, and reject. |
 | UX issues | The screen is high-value but dense. Activity log strings in feedback paths are partly hardcoded. |
 | Missing functionality | Better traceability from feedback to future prompt changes and a clearer "what changed after regenerate" comparison. |
 | Suggested redesign | Split into message editor, quality/why panel, delivery plan, and review actions. Add diff after regeneration. |
@@ -411,10 +413,10 @@ Migration sequence:
 | Purpose | Track gift history and suggest gifts from relationship context. |
 | Business goal | Expand product value beyond messages. |
 | User goal | Remember past gifts and find appropriate new ideas. |
-| Current implementation | Shows profile, history, spending, budget, add/delete gift record, AI suggestions, budget-fit evidence, confidence, duplicate-history warnings, dismiss/ignore, and a record-suggestion shortcut that pre-fills the gift form. |
-| UX issues | Large screen file. Suggestions are now more explainable, but the screen still mixes budget, suggestion review, history, and record-entry workflows in one file. |
-| Missing functionality | Adjust-budget action, use-in-message action, and persisted feedback about whether a suggestion was useful. |
-| Suggested redesign | Treat suggestions as draft gift records with actions: save, dismiss, adjust budget, use in message, and explain why a suggestion appeared. |
+| Current implementation | Shows profile, history, spending, budget, an Adjust budget route to Contact Detail preferences, add/delete gift record, AI suggestions, budget-fit evidence, confidence, duplicate-history warnings, dismiss/ignore, and a record-suggestion shortcut that pre-fills the gift form. |
+| UX issues | Large screen file. Suggestions are now more explainable/actionable, but the screen still mixes budget, suggestion review, history, and record-entry workflows in one file. |
+| Missing functionality | Use-in-message action and persisted feedback about whether a suggestion was useful. |
+| Suggested redesign | Treat suggestions as draft gift records with actions: save, dismiss, use in message, persisted feedback, and explain why a suggestion appeared. |
 | Priority | P2 |
 | Related files | `GiftAdvisorViewModel`, `GiftAdvisorScreen`, `PromptBuilder`, gift repositories |
 
@@ -593,18 +595,28 @@ Recommendation:
 
 ### P1. Readiness State Is Not Single-Source
 
-Status on 2026-07-01: partially addressed. Messages and automatic channel selection now share `DeliveryRouteReadinessPolicy` for route prerequisites: missing contact, disabled channel, missing phone/email, invalid contact email, and Gmail sender setup. A complete shared readiness output across Home, Wish Preview, AI Doctor, notifications, route selection, and dispatch timing is still open.
+Status on 2026-07-01: partially addressed. Messages and automatic channel selection share `DeliveryRouteReadinessPolicy` for route prerequisites: missing contact, disabled channel, missing phone/email, invalid contact email, and Gmail sender setup. Updated 2026-07-03: Messages now uses `MessageOperationalReadinessPolicy` to combine route blockers with pending-message status, shared task-flow flags, and `DispatchEligibilityPolicy` scheduled-time/allowed-window decisions; `DispatchEligibilityPolicy` blocks already-handled `SENT` and `DISPATCHING` states; exact-send scheduling uses `ExactSendSchedulePolicy`; initial recurring automation scheduling and boot recovery share `BootRecoveryRecurringWorkCommand`; exact-send stale-dispatch recovery classification uses `ExactSendRecoveryPolicy`; SMS stale delivery-status recovery uses `SmsDeliveryStatusRecoveryPolicy`; event-reminder cancel/exact/inexact scheduling uses `EventReminderSchedulePolicy`; foreground and worker dispatcher exception outcomes use `DispatchExceptionFailurePolicy`; SMS callback delivery/attempt outcome mapping uses `SmsCallbackOutcomePolicy`; Wish Preview uses `WishDraftReadinessPolicy` for draft text approval-blocking state and `WishPreviewSendSummaryPolicy` for event/channel/route choice/route setup/device setup/schedule/approval/fallback and quiet-hours/blackout dispatch context; approval notification actions use `ApprovalNotificationActionPolicy`; approval notification helper rendering uses `ApprovalNotificationAdapters`; dispatch, AI-provider, revival-AI-provider, and exact-alarm setup notification request reasons/helper rendering use `SetupNotificationRequest`; AI-fallback and stale-backup alert reasons/helper rendering use `SystemAlertNotificationRequest`; revival review notification payloads use `RevivalNotificationRequest`; revival notification helper rendering uses `RevivalNotificationAdapters`; event-reminder notification helper rendering uses `EventReminderNotificationAdapters`; route selection and final dispatch fallback ordering use history-aware `AutoSendChannelSelector.orderedRoutes`; AI Doctor account/provider readiness uses `SetupAccountProviderReadinessPolicy`; AI Doctor full-automation, event, and selected-channel count decisions use `SetupAutomationReadinessPolicy`; AI Doctor SMS/WhatsApp setup checks and channel verification routing use `SetupChannelReadinessPolicy`; AI Doctor email setup readiness uses `SetupEmailReadinessPolicy`; AI Doctor Style Coach, personalization, and generic-message risk checks use `SetupQualityReadinessPolicy`; AI Doctor notification permission, exact-send permission, daily scheduler, recent-health, and dispatch-recovery checks use `SetupSystemReadinessPolicy`; Home and AI Doctor setup summary/progress use `SetupReadinessSummaryPolicy` and `SetupReadinessProgressPolicy`; AI Doctor recommended-fix ranking uses `SetupReadinessRecommendationPolicy`; Home uses `HomeNextActionPolicy` for readiness banner classification, backup freshness, and ranked next actions. A complete shared readiness output across remaining notification surfaces outside typed approval/setup/system-alert/revival/event-reminder requests and dispatch/recovery timing surfaces outside Messages/Wish Preview/exact-send scheduling/exact-send recovery/SMS delivery-status recovery/event-reminder scheduling/dispatch-exception failure/SMS callback outcomes is still open.
 
 Evidence:
 
-- Messages route-readiness labels map from the shared domain policy instead of duplicating channel prerequisite checks in the ViewModel.
+- Messages route/status/scheduled-window readiness labels map from shared domain policies instead of duplicating channel prerequisite, task-flow, and dispatch-window checks in the ViewModel/UI.
+- Exact-send stale-dispatch recovery maps attempt results through a shared domain policy before the scheduler applies DAO updates.
+- SMS stale pending-delivery recovery maps cutoff and recovered delivery status through a shared domain policy before the sender recovery adapter applies DAO updates.
+- Event reminder scheduling maps inactive/disabled/past reminders and exact-vs-inexact alarm choice through a shared domain policy before the scheduler applies AlarmManager calls.
+- Foreground and worker dispatcher exception paths map final-failure outcome details through a shared domain policy before persisting attempt updates.
+- SMS sent/delivered callbacks map delivery status, dispatch result, pending failure marking, dead-letter behavior, and failure metadata through a shared domain policy before DAO updates.
+- Wish Preview blank/short/edited draft text readiness maps from a shared domain policy instead of screen-local thresholds and approval-blocking helpers.
+- Setup/remediation notifications pass typed request reasons through the Android helper instead of raw title/message helper arguments.
+- System alert notifications pass typed request reasons through the Android helper instead of raw title/message helper arguments.
+- Revival review notifications map contact id/name, days-since-contact, and suggestion text through a shared typed request before Android notification rendering.
+- Home backup freshness and ranked next-action priorities map from a shared domain policy instead of ViewModel-local ranking rules.
 - `AutoSendChannelSelector` uses the same policy for available-channel selection and no-route diagnostics.
 - AI Doctor has a broader setup model.
 - Dispatch policy owns schedule/time eligibility.
 
 Impact:
 
-- Route prerequisite drift is reduced between Messages and automatic channel selection.
+- Route prerequisite drift is reduced between Messages and automatic channel selection, and Messages task buckets now use shared readiness flags.
 - A user can still see inconsistent "ready", "blocked", "scheduled", or "needs setup" states when the reason depends on broader setup, permissions, schedule timing, approval state, quality, or recovery.
 
 Recommendation:
@@ -614,7 +626,7 @@ Recommendation:
 
 ### P1. Repository Hygiene and Ignore Rules Are Unsafe
 
-Status on 2026-07-01: addressed for verified generated/local artifacts. The global media ignore rules were narrowed so app assets are trackable, and local Gradle/tool diagnostics, app/logcat dumps, stale lint snapshots, the stray screenshot, and legacy app-level schema exports were removed from git tracking. `app/google-services.json` and `app/src/debug/google-services.json` remain tracked pending an explicit public/private repository policy decision.
+Status on 2026-07-01: addressed for verified generated/local artifacts. The global media ignore rules were narrowed so app assets are trackable, and local Gradle/tool diagnostics, app/logcat dumps, stale lint snapshots, the stray screenshot, and legacy app-level schema exports were removed from git tracking. Updated 2026-07-03: `app/google-services.json` and `app/src/debug/google-services.json` remain tracked as approved Firebase/Google client config files, exact allowlist entries exist in `.gitignore`, and `RepositoryHygieneTest` checks the approved files for server-side secret markers.
 
 Evidence:
 
@@ -742,7 +754,7 @@ This section separates safe cleanup from files that only look suspicious.
 | Path/pattern | Reason |
 | --- | --- |
 | `app/src/main/res/mipmap-*/ic_launcher*.webp` | Valid Android launcher assets. The issue is `.gitignore`, not the assets. |
-| `app/google-services.json`, `app/src/debug/google-services.json` | Used by Google/Firebase configuration. If this repository is public, rotate/remove and provide secret-backed config. If private, document policy. |
+| `app/google-services.json`, `app/src/debug/google-services.json` | Approved Google/Firebase client config files. Keep tracked only under the explicit provider-config policy; keep service account JSON, private keys, OAuth tokens, client secrets, signing material, SMTP credentials, Gemini keys, and local variants untracked. |
 | `scripts/extract_strings.sh` | Referenced by docs/tests; keep. |
 | `PRODUCT_BLUEPRINT.md`, `SSOT.md`, `PRODUCT_UX_WORKFLOW_TECHNICAL_ANALYSIS.md` | Stale but not dead. Update or archive; do not delete blindly. |
 
@@ -781,7 +793,7 @@ Recommendation:
 | Gap | Risk | Recommendation |
 | --- | --- | --- |
 | No regression appears to cover FULLY_AUTO fallback downgrade. | Critical trust bug survived. | Add `AiAutoSendQualityGateTest` and use-case tests for generation/promotion. |
-| Messages readiness tests cannot validate full dispatch readiness because readiness is screen-local. | UI can claim wrong operational state. | Test shared readiness use case once introduced. |
+| Messages readiness tests validate the route/status/scheduled-window slice, not full dispatch readiness. | UI can still claim wrong operational state for permission, quality, or recovery reasons outside the shared Messages policy. | Continue testing shared readiness policies as remaining surfaces migrate. |
 | Accessibility regression checks selected source files, not every action icon/screen. | Secondary features may regress. | Expand a11y checks to feature folders or add Compose UI tests for primary workflows. |
 | Hardcoded string checks cover a curated list. | Hardcoded user-facing/activity strings remain possible elsewhere. | Expand reviewed source list or use a stricter lint/custom detector. |
 | Activity/history scaling is not tested with large data sets. | In-memory filtering and 100-row caps may hide problems. | Add performance tests or migrate to Paging. |
@@ -797,6 +809,7 @@ Add end-to-end or integration tests for:
 5. Messages blocked state matches AI Doctor setup state for missing SMS, email, WhatsApp accessibility, and channel blackout.
 6. Enable full automation should not promote fallback/generic/low-quality pending messages.
 7. Backup export/import excludes secrets and preserves non-secret automation preferences.
+8. Deep-linked signed-in routes remain behind the biometric shell gate and the NavGraph auth gate.
 
 ## 9. Security and Privacy Review
 
@@ -815,8 +828,8 @@ Add end-to-end or integration tests for:
 
 | Risk | Priority | Recommendation |
 | --- | --- | --- |
-| Checked-in Firebase/Google service config may be inappropriate for a public repo. | P1 if public, P3 if private | Decide policy. If public, rotate and move config to secret/local generation. |
-| Direct `Log` usage and operational metadata may include contact names/context. | P2 | Resolved for direct Android logging on 2026-07-01: production source now routes logging through `StructuredLogger`, domain sync no longer logs through Android, and `ProductionReadinessConfigTest` blocks direct `android.util.Log` outside `StructuredLogger`. Continue avoiding names and personal relationship context in structured extras. |
+| Checked-in Firebase/Google service config requires explicit governance. | P3 after policy update | Updated 2026-07-03: approved app/debug client config files are allowlisted and test-checked for server-side secret markers. Release owners still verify Firebase project, OAuth client, and signing SHA correctness before distribution. |
+| Direct `Log` usage and operational metadata may include contact names/context. | P2 | Resolved for direct Android logging on 2026-07-01: production source now routes logging through `StructuredLogger`, domain sync no longer logs through Android, `ProductionReadinessConfigTest` blocks direct `android.util.Log` outside `StructuredLogger`, and message-body fields are redacted by key/inline assignment. Continue avoiding names and personal relationship context in structured extras. |
 | Memory notes have no prompt-eligibility privacy control. | P2 | Partially mitigated on 2026-07-01: Memory Vault now has a Private category that remains in the vault but is filtered out of AI prompt context. Next step is a separate per-note "use for AI" toggle and prompt data preview. |
 | Gmail app password storage is encrypted but high-risk. | P2 | Partially mitigated on 2026-07-01: Settings setup copy now explains app-password use, encrypted storage, AI Doctor email verification, and Google revocation. Keep AI Doctor test-email enforcement visible before automatic Email delivery. |
 | Certificate pins expire on 2027-06-01. | P3 now, P1 near expiry | Resolved as a release-process task on 2026-07-01: `docs/operations/release-checklist.md` now requires network pin rotation to be scheduled by 2027-04-01 and release-owner signoff for any release after that date without refreshed pins. |
@@ -859,7 +872,7 @@ Add end-to-end or integration tests for:
 3. Done on 2026-07-01: `DispatchMessageUseCase` passes quiet hours and blackout dates.
 4. Done on 2026-07-01: dispatch tests cover manual/foreground blocked windows.
 5. Make missing/unsupported global automation defaults review-first instead of fully automatic.
-6. Define a shared readiness model and start by replacing Messages readiness.
+6. Continue the shared readiness model after the Messages route/status/scheduled-window slice by migrating remaining notification and dispatch/recovery timing surfaces.
 7. Clean tracked local artifacts and narrow `.gitignore`.
 8. Update `SSOT.md` for `:core:model` and Room schema v16.
 
@@ -927,7 +940,7 @@ Scope:
 
 - Remove tracked local Gradle caches, local diagnostics, app/logcat dumps, stale lint snapshot, and stray screenshot.
 - Fix `.gitignore` global media patterns.
-- Decide Firebase config policy.
+- Keep Firebase config policy enforced by `.gitignore`, `RepositoryHygieneTest`, and release-owner OAuth/SHA evidence.
 
 Acceptance criteria:
 
@@ -950,8 +963,8 @@ Acceptance criteria:
 
 Scope:
 
-- Add a domain readiness model.
-- Replace `MessagesViewModel.readinessFor`.
+- Extend the domain readiness model beyond Messages route/status/scheduled-window readiness.
+- Migrate remaining notifications and dispatch/recovery timing surfaces to shared readiness outputs.
 - Begin using the same model in Wish Preview and AI Doctor.
 
 Acceptance criteria:

@@ -84,8 +84,10 @@ class SettingsScreenInteractionTest {
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.settings_secure_prefs_recovery_notice_body))
+            .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.settings_secure_prefs_recovery_notice_dismiss))
+            .performScrollTo()
             .performClick()
 
         assertEquals(listOf("dismiss_secure_prefs_recovery"), actions)

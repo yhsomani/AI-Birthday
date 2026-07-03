@@ -125,6 +125,12 @@ fun RelateNavGraph(
                     navController.navigate(Screen.Auth.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
+                },
+                onStartLocalModeComplete = {
+                    postAuthDestination = Screen.Home.route
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
                 }
             )
         }
@@ -283,6 +289,11 @@ fun RelateNavGraph(
                 onNavigateToWish = { contactId, messageRef ->
                     navController.navigate(Screen.WishPreview.createRoute(contactId, messageRef))
                 },
+                onNavigateToContact = { contactId ->
+                    navController.navigate(
+                        Screen.ContactDetail.createRoute(contactId, openPreferences = true)
+                    )
+                },
                 onNavigateToAutomationSetup = {
                     navController.navigate(Screen.AutomationSetup.route)
                 },
@@ -301,6 +312,11 @@ fun RelateNavGraph(
                 verificationChannelFilter = channelFilter,
                 onNavigateToWish = { contactId, messageRef ->
                     navController.navigate(Screen.WishPreview.createRoute(contactId, messageRef))
+                },
+                onNavigateToContact = { contactId ->
+                    navController.navigate(
+                        Screen.ContactDetail.createRoute(contactId, openPreferences = true)
+                    )
                 },
                 onNavigateToAutomationSetup = {
                     navController.navigate(Screen.AutomationSetup.route)
@@ -388,6 +404,11 @@ fun RelateNavGraph(
             route = Screen.AutomationSetup.route,
             navController = navController,
             isSignedIn = isSignedIn,
+            deepLinks = listOf(
+                navDeepLink {
+                    uriPattern = RelateDeepLinks.AutomationSetup.pattern
+                }
+            )
         ) {
             AutomationSetupScreen(
                 onBack = { navController.popBackStack() },

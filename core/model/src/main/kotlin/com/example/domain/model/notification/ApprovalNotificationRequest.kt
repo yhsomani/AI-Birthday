@@ -17,3 +17,10 @@ data class EventReminderNotificationRequest(
     val eventId: OccasionId,
     val eventType: String,
 )
+
+data class RevivalNotificationRequest(
+    val contactId: ContactId,
+    val contactDisplayName: String,
+    val daysSinceContact: Int,
+    val suggestionText: String,
+)

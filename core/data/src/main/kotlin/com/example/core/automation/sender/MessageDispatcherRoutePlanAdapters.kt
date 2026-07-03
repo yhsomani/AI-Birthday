@@ -1,6 +1,7 @@
 package com.example.core.automation.sender
 
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.message.DeliveryRouteHistoryRecord
 
 internal data class MessageDispatchRoutePlan(
     val initialFinalChannel: MessageChannel,
@@ -18,6 +19,7 @@ internal fun messageDispatchRoutePlan(
     senderEmail: String,
     senderEmailPassword: String,
     channelBlackoutJson: String,
+    routeHistory: List<DeliveryRouteHistoryRecord> = emptyList(),
 ): MessageDispatchRoutePlan {
     val blockedChannels = DeliveryChannelResolver.parseBlockedChannels(channelBlackoutJson)
     return MessageDispatchRoutePlan(
@@ -32,6 +34,7 @@ internal fun messageDispatchRoutePlan(
             senderEmail = senderEmail,
             senderEmailPassword = senderEmailPassword,
             blockedChannels = blockedChannels,
+            routeHistory = routeHistory,
         ),
     )
 }

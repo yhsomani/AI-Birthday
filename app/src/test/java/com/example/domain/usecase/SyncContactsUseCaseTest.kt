@@ -7,6 +7,7 @@ import com.example.domain.service.DeviceContactsPermissionDeniedException
 import com.example.domain.service.PreferencesRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -35,15 +36,14 @@ class SyncContactsUseCaseTest {
     fun `invoke with empty fetched contacts inserts nothing`() = runTest {
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns emptyList()
         coEvery { contactSyncService.fetchDeviceContacts() } returns emptyList()
-        coEvery { contactRepository.getAllSync() } returns emptyList()
-        coEvery { contactRepository.getById(any()) } returns null
+        coEvery { contactRepository.contactExists(any()) } returns false
 
         val outcome = useCase()
 
         assertEquals(0, outcome.googleCount)
         assertEquals(0, outcome.deviceCount)
         assertEquals(0, outcome.inserted)
-        coVerify(exactly = 0) { contactRepository.upsert(any()) }
+        coVerify(exactly = 0) { contactRepository.upsertSyncedContact(any()) }
         coVerify { discoverEventsUseCase() }
     }
 
@@ -58,15 +58,34 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
         coEvery { contactSyncService.fetchDeviceContacts() } returns emptyList()
-        coEvery { contactRepository.getById(any()) } returns null
+        coEvery { contactRepository.contactExists(any()) } returns false
 
         val outcome = useCase()
 
         assertEquals(1, outcome.googleCount)
         assertEquals(0, outcome.deviceCount)
         assertEquals(1, outcome.inserted)
-        coVerify { contactRepository.upsert(match { it.name == "Alice" && it.googleContactId == "google_1" && it.primaryEmail == "alice@gmail.com" }) }
+        coVerify { contactRepository.upsertSyncedContact(match { it.displayName == "Alice" && it.googleContactId == "google_1" && it.primaryEmail == "alice@gmail.com" }) }
         coVerify { discoverEventsUseCase() }
+    }
+
+    @Test
+    fun `invoke counts existing synced contact as updated`() = runTest {
+        val googleContact = ContactSyncRecord(
+            id = "g1",
+            displayName = "Alice",
+            googleContactId = "google_1",
+        )
+
+        coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
+        coEvery { contactSyncService.fetchDeviceContacts() } returns emptyList()
+        coEvery { contactRepository.contactExists("g1") } returns true
+
+        val outcome = useCase()
+
+        assertEquals(0, outcome.inserted)
+        assertEquals(1, outcome.updated)
+        coVerify { contactRepository.upsertSyncedContact(match { it.id == "g1" }) }
     }
 
     @Test
@@ -80,15 +99,36 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns emptyList()
         coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
-        coEvery { contactRepository.getAllSync() } returns emptyList()
-        coEvery { contactRepository.getById(any()) } returns null
+        coEvery { contactRepository.contactExists(any()) } returns false
 
         val outcome = useCase()
 
         assertEquals(0, outcome.googleCount)
         assertEquals(1, outcome.deviceCount)
         assertEquals(1, outcome.inserted)
-        coVerify { contactRepository.upsert(match { it.id == "device_1" && it.contactGroup == "Device" }) }
+        coVerify { contactRepository.upsertSyncedContact(match { it.id == "device_1" && it.contactGroup == "Device" }) }
+    }
+
+    @Test
+    fun `invoke skips Google contacts when local only mode is enabled`() = runTest {
+        val deviceContact = ContactSyncRecord(
+            id = "device_local_1",
+            displayName = "Local Contact",
+            primaryPhone = "+1 555 0100",
+            contactGroup = "Device",
+        )
+
+        every { preferencesRepository.isLocalOnlyModeEnabled() } returns true
+        coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
+        coEvery { contactRepository.contactExists(any()) } returns false
+
+        val outcome = useCase()
+
+        assertEquals(0, outcome.googleCount)
+        assertEquals(1, outcome.deviceCount)
+        assertEquals(1, outcome.inserted)
+        coVerify(exactly = 0) { contactSyncService.fetchGoogleContacts(any()) }
+        coVerify { contactRepository.upsertSyncedContact(match { it.id == "device_local_1" }) }
     }
 
     @Test
@@ -101,8 +141,7 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } throws RuntimeException("auth expired")
         coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
-        coEvery { contactRepository.getAllSync() } returns emptyList()
-        coEvery { contactRepository.getById(any()) } returns null
+        coEvery { contactRepository.contactExists(any()) } returns false
 
         val outcome = useCase()
 
@@ -110,7 +149,7 @@ class SyncContactsUseCaseTest {
         assertEquals(1, outcome.deviceCount)
         assertEquals(1, outcome.inserted)
         coVerify { preferencesRepository.setLastSyncError("Google sync failed; imported 1 device contacts.") }
-        coVerify { contactRepository.upsert(match { it.id == "device_2" }) }
+        coVerify { contactRepository.upsertSyncedContact(match { it.id == "device_2" }) }
     }
 
     @Test
@@ -123,8 +162,7 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
         coEvery { contactSyncService.fetchDeviceContacts() } throws DeviceContactsPermissionDeniedException()
-        coEvery { contactRepository.getAllSync() } returns emptyList()
-        coEvery { contactRepository.getById(any()) } returns null
+        coEvery { contactRepository.contactExists(any()) } returns false
 
         val outcome = useCase()
 
@@ -134,7 +172,7 @@ class SyncContactsUseCaseTest {
         coVerify {
             preferencesRepository.setLastSyncError(SyncContactsUseCase.DEVICE_CONTACTS_PERMISSION_ERROR)
         }
-        coVerify { contactRepository.upsert(match { it.id == "google_1" }) }
+        coVerify { contactRepository.upsertSyncedContact(match { it.id == "google_1" }) }
     }
 
     @Test
@@ -156,8 +194,7 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
         coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
-        coEvery { contactRepository.getAllSync() } returns emptyList()
-        coEvery { contactRepository.getById(any()) } returns null
+        coEvery { contactRepository.contactExists(any()) } returns false
 
         val outcome = useCase()
 
@@ -165,7 +202,7 @@ class SyncContactsUseCaseTest {
         assertEquals(1, outcome.deviceCount)
         assertEquals(1, outcome.inserted)
         coVerify {
-            contactRepository.upsert(match {
+            contactRepository.upsertSyncedContact(match {
                 it.id == "google_1" &&
                     it.googleContactId == "people/c1" &&
                     it.primaryPhone == "+91 88888 77777" &&
@@ -186,13 +223,12 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns listOf(googleContact)
         coEvery { contactSyncService.fetchDeviceContacts() } returns emptyList()
-        coEvery { contactRepository.getAllSync() } returns emptyList()
-        coEvery { contactRepository.getById(any()) } returns null
+        coEvery { contactRepository.contactExists(any()) } returns false
 
         useCase()
 
         coVerify {
-            contactRepository.upsert(match {
+            contactRepository.upsertSyncedContact(match {
                 it.id == "google_2" &&
                     it.relationshipType == "FRIEND"
             })
@@ -210,13 +246,12 @@ class SyncContactsUseCaseTest {
 
         coEvery { contactSyncService.fetchGoogleContacts(any()) } returns emptyList()
         coEvery { contactSyncService.fetchDeviceContacts() } returns listOf(deviceContact)
-        coEvery { contactRepository.getAllSync() } returns emptyList()
-        coEvery { contactRepository.getById(any()) } returns null
+        coEvery { contactRepository.contactExists(any()) } returns false
 
         useCase()
 
         coVerify {
-            contactRepository.upsert(match {
+            contactRepository.upsertSyncedContact(match {
                 it.id == "device_3" &&
                     it.relationshipType == "UNKNOWN"
             })

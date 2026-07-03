@@ -14,11 +14,14 @@ import com.example.domain.model.common.OccasionId
 import com.example.domain.model.common.SentMessageId
 import com.example.domain.model.message.MessageApprovalState
 import com.example.domain.model.message.MessageStatusUpdate
+import com.example.domain.model.message.PendingMessageRecord
 import com.example.domain.model.message.RetryQueuedMessageDraft
+import com.example.domain.model.message.SentMessageRecord
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -32,6 +35,71 @@ class MessageRepositoryImplTest {
     private val repository = MessageRepositoryImpl(pendingMessageDao, sentMessageDao)
 
     @Test
+    fun getAllPending_mapsRoomMessagesToPureRecords() = runTest {
+        every { pendingMessageDao.getAll() } returns flowOf(
+            listOf(
+                pendingMessage(
+                    channel = " whatsapp ",
+                    approvalMode = " fully_auto ",
+                    status = " approved ",
+                    qualityScore = 94,
+                ),
+            ),
+        )
+
+        val records = repository.getAllPending().first()
+
+        assertEquals(MessageDraftId("pm_1"), records.single().id)
+        assertEquals(ContactId("contact_1"), records.single().contactId)
+        assertEquals(OccasionId("event_1"), records.single().occasionId)
+        assertEquals(MessageChannel.WHATSAPP, records.single().channel)
+        assertEquals(ApprovalMode.FULLY_AUTO, records.single().approvalMode)
+        assertEquals(MessageStatus.APPROVED, records.single().status)
+        assertEquals(94, records.single().qualityScore)
+    }
+
+    @Test
+    fun insertPending_mapsPureRecordToRoomMessage() = runTest {
+        val saved = slot<PendingMessageEntity>()
+
+        repository.insertPending(
+            PendingMessageRecord(
+                id = MessageDraftId("pm_new"),
+                contactId = ContactId("contact_new"),
+                occasionId = OccasionId("event_new"),
+                shortVariant = "Short",
+                standardVariant = "Standard",
+                longVariant = "Long",
+                formalVariant = "Formal",
+                funnyVariant = "Funny",
+                emotionalVariant = "Emotional",
+                selectedVariant = "funny",
+                selectedVariantText = "Funny",
+                channel = MessageChannel.EMAIL,
+                scheduledForMs = 1_900_000_000_000L,
+                approvalMode = ApprovalMode.SMART_APPROVE,
+                status = MessageStatus.APPROVED,
+                generatedAtMs = 1_800_000_000_000L,
+                qualityScore = 88,
+                scheduledYear = 2027,
+                isUsingFallback = true,
+            )
+        )
+
+        coVerify { pendingMessageDao.insert(capture(saved)) }
+        assertEquals("pm_new", saved.captured.id)
+        assertEquals("contact_new", saved.captured.contactId)
+        assertEquals("event_new", saved.captured.eventId)
+        assertEquals(MessageChannel.EMAIL.raw, saved.captured.channel)
+        assertEquals(ApprovalMode.SMART_APPROVE.raw, saved.captured.approvalMode)
+        assertEquals(MessageStatus.APPROVED.raw, saved.captured.status)
+        assertEquals(1_800_000_000_000L, saved.captured.generatedAtMs)
+        assertEquals(88, saved.captured.qualityScore)
+        assertEquals(2027, saved.captured.scheduledYear)
+        assertEquals(true, saved.captured.isUsingFallback)
+    }
+
+    @Test
     fun getPendingListItems_mapsRoomMessagesToPureListItems() = runTest {
         every { pendingMessageDao.getAll() } returns flowOf(
             listOf(
@@ -39,6 +107,7 @@ class MessageRepositoryImplTest {
                     channel = " email ",
                     approvalMode = "smart_approve",
                     status = "approved",
+                    qualityScore = 35,
                     isUsingFallback = true,
                 ).copy(
                     editedByUser = true,
@@ -59,6 +128,8 @@ class MessageRepositoryImplTest {
         assertEquals(MessageStatus.APPROVED, items.single().status)
         assertEquals(true, items.single().editedByUser)
         assertEquals("Edited draft", items.single().userEditedText)
+        assertEquals(35, items.single().qualityScore)
+        assertEquals(true, items.single().isUsingFallback)
     }
 
     @Test
@@ -276,6 +347,81 @@ class MessageRepositoryImplTest {
     }
 
     @Test
+    fun getAllSent_mapsRoomMessagesToPureRecords() = runTest {
+        every { sentMessageDao.getAll() } returns flowOf(
+            listOf(
+                SentMessageEntity(
+                    id = "sent_1",
+                    contactId = "contact_1",
+                    eventType = "BIRTHDAY",
+                    eventId = "event_1",
+                    occasionType = "ANNIVERSARY",
+                    occasionLabel = "Wedding",
+                    eventYear = 2026,
+                    messageText = "Happy anniversary",
+                    channel = " whatsapp ",
+                    sentAtMs = 1_700_000_100_000L,
+                    deliveryStatus = " delivered ",
+                    replyReceived = true,
+                ),
+            ),
+        )
+
+        val records = repository.getAllSent().first()
+
+        assertEquals(SentMessageId("sent_1"), records.single().id)
+        assertEquals(ContactId("contact_1"), records.single().contactId)
+        assertEquals(OccasionId("event_1"), records.single().occasionId)
+        assertEquals("ANNIVERSARY", records.single().occasionType)
+        assertEquals("Wedding", records.single().occasionLabel)
+        assertEquals(MessageChannel.WHATSAPP, records.single().channel)
+        assertEquals(MessageDeliveryStatus.DELIVERED, records.single().deliveryStatus)
+        assertEquals(true, records.single().replyReceived)
+    }
+
+    @Test
+    fun insertSent_mapsPureRecordToRoomMessage() = runTest {
+        val saved = slot<SentMessageEntity>()
+
+        repository.insertSent(
+            SentMessageRecord(
+                id = SentMessageId("sent_new"),
+                contactId = ContactId("contact_new"),
+                eventType = "BIRTHDAY",
+                occasionId = OccasionId("event_new"),
+                occasionType = "WORK_ANNIVERSARY",
+                occasionLabel = "Work date",
+                eventYear = 2027,
+                messageText = "Congratulations",
+                channel = MessageChannel.EMAIL,
+                sentAtMs = 1_900_000_000_000L,
+                deliveryStatus = MessageDeliveryStatus.DELIVERED,
+                aiGenerated = false,
+                geminiModel = "manual",
+                variantUsed = "custom",
+                replyReceived = true,
+                replyAtMs = 1_900_000_010_000L,
+                isContactDeleted = true,
+            )
+        )
+
+        coVerify { sentMessageDao.insert(capture(saved)) }
+        assertEquals("sent_new", saved.captured.id)
+        assertEquals("contact_new", saved.captured.contactId)
+        assertEquals("event_new", saved.captured.eventId)
+        assertEquals("WORK_ANNIVERSARY", saved.captured.occasionType)
+        assertEquals("Work date", saved.captured.occasionLabel)
+        assertEquals(MessageChannel.EMAIL.raw, saved.captured.channel)
+        assertEquals(MessageDeliveryStatus.DELIVERED.raw, saved.captured.deliveryStatus)
+        assertEquals(false, saved.captured.aiGenerated)
+        assertEquals("manual", saved.captured.geminiModel)
+        assertEquals("custom", saved.captured.variantUsed)
+        assertEquals(true, saved.captured.replyReceived)
+        assertEquals(1_900_000_010_000L, saved.captured.replyAtMs)
+        assertEquals(true, saved.captured.isContactDeleted)
+    }
+
+    @Test
     fun getGenerationHistoryByContact_mapsRoomMessagesToPureGenerationHistory() = runTest {
         coEvery { sentMessageDao.getByContact("contact_1", 10) } returns listOf(
             SentMessageEntity(
@@ -367,6 +513,7 @@ class MessageRepositoryImplTest {
         channel: String = MessageChannel.SMS.raw,
         approvalMode: String = ApprovalMode.VIP_APPROVE.raw,
         status: String = MessageStatus.PENDING.raw,
+        qualityScore: Int = 0,
         isUsingFallback: Boolean = false,
     ) = PendingMessageEntity(
         id = id,
@@ -384,6 +531,7 @@ class MessageRepositoryImplTest {
         scheduledForMs = 1_800_000_000_000L,
         approvalMode = approvalMode,
         status = status,
+        qualityScore = qualityScore,
         isUsingFallback = isUsingFallback,
     )
 }

@@ -45,6 +45,23 @@ class NotificationMappersTest {
     }
 
     @Test
+    fun buildRevivalNotificationRequest_mapsPureContactAndSuggestionContext() {
+        val request = buildRevivalNotificationRequest(
+            contact = ContactHeader(
+                id = ContactId("contact_1"),
+                displayName = "Asha",
+            ),
+            daysSinceContact = 42,
+            suggestionText = "Want to catch up this week?",
+        )
+
+        assertEquals(ContactId("contact_1"), request.contactId)
+        assertEquals("Asha", request.contactDisplayName)
+        assertEquals(42, request.daysSinceContact)
+        assertEquals("Want to catch up this week?", request.suggestionText)
+    }
+
+    @Test
     fun buildEventReminderScheduleRequest_mapsPureOccasion() {
         val request = buildEventReminderScheduleRequest(occasion())
 

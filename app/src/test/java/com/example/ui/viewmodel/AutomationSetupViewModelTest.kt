@@ -2,6 +2,7 @@ package com.example.ui.viewmodel
 
 import android.app.Application
 import android.content.Context
+import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import com.example.R
 import com.example.core.resilience.DeadLetterEntry
@@ -9,7 +10,6 @@ import com.example.core.resilience.DeadLetterQueue
 import com.example.core.resilience.HealthMonitor
 import com.example.core.resilience.StructuredLogger
 import com.example.core.gemini.GeminiClient
-import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
@@ -25,11 +25,15 @@ import com.example.domain.model.dispatch.DispatchAttempt
 import com.example.domain.model.dispatch.DispatchAttemptCreator
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.DispatchEligibilityRecord
+import com.example.domain.readiness.RelationshipReadinessAction
+import com.example.domain.readiness.RelationshipReadinessReason
+import com.example.domain.readiness.RelationshipReadinessState
 import com.example.domain.model.style.StyleProfileRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.DiagnosticSnapshotRepository
 import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.StyleProfileRepository
+import com.example.domain.service.PreferencesRepository
 import com.example.domain.usecase.SyncContactsUseCase
 import com.example.domain.usecase.TestSendUseCase
 import io.mockk.coEvery
@@ -39,6 +43,8 @@ import io.mockk.junit4.MockKRule
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -67,7 +73,7 @@ class AutomationSetupViewModelTest {
     val mockkRule = MockKRule(this)
 
     @RelaxedMockK
-    private lateinit var securePrefs: SecurePrefs
+    private lateinit var preferencesRepository: PreferencesRepository
 
     @RelaxedMockK
     private lateinit var syncContactsUseCase: SyncContactsUseCase
@@ -97,6 +103,7 @@ class AutomationSetupViewModelTest {
     private lateinit var preferenceChanges: MutableSharedFlow<Unit>
     private lateinit var failureRecoveryCount: MutableStateFlow<Int>
     private lateinit var deadLetterCount: MutableStateFlow<Int>
+    private val createdViewModels = mutableListOf<AutomationSetupViewModel>()
 
     @Before
     fun setUp() {
@@ -110,17 +117,17 @@ class AutomationSetupViewModelTest {
         preferenceChanges = MutableSharedFlow(extraBufferCapacity = 1)
         failureRecoveryCount = MutableStateFlow(0)
         deadLetterCount = MutableStateFlow(0)
-        every { securePrefs.getGoogleOAuthToken() } returns ""
-        every { securePrefs.getGeminiApiKey() } returns ""
-        every { securePrefs.getSenderEmail() } returns ""
-        every { securePrefs.getSenderEmailPassword() } returns ""
-        every { securePrefs.getLastSuccessfulEmailTestSender() } returns ""
-        every { securePrefs.getLastSuccessfulEmailTestMs() } returns 0L
-        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.FULLY_AUTO
-        every { securePrefs.getChannelBlackout() } returns "[]"
-        every { securePrefs.isAiWishGenerationEnabled() } returns true
-        every { securePrefs.isWhatsAppAutomationConsentGranted() } returns true
-        every { securePrefs.observeChanges() } returns preferenceChanges
+        every { preferencesRepository.getGoogleOAuthToken() } returns ""
+        every { preferencesRepository.getGeminiApiKey() } returns ""
+        every { preferencesRepository.getSenderEmail() } returns ""
+        every { preferencesRepository.getSenderEmailPassword() } returns ""
+        every { preferencesRepository.getLastSuccessfulEmailTestSender() } returns ""
+        every { preferencesRepository.getLastSuccessfulEmailTestMs() } returns 0L
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.FULLY_AUTO
+        every { preferencesRepository.getChannelBlackout() } returns "[]"
+        every { preferencesRepository.isAiWishGenerationEnabled() } returns true
+        every { preferencesRepository.isWhatsAppAutomationConsentGranted() } returns true
+        every { preferencesRepository.observeChanges() } returns preferenceChanges
         coEvery { contactRepository.getAutomationReadinessProfiles() } returns emptyList()
         every { contactRepository.getAutomationReadinessProfilesFlow() } returns readinessProfiles
         coEvery { styleProfileRepository.getProfileOnce() } returns null
@@ -135,7 +142,12 @@ class AutomationSetupViewModelTest {
     }
 
     @After
-    fun tearDown() {
+    fun tearDown() = runTest(testDispatcher) {
+        createdViewModels.forEach { viewModel ->
+            viewModel.viewModelScope.coroutineContext[Job]?.cancelAndJoin()
+        }
+        createdViewModels.clear()
+        advanceUntilIdle()
         DeadLetterQueue.clear()
         HealthMonitor.clearForTests()
         StructuredLogger.clearForTests()
@@ -218,7 +230,7 @@ class AutomationSetupViewModelTest {
 
     @Test
     fun `buildChecksForTesting requires fully auto for unattended message sending`() = runTest(testDispatcher) {
-        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.ALWAYS_ASK
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.ALWAYS_ASK
         val viewModel = newViewModel()
         advanceUntilIdle()
 
@@ -305,11 +317,26 @@ class AutomationSetupViewModelTest {
         assertEquals(ReadinessStatus.ACTION_REQUIRED, googleContactsCheck.status)
         assertEquals(AiDoctorAction.SYNC_CONTACTS, googleContactsCheck.action)
         assertEquals(context.getString(R.string.automation_setup_action_sync_contacts), googleContactsCheck.actionLabel)
+        assertEquals(RelationshipReadinessState.ACTION_REQUIRED, googleContactsCheck.actionReadiness.state)
+        assertEquals(RelationshipReadinessReason.SETUP_ACTION_REQUIRED, googleContactsCheck.actionReadiness.primaryReason)
+        assertEquals(RelationshipReadinessAction.OPEN_SETUP, googleContactsCheck.actionReadiness.primaryAction)
+    }
+
+    @Test
+    fun `report exposes canonical setup readiness summary`() = runTest(testDispatcher) {
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val readiness = viewModel.buildSetupActionReadinessForTesting()
+
+        assertEquals(RelationshipReadinessState.ACTION_REQUIRED, readiness.state)
+        assertEquals(RelationshipReadinessReason.SETUP_ACTION_REQUIRED, readiness.primaryReason)
+        assertEquals(RelationshipReadinessAction.OPEN_SETUP, readiness.primaryAction)
     }
 
     @Test
     fun `buildChecksForTesting accepts cached People API token for Google Contacts readiness`() = runTest(testDispatcher) {
-        every { securePrefs.getGoogleOAuthToken() } returns "cached-token"
+        every { preferencesRepository.getGoogleOAuthToken() } returns "cached-token"
         val viewModel = newViewModel()
         advanceUntilIdle()
 
@@ -372,8 +399,8 @@ class AutomationSetupViewModelTest {
                     hasPrimaryEmail = true,
                 ),
             )
-            every { securePrefs.getSenderEmail() } returns "sender@example.com"
-            every { securePrefs.getSenderEmailPassword() } returns "app-password"
+            every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
+            every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
             coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns setOf(MessageChannel.SMS)
             val viewModel = newViewModel()
             advanceUntilIdle()
@@ -401,8 +428,8 @@ class AutomationSetupViewModelTest {
                     hasPrimaryEmail = true,
                 ),
             )
-            every { securePrefs.getSenderEmail() } returns "sender@example.com"
-            every { securePrefs.getSenderEmailPassword() } returns "app-password"
+            every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
+            every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
             coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns setOf(MessageChannel.EMAIL)
             val viewModel = newViewModel()
             advanceUntilIdle()
@@ -429,10 +456,10 @@ class AutomationSetupViewModelTest {
                     hasPrimaryEmail = true,
                 ),
             )
-            every { securePrefs.getSenderEmail() } returns "sender@example.com"
-            every { securePrefs.getSenderEmailPassword() } returns "app-password"
-            every { securePrefs.getLastSuccessfulEmailTestSender() } returns "sender@example.com"
-            every { securePrefs.getLastSuccessfulEmailTestMs() } returns Long.MAX_VALUE
+            every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
+            every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
+            every { preferencesRepository.getLastSuccessfulEmailTestSender() } returns "sender@example.com"
+            every { preferencesRepository.getLastSuccessfulEmailTestMs() } returns Long.MAX_VALUE
             coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns emptySet()
             val viewModel = newViewModel()
             advanceUntilIdle()
@@ -459,10 +486,10 @@ class AutomationSetupViewModelTest {
                     hasPrimaryEmail = true,
                 ),
             )
-            every { securePrefs.getSenderEmail() } returns "new-sender@example.com"
-            every { securePrefs.getSenderEmailPassword() } returns "app-password"
-            every { securePrefs.getLastSuccessfulEmailTestSender() } returns "old-sender@example.com"
-            every { securePrefs.getLastSuccessfulEmailTestMs() } returns Long.MAX_VALUE
+            every { preferencesRepository.getSenderEmail() } returns "new-sender@example.com"
+            every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
+            every { preferencesRepository.getLastSuccessfulEmailTestSender() } returns "old-sender@example.com"
+            every { preferencesRepository.getLastSuccessfulEmailTestMs() } returns Long.MAX_VALUE
             coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns emptySet()
             val viewModel = newViewModel()
             advanceUntilIdle()
@@ -496,8 +523,8 @@ class AutomationSetupViewModelTest {
                     hasPrimaryEmail = true,
                 ),
             )
-            every { securePrefs.getSenderEmail() } returns "sender@example.com"
-            every { securePrefs.getSenderEmailPassword() } returns "app-password"
+            every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
+            every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
             coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns emptySet()
             val viewModel = newViewModel()
             advanceUntilIdle()
@@ -528,7 +555,7 @@ class AutomationSetupViewModelTest {
                     hasPrimaryPhone = true,
                 ),
             )
-            every { securePrefs.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
+            every { preferencesRepository.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
             coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns emptySet()
             val viewModel = newViewModel()
             advanceUntilIdle()
@@ -606,8 +633,8 @@ class AutomationSetupViewModelTest {
 
     @Test
     fun `buildChecksForTesting warns when Gmail sender is configured but unverified`() = runTest(testDispatcher) {
-        every { securePrefs.getSenderEmail() } returns "sender@example.com"
-        every { securePrefs.getSenderEmailPassword() } returns "app-password"
+        every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
+        every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
         val viewModel = newViewModel()
         advanceUntilIdle()
 
@@ -621,10 +648,10 @@ class AutomationSetupViewModelTest {
 
     @Test
     fun `buildChecksForTesting passes email readiness after matching recent self test`() = runTest(testDispatcher) {
-        every { securePrefs.getSenderEmail() } returns "sender@example.com"
-        every { securePrefs.getSenderEmailPassword() } returns "app-password"
-        every { securePrefs.getLastSuccessfulEmailTestSender() } returns "sender@example.com"
-        every { securePrefs.getLastSuccessfulEmailTestMs() } returns Long.MAX_VALUE
+        every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
+        every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
+        every { preferencesRepository.getLastSuccessfulEmailTestSender() } returns "sender@example.com"
+        every { preferencesRepository.getLastSuccessfulEmailTestMs() } returns Long.MAX_VALUE
         val viewModel = newViewModel()
         advanceUntilIdle()
 
@@ -638,8 +665,8 @@ class AutomationSetupViewModelTest {
 
     @Test
     fun `buildChecksForTesting blocks invalid saved Gmail sender address`() = runTest(testDispatcher) {
-        every { securePrefs.getSenderEmail() } returns "not-an-email"
-        every { securePrefs.getSenderEmailPassword() } returns "app-password"
+        every { preferencesRepository.getSenderEmail() } returns "not-an-email"
+        every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
         val viewModel = newViewModel()
         advanceUntilIdle()
 
@@ -662,8 +689,8 @@ class AutomationSetupViewModelTest {
                     hasPrimaryEmail = true,
                 ),
             )
-            every { securePrefs.getSenderEmail() } returns "sender@example.com"
-            every { securePrefs.getSenderEmailPassword() } returns "app-password"
+            every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
+            every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
             val viewModel = newViewModel()
             advanceUntilIdle()
 
@@ -703,7 +730,7 @@ class AutomationSetupViewModelTest {
     @Test
     fun `buildChecksForTesting treats disabled SMS as intentionally unused`() =
         runTest(testDispatcher) {
-            every { securePrefs.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
+            every { preferencesRepository.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
             coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
                 readinessProfile(
                     id = "sms",
@@ -725,8 +752,8 @@ class AutomationSetupViewModelTest {
 
     @Test
     fun `buildChecksForTesting requires WhatsApp consent before automation channel is ready`() = runTest(testDispatcher) {
-        every { securePrefs.isWhatsAppAutomationConsentGranted() } returns false
-        every { securePrefs.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
+        every { preferencesRepository.isWhatsAppAutomationConsentGranted() } returns false
+        every { preferencesRepository.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
         coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
             readinessProfile(
                 id = "whatsapp",
@@ -750,14 +777,14 @@ class AutomationSetupViewModelTest {
 
     @Test
     fun `setWhatsAppAutomationConsent persists acknowledgement and updates state`() = runTest(testDispatcher) {
-        every { securePrefs.isWhatsAppAutomationConsentGranted() } returns false
+        every { preferencesRepository.isWhatsAppAutomationConsentGranted() } returns false
         val viewModel = newViewModel()
         advanceUntilIdle()
 
         viewModel.setWhatsAppAutomationConsent(true)
         advanceUntilIdle()
 
-        verify { securePrefs.setWhatsAppAutomationConsentGranted(true) }
+        verify { preferencesRepository.setWhatsAppAutomationConsentGranted(true) }
         assertTrue(viewModel.uiState.value.whatsAppAutomationConsentGranted)
         assertEquals(
             context.getString(R.string.automation_setup_whatsapp_consent_saved),
@@ -805,7 +832,7 @@ class AutomationSetupViewModelTest {
             ) { it.status == ReadinessStatus.ACTION_REQUIRED }
             assertEquals(ReadinessStatus.ACTION_REQUIRED, initialCheck.status)
 
-            every { securePrefs.getGeminiApiKey() } returns "real-gemini-key"
+            every { preferencesRepository.getGeminiApiKey() } returns "real-gemini-key"
             preferenceChanges.tryEmit(Unit)
 
             val updatedCheck = awaitCheck(
@@ -979,6 +1006,9 @@ class AutomationSetupViewModelTest {
         assertEquals(MessageChannel.SMS.raw, recommendedFix?.title)
         assertEquals(AiDoctorAction.OPEN_APP_SETTINGS, recommendedFix?.action)
         assertEquals(ReadinessGroup.REQUIRED, recommendedFix?.group)
+        assertEquals(RelationshipReadinessState.ACTION_REQUIRED, recommendedFix?.actionReadiness?.state)
+        assertEquals(RelationshipReadinessReason.SETUP_ACTION_REQUIRED, recommendedFix?.actionReadiness?.primaryReason)
+        assertEquals(RelationshipReadinessAction.OPEN_SETUP, recommendedFix?.actionReadiness?.primaryAction)
     }
 
     @Test
@@ -1042,7 +1072,7 @@ class AutomationSetupViewModelTest {
     private fun newViewModel(): AutomationSetupViewModel {
         return AutomationSetupViewModel(
             appContext = context,
-            securePrefs = securePrefs,
+            preferencesRepository = preferencesRepository,
             syncContactsUseCase = syncContactsUseCase,
             geminiClient = geminiClient,
             contactRepository = contactRepository,
@@ -1050,7 +1080,7 @@ class AutomationSetupViewModelTest {
             testSendUseCase = testSendUseCase,
             dispatchAttemptRepository = dispatchAttemptRepository,
             diagnosticSnapshotRepository = diagnosticSnapshotRepository,
-        )
+        ).also { createdViewModels += it }
     }
 
     private fun awaitCheck(

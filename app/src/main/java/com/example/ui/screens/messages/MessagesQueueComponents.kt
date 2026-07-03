@@ -58,10 +58,13 @@ import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.relateSemanticColors
+import com.example.domain.readiness.RelationshipActionReadiness
+import com.example.domain.readiness.RelationshipReadinessReason
+import com.example.domain.readiness.RelationshipReadinessState
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.occasion.OccasionType
-import com.example.ui.viewmodel.MessageReadiness
+import com.example.ui.viewmodel.MessageActionRoute
 
 @Composable
 internal fun <T> MessageQueueList(
@@ -285,6 +288,26 @@ internal fun MessageEditActionButton(
 }
 
 @Composable
+internal fun MessagePrimaryActionButton(
+    actionRoute: MessageActionRoute,
+    onClick: () -> Unit,
+    testTag: String,
+) {
+    val label = when (actionRoute) {
+        MessageActionRoute.CONTACT,
+        MessageActionRoute.WISH -> stringResource(R.string.edit_contact)
+        MessageActionRoute.AUTOMATION_SETUP -> stringResource(R.string.messages_recovery_open_setup)
+        MessageActionRoute.NONE -> stringResource(R.string.edit_contact)
+    }
+    MessageOutlinedActionButton(
+        label = label,
+        contentColor = MaterialTheme.colorScheme.primary,
+        onClick = onClick,
+        testTag = testTag,
+    )
+}
+
+@Composable
 internal fun MessageApproveActionButton(
     isApproving: Boolean,
     onClick: () -> Unit,
@@ -375,31 +398,71 @@ internal fun MessageApprovalModeStatus(
 
 @Composable
 internal fun MessageReadinessBadge(
-    readiness: MessageReadiness,
+    readiness: RelationshipActionReadiness,
     modifier: Modifier = Modifier,
 ) {
     val label = readiness.label()
-    val color = when (readiness) {
-        MessageReadiness.READY_FOR_REVIEW,
-        MessageReadiness.APPROVED_SCHEDULED,
-        MessageReadiness.SENDING_NOW -> MaterialTheme.relateSemanticColors.success
-        MessageReadiness.FAILED_CHECK_SETUP -> MaterialTheme.relateSemanticColors.warning
-        MessageReadiness.CONTACT_MISSING,
-        MessageReadiness.CHANNEL_DISABLED,
-        MessageReadiness.MISSING_PHONE,
-        MessageReadiness.MISSING_EMAIL,
-        MessageReadiness.EMAIL_SETUP_MISSING -> MaterialTheme.colorScheme.error
+    val color = when (readiness.state) {
+        RelationshipReadinessState.READY,
+        RelationshipReadinessState.NEEDS_REVIEW,
+        RelationshipReadinessState.IN_PROGRESS -> MaterialTheme.relateSemanticColors.success
+        RelationshipReadinessState.WAITING,
+        RelationshipReadinessState.WARNING -> MaterialTheme.relateSemanticColors.warning
+        RelationshipReadinessState.ACTION_REQUIRED -> MaterialTheme.colorScheme.error
     }
-    val icon = when (readiness) {
-        MessageReadiness.READY_FOR_REVIEW,
-        MessageReadiness.APPROVED_SCHEDULED,
-        MessageReadiness.SENDING_NOW -> Icons.Filled.CheckCircle
-        MessageReadiness.FAILED_CHECK_SETUP -> Icons.Filled.Warning
-        MessageReadiness.CONTACT_MISSING,
-        MessageReadiness.CHANNEL_DISABLED,
-        MessageReadiness.MISSING_PHONE,
-        MessageReadiness.MISSING_EMAIL,
-        MessageReadiness.EMAIL_SETUP_MISSING -> Icons.Filled.Error
+    val icon = when (readiness.state) {
+        RelationshipReadinessState.READY,
+        RelationshipReadinessState.NEEDS_REVIEW,
+        RelationshipReadinessState.IN_PROGRESS -> Icons.Filled.CheckCircle
+        RelationshipReadinessState.WAITING,
+        RelationshipReadinessState.WARNING -> Icons.Filled.Warning
+        RelationshipReadinessState.ACTION_REQUIRED -> Icons.Filled.Error
+    }
+
+    Surface(
+        modifier = modifier,
+        color = color.copy(alpha = RelateAlpha.feedbackContainer),
+        shape = RoundedCornerShape(RelateRadius.md),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = RelateSpacing.sm, vertical = RelateSpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.xs),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(RelateSize.iconXs),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = color,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun MessageDraftSourceBadge(
+    isUsingFallback: Boolean,
+    qualityScore: Int,
+    modifier: Modifier = Modifier,
+) {
+    val normalizedScore = qualityScore.coerceIn(0, 100)
+    val isLowQuality = normalizedScore in 1..69
+    val color = if (isUsingFallback || isLowQuality) {
+        MaterialTheme.relateSemanticColors.warning
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val icon = if (isUsingFallback || isLowQuality) Icons.Filled.Warning else Icons.Filled.Info
+    val label = when {
+        isUsingFallback -> stringResource(R.string.messages_draft_source_fallback)
+        normalizedScore > 0 -> stringResource(R.string.messages_draft_source_ai_score, normalizedScore)
+        else -> stringResource(R.string.messages_draft_source_ai)
     }
 
     Surface(
@@ -514,16 +577,35 @@ private fun approvalModeColor(approvalMode: ApprovalMode): Color = when (approva
 }
 
 @Composable
-private fun MessageReadiness.label(): String = when (this) {
-    MessageReadiness.READY_FOR_REVIEW -> stringResource(R.string.messages_readiness_ready_review)
-    MessageReadiness.APPROVED_SCHEDULED -> stringResource(R.string.messages_readiness_approved_scheduled)
-    MessageReadiness.SENDING_NOW -> stringResource(R.string.messages_readiness_sending_now)
-    MessageReadiness.CONTACT_MISSING -> stringResource(R.string.messages_readiness_contact_missing)
-    MessageReadiness.CHANNEL_DISABLED -> stringResource(R.string.messages_readiness_channel_disabled)
-    MessageReadiness.MISSING_PHONE -> stringResource(R.string.messages_readiness_missing_phone)
-    MessageReadiness.MISSING_EMAIL -> stringResource(R.string.messages_readiness_missing_email)
-    MessageReadiness.EMAIL_SETUP_MISSING -> stringResource(R.string.messages_readiness_email_setup_missing)
-    MessageReadiness.FAILED_CHECK_SETUP -> stringResource(R.string.messages_readiness_failed_check_setup)
+private fun RelationshipActionReadiness.label(): String = when (primaryReason) {
+    RelationshipReadinessReason.MESSAGE_NEEDS_REVIEW -> stringResource(R.string.messages_readiness_ready_review)
+    RelationshipReadinessReason.APPROVED_READY,
+    RelationshipReadinessReason.READY -> stringResource(R.string.messages_readiness_approved_scheduled)
+    RelationshipReadinessReason.WAITING_FOR_SCHEDULE ->
+        stringResource(R.string.messages_readiness_waiting_schedule)
+    RelationshipReadinessReason.WAITING_FOR_ALLOWED_WINDOW ->
+        stringResource(R.string.messages_readiness_paused_window)
+    RelationshipReadinessReason.SENDING -> stringResource(R.string.messages_readiness_sending_now)
+    RelationshipReadinessReason.CONTACT_MISSING -> stringResource(R.string.messages_readiness_contact_missing)
+    RelationshipReadinessReason.CHANNEL_DISABLED -> stringResource(R.string.messages_readiness_channel_disabled)
+    RelationshipReadinessReason.MISSING_PHONE -> stringResource(R.string.messages_readiness_missing_phone)
+    RelationshipReadinessReason.MISSING_EMAIL -> stringResource(R.string.messages_readiness_missing_email)
+    RelationshipReadinessReason.EMAIL_SETUP_MISSING -> stringResource(R.string.messages_readiness_email_setup_missing)
+    RelationshipReadinessReason.FAILED_CHECK_SETUP,
+    RelationshipReadinessReason.SETUP_ACTION_REQUIRED,
+    RelationshipReadinessReason.SETUP_WARNING -> stringResource(R.string.messages_readiness_failed_check_setup)
+    RelationshipReadinessReason.DRAFT_READY,
+    RelationshipReadinessReason.DRAFT_EDITED_READY,
+    RelationshipReadinessReason.DRAFT_TOO_SHORT,
+    RelationshipReadinessReason.DRAFT_BLANK,
+    RelationshipReadinessReason.CONTACT_SYNC_FAILED,
+    RelationshipReadinessReason.CONTACTS_MISSING,
+    RelationshipReadinessReason.AI_ACCESS_MISSING,
+    RelationshipReadinessReason.AI_GENERATION_DISABLED,
+    RelationshipReadinessReason.PENDING_MESSAGES,
+    RelationshipReadinessReason.BACKUP_MISSING,
+    RelationshipReadinessReason.BACKUP_STALE,
+    RelationshipReadinessReason.RELATIONSHIP_HEALTH_LOW -> stringResource(R.string.messages_readiness_ready_review)
 }
 
 @Composable

@@ -4,6 +4,8 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +40,7 @@ import com.example.ui.viewmodel.AuthViewModel
 
 internal object AuthScreenTestTags {
     const val SIGN_IN_BUTTON = "auth_sign_in_button"
+    const val LOCAL_MODE_BUTTON = "auth_local_mode_button"
     const val LOADING = "auth_loading"
     const val ERROR = "auth_error"
 }
@@ -63,6 +67,7 @@ fun AuthScreen(
     AuthContent(
         state = state,
         onSignIn = { viewModel.startGoogleSignIn { launcher.launch(it) } },
+        onContinueLocalOnly = viewModel::continueLocalOnly,
     )
 }
 
@@ -70,11 +75,13 @@ fun AuthScreen(
 internal fun AuthContent(
     state: AuthUiState,
     onSignIn: () -> Unit,
+    onContinueLocalOnly: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
             .padding(RelateSpacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -117,6 +124,28 @@ internal fun AuthContent(
                     color = MaterialTheme.colorScheme.onBackground,
                 )
             }
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
+            OutlinedButton(
+                onClick = onContinueLocalOnly,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(RelateSize.primaryButtonHeight)
+                    .testTag(AuthScreenTestTags.LOCAL_MODE_BUTTON),
+                shape = RoundedCornerShape(RelateRadius.control),
+            ) {
+                Text(
+                    text = stringResource(R.string.auth_continue_local_only),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
+            }
+            Spacer(modifier = Modifier.height(RelateSpacing.sm))
+            Text(
+                text = stringResource(R.string.auth_local_only_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         }
         state.error?.let { error ->
             Spacer(modifier = Modifier.height(RelateSpacing.md))

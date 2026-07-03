@@ -1,9 +1,11 @@
 package com.example.domain.message
 
-import com.example.core.db.entities.PendingMessageEntity
+import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.OccasionId
+import com.example.domain.model.message.PendingMessageRecord
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -28,7 +30,7 @@ class PendingMessageMappersTest {
             selectedVariant = "funny",
             selectedVariantText = "",
             funnyVariant = "Funny birthday wish",
-            channel = " email ",
+            channel = MessageChannel.EMAIL,
         ).toMessageDispatchDraft()
 
         assertEquals(MessageChannel.EMAIL, draft.preferredChannel)
@@ -47,11 +49,11 @@ class PendingMessageMappersTest {
         assertEquals("Dispatch this wish", state.dispatchDraft.messageText)
     }
 
-    private fun pendingMessage(): PendingMessageEntity {
-        return PendingMessageEntity(
-            id = "pm_1",
-            contactId = "contact_1",
-            eventId = "event_1",
+    private fun pendingMessage(): PendingMessageRecord {
+        return PendingMessageRecord(
+            id = MessageDraftId("pm_1"),
+            contactId = ContactId("contact_1"),
+            occasionId = OccasionId("event_1"),
             shortVariant = "Short wish",
             standardVariant = "Standard wish",
             longVariant = "Long wish",
@@ -60,9 +62,9 @@ class PendingMessageMappersTest {
             emotionalVariant = "Emotional wish",
             selectedVariant = "standard",
             selectedVariantText = "Standard wish",
-            channel = MessageChannel.SMS.raw,
+            channel = MessageChannel.SMS,
             scheduledForMs = 1_800_000_000_000,
-            approvalMode = "ALWAYS_ASK",
+            approvalMode = ApprovalMode.ALWAYS_ASK,
         )
     }
 }

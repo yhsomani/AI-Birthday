@@ -9,8 +9,6 @@ import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.automation.AiAutoSendQualityGate
 import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutoSendChannelSelector
-import com.example.domain.contact.toDeliveryRouteProfile
-import com.example.domain.contact.toMessagePromptContact
 import com.example.domain.message.buildMessagePromptContext
 import com.example.domain.message.toStylePromptProfile
 import com.example.domain.model.ApprovalMode
@@ -46,16 +44,16 @@ class RegeneratePendingMessageUseCase @Inject constructor(
 
         val pending = messageRepository.getPendingById(pendingMessageId)
             ?: return Outcome.PendingNotFound
-        val contact = contactRepository.getById(pending.contactId)
+        val contact = contactRepository.getMessageGenerationProfile(pending.contactId.value)
             ?: return Outcome.ContextNotFound
-        val event = eventRepository.getOccasionById(pending.eventId)
+        val event = eventRepository.getOccasionById(pending.occasionId.value)
             ?: return Outcome.ContextNotFound
         val styleProfile = styleProfileRepository.getProfileOnce()
-        val generationHistory = messageRepository.getGenerationHistoryByContact(contact.id, 10)
-        val memoryNotes = memoryNoteRepository.getRecordsByContact(contact.id)
-        val giftHistory = giftHistoryRepository.getRecordsByContact(contact.id)
+        val generationHistory = messageRepository.getGenerationHistoryByContact(contact.id.value, 10)
+        val memoryNotes = memoryNoteRepository.getRecordsByContact(contact.id.value)
+        val giftHistory = giftHistoryRepository.getRecordsByContact(contact.id.value)
         val promptContext = buildMessagePromptContext(
-            contact = contact.toMessagePromptContact(),
+            contact = contact.promptContext,
             event = event,
             styleProfile = styleProfile?.toStylePromptProfile(),
             previousWishes = generationHistory.previousWishes,
@@ -73,7 +71,7 @@ class RegeneratePendingMessageUseCase @Inject constructor(
         val selectedText = if (shouldPreserveUserEdit) currentDraft else regeneratedText
         val requestedApprovalMode = ApprovalModeResolver.resolve(
             relationship = contact.relationshipType,
-            contactOverride = ApprovalMode.fromRaw(contact.automationMode),
+            contactOverride = contact.automationMode,
             globalMode = preferencesRepository.getGlobalAutomationMode(),
             skipAutoWish = contact.skipAutoWish,
         )
@@ -83,7 +81,7 @@ class RegeneratePendingMessageUseCase @Inject constructor(
             isUsingFallback = variants.isUsingFallback,
         )
         val channelSelection = AutoSendChannelSelector.selectRoute(
-            contact = contact.toDeliveryRouteProfile(),
+            contact = contact.deliveryRouteProfile,
             routeHistory = generationHistory.routeHistory,
             channelBlackoutJson = preferencesRepository.getChannelBlackout(),
             senderEmail = preferencesRepository.getSenderEmail(),
@@ -109,9 +107,9 @@ class RegeneratePendingMessageUseCase @Inject constructor(
             emotionalVariant = variants.emotional,
             selectedVariant = variants.recommended,
             selectedVariantText = selectedText,
-            channel = channelSelection.channel.raw,
-            approvalMode = approvalMode.raw,
-            status = status.raw,
+            channel = channelSelection.channel,
+            approvalMode = approvalMode,
+            status = status,
             editedByUser = shouldPreserveUserEdit,
             userEditedText = if (shouldPreserveUserEdit) selectedText else null,
             qualityScore = qualityDecision.qualityScore,
@@ -119,17 +117,17 @@ class RegeneratePendingMessageUseCase @Inject constructor(
         )
         messageRepository.insertPending(updated)
         if (
-            MessageStatus.fromRaw(updated.status) == MessageStatus.APPROVED ||
+            updated.status == MessageStatus.APPROVED ||
             ApprovalModeResolver.schedulesAutomaticDispatch(approvalMode)
         ) {
-            schedulerService.scheduleExactSend(updated.id)
+            schedulerService.scheduleExactSend(updated.id.value)
         }
 
-        return Outcome.Regenerated(updated.id, variants.isUsingFallback)
+        return Outcome.Regenerated(updated.id.value, variants.isUsingFallback)
     }
 
     private fun regeneratedStatus(
-        previousStatus: String,
+        previousStatus: MessageStatus,
         approvalMode: ApprovalMode,
         hasAvailableRoute: Boolean,
         preserveApprovedStatus: Boolean,
@@ -138,7 +136,7 @@ class RegeneratePendingMessageUseCase @Inject constructor(
         if (
             preserveApprovedStatus &&
             approvalMode != ApprovalMode.ALWAYS_ASK &&
-            MessageStatus.fromRaw(previousStatus) == MessageStatus.APPROVED
+            previousStatus == MessageStatus.APPROVED
         ) {
             return MessageStatus.APPROVED
         }

@@ -230,8 +230,40 @@
     <string name="wish_preview_send_summary_title">स्वीकृति योजना</string>
     <string name="wish_preview_summary_event">इवेंट</string>
     <string name="wish_preview_summary_route">रूट</string>
+    <string name="wish_preview_summary_route_choice">रूट चयन</string>
+    <string name="wish_preview_summary_route_choice_preferred">पसंदीदा रूट</string>
+    <string name="wish_preview_summary_route_choice_fallback">%1$s से फॉलबैक</string>
+    <string name="wish_preview_summary_route_setup">रूट सेटअप</string>
+    <string name="wish_preview_summary_route_ready">रूट तैयार</string>
+    <string name="wish_preview_summary_route_contact_missing">कॉन्टैक्ट नहीं मिला</string>
+    <string name="wish_preview_summary_route_channel_disabled">चैनल बंद है</string>
+    <string name="wish_preview_summary_route_missing_phone">फोन नंबर नहीं है</string>
+    <string name="wish_preview_summary_route_missing_email">ईमेल नहीं है</string>
+    <string name="wish_preview_summary_route_email_setup_missing">ईमेल सेटअप नहीं है</string>
+    <string name="wish_preview_summary_route_email_sender_invalid">भेजने वाला ईमेल अमान्य है</string>
+    <string name="wish_preview_summary_route_unsupported">असमर्थित चैनल</string>
+    <string name="wish_preview_summary_device_setup">डिवाइस सेटअप</string>
+    <string name="wish_preview_summary_device_sms_ready">SMS अनुमति तैयार</string>
+    <string name="wish_preview_summary_device_sms_permission_missing">SMS अनुमति नहीं है</string>
+    <string name="wish_preview_summary_device_sms_disabled">SMS चैनल बंद है</string>
+    <string name="wish_preview_summary_device_whatsapp_ready">WhatsApp ऑटोमेशन तैयार</string>
+    <string name="wish_preview_summary_device_whatsapp_consent_required">WhatsApp सहमति चाहिए</string>
+    <string name="wish_preview_summary_device_whatsapp_app_missing">WhatsApp ऐप नहीं है</string>
+    <string name="wish_preview_summary_device_whatsapp_accessibility_missing">WhatsApp Accessibility बंद है</string>
+    <string name="wish_preview_summary_device_whatsapp_disabled">WhatsApp चैनल बंद है</string>
+    <string name="wish_preview_summary_device_setup_required">डिवाइस सेटअप चाहिए</string>
     <string name="wish_preview_summary_schedule">शेड्यूल</string>
     <string name="wish_preview_summary_approval">स्वीकृति</string>
+    <string name="wish_preview_summary_dispatch">डिस्पैच</string>
+    <string name="wish_preview_summary_dispatch_needs_approval">स्वीकृति चाहिए</string>
+    <string name="wish_preview_summary_dispatch_ready">भेजने के लिए तैयार</string>
+    <string name="wish_preview_summary_dispatch_scheduled">शेड्यूल का इंतज़ार</string>
+    <string name="wish_preview_summary_dispatch_deferred">शांत समय के लिए रोका गया</string>
+    <string name="wish_preview_summary_dispatch_expired">स्वीकृति समय समाप्त</string>
+    <string name="wish_preview_summary_dispatch_handled">पहले ही संभाला गया</string>
+    <string name="wish_preview_summary_dispatch_rejected">अस्वीकृत</string>
+    <string name="wish_preview_summary_dispatch_failed">पिछला भेजना विफल</string>
+    <string name="wish_preview_summary_dispatch_blocked">ब्लॉक किया गया</string>
     <string name="wish_preview_summary_quality">ड्राफ्ट गुणवत्ता</string>
     <string name="wish_preview_summary_quality_ai">AI ड्राफ्ट</string>
     <string name="wish_preview_summary_quality_fallback">टेम्पलेट फॉलबैक</string>
@@ -371,6 +403,7 @@
     <string name="automation_setup_google_contacts_missing">Google से साइन इन करें और संपर्क एक्सेस दें।</string>
     <string name="automation_setup_check_gemini">Gemini</string>
     <string name="automation_setup_gemini_key_ok">API कुंजी कॉन्फिगर है।</string>
+    <string name="automation_setup_gemini_auth_ok">Gemini access के लिए Firebase प्रमाणीकरण उपलब्ध है।</string>
     <string name="automation_setup_gemini_auth_missing">Firebase प्रमाणीकरण इस्तेमाल करें या Gemini API कुंजी जोड़ें।</string>
     <string name="automation_setup_check_ai_wish_generation">AI शुभकामना निर्माण</string>
     <string name="automation_setup_ai_wish_enabled">सेटिंग्स में चालू है।</string>
@@ -504,7 +537,9 @@
     <string name="auth_error_firebase">Firebase प्रमाणीकरण विफल रहा। OAuth कॉन्फ़िगरेशन जांचें और फिर कोशिश करें।</string>
     <string name="auth_subtitle">AI-संचालित शुभकामनाओं के साथ\nअपने रिश्ते मजबूत रखें</string>
     <string name="auth_sign_in_google">Google से साइन इन करें</string>
-    <string name="auth_legal_agreement">साइन इन करके आप हमारी शर्तों और गोपनीयता नीति से सहमत होते हैं</string>
+    <string name="auth_continue_local_only">Google के बिना जारी रखें</string>
+    <string name="auth_local_only_note">इस डिवाइस पर मैन्युअल संपर्क इस्तेमाल करें। Google संपर्क सिंक के लिए Google साइन-इन जरूरी है।</string>
+    <string name="auth_legal_agreement">जारी रखकर आप हमारी शर्तों और गोपनीयता नीति से सहमत होते हैं</string>
     
     <!-- Common -->
     <string name="add">जोड़ें</string>
@@ -852,6 +887,8 @@
     <string name="messages_status_approved">स्वीकृत</string>
     <string name="messages_readiness_ready_review">रिव्यू के लिए तैयार</string>
     <string name="messages_readiness_approved_scheduled">स्वीकृत और शेड्यूल्ड</string>
+    <string name="messages_readiness_waiting_schedule">शेड्यूल समय की प्रतीक्षा</string>
+    <string name="messages_readiness_paused_window">शांत समय या ब्लैकआउट के कारण रुका</string>
     <string name="messages_readiness_sending_now">अभी भेज रहा है</string>
     <string name="messages_readiness_contact_missing">संपर्क नहीं मिला</string>
     <string name="messages_readiness_channel_disabled">चैनल बंद है</string>
@@ -859,6 +896,9 @@
     <string name="messages_readiness_missing_email">ईमेल पता नहीं है</string>
     <string name="messages_readiness_email_setup_missing">Gmail सेटअप नहीं है</string>
     <string name="messages_readiness_failed_check_setup">विफल - फिर कोशिश से पहले सेटअप जांचें</string>
+    <string name="messages_draft_source_ai">AI ड्राफ्ट</string>
+    <string name="messages_draft_source_ai_score">AI ड्राफ्ट %1$d%%</string>
+    <string name="messages_draft_source_fallback">टेम्पलेट फॉलबैक</string>
     <string name="messages_retry_send">फिर भेजें</string>
     <string name="messages_revoke">वापस लें</string>
     <string name="channel_sms">SMS</string>
@@ -988,6 +1028,8 @@
     <string name="onboarding_setup_automation_description">AI डॉक्टर से AI, ईमेल, संपर्क सिंक, अनुमतियां और विफल-भेजने की रिकवरी टेस्ट करें।</string>
     <string name="onboarding_continue_to_sign_in">साइन इन जारी रखें</string>
     <string name="onboarding_open_setup_checklist">साइन इन करके सेटअप चेकलिस्ट खोलें</string>
+    <string name="onboarding_start_local_only">स्थानीय संपर्कों से शुरू करें</string>
+    <string name="onboarding_local_only_note">मैन्युअल संपर्क और इवेंट इसी डिवाइस पर रहते हैं। Google सिंक के लिए Google साइन-इन जरूरी है।</string>
     <string name="settings_gemini_saved">Gemini API कुंजी सहेजी गई।</string>
     <string name="settings_email_sending_title">ईमेल भेजना</string>
     <string name="settings_email_sending_help">ईमेल चैनल या खुद को टेस्ट संदेश भेजने के लिए Gmail भेजने वाले विवरण चाहिए।</string>

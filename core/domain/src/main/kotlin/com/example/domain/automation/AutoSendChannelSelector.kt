@@ -74,27 +74,33 @@ object AutoSendChannelSelector {
             )
         }
 
-        val preferred = contact.preferredChannel
-        val bestHistorical = routeHistory
-            .asSequence()
-            .filter { it.deliveryStatus.isSuccessfulForRouting }
-            .map { it.channel }
-            .filter { it in availableChannels }
-            .groupingBy { it }
-            .eachCount()
-            .maxWithOrNull(
-                compareBy<Map.Entry<MessageChannel, Int>> { it.value }
-                    .thenByDescending { preferredTieBreakRank(it.key, preferred) }
-            )
-            ?.key
-
-        val selectedChannel = when {
-            bestHistorical != null -> bestHistorical
-            preferred in availableChannels -> preferred
-            else -> defaultOrder.first { it in availableChannels }
-        }
+        val selectedChannel = orderedAvailableChannels(
+            preferred = contact.preferredChannel,
+            routeHistory = routeHistory,
+            availableChannels = availableChannels,
+        ).first()
         return ChannelSelection.Selected(
             channel = selectedChannel,
+            availableChannels = availableChannels,
+        )
+    }
+
+    fun orderedRoutes(
+        contact: ContactDeliveryRouteProfile,
+        routeHistory: List<DeliveryRouteHistoryRecord>,
+        channelBlackoutJson: String,
+        senderEmail: String,
+        senderEmailPassword: String,
+    ): List<MessageChannel> {
+        val availableChannels = availableChannels(
+            contact = contact,
+            channelBlackoutJson = channelBlackoutJson,
+            senderEmail = senderEmail,
+            senderEmailPassword = senderEmailPassword,
+        )
+        return orderedAvailableChannels(
+            preferred = contact.preferredChannel,
+            routeHistory = routeHistory,
             availableChannels = availableChannels,
         )
     }
@@ -160,6 +166,45 @@ object AutoSendChannelSelector {
         if (channel == preferred) return 100
         val index = defaultOrder.indexOf(channel).takeIf { it >= 0 } ?: defaultOrder.size
         return defaultOrder.size - index
+    }
+
+    private fun orderedAvailableChannels(
+        preferred: MessageChannel,
+        routeHistory: List<DeliveryRouteHistoryRecord>,
+        availableChannels: Set<MessageChannel>,
+    ): List<MessageChannel> {
+        if (availableChannels.isEmpty()) return emptyList()
+        val bestHistorical = routeHistory
+            .asSequence()
+            .filter { it.deliveryStatus.isSuccessfulForRouting }
+            .map { it.channel }
+            .filter { it in availableChannels }
+            .groupingBy { it }
+            .eachCount()
+            .maxWithOrNull(
+                compareBy<Map.Entry<MessageChannel, Int>> { it.value }
+                    .thenByDescending { preferredTieBreakRank(it.key, preferred) }
+            )
+            ?.key
+
+        return routeFallbackOrder(preferred)
+            .let { fallbackOrder ->
+                if (bestHistorical == null) {
+                    fallbackOrder
+                } else {
+                    listOf(bestHistorical) + fallbackOrder.filterNot { it == bestHistorical }
+                }
+            }
+            .filter { it in availableChannels }
+    }
+
+    private fun routeFallbackOrder(preferred: MessageChannel): List<MessageChannel> {
+        val knownPreferred = preferred.takeIf { it != MessageChannel.UNKNOWN }
+        return if (knownPreferred == null) {
+            defaultOrder
+        } else {
+            listOf(knownPreferred) + defaultOrder.filterNot { it == knownPreferred }
+        }
     }
 
     private val defaultOrder = listOf(MessageChannel.SMS, MessageChannel.WHATSAPP, MessageChannel.EMAIL)

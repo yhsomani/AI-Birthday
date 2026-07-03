@@ -1,5 +1,7 @@
 package com.example.ui.screens.messages
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -9,13 +11,14 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.example.R
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.ui.viewmodel.MessageReadiness
+import com.example.domain.readiness.RelationshipActionReadiness
 
 @Composable
 internal fun MessageFailedStatusIcon(modifier: Modifier = Modifier) {
@@ -40,14 +43,27 @@ internal fun MessageApprovedStatusIcon(modifier: Modifier = Modifier) {
 @Composable
 internal fun MessageReviewCardBody(
     messageText: String,
-    readiness: MessageReadiness,
+    readiness: RelationshipActionReadiness,
     readinessTestTag: String,
+    qualityScore: Int,
+    isUsingFallback: Boolean,
+    sourceTestTag: String,
 ) {
     Spacer(modifier = Modifier.height(RelateSpacing.sm))
     MessagePreviewText(text = messageText)
     Spacer(modifier = Modifier.height(RelateSpacing.md))
-    MessageReadinessBadge(
-        readiness = readiness,
-        modifier = Modifier.testTag(readinessTestTag),
-    )
+    Column(
+        verticalArrangement = Arrangement.spacedBy(RelateSpacing.xs),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        MessageReadinessBadge(
+            readiness = readiness,
+            modifier = Modifier.testTag(readinessTestTag),
+        )
+        MessageDraftSourceBadge(
+            isUsingFallback = isUsingFallback,
+            qualityScore = qualityScore,
+            modifier = Modifier.testTag(sourceTestTag),
+        )
+    }
 }

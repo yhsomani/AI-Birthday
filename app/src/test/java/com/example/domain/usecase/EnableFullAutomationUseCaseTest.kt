@@ -1,12 +1,14 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageStatus
 import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.common.OccasionId
+import com.example.domain.model.contact.ContactAutomationReadinessProfile
 import com.example.domain.model.dispatch.MessageDispatchRecipient
+import com.example.domain.model.message.PendingMessageRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.PreferencesRepository
@@ -39,8 +41,7 @@ class EnableFullAutomationUseCaseTest {
 
     @Test
     fun `invoke enables full auto and schedules queued routable messages`() = runTest {
-        val promoted = slot<PendingMessageEntity>()
-        val updatedContact = slot<ContactEntity>()
+        val promoted = slot<PendingMessageRecord>()
         var promotedMessageScheduled = false
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
@@ -54,11 +55,10 @@ class EnableFullAutomationUseCaseTest {
                 promotedMessageScheduled,
             )
         }
-        coEvery { contactRepository.getAllSync() } returns listOf(
-            ContactEntity(
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            automationProfile(
                 id = "contact_1",
-                name = "Taylor",
-                automationMode = ApprovalMode.VIP_APPROVE.raw,
+                automationMode = ApprovalMode.VIP_APPROVE,
                 skipAutoWish = true,
             ),
         )
@@ -80,12 +80,17 @@ class EnableFullAutomationUseCaseTest {
         assertEquals(1, outcome.promotedMessages)
         assertEquals(0, outcome.skippedWithoutRoute)
         verify { preferencesRepository.setGlobalAutomationMode(ApprovalMode.FULLY_AUTO) }
-        coVerify { contactRepository.update(capture(updatedContact)) }
-        assertEquals(ApprovalMode.DEFAULT.raw, updatedContact.captured.automationMode)
-        assertEquals(false, updatedContact.captured.skipAutoWish)
+        coVerify {
+            contactRepository.updateAutomationOverride(
+                id = ContactId("contact_1"),
+                automationMode = ApprovalMode.DEFAULT,
+                skipAutoWish = false,
+                updatedAt = any(),
+            )
+        }
         coVerify { messageRepository.insertPending(capture(promoted)) }
-        assertEquals(MessageStatus.APPROVED.raw, promoted.captured.status)
-        assertEquals(ApprovalMode.FULLY_AUTO.raw, promoted.captured.approvalMode)
+        assertEquals(MessageStatus.APPROVED, promoted.captured.status)
+        assertEquals(ApprovalMode.FULLY_AUTO, promoted.captured.approvalMode)
         assertEquals(
             "Happy birthday Taylor, still remember our Jaipur food walk. Hope this year brings more trips and good coffee.",
             promoted.captured.selectedVariantText,
@@ -98,7 +103,7 @@ class EnableFullAutomationUseCaseTest {
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
-        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns emptyList()
         coEvery { messageRepository.getAllPendingSync() } throws IllegalStateException("pending load failed")
 
         try {
@@ -116,7 +121,7 @@ class EnableFullAutomationUseCaseTest {
         every { preferencesRepository.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}","${MessageChannel.WHATSAPP.raw}"]"""
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
-        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns emptyList()
         coEvery { messageRepository.getAllPendingSync() } returns listOf(
             pendingMessage(id = "pending_1", contactId = "contact_1", approvalMode = ApprovalMode.ALWAYS_ASK),
             pendingMessage(id = "sent_1", contactId = "contact_2", status = MessageStatus.SENT),
@@ -144,7 +149,7 @@ class EnableFullAutomationUseCaseTest {
             """["${MessageChannel.SMS.raw}","${MessageChannel.WHATSAPP.raw}"]"""
         every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
         every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
-        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns emptyList()
         coEvery { messageRepository.getAllPendingSync() } returns listOf(
             pendingMessage(
                 id = "invalid_recipient",
@@ -171,7 +176,7 @@ class EnableFullAutomationUseCaseTest {
             """["${MessageChannel.SMS.raw}","${MessageChannel.WHATSAPP.raw}"]"""
         every { preferencesRepository.getSenderEmail() } returns "not an email"
         every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
-        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns emptyList()
         coEvery { messageRepository.getAllPendingSync() } returns listOf(
             pendingMessage(
                 id = "invalid_sender",
@@ -197,7 +202,7 @@ class EnableFullAutomationUseCaseTest {
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
-        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns emptyList()
         coEvery { messageRepository.getAllPendingSync() } returns listOf(
             pendingMessage(
                 id = "generic_1",
@@ -225,7 +230,7 @@ class EnableFullAutomationUseCaseTest {
         every { preferencesRepository.getChannelBlackout() } returns "[]"
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
-        coEvery { contactRepository.getAllSync() } returns emptyList()
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns emptyList()
         coEvery { messageRepository.getAllPendingSync() } returns listOf(
             pendingMessage(
                 id = "blank_1",
@@ -255,10 +260,10 @@ class EnableFullAutomationUseCaseTest {
         selectedText: String = "Happy birthday Taylor, still remember our Jaipur food walk. Hope this year brings more trips and good coffee.",
         isUsingFallback: Boolean = false,
         channel: MessageChannel = MessageChannel.SMS,
-    ) = PendingMessageEntity(
-        id = id,
-        contactId = contactId,
-        eventId = "event_$id",
+    ) = PendingMessageRecord(
+        id = MessageDraftId(id),
+        contactId = ContactId(contactId),
+        occasionId = OccasionId("event_$id"),
         shortVariant = selectedText,
         standardVariant = selectedText,
         longVariant = selectedText,
@@ -266,10 +271,10 @@ class EnableFullAutomationUseCaseTest {
         funnyVariant = selectedText,
         emotionalVariant = selectedText,
         selectedVariantText = selectedText,
-        channel = channel.raw,
+        channel = channel,
         scheduledForMs = 0L,
-        approvalMode = approvalMode.raw,
-        status = status.raw,
+        approvalMode = approvalMode,
+        status = status,
         isUsingFallback = isUsingFallback,
     )
 
@@ -282,5 +287,21 @@ class EnableFullAutomationUseCaseTest {
         displayName = "Taylor",
         primaryPhone = phone,
         primaryEmail = email,
+    )
+
+    private fun automationProfile(
+        id: String,
+        automationMode: ApprovalMode = ApprovalMode.DEFAULT,
+        skipAutoWish: Boolean = false,
+    ) = ContactAutomationReadinessProfile(
+        id = ContactId(id),
+        preferredChannel = MessageChannel.SMS,
+        automationMode = automationMode,
+        skipAutoWish = skipAutoWish,
+        nickname = null,
+        notesText = "",
+        interestsJson = "[]",
+        sharedHistoryJson = "[]",
+        classificationConfidence = 0.0,
     )
 }

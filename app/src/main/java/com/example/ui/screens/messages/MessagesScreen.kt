@@ -40,12 +40,14 @@ internal object MessagesTestTags {
     const val FAILED_RECOVERY_OPEN_SETUP = "messages_failed_recovery_open_setup"
     const val VERIFICATION_ASSISTANT = "messages_verification_assistant"
     const val READINESS_PREFIX = "messages_readiness_"
+    const val SOURCE_PREFIX = "messages_source_"
     const val CHANNEL_PREFIX = "messages_channel_"
     const val SENT_CARD_PREFIX = "messages_sent_card_"
     const val SELECT_PREFIX = "messages_select_"
     const val PENDING_APPROVE_PREFIX = "messages_pending_approve_"
     const val PENDING_REJECT_PREFIX = "messages_pending_reject_"
     const val PENDING_EDIT_PREFIX = "messages_pending_edit_"
+    const val BLOCKED_PRIMARY_ACTION_PREFIX = "messages_blocked_primary_action_"
     const val APPROVED_REVOKE_PREFIX = "messages_approved_revoke_"
     const val APPROVED_REJECT_PREFIX = "messages_approved_reject_"
     const val APPROVED_EDIT_PREFIX = "messages_approved_edit_"
@@ -56,6 +58,7 @@ internal object MessagesTestTags {
 @Composable
 fun MessagesScreen(
     onNavigateToWish: (String, String) -> Unit = { _, _ -> },
+    onNavigateToContact: (String) -> Unit = {},
     onNavigateToAutomationSetup: () -> Unit = {},
     initialChannelFilter: MessageChannelFilter? = null,
     verificationChannelFilter: MessageChannelFilter? = null,
@@ -71,6 +74,7 @@ fun MessagesScreen(
         state = state,
         verificationChannelFilter = verificationChannelFilter,
         onNavigateToWish = onNavigateToWish,
+        onNavigateToContact = onNavigateToContact,
         onNavigateToAutomationSetup = onNavigateToAutomationSetup,
         onSearchQueryChange = viewModel::updateSearchQuery,
         onChannelFilterSelected = viewModel::selectChannelFilter,
@@ -96,6 +100,7 @@ internal fun MessagesContent(
     initialPage: Int = 0,
     verificationChannelFilter: MessageChannelFilter? = null,
     onNavigateToWish: (String, String) -> Unit = { _, _ -> },
+    onNavigateToContact: (String) -> Unit = {},
     onNavigateToAutomationSetup: () -> Unit = {},
     onSearchQueryChange: (String) -> Unit = {},
     onChannelFilterSelected: (MessageChannelFilter) -> Unit = {},
@@ -234,6 +239,7 @@ internal fun MessagesContent(
             pagerState = pagerState,
             onRefresh = onRefresh,
             onNavigateToWish = onNavigateToWish,
+            onNavigateToContact = onNavigateToContact,
             onNavigateToAutomationSetup = onNavigateToAutomationSetup,
             onApproveMessage = onApproveMessage,
             onRejectRequested = { showRejectDialogForId = it },

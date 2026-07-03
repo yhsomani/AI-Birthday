@@ -4,9 +4,10 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.core.automation.notifications.NotificationHelper
-import com.example.core.data.R
+import com.example.core.automation.sender.setupNotificationRequest
+import com.example.core.automation.sender.showSetupNotification
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.model.notification.SetupNotificationReason
 import com.example.domain.repository.EventRepository
 import com.example.domain.service.PreferencesRepository
 import com.example.domain.usecase.GenerateMessageUseCase
@@ -35,10 +36,10 @@ class MessageGenerationWorker @AssistedInject constructor(
         val firebaseUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
         if (apiKey.isNullOrBlank() && firebaseUser == null) {
             StructuredLogger.w(TAG, "Gemini API key not configured and user not authenticated; skipping worker")
-            NotificationHelper.showSetupNotification(
-                applicationContext,
-                applicationContext.getString(R.string.notification_setup_ai_title),
-                applicationContext.getString(R.string.notification_setup_ai_message),
+            applicationContext.showSetupNotification(
+                setupNotificationRequest(
+                    reason = SetupNotificationReason.AI_PROVIDER_MISSING,
+                )
             )
             return Result.failure()
         }

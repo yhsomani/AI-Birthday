@@ -37,6 +37,7 @@ class OnboardingScreenInteractionTest {
                 OnboardingContent(
                     onContinue = { actions += "continue" },
                     onOpenAutomationSetup = { actions += "setup" },
+                    onStartLocalMode = { actions += "local" },
                 )
             }
         }
@@ -50,11 +51,18 @@ class OnboardingScreenInteractionTest {
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
+        composeRule.onNodeWithTag(OnboardingTestTags.LOCAL_MODE_BUTTON)
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText(context.getString(R.string.onboarding_local_only_note))
+            .performScrollTo()
+            .assertIsDisplayed()
         composeRule.onNodeWithTag(OnboardingTestTags.CONTINUE_BUTTON)
             .performScrollTo()
             .assertIsDisplayed()
             .performClick()
 
-        assertEquals(listOf("setup", "continue"), actions)
+        assertEquals(listOf("setup", "local", "continue"), actions)
     }
 }

@@ -68,7 +68,7 @@ class RevivalWorkerTest {
 
         coEvery { RateLimiter.waitIfNeeded() } returns Unit
         coEvery { sentMessageDao.getByContact(any()) } returns emptyList()
-        every { NotificationHelper.showRevivalNotification(any(), any(), any(), any(), any()) } just Runs
+        every { NotificationHelper.showRevivalNotification(any(), any()) } just Runs
         every { DailyScheduler.scheduleExactSend(any(), any()) } just Runs
     }
 
@@ -118,7 +118,17 @@ class RevivalWorkerTest {
         }
         coVerify { contactDao.updateLastRevivalAttempt("c1", any()) }
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
-        verify { NotificationHelper.showRevivalNotification(any(), "Priya", any(), any(), "c1") }
+        verify {
+            NotificationHelper.showRevivalNotification(
+                any(),
+                match {
+                    it.contactId.value == "c1" &&
+                        it.contactDisplayName == "Priya" &&
+                        it.daysSinceContact >= 39 &&
+                        it.suggestionText.isNotBlank()
+                },
+            )
+        }
     }
 
     @Test
@@ -154,7 +164,7 @@ class RevivalWorkerTest {
         assertEquals("FULLY_AUTO", pendingSlot.captured.approvalMode)
         assertEquals(MessageStatus.APPROVED.raw, pendingSlot.captured.status)
         verify { DailyScheduler.scheduleExactSend(any(), pendingSlot.captured.id) }
-        verify(exactly = 0) { NotificationHelper.showRevivalNotification(any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { NotificationHelper.showRevivalNotification(any(), any()) }
     }
 
     @Test
@@ -190,7 +200,16 @@ class RevivalWorkerTest {
         assertEquals(MessageStatus.PENDING.raw, pendingSlot.captured.status)
         assertEquals(MessageChannel.SMS.raw, pendingSlot.captured.channel)
         verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
-        verify { NotificationHelper.showRevivalNotification(any(), "Priya", any(), pendingSlot.captured.selectedVariantText, "c1") }
+        verify {
+            NotificationHelper.showRevivalNotification(
+                any(),
+                match {
+                    it.contactId.value == "c1" &&
+                        it.contactDisplayName == "Priya" &&
+                        it.suggestionText == pendingSlot.captured.selectedVariantText
+                },
+            )
+        }
     }
 
     @Test
@@ -228,7 +247,16 @@ class RevivalWorkerTest {
         assertEquals(35, pendingSlot.captured.qualityScore)
         assertEquals(true, pendingSlot.captured.isUsingFallback)
         verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
-        verify { NotificationHelper.showRevivalNotification(any(), "Priya", any(), pendingSlot.captured.selectedVariantText, "c1") }
+        verify {
+            NotificationHelper.showRevivalNotification(
+                any(),
+                match {
+                    it.contactId.value == "c1" &&
+                        it.contactDisplayName == "Priya" &&
+                        it.suggestionText == pendingSlot.captured.selectedVariantText
+                },
+            )
+        }
     }
 
     @Test

@@ -1,80 +1,74 @@
 package com.example.domain.message
 
-import com.example.core.db.entities.PendingMessageEntity
-import com.example.domain.model.ApprovalMode
-import com.example.domain.model.MessageChannel
-import com.example.domain.model.MessageStatus
-import com.example.domain.model.common.ContactId
-import com.example.domain.model.common.MessageDraftId
-import com.example.domain.model.common.OccasionId
 import com.example.domain.model.dispatch.MessageDispatchDraft
 import com.example.domain.model.message.MessageApprovalState
 import com.example.domain.model.message.MessageDispatchState
 import com.example.domain.model.message.MessageDraft
+import com.example.domain.model.message.PendingMessageRecord
 import com.example.domain.model.message.PendingMessageListItem
 import com.example.domain.model.message.RetryableMessageDraft
 import com.example.domain.model.message.WishPreviewDraft
 import com.example.domain.model.message.WishPreviewReviewItem
 import com.example.domain.model.message.WishPreviewVariants
 
-fun PendingMessageEntity.toMessageDraft(): MessageDraft {
+fun PendingMessageRecord.toMessageDraft(): MessageDraft {
     return MessageDraft(
-        id = MessageDraftId(id),
-        contactId = ContactId(contactId),
-        occasionId = OccasionId(eventId),
+        id = id,
+        contactId = contactId,
+        occasionId = occasionId,
         scheduledForMs = scheduledForMs,
-        approvalMode = ApprovalMode.fromRaw(approvalMode),
-        status = MessageStatus.fromRaw(status),
-        channel = MessageChannel.fromRaw(channel),
+        approvalMode = approvalMode,
+        status = status,
+        channel = channel,
         scheduledYear = scheduledYear,
         qualityScore = qualityScore,
         isUsingFallback = isUsingFallback,
     )
 }
 
-fun PendingMessageEntity.toMessageApprovalState(): MessageApprovalState {
+fun PendingMessageRecord.toMessageApprovalState(): MessageApprovalState {
     return MessageApprovalState(
-        id = MessageDraftId(id),
+        id = id,
         selectedVariantText = selectedVariantText,
-        approvalMode = ApprovalMode.fromRaw(approvalMode),
-        status = MessageStatus.fromRaw(status),
+        approvalMode = approvalMode,
+        status = status,
         editedByUser = editedByUser,
         userEditedText = userEditedText,
     )
 }
 
-fun PendingMessageEntity.toRetryableMessageDraft(): RetryableMessageDraft {
+fun PendingMessageRecord.toRetryableMessageDraft(): RetryableMessageDraft {
     return RetryableMessageDraft(
-        id = MessageDraftId(id),
-        contactId = ContactId(contactId),
-        occasionId = OccasionId(eventId),
-        channel = MessageChannel.fromRaw(channel),
-        status = MessageStatus.fromRaw(status),
+        id = id,
+        contactId = contactId,
+        occasionId = occasionId,
+        channel = channel,
+        status = status,
         scheduledForMs = scheduledForMs,
     )
 }
 
-fun PendingMessageEntity.toMessageDispatchDraft(): MessageDispatchDraft {
+fun PendingMessageRecord.toMessageDispatchDraft(): MessageDispatchDraft {
     return MessageDispatchDraft(
-        id = MessageDraftId(id),
-        occasionReference = OccasionId(eventId),
-        preferredChannel = MessageChannel.fromRaw(channel),
-        messageText = dispatchText(),
+        id = id,
+        occasionReference = occasionId,
+        preferredChannel = channel,
+        messageText = selectedDispatchText(),
     )
 }
 
-fun PendingMessageEntity.toMessageDispatchState(): MessageDispatchState {
+fun PendingMessageRecord.toMessageDispatchState(): MessageDispatchState {
     return MessageDispatchState(
         draft = toMessageDraft(),
         dispatchDraft = toMessageDispatchDraft(),
     )
 }
 
-fun PendingMessageEntity.toWishPreviewDraft(): WishPreviewDraft {
+fun PendingMessageRecord.toWishPreviewDraft(): WishPreviewDraft {
     return WishPreviewDraft(
-        id = MessageDraftId(id),
-        contactId = ContactId(contactId),
-        occasionId = OccasionId(eventId),
+        id = id,
+        contactId = contactId,
+        occasionId = occasionId,
         variants = WishPreviewVariants(
             short = shortVariant,
             standard = standardVariant,
@@ -85,51 +79,41 @@ fun PendingMessageEntity.toWishPreviewDraft(): WishPreviewDraft {
         ),
         selectedVariant = selectedVariant,
         selectedVariantText = selectedVariantText,
-        channel = MessageChannel.fromRaw(channel),
+        channel = channel,
         scheduledForMs = scheduledForMs,
-        approvalMode = ApprovalMode.fromRaw(approvalMode),
-        status = MessageStatus.fromRaw(status),
+        approvalMode = approvalMode,
+        status = status,
         isUsingFallback = isUsingFallback,
     )
 }
 
-fun PendingMessageEntity.toWishPreviewReviewItem(): WishPreviewReviewItem {
+fun PendingMessageRecord.toWishPreviewReviewItem(): WishPreviewReviewItem {
     return WishPreviewReviewItem(
-        id = MessageDraftId(id),
-        contactId = ContactId(contactId),
+        id = id,
+        contactId = contactId,
         scheduledForMs = scheduledForMs,
-        status = MessageStatus.fromRaw(status),
+        status = status,
     )
 }
 
-fun PendingMessageEntity.toPendingMessageListItem(): PendingMessageListItem {
+fun PendingMessageRecord.toPendingMessageListItem(): PendingMessageListItem {
     return PendingMessageListItem(
-        id = MessageDraftId(id),
-        contactId = ContactId(contactId),
-        occasionId = OccasionId(eventId),
+        id = id,
+        contactId = contactId,
+        occasionId = occasionId,
         selectedVariantText = selectedVariantText,
         standardVariant = standardVariant,
-        channel = MessageChannel.fromRaw(channel),
+        channel = channel,
         scheduledForMs = scheduledForMs,
-        approvalMode = ApprovalMode.fromRaw(approvalMode),
-        status = MessageStatus.fromRaw(status),
+        approvalMode = approvalMode,
+        status = status,
         editedByUser = editedByUser,
         userEditedText = userEditedText,
+        qualityScore = qualityScore,
+        isUsingFallback = isUsingFallback,
     )
 }
 
-fun Iterable<PendingMessageEntity>.toPendingMessageListItems(): List<PendingMessageListItem> {
+fun Iterable<PendingMessageRecord>.toPendingMessageListItems(): List<PendingMessageListItem> {
     return map { it.toPendingMessageListItem() }
-}
-
-private fun PendingMessageEntity.dispatchText(): String {
-    return (if (editedByUser) userEditedText else null) ?: selectedVariantText.ifBlank {
-        when (selectedVariant) {
-            "short" -> shortVariant
-            "long" -> longVariant
-            "funny" -> funnyVariant
-            "formal" -> formalVariant
-            else -> standardVariant
-        }
-    }
 }

@@ -58,6 +58,7 @@ import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
 import com.example.core.ui.theme.relateSemanticColors
+import com.example.domain.readiness.RelationshipReadinessState
 import com.example.ui.components.SyncErrorCard
 import com.example.ui.viewmodel.HomeActionTarget
 import com.example.ui.viewmodel.HomeNextAction
@@ -447,14 +448,15 @@ private fun NextActionCard(
         HomeNextActionKind.RECONNECT_CONTACT -> Icons.Filled.Favorite
     }
     val tint = when (action.kind) {
-        HomeNextActionKind.SYNC_CONTACTS,
-        HomeNextActionKind.FIX_CONTACT_SYNC,
-        HomeNextActionKind.CONNECT_AI,
-        HomeNextActionKind.ENABLE_AI_GENERATION -> MaterialTheme.colorScheme.error
-        HomeNextActionKind.REVIEW_PENDING -> MaterialTheme.colorScheme.primary
-        HomeNextActionKind.CREATE_BACKUP,
-        HomeNextActionKind.REFRESH_BACKUP -> MaterialTheme.relateSemanticColors.warning
         HomeNextActionKind.RECONNECT_CONTACT -> MaterialTheme.colorScheme.primary
+        else -> when (action.actionReadiness.state) {
+            RelationshipReadinessState.ACTION_REQUIRED -> MaterialTheme.colorScheme.error
+            RelationshipReadinessState.WARNING,
+            RelationshipReadinessState.WAITING -> MaterialTheme.relateSemanticColors.warning
+            RelationshipReadinessState.NEEDS_REVIEW,
+            RelationshipReadinessState.READY,
+            RelationshipReadinessState.IN_PROGRESS -> MaterialTheme.colorScheme.primary
+        }
     }
     RelateGlassCard(
         modifier = modifier

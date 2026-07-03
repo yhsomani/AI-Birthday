@@ -1,8 +1,6 @@
 package com.example.data.repository
 
 import com.example.core.db.dao.MemoryNoteDao
-import com.example.domain.memory.toEntity
-import com.example.domain.memory.toRecord
 import com.example.domain.model.common.MemoryNoteId
 import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.domain.model.memory.MemoryNoteCategoryCount

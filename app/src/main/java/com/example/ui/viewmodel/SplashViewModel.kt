@@ -1,11 +1,9 @@
 package com.example.ui.viewmodel
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import com.example.core.auth.AuthManager
-import com.example.core.prefs.SecurePrefs
+import com.example.domain.service.PreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 enum class SplashDestination {
@@ -17,12 +15,12 @@ enum class SplashDestination {
 @HiltViewModel
 class SplashViewModel @Inject constructor(
     private val authManager: AuthManager,
-    private val securePrefs: SecurePrefs,
+    private val preferencesRepository: PreferencesRepository,
 ) : ViewModel() {
 
     fun resolveDestination(): SplashDestination {
         if (authManager.isSignedIn()) return SplashDestination.HOME
-        return if (securePrefs.isOnboardingComplete()) SplashDestination.AUTH
+        return if (preferencesRepository.isOnboardingComplete()) SplashDestination.AUTH
         else SplashDestination.ONBOARDING
     }
 }

@@ -10,11 +10,14 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.json.JSONObject
 import java.io.IOException
 
-class GoogleContactsSync(private val context: Context) {
+class GoogleContactsSync(
+    private val context: Context,
+    private val client: OkHttpClient,
+    private val requestFactory: PeopleConnectionsRequestFactory,
+) {
     private companion object {
         const val TAG = "GoogleContactsSync"
     }
@@ -110,18 +113,12 @@ class GoogleContactsSync(private val context: Context) {
         val baseFields = "names,nicknames,emailAddresses,phoneNumbers,birthdays,events,organizations,memberships,relations,addresses,photos,biographies"
         val syncToken = if (forceRefresh) "" else prefs.getSyncToken()
         val contacts = mutableListOf<ContactSyncRecord>()
-        val client = OkHttpClient()
         
         var pageToken: String? = null
         var lastNextSyncToken = ""
         
         try {
             do {
-                val url = PeopleConnectionsRequestUrl.build(
-                    personFields = baseFields,
-                    syncToken = syncToken,
-                    pageToken = pageToken,
-                )
                 StructuredLogger.d(
                     TAG,
                     "Requesting People API connections page",
@@ -131,10 +128,12 @@ class GoogleContactsSync(private val context: Context) {
                     ),
                 )
                 
-                val request = Request.Builder()
-                    .url(url)
-                    .addHeader("Authorization", "Bearer $token")
-                    .build()
+                val request = requestFactory.build(
+                    oauthToken = token,
+                    personFields = baseFields,
+                    syncToken = syncToken,
+                    pageToken = pageToken,
+                )
                     
                 val response = client.newCall(request).execute()
                 if (!response.isSuccessful) {

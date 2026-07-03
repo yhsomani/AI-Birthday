@@ -63,7 +63,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun messageFeedbackDao(): MessageFeedbackDao
     abstract fun dispatchAttemptDao(): DispatchAttemptDao
     abstract fun diagnosticSnapshotDao(): DiagnosticSnapshotDao
-    // abstract fun moodLogDao(): MoodLogDao
 
     companion object {
         private const val TAG = "AppDatabase"

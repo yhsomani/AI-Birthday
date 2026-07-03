@@ -1,8 +1,6 @@
 package com.example.data.repository
 
 import com.example.core.db.dao.MessageFeedbackDao
-import com.example.domain.message.toEntity
-import com.example.domain.message.toRecord
 import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.MessageFeedbackId
 import com.example.domain.model.message.MessageFeedbackRecord

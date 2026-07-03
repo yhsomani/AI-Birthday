@@ -1,8 +1,6 @@
 package com.example.data.repository
 
 import com.example.core.db.dao.ActivityLogDao
-import com.example.domain.activity.toEntity
-import com.example.domain.activity.toRecord
 import com.example.domain.model.activity.ActivityLogRecord
 import com.example.domain.repository.ActivityLogRepository
 import kotlinx.coroutines.flow.Flow

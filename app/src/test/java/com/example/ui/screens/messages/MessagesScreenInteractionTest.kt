@@ -12,6 +12,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -29,6 +30,8 @@ import com.example.domain.model.common.OccasionId
 import com.example.domain.model.common.SentMessageId
 import com.example.domain.model.message.PendingMessageListItem
 import com.example.domain.model.message.SentMessageListItem
+import com.example.domain.readiness.RelationshipActionReadiness
+import com.example.domain.readiness.RelationshipActionReadinessPolicy
 import com.example.ui.viewmodel.MessageChannelFilter
 import com.example.ui.viewmodel.MessageReadiness
 import com.example.ui.viewmodel.MessageSort
@@ -126,6 +129,50 @@ class MessagesScreenInteractionTest {
             ),
             actions,
         )
+    }
+
+    @Test
+    fun blockedPrimaryAction_routesMissingContactDetailsToContact() {
+        val actions = mutableListOf<String>()
+
+        composeRule.setMessagesContent(
+            state = { messagesState() },
+            onNavigateToContact = { actions += "contact:$it" },
+        )
+
+        assertMessageCardVisible(MessagesTestTags.BLOCKED_CARD_PREFIX + BLOCKED_ID, tabIndex = 2)
+        clickScrollableTag(MessagesTestTags.BLOCKED_PRIMARY_ACTION_PREFIX + BLOCKED_ID)
+
+        assertEquals(listOf("contact:contact-blocked"), actions)
+    }
+
+    @Test
+    fun blockedPrimaryAction_routesSetupBlockerToAutomationSetup() {
+        val actions = mutableListOf<String>()
+        val setupBlockedId = "blocked-setup"
+        val state = MessagesUiState(
+            blockedMessages = listOf(
+                pendingItem(
+                    setupBlockedId,
+                    "contact-setup",
+                    "Sana",
+                    MessageChannel.EMAIL.raw,
+                    "BIRTHDAY",
+                    readiness = MessageReadiness.EMAIL_SETUP_MISSING,
+                ),
+            ),
+            isLoading = false,
+        )
+
+        composeRule.setMessagesContent(
+            state = { state },
+            onNavigateToAutomationSetup = { actions += "automation" },
+        )
+
+        assertMessageCardVisible(MessagesTestTags.BLOCKED_CARD_PREFIX + setupBlockedId, tabIndex = 2)
+        clickScrollableTag(MessagesTestTags.BLOCKED_PRIMARY_ACTION_PREFIX + setupBlockedId)
+
+        assertEquals(listOf("automation"), actions)
     }
 
     @Test
@@ -314,6 +361,84 @@ class MessagesScreenInteractionTest {
     }
 
     @Test
+    fun readinessBadgesPreferCanonicalReadinessOverLegacyReadiness() {
+        val state = MessagesUiState(
+            needsReviewMessages = listOf(
+                pendingItem(
+                    TODAY_ID,
+                    "contact-today",
+                    "Tara",
+                    MessageChannel.SMS.raw,
+                    "BIRTHDAY",
+                    readiness = MessageReadiness.READY_FOR_REVIEW,
+                    actionReadiness = RelationshipActionReadinessPolicy.fromMessageOperationalReadiness(
+                        readiness = MessageReadiness.MISSING_PHONE,
+                    ),
+                ),
+            ),
+            isLoading = false,
+        )
+
+        composeRule.setMessagesContent(
+            state = { state },
+        )
+
+        composeRule.onNodeWithTag(MessagesTestTags.READINESS_PREFIX + TODAY_ID)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Phone number missing")
+            .assertIsDisplayed()
+        composeRule.onAllNodesWithText("Ready for review")
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun draftSourceBadges_renderFallbackAndAiDrafts() {
+        val state = messagesState().copy(
+            needsReviewMessages = listOf(
+                pendingItem(
+                    TODAY_ID,
+                    "contact-today",
+                    "Tara",
+                    MessageChannel.SMS.raw,
+                    "BIRTHDAY",
+                    qualityScore = 35,
+                    isUsingFallback = true,
+                ),
+            ),
+            scheduledMessages = listOf(
+                pendingItem(
+                    APPROVED_ID,
+                    "contact-approved",
+                    "Dev",
+                    MessageChannel.WHATSAPP.raw,
+                    "WORK_ANNIVERSARY",
+                    status = "APPROVED",
+                    readiness = MessageReadiness.APPROVED_SCHEDULED,
+                    qualityScore = 95,
+                ),
+            ),
+        )
+
+        composeRule.setMessagesContent(
+            state = { state },
+        )
+
+        composeRule.onNodeWithTag(MessagesTestTags.SOURCE_PREFIX + TODAY_ID)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Template fallback")
+            .assertIsDisplayed()
+
+        assertMessageCardVisible(MessagesTestTags.APPROVED_CARD_PREFIX + APPROVED_ID, tabIndex = 1)
+        composeRule.onNodeWithTag(MessagesTestTags.SOURCE_PREFIX + APPROVED_ID)
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("AI draft 95%")
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun verificationModeOpensFirstActionableFilteredTab() {
         val state = messagesState().copy(
             selectedChannelFilter = MessageChannelFilter.SMS,
@@ -346,6 +471,7 @@ class MessagesScreenInteractionTest {
         initialPage: Int = 0,
         verificationChannelFilter: MessageChannelFilter? = null,
         onNavigateToWish: (String, String) -> Unit = { _, _ -> },
+        onNavigateToContact: (String) -> Unit = {},
         onNavigateToAutomationSetup: () -> Unit = {},
         onSearchQueryChange: (String) -> Unit = {},
         onChannelFilterSelected: (MessageChannelFilter) -> Unit = {},
@@ -367,6 +493,7 @@ class MessagesScreenInteractionTest {
                     initialPage = initialPage,
                     verificationChannelFilter = verificationChannelFilter,
                     onNavigateToWish = onNavigateToWish,
+                    onNavigateToContact = onNavigateToContact,
                     onNavigateToAutomationSetup = onNavigateToAutomationSetup,
                     onSearchQueryChange = onSearchQueryChange,
                     onChannelFilterSelected = onChannelFilterSelected,
@@ -454,6 +581,10 @@ class MessagesScreenInteractionTest {
         eventType: String,
         status: String = "PENDING",
         readiness: MessageReadiness = MessageReadiness.READY_FOR_REVIEW,
+        actionReadiness: RelationshipActionReadiness =
+            RelationshipActionReadinessPolicy.fromMessageOperationalReadiness(readiness),
+        qualityScore: Int = 0,
+        isUsingFallback: Boolean = false,
     ) = PendingMessageItem(
         message = PendingMessageListItem(
             id = MessageDraftId(id),
@@ -467,10 +598,13 @@ class MessagesScreenInteractionTest {
             status = MessageStatus.fromRaw(status),
             editedByUser = false,
             userEditedText = null,
+            qualityScore = qualityScore,
+            isUsingFallback = isUsingFallback,
         ),
         contactName = contactName,
         eventType = eventType,
         readiness = readiness,
+        actionReadiness = actionReadiness,
     )
 
     private fun sentItem(channel: String = MessageChannel.EMAIL.raw) = SentMessageItem(

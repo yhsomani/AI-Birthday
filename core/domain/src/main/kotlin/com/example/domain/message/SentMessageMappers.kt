@@ -1,65 +1,61 @@
 package com.example.domain.message
 
-import com.example.core.db.entities.SentMessageEntity
-import com.example.domain.model.MessageChannel
-import com.example.domain.model.MessageDeliveryStatus
-import com.example.domain.model.common.ContactId
-import com.example.domain.model.common.SentMessageId
 import com.example.domain.model.message.ChatHistoryMessageItem
 import com.example.domain.model.message.DeliveryRouteHistoryRecord
 import com.example.domain.model.message.MessageAnalyticsRecord
 import com.example.domain.model.message.MessageGenerationHistory
+import com.example.domain.model.message.SentMessageRecord
 import com.example.domain.model.message.SentMessageListItem
 
-fun SentMessageEntity.toMessageAnalyticsRecord(): MessageAnalyticsRecord {
+fun SentMessageRecord.toMessageAnalyticsRecord(): MessageAnalyticsRecord {
     return MessageAnalyticsRecord(
         sentAtMs = sentAtMs,
-        deliveryStatus = MessageDeliveryStatus.fromRaw(deliveryStatus),
+        deliveryStatus = deliveryStatus,
         replyReceived = replyReceived,
     )
 }
 
-fun SentMessageEntity.toSentMessageListItem(): SentMessageListItem {
+fun SentMessageRecord.toSentMessageListItem(): SentMessageListItem {
     return SentMessageListItem(
-        id = SentMessageId(id),
-        contactId = contactId?.let(::ContactId),
+        id = id,
+        contactId = contactId,
         occasionType = occasionType.ifBlank { eventType },
         messageText = messageText,
-        channel = MessageChannel.fromRaw(channel),
+        channel = channel,
         sentAtMs = sentAtMs,
-        deliveryStatus = MessageDeliveryStatus.fromRaw(deliveryStatus),
+        deliveryStatus = deliveryStatus,
     )
 }
 
-fun SentMessageEntity.toChatHistoryMessageItem(): ChatHistoryMessageItem {
+fun SentMessageRecord.toChatHistoryMessageItem(): ChatHistoryMessageItem {
     return ChatHistoryMessageItem(
-        id = SentMessageId(id),
+        id = id,
         messageText = messageText,
-        channel = MessageChannel.fromRaw(channel),
+        channel = channel,
         sentAtMs = sentAtMs,
     )
 }
 
-fun SentMessageEntity.toDeliveryRouteHistoryRecord(): DeliveryRouteHistoryRecord {
+fun SentMessageRecord.toDeliveryRouteHistoryRecord(): DeliveryRouteHistoryRecord {
     return DeliveryRouteHistoryRecord(
-        channel = MessageChannel.fromRaw(channel),
-        deliveryStatus = MessageDeliveryStatus.fromRaw(deliveryStatus),
+        channel = channel,
+        deliveryStatus = deliveryStatus,
     )
 }
 
-fun Iterable<SentMessageEntity>.toSentMessageListItems(): List<SentMessageListItem> {
+fun Iterable<SentMessageRecord>.toSentMessageListItems(): List<SentMessageListItem> {
     return map { it.toSentMessageListItem() }
 }
 
-fun Iterable<SentMessageEntity>.toChatHistoryMessageItems(): List<ChatHistoryMessageItem> {
+fun Iterable<SentMessageRecord>.toChatHistoryMessageItems(): List<ChatHistoryMessageItem> {
     return map { it.toChatHistoryMessageItem() }
 }
 
-fun Iterable<SentMessageEntity>.toDeliveryRouteHistoryRecords(): List<DeliveryRouteHistoryRecord> {
+fun Iterable<SentMessageRecord>.toDeliveryRouteHistoryRecords(): List<DeliveryRouteHistoryRecord> {
     return map { it.toDeliveryRouteHistoryRecord() }
 }
 
-fun Iterable<SentMessageEntity>.toMessageGenerationHistory(): MessageGenerationHistory {
+fun Iterable<SentMessageRecord>.toMessageGenerationHistory(): MessageGenerationHistory {
     val messages = toList()
     return MessageGenerationHistory(
         previousWishes = messages.map { it.messageText },

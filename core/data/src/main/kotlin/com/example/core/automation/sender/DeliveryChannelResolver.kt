@@ -1,7 +1,10 @@
 package com.example.core.automation.sender
 
+import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.EmailAddressSyntaxPolicy
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.contact.ContactDeliveryRouteProfile
+import com.example.domain.model.message.DeliveryRouteHistoryRecord
 
 internal object DeliveryChannelResolver {
     private val channelTokenPattern = Regex("\"([A-Za-z_]+)\"")
@@ -20,26 +23,22 @@ internal object DeliveryChannelResolver {
         senderEmail: String,
         senderEmailPassword: String,
         blockedChannels: Set<MessageChannel>,
+        routeHistory: List<DeliveryRouteHistoryRecord> = emptyList(),
     ): List<MessageChannel> {
-        return candidateOrder(preferredChannel)
-            .filterNot { it in blockedChannels }
-            .filter {
-                when (it) {
-                    MessageChannel.SMS,
-                    MessageChannel.WHATSAPP -> !primaryPhone.isNullOrBlank()
-                    MessageChannel.EMAIL -> EmailAddressSyntaxPolicy.isUsableAddress(primaryEmail) &&
-                        EmailAddressSyntaxPolicy.isConfiguredSender(senderEmail, senderEmailPassword)
-                    MessageChannel.UNKNOWN -> false
-                }
-            }
+        return AutoSendChannelSelector.orderedRoutes(
+            contact = ContactDeliveryRouteProfile(
+                preferredChannel = preferredChannel,
+                hasPrimaryPhone = !primaryPhone.isNullOrBlank(),
+                hasPrimaryEmail = EmailAddressSyntaxPolicy.isUsableAddress(primaryEmail),
+            ),
+            routeHistory = routeHistory,
+            channelBlackoutJson = blockedChannels.toChannelBlackoutJson(),
+            senderEmail = senderEmail,
+            senderEmailPassword = senderEmailPassword,
+        )
     }
 
-    private fun candidateOrder(preferredChannel: MessageChannel): List<MessageChannel> {
-        return when (preferredChannel) {
-            MessageChannel.WHATSAPP -> listOf(MessageChannel.WHATSAPP, MessageChannel.SMS, MessageChannel.EMAIL)
-            MessageChannel.EMAIL -> listOf(MessageChannel.EMAIL, MessageChannel.SMS, MessageChannel.WHATSAPP)
-            MessageChannel.SMS,
-            MessageChannel.UNKNOWN -> listOf(MessageChannel.SMS, MessageChannel.WHATSAPP, MessageChannel.EMAIL)
-        }
+    private fun Set<MessageChannel>.toChannelBlackoutJson(): String {
+        return joinToString(prefix = "[", postfix = "]") { "\"${it.raw}\"" }
     }
 }

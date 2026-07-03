@@ -33,7 +33,8 @@ class AiServiceImpl @Inject constructor(
         logParseFallbackIfNeeded("generate", context, variants)
 
         StructuredLogger.d(TAG, "Message generated", mapOf(
-            "recommended" to variants.recommended.take(50),
+            "recommendedVariantName" to variants.recommended,
+            "isUsingFallback" to variants.isUsingFallback.toString(),
         ))
         return MessageVariantsResult(
             short = variants.short,

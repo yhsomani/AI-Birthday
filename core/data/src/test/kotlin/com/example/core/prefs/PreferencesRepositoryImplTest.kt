@@ -40,4 +40,24 @@ class PreferencesRepositoryImplTest {
         assertEquals("sender@example.com", repository.getLastSuccessfulEmailTestSender())
         assertEquals(1234L, repository.getLastSuccessfulEmailTestMs())
     }
+
+    @Test
+    fun `WhatsApp automation consent delegates through SecurePrefs`() {
+        every { securePrefs.isWhatsAppAutomationConsentGranted() } returns true
+
+        repository.setWhatsAppAutomationConsentGranted(true)
+
+        verify { securePrefs.setWhatsAppAutomationConsentGranted(true) }
+        assertEquals(true, repository.isWhatsAppAutomationConsentGranted())
+    }
+
+    @Test
+    fun `local only mode delegates through SecurePrefs`() {
+        every { securePrefs.isLocalOnlyModeEnabled() } returns true
+
+        repository.setLocalOnlyModeEnabled(true)
+
+        verify { securePrefs.setLocalOnlyModeEnabled(true) }
+        assertEquals(true, repository.isLocalOnlyModeEnabled())
+    }
 }

@@ -91,6 +91,7 @@ class OnboardingScreenshotTest {
             OnboardingContent(
                 onContinue = {},
                 onOpenAutomationSetup = {},
+                onStartLocalMode = {},
             )
         }
     }

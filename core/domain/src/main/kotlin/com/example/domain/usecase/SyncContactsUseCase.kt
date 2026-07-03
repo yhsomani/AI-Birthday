@@ -1,7 +1,5 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ContactEntity
-import com.example.domain.contact.toEntities
 import com.example.domain.model.contact.ContactSyncRecord
 import com.example.domain.repository.ContactRepository
 import com.example.domain.service.ContactSyncService
@@ -26,12 +24,14 @@ class SyncContactsUseCase @Inject constructor(
     suspend operator fun invoke(forceRefresh: Boolean = false): SyncOutcome {
         var googleContacts = emptyList<ContactSyncRecord>()
         var googleError: String? = null
-        try {
-            googleContacts = contactSyncService.fetchGoogleContacts(forceRefresh)
-            preferencesRepository.setLastSyncError(null)
-        } catch (e: Exception) {
-            googleError = e.message ?: "Failed to fetch Google contacts"
-            preferencesRepository.setLastSyncError(googleError)
+        if (!preferencesRepository.isLocalOnlyModeEnabled()) {
+            try {
+                googleContacts = contactSyncService.fetchGoogleContacts(forceRefresh)
+                preferencesRepository.setLastSyncError(null)
+            } catch (e: Exception) {
+                googleError = e.message ?: "Failed to fetch Google contacts"
+                preferencesRepository.setLastSyncError(googleError)
+            }
         }
 
         var deviceContacts = emptyList<ContactSyncRecord>()
@@ -59,15 +59,15 @@ class SyncContactsUseCase @Inject constructor(
             preferencesRepository.setLastSyncError(deviceError)
         }
 
-        val merged = mergeContacts(googleContacts.toEntities(), deviceContacts.toEntities())
+        val merged = mergeContacts(googleContacts, deviceContacts)
             .map { it.withRelationshipFromContactGroup() }
 
         var inserted = 0
         var updated = 0
         merged.forEach { contact ->
-            val existing = contactRepository.getById(contact.id)
-            contactRepository.upsert(contact)
-            if (existing == null) inserted++ else updated++
+            val exists = contactRepository.contactExists(contact.id)
+            contactRepository.upsertSyncedContact(contact)
+            if (exists) updated++ else inserted++
         }
 
         // Run event discovery immediately so events are available in the database
@@ -83,13 +83,13 @@ class SyncContactsUseCase @Inject constructor(
     }
 
     private fun mergeContacts(
-        googleContacts: List<ContactEntity>,
-        deviceContacts: List<ContactEntity>,
-    ): List<ContactEntity> {
-        val mergedContacts = mutableListOf<ContactEntity>()
+        googleContacts: List<ContactSyncRecord>,
+        deviceContacts: List<ContactSyncRecord>,
+    ): List<ContactSyncRecord> {
+        val mergedContacts = mutableListOf<ContactSyncRecord>()
         val keyToIndex = linkedMapOf<String, Int>()
 
-        fun registerKeys(index: Int, contact: ContactEntity) {
+        fun registerKeys(index: Int, contact: ContactSyncRecord) {
             contact.mergeKeys().forEach { key ->
                 keyToIndex.putIfAbsent(key, index)
             }
@@ -115,17 +115,17 @@ class SyncContactsUseCase @Inject constructor(
         return mergedContacts
     }
 
-    private fun ContactEntity.mergeKeys(): List<String> {
+    private fun ContactSyncRecord.mergeKeys(): List<String> {
         val keys = mutableListOf<String>()
         val phone = primaryPhone?.filter(Char::isDigit)?.takeIf { it.isNotBlank() }
         if (phone != null) keys += "phone:$phone"
         val email = primaryEmail?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
         if (email != null) keys += "email:$email"
-        keys += "name:${name.trim().lowercase()}"
+        keys += "name:${displayName.trim().lowercase()}"
         return keys
     }
 
-    private fun ContactEntity.mergeMissingFrom(fallback: ContactEntity): ContactEntity {
+    private fun ContactSyncRecord.mergeMissingFrom(fallback: ContactSyncRecord): ContactSyncRecord {
         return copy(
             primaryPhone = primaryPhone ?: fallback.primaryPhone,
             secondaryPhone = secondaryPhone ?: fallback.secondaryPhone,
@@ -146,7 +146,7 @@ class SyncContactsUseCase @Inject constructor(
         )
     }
 
-    private fun ContactEntity.withRelationshipFromContactGroup(): ContactEntity {
+    private fun ContactSyncRecord.withRelationshipFromContactGroup(): ContactSyncRecord {
         val group = contactGroup?.trim()?.takeIf { it.isNotBlank() } ?: return this
         if (relationshipType != "UNKNOWN" || group.equals("device", ignoreCase = true)) {
             return this

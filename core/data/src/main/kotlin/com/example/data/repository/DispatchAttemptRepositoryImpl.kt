@@ -1,8 +1,6 @@
 package com.example.data.repository
 
 import com.example.core.db.dao.DispatchAttemptDao
-import com.example.domain.dispatch.toDispatchAttempt
-import com.example.domain.dispatch.toEntity
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.common.DispatchAttemptId

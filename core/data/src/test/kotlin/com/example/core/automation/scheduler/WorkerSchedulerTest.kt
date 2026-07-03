@@ -72,9 +72,30 @@ class WorkerSchedulerTest {
     fun `scheduleAll enqueues periodic trigger and immediate automation chain`() {
         WorkerScheduler.scheduleAll(context)
 
+        verify(exactly = 3) {
+            workManager.enqueueUniquePeriodicWork(
+                any(),
+                ExistingPeriodicWorkPolicy.KEEP,
+                any<PeriodicWorkRequest>(),
+            )
+        }
         verify {
             workManager.enqueueUniquePeriodicWork(
                 "daily_trigger",
+                ExistingPeriodicWorkPolicy.KEEP,
+                any<PeriodicWorkRequest>(),
+            )
+        }
+        verify {
+            workManager.enqueueUniquePeriodicWork(
+                "revival_check",
+                ExistingPeriodicWorkPolicy.KEEP,
+                any<PeriodicWorkRequest>(),
+            )
+        }
+        verify {
+            workManager.enqueueUniquePeriodicWork(
+                "style_analysis",
                 ExistingPeriodicWorkPolicy.KEEP,
                 any<PeriodicWorkRequest>(),
             )

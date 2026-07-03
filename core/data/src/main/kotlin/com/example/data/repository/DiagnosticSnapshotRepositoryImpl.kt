@@ -1,8 +1,6 @@
 package com.example.data.repository
 
 import com.example.core.db.dao.DiagnosticSnapshotDao
-import com.example.domain.diagnostic.toDiagnosticSnapshot
-import com.example.domain.diagnostic.toEntity
 import com.example.domain.model.diagnostic.DiagnosticSnapshot
 import com.example.domain.model.diagnostic.DiagnosticSnapshotSource
 import com.example.domain.repository.DiagnosticSnapshotRepository

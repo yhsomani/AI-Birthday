@@ -5,11 +5,9 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
-import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
-import com.example.domain.automation.DeliveryRouteBlockReason
-import com.example.domain.automation.DeliveryRouteReadiness
-import com.example.domain.automation.DeliveryRouteReadinessPolicy
+import com.example.domain.automation.MessageOperationalReadiness
+import com.example.domain.automation.MessageOperationalReadinessPolicy
 import com.example.domain.model.ActivityLogType
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
@@ -23,6 +21,12 @@ import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
+import com.example.domain.readiness.RelationshipActionReadiness
+import com.example.domain.readiness.RelationshipActionReadinessPolicy
+import com.example.domain.readiness.RelationshipReadinessAction
+import com.example.domain.readiness.RelationshipReadinessReason
+import com.example.domain.readiness.RelationshipReadinessState
+import com.example.domain.service.PreferencesRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
 import com.example.domain.usecase.RevokeApprovalUseCase
@@ -38,6 +42,8 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 
+typealias MessageReadiness = MessageOperationalReadiness
+
 enum class MessageChannelFilter {
     ALL,
     SMS,
@@ -51,16 +57,11 @@ enum class MessageSort {
     CONTACT_ASC,
 }
 
-enum class MessageReadiness {
-    READY_FOR_REVIEW,
-    APPROVED_SCHEDULED,
-    SENDING_NOW,
-    CONTACT_MISSING,
-    CHANNEL_DISABLED,
-    MISSING_PHONE,
-    MISSING_EMAIL,
-    EMAIL_SETUP_MISSING,
-    FAILED_CHECK_SETUP,
+enum class MessageActionRoute {
+    NONE,
+    WISH,
+    CONTACT,
+    AUTOMATION_SETUP,
 }
 
 data class PendingMessageItem(
@@ -69,6 +70,12 @@ data class PendingMessageItem(
     val contactAvatarUrl: String? = null,
     val eventType: String = OccasionType.BIRTHDAY.raw,
     val readiness: MessageReadiness = MessageReadiness.READY_FOR_REVIEW,
+    val actionReadiness: RelationshipActionReadiness = RelationshipActionReadinessPolicy.fromMessageOperationalReadiness(
+        readiness = readiness,
+        relatedMessageId = message.id.value,
+        relatedContactId = message.contactId.value,
+        relatedEventId = message.occasionId.value,
+    ),
 ) {
     val id: String
         get() = message.id.value
@@ -100,6 +107,53 @@ data class PendingMessageItem(
 
     val messageText: String
         get() = message.selectedVariantText.ifBlank { message.standardVariant }
+
+    val qualityScore: Int
+        get() = message.qualityScore
+
+    val isUsingFallback: Boolean
+        get() = message.isUsingFallback
+
+    val blocksTaskFlow: Boolean
+        get() = actionReadiness.state == RelationshipReadinessState.ACTION_REQUIRED
+
+    val requiresContactOrChannelFix: Boolean
+        get() = actionReadiness.blockers.any { blocker ->
+            blocker.action in setOf(
+                RelationshipReadinessAction.OPEN_CONTACT,
+                RelationshipReadinessAction.CONFIGURE_CHANNEL,
+                RelationshipReadinessAction.CONFIGURE_EMAIL,
+            )
+        }
+
+    val primaryActionRoute: MessageActionRoute
+        get() = actionReadiness.toMessageActionRoute()
+}
+
+private fun RelationshipActionReadiness.toMessageActionRoute(): MessageActionRoute {
+    return when (primaryAction) {
+        RelationshipReadinessAction.REVIEW_MESSAGE,
+        RelationshipReadinessAction.EDIT_DRAFT -> MessageActionRoute.WISH
+        RelationshipReadinessAction.OPEN_CONTACT -> MessageActionRoute.CONTACT
+        RelationshipReadinessAction.CONFIGURE_CHANNEL -> when (primaryReason) {
+            RelationshipReadinessReason.CONTACT_MISSING,
+            RelationshipReadinessReason.MISSING_PHONE,
+            RelationshipReadinessReason.MISSING_EMAIL -> MessageActionRoute.CONTACT
+            else -> MessageActionRoute.AUTOMATION_SETUP
+        }
+        RelationshipReadinessAction.CONFIGURE_EMAIL,
+        RelationshipReadinessAction.OPEN_SETUP,
+        RelationshipReadinessAction.CHECK_SETUP,
+        RelationshipReadinessAction.CONNECT_AI,
+        RelationshipReadinessAction.ENABLE_AI_GENERATION,
+        RelationshipReadinessAction.FIX_CONTACT_SYNC,
+        RelationshipReadinessAction.SYNC_CONTACTS -> MessageActionRoute.AUTOMATION_SETUP
+        RelationshipReadinessAction.NONE,
+        RelationshipReadinessAction.WAIT,
+        RelationshipReadinessAction.REVIEW_MESSAGES,
+        RelationshipReadinessAction.CREATE_BACKUP,
+        RelationshipReadinessAction.REFRESH_BACKUP -> MessageActionRoute.NONE
+    }
 }
 
 data class SentMessageItem(
@@ -161,7 +215,7 @@ class MessagesViewModel @Inject constructor(
     private val revokeApprovalUseCase: RevokeApprovalUseCase,
     private val retryFailedMessageUseCase: RetryFailedMessageUseCase,
     private val activityLogRepository: ActivityLogRepository,
-    private val securePrefs: SecurePrefs,
+    private val preferencesRepository: PreferencesRepository,
 ) : ViewModel() {
     private companion object {
         const val TAG = "MessagesViewModel"
@@ -185,7 +239,7 @@ class MessagesViewModel @Inject constructor(
                     messageRepository.getSentListItems(),
                     contactRepository.getMessageContexts(),
                     eventRepository.getEventListItems(),
-                    securePrefs.observeChanges().onStart { emit(Unit) },
+                    preferencesRepository.observeChanges().onStart { emit(Unit) },
                 ) { pending, sent, contacts, events, _ ->
                     val contactMap = contacts.associateBy { it.id.value }
                     val eventMap = events.associateBy { it.id.value }
@@ -198,13 +252,20 @@ class MessagesViewModel @Inject constructor(
                     pending.forEach { msg ->
                         val contact = contactMap[msg.contactId.value]
                         val event = eventMap[msg.occasionId.value]
+                        val readiness = msg.readinessFor(
+                            contact = contact,
+                        )
                         val item = PendingMessageItem(
                             message = msg,
                             contactName = contact?.displayName ?: msg.contactId.value,
                             contactAvatarUrl = contact?.avatarUrl,
                             eventType = event?.type?.raw ?: OccasionType.BIRTHDAY.raw,
-                            readiness = msg.readinessFor(
-                                contact = contact,
+                            readiness = readiness,
+                            actionReadiness = RelationshipActionReadinessPolicy.fromMessageOperationalReadiness(
+                                readiness = readiness,
+                                relatedMessageId = msg.id.value,
+                                relatedContactId = msg.contactId.value,
+                                relatedEventId = msg.occasionId.value,
                             ),
                         )
 
@@ -212,7 +273,7 @@ class MessagesViewModel @Inject constructor(
                             MessageStatus.FAILED -> failedItems.add(item)
                             MessageStatus.APPROVED,
                             MessageStatus.DISPATCHING -> {
-                                if (item.readiness.blocksTaskFlow()) {
+                                if (item.blocksTaskFlow) {
                                     blockedItems.add(item)
                                 } else {
                                     scheduledItems.add(item)
@@ -225,7 +286,7 @@ class MessagesViewModel @Inject constructor(
                             }
                             MessageStatus.PENDING,
                             MessageStatus.UNKNOWN -> {
-                                if (item.readiness.blocksTaskFlow()) {
+                                if (item.blocksTaskFlow) {
                                     blockedItems.add(item)
                                 } else {
                                     needsReviewItems.add(item)
@@ -557,49 +618,16 @@ class MessagesViewModel @Inject constructor(
 
     private fun PendingMessageListItem.readinessFor(
         contact: ContactMessageContext?,
-    ): MessageReadiness {
-        val routeReadiness = DeliveryRouteReadinessPolicy.evaluate(
-            channel = channel,
-            contact = contact,
-            channelBlackoutJson = securePrefs.getChannelBlackout(),
-            senderEmail = securePrefs.getSenderEmail(),
-            senderEmailPassword = securePrefs.getSenderEmailPassword(),
-        )
-        if (routeReadiness is DeliveryRouteReadiness.Blocked) {
-            return routeReadiness.reason.toMessageReadiness()
-        }
-
-        return when (status) {
-            MessageStatus.APPROVED -> MessageReadiness.APPROVED_SCHEDULED
-            MessageStatus.DISPATCHING -> MessageReadiness.SENDING_NOW
-            MessageStatus.FAILED -> MessageReadiness.FAILED_CHECK_SETUP
-            else -> MessageReadiness.READY_FOR_REVIEW
-        }
-    }
-
-    private fun MessageReadiness.blocksTaskFlow(): Boolean = when (this) {
-        MessageReadiness.CONTACT_MISSING,
-        MessageReadiness.CHANNEL_DISABLED,
-        MessageReadiness.MISSING_PHONE,
-        MessageReadiness.MISSING_EMAIL,
-        MessageReadiness.EMAIL_SETUP_MISSING -> true
-        MessageReadiness.READY_FOR_REVIEW,
-        MessageReadiness.APPROVED_SCHEDULED,
-        MessageReadiness.SENDING_NOW,
-        MessageReadiness.FAILED_CHECK_SETUP -> false
-    }
-
-    private fun DeliveryRouteBlockReason.toMessageReadiness(): MessageReadiness {
-        return when (this) {
-            DeliveryRouteBlockReason.CONTACT_MISSING -> MessageReadiness.CONTACT_MISSING
-            DeliveryRouteBlockReason.CHANNEL_DISABLED,
-            DeliveryRouteBlockReason.UNSUPPORTED_CHANNEL -> MessageReadiness.CHANNEL_DISABLED
-            DeliveryRouteBlockReason.MISSING_PHONE -> MessageReadiness.MISSING_PHONE
-            DeliveryRouteBlockReason.MISSING_EMAIL -> MessageReadiness.MISSING_EMAIL
-            DeliveryRouteBlockReason.EMAIL_SENDER_NOT_CONFIGURED,
-            DeliveryRouteBlockReason.EMAIL_SENDER_INVALID -> MessageReadiness.EMAIL_SETUP_MISSING
-        }
-    }
+    ): MessageReadiness = MessageOperationalReadinessPolicy.evaluate(
+        message = this,
+        contact = contact,
+        channelBlackoutJson = preferencesRepository.getChannelBlackout(),
+        senderEmail = preferencesRepository.getSenderEmail(),
+        senderEmailPassword = preferencesRepository.getSenderEmailPassword(),
+        quietHoursStart = preferencesRepository.getQuietHoursStart(),
+        quietHoursEnd = preferencesRepository.getQuietHoursEnd(),
+        blackoutDatesJson = preferencesRepository.getBlackoutDates(),
+    )
 
     private suspend fun recordMessageActivity(
         title: String,

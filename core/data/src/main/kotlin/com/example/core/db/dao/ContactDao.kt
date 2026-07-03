@@ -1,7 +1,6 @@
 package com.example.core.db.dao
 
 import androidx.room.*
-import androidx.paging.PagingSource
 import com.example.core.db.entities.ContactEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -9,9 +8,6 @@ import kotlinx.coroutines.flow.Flow
 interface ContactDao {
     @Query("SELECT * FROM contacts WHERE isArchived = 0 AND isDeleted = 0")
     fun getAll(): Flow<List<ContactEntity>>
-    
-    @Query("SELECT * FROM contacts WHERE isArchived = 0 AND isDeleted = 0 ORDER BY name ASC")
-    fun getAllPaged(): PagingSource<Int, ContactEntity>
     
     @Query("SELECT * FROM contacts WHERE isArchived = 0 AND isDeleted = 0")
     suspend fun getAllSync(): List<ContactEntity>
@@ -33,6 +29,23 @@ interface ContactDao {
 
     @Query("UPDATE contacts SET classificationConfidence = :confidence WHERE id = :id")
     suspend fun updateClassificationConfidence(id: String, confidence: Double)
+
+    @Query("UPDATE contacts SET automationMode = :automationMode, skipAutoWish = :skipAutoWish, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateAutomationOverride(
+        id: String,
+        automationMode: String,
+        skipAutoWish: Boolean,
+        updatedAt: Long,
+    )
+
+    @Query("UPDATE contacts SET birthdayDay = :day, birthdayMonth = :month, birthdayYear = :year, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateBirthdayDate(id: String, day: Int, month: Int, year: Int?, updatedAt: Long)
+
+    @Query("UPDATE contacts SET anniversaryDay = :day, anniversaryMonth = :month, anniversaryYear = :year, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateAnniversaryDate(id: String, day: Int, month: Int, year: Int?, updatedAt: Long)
+
+    @Query("UPDATE contacts SET workStartDay = :day, workStartMonth = :month, workStartYear = :year, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateWorkStartDate(id: String, day: Int, month: Int, year: Int?, updatedAt: Long)
 
     @Query("UPDATE contacts SET healthScore = :score WHERE id = :id")
     suspend fun updateHealthScore(id: String, score: Int)

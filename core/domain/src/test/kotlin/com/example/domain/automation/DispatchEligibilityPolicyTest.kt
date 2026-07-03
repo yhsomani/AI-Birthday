@@ -178,6 +178,24 @@ class DispatchEligibilityPolicyTest {
         assertEquals(DispatchBlockReason.ALREADY_HANDLED, (decision as DispatchDecision.Blocked).reason)
     }
 
+    @Test
+    fun `sent message is blocked as already handled`() {
+        val pending = pending(
+            status = "SENT",
+            approvalMode = ApprovalMode.FULLY_AUTO,
+            scheduledForMs = nowMs,
+        )
+
+        val decision = DispatchEligibilityPolicy.evaluate(
+            draft = pending,
+            approvalMode = ApprovalMode.FULLY_AUTO,
+            nowMs = nowMs,
+        )
+
+        assertTrue(decision is DispatchDecision.Blocked)
+        assertEquals(DispatchBlockReason.ALREADY_HANDLED, (decision as DispatchDecision.Blocked).reason)
+    }
+
     private fun pending(
         status: String,
         approvalMode: ApprovalMode,

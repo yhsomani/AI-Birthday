@@ -8,6 +8,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.core.ui.theme.RelateSpacing
 import com.example.domain.model.ApprovalMode
+import com.example.ui.viewmodel.MessageActionRoute
 
 @Composable
 internal fun MessagePendingActionRow(
@@ -17,6 +18,9 @@ internal fun MessagePendingActionRow(
     rejectTestTag: String,
     onEdit: () -> Unit,
     editTestTag: String,
+    primaryActionRoute: MessageActionRoute = MessageActionRoute.NONE,
+    onPrimaryAction: () -> Unit = {},
+    primaryActionTestTag: String = "",
     isApproving: Boolean,
     showApproveAction: Boolean,
     onApprove: () -> Unit,
@@ -41,6 +45,13 @@ internal fun MessagePendingActionRow(
                 onClick = onEdit,
                 testTag = editTestTag,
             )
+            if (primaryActionRoute != MessageActionRoute.NONE) {
+                MessagePrimaryActionButton(
+                    actionRoute = primaryActionRoute,
+                    onClick = onPrimaryAction,
+                    testTag = primaryActionTestTag,
+                )
+            }
             if (showApproveAction) {
                 MessageApproveActionButton(
                     isApproving = isApproving,

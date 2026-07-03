@@ -7,6 +7,7 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.workDataOf
+import com.example.core.automation.notifications.NotificationHelper
 import com.example.core.automation.sender.MessageDispatcher
 import com.example.core.automation.scheduler.DailyScheduler
 import com.example.core.db.dao.ContactDao
@@ -19,6 +20,7 @@ import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.DispatchEligibilityRecord
+import com.example.domain.model.notification.SetupNotificationReason
 import com.example.domain.service.PreferencesRepository
 import io.mockk.*
 import java.util.Calendar
@@ -48,8 +50,10 @@ class MessageDispatchWorkerTest {
         context = ApplicationProvider.getApplicationContext()
         mockkConstructor(MessageDispatcher::class)
         mockkObject(DailyScheduler)
+        mockkObject(NotificationHelper)
         coEvery { anyConstructed<MessageDispatcher>().dispatch(any()) } returns Unit
         every { DailyScheduler.scheduleExactSendCommand(any(), any()) } just Runs
+        every { NotificationHelper.showSetupNotification(any(), any()) } just Runs
         every { preferencesRepository.getQuietHoursStart() } returns 0
         every { preferencesRepository.getQuietHoursEnd() } returns 0
         every { preferencesRepository.getBlackoutDates() } returns "[]"
@@ -92,6 +96,15 @@ class MessageDispatchWorkerTest {
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
+        verify {
+            NotificationHelper.showSetupNotification(
+                context,
+                match {
+                    it.reason == SetupNotificationReason.DOUBLE_SEND_GUARD &&
+                        it.contactDisplayName == "Alice"
+                },
+            )
+        }
     }
 
     @Test
@@ -242,6 +255,15 @@ class MessageDispatchWorkerTest {
 
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify { pendingMessageDao.updateStatus("msg_1", "EXPIRED") }
+        verify {
+            NotificationHelper.showSetupNotification(
+                context,
+                match {
+                    it.reason == SetupNotificationReason.MESSAGE_EXPIRED &&
+                        it.contactDisplayName == "Alice"
+                },
+            )
+        }
         coVerify(exactly = 0) { anyConstructed<MessageDispatcher>().dispatch(any()) }
         coVerify {
             dispatchAttemptDao.upsert(match {

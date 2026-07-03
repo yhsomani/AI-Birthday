@@ -5,6 +5,7 @@ import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.notification.ApprovalNotificationRequest
 import com.example.domain.model.notification.EventReminderNotificationRequest
 import com.example.domain.model.notification.EventReminderScheduleRequest
+import com.example.domain.model.notification.RevivalNotificationRequest
 import com.example.domain.model.occasion.Occasion
 
 fun buildApprovalNotificationRequest(
@@ -29,6 +30,19 @@ fun buildEventReminderNotificationRequest(
         contactDisplayName = contact.displayName,
         eventId = event.id,
         eventType = event.type.raw,
+    )
+}
+
+fun buildRevivalNotificationRequest(
+    contact: ContactHeader,
+    daysSinceContact: Int,
+    suggestionText: String,
+): RevivalNotificationRequest {
+    return RevivalNotificationRequest(
+        contactId = contact.id,
+        contactDisplayName = contact.displayName,
+        daysSinceContact = daysSinceContact,
+        suggestionText = suggestionText,
     )
 }
 

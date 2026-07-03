@@ -9,12 +9,15 @@ import android.content.Intent
 import android.os.Build
 import androidx.work.ExistingWorkPolicy
 import com.example.core.automation.sender.SmsDeliveryStatusRecovery
+import com.example.core.automation.sender.setupNotificationRequest
+import com.example.core.automation.sender.showSetupNotification
 import com.example.core.automation.workers.MessageDispatchWorkRequests
-import com.example.core.data.R
 import com.example.core.db.AppDatabase
 import com.example.core.prefs.SecurePrefs
-import com.example.domain.automation.AutomationSchedulePolicy
+import com.example.domain.automation.ExactSendScheduleDecision
+import com.example.domain.automation.ExactSendSchedulePolicy
 import com.example.domain.model.message.ExactSendCommand
+import com.example.domain.model.notification.SetupNotificationReason
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,52 +36,53 @@ object DailyScheduler {
             val scheduleState = pendingMessageDao.getExactSendScheduleState(pendingMessageId)
             if (scheduleState != null) {
                 val prefs = SecurePrefs(context)
-                val scheduledForMs = AutomationSchedulePolicy.nextAllowedSendMs(
-                    candidateMs = scheduleState.scheduledForMs,
+                val nowMs = System.currentTimeMillis()
+                val decision = ExactSendSchedulePolicy.decide(
+                    scheduleState = scheduleState,
                     quietHoursStart = prefs.getQuietHoursStart(),
                     quietHoursEnd = prefs.getQuietHoursEnd(),
                     blackoutDatesJson = prefs.getBlackoutDates(),
+                    canScheduleExactAlarm = canScheduleExactAlarms(alarmManager),
+                    nowMs = nowMs,
                 )
-                if (scheduledForMs != scheduleState.scheduledForMs) {
-                    pendingMessageDao.saveExactSendScheduleUpdate(scheduleState.scheduleUpdate(scheduledForMs))
-                }
-                val pendingIntent = buildDispatchPendingIntent(
-                    context = context,
-                    requestCode = scheduleState.messageId.value.hashCode(),
-                    pendingMessageId = scheduleState.messageId.value,
-                    eventId = scheduleState.occasionId.value,
-                    flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                )
+                decision.scheduleUpdate?.let { pendingMessageDao.saveExactSendScheduleUpdate(it) }
 
-                val nowMs = System.currentTimeMillis()
-                if (scheduledForMs <= nowMs) {
-                    androidx.work.WorkManager.getInstance(context)
-                        .enqueueUniquePendingMessageDispatchWork(
+                when (decision) {
+                    is ExactSendScheduleDecision.EnqueueNow -> {
+                        androidx.work.WorkManager.getInstance(context)
+                            .enqueueUniquePendingMessageDispatchWork(
+                                pendingMessageId = scheduleState.messageId.value,
+                                eventId = scheduleState.occasionId.value,
+                                existingWorkPolicy = ExistingWorkPolicy.KEEP,
+                            )
+                    }
+                    is ExactSendScheduleDecision.ScheduleExactAlarm -> {
+                        val pendingIntent = buildDispatchPendingIntent(
+                            context = context,
+                            requestCode = scheduleState.messageId.value.hashCode(),
                             pendingMessageId = scheduleState.messageId.value,
                             eventId = scheduleState.occasionId.value,
-                            existingWorkPolicy = ExistingWorkPolicy.KEEP,
+                            flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                         )
-                    return@launch
-                }
-
-                if (canScheduleExactAlarms(alarmManager)) {
-                    alarmManager.setAlarmClock(
-                        AlarmManager.AlarmClockInfo(scheduledForMs, pendingIntent),
-                        pendingIntent
-                    )
-                } else {
-                    com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
-                        context,
-                        context.getString(R.string.notification_setup_exact_alarm_title),
-                        context.getString(R.string.notification_setup_exact_alarm_message),
-                    )
-                    androidx.work.WorkManager.getInstance(context)
-                        .enqueueUniquePendingMessageDispatchWork(
-                            pendingMessageId = scheduleState.messageId.value,
-                            eventId = scheduleState.occasionId.value,
-                            initialDelayMs = scheduledForMs - nowMs,
-                            existingWorkPolicy = ExistingWorkPolicy.REPLACE,
+                        alarmManager.setAlarmClock(
+                            AlarmManager.AlarmClockInfo(decision.scheduledForMs, pendingIntent),
+                            pendingIntent
                         )
+                    }
+                    is ExactSendScheduleDecision.ScheduleWorkFallback -> {
+                        context.showSetupNotification(
+                            setupNotificationRequest(
+                                reason = SetupNotificationReason.EXACT_ALARM_PERMISSION_MISSING,
+                            )
+                        )
+                        androidx.work.WorkManager.getInstance(context)
+                            .enqueueUniquePendingMessageDispatchWork(
+                                pendingMessageId = scheduleState.messageId.value,
+                                eventId = scheduleState.occasionId.value,
+                                initialDelayMs = decision.initialDelayMs,
+                                existingWorkPolicy = ExistingWorkPolicy.REPLACE,
+                            )
+                    }
                 }
             }
         }

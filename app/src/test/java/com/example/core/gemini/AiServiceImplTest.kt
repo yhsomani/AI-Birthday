@@ -16,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -74,6 +75,49 @@ class AiServiceImplTest {
         assertFalse(loggedText.contains("98765"))
         assertFalse(loggedText.contains("private@example.com"))
         assertFalse(loggedText.contains("not json"))
+    }
+
+    @Test
+    fun `generateMessage logs metadata without generated message text`() = runTest {
+        StructuredLogger.clearForTests()
+        ShadowLog.clear()
+        coEvery { geminiClient.generate(any()) } returns """
+            {
+                "short": "Happy birthday Asha",
+                "standard": "Happy birthday Asha, I hope the private Goa memory makes today feel special.",
+                "long": "Happy birthday Asha, your private Goa memory and family dinner deserve a warm note.",
+                "formal": "Warm birthday wishes, Asha.",
+                "funny": "Happy birthday Asha, no private jokes in logs.",
+                "emotional": "Asha, your private memory means a lot.",
+                "recommended": "standard"
+            }
+        """.trimIndent()
+
+        val result = service.generateMessage(
+            context = promptContext(eventType = "BIRTHDAY"),
+        )
+
+        assertEquals(
+            "Happy birthday Asha, I hope the private Goa memory makes today feel special.",
+            result.standard,
+        )
+        val entry = StructuredLogger.getRecent()
+            .single { it.message == "Message generated" }
+        assertEquals("standard", entry.extras["recommendedVariantName"])
+        assertEquals("false", entry.extras["isUsingFallback"])
+
+        val loggedText = StructuredLogger.getRecent().joinToString("\n") { log ->
+            log.message + " " + log.extras.entries.joinToString(" ") { "${it.key}=${it.value}" }
+        }
+        assertFalse(loggedText.contains("private Goa memory"))
+        assertFalse(loggedText.contains("family dinner"))
+        assertFalse(loggedText.contains("no private jokes"))
+
+        val androidLogText = ShadowLog.getLogs().joinToString("\n") { "${it.tag}: ${it.msg}" }
+        assertFalse(androidLogText.contains("private Goa memory"))
+        assertFalse(androidLogText.contains("family dinner"))
+        assertFalse(androidLogText.contains("no private jokes"))
+        assertTrue(androidLogText.contains("recommendedVariantName=standard"))
     }
 
     private fun promptContext(eventType: String) = MessagePromptContext(

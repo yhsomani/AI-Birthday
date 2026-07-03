@@ -317,7 +317,10 @@ class MessageDispatcherFinalizationAdaptersTest {
             )
         }
 
-        val logEntry = StructuredLogger.getRecent(1).single()
+        val logEntry = StructuredLogger.getRecent().single {
+            it.tag == "MessageDispatcher" &&
+                it.message == "Failed to dispatch message pending_no_route via SMS: NO_DELIVERY_ROUTE"
+        }
         assertEquals("MessageDispatcher", logEntry.tag)
         assertEquals(LogLevel.WARN, logEntry.level)
         assertEquals(

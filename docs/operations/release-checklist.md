@@ -1,6 +1,6 @@
 # Release Checklist
 
-Last reviewed: 2026-06-27
+Last reviewed: 2026-07-03
 
 This checklist is the production gate for RelateAI. A release is not ready until every required item is completed against the exact build submitted to distribution.
 
@@ -13,6 +13,7 @@ This checklist is the production gate for RelateAI. A release is not ready until
 - Run `git diff --check` before handoff.
 - Confirm Room schema exports and migrations are committed when database versions change.
 - Confirm no generated, local, signing, or secret files are accidentally staged.
+- Confirm provider config changes follow the approved allowlist: only `app/google-services.json` and `app/src/debug/google-services.json` may be tracked as Firebase/Google client config files.
 - Produce a signed release build with the production signing configuration before Play upload.
 
 ## Play Policy Gate
@@ -87,6 +88,7 @@ Release requirements:
 - Network security pins are valid beyond the release support window. CI runs `ProductionReadinessConfigTest`, which fails release readiness when the soonest `network_security_config.xml` pin expiration is within 60 days.
 - Network pin rotation task is scheduled no later than 2027-04-01 for the current `2027-06-01` pin-set expiration. Each release after 2027-04-01 must either include refreshed pins with a new expiration date or attach explicit release-owner signoff accepting the remaining pin lifetime.
 - Dependency changes pass the CI dependency-review gate, and the final release branch has no unresolved dependency graph or Dependabot security alerts.
+- Approved Google/Firebase client config files may be tracked only at `app/google-services.json` and `app/src/debug/google-services.json`. Do not commit service account JSON, private keys, OAuth access or refresh tokens, client secrets, signing material, SMTP credentials, Gemini keys, or local project variants.
 - No API keys, OAuth tokens, SMTP passwords, database keys, phone/email fixtures, raw AI responses, or message bodies appear in logs, test output, backups, or analytics exports outside explicit user export flows.
 - SQLCipher key strategy and backup recovery limitations are reviewed.
 - Fresh-install database keying generates random local key material formatted as SQLCipher raw-key literals; legacy identifier-derived key recovery is treated as migration-only and must be tested before removal.
@@ -103,7 +105,7 @@ Release requirements:
 
 ## Device Release Smoke Test
 
-- Fresh install can start only through Google sign-in; no alternate, demo, or fake-account path is exposed.
+- Fresh install can start through Google sign-in or local-only manual mode; no demo or fake-account path is exposed.
 - Contact sync/import, manual contact creation, event discovery/manual event creation, wish generation, review/edit/regenerate, approval, schedule, send/test, activity history, backup export, restore preview, and AI Doctor all work.
 - Permission denial paths are exercised for contacts, notifications, SMS, exact alarms, and Accessibility.
 - Reboot recovery restores scheduled work without direct send from boot receiver.

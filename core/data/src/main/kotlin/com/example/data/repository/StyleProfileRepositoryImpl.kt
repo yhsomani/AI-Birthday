@@ -4,8 +4,6 @@ import com.example.core.db.dao.StyleProfileDao
 import com.example.domain.model.style.StyleProfileHistoryRecord
 import com.example.domain.model.style.StyleProfileRecord
 import com.example.domain.repository.StyleProfileRepository
-import com.example.domain.style.toEntity
-import com.example.domain.style.toRecord
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject

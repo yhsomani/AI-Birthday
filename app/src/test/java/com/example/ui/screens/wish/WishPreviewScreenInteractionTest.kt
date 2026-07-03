@@ -25,6 +25,15 @@ import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.OccasionId
 import com.example.domain.model.message.WishPreviewDraft
 import com.example.domain.model.message.WishPreviewVariants
+import com.example.domain.message.WishPreviewDeviceSetupContext
+import com.example.domain.message.WishPreviewDeviceSetupReason
+import com.example.domain.message.WishPreviewDeviceSetupState
+import com.example.domain.message.WishPreviewRouteContext
+import com.example.domain.message.WishPreviewRouteReason
+import com.example.domain.message.WishPreviewRouteSelectionContext
+import com.example.domain.message.WishPreviewRouteSelectionReason
+import com.example.domain.message.WishPreviewRouteSelectionState
+import com.example.domain.message.WishPreviewRouteState
 import com.example.ui.viewmodel.ReviewNextTarget
 import com.example.ui.viewmodel.WishDraftReadiness
 import com.example.ui.viewmodel.WishPreviewSendSummary
@@ -94,7 +103,9 @@ class WishPreviewScreenInteractionTest {
         clickScrollableTag(WishPreviewTestTags.REGENERATE_BUTTON)
         clickScrollableTag(WishPreviewTestTags.TEST_SEND_BUTTON)
         clickScrollableTag(WishPreviewTestTags.REJECT_BUTTON)
+        clickDisplayedTag(WishPreviewTestTags.CONFIRM_REJECT_ACTION)
         clickScrollableTag(WishPreviewTestTags.APPROVE_BUTTON)
+        clickDisplayedTag(WishPreviewTestTags.CONFIRM_APPROVE_ACTION)
 
         assertEquals(
             listOf(
@@ -122,6 +133,20 @@ class WishPreviewScreenInteractionTest {
                         scheduledForMs = 1_800_000_000_000L,
                         approvalMode = "SMART_APPROVE",
                         usesFallback = true,
+                        routeContext = WishPreviewRouteContext(
+                            state = WishPreviewRouteState.BLOCKED,
+                            reason = WishPreviewRouteReason.MISSING_EMAIL,
+                        ),
+                        routeSelectionContext = WishPreviewRouteSelectionContext(
+                            preferredChannel = MessageChannel.SMS.raw,
+                            selectedChannel = MessageChannel.EMAIL.raw,
+                            state = WishPreviewRouteSelectionState.FALLBACK_ROUTE,
+                            reason = WishPreviewRouteSelectionReason.SELECTED_NON_PREFERRED_CHANNEL,
+                        ),
+                        deviceSetupContext = WishPreviewDeviceSetupContext(
+                            state = WishPreviewDeviceSetupState.ACTION_REQUIRED,
+                            reason = WishPreviewDeviceSetupReason.SMS_PERMISSION_MISSING,
+                        ),
                     ),
                 )
             },
@@ -133,7 +158,15 @@ class WishPreviewScreenInteractionTest {
         composeRule.onNodeWithText("Approval plan").assertIsDisplayed()
         composeRule.onNodeWithText("Anniversary").assertIsDisplayed()
         composeRule.onNodeWithText("Email").assertIsDisplayed()
+        composeRule.onNodeWithText("Route choice").assertIsDisplayed()
+        composeRule.onNodeWithText("Fallback from SMS").assertIsDisplayed()
+        composeRule.onNodeWithText("Route setup").assertIsDisplayed()
+        composeRule.onNodeWithText("Missing email").assertIsDisplayed()
+        composeRule.onNodeWithText("Device setup").assertIsDisplayed()
+        composeRule.onNodeWithText("SMS permission missing").assertIsDisplayed()
         composeRule.onNodeWithText("Smart Approve").assertIsDisplayed()
+        composeRule.onNodeWithText("Dispatch").assertIsDisplayed()
+        composeRule.onNodeWithText("Needs approval").assertIsDisplayed()
         composeRule.onNodeWithText("Template fallback").assertIsDisplayed()
     }
 
@@ -263,6 +296,12 @@ class WishPreviewScreenInteractionTest {
     private fun clickScrollableTag(tag: String) {
         composeRule.onNodeWithTag(tag)
             .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+    }
+
+    private fun clickDisplayedTag(tag: String) {
+        composeRule.onNodeWithTag(tag)
             .assertIsDisplayed()
             .performClick()
     }

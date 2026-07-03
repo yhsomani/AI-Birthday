@@ -1,7 +1,8 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ContactEntity
 import com.example.domain.model.common.ContactId
+import com.example.domain.model.contact.ContactClassificationProfile
+import com.example.domain.model.contact.ContactClassificationPromptContext
 import com.example.domain.repository.ContactRepository
 import com.example.domain.service.AiService
 import com.example.domain.service.ContactClassificationResult
@@ -21,7 +22,7 @@ class ClassifyContactUseCaseTest {
 
     @Test
     fun `invoke with missing contact returns ContactNotFound`() = runTest {
-        coEvery { contactRepository.getById("c1") } returns null
+        coEvery { contactRepository.getClassificationProfile("c1") } returns null
 
         val result = useCase("c1")
 
@@ -30,12 +31,9 @@ class ClassifyContactUseCaseTest {
 
     @Test
     fun `invoke with already classified contact returns AlreadyClassified`() = runTest {
-        val contact = ContactEntity(
-            id = "c1",
-            name = "John Doe",
-            relationshipType = "FAMILY"
+        coEvery { contactRepository.getClassificationProfile("c1") } returns classificationProfile(
+            relationshipType = "FAMILY",
         )
-        coEvery { contactRepository.getById("c1") } returns contact
 
         val result = useCase("c1")
 
@@ -46,11 +44,6 @@ class ClassifyContactUseCaseTest {
 
     @Test
     fun `invoke with unclassified contact performs classification and saves result`() = runTest {
-        val contact = ContactEntity(
-            id = "c1",
-            name = "John Doe",
-            relationshipType = "UNKNOWN"
-        )
         val classificationResult = ContactClassificationResult(
             type = "friend",
             subtype = "CLOSE",
@@ -59,7 +52,7 @@ class ClassifyContactUseCaseTest {
             communicationStyle = "professional",
             confidence = 0.95
         )
-        coEvery { contactRepository.getById("c1") } returns contact
+        coEvery { contactRepository.getClassificationProfile("c1") } returns classificationProfile()
         coEvery { aiService.classifyContact(any()) } returns classificationResult
 
         val result = useCase("c1")
@@ -94,11 +87,6 @@ class ClassifyContactUseCaseTest {
 
     @Test
     fun `invoke defaults unsupported classification values before saving`() = runTest {
-        val contact = ContactEntity(
-            id = "c1",
-            name = "John Doe",
-            relationshipType = "UNKNOWN"
-        )
         val classificationResult = ContactClassificationResult(
             type = "not_a_relationship",
             subtype = null,
@@ -107,7 +95,7 @@ class ClassifyContactUseCaseTest {
             communicationStyle = "EXPRESSIVE",
             confidence = 0.4
         )
-        coEvery { contactRepository.getById("c1") } returns contact
+        coEvery { contactRepository.getClassificationProfile("c1") } returns classificationProfile()
         coEvery { aiService.classifyContact(any()) } returns classificationResult
 
         val result = useCase("c1")
@@ -126,5 +114,20 @@ class ClassifyContactUseCaseTest {
                 confidence = 0.4,
             )
         }
+    }
+
+    private fun classificationProfile(
+        id: String = "c1",
+        displayName: String = "John Doe",
+        relationshipType: String = "UNKNOWN",
+    ): ContactClassificationProfile {
+        return ContactClassificationProfile(
+            id = ContactId(id),
+            relationshipType = relationshipType,
+            promptContext = ContactClassificationPromptContext(
+                id = ContactId(id),
+                displayName = displayName,
+            ),
+        )
     }
 }

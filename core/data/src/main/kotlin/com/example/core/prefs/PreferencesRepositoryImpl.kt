@@ -50,8 +50,23 @@ class PreferencesRepositoryImpl @Inject constructor(
     override fun setChannelBlackout(channelsJson: String) = securePrefs.setChannelBlackout(channelsJson)
     override fun getChannelBlackout(): String = securePrefs.getChannelBlackout()
 
+    override fun setWhatsAppAutomationConsentGranted(granted: Boolean) =
+        securePrefs.setWhatsAppAutomationConsentGranted(granted)
+    override fun isWhatsAppAutomationConsentGranted(): Boolean =
+        securePrefs.isWhatsAppAutomationConsentGranted()
+
     override fun setBiometricLockEnabled(enabled: Boolean) = securePrefs.setBiometricLockEnabled(enabled)
     override fun isBiometricLockEnabled(): Boolean = securePrefs.isBiometricLockEnabled()
+
+    override fun setLegacyUnencryptedDbQuarantined(quarantined: Boolean) =
+        securePrefs.setLegacyUnencryptedDbQuarantined(quarantined)
+    override fun wasLegacyUnencryptedDbQuarantined(): Boolean =
+        securePrefs.wasLegacyUnencryptedDbQuarantined()
+
+    override fun setSecurePrefsRebuiltNoticePending(pending: Boolean) =
+        securePrefs.setSecurePrefsRebuiltNoticePending(pending)
+    override fun isSecurePrefsRebuiltNoticePending(): Boolean =
+        securePrefs.isSecurePrefsRebuiltNoticePending()
 
     override fun setBirthdayRemindersEnabled(enabled: Boolean) =
         securePrefs.setBirthdayRemindersEnabled(enabled)
@@ -70,6 +85,11 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     override fun setOnboardingComplete(complete: Boolean) = securePrefs.setOnboardingComplete(complete)
     override fun isOnboardingComplete(): Boolean = securePrefs.isOnboardingComplete()
+
+    override fun setLocalOnlyModeEnabled(enabled: Boolean) =
+        securePrefs.setLocalOnlyModeEnabled(enabled)
+    override fun isLocalOnlyModeEnabled(): Boolean =
+        securePrefs.isLocalOnlyModeEnabled()
 
     override fun setLastSyncError(error: String?) = securePrefs.setLastSyncError(error)
     override fun getLastSyncError(): String? = securePrefs.getLastSyncError()

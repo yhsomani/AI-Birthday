@@ -50,6 +50,7 @@ import com.example.core.ui.theme.RelateSpacing
 import com.example.ui.navigation.RelateNavGraph
 import com.example.ui.navigation.Screen
 import com.example.ui.navigation.bottomNavItems
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -81,6 +82,10 @@ class MainActivity : FragmentActivity() {
                                 if (permissionsToRequest.isNotEmpty()) {
                                     requestPermissionLauncher.launch(permissionsToRequest)
                                 }
+                            },
+                            isSignedIn = {
+                                securePrefs.isLocalOnlyModeEnabled() ||
+                                    FirebaseAuth.getInstance().currentUser != null
                             },
                         )
                     }
@@ -251,6 +256,7 @@ private fun BiometricLockGate(
 @Composable
 fun RelateApp(
     onRequestCorePermissions: () -> Unit = {},
+    isSignedIn: () -> Boolean = { FirebaseAuth.getInstance().currentUser != null },
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -315,6 +321,7 @@ fun RelateApp(
         RelateNavGraph(
             navController = navController,
             modifier = Modifier.padding(innerPadding),
+            isSignedIn = isSignedIn,
         )
     }
 

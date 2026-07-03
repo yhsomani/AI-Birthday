@@ -57,6 +57,12 @@ object RelateDeepLinks {
         const val pattern = uri
     }
 
+    object AutomationSetup {
+        const val HOST = "automation-setup"
+        const val uri = "$SCHEME://$HOST"
+        const val pattern = uri
+    }
+
     fun encodePathSegment(value: String): String {
         return URLEncoder.encode(value, StandardCharsets.UTF_8.name())
             .replace("+", "%20")

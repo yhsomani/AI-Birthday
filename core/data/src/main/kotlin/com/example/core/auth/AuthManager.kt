@@ -81,6 +81,7 @@ open class AuthManager @Inject constructor(
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         StructuredLogger.d(TAG, "Firebase Sign-In successful")
+                        securePrefs.setLocalOnlyModeEnabled(false)
                         updateProfileFromFirebaseUser()
                         onComplete(SignInResult(success = true))
                     } else {
@@ -115,7 +116,7 @@ open class AuthManager @Inject constructor(
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
             nm.cancelAll()
 
-            // Step 3: Wipe all 7 Room tables
+            // Step 3: Wipe all Room tables
             try {
                 database.clearAllTables()
             } catch (e: Exception) {
@@ -163,7 +164,15 @@ open class AuthManager @Inject constructor(
         _userProfile.value = UserProfile()
     }
 
-    open fun isSignedIn(): Boolean = auth.currentUser != null
+    open fun enableLocalOnlyMode() {
+        securePrefs.setOnboardingComplete(true)
+        securePrefs.setLocalOnlyModeEnabled(true)
+        _userProfile.value = UserProfile(displayName = "Local user")
+    }
+
+    open fun isLocalOnlyModeEnabled(): Boolean = securePrefs.isLocalOnlyModeEnabled()
+
+    open fun isSignedIn(): Boolean = auth.currentUser != null || isLocalOnlyModeEnabled()
 
     open fun getCurrentUser() = auth.currentUser
 

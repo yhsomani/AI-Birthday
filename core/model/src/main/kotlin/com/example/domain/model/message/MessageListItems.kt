@@ -21,6 +21,8 @@ data class PendingMessageListItem(
     val status: MessageStatus,
     val editedByUser: Boolean,
     val userEditedText: String?,
+    val qualityScore: Int = 0,
+    val isUsingFallback: Boolean = false,
 )
 
 data class SentMessageListItem(

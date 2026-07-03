@@ -70,6 +70,16 @@ class AuthViewModel @Inject constructor(
         launch(getSignInIntent())
     }
 
+    fun continueLocalOnly() {
+        authManager.enableLocalOnlyMode()
+        _uiState.value = _uiState.value.copy(
+            isLoading = false,
+            isSignedIn = true,
+            error = null,
+            userProfile = authManager.userProfile.value,
+        )
+    }
+
     fun handleResult(resultCode: Int, data: Intent?) {
         if (resultCode != Activity.RESULT_OK) {
             _uiState.value = _uiState.value.copy(error = context.getString(R.string.auth_error_cancelled))

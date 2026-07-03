@@ -1,6 +1,7 @@
 package com.example.core.automation.notifications
 
 import com.example.core.db.dao.PendingMessageDao
+import com.example.data.repository.toPendingMessageRecord
 import com.example.domain.message.toMessageDraft
 import com.example.domain.model.message.MessageDraft
 
@@ -15,5 +16,5 @@ internal suspend fun PendingMessageDao.getApprovalNotificationDraftByIdOrOccasio
     } else {
         null
     }
-    return pending?.toMessageDraft()
+    return pending?.toPendingMessageRecord()?.toMessageDraft()
 }

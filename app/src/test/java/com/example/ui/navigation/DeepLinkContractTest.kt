@@ -31,6 +31,7 @@ class DeepLinkContractTest {
             RelateDeepLinks.Wish.HOST,
             RelateDeepLinks.Settings.HOST,
             RelateDeepLinks.BackupRestore.HOST,
+            RelateDeepLinks.AutomationSetup.HOST,
         ).forEach { host ->
             assertTrue("AndroidManifest.xml must declare relateai://$host", relateHosts.contains(host))
         }
@@ -48,6 +49,7 @@ class DeepLinkContractTest {
             "RelateDeepLinks.Wish.pattern",
             "RelateDeepLinks.Settings.pattern",
             "RelateDeepLinks.BackupRestore.pattern",
+            "RelateDeepLinks.AutomationSetup.pattern",
         ).forEach { patternReference ->
             assertTrue("NavGraph must register $patternReference", source.contains("uriPattern = $patternReference"))
         }
@@ -86,6 +88,57 @@ class DeepLinkContractTest {
     }
 
     @Test
+    fun mainActivityKeepsDeepLinkedNavGraphBehindBiometricGate() {
+        val source = rootFile("app/src/main/java/com/example/MainActivity.kt").readText()
+        val setContentBlock = source
+            .substringAfter("setContent {")
+            .substringBefore("override fun onResume")
+
+        val unlockedBranch = Regex(
+            pattern = """BiometricGateState\.Unlocked\s*->\s*\{\s*RelateApp\(""",
+            option = RegexOption.DOT_MATCHES_ALL,
+        )
+        val lockedBranch = Regex(
+            pattern = """else\s*->\s*\{\s*BiometricLockGate\(""",
+            option = RegexOption.DOT_MATCHES_ALL,
+        )
+        val relateAppCalls = Regex("""\bRelateApp\(""").findAll(setContentBlock).count()
+
+        assertTrue(
+            "MainActivity must render RelateApp only after biometric state is unlocked",
+            unlockedBranch.containsMatchIn(setContentBlock),
+        )
+        assertTrue(
+            "MainActivity must render BiometricLockGate for locked/authenticating/error biometric states",
+            lockedBranch.containsMatchIn(setContentBlock),
+        )
+        assertEquals(
+            "MainActivity should not expose a second nav graph path outside the biometric gate",
+            1,
+            relateAppCalls,
+        )
+    }
+
+    @Test
+    fun appShellAllowsLocalOnlyModeThroughSignedInRouteGate() {
+        val mainActivitySource = rootFile("app/src/main/java/com/example/MainActivity.kt").readText()
+        val authManagerSource = rootFile("core/data/src/main/kotlin/com/example/core/auth/AuthManager.kt").readText()
+
+        assertTrue(
+            "MainActivity route gate must treat local-only mode as signed in",
+            mainActivitySource.contains("securePrefs.isLocalOnlyModeEnabled()"),
+        )
+        assertTrue(
+            "MainActivity route gate must still allow Firebase authenticated users",
+            mainActivitySource.contains("FirebaseAuth.getInstance().currentUser != null"),
+        )
+        assertTrue(
+            "AuthManager.isSignedIn must include local-only mode for splash/auth flows",
+            authManagerSource.contains("auth.currentUser != null || isLocalOnlyModeEnabled()"),
+        )
+    }
+
+    @Test
     fun contactDetailRouteCanOpenPreferencesFromInternalActions() {
         assertEquals(
             "contacts/contact_1?openPreferences=true",
@@ -105,6 +158,7 @@ class DeepLinkContractTest {
             "RelateDeepLinks.Wish.uri",
             "RelateDeepLinks.Contact.uri",
             "RelateDeepLinks.BackupRestore.uri",
+            "RelateDeepLinks.AutomationSetup.uri",
         ).forEach { builderReference ->
             assertTrue("NotificationHelper must use $builderReference", source.contains(builderReference))
         }

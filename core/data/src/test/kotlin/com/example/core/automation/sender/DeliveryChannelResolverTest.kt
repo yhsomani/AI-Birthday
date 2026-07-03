@@ -1,6 +1,8 @@
 package com.example.core.automation.sender
 
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.message.DeliveryRouteHistoryRecord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -93,6 +95,25 @@ class DeliveryChannelResolverTest {
         )
 
         assertEquals(listOf(MessageChannel.EMAIL), routes)
+    }
+
+    @Test
+    fun `resolveRoutes puts strongest successful history before preferred fallback order`() {
+        val routes = DeliveryChannelResolver.resolveRoutes(
+            preferredChannel = MessageChannel.SMS,
+            primaryPhone = "+15551234567",
+            primaryEmail = "alex@example.com",
+            senderEmail = "me@example.com",
+            senderEmailPassword = "app-password",
+            blockedChannels = emptySet(),
+            routeHistory = listOf(
+                DeliveryRouteHistoryRecord(MessageChannel.EMAIL, MessageDeliveryStatus.DELIVERED),
+                DeliveryRouteHistoryRecord(MessageChannel.EMAIL, MessageDeliveryStatus.SENT),
+                DeliveryRouteHistoryRecord(MessageChannel.WHATSAPP, MessageDeliveryStatus.SENT),
+            ),
+        )
+
+        assertEquals(listOf(MessageChannel.EMAIL, MessageChannel.SMS, MessageChannel.WHATSAPP), routes)
     }
 
     @Test

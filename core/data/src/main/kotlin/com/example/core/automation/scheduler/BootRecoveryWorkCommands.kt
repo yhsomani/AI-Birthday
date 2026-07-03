@@ -56,6 +56,10 @@ internal fun WorkManager.reconcileBootRecoveryRecurringWork(command: BootRecover
     if (getWorkInfosByTag(command.tag).get().any { it.state.isBootRecoveryRecurringWorkActive() }) {
         return
     }
+    enqueueRecurringAutomationWork(command)
+}
+
+internal fun WorkManager.enqueueRecurringAutomationWork(command: BootRecoveryRecurringWorkCommand) {
     enqueueUniquePeriodicWork(
         command.uniqueWorkName,
         ExistingPeriodicWorkPolicy.KEEP,

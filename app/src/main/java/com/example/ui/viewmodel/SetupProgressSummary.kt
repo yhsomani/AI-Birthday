@@ -1,17 +1,16 @@
 package com.example.ui.viewmodel
 
-data class SetupProgressSummary(
-    val completedSteps: Int = 0,
-    val totalSteps: Int = 0,
-    val actionRequiredCount: Int = 0,
-    val warningCount: Int = 0,
-) {
-    val progressFraction: Float
-        get() = if (totalSteps == 0) 0f else completedSteps.toFloat() / totalSteps.toFloat()
-}
+import com.example.domain.automation.SetupProgressSummary as DomainSetupProgressSummary
+import com.example.domain.automation.SetupReadinessGroup
+import com.example.domain.automation.SetupReadinessProgressPolicy
+import com.example.domain.automation.SetupReadinessStatus
+
+typealias ReadinessGroup = SetupReadinessGroup
+typealias ReadinessStatus = SetupReadinessStatus
+typealias SetupProgressSummary = DomainSetupProgressSummary
 
 internal fun List<ReadinessCheck>.toSetupProgressSummary(): SetupProgressSummary {
-    return statusesToSetupProgressSummary(map { it.status })
+    return SetupReadinessProgressPolicy.summarize(map { it.status })
 }
 
 internal fun buildHomeSetupProgressSummary(
@@ -21,32 +20,11 @@ internal fun buildHomeSetupProgressSummary(
     hasAiAccess: Boolean,
     pendingCount: Int,
 ): SetupProgressSummary {
-    return statusesToSetupProgressSummary(
-        listOf(
-            if (contactCount > 0 && syncError == null) {
-                ReadinessStatus.OK
-            } else {
-                ReadinessStatus.ACTION_REQUIRED
-            },
-            if (aiGenerationEnabled && hasAiAccess) {
-                ReadinessStatus.OK
-            } else {
-                ReadinessStatus.ACTION_REQUIRED
-            },
-            if (pendingCount == 0) {
-                ReadinessStatus.OK
-            } else {
-                ReadinessStatus.WARNING
-            },
-        )
-    )
-}
-
-private fun statusesToSetupProgressSummary(statuses: List<ReadinessStatus>): SetupProgressSummary {
-    return SetupProgressSummary(
-        completedSteps = statuses.count { it == ReadinessStatus.OK },
-        totalSteps = statuses.size,
-        actionRequiredCount = statuses.count { it == ReadinessStatus.ACTION_REQUIRED },
-        warningCount = statuses.count { it == ReadinessStatus.WARNING },
+    return SetupReadinessProgressPolicy.summarizeHome(
+        contactCount = contactCount,
+        syncError = syncError,
+        aiGenerationEnabled = aiGenerationEnabled,
+        hasAiAccess = hasAiAccess,
+        pendingCount = pendingCount,
     )
 }

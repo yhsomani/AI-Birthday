@@ -1,11 +1,16 @@
 package com.example.domain.usecase
 
-import com.example.core.db.entities.ContactEntity
-import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageStatus
 import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.MessageDraftId
+import com.example.domain.model.contact.ContactDeliveryRouteProfile
+import com.example.domain.model.contact.ContactHeader
+import com.example.domain.model.contact.ContactMessageGenerationProfile
+import com.example.domain.model.contact.ContactMessagePromptContext
 import com.example.domain.model.message.MessageGenerationHistory
+import com.example.domain.model.message.PendingMessageRecord
 import com.example.domain.model.common.OccasionId
 import com.example.domain.model.occasion.Occasion
 import com.example.domain.model.occasion.OccasionDate
@@ -60,10 +65,10 @@ class RegeneratePendingMessageUseCaseTest {
         channel: String = MessageChannel.SMS.raw,
         editedByUser: Boolean = false,
         userEditedText: String? = null,
-    ) = PendingMessageEntity(
-        id = "pm_1",
-        contactId = "c_1",
-        eventId = "e_1",
+    ) = PendingMessageRecord(
+        id = MessageDraftId("pm_1"),
+        contactId = ContactId("c_1"),
+        occasionId = OccasionId("e_1"),
         shortVariant = "old short",
         standardVariant = "old standard",
         longVariant = "old long",
@@ -72,10 +77,10 @@ class RegeneratePendingMessageUseCaseTest {
         emotionalVariant = "old emotional",
         selectedVariant = "standard",
         selectedVariantText = "old standard",
-        channel = channel,
+        channel = MessageChannel.fromRaw(channel),
         scheduledForMs = 1_700_000_000_000L,
-        approvalMode = approvalMode,
-        status = status,
+        approvalMode = ApprovalMode.fromRaw(approvalMode),
+        status = MessageStatus.fromRaw(status),
         editedByUser = editedByUser,
         userEditedText = userEditedText,
         qualityScore = 100,
@@ -128,7 +133,7 @@ class RegeneratePendingMessageUseCaseTest {
     @Test
     fun `invoke regenerates variants and saves same pending message`() = runTest {
         val pending = pending()
-        val contact = ContactEntity(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
+        val contact = generationContact(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
         val event = occasion(
             id = "e_1",
             contactId = "c_1",
@@ -148,7 +153,7 @@ class RegeneratePendingMessageUseCaseTest {
             recommended = "emotional",
             isUsingFallback = true,
         )
-        val saved = slot<PendingMessageEntity>()
+        val saved = slot<PendingMessageRecord>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
         every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.SMART_APPROVE
@@ -156,7 +161,7 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
-        coEvery { contactRepository.getById("c_1") } returns contact
+        coEvery { contactRepository.getMessageGenerationProfile("c_1") } returns contact
         coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
@@ -173,10 +178,10 @@ class RegeneratePendingMessageUseCaseTest {
         assertEquals("pm_1", result.pendingId)
         assertTrue(result.usedFallback)
         coVerify { messageRepository.insertPending(capture(saved)) }
-        assertEquals("pm_1", saved.captured.id)
+        assertEquals("pm_1", saved.captured.id.value)
         assertEquals("fresh emotional", saved.captured.selectedVariantText)
-        assertEquals("ALWAYS_ASK", saved.captured.approvalMode)
-        assertEquals("PENDING", saved.captured.status)
+        assertEquals(ApprovalMode.ALWAYS_ASK, saved.captured.approvalMode)
+        assertEquals(MessageStatus.PENDING, saved.captured.status)
         assertEquals(35, saved.captured.qualityScore)
         assertEquals(false, saved.captured.editedByUser)
         assertEquals(null, saved.captured.userEditedText)
@@ -186,7 +191,7 @@ class RegeneratePendingMessageUseCaseTest {
     @Test
     fun `invoke forwards feedback instruction to AI regeneration`() = runTest {
         val pending = pending()
-        val contact = ContactEntity(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
+        val contact = generationContact(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
         val event = occasion(
             id = "e_1",
             contactId = "c_1",
@@ -213,7 +218,7 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
-        coEvery { contactRepository.getById("c_1") } returns contact
+        coEvery { contactRepository.getMessageGenerationProfile("c_1") } returns contact
         coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
@@ -231,9 +236,9 @@ class RegeneratePendingMessageUseCaseTest {
     }
 
     @Test
-    fun `invoke schedules fully auto fallback regeneration when route is available`() = runTest {
+    fun `invoke schedules fully auto high quality regeneration when route is available`() = runTest {
         val pending = pending(approvalMode = "FULLY_AUTO", status = "APPROVED")
-        val contact = ContactEntity(
+        val contact = generationContact(
             id = "c_1",
             name = "Riya",
             primaryPhone = "+15551234567",
@@ -249,16 +254,16 @@ class RegeneratePendingMessageUseCaseTest {
             nextOccurrenceMs = 1_700_000_000_000L,
         )
         val variants = MessageVariantsResult(
-            short = "Wishing you a very happy birthday! Hope you have a wonderful day!",
-            standard = "Wishing you a very happy birthday! Hope you have a wonderful day!",
-            long = "Wishing you a very happy birthday! Hope you have a wonderful day!",
-            formal = "Wishing you a very happy birthday! Hope you have a wonderful day!",
-            funny = "Wishing you a very happy birthday! Hope you have a wonderful day!",
-            emotional = "Wishing you a very happy birthday! Hope you have a wonderful day!",
+            short = "Happy birthday Riya, may pottery class and Jaipur plans make today feel special.",
+            standard = "Happy birthday Riya, may pottery class and Jaipur plans make today feel special.",
+            long = "Happy birthday Riya, may pottery class and Jaipur plans make today feel special.",
+            formal = "Happy birthday Riya, may pottery class and Jaipur plans make today feel special.",
+            funny = "Happy birthday Riya, may pottery class and Jaipur plans make today feel special.",
+            emotional = "Happy birthday Riya, may pottery class and Jaipur plans make today feel special.",
             recommended = "standard",
-            isUsingFallback = true,
+            isUsingFallback = false,
         )
-        val saved = slot<PendingMessageEntity>()
+        val saved = slot<PendingMessageRecord>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
         every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.FULLY_AUTO
@@ -266,7 +271,7 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
-        coEvery { contactRepository.getById("c_1") } returns contact
+        coEvery { contactRepository.getMessageGenerationProfile("c_1") } returns contact
         coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
@@ -279,17 +284,17 @@ class RegeneratePendingMessageUseCaseTest {
         useCase("pm_1", "current draft")
 
         coVerify { messageRepository.insertPending(capture(saved)) }
-        assertEquals("FULLY_AUTO", saved.captured.approvalMode)
-        assertEquals("APPROVED", saved.captured.status)
-        assertEquals(35, saved.captured.qualityScore)
-        assertTrue(saved.captured.isUsingFallback)
+        assertEquals(ApprovalMode.FULLY_AUTO, saved.captured.approvalMode)
+        assertEquals(MessageStatus.APPROVED, saved.captured.status)
+        assertEquals(100, saved.captured.qualityScore)
+        assertEquals(false, saved.captured.isUsingFallback)
         verify { schedulerService.scheduleExactSend("pm_1") }
     }
 
     @Test
     fun `invoke forces review and skips scheduling when regenerated draft has no route`() = runTest {
         val pending = pending(approvalMode = "FULLY_AUTO", status = "APPROVED")
-        val contact = ContactEntity(
+        val contact = generationContact(
             id = "c_1",
             name = "Riya",
             automationMode = "FULLY_AUTO",
@@ -314,7 +319,7 @@ class RegeneratePendingMessageUseCaseTest {
             recommended = "standard",
             isUsingFallback = false,
         )
-        val saved = slot<PendingMessageEntity>()
+        val saved = slot<PendingMessageRecord>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
         every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.FULLY_AUTO
@@ -322,7 +327,7 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
-        coEvery { contactRepository.getById("c_1") } returns contact
+        coEvery { contactRepository.getMessageGenerationProfile("c_1") } returns contact
         coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
@@ -335,16 +340,16 @@ class RegeneratePendingMessageUseCaseTest {
         useCase("pm_1", "current draft")
 
         coVerify { messageRepository.insertPending(capture(saved)) }
-        assertEquals("ALWAYS_ASK", saved.captured.approvalMode)
-        assertEquals("PENDING", saved.captured.status)
-        assertEquals(MessageChannel.SMS.raw, saved.captured.channel)
+        assertEquals(ApprovalMode.ALWAYS_ASK, saved.captured.approvalMode)
+        assertEquals(MessageStatus.PENDING, saved.captured.status)
+        assertEquals(MessageChannel.SMS, saved.captured.channel)
         verify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
     }
 
     @Test
     fun `invoke clears stale user edited text by default`() = runTest {
         val pending = pending(editedByUser = true, userEditedText = "stale edited draft")
-        val contact = ContactEntity(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
+        val contact = generationContact(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
         val event = occasion(
             id = "e_1",
             contactId = "c_1",
@@ -364,7 +369,7 @@ class RegeneratePendingMessageUseCaseTest {
             recommended = "standard",
             isUsingFallback = false,
         )
-        val saved = slot<PendingMessageEntity>()
+        val saved = slot<PendingMessageRecord>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
         every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.SMART_APPROVE
@@ -372,7 +377,7 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
-        coEvery { contactRepository.getById("c_1") } returns contact
+        coEvery { contactRepository.getMessageGenerationProfile("c_1") } returns contact
         coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
@@ -396,7 +401,7 @@ class RegeneratePendingMessageUseCaseTest {
     @Test
     fun `invoke preserves user edited text only when explicitly requested`() = runTest {
         val pending = pending(editedByUser = true, userEditedText = "keep this edit")
-        val contact = ContactEntity(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
+        val contact = generationContact(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
         val event = occasion(
             id = "e_1",
             contactId = "c_1",
@@ -416,7 +421,7 @@ class RegeneratePendingMessageUseCaseTest {
             recommended = "standard",
             isUsingFallback = false,
         )
-        val saved = slot<PendingMessageEntity>()
+        val saved = slot<PendingMessageRecord>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
         every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.SMART_APPROVE
@@ -424,7 +429,7 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
-        coEvery { contactRepository.getById("c_1") } returns contact
+        coEvery { contactRepository.getMessageGenerationProfile("c_1") } returns contact
         coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
@@ -445,7 +450,7 @@ class RegeneratePendingMessageUseCaseTest {
     @Test
     fun `invoke preserves approved status only when explicitly requested`() = runTest {
         val pending = pending(approvalMode = "SMART_APPROVE", status = "APPROVED")
-        val contact = ContactEntity(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
+        val contact = generationContact(id = "c_1", name = "Riya", primaryPhone = "+15551234567")
         val event = occasion(
             id = "e_1",
             contactId = "c_1",
@@ -465,7 +470,7 @@ class RegeneratePendingMessageUseCaseTest {
             recommended = "standard",
             isUsingFallback = false,
         )
-        val saved = slot<PendingMessageEntity>()
+        val saved = slot<PendingMessageRecord>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
         every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.SMART_APPROVE
@@ -473,7 +478,7 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
-        coEvery { contactRepository.getById("c_1") } returns contact
+        coEvery { contactRepository.getMessageGenerationProfile("c_1") } returns contact
         coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
@@ -486,14 +491,14 @@ class RegeneratePendingMessageUseCaseTest {
         useCase("pm_1", "approved draft", preserveApprovedStatus = true)
 
         coVerify { messageRepository.insertPending(capture(saved)) }
-        assertEquals("APPROVED", saved.captured.status)
+        assertEquals(MessageStatus.APPROVED, saved.captured.status)
         verify { schedulerService.scheduleExactSend("pm_1") }
     }
 
     @Test
     fun `invoke sends fallback fully auto regeneration back to review`() = runTest {
         val pending = pending(approvalMode = "FULLY_AUTO", status = "APPROVED")
-        val contact = ContactEntity(
+        val contact = generationContact(
             id = "c_1",
             name = "Riya",
             primaryPhone = "+15551234567",
@@ -518,7 +523,7 @@ class RegeneratePendingMessageUseCaseTest {
             recommended = "standard",
             isUsingFallback = true,
         )
-        val saved = slot<PendingMessageEntity>()
+        val saved = slot<PendingMessageRecord>()
 
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
         every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.FULLY_AUTO
@@ -526,7 +531,7 @@ class RegeneratePendingMessageUseCaseTest {
         every { preferencesRepository.getSenderEmail() } returns ""
         every { preferencesRepository.getSenderEmailPassword() } returns ""
         coEvery { messageRepository.getPendingById("pm_1") } returns pending
-        coEvery { contactRepository.getById("c_1") } returns contact
+        coEvery { contactRepository.getMessageGenerationProfile("c_1") } returns contact
         coEvery { eventRepository.getOccasionById("e_1") } returns event
         coEvery { styleProfileRepository.getProfileOnce() } returns null
         coEvery { messageRepository.getGenerationHistoryByContact("c_1", 10) } returns MessageGenerationHistory()
@@ -539,9 +544,45 @@ class RegeneratePendingMessageUseCaseTest {
         useCase("pm_1", "approved draft", preserveApprovedStatus = true)
 
         coVerify { messageRepository.insertPending(capture(saved)) }
-        assertEquals("ALWAYS_ASK", saved.captured.approvalMode)
-        assertEquals("PENDING", saved.captured.status)
+        assertEquals(ApprovalMode.ALWAYS_ASK, saved.captured.approvalMode)
+        assertEquals(MessageStatus.PENDING, saved.captured.status)
         assertEquals(35, saved.captured.qualityScore)
         verify(exactly = 0) { schedulerService.scheduleExactSend(any()) }
+    }
+
+    private fun generationContact(
+        id: String,
+        name: String,
+        relationshipType: String = "UNKNOWN",
+        primaryPhone: String? = null,
+        primaryEmail: String? = null,
+        preferredChannel: String = MessageChannel.SMS.raw,
+        automationMode: String = ApprovalMode.DEFAULT.raw,
+        skipAutoWish: Boolean = false,
+    ): ContactMessageGenerationProfile {
+        val contactId = ContactId(id)
+        return ContactMessageGenerationProfile(
+            id = contactId,
+            relationshipType = relationshipType,
+            automationMode = ApprovalMode.fromRaw(automationMode),
+            skipAutoWish = skipAutoWish,
+            deliveryRouteProfile = ContactDeliveryRouteProfile(
+                preferredChannel = MessageChannel.fromRaw(preferredChannel),
+                hasPrimaryPhone = !primaryPhone.isNullOrBlank(),
+                hasPrimaryEmail = primaryEmail?.contains("@") == true,
+            ),
+            promptContext = ContactMessagePromptContext(
+                id = contactId,
+                displayName = name,
+                relationshipType = relationshipType,
+                preferredChannel = preferredChannel,
+            ),
+            header = ContactHeader(
+                id = contactId,
+                displayName = name,
+            ),
+            customSendTimeHour = null,
+            customSendTimeMinute = null,
+        )
     }
 }

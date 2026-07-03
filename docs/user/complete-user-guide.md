@@ -1,6 +1,6 @@
 # RelateAI Complete User Guide
 
-Last updated: 2026-06-30
+Last updated: 2026-07-03
 
 RelateAI is a local-first Android relationship assistant. It helps you import contacts, discover birthdays and other important moments, add relationship context, generate personalized wishes, review or approve drafts, schedule delivery, and send through SMS, WhatsApp, or Gmail depending on your setup.
 
@@ -16,7 +16,7 @@ This guide is written for three situations:
 2. You are testing a local build from this repository.
 3. You want to automate relationship reminders and messages while understanding every blocker, permission, and fallback.
 
-RelateAI has no demo-user, guest-user, or fake-data path. The real workflow starts with Google sign-in, real contact import or manual contact/event creation, and explicit setup for any external service.
+RelateAI has no demo-user or fake-data path. The real workflow starts with either Google sign-in for Google Contacts sync or local-only mode for manual contacts and events, followed by explicit setup for any external service.
 
 ### Choose Your Path
 
@@ -92,7 +92,7 @@ RelateAI supports these major workflows:
 
 | Feature area | Variations supported |
 | --- | --- |
-| Account | Google sign-in only. No alternate login, guest mode, developer bypass, or fake account. |
+| Account | Google sign-in for Google sync, or local-only mode for manual on-device contacts and events. No demo login, developer bypass, or fake account. |
 | Contact source | Google People contacts, Android device contacts, and manual contact creation through event flows. |
 | Event type | Birthday, anniversary, work anniversary, graduation, holiday, revival, follow-up, custom. |
 | Event origin | Imported, manual, calendar, AI inferred, merged, conflict, or unknown source. |
@@ -126,7 +126,7 @@ Treat Contacts, Events, Messages, and AI Doctor as the source-of-truth surfaces.
 You need:
 
 1. An Android device running Android API 24 or newer.
-2. A Google account. Google sign-in is the only supported app login.
+2. A Google account if you want Google sign-in, Google Contacts sync, or Firebase-backed provider access. Local-only mode can be used for manual on-device contacts and events.
 3. Device contacts permission if you want to import contacts stored on the phone.
 4. Notification permission if you want reminders and approval prompts.
 5. SMS permission if you want RelateAI to send approved SMS messages.
@@ -147,7 +147,7 @@ Choose the path that matches how you received the app.
 1. Install RelateAI on an Android device.
 2. Open the app.
 3. Continue through onboarding.
-4. Sign in with Google.
+4. Sign in with Google, or choose local-only mode if you want to start with manual on-device contacts and events.
 5. Complete the setup checklist in this guide.
 
 #### Option B: Android Studio local build
@@ -156,12 +156,12 @@ Use this when testing from the repository.
 
 1. Install JDK 21 and an Android SDK that supports compile SDK 37.
 2. Open the repository root in Android Studio.
-3. Add the correct Firebase `google-services.json` file for the checked-in application id.
+3. Use the approved tracked Firebase `google-services.json` file for the checked-in application id, or replace it only for a deliberate local Firebase project switch.
 4. Let Gradle sync.
 5. Select the `app` run configuration.
 6. Run on an emulator or physical device.
 
-Repository debug builds use the checked-in application id, so Firebase OAuth clients and SHA-1 fingerprints must match `com.aistudio.relateai.qxtjrk` and the signing key used for the build. If a future local variant reintroduces an application-id suffix, that variant needs its own matching Firebase OAuth client and `google-services.json`.
+Repository debug builds use the checked-in application id, so Firebase OAuth clients and SHA-1 fingerprints must match `com.aistudio.relateai.qxtjrk` and the signing key used for the build. If a future local variant reintroduces an application-id suffix, that variant needs its own matching Firebase OAuth client and `google-services.json`, and local variants must not be committed unless they are added to the approved provider-config policy.
 
 #### Option C: Command-line debug build
 
@@ -221,24 +221,25 @@ When you open the app for the first time, the onboarding flow explains the main 
 
 You can continue through onboarding or open the setup checklist from onboarding.
 
-### Step 2: Sign in with Google
+### Step 2: Choose Google Sign-In or Local-Only Mode
 
-RelateAI uses one real app login path:
+RelateAI supports two real first-run paths:
 
-1. Tap Sign in with Google.
+1. Tap Sign in with Google when you want Google account access and Google Contacts sync.
 2. Choose the Google account you want RelateAI to use.
 3. Grant the requested account and Google Contacts access when prompted.
 4. Wait for Firebase/Google sign-in to complete.
+5. Choose Start with local contacts or Continue without Google when you want manual on-device contacts and events without Google sync.
 
-There is no alternate login, demo login, or fake local account path. If Google sign-in fails, fix the configuration, network, or Firebase issue rather than bypassing authentication.
+Local-only mode is not a demo account. Manual contacts and events stay on the device; Google Contacts sync still requires Google sign-in. If Google sign-in fails and you need Google sync, fix the configuration, network, or Firebase issue rather than treating local-only mode as a Google replacement.
 
 ### Step 3: Import contacts
 
 From Home, Settings, AI Doctor, or Contacts:
 
 1. Tap Sync Contacts.
-2. Grant Android contacts permission when Android asks. Google Contacts sync can still use the signed-in Google Contacts scope or cached People API token.
-3. Let RelateAI import Google contacts and/or device contacts.
+2. Grant Android contacts permission when Android asks. Google Contacts sync requires the signed-in Google Contacts scope or cached People API token.
+3. Let RelateAI import Google contacts and/or device contacts. In local-only mode, Google fetches are skipped and device/manual contacts remain usable.
 4. Review the Contacts list for missing relationship labels, missing channels, low health, VIPs, and contacts needing more context.
 
 RelateAI uses contacts to discover events, personalize wishes, calculate relationship health, and determine delivery routes.
@@ -360,7 +361,7 @@ Expected result:
 
 Use AI setup when you want generated drafts, style analysis, classification, or gift suggestions.
 
-1. Sign in with Google.
+1. Sign in with Google for account-backed Gemini access, or add a Gemini API key when using local-only mode or a build that requires keys.
 2. Turn on AI Wish Generation in Settings.
 3. Add a Gemini API key if this build requires one.
 4. Open AI Doctor.
@@ -502,7 +503,7 @@ Use this map when a user asks, "What do I do next?"
 
 | Phase | Goal | Action | Success signal |
 | --- | --- | --- | --- |
-| 1. Access | Establish the real user identity. | Finish onboarding and sign in with Google. | Home opens without guest/demo mode. |
+| 1. Access | Establish a real operating mode. | Finish onboarding and choose Google sign-in or local-only mode. | Home opens without demo/fake data. |
 | 2. Data | Bring in real people and events. | Sync contacts or create manual contacts/events. | Contacts and Events show real records. |
 | 3. Readiness | Remove blockers before automation. | Run AI Doctor and fix the top recommended issue. | Required checks are clear or explicitly understood. |
 | 4. Personalization | Improve draft quality. | Add relationship type, channel, memories, topics to avoid, gifts, and style samples. | Contact quality and Why this draft signals become specific. |
@@ -517,8 +518,8 @@ RelateAI can be useful before every integration is configured. Use this table to
 
 | Workflow | Required setup | Optional setup | What will not work yet |
 | --- | --- | --- | --- |
-| Manual reminders only | Google sign-in, contacts or manual events, notifications. | Gemini, delivery channels, Style Coach, backup. | AI generation and automatic sends. |
-| AI drafts only | Google sign-in, contact/event data, AI Wish Generation, Gemini access. | Style Coach, delivery channels, exact alarms. | Scheduled channel delivery unless a channel is configured. |
+| Manual reminders only | Local-only mode or Google sign-in, contacts or manual events, notifications. | Gemini, delivery channels, Style Coach, backup. | AI generation and automatic sends. |
+| AI drafts only | Local-only mode or Google sign-in, contact/event data, AI Wish Generation, Gemini access/API key. | Style Coach, delivery channels, exact alarms. | Scheduled channel delivery unless a channel is configured. |
 | Review-first sending | Contact/event data, one delivery channel, notifications, Always Ask or VIP Approve. | Style Coach, exact alarms, backup. | Hands-off sending without approval. |
 | Smart Approve | Contact/event data, one delivery channel, notifications, Smart Approve, AI Doctor checks. | Contact-level VIP overrides, exact alarms, Style Coach. | Strict manual approval for contacts left on Smart Approve. |
 | Fully Auto SMS | Contact/event data, phone numbers, SMS permission, Fully Auto, no SMS blackout, AI Doctor clear for SMS. | WhatsApp, Gmail, Style Coach. | WhatsApp and Email fallback unless configured. |
@@ -750,7 +751,7 @@ RelateAI dispatches only after checks pass.
 
 Use this path when the goal is to let RelateAI generate, approve, schedule, and send every eligible message with the least manual work.
 
-1. Sign in with Google.
+1. Choose Google sign-in or local-only mode.
 2. Sync contacts or create manual contacts and events.
 3. Add at least one valid route for each automated contact: phone for SMS or WhatsApp, or email plus Gmail sender setup for Email.
 4. Open Settings and confirm Automation Mode is Fully Auto.
@@ -1323,7 +1324,7 @@ External services are explicit:
 
 | Service | Used for |
 | --- | --- |
-| Google/Firebase auth | Sign-in and authenticated access. |
+| Google/Firebase auth | Google sign-in, authenticated access, and Google-backed integrations. |
 | Google People API | Google Contacts sync. |
 | Gemini | AI generation, classification, style analysis, and suggestions. |
 | Gmail SMTP | Email delivery and test email. |
@@ -1570,8 +1571,8 @@ Use this compact runbook when you want one complete workflow without leaving loo
 ### Setup checklist
 
 1. Finish onboarding.
-2. Sign in with Google.
-3. Sync contacts.
+2. Sign in with Google if you need Google Contacts sync, or continue in local-only mode for manual/device contacts.
+3. Sync contacts or create manual contacts/events.
 4. Review Events.
 5. Add Gemini access.
 6. Configure SMS, WhatsApp, or Email.

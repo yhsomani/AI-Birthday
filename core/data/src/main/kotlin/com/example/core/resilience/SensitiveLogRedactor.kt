@@ -1,6 +1,24 @@
 package com.example.core.resilience
 
 object SensitiveLogRedactor {
+    private const val REDACTED_MESSAGE_BODY = "[REDACTED_MESSAGE_BODY]"
+
+    private val messageBodyKeys = setOf(
+        "messagetext",
+        "messagebody",
+        "drafttext",
+        "selectedvarianttext",
+        "recommendedvarianttext",
+        "recommendedtext",
+        "shortvariant",
+        "standardvariant",
+        "longvariant",
+        "formalvariant",
+        "funnyvariant",
+        "emotionalvariant",
+        "usereditedtext",
+        "payload",
+    )
     private val emailPattern = Regex(
         pattern = "[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}",
         option = RegexOption.IGNORE_CASE,
@@ -23,6 +41,9 @@ object SensitiveLogRedactor {
     private val peopleApiConnectionsUrlPattern = Regex(
         pattern = "https://people\\.googleapis\\.com/v1/people/me/connections\\?[^\\s]+",
     )
+    private val messageBodyAssignmentPattern = Regex(
+        pattern = "(?i)([\"']?(?:messageText|messageBody|draftText|selectedVariantText|recommendedVariantText|recommendedText|shortVariant|standardVariant|longVariant|formalVariant|funnyVariant|emotionalVariant|userEditedText|payload)[\"']?\\s*[:=]\\s*)(\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'|[^,\\s}\\]]+)",
+    )
 
     fun redact(message: String): String {
         return message
@@ -34,11 +55,27 @@ object SensitiveLogRedactor {
             .replace(secretAssignmentPattern) { match ->
                 "${match.groupValues[1]}=[REDACTED]"
             }
+            .replace(messageBodyAssignmentPattern) { match ->
+                "${match.groupValues[1]}$REDACTED_MESSAGE_BODY"
+            }
             .replace(sensitiveQueryParamPattern) { match ->
                 "${match.groupValues[1]}[REDACTED]"
             }
             .replace(phonePattern, "[REDACTED_PHONE]")
             .replace(emailPattern, "[REDACTED_EMAIL]")
+    }
+
+    fun redactValue(key: String, value: String): String {
+        return if (key.isMessageBodyKey()) {
+            REDACTED_MESSAGE_BODY
+        } else {
+            redact(value)
+        }
+    }
+
+    private fun String.isMessageBodyKey(): Boolean {
+        val normalized = filter { it.isLetterOrDigit() }.lowercase()
+        return normalized in messageBodyKeys
     }
 
     fun googleContactsHttpErrorSummary(statusCode: Int): String {

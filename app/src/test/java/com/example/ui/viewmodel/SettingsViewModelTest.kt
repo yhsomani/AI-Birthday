@@ -3,10 +3,9 @@ package com.example.ui.viewmodel
 import com.example.R
 import com.example.core.auth.AuthManager
 import com.example.core.auth.UserProfile
-import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
-import com.example.domain.repository.ContactRepository
+import com.example.domain.service.PreferencesRepository
 import com.example.domain.usecase.EnableFullAutomationUseCase
 import com.example.domain.usecase.SyncContactsUseCase
 import com.example.ui.feedback.FeedbackType
@@ -37,13 +36,10 @@ class SettingsViewModelTest {
     private lateinit var syncContactsUseCase: SyncContactsUseCase
 
     @RelaxedMockK
-    private lateinit var contactRepository: ContactRepository
-
-    @RelaxedMockK
     private lateinit var authManager: AuthManager
 
     @RelaxedMockK
-    private lateinit var securePrefs: SecurePrefs
+    private lateinit var preferencesRepository: PreferencesRepository
 
     @RelaxedMockK
     private lateinit var enableFullAutomationUseCase: EnableFullAutomationUseCase
@@ -57,20 +53,20 @@ class SettingsViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         every { authManager.userProfile } returns userProfileFlow
-        every { securePrefs.observeChanges() } returns preferenceChanges
-        every { securePrefs.isBirthdayRemindersEnabled() } returns true
-        every { securePrefs.isAiWishGenerationEnabled() } returns true
-        every { securePrefs.getGeminiApiKey() } returns ""
-        every { securePrefs.getSenderEmail() } returns ""
-        every { securePrefs.getSenderEmailPassword() } returns ""
-        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.FULLY_AUTO
-        every { securePrefs.getQuietHoursStart() } returns 22
-        every { securePrefs.getQuietHoursEnd() } returns 8
-        every { securePrefs.getChannelBlackout() } returns "[]"
-        every { securePrefs.isBiometricLockEnabled() } returns false
-        every { securePrefs.wasLegacyUnencryptedDbQuarantined() } returns false
-        every { securePrefs.isSecurePrefsRebuiltNoticePending() } returns false
-        every { securePrefs.getLastBackupMs() } returns 0L
+        every { preferencesRepository.observeChanges() } returns preferenceChanges
+        every { preferencesRepository.isBirthdayRemindersEnabled() } returns true
+        every { preferencesRepository.isAiWishGenerationEnabled() } returns true
+        every { preferencesRepository.getGeminiApiKey() } returns ""
+        every { preferencesRepository.getSenderEmail() } returns ""
+        every { preferencesRepository.getSenderEmailPassword() } returns ""
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.FULLY_AUTO
+        every { preferencesRepository.getQuietHoursStart() } returns 22
+        every { preferencesRepository.getQuietHoursEnd() } returns 8
+        every { preferencesRepository.getChannelBlackout() } returns "[]"
+        every { preferencesRepository.isBiometricLockEnabled() } returns false
+        every { preferencesRepository.wasLegacyUnencryptedDbQuarantined() } returns false
+        every { preferencesRepository.isSecurePrefsRebuiltNoticePending() } returns false
+        every { preferencesRepository.getLastBackupMs() } returns 0L
         every { context.getString(R.string.settings_last_sync_never) } returns "Never"
         every { context.getString(R.string.settings_last_sync_just_now) } returns "Just now"
         every { context.getString(R.string.settings_last_backup_today) } returns "Today"
@@ -92,9 +88,8 @@ class SettingsViewModelTest {
     private fun newViewModel() = SettingsViewModel(
         context,
         syncContactsUseCase,
-        contactRepository,
         authManager,
-        securePrefs,
+        preferencesRepository,
         enableFullAutomationUseCase,
     )
 
@@ -109,11 +104,11 @@ class SettingsViewModelTest {
 
         viewModel.toggleBirthdayReminders(false)
         assertFalse(viewModel.uiState.value.birthdayReminders)
-        verify { securePrefs.setBirthdayRemindersEnabled(false) }
+        verify { preferencesRepository.setBirthdayRemindersEnabled(false) }
 
         viewModel.toggleBirthdayReminders(true)
         assertTrue(viewModel.uiState.value.birthdayReminders)
-        verify { securePrefs.setBirthdayRemindersEnabled(true) }
+        verify { preferencesRepository.setBirthdayRemindersEnabled(true) }
     }
 
     @Test
@@ -122,12 +117,12 @@ class SettingsViewModelTest {
 
         viewModel.toggleAiWishGeneration(false)
         assertFalse(viewModel.uiState.value.aiWishGeneration)
-        verify { securePrefs.setAiWishGenerationEnabled(false) }
+        verify { preferencesRepository.setAiWishGenerationEnabled(false) }
     }
 
     @Test
     fun `init reads typed global automation mode from secure prefs`() = runTest(testDispatcher) {
-        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.VIP_APPROVE
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.VIP_APPROVE
 
         val viewModel = newViewModel()
 
@@ -136,7 +131,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `init uses secure prefs fallback global automation mode`() = runTest(testDispatcher) {
-        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.FULLY_AUTO
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.FULLY_AUTO
 
         val viewModel = newViewModel()
 
@@ -150,7 +145,7 @@ class SettingsViewModelTest {
         viewModel.setAutomationMode(ApprovalMode.ALWAYS_ASK)
 
         assertEquals(ApprovalMode.ALWAYS_ASK, viewModel.uiState.value.automationMode)
-        verify { securePrefs.setGlobalApprovalMode(ApprovalMode.ALWAYS_ASK) }
+        verify { preferencesRepository.setGlobalAutomationMode(ApprovalMode.ALWAYS_ASK) }
     }
 
     @Test
@@ -172,12 +167,12 @@ class SettingsViewModelTest {
         assertEquals(listOf(3, 2, 1, 1), message.args)
         assertEquals(FeedbackType.INFO, viewModel.uiState.value.feedbackEvent?.type)
         coVerify { enableFullAutomationUseCase() }
-        verify(exactly = 0) { securePrefs.setGlobalApprovalMode(ApprovalMode.FULLY_AUTO) }
+        verify(exactly = 0) { preferencesRepository.setGlobalAutomationMode(ApprovalMode.FULLY_AUTO) }
     }
 
     @Test
     fun `setAutomationMode full auto reports localized failure feedback`() = runTest(testDispatcher) {
-        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.VIP_APPROVE
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.VIP_APPROVE
         coEvery { enableFullAutomationUseCase() } throws IllegalStateException("Review setup and try again.")
         val viewModel = newViewModel()
 
@@ -190,12 +185,12 @@ class SettingsViewModelTest {
         assertEquals(R.string.settings_full_automation_failed_with_reason, message.resId)
         assertEquals(listOf("Review setup and try again."), message.args)
         assertEquals(FeedbackType.ERROR, viewModel.uiState.value.feedbackEvent?.type)
-        verify(exactly = 0) { securePrefs.setGlobalApprovalMode(ApprovalMode.FULLY_AUTO) }
+        verify(exactly = 0) { preferencesRepository.setGlobalAutomationMode(ApprovalMode.FULLY_AUTO) }
     }
 
     @Test
     fun `init maps channel blackout storage to typed settings state`() = runTest(testDispatcher) {
-        every { securePrefs.getChannelBlackout() } returns
+        every { preferencesRepository.getChannelBlackout() } returns
             """["${MessageChannel.SMS.raw.lowercase()}","LEGACY_CHANNEL","${MessageChannel.EMAIL.raw}"]"""
 
         val viewModel = newViewModel()
@@ -207,7 +202,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `toggleChannelBlackout stores typed channel raw values`() = runTest(testDispatcher) {
-        every { securePrefs.getChannelBlackout() } returns
+        every { preferencesRepository.getChannelBlackout() } returns
             """["${MessageChannel.SMS.raw.lowercase()}","LEGACY_CHANNEL","${MessageChannel.EMAIL.raw}"]"""
         val viewModel = newViewModel()
 
@@ -217,7 +212,7 @@ class SettingsViewModelTest {
         assertTrue(viewModel.uiState.value.channelBlackoutWhatsApp)
         assertTrue(viewModel.uiState.value.channelBlackoutEmail)
         verify {
-            securePrefs.setChannelBlackout(
+            preferencesRepository.setChannelBlackout(
                 """["${MessageChannel.EMAIL.raw}","${MessageChannel.SMS.raw}","${MessageChannel.WHATSAPP.raw}"]"""
             )
         }
@@ -232,7 +227,7 @@ class SettingsViewModelTest {
         assertFalse(viewModel.uiState.value.channelBlackoutSms)
         assertFalse(viewModel.uiState.value.channelBlackoutWhatsApp)
         assertFalse(viewModel.uiState.value.channelBlackoutEmail)
-        verify(exactly = 0) { securePrefs.setChannelBlackout(any()) }
+        verify(exactly = 0) { preferencesRepository.setChannelBlackout(any()) }
     }
 
     @Test
@@ -277,8 +272,8 @@ class SettingsViewModelTest {
         val message = viewModel.uiState.value.feedbackEvent?.message as UiText.Resource
         assertEquals(R.string.settings_email_invalid, message.resId)
         assertEquals(FeedbackType.ERROR, viewModel.uiState.value.feedbackEvent?.type)
-        verify(exactly = 0) { securePrefs.setSenderEmail(any()) }
-        verify(exactly = 0) { securePrefs.setSenderEmailPassword(any()) }
+        verify(exactly = 0) { preferencesRepository.setSenderEmail(any()) }
+        verify(exactly = 0) { preferencesRepository.setSenderEmailPassword(any()) }
     }
 
     @Test
@@ -290,7 +285,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `init shows today for fresh backup timestamp`() = runTest(testDispatcher) {
-        every { securePrefs.getLastBackupMs() } returns System.currentTimeMillis()
+        every { preferencesRepository.getLastBackupMs() } returns System.currentTimeMillis()
         val viewModel = newViewModel()
 
         assertEquals("Today", viewModel.uiState.value.lastBackupTimestamp)
@@ -305,10 +300,10 @@ class SettingsViewModelTest {
         assertTrue(viewModel.uiState.value.aiWishGeneration)
         assertEquals("Never", viewModel.uiState.value.lastBackupTimestamp)
 
-        every { securePrefs.getGlobalApprovalMode() } returns ApprovalMode.ALWAYS_ASK
-        every { securePrefs.isAiWishGenerationEnabled() } returns false
-        every { securePrefs.getLastBackupMs() } returns System.currentTimeMillis()
-        every { securePrefs.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
+        every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.ALWAYS_ASK
+        every { preferencesRepository.isAiWishGenerationEnabled() } returns false
+        every { preferencesRepository.getLastBackupMs() } returns System.currentTimeMillis()
+        every { preferencesRepository.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
         preferenceChanges.tryEmit(Unit)
         advanceUntilIdle()
 
@@ -320,7 +315,7 @@ class SettingsViewModelTest {
 
     @Test
     fun `dismissLegacyDbNotice clears persisted notice flag`() = runTest(testDispatcher) {
-        every { securePrefs.wasLegacyUnencryptedDbQuarantined() } returns true
+        every { preferencesRepository.wasLegacyUnencryptedDbQuarantined() } returns true
         val viewModel = newViewModel()
 
         assertTrue(viewModel.uiState.value.showLegacyDbNotice)
@@ -328,12 +323,12 @@ class SettingsViewModelTest {
         viewModel.dismissLegacyDbNotice()
 
         assertFalse(viewModel.uiState.value.showLegacyDbNotice)
-        verify { securePrefs.setLegacyUnencryptedDbQuarantined(false) }
+        verify { preferencesRepository.setLegacyUnencryptedDbQuarantined(false) }
     }
 
     @Test
     fun `dismissSecurePrefsRecoveryNotice clears persisted recovery flag`() = runTest(testDispatcher) {
-        every { securePrefs.isSecurePrefsRebuiltNoticePending() } returns true
+        every { preferencesRepository.isSecurePrefsRebuiltNoticePending() } returns true
         val viewModel = newViewModel()
 
         assertTrue(viewModel.uiState.value.showSecurePrefsRecoveryNotice)
@@ -341,7 +336,7 @@ class SettingsViewModelTest {
         viewModel.dismissSecurePrefsRecoveryNotice()
 
         assertFalse(viewModel.uiState.value.showSecurePrefsRecoveryNotice)
-        verify { securePrefs.setSecurePrefsRebuiltNoticePending(false) }
+        verify { preferencesRepository.setSecurePrefsRebuiltNoticePending(false) }
     }
 
     @Test
@@ -351,7 +346,7 @@ class SettingsViewModelTest {
         viewModel.signOut()
 
         verify { authManager.signOut() }
-        verify(exactly = 0) { securePrefs.clearAll() }
+        verify(exactly = 0) { preferencesRepository.clearAll() }
         verify(exactly = 0) { context.deleteDatabase(any()) }
     }
 }

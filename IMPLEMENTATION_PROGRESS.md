@@ -4,6 +4,2367 @@ Version: 1.0.0
 Date: 2026-06-26
 Source backlog: [IMPLEMENTATION_TASKS.md](IMPLEMENTATION_TASKS.md)
 
+## 2026-07-03 - Pure Repository Mapper Boundary Cleanup
+
+Completed tasks:
+
+- A-004 partial architecture slice: move Room entity mappers for already-pure repositories out of `core/domain`.
+- A-004 partial architecture slice: keep activity log, diagnostic snapshot, gift history, memory note, message feedback, and style profile entity conversion inside `core:data`.
+- A-004 partial architecture slice: add a boundary test preventing those persistence mapper files from returning to `core/domain`.
+
+Changed files:
+
+- Deleted [core/domain/src/main/kotlin/com/example/domain/activity/ActivityLogMappers.kt](core/domain/src/main/kotlin/com/example/domain/activity/ActivityLogMappers.kt)
+- Deleted [core/domain/src/main/kotlin/com/example/domain/diagnostic/DiagnosticSnapshotMappers.kt](core/domain/src/main/kotlin/com/example/domain/diagnostic/DiagnosticSnapshotMappers.kt)
+- Deleted [core/domain/src/main/kotlin/com/example/domain/gift/GiftHistoryMappers.kt](core/domain/src/main/kotlin/com/example/domain/gift/GiftHistoryMappers.kt)
+- Deleted [core/domain/src/main/kotlin/com/example/domain/memory/MemoryNoteMappers.kt](core/domain/src/main/kotlin/com/example/domain/memory/MemoryNoteMappers.kt)
+- Deleted [core/domain/src/main/kotlin/com/example/domain/message/MessageFeedbackMappers.kt](core/domain/src/main/kotlin/com/example/domain/message/MessageFeedbackMappers.kt)
+- Deleted [core/domain/src/main/kotlin/com/example/domain/style/StyleProfileMappers.kt](core/domain/src/main/kotlin/com/example/domain/style/StyleProfileMappers.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/RepositoryRecordMappers.kt](core/data/src/main/kotlin/com/example/data/repository/RepositoryRecordMappers.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/ActivityLogRepositoryImpl.kt](core/data/src/main/kotlin/com/example/data/repository/ActivityLogRepositoryImpl.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/DiagnosticSnapshotRepositoryImpl.kt](core/data/src/main/kotlin/com/example/data/repository/DiagnosticSnapshotRepositoryImpl.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/GiftHistoryRepositoryImpl.kt](core/data/src/main/kotlin/com/example/data/repository/GiftHistoryRepositoryImpl.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/MemoryNoteRepositoryImpl.kt](core/data/src/main/kotlin/com/example/data/repository/MemoryNoteRepositoryImpl.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/MessageFeedbackRepositoryImpl.kt](core/data/src/main/kotlin/com/example/data/repository/MessageFeedbackRepositoryImpl.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/StyleProfileRepositoryImpl.kt](core/data/src/main/kotlin/com/example/data/repository/StyleProfileRepositoryImpl.kt)
+- [core/domain/src/test/kotlin/com/example/domain/repository/RepositoryBoundaryContractTest.kt](core/domain/src/test/kotlin/com/example/domain/repository/RepositoryBoundaryContractTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added data-layer `RepositoryRecordMappers` for `ActivityLogEntity`, `DiagnosticSnapshotEntity`, `GiftHistoryEntity`, `MemoryNoteEntity`, `MessageFeedbackEntity`, `StyleProfileEntity`, and `StyleProfileHistoryEntity`.
+- Removed matching Room-coupled mapper files from `core/domain`.
+- Updated repository implementations to resolve conversion from their `core:data` package instead of importing domain mapper packages.
+- Tightened `RepositoryBoundaryContractTest` so these pure-repository persistence mappers cannot be reintroduced in `core/domain`.
+
+Validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.repository.RepositoryBoundaryContractTest \
+  :core:data:testDebugUnitTest \
+  --tests com.example.data.repository.ActivityLogRepositoryImplTest \
+  --tests com.example.data.repository.MemoryNoteRepositoryImplTest \
+  --tests com.example.data.repository.GiftHistoryRepositoryImplTest \
+  --tests com.example.data.repository.MessageFeedbackRepositoryImplTest \
+  --tests com.example.data.repository.StyleProfileRepositoryImplTest \
+  --tests com.example.data.repository.DiagnosticSnapshotRepositoryImplTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Broad validation:
+
+```bash
+./gradlew :app:testDebugUnitTest :core:domain:testDebugUnitTest :core:data:testDebugUnitTest --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Message Repository Boundary Cleanup
+
+Completed tasks:
+
+- A-004 partial architecture slice: replace `PendingMessageEntity` exposure in `MessageRepository` pending-message APIs with pure `PendingMessageRecord`.
+- A-004 partial architecture slice: move pending-message Room/entity conversion into `core:data`.
+- A-004 partial architecture slice: update generation, regeneration, and full-automation promotion paths to create/copy pure pending-message records instead of Room entities.
+- A-004 partial architecture slice: replace `SentMessageEntity` exposure in `MessageRepository` sent-message APIs with pure `SentMessageRecord`.
+- A-004 partial architecture slice: move sent-message Room/entity conversion into `core:data`.
+- A-004 partial architecture slice: update style-analysis and chat-history paths to consume pure sent-message records.
+- A-004 partial architecture slice: enforce the message repository boundary with `RepositoryBoundaryContractTest`.
+
+Changed files:
+
+- [core/model/src/main/kotlin/com/example/domain/model/message/PendingMessageRecord.kt](core/model/src/main/kotlin/com/example/domain/model/message/PendingMessageRecord.kt)
+- [core/model/src/main/kotlin/com/example/domain/model/message/SentMessageRecord.kt](core/model/src/main/kotlin/com/example/domain/model/message/SentMessageRecord.kt)
+- [core/domain/src/main/kotlin/com/example/domain/repository/MessageRepository.kt](core/domain/src/main/kotlin/com/example/domain/repository/MessageRepository.kt)
+- [core/domain/src/main/kotlin/com/example/domain/message/PendingMessageMappers.kt](core/domain/src/main/kotlin/com/example/domain/message/PendingMessageMappers.kt)
+- [core/domain/src/main/kotlin/com/example/domain/message/SentMessageMappers.kt](core/domain/src/main/kotlin/com/example/domain/message/SentMessageMappers.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/GenerateMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/GenerateMessageUseCase.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/RegeneratePendingMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/RegeneratePendingMessageUseCase.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/EnableFullAutomationUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/EnableFullAutomationUseCase.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/PendingMessageRecordMappers.kt](core/data/src/main/kotlin/com/example/data/repository/PendingMessageRecordMappers.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/SentMessageRecordMappers.kt](core/data/src/main/kotlin/com/example/data/repository/SentMessageRecordMappers.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/MessageRepositoryImpl.kt](core/data/src/main/kotlin/com/example/data/repository/MessageRepositoryImpl.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/ApprovalReceiverMessageAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/ApprovalReceiverMessageAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherRouteHistoryAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherRouteHistoryAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/WorkerMessageDispatchAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/workers/WorkerMessageDispatchAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/WorkerMessageHistoryAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/workers/WorkerMessageHistoryAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt)
+- [core/domain/src/test/kotlin/com/example/domain/message/PendingMessageMappersTest.kt](core/domain/src/test/kotlin/com/example/domain/message/PendingMessageMappersTest.kt)
+- [core/domain/src/test/kotlin/com/example/domain/repository/RepositoryBoundaryContractTest.kt](core/domain/src/test/kotlin/com/example/domain/repository/RepositoryBoundaryContractTest.kt)
+- [core/data/src/test/kotlin/com/example/data/repository/MessageRepositoryImplTest.kt](core/data/src/test/kotlin/com/example/data/repository/MessageRepositoryImplTest.kt)
+- [app/src/test/java/com/example/domain/usecase/GenerateMessageUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/GenerateMessageUseCaseTest.kt)
+- [app/src/test/java/com/example/domain/usecase/RegeneratePendingMessageUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/RegeneratePendingMessageUseCaseTest.kt)
+- [app/src/test/java/com/example/domain/usecase/EnableFullAutomationUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/EnableFullAutomationUseCaseTest.kt)
+- [app/src/test/java/com/example/domain/usecase/StyleAnalysisUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/StyleAnalysisUseCaseTest.kt)
+- [app/src/test/java/com/example/ui/screens/chat/ChatHistoryViewModelTest.kt](app/src/test/java/com/example/ui/screens/chat/ChatHistoryViewModelTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `PendingMessageRecord` as the pure domain/model representation for pending messages.
+- Changed pending-message methods in `MessageRepository` to return and save `PendingMessageRecord` instead of `PendingMessageEntity`.
+- Added data-layer mappers from `PendingMessageEntity` to `PendingMessageRecord` and back.
+- Added `SentMessageRecord` as the pure domain/model representation for sent messages.
+- Changed sent-message methods in `MessageRepository` to return and save `SentMessageRecord` instead of `SentMessageEntity`.
+- Added data-layer mappers from `SentMessageEntity` to `SentMessageRecord` and back.
+- Updated repository implementation methods and DAO adapter call sites to keep Room entities inside `core:data`.
+- Updated `GenerateMessageUseCase`, `RegeneratePendingMessageUseCase`, and `EnableFullAutomationUseCase` to work with typed `ApprovalMode`, `MessageStatus`, `MessageChannel`, and model IDs.
+- Updated style-analysis and chat-history tests/call paths to work with typed sent-message records.
+- Updated focused tests and added repository mapping coverage for both read and save directions.
+- Added a boundary contract test preventing `MessageRepository` message APIs from exposing `PendingMessageEntity` or `SentMessageEntity`.
+
+Validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.repository.RepositoryBoundaryContractTest \
+  --tests com.example.domain.message.PendingMessageMappersTest \
+  :core:data:testDebugUnitTest \
+  --tests com.example.data.repository.MessageRepositoryImplTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional focused validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.message.PendingMessageMappersTest \
+  :core:data:testDebugUnitTest \
+  --tests com.example.data.repository.MessageRepositoryImplTest \
+  :app:testDebugUnitTest \
+  --tests com.example.domain.usecase.GenerateMessageUseCaseTest \
+  --tests com.example.domain.usecase.RegeneratePendingMessageUseCaseTest \
+  --tests com.example.domain.usecase.EnableFullAutomationUseCaseTest \
+  --tests com.example.domain.usecase.StyleAnalysisUseCaseTest \
+  --tests com.example.ui.screens.chat.ChatHistoryViewModelTest \
+  --tests com.example.ui.viewmodel.WishPreviewViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Broad validation:
+
+```bash
+./gradlew :app:testDebugUnitTest :core:domain:testDebugUnitTest :core:data:testDebugUnitTest --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Contact Repository Boundary Cleanup
+
+Completed tasks:
+
+- A-004 partial architecture slice: remove unused DAO projection, raw health-ranking, and unused raw entity methods from `ContactRepository`.
+- A-004 partial architecture slice: replace classification read paths with pure domain contact models and IDs.
+- A-004 partial architecture slice: replace full-automation contact override updates with pure profiles and a narrow repository command.
+- A-004 partial architecture slice: replace message generation/regeneration contact reads with a pure message generation profile.
+- A-004 partial architecture slice: replace manual event contact reads/writes with pure headers and narrow event-date repository commands.
+- A-004 partial architecture slice: replace contact sync merge/upsert with pure sync records and a data-layer entity mapper.
+- A-004 partial architecture slice: remove the remaining raw `ContactEntity` methods from `ContactRepository` and enforce the pure contract with boundary tests.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/repository/ContactRepository.kt](core/domain/src/main/kotlin/com/example/domain/repository/ContactRepository.kt)
+- [core/model/src/main/kotlin/com/example/domain/model/contact/ContactClassificationProfile.kt](core/model/src/main/kotlin/com/example/domain/model/contact/ContactClassificationProfile.kt)
+- [core/model/src/main/kotlin/com/example/domain/model/contact/ContactMessageGenerationProfile.kt](core/model/src/main/kotlin/com/example/domain/model/contact/ContactMessageGenerationProfile.kt)
+- [core/domain/src/main/kotlin/com/example/domain/contact/ContactMappers.kt](core/domain/src/main/kotlin/com/example/domain/contact/ContactMappers.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/ClassifyContactUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/ClassifyContactUseCase.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/EnableFullAutomationUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/EnableFullAutomationUseCase.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/GenerateMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/GenerateMessageUseCase.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/RegeneratePendingMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/RegeneratePendingMessageUseCase.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/SaveManualEventUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/SaveManualEventUseCase.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/SyncContactsUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/SyncContactsUseCase.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/ContactSyncWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/ContactSyncWorker.kt)
+- [core/data/src/main/kotlin/com/example/core/db/dao/ContactDao.kt](core/data/src/main/kotlin/com/example/core/db/dao/ContactDao.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/ContactRepositoryImpl.kt](core/data/src/main/kotlin/com/example/data/repository/ContactRepositoryImpl.kt)
+- Deleted [core/domain/src/main/kotlin/com/example/domain/contact/ContactSyncMappers.kt](core/domain/src/main/kotlin/com/example/domain/contact/ContactSyncMappers.kt)
+- [app/src/test/java/com/example/domain/usecase/ClassifyContactUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/ClassifyContactUseCaseTest.kt)
+- [app/src/test/java/com/example/domain/usecase/EnableFullAutomationUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/EnableFullAutomationUseCaseTest.kt)
+- [app/src/test/java/com/example/domain/usecase/GenerateMessageUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/GenerateMessageUseCaseTest.kt)
+- [app/src/test/java/com/example/domain/usecase/RegeneratePendingMessageUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/RegeneratePendingMessageUseCaseTest.kt)
+- [app/src/test/java/com/example/domain/usecase/SaveManualEventUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/SaveManualEventUseCaseTest.kt)
+- [app/src/test/java/com/example/domain/usecase/SyncContactsUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/SyncContactsUseCaseTest.kt)
+- [app/src/test/java/com/example/core/automation/workers/ContactSyncWorkerTest.kt](app/src/test/java/com/example/core/automation/workers/ContactSyncWorkerTest.kt)
+- [core/data/src/test/kotlin/com/example/data/repository/ContactRepositoryImplTest.kt](core/data/src/test/kotlin/com/example/data/repository/ContactRepositoryImplTest.kt)
+- [core/domain/src/test/kotlin/com/example/domain/repository/RepositoryBoundaryContractTest.kt](core/domain/src/test/kotlin/com/example/domain/repository/RepositoryBoundaryContractTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Removed `countByRelationshipType()` from `ContactRepository`; callers already use `getRelationshipAnalyticsCounts()` for the pure domain projection.
+- Removed raw `getTopByHealthScore()` and `getBottomByHealthScore()` from `ContactRepository`; callers already use `ContactAnalyticsSummary` methods.
+- Removed unused raw `getAll()` and `delete(ContactEntity)` methods from `ContactRepository`; the DAO remains responsible for persistence-level streams and deletion.
+- Kept DAO projection and raw entity methods inside `ContactDao`/`ContactRepositoryImpl`, where persistence details belong.
+- Added a repository boundary contract test that prevents `ContactRepository` from re-exposing DAO projection types or the removed unused raw entity APIs.
+- Added `ContactClassificationProfile` and repository methods for classification profile lookup and unclassified contact IDs.
+- Updated `ClassifyContactUseCase` and `ContactSyncWorker` to stop fetching full `ContactEntity` records for classification flow decisions.
+- Added repository/use-case/worker tests for the new pure classification boundary.
+- Added `updateAutomationOverride()` to update automation override fields through `ContactId` and `ApprovalMode` instead of copied `ContactEntity` records.
+- Updated `EnableFullAutomationUseCase` to use `getAutomationReadinessProfiles()` and the narrow update command when resetting per-contact automation overrides.
+- Added repository/use-case tests for full-automation override reset behavior.
+- Added `ContactMessageGenerationProfile` and repository lookup support for message generation contact context.
+- Updated `GenerateMessageUseCase` and `RegeneratePendingMessageUseCase` to use pure prompt, route, header, automation, and send-time contact fields instead of full `ContactEntity` records.
+- Added repository/generation/regeneration tests for the new message generation contact boundary.
+- Added manual-contact repository commands for creating a local manual contact with an event date and updating existing event-date fields.
+- Updated `SaveManualEventUseCase` to use `ContactHeader`, `createManualContactForEvent()`, and `updateContactEventDate()` instead of fetching and upserting `ContactEntity`.
+- Updated manual-event and repository tests for the new pure manual-event contact boundary.
+- Added `upsertSyncedContact()` so contact sync can persist `ContactSyncRecord` through the data layer instead of converting to `ContactEntity` in domain.
+- Updated `SyncContactsUseCase` to merge/dedupe `ContactSyncRecord` directly and use `contactExists()` for inserted/updated counts.
+- Removed the domain `ContactSyncMappers` entity mapper and covered the data-layer sync mapping in `ContactRepositoryImplTest`.
+- Removed legacy raw `ContactRepository` methods: `getAllSync()`, `getById()`, `upsert(ContactEntity)`, `update(ContactEntity)`, and `getContactsForRevival()`.
+- Tightened `RepositoryBoundaryContractTest` so `ContactRepository` cannot expose Room entities, DAO projections, or the removed raw entity APIs.
+
+Validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.repository.RepositoryBoundaryContractTest \
+  :core:data:testDebugUnitTest \
+  --tests com.example.data.repository.ContactRepositoryImplTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional focused validation:
+
+```bash
+./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.data.repository.ContactRepositoryImplTest \
+  :app:testDebugUnitTest \
+  --tests com.example.domain.usecase.ClassifyContactUseCaseTest \
+  --tests com.example.core.automation.workers.ContactSyncWorkerTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional focused validation:
+
+```bash
+./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.data.repository.ContactRepositoryImplTest \
+  :app:testDebugUnitTest \
+  --tests com.example.domain.usecase.EnableFullAutomationUseCaseTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional focused validation:
+
+```bash
+./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.data.repository.ContactRepositoryImplTest \
+  :app:testDebugUnitTest \
+  --tests com.example.domain.usecase.GenerateMessageUseCaseTest \
+  --tests com.example.domain.usecase.RegeneratePendingMessageUseCaseTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional focused validation:
+
+```bash
+./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.data.repository.ContactRepositoryImplTest \
+  :app:testDebugUnitTest \
+  --tests com.example.domain.usecase.SaveManualEventUseCaseTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional focused validation:
+
+```bash
+./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.data.repository.ContactRepositoryImplTest \
+  :app:testDebugUnitTest \
+  --tests com.example.domain.usecase.SyncContactsUseCaseTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional focused validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.repository.RepositoryBoundaryContractTest \
+  :core:data:testDebugUnitTest \
+  --tests com.example.data.repository.ContactRepositoryImplTest \
+  :app:testDebugUnitTest \
+  --tests com.example.domain.usecase.SyncContactsUseCaseTest \
+  --tests com.example.domain.usecase.SaveManualEventUseCaseTest \
+  --tests com.example.domain.usecase.GetDashboardMetricsUseCaseTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional broad validation:
+
+```bash
+./gradlew :app:testDebugUnitTest \
+  :core:domain:testDebugUnitTest \
+  :core:data:testDebugUnitTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Messages Canonical CTA Routing
+
+Completed tasks:
+
+- A-003 final app slice for named surfaces: route blocked Messages card CTAs from canonical readiness actions instead of leaving setup/contact fixes behind generic edit/retry paths.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt](app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt)
+- [app/src/main/java/com/example/ui/navigation/NavGraph.kt](app/src/main/java/com/example/ui/navigation/NavGraph.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesScreen.kt](app/src/main/java/com/example/ui/screens/messages/MessagesScreen.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesPagerComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesPagerComponents.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesListComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesListComponents.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesCardActionComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesCardActionComponents.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesQueueComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesQueueComponents.kt)
+- [app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/messages/MessagesScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/messages/MessagesScreenInteractionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `PendingMessageItem` now exposes a `primaryActionRoute` projection from `RelationshipActionReadiness.primaryAction` and `primaryReason`.
+- Blocked Messages cards now show a canonical primary action button: missing phone/email/contact blockers open Contact Detail preferences, setup/email/provider blockers open Automation Setup.
+- Messages navigation now accepts `onNavigateToContact` and routes blocked contact-detail fixes through `Screen.ContactDetail.createRoute(..., openPreferences = true)`.
+- ViewModel and Compose interaction tests cover canonical contact-vs-setup CTA routing.
+
+Validation:
+
+```bash
+./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.MessagesViewModelTest \
+  --tests com.example.ui.screens.messages.MessagesScreenInteractionTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional broad validation:
+
+```bash
+./gradlew :app:testDebugUnitTest \
+  :core:domain:testDebugUnitTest \
+  :core:data:testDebugUnitTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Wish Preview Send Summary Canonical Readiness Adoption
+
+Completed tasks:
+
+- A-003 partial domain/app slice: make Wish Preview route, device setup, and dispatch send-summary state project into the canonical readiness/action contract.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/readiness/RelationshipActionReadiness.kt](core/domain/src/main/kotlin/com/example/domain/readiness/RelationshipActionReadiness.kt)
+- [app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt](app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt)
+- [core/domain/src/test/kotlin/com/example/domain/readiness/RelationshipActionReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/readiness/RelationshipActionReadinessPolicyTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `RelationshipActionReadinessPolicy` now maps `WishPreviewSendSummary` route blockers, device setup blockers, and dispatch state into canonical state/reason/action metadata.
+- `WishPreviewUiState` exposes `sendActionReadiness` with pending message, contact, and event IDs attached.
+- Wish Preview's send summary card now colors its status title from canonical send readiness state while preserving the existing route/device/dispatch row copy.
+- ViewModel tests now assert canonical send readiness for approval-needed, missing phone route blocker, quiet-hours deferral, and missing SMS permission paths.
+
+Validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.readiness.RelationshipActionReadinessPolicyTest \
+  --tests com.example.domain.message.WishPreviewSendSummaryPolicyTest \
+  :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.WishPreviewViewModelTest \
+  --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional broad validation:
+
+```bash
+./gradlew :app:testDebugUnitTest \
+  :core:domain:testDebugUnitTest \
+  :core:data:testDebugUnitTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Notification Canonical Readiness Adoption
+
+Completed tasks:
+
+- A-003 partial domain/data/app slice: make setup and system-alert notifications consume canonical readiness actions for click-through routing.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/readiness/RelationshipActionReadiness.kt](core/domain/src/main/kotlin/com/example/domain/readiness/RelationshipActionReadiness.kt)
+- [core/domain/src/main/kotlin/com/example/domain/navigation/RelateDeepLinks.kt](core/domain/src/main/kotlin/com/example/domain/navigation/RelateDeepLinks.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt)
+- [app/src/main/java/com/example/ui/navigation/NavGraph.kt](app/src/main/java/com/example/ui/navigation/NavGraph.kt)
+- [app/src/main/AndroidManifest.xml](app/src/main/AndroidManifest.xml)
+- [core/domain/src/test/kotlin/com/example/domain/readiness/RelationshipActionReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/readiness/RelationshipActionReadinessPolicyTest.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdaptersTest.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/notifications/SystemAlertNotificationAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/notifications/SystemAlertNotificationAdaptersTest.kt)
+- [app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt](app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `RelationshipActionReadinessPolicy` now maps `SetupNotificationRequest` and `SystemAlertNotificationRequest` into canonical state/reason/action metadata.
+- Setup notifications now use canonical primary actions for tap targets: setup blockers open Automation Setup, expired/double-send warnings open Messages.
+- System alert notifications now use canonical primary actions for tap targets; AI fallback alerts open Automation Setup instead of the stale-backup route, while backup alerts still open Backup/Restore.
+- Added `relateai://automation-setup` to the shared deep-link contract, manifest, and nav graph.
+
+Validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.readiness.RelationshipActionReadinessPolicyTest \
+  :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest \
+  --tests com.example.core.automation.notifications.SystemAlertNotificationAdaptersTest \
+  :app:testDebugUnitTest \
+  --tests com.example.ui.navigation.DeepLinkContractTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional broad validation:
+
+```bash
+./gradlew :app:testDebugUnitTest \
+  :core:domain:testDebugUnitTest \
+  :core:data:testDebugUnitTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Setup Canonical Readiness Adoption
+
+Completed tasks:
+
+- A-003 partial app/domain slice: make Automation Setup expose canonical readiness for checks, recommended fix, and the overall setup summary.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt](app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt)
+- [app/src/test/java/com/example/ui/viewmodel/AutomationSetupViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupViewModelTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `ReadinessCheck`, `AiDoctorRecommendedFix`, and `AutomationSetupUiState` now carry `RelationshipActionReadiness` projections from the existing setup recommendation candidates.
+- Setup report construction now computes one canonical `setupActionReadiness` summary from all checks.
+- Automation Setup's top status banner uses canonical readiness state for severity/icon while preserving existing titles, details, groups, and local `AiDoctorAction` routing.
+- ViewModel tests now assert per-check, recommended-fix, and report-level canonical setup readiness projections.
+
+Validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.readiness.RelationshipActionReadinessPolicyTest \
+  :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.AutomationSetupViewModelTest \
+  --tests com.example.ui.screens.setup.AutomationSetupScreenInteractionTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Home Canonical Readiness Adoption
+
+Completed tasks:
+
+- A-003 partial app/domain slice: make Home next actions and readiness banner carry the canonical readiness/action contract.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/readiness/RelationshipActionReadiness.kt](core/domain/src/main/kotlin/com/example/domain/readiness/RelationshipActionReadiness.kt)
+- [app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt](app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/home/HomeScreen.kt](app/src/main/java/com/example/ui/screens/home/HomeScreen.kt)
+- [core/domain/src/test/kotlin/com/example/domain/readiness/RelationshipActionReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/readiness/RelationshipActionReadinessPolicyTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/HomeViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/HomeViewModelTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Extended `RelationshipActionReadinessPolicy` with Home next-action adapters for contact sync, missing contacts, AI setup, pending reviews, backup freshness, and low relationship health.
+- `HomeNextAction` now carries `actionReadiness`, and `HomeUiState` exposes `readinessActionReadiness` for the readiness banner path.
+- Home readiness banner selection now branches on canonical readiness reason while preserving the existing localized copy and routes.
+- Home next-action card severity color now reads from canonical readiness state for setup/review/backup actions.
+
+Validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.readiness.RelationshipActionReadinessPolicyTest \
+  :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.HomeViewModelTest \
+  --tests com.example.ui.screens.home.HomeScreenInteractionTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Messages Canonical Readiness Badge Adoption
+
+Completed tasks:
+
+- A-003 partial app/domain slice: make user-facing Messages readiness badges consume the canonical readiness contract.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/messages/MessagesListComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesListComponents.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesPendingCardComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesPendingCardComponents.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesQueueComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesQueueComponents.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesReviewCardComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesReviewCardComponents.kt)
+- [app/src/test/java/com/example/ui/screens/messages/MessagesScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/messages/MessagesScreenInteractionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Messages pending, approved, and failed card bodies now pass `PendingMessageItem.actionReadiness` into the badge path.
+- `MessageReadinessBadge` derives label, color, and icon from `RelationshipActionReadiness.state` and `primaryReason` while preserving existing localized copy.
+- Added a Compose interaction test that deliberately mismatches legacy `MessageReadiness` and canonical readiness, proving the rendered badge trusts the canonical contract.
+
+Validation:
+
+```bash
+./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.MessagesViewModelTest \
+  --tests com.example.ui.screens.messages.MessagesScreenInteractionTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Wish Preview Draft Canonical Readiness Adoption
+
+Completed tasks:
+
+- A-003 partial app/domain slice: make Wish Preview consume the canonical readiness contract for draft approval blocking and readiness copy.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt](app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt)
+- [app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `WishPreviewUiState` now exposes `draftActionReadiness` as a `RelationshipActionReadiness` projection with message, contact, and event identifiers.
+- Draft approval blocking now reads canonical `ACTION_REQUIRED` plus `EDIT_DRAFT` action metadata instead of branching directly on the legacy draft enum.
+- The Wish Preview readiness message renders from canonical draft reasons while preserving the existing localized user-facing copy.
+- Wish Preview ViewModel tests now assert canonical ready, edited-ready, blank, and too-short draft state/action/reason projections.
+
+Validation:
+
+```bash
+./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.WishPreviewViewModelTest \
+  --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Messages Canonical Readiness Adoption
+
+Completed tasks:
+
+- A-003 partial app/domain slice: make Messages consume the canonical readiness contract for task grouping and failed-send recovery setup counts.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt](app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesRecoveryComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesRecoveryComponents.kt)
+- [app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `PendingMessageItem` now carries `RelationshipActionReadiness` alongside the legacy `MessageReadiness` label enum.
+- Messages task buckets use canonical `RelationshipReadinessState.ACTION_REQUIRED` instead of directly branching on the legacy operational enum.
+- Failed-message recovery counts setup blockers through canonical actions such as `OPEN_CONTACT`, `CONFIGURE_CHANNEL`, and `CONFIGURE_EMAIL`.
+- Messages ViewModel tests now assert both legacy labels and canonical state/action/reason projections for route blockers and scheduled waiting states.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.MessagesViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Canonical Relationship Readiness Contract
+
+Completed tasks:
+
+- A-002 domain/product slice: define one canonical readiness/action model that existing readiness policies can project into.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/readiness/RelationshipActionReadiness.kt](core/domain/src/main/kotlin/com/example/domain/readiness/RelationshipActionReadiness.kt)
+- [core/domain/src/test/kotlin/com/example/domain/readiness/RelationshipActionReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/readiness/RelationshipActionReadinessPolicyTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `RelationshipActionReadiness`, `RelationshipReadinessState`, `RelationshipReadinessReason`, `RelationshipReadinessAction`, and blockers/confidence metadata as the shared domain contract for user-facing readiness.
+- Added `RelationshipActionReadinessPolicy` adapters from `MessageOperationalReadiness`, `WishDraftReadiness`, and setup readiness candidates.
+- Added focused tests for message route blockers, scheduled waiting states, draft blockers, edited-ready drafts, and setup recommended-action projection.
+- The current audit report now treats A-002 as resolved while keeping A-003 open for UI/surface adoption.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.readiness.RelationshipActionReadinessPolicyTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - AI Message Log Privacy
+
+Completed tasks:
+
+- A-001 security/privacy slice: keep generated AI message text out of logs and make variant metadata explicit.
+
+Changed files:
+
+- [core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt](core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt)
+- [core/data/src/main/kotlin/com/example/core/resilience/SensitiveLogRedactor.kt](core/data/src/main/kotlin/com/example/core/resilience/SensitiveLogRedactor.kt)
+- [app/src/test/java/com/example/core/gemini/AiServiceImplTest.kt](app/src/test/java/com/example/core/gemini/AiServiceImplTest.kt)
+- [core/data/src/test/kotlin/com/example/core/resilience/SensitiveLogRedactorTest.kt](core/data/src/test/kotlin/com/example/core/resilience/SensitiveLogRedactorTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `AiServiceImpl` now logs the selected variant as `recommendedVariantName`, making the value label-only instead of ambiguous message content.
+- `SensitiveLogRedactor` now treats `recommendedVariantText` and `recommendedText` as generated message body keys if future callers accidentally include content.
+- Regression coverage now checks generated AI copy is absent from both `StructuredLogger` history and Android log output.
+- The current audit report marks A-001 resolved and removes it from the active priority backlog.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest :core:data:testDebugUnitTest \
+  --tests com.example.core.gemini.AiServiceImplTest \
+  --tests com.example.core.resilience.SensitiveLogRedactorTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - People API Request Injection
+
+Completed tasks:
+
+- T615 networking seam slice: inject the shared OkHttpClient and People API request factory into Google contact sync instead of constructing request/client objects inline.
+
+Changed files:
+
+- [core/data/src/main/kotlin/com/example/core/contacts/PeopleConnectionsRequestFactory.kt](core/data/src/main/kotlin/com/example/core/contacts/PeopleConnectionsRequestFactory.kt)
+- [core/data/src/main/kotlin/com/example/core/contacts/GoogleContactsSync.kt](core/data/src/main/kotlin/com/example/core/contacts/GoogleContactsSync.kt)
+- [core/data/src/main/kotlin/com/example/core/contacts/ContactSyncServiceImpl.kt](core/data/src/main/kotlin/com/example/core/contacts/ContactSyncServiceImpl.kt)
+- [core/data/src/test/kotlin/com/example/core/contacts/PeopleConnectionsRequestFactoryTest.kt](core/data/src/test/kotlin/com/example/core/contacts/PeopleConnectionsRequestFactoryTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `PeopleConnectionsRequestFactory` to build authorized People connections requests through the existing encoded URL helper.
+- `GoogleContactsSync` now uses injected `OkHttpClient` and request factory dependencies for People API calls.
+- `ContactSyncServiceImpl` passes Hilt's shared `OkHttpClient` and injected request factory into Google contact sync.
+- Added focused tests for the Authorization header, sync-token/page-token encoding, and full-sync request shape.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.contacts.PeopleConnectionsRequestFactoryTest \
+  --tests com.example.core.contacts.PeopleConnectionsRequestUrlTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused People API request factory and encoded URL coverage.
+
+## 2026-07-03 - Biometric-Gated Deep Link Contract
+
+Completed tasks:
+
+- T413 security/navigation slice: verify deep-linked authenticated routes remain behind the app shell biometric gate and the NavGraph auth gate.
+
+Changed files:
+
+- [app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt](app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added a contract test proving `MainActivity` renders `RelateApp` only from the unlocked biometric branch and renders `BiometricLockGate` for locked/authenticating/error states.
+- Kept the existing `NavGraph` contract coverage that every external deep-linked signed-in destination registers through `authenticatedComposable`.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.navigation.DeepLinkContractTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused biometric-gated deep link contract coverage. The first run failed because the new static assertion counted the `fun RelateApp` declaration as a render call; the assertion now scopes the count to the `setContent` block.
+
+## 2026-07-03 - Message Body Log Redaction
+
+Completed tasks:
+
+- T412 logging safety slice: redact generated/user-edited message bodies from structured logs even when the text does not contain a token, phone number, or email pattern.
+
+Changed files:
+
+- [core/data/src/main/kotlin/com/example/core/resilience/SensitiveLogRedactor.kt](core/data/src/main/kotlin/com/example/core/resilience/SensitiveLogRedactor.kt)
+- [core/data/src/main/kotlin/com/example/core/resilience/StructuredLogger.kt](core/data/src/main/kotlin/com/example/core/resilience/StructuredLogger.kt)
+- [core/data/src/test/kotlin/com/example/core/resilience/SensitiveLogRedactorTest.kt](core/data/src/test/kotlin/com/example/core/resilience/SensitiveLogRedactorTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `SensitiveLogRedactor` now redacts common inline message-body assignments such as `messageText`, `draftText`, variant text fields, `userEditedText`, and dispatch `payload`.
+- `StructuredLogger` now redacts extras by key for the same message-body fields while preserving non-body identifiers such as `messageId`.
+- Added focused tests for inline body assignments and logger extras where the body has no other secret-looking pattern.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.resilience.SensitiveLogRedactorTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused message-body log redaction coverage.
+
+## 2026-07-03 - Already Handled Dispatch Eligibility Coverage
+
+Completed tasks:
+
+- T109 readiness/safety coverage: explicitly prove that both `SENT` and `DISPATCHING` message states map to the shared already-handled dispatch blocker.
+
+Changed files:
+
+- [core/domain/src/test/kotlin/com/example/domain/automation/DispatchEligibilityPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/DispatchEligibilityPolicyTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added explicit `SENT` coverage beside the existing `DISPATCHING` coverage for `DispatchEligibilityPolicy`.
+- Updated SSOT/audit wording so already-handled dispatch-state protection is visible in the current readiness evidence.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.automation.DispatchEligibilityPolicyTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused already-handled dispatch eligibility coverage.
+
+## 2026-07-03 - Recurring Automation Work Commands
+
+Completed tasks:
+
+- T-001 readiness consistency slice: reuse the boot-recovery recurring work command contract for initial daily/revival/style-analysis scheduling.
+
+Changed files:
+
+- [core/data/src/main/kotlin/com/example/core/automation/scheduler/BootRecoveryWorkCommands.kt](core/data/src/main/kotlin/com/example/core/automation/scheduler/BootRecoveryWorkCommands.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/scheduler/WorkerScheduler.kt](core/data/src/main/kotlin/com/example/core/automation/scheduler/WorkerScheduler.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/scheduler/WorkerSchedulerTest.kt](core/data/src/test/kotlin/com/example/core/automation/scheduler/WorkerSchedulerTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `WorkManager.enqueueRecurringAutomationWork(command)` so initial scheduling and boot recovery use the same `BootRecoveryRecurringWorkCommand` definitions.
+- `WorkerScheduler.scheduleAll` now enqueues daily trigger, revival, and style-analysis periodic work through `bootRecoveryRecurringWorkCommands()` instead of duplicating repeat intervals, tags, constraints, and unique work names.
+- Strengthened `WorkerSchedulerTest` to verify all three recurring jobs are scheduled from the shared command set.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.scheduler.WorkerSchedulerTest \
+  --tests com.example.core.automation.scheduler.BootRecoveryWorkCommandsTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused recurring automation work command coverage.
+
+## 2026-07-03 - Exact Send Scheduling Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move exact-send enqueue-now, exact-alarm, WorkManager fallback, and schedule-update decisions into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/ExactSendSchedulePolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/ExactSendSchedulePolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/ExactSendSchedulePolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/ExactSendSchedulePolicyTest.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt](core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `ExactSendSchedulePolicy` to classify exact-send scheduling as enqueue-now, exact alarm-clock scheduling, or WorkManager fallback when exact-alarm permission is unavailable.
+- The policy now carries any schedule update produced by quiet-hours or blackout-date adjustment so persistence stays consistent across scheduler callers.
+- `DailyScheduler.scheduleExactSend` now delegates scheduling decisions to the shared policy and keeps AlarmManager, WorkManager, setup notification, and DAO side effects in the data adapter.
+- Added focused domain coverage for due-now scheduling, exact-alarm scheduling, WorkManager fallback, and adjusted schedule updates.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.automation.ExactSendSchedulePolicyTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.scheduler.DailySchedulerMessageAdaptersTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused exact-send scheduling policy and scheduler adapter coverage.
+
+## 2026-07-03 - Revival Notification Helper Contract
+
+Completed tasks:
+
+- T-001 readiness consistency slice: pass revival notification requests through a shared Android adapter/copy contract instead of formatting revival copy directly in the helper call path.
+
+Changed files:
+
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/RevivalNotificationAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/RevivalNotificationAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/notifications/RevivalNotificationAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/notifications/RevivalNotificationAdaptersTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `RevivalNotificationAdapters` to expose a typed `Context.showRevivalNotification` call and localized `RevivalNotificationCopy`.
+- `NotificationHelper.showRevivalNotification` now derives title/body/big-text copy through the adapter while keeping notification channel, intent, and posting mechanics in the Android helper.
+- `RevivalWorker` now routes review notifications through the typed context adapter after building `RevivalNotificationRequest`.
+- Added focused Robolectric coverage for adapter delegation and revival copy projection.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.notifications.RevivalNotificationAdaptersTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.core.automation.workers.RevivalWorkerTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused revival notification adapter coverage and the revival worker call site.
+
+## 2026-07-03 - Approval Notification Helper Contract
+
+Completed tasks:
+
+- T-001 readiness consistency slice: pass approval notification requests through a shared Android adapter/copy contract and centralize domain-to-data message-variant mapping.
+
+Changed files:
+
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/ApprovalNotificationAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/ApprovalNotificationAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationServiceImpl.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationServiceImpl.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/HolidayWishWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/HolidayWishWorker.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/PostEventFollowUpWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/PostEventFollowUpWorker.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/notifications/ApprovalNotificationAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/notifications/ApprovalNotificationAdaptersTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `ApprovalNotificationAdapters` to expose a typed `Context.showApprovalNotification` call, localized `ApprovalNotificationCopy`, and shared `MessageVariantsResult` to `MessageVariants` mapping.
+- `NotificationHelper.showApprovalNotification` now derives title/body copy through the adapter while keeping notification actions, deep links, channel, and posting mechanics in the Android helper.
+- `NotificationServiceImpl`, `HolidayWishWorker`, and `PostEventFollowUpWorker` now route approval notifications through the typed context adapter.
+- Added focused Robolectric coverage for adapter delegation, approval copy projection, and variant mapping.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.notifications.ApprovalNotificationAdaptersTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.core.automation.workers.HolidayWishWorkerTest \
+  --tests com.example.core.automation.workers.PostEventFollowUpWorkerTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused approval notification adapter coverage and approval-notification worker call sites.
+
+## 2026-07-03 - Event Reminder Notification Helper Contract
+
+Completed tasks:
+
+- T-001 readiness consistency slice: pass event-reminder notification requests through a shared Android adapter/copy contract instead of formatting reminder copy directly in the helper call path.
+
+Changed files:
+
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/EventReminderNotificationAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/EventReminderNotificationAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/EventReminderReceiver.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/EventReminderReceiver.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/notifications/EventReminderNotificationAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/notifications/EventReminderNotificationAdaptersTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `EventReminderNotificationAdapters` to expose a typed `Context.showEventReminderNotification` call and a localized `EventReminderNotificationCopy`.
+- `NotificationHelper.showEventReminderNotification` now derives title/body copy through the adapter while keeping notification channel, intent, and posting mechanics in the Android helper.
+- `EventReminderReceiver` now uses the typed context adapter after building `EventReminderNotificationRequest`.
+- Added focused Robolectric coverage for adapter delegation and event-type label normalization.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.notifications.EventReminderNotificationAdaptersTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused event-reminder notification adapter coverage.
+
+## 2026-07-03 - Event Reminder Scheduling Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move event-reminder cancel/exact/inexact scheduling decisions into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/EventReminderSchedulePolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/EventReminderSchedulePolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/EventReminderSchedulePolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/EventReminderSchedulePolicyTest.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/scheduler/EventReminderScheduler.kt](core/data/src/main/kotlin/com/example/core/automation/scheduler/EventReminderScheduler.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `EventReminderSchedulePolicy` to classify inactive, disabled, and past reminders as cancel decisions and future reminders as exact or inexact schedule decisions.
+- `EventReminderScheduler` now delegates the decision to the shared policy and keeps AlarmManager/PendingIntent mechanics in the data adapter.
+- Added focused domain coverage for inactive, disabled, past, exact, and inexact reminder decisions.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.automation.EventReminderSchedulePolicyTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.scheduler.EventReminderSchedulerTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused domain event-reminder scheduling policy and scheduler adapter tests.
+
+## 2026-07-03 - Setup Notification Helper Contract
+
+Completed tasks:
+
+- T-001 readiness consistency slice: pass setup/remediation notification requests through the Android helper as typed requests instead of raw title/message arguments.
+
+Changed files:
+
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdapters.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdaptersTest.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherSmsRouteAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherSmsRouteAdaptersTest.kt)
+- [app/src/test/java/com/example/core/automation/workers/MessageDispatchWorkerTest.kt](app/src/test/java/com/example/core/automation/workers/MessageDispatchWorkerTest.kt)
+- [app/src/test/java/com/example/core/automation/workers/MessageGenerationWorkerTest.kt](app/src/test/java/com/example/core/automation/workers/MessageGenerationWorkerTest.kt)
+- [app/src/test/java/com/example/core/automation/sender/MessageDispatcherTest.kt](app/src/test/java/com/example/core/automation/sender/MessageDispatcherTest.kt)
+- [app/src/test/java/com/example/core/automation/workers/HolidayWishWorkerTest.kt](app/src/test/java/com/example/core/automation/workers/HolidayWishWorkerTest.kt)
+- [app/src/test/java/com/example/core/automation/workers/PostEventFollowUpWorkerTest.kt](app/src/test/java/com/example/core/automation/workers/PostEventFollowUpWorkerTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `NotificationHelper.showSetupNotification` now accepts `SetupNotificationRequest` directly and derives localized copy from the typed setup/remediation reason.
+- The `Context.showSetupNotification` and SMS-permission setup adapters now delegate typed requests through to the helper instead of unpacking localized strings first.
+- Updated dispatch, SMS-route, message-generation, holiday, and follow-up tests to verify typed setup request flow.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest \
+  --tests com.example.core.automation.sender.MessageDispatcherSmsRouteAdaptersTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.core.automation.workers.MessageDispatchWorkerTest \
+  --tests com.example.core.automation.workers.MessageGenerationWorkerTest \
+  --tests com.example.core.automation.sender.MessageDispatcherTest \
+  --tests com.example.core.automation.workers.HolidayWishWorkerTest \
+  --tests com.example.core.automation.workers.PostEventFollowUpWorkerTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused data setup-notification adapter/SMS-route tests and app dispatch/generation worker tests.
+
+## 2026-07-03 - System Alert Notification Helper Contract
+
+Completed tasks:
+
+- T-001 readiness consistency slice: pass system alert notification requests through the Android helper as typed requests instead of raw title/message arguments.
+
+Changed files:
+
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/SystemAlertNotificationAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/SystemAlertNotificationAdapters.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/notifications/SystemAlertNotificationAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/notifications/SystemAlertNotificationAdaptersTest.kt)
+- [app/src/test/java/com/example/core/automation/workers/DailyTriggerWorkerTest.kt](app/src/test/java/com/example/core/automation/workers/DailyTriggerWorkerTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `NotificationHelper.showSystemAlert` now accepts `SystemAlertNotificationRequest` directly and derives localized copy from the typed reason.
+- The `Context.showSystemAlert` adapter now delegates the typed request through to the helper instead of unpacking raw strings first.
+- Updated adapter and DailyTrigger worker tests to verify typed request flow and localized copy mapping.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.notifications.SystemAlertNotificationAdaptersTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.core.automation.workers.DailyTriggerWorkerTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused system-alert adapter and DailyTrigger worker tests. A parallel first attempt hit generated KSP output contention; rerunning the data test by itself passed.
+
+## 2026-07-03 - Revival Notification Request Contract
+
+Completed tasks:
+
+- T-001 readiness consistency slice: route revival review notifications through a shared typed notification request instead of raw Android helper arguments.
+
+Changed files:
+
+- [core/model/src/main/kotlin/com/example/domain/model/notification/ApprovalNotificationRequest.kt](core/model/src/main/kotlin/com/example/domain/model/notification/ApprovalNotificationRequest.kt)
+- [core/domain/src/main/kotlin/com/example/domain/notification/NotificationMappers.kt](core/domain/src/main/kotlin/com/example/domain/notification/NotificationMappers.kt)
+- [core/domain/src/test/kotlin/com/example/domain/notification/NotificationMappersTest.kt](core/domain/src/test/kotlin/com/example/domain/notification/NotificationMappersTest.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt)
+- [app/src/test/java/com/example/core/automation/workers/RevivalWorkerTest.kt](app/src/test/java/com/example/core/automation/workers/RevivalWorkerTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `RevivalNotificationRequest` to the notification model contract and mapped it from `ContactHeader`, days-since-contact, and generated suggestion text.
+- `RevivalWorker` now builds the shared request before asking `NotificationHelper` to render the Android notification.
+- Updated worker tests to verify typed request contents instead of positional raw notification arguments.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.notification.NotificationMappersTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.core.automation.workers.RevivalWorkerTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused domain notification mapper and Revival worker tests.
+
+## 2026-07-03 - SMS Delivery Status Recovery Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move stale SMS pending-delivery cutoff and recovered-status decisions into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/SmsDeliveryStatusRecoveryPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/SmsDeliveryStatusRecoveryPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/SmsDeliveryStatusRecoveryPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/SmsDeliveryStatusRecoveryPolicyTest.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/SmsDeliveryStatusRecovery.kt](core/data/src/main/kotlin/com/example/core/automation/sender/SmsDeliveryStatusRecovery.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `SmsDeliveryStatusRecoveryPolicy` to derive the stale pending-delivery cutoff and recovered delivery status for SMS delivery-status recovery.
+- `SmsDeliveryStatusRecovery` now uses the shared policy and keeps only database access, DAO update, and structured logging in the data adapter.
+- Added focused policy coverage for normal stale-window cutoff calculation and negative-window clamping.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.automation.SmsDeliveryStatusRecoveryPolicyTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.sender.SmsDeliveryStatusRecoveryTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused domain SMS delivery-status recovery policy and data recovery adapter tests.
+
+## 2026-07-03 - SMS Callback Outcome Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: use one shared SMS callback outcome policy for delivery status, dispatch-attempt result, pending failure marking, and callback failure metadata.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/dispatch/SmsCallbackOutcomePolicy.kt](core/domain/src/main/kotlin/com/example/domain/dispatch/SmsCallbackOutcomePolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/dispatch/SmsCallbackOutcomePolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/dispatch/SmsCallbackOutcomePolicyTest.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/SmsStatusReceiver.kt](core/data/src/main/kotlin/com/example/core/automation/sender/SmsStatusReceiver.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `SmsCallbackOutcomePolicy` to map Android SMS sent/delivered callback success and failure into typed delivery status, dispatch-attempt result, pending failure behavior, dead-letter behavior, and redacted failure metadata.
+- `SmsStatusReceiver` now delegates sent and delivered callback outcomes to the shared domain policy before applying DAO updates.
+- Added focused policy coverage for sent success, delivered success, sent callback failure, and delivered callback failure.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.dispatch.SmsCallbackOutcomePolicyTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.core.automation.sender.SmsStatusReceiverTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused domain SMS callback outcome policy and SMS status receiver tests.
+
+## 2026-07-03 - Dispatch Exception Failure Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: use one shared final-failure policy for foreground and worker dispatcher exceptions.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/dispatch/DispatchExceptionFailurePolicy.kt](core/domain/src/main/kotlin/com/example/domain/dispatch/DispatchExceptionFailurePolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/dispatch/DispatchExceptionFailurePolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/dispatch/DispatchExceptionFailurePolicyTest.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/DispatchMessageUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/DispatchMessageUseCase.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/WorkerMessageDispatchAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/workers/WorkerMessageDispatchAdapters.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/workers/WorkerMessageDispatchAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/workers/WorkerMessageDispatchAdaptersTest.kt)
+- [app/src/test/java/com/example/domain/usecase/DispatchMessageUseCaseTest.kt](app/src/test/java/com/example/domain/usecase/DispatchMessageUseCaseTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `DispatchExceptionFailurePolicy` to derive final dispatch-attempt failure details from dispatcher exceptions without leaking provider exception messages.
+- `DispatchMessageUseCase` and `WorkerMessageDispatchAdapters` now both use the shared policy for `FAILED_FINAL`, failed delivery status, error type fallback, redacted user-safe message, and dead-letter behavior.
+- Added focused policy and foreground-dispatch regression coverage while preserving the existing worker adapter behavior.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.dispatch.DispatchExceptionFailurePolicyTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.workers.WorkerMessageDispatchAdaptersTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.domain.usecase.DispatchMessageUseCaseTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused domain exception policy, worker adapter, and foreground dispatch use-case tests.
+
+## 2026-07-03 - Exact Send Recovery Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move stale exact-send recovery classification into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/ExactSendRecoveryPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/ExactSendRecoveryPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/ExactSendRecoveryPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/ExactSendRecoveryPolicyTest.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/scheduler/ExactSendRecovery.kt](core/data/src/main/kotlin/com/example/core/automation/scheduler/ExactSendRecovery.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `ExactSendRecoveryPolicy` to classify stale dispatching attempts as wait-for-grace, mark sent, reschedule retry, mark expired, or fail for manual review.
+- `ExactSendRecovery` now delegates the recovery decision to the domain policy and keeps only DAO status/outcome updates in the scheduler adapter.
+- Added focused domain tests for fresh attempts, provider-accepted outcomes, retryable outcomes with and without retry time, expired attempts, and unresolved stale attempts.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.automation.ExactSendRecoveryPolicyTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.scheduler.ExactSendRecoveryTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused domain recovery policy and scheduler recovery adapter tests.
+
+## 2026-07-03 - Messages Dispatch Timing Readiness
+
+Completed tasks:
+
+- T-001 readiness consistency slice: use shared dispatch eligibility decisions for Messages scheduled readiness labels.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/MessageOperationalReadinessPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/MessageOperationalReadinessPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/MessageOperationalReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/MessageOperationalReadinessPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt](app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesQueueComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesQueueComponents.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt)
+- [app/src/test/java/com/example/ui/LocalizationParityTest.kt](app/src/test/java/com/example/ui/LocalizationParityTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `MessageOperationalReadinessPolicy` now maps approved messages through `DispatchEligibilityPolicy`, distinguishing send-ready rows from rows waiting for their scheduled time or paused by quiet hours/blackout dates.
+- `MessagesViewModel` passes quiet-hours and blackout preferences into the shared readiness policy instead of showing all route-ready approved rows as simply scheduled.
+- Messages badges now expose localized labels for scheduled-time and allowed-window waiting states while keeping them in the Scheduled task bucket.
+- Added focused domain and ViewModel tests for future approved messages and quiet-hours deferral, plus localization parity coverage for the new strings.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.automation.MessageOperationalReadinessPolicyTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.MessagesViewModelTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused domain readiness, Messages ViewModel, and localization parity tests.
+
+## 2026-07-03 - History-Aware Dispatch Route Ordering
+
+Completed tasks:
+
+- T-001 readiness consistency slice: use the shared history-aware route policy for final dispatch fallback ordering.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/AutoSendChannelSelector.kt](core/domain/src/main/kotlin/com/example/domain/automation/AutoSendChannelSelector.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/AutoSendChannelSelectorTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/AutoSendChannelSelectorTest.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/DeliveryChannelResolver.kt](core/data/src/main/kotlin/com/example/core/automation/sender/DeliveryChannelResolver.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherRoutePlanAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherRoutePlanAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherRouteHistoryAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherRouteHistoryAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcher.kt](core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcher.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/sender/DeliveryChannelResolverTest.kt](core/data/src/test/kotlin/com/example/core/automation/sender/DeliveryChannelResolverTest.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherRoutePlanAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherRoutePlanAdaptersTest.kt)
+- [app/src/test/java/com/example/core/automation/sender/MessageDispatcherTest.kt](app/src/test/java/com/example/core/automation/sender/MessageDispatcherTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `AutoSendChannelSelector.orderedRoutes(...)` so the domain selector returns a full route order, not just the selected first route.
+- `DeliveryChannelResolver` now delegates route ordering to `AutoSendChannelSelector`, preserving blocked-channel and contact-reachability checks while reusing successful route history.
+- `MessageDispatcher` reads recent sent-message route history for the contact and passes it into the route plan before trying SMS/WhatsApp/email routes.
+- Added focused domain, data route-plan, and dispatcher tests proving successful delivery history can promote email ahead of SMS while preserving fallback routes.
+- Updated SSOT/audit wording to show history-aware route selection and final dispatch fallback ordering as shared; remaining T-001 gaps are notification surfaces outside typed alert requests and end-to-end dispatch timing outside Wish Preview.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.automation.AutoSendChannelSelectorTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.sender.DeliveryChannelResolverTest \
+  --tests com.example.core.automation.sender.MessageDispatcherRoutePlanAdaptersTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.core.automation.sender.MessageDispatcherTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused domain selector, data route-plan, and dispatcher tests.
+
+## 2026-07-03 - System Alert Notification Reasons
+
+Completed tasks:
+
+- T-001 readiness consistency slice: route AI fallback and stale-backup system alerts through shared typed notification request reasons.
+
+Changed files:
+
+- [core/model/src/main/kotlin/com/example/domain/model/notification/SystemAlertNotificationRequest.kt](core/model/src/main/kotlin/com/example/domain/model/notification/SystemAlertNotificationRequest.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/SystemAlertNotificationAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/SystemAlertNotificationAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationServiceImpl.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationServiceImpl.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/DailyTriggerWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/DailyTriggerWorker.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/notifications/SystemAlertNotificationAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/notifications/SystemAlertNotificationAdaptersTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `SystemAlertNotificationRequest` and `SystemAlertNotificationReason` for AI fallback and stale-backup alert decisions.
+- Added `SystemAlertNotificationAdapters` to map typed system alert requests to localized Android notification copy.
+- `NotificationServiceImpl.showAiFallbackAlert()` and `DailyTriggerWorker` now pass typed system alert requests instead of selecting title/message resources at the call site.
+- Added focused adapter coverage for both system alert reasons.
+- Updated SSOT/audit wording to show system alert reasons as shared; remaining notification surfaces outside typed alert requests, history-aware route selection/fallback, and end-to-end dispatch timing outside Wish Preview remain open.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.notifications.SystemAlertNotificationAdaptersTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.core.automation.workers.DailyTriggerWorkerTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused adapter and affected worker tests.
+
+## 2026-07-03 - Setup Notification Readiness Reasons
+
+Completed tasks:
+
+- T-001 readiness consistency slice: route remaining setup/remediation notification states through shared typed setup notification reasons.
+
+Changed files:
+
+- [core/model/src/main/kotlin/com/example/domain/model/notification/SetupNotificationRequest.kt](core/model/src/main/kotlin/com/example/domain/model/notification/SetupNotificationRequest.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/MessageGenerationWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/MessageGenerationWorker.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/HolidayWishWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/HolidayWishWorker.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/PostEventFollowUpWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/PostEventFollowUpWorker.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt](core/data/src/main/kotlin/com/example/core/automation/scheduler/DailyScheduler.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdaptersTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Extended `SetupNotificationReason` with `AI_PROVIDER_MISSING`, `REVIVAL_AI_PROVIDER_MISSING`, and `EXACT_ALARM_PERMISSION_MISSING`.
+- `MessageDispatcherNotificationAdapters` now maps those typed setup reasons to the existing localized AI setup, revival AI setup, and exact-alarm setup notification copy.
+- Message generation, holiday wish, post-event follow-up, revival, and exact-send scheduling paths now call `showSetupNotification(SetupNotificationRequest)` instead of selecting setup notification title/message resources at the call site.
+- Added focused adapter coverage for the new setup notification reasons.
+- Updated SSOT/audit wording to show setup/remediation notification reasons as shared; non-setup notification readiness, history-aware route selection/fallback, and end-to-end dispatch timing outside Wish Preview remain open.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest \
+  --tests com.example.core.automation.workers.MessageGenerationWorkerTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.core.automation.workers.HolidayWishWorkerTest \
+  --tests com.example.core.automation.workers.PostEventFollowUpWorkerTest \
+  --tests com.example.core.automation.workers.RevivalWorkerTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused adapter and affected worker tests.
+
+## 2026-07-03 - Wish Preview Dispatch Timing Preferences
+
+Completed tasks:
+
+- T-001 readiness consistency slice: pass quiet-hours and blackout-date preferences into the Wish Preview shared dispatch context.
+
+Changed files:
+
+- [core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt](app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt)
+- [app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `WishPreviewViewModel` now reads `getBlackoutDates()`, `getQuietHoursStart()`, and `getQuietHoursEnd()` when preference changes refresh the approval plan.
+- The ViewModel passes those timing preferences into `WishPreviewSendSummaryPolicy.build(...)`, so the Dispatch row can show quiet-hours/blackout deferral instead of only schedule/approval state.
+- Added a domain summary test for quiet-hours dispatch deferral and a ViewModel test proving timing preferences flow into `dispatchContext`.
+- Updated SSOT/audit wording to show Wish Preview quiet-hours/blackout dispatch timing as shared; broader notification readiness, history-aware route selection/fallback, and end-to-end dispatch timing outside the Wish Preview review summary remain open.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.message.WishPreviewSendSummaryPolicyTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.WishPreviewViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused domain and ViewModel tests.
+
+## 2026-07-03 - Wish Preview Route Choice Context
+
+Completed tasks:
+
+- T-001 readiness consistency slice: show whether the selected Wish Preview send channel matches the contact's preferred channel or is a fallback from it.
+
+Changed files:
+
+- [core/model/src/main/kotlin/com/example/domain/model/contact/ContactMessageContext.kt](core/model/src/main/kotlin/com/example/domain/model/contact/ContactMessageContext.kt)
+- [core/domain/src/main/kotlin/com/example/domain/contact/ContactMappers.kt](core/domain/src/main/kotlin/com/example/domain/contact/ContactMappers.kt)
+- [core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt](core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt)
+- [core/data/src/test/kotlin/com/example/data/repository/ContactRepositoryImplTest.kt](core/data/src/test/kotlin/com/example/data/repository/ContactRepositoryImplTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt](app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added preferred-channel evidence to `ContactMessageContext` and its Room-contact mapper.
+- Extended `WishPreviewSendSummaryPolicy` with optional `WishPreviewRouteSelectionContext`, `WishPreviewRouteSelectionState`, and `WishPreviewRouteSelectionReason`.
+- `WishPreviewViewModel` now passes the contact preferred channel into the shared send-summary projection.
+- The Wish Preview approval plan now renders a Route choice row showing `Preferred route` or `Fallback from <channel>`.
+- Added English/Hindi strings and focused domain, data mapper, ViewModel, Compose, and localization tests.
+- Updated SSOT/audit wording to show preferred-vs-fallback route choice as domain-derived; broader notification readiness surfaces, broader dispatch timing, and history-aware route selection/fallback remain open.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.message.WishPreviewSendSummaryPolicyTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.data.repository.ContactRepositoryImplTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.WishPreviewViewModelTest \
+  --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed for focused domain, data mapper, app, and localization tests.
+
+## 2026-07-03 - Wish Preview Device Setup Context
+
+Completed tasks:
+
+- T-001 readiness consistency slice: add shared SMS/WhatsApp device setup context to the Wish Preview delivery plan.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt](core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt)
+- [core/domain/src/main/kotlin/com/example/domain/service/PreferencesRepository.kt](core/domain/src/main/kotlin/com/example/domain/service/PreferencesRepository.kt)
+- [core/data/src/main/kotlin/com/example/core/prefs/PreferencesRepositoryImpl.kt](core/data/src/main/kotlin/com/example/core/prefs/PreferencesRepositoryImpl.kt)
+- [core/data/src/test/kotlin/com/example/core/prefs/PreferencesRepositoryImplTest.kt](core/data/src/test/kotlin/com/example/core/prefs/PreferencesRepositoryImplTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/WishPreviewDeviceReadinessReader.kt](app/src/main/java/com/example/ui/viewmodel/WishPreviewDeviceReadinessReader.kt)
+- [app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt](app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Extended `WishPreviewSendSummaryPolicy` with optional `WishPreviewDeviceSetupContext`, `WishPreviewDeviceSetupState`, and `WishPreviewDeviceSetupReason` derived from the shared `SetupChannelReadinessPolicy`.
+- Added `WishPreviewDeviceReadinessReader` to collect Android SMS permission, WhatsApp consent, WhatsApp Accessibility service, and installed-app evidence for the selected draft channel.
+- Exposed WhatsApp automation consent through `PreferencesRepository` so Wish Preview can read the same persisted setup evidence without depending on `SecurePrefs` directly.
+- The Wish Preview delivery plan now renders a Device setup row for SMS permission and WhatsApp consent/app/accessibility readiness when device evidence is available.
+- Added English/Hindi strings and focused domain, data, ViewModel, and Compose tests for the device setup context.
+- Updated SSOT/audit wording to show Wish Preview device setup context as domain-derived; broader notification readiness surfaces, broader dispatch timing, and route selection/fallback remain open.
+
+Validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.message.WishPreviewSendSummaryPolicyTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.prefs.PreferencesRepositoryImplTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.WishPreviewViewModelTest \
+  --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed. Static diff checks, focused domain/data/app tests, and localization parity passed for this slice.
+
+## 2026-07-03 - Dispatch Finalization Dead-Letter Log Test Alignment
+
+Completed tasks:
+
+- Validation cleanup: align the no-route finalization test with current failure side effects where a `MessageDispatcher` warning is followed by a `DeadLetterQueue` enqueue log.
+
+Changed files:
+
+- [core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherFinalizationAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherFinalizationAdaptersTest.kt)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Updated `MessageDispatcherFinalizationAdaptersTest.saveFailedMessageDispatchFinalization_persistsNoRouteFinalFailureEffects` to find the expected `MessageDispatcher` warning among recent structured logs instead of assuming it is the final log entry after dead-letter enqueue side effects.
+- Preserved the assertions for failed pending status, dispatch-attempt dead-letter metadata, dead-letter queue payload, and health-monitor error evidence.
+- Cleared the wider `:core:data:testDebugUnitTest` failure that surfaced during the dispatch setup notification request slice.
+
+Validation:
+
+```bash
+git diff --check -- core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherFinalizationAdaptersTest.kt
+rg -n "Failed to dispatch message pending_no_route|StructuredLogger\\.getRecent\\(\\)\\.single|DeadLetterQueue" core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherFinalizationAdaptersTest.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.sender.MessageDispatcherFinalizationAdaptersTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --no-configuration-cache
+```
+
+Result: passed. The wider `:core:data:testDebugUnitTest` suite now passes after the stale log-order assertion was updated.
+
+## 2026-07-03 - Dispatch Setup Notification Requests
+
+Completed tasks:
+
+- T-001 readiness consistency slice: replace dispatch-worker raw setup notification copy decisions with typed setup notification request reasons.
+
+Changed files:
+
+- [core/model/src/main/kotlin/com/example/domain/model/notification/SetupNotificationRequest.kt](core/model/src/main/kotlin/com/example/domain/model/notification/SetupNotificationRequest.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt)
+- [core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdaptersTest.kt](core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdaptersTest.kt)
+- [app/src/test/java/com/example/core/automation/workers/MessageDispatchWorkerTest.kt](app/src/test/java/com/example/core/automation/workers/MessageDispatchWorkerTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added shared `SetupNotificationRequest` and `SetupNotificationReason` for SMS permission, expired-message, and double-send-guard setup alerts.
+- `MessageDispatcherNotificationAdapters` now maps typed setup notification requests to localized Android notification title/message copy.
+- `MessageDispatchWorker` now emits expired-message and double-send setup alerts through typed request reasons instead of constructing raw title/message pairs inline.
+- Focused tests cover the typed request factory, localized adapter mapping, and the dispatch worker expired/double-send notification branches.
+- Updated SSOT/audit wording to show dispatch setup notification requests as shared; broader notification readiness surfaces, Wish Preview OS permission context, broader dispatch timing, and route selection/fallback remain open.
+
+Validation:
+
+```bash
+git diff --check -- core/model/src/main/kotlin/com/example/domain/model/notification/SetupNotificationRequest.kt core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdapters.kt core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdaptersTest.kt app/src/test/java/com/example/core/automation/workers/MessageDispatchWorkerTest.kt
+rg -n "SetupNotificationReason|SetupNotificationRequest|setupNotificationRequest|showSetupNotification\\(" core/model/src/main/kotlin/com/example/domain/model/notification/SetupNotificationRequest.kt core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdapters.kt core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt core/data/src/test/kotlin/com/example/core/automation/sender/MessageDispatcherNotificationAdaptersTest.kt app/src/test/java/com/example/core/automation/workers/MessageDispatchWorkerTest.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:data:testDebugUnitTest \
+  --tests com.example.core.automation.sender.MessageDispatcherNotificationAdaptersTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.core.automation.workers.MessageDispatchWorkerTest \
+  --no-configuration-cache
+```
+
+Result: passed for the focused adapter and worker tests. The wider `:core:data:testDebugUnitTest` failure exposed by this slice was resolved in the later 2026-07-03 dispatch finalization dead-letter log test alignment entry.
+
+## 2026-07-03 - Wish Preview Route Setup Context
+
+Completed tasks:
+
+- T-001 readiness consistency slice: add shared route/contact/email setup context to the Wish Preview delivery plan.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt](core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt](app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Extended `WishPreviewSendSummaryPolicy` with optional `WishPreviewRouteContext`, `WishPreviewRouteState`, and `WishPreviewRouteReason` derived from shared `DeliveryRouteReadinessPolicy`.
+- `WishPreviewViewModel` now observes contact delivery context and preference changes, then passes channel blackout and sender email setup into the shared send-summary projection.
+- The Wish Preview delivery plan now renders a Route setup row when route evidence is available, covering ready, missing contact, disabled channel, missing phone/email, missing email setup, invalid sender email, and unsupported channel states.
+- Added English/Hindi strings and focused domain, ViewModel, and Compose tests for the route setup context.
+- Updated SSOT/audit wording to show Wish Preview route setup context as domain-derived; Wish Preview OS permission context, broader dispatch timing, route selection/fallback, and notification readiness surfaces remain open.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt
+rg -n "WishPreviewRouteState|WishPreviewRouteReason|WishPreviewRouteContext|routeContext|wish_preview_summary_route_" core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.message.WishPreviewSendSummaryPolicyTest \
+  --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.WishPreviewViewModelTest \
+  --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed. The first sandboxed Gradle attempt was blocked by the existing `~/.gradle` wrapper lock; rerunning with filesystem access to the existing Gradle cache passed.
+
+## 2026-07-03 - Wish Preview Dispatch Context Summary
+
+Completed tasks:
+
+- T-001 readiness consistency slice: add shared dispatch eligibility context to the Wish Preview delivery plan.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt](core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt)
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt)
+- [app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Extended `WishPreviewSendSummaryPolicy` with `WishPreviewDispatchContext`, `WishPreviewDispatchState`, and `WishPreviewDispatchReason` derived from shared `DispatchEligibilityPolicy`.
+- The Wish Preview delivery plan now renders a Dispatch row for needs-approval, ready, scheduled, deferred, expired, and blocked states.
+- Added English/Hindi strings and focused tests for domain summary projection, ViewModel exposure, and Compose rendering.
+- Updated SSOT/audit wording to show Wish Preview dispatch context as domain-derived; Wish Preview permission context, broader dispatch timing, route selection, and notification readiness surfaces remain open.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "WishPreviewDispatchState|WishPreviewDispatchReason|WishPreviewDispatchContext|dispatchContext|wish_preview_summary_dispatch" core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml app/src/test/java/com/example/ui/viewmodel/WishPreviewViewModelTest.kt app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.message.WishPreviewSendSummaryPolicyTest \
+  --tests com.example.ui.viewmodel.WishPreviewViewModelTest \
+  --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Approval Notification Action Policy Domain Move
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move approval notification approve/schedule/dispatch/expire/block decisions from Android data code into a shared domain notification policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/notification/ApprovalNotificationActionPolicy.kt](core/domain/src/main/kotlin/com/example/domain/notification/ApprovalNotificationActionPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/notification/ApprovalNotificationActionPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/notification/ApprovalNotificationActionPolicyTest.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/ApprovalReceiver.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/ApprovalReceiver.kt)
+- Removed `core/data/src/main/kotlin/com/example/core/automation/notifications/ApprovalNotificationActionPolicy.kt`
+- Removed `core/data/src/test/kotlin/com/example/core/automation/notifications/ApprovalNotificationActionPolicyTest.kt`
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added domain `ApprovalNotificationActionPolicy` and `ApprovalNotificationAction` to classify approval notification actions through the shared `DispatchEligibilityPolicy`.
+- `ApprovalReceiver` now imports the domain notification action policy and keeps only Android side effects: status persistence, exact-send schedule/cancel commands, and dispatch work enqueue.
+- Moved approval notification action tests from `core:data` to `core:domain` so notification action readiness is verified at the shared policy layer.
+- Updated SSOT/audit wording to show approval notification actions as domain-derived; Wish Preview permission/dispatch context, broader dispatch timing, and remaining notification readiness surfaces remain open.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/notification/ApprovalNotificationActionPolicy.kt core/domain/src/test/kotlin/com/example/domain/notification/ApprovalNotificationActionPolicyTest.kt core/data/src/main/kotlin/com/example/core/automation/notifications/ApprovalReceiver.kt core/data/src/main/kotlin/com/example/core/automation/notifications/ApprovalNotificationActionPolicy.kt core/data/src/test/kotlin/com/example/core/automation/notifications/ApprovalNotificationActionPolicyTest.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "ApprovalNotificationActionPolicy|ApprovalNotificationAction" core/data/src/main core/data/src/test core/domain/src/main core/domain/src/test
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :core:data:testDebugUnitTest \
+  --tests com.example.domain.notification.ApprovalNotificationActionPolicyTest \
+  --tests com.example.core.automation.notifications.ApprovalReceiverStatusCommandsTest \
+  --tests com.example.core.automation.notifications.ApprovalReceiverMessageAdaptersTest \
+  --tests com.example.core.automation.notifications.ApprovalReceiverDispatchCommandsTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Setup Account Provider Readiness Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move AI Doctor Google Contacts access, Gemini access, AI wish-generation toggle, and Gemini circuit decisions into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/SetupAccountProviderReadinessPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/SetupAccountProviderReadinessPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/SetupAccountProviderReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/SetupAccountProviderReadinessPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `SetupAccountProviderReadinessPolicy` with typed readiness reasons for Google Contacts access, Gemini API key/Firebase auth access, AI wish-generation enablement, and Gemini provider circuit health.
+- `AutomationSetupViewModel` now delegates AI Doctor account/provider readiness decisions to the domain policy while keeping localized copy and action routes in the ViewModel.
+- Added localized copy for the Firebase-auth Gemini-ready state so an authenticated provider path no longer renders as missing access.
+- Updated SSOT/audit wording to show AI Doctor account/provider readiness as domain-derived; Wish Preview permission/dispatch context, broader dispatch timing, and notification action/readiness surfaces remain open. Approval notification action decisions were moved to domain in a later 2026-07-03 slice.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/automation/SetupAccountProviderReadinessPolicy.kt core/domain/src/test/kotlin/com/example/domain/automation/SetupAccountProviderReadinessPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "hasGoogleContactsAccess\\) \\{|securePrefs\\.getGeminiApiKey\\(\\)\\.isNotBlank\\(\\)\\) \\{|health\\.circuitBreakerStates\\[\\\"gemini\\\"\\]\\?\\.let|when \\(health\\.circuitBreakerStates\\[\\\"gemini\\\"\\]\\)|if \\(aiEnabled\\) text\\(R\\.string\\.automation_setup_ai_wish_enabled\\)" app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.automation.SetupAccountProviderReadinessPolicyTest \
+  --tests com.example.ui.viewmodel.AutomationSetupViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed. Gradle still reports the existing `GoogleSignIn` deprecation warnings in `AutomationSetupViewModel`.
+
+## 2026-07-03 - Setup Automation Readiness Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move AI Doctor full-automation mode, automatable-event, automatic delivery-route, and selected-channel count decisions into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/SetupAutomationReadinessPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/SetupAutomationReadinessPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/SetupAutomationReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/SetupAutomationReadinessPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `SetupAutomationReadinessPolicy` with typed readiness reasons for disabled full automation, contact review-first overrides, missing automatable events, missing delivery routes, and selected automatic-channel counts.
+- `AutomationSetupViewModel` now delegates full-automation, event readiness, delivery-route readiness, and selected-channel count decisions to the domain policy while keeping localized strings and action routes in the ViewModel.
+- Updated SSOT/audit wording to show AI Doctor automation prerequisite readiness as domain-derived; Wish Preview permission/dispatch context, broader dispatch timing, and notification action/readiness surfaces remain open. AI Doctor account/provider readiness was moved to `SetupAccountProviderReadinessPolicy` in a later 2026-07-03 slice.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/automation/SetupAutomationReadinessPolicy.kt core/domain/src/test/kotlin/com/example/domain/automation/SetupAutomationReadinessPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "hasReviewFirstAutomationOverride|eventReadyCount = contacts|hasAutomaticDeliveryRoute|private fun selectedAutomaticChannelCounts|private fun ContactAutomationReadinessProfile\\.selectedAutomaticChannel" app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.automation.SetupAutomationReadinessPolicyTest \
+  --tests com.example.ui.viewmodel.AutomationSetupViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed. Gradle still reports the existing `GoogleSignIn` deprecation warnings in `AutomationSetupViewModel`.
+
+## 2026-07-03 - Setup Quality Readiness Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move AI Doctor Style Coach, personalization coverage, and generic-message risk decisions into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/SetupQualityReadinessPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/SetupQualityReadinessPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/SetupQualityReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/SetupQualityReadinessPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `SetupQualityReadinessPolicy` with typed readiness reasons for Style Coach training, personalization coverage, and generic-message risk.
+- `AutomationSetupViewModel` now delegates Style Coach sample thresholds, personalization percentage, and AI-context risk checks to the domain policy while keeping localized strings and action routes in the ViewModel.
+- Updated SSOT/audit wording to show AI Doctor quality readiness as domain-derived; Wish Preview permission/dispatch context, AI Doctor remaining non-quality/non-email/non-system check generation/copy, broader dispatch timing, and notification action/readiness surfaces remain open.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/automation/SetupQualityReadinessPolicy.kt core/domain/src/test/kotlin/com/example/domain/automation/SetupQualityReadinessPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "PERSONALIZATION_CONFIDENCE_THRESHOLD|styleSampleCount >= 3|styleSampleCount > 0|percentage >= 50|hasPersonalizationContextForAi" app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.automation.SetupQualityReadinessPolicyTest \
+  --tests com.example.ui.viewmodel.AutomationSetupViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed. Gradle still reports the existing `GoogleSignIn` deprecation warnings in `AutomationSetupViewModel`.
+
+## 2026-07-03 - Setup Email Readiness Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move AI Doctor Gmail sender setup readiness into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/SetupEmailReadinessPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/SetupEmailReadinessPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/SetupEmailReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/SetupEmailReadinessPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `SetupEmailReadinessPolicy` with typed readiness reasons for invalid sender address, verified sender, unverified sender, missing setup for email-preferred contacts, and optional email setup.
+- `AutomationSetupViewModel` now uses the domain policy for sender readiness and the AI Doctor email check while keeping localized strings and action routes in the ViewModel.
+- Updated SSOT/audit wording to show AI Doctor email setup readiness as domain-derived; Wish Preview permission/dispatch context, AI Doctor remaining non-email/non-system check generation/copy, broader dispatch timing, and notification action/readiness surfaces remain open.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/automation/SetupEmailReadinessPolicy.kt core/domain/src/test/kotlin/com/example/domain/automation/SetupEmailReadinessPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "senderEmailSyntaxValid|senderEmailConfigured|isValidEmailAddress" app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.automation.SetupEmailReadinessPolicyTest \
+  --tests com.example.ui.viewmodel.AutomationSetupViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed. Gradle still reports the existing `GoogleSignIn` deprecation warnings in `AutomationSetupViewModel`.
+
+## 2026-07-03 - Setup System Readiness Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move AI Doctor notification permission, exact-send permission, daily scheduler, recent health evidence, and dispatch recovery status decisions into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/SetupSystemReadinessPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/SetupSystemReadinessPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/SetupSystemReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/SetupSystemReadinessPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `SetupSystemReadinessPolicy` with typed readiness reasons for notification permission, exact sends, daily automation scheduling, recent health evidence, and persisted dispatch recovery.
+- `AutomationSetupViewModel` now delegates those system/recovery status decisions to the domain policy while keeping Android probes, localized strings, and action routes in the ViewModel.
+- Updated SSOT/audit wording to show AI Doctor system readiness as domain-derived; Wish Preview permission/dispatch context, AI Doctor remaining non-system check generation/copy, broader dispatch timing, and notification action/readiness surfaces remain open.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/automation/SetupSystemReadinessPolicy.kt core/domain/src/test/kotlin/com/example/domain/automation/SetupSystemReadinessPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "notificationsAllowed\\).*ReadinessCheck|exactSendsAllowed\\).*ReadinessCheck|dailyScheduled\\).*ReadinessCheck|hasRecentHealthEvidence\\).*ReadinessCheck|totalRecoveryCount == 0" app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.automation.SetupSystemReadinessPolicyTest \
+  --tests com.example.ui.viewmodel.AutomationSetupViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed. Gradle still reports the existing `GoogleSignIn` deprecation warnings in `AutomationSetupViewModel`.
+
+## 2026-07-03 - Setup Channel Readiness Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move AI Doctor SMS/WhatsApp setup-channel readiness and channel verification routing decisions into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/SetupChannelReadinessPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/SetupChannelReadinessPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/SetupChannelReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/SetupChannelReadinessPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `SetupChannelReadinessPolicy` with typed SMS, WhatsApp, and channel-verification readiness reasons.
+- `AutomationSetupViewModel` now delegates SMS permission, disabled-channel, unused-channel, WhatsApp consent, app-installed, and accessibility decisions to the domain policy while keeping localized strings and UI actions in the ViewModel.
+- `AutomationSetupViewModel` now delegates channel verification routing for no routes, verified channels, email self-test, SMS/WhatsApp message proof, and activity-history fallback to the domain policy while keeping localized strings and UI actions in the ViewModel.
+- Updated SSOT/audit wording to show SMS/WhatsApp setup readiness and channel verification routing as domain-derived; Wish Preview permission/dispatch context, AI Doctor remaining check generation/copy, notifications, and dispatch timing remain open.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/automation/SetupChannelReadinessPolicy.kt core/domain/src/test/kotlin/com/example/domain/automation/SetupChannelReadinessPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "smsDisabled ->|selectedSmsContactCount == 0 ->|smsAllowed ->|!consentGranted ->|!whatsAppInstalled ->|!accessibilityEnabled ->|canFixWithEmailTest|realMessageProofChannel" app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.automation.SetupChannelReadinessPolicyTest \
+  --tests com.example.ui.viewmodel.AutomationSetupViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed after rerunning Gradle with filesystem access to the existing `~/.gradle` wrapper lock. The first full focused run hit a coroutine-test dispatcher teardown race in `AutomationSetupViewModelTest`; rerunning the same command passed.
+
+## 2026-07-03 - Home Readiness Banner Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move Home readiness banner classification for sync failures, missing contacts, and pending approvals into the shared Home domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/home/HomeNextActionPolicy.kt](core/domain/src/main/kotlin/com/example/domain/home/HomeNextActionPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/home/HomeNextActionPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/home/HomeNextActionPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt](app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `HomeReadinessBannerCandidate` and `HomeNextActionPolicy.readinessBanner` to preserve Home's banner priority: contact sync error, missing contacts, then pending approvals.
+- `HomeViewModel` now maps the domain banner candidate to localized strings and navigation targets instead of owning the banner priority logic.
+- Updated SSOT/audit wording to show Home readiness banner classification, backup freshness, and next-action ranking as domain-derived; Wish Preview permission/dispatch context, AI Doctor check generation/copy, notifications, and dispatch timing remain open.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/home/HomeNextActionPolicy.kt core/domain/src/test/kotlin/com/example/domain/home/HomeNextActionPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "syncError != null -> copy|contactCount == 0 -> copy|pendingCount > 0 -> copy" app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.home.HomeNextActionPolicyTest \
+  --tests com.example.ui.viewmodel.HomeViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed after rerunning Gradle with filesystem access to the existing `~/.gradle` wrapper lock.
+
+## 2026-07-03 - Setup Readiness Summary, Progress, and Recommendation Policies
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move setup readiness status, AI Doctor summary classification, setup-progress counts, and AI Doctor recommended-fix ranking into shared domain policies.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/SetupReadinessProgressPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/SetupReadinessProgressPolicy.kt)
+- [core/domain/src/main/kotlin/com/example/domain/automation/SetupReadinessSummaryPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/SetupReadinessSummaryPolicy.kt)
+- [core/domain/src/main/kotlin/com/example/domain/automation/SetupReadinessRecommendationPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/SetupReadinessRecommendationPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/SetupReadinessProgressPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/SetupReadinessProgressPolicyTest.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/SetupReadinessSummaryPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/SetupReadinessSummaryPolicyTest.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/SetupReadinessRecommendationPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/SetupReadinessRecommendationPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/SetupProgressSummary.kt](app/src/main/java/com/example/ui/viewmodel/SetupProgressSummary.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `SetupReadinessSummaryPolicy`, `SetupReadinessProgressPolicy`, `SetupReadinessRecommendationPolicy`, `SetupReadinessStatus`, `SetupReadinessGroup`, and a domain `SetupProgressSummary` model for setup summary classification, progress counts, progress fraction, and fix ranking.
+- Preserved existing UI imports through `ReadinessStatus`, `ReadinessGroup`, and `SetupProgressSummary` type aliases in the UI ViewModel package.
+- `buildHomeSetupProgressSummary` and AI Doctor check-list progress now call the domain policy instead of local UI counting helpers.
+- AI Doctor summary status, blocker/warning counts, and first-problem selection now call the domain summary policy while localized strings remain in the ViewModel.
+- AI Doctor recommended-fix selection now calls the domain ranking policy while UI action labels/routes remain in the ViewModel.
+- Updated SSOT/audit wording to show this as partial progress toward T-001; AI Doctor check generation/copy, notifications, dispatch timing, and Wish Preview permission/dispatch context remain separate.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/automation/SetupReadinessProgressPolicy.kt core/domain/src/main/kotlin/com/example/domain/automation/SetupReadinessSummaryPolicy.kt core/domain/src/main/kotlin/com/example/domain/automation/SetupReadinessRecommendationPolicy.kt core/domain/src/test/kotlin/com/example/domain/automation/SetupReadinessProgressPolicyTest.kt core/domain/src/test/kotlin/com/example/domain/automation/SetupReadinessSummaryPolicyTest.kt core/domain/src/test/kotlin/com/example/domain/automation/SetupReadinessRecommendationPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/SetupProgressSummary.kt app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "enum class ReadinessStatus|enum class ReadinessGroup|private fun statusesToSetupProgressSummary|data class SetupProgressSummary|val blockers = count|val warnings = count" app/src/main/java/com/example/ui/viewmodel/SetupProgressSummary.kt app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.automation.SetupReadinessSummaryPolicyTest \
+  --tests com.example.domain.automation.SetupReadinessProgressPolicyTest \
+  --tests com.example.domain.automation.SetupReadinessRecommendationPolicyTest \
+  --tests com.example.ui.viewmodel.AutomationSetupViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed after rerunning Gradle with filesystem access to the existing `~/.gradle` wrapper lock.
+
+## 2026-07-03 - Wish Preview Send Summary Policy
+
+Completed tasks:
+
+- T-001 readiness/action consistency slice: move Wish Preview event, channel, schedule, approval-mode, and fallback send-summary projection into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt](core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt](app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `WishPreviewSendSummaryPolicy` and a domain `WishPreviewSendSummary` model for the review screen's send-plan projection.
+- `WishPreviewViewModel` now calls the domain policy while preserving the existing UI-facing `WishPreviewSendSummary` name through a type alias.
+- Updated SSOT/audit wording to show this as partial progress toward T-001; permission, quality, route fallback, AI Doctor, notifications, and dispatch timing remain separate.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt core/domain/src/test/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "data class WishPreviewSendSummary|eventType = eventType\\?\\.raw" app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.message.WishPreviewSendSummaryPolicyTest \
+  --tests com.example.ui.viewmodel.WishPreviewViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed after rerunning Gradle with filesystem access to the existing `~/.gradle` wrapper lock.
+
+## 2026-07-03 - Home Next Action Policy
+
+Completed tasks:
+
+- T-001 readiness/action consistency slice: move Home backup freshness and ranked next-action priority rules into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/home/HomeNextActionPolicy.kt](core/domain/src/main/kotlin/com/example/domain/home/HomeNextActionPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/home/HomeNextActionPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/home/HomeNextActionPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt](app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `HomeNextActionPolicy` for backup freshness, next-action kinds, target kinds, and Home action ranking priorities.
+- `HomeViewModel` now calls the domain policy and maps domain target kinds to UI navigation targets.
+- Existing Home UI state names remain stable through type aliases, so Home screen and interaction fixtures keep their current surface.
+
+Why this improves readiness consistency:
+
+- Home's primary/supporting action priorities now live outside the ViewModel and can be reused by future cross-feature action surfaces.
+- This is still a partial T-001 slice; AI Doctor, notifications, dispatch timing, and Wish Preview permission/dispatch context remain separate.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/home/HomeNextActionPolicy.kt core/domain/src/test/kotlin/com/example/domain/home/HomeNextActionPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "enum class HomeNextActionKind|enum class BackupFreshnessStatus|data class BackupFreshnessPrompt|STALE_BACKUP_DAYS|DAY_MS" app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.home.HomeNextActionPolicyTest \
+  --tests com.example.ui.viewmodel.HomeViewModelTest \
+  --tests com.example.ui.screens.home.HomeScreenInteractionTest \
+  --no-configuration-cache
+```
+
+Result: passed. Static checks are clean, Home-local action/freshness enums and timing constants are gone, and focused domain/app tests passed.
+
+## 2026-07-03 - Wish Preview Draft Readiness Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move Wish Preview draft text readiness and approval-blocking semantics into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/message/WishDraftReadinessPolicy.kt](core/domain/src/main/kotlin/com/example/domain/message/WishDraftReadinessPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/message/WishDraftReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/message/WishDraftReadinessPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt](app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt)
+- [app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `WishDraftReadinessPolicy` with the reviewed-draft length threshold, blank/short/edited/ready states, and shared approval-blocking flags.
+- `WishPreviewViewModel` now evaluates draft text readiness through the domain policy instead of local string/variant helpers.
+- `WishPreviewScreen` now uses the shared `blocksApproval` flag instead of a screen-local readiness helper.
+- The Wish Preview interaction test now confirms reject/approve dialogs explicitly, matching the actual user flow.
+
+Why this improves readiness consistency:
+
+- The same draft text readiness decision now drives ViewModel state, the disabled approve action, and approval-attempt validation.
+- This is still a partial T-001 slice; permission, quality, route fallback, AI Doctor, Home, notifications, and final dispatch readiness remain separate.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/message/WishDraftReadinessPolicy.kt core/domain/src/test/kotlin/com/example/domain/message/WishDraftReadinessPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt app/src/test/java/com/example/ui/screens/wish/WishPreviewScreenInteractionTest.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "enum class WishDraftReadiness|blocksApproval\\(|MIN_REVIEWED_DRAFT_LENGTH|evaluateDraftReadinessAgainst" app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.message.WishDraftReadinessPolicyTest \
+  --tests com.example.ui.viewmodel.WishPreviewViewModelTest \
+  --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest \
+  --no-configuration-cache
+```
+
+Result: passed. Static checks are clean, old screen-local draft readiness helpers are gone, and focused domain/app tests passed.
+
+## 2026-07-03 - Messages Operational Readiness Policy
+
+Completed tasks:
+
+- T-001 readiness consistency slice: move Messages route/status readiness and setup-recovery grouping into a shared domain policy.
+
+Changed files:
+
+- [core/domain/src/main/kotlin/com/example/domain/automation/MessageOperationalReadinessPolicy.kt](core/domain/src/main/kotlin/com/example/domain/automation/MessageOperationalReadinessPolicy.kt)
+- [core/domain/src/test/kotlin/com/example/domain/automation/MessageOperationalReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/automation/MessageOperationalReadinessPolicyTest.kt)
+- [app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt](app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesRecoveryComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesRecoveryComponents.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `MessageOperationalReadinessPolicy` to combine `DeliveryRouteReadinessPolicy` route blockers with pending-message status.
+- Added shared `blocksTaskFlow` and `requiresContactOrChannelFix` flags to remove duplicated readiness grouping from `MessagesViewModel` and `MessagesRecoveryComponents`.
+- Kept the UI-facing `MessageReadiness` name as a type alias so existing Messages screens/tests continue to render the same labels and badges.
+- Updated SSOT/audit wording to show this as partial progress toward T-001, with Home, Wish Preview, AI Doctor, notifications, and dispatch timing still open.
+
+Why this improves readiness consistency:
+
+- Messages task buckets, row badges, and failed-send recovery now read the same domain readiness decision instead of maintaining separate route/status grouping rules.
+- Route blockers still come from the existing route-readiness policy shared with automatic channel selection.
+
+Validation:
+
+```bash
+git diff --check -- core/domain/src/main/kotlin/com/example/domain/automation/MessageOperationalReadinessPolicy.kt core/domain/src/test/kotlin/com/example/domain/automation/MessageOperationalReadinessPolicyTest.kt app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt app/src/main/java/com/example/ui/screens/messages/MessagesRecoveryComponents.kt SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "blocksTaskFlow\\(|requiresContactOrChannelFix\\(|enum class MessageReadiness|toMessageReadiness|DeliveryRouteReadinessPolicy\\.evaluate" app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt app/src/main/java/com/example/ui/screens/messages/MessagesRecoveryComponents.kt
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:testDebugUnitTest :app:testDebugUnitTest \
+  --tests com.example.domain.automation.MessageOperationalReadinessPolicyTest \
+  --tests com.example.ui.viewmodel.MessagesViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed. Static diff checks are clean, the old screen-local readiness grouping functions are gone from Messages, and focused domain/app tests passed.
+
+## 2026-07-03 - Provider Config Policy
+
+Completed tasks:
+
+- T-004 security/release governance slice: make the tracked Google/Firebase client config policy explicit and test-covered.
+
+Changed files:
+
+- [.gitignore](.gitignore)
+- [app/src/test/java/com/example/RepositoryHygieneTest.kt](app/src/test/java/com/example/RepositoryHygieneTest.kt)
+- [docs/operations/release-checklist.md](docs/operations/release-checklist.md)
+- [docs/security/privacy-and-permissions.md](docs/security/privacy-and-permissions.md)
+- [docs/user/complete-user-guide.md](docs/user/complete-user-guide.md)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `.gitignore` now keeps the broad `google-services.json` ignore while explicitly allowlisting only the approved app/debug Firebase client config files.
+- `RepositoryHygieneTest` now verifies the allowlist and checks the approved config files for server-side secret markers.
+- Release/security/user docs now state that service account JSON, private keys, OAuth tokens, client secrets, signing material, SMTP credentials, Gemini keys, and local Firebase variants must not be committed.
+- `SSOT.md` marks T-004/D-004 resolved in the current working tree while keeping Firebase project/OAuth/SHA verification as external release evidence.
+
+Why this improves release readiness:
+
+- Contributors can distinguish approved client config files from forbidden secrets and local provider variants.
+- The policy is enforced by a repository hygiene test instead of living only in prose.
+
+Validation:
+
+```bash
+git diff --check -- .gitignore app/src/test/java/com/example/RepositoryHygieneTest.kt docs/operations/release-checklist.md docs/security/privacy-and-permissions.md docs/user/complete-user-guide.md SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "provider config|Provider config|google-services|T-004|D-004|providerConfigs_areAllowlisted" .gitignore app/src/test/java/com/example/RepositoryHygieneTest.kt docs/operations/release-checklist.md docs/security/privacy-and-permissions.md docs/user/complete-user-guide.md SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "\"private_key\"|\"private_key_id\"|\"client_secret\"|\"refresh_token\"|\"type\": \"service_account\"|\"type\":\"service_account\"" app/google-services.json app/src/debug/google-services.json
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.RepositoryHygieneTest --no-configuration-cache
+```
+
+Result: passed. Static diff checks are clean, approved provider config paths are allowlisted while a local variant remains ignored, no server-side secret markers were found in the approved config files, and `RepositoryHygieneTest` passed.
+
+## 2026-07-03 - Sign-Out Cleanup Comment
+
+Completed tasks:
+
+- T-008 SSOT quick win: remove the stale fixed table-count wording from secure sign-out cleanup.
+
+Changed files:
+
+- [core/data/src/main/kotlin/com/example/core/auth/AuthManager.kt](core/data/src/main/kotlin/com/example/core/auth/AuthManager.kt)
+- [SSOT.md](SSOT.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `AuthManager.signOut()` now documents Step 3 as wiping all Room tables instead of a fixed table count.
+- `SSOT.md` now marks the stale sign-out comment as resolved in the current working tree while keeping broader documentation cleanup open.
+
+Why this improves maintainability:
+
+- The source comment now matches `database.clearAllTables()` and avoids suggesting an outdated fixed schema size.
+
+Validation:
+
+```bash
+git diff --check -- core/data/src/main/kotlin/com/example/core/auth/AuthManager.kt SSOT.md IMPLEMENTATION_PROGRESS.md
+rg -n "Wipe all Room tables|T-008|D-010|Secure sign-out" core/data/src/main/kotlin/com/example/core/auth/AuthManager.kt SSOT.md IMPLEMENTATION_PROGRESS.md
+```
+
+Result: passed. Static diff checks are clean, and the source, SSOT, and progress ledger now show the corrected all-table cleanup wording.
+
+## 2026-07-01 - Gift Advisor Budget Shortcut
+
+Completed tasks:
+
+- P2 Gift Advisor UX slice: give users a direct budget-adjustment path from the screen that shows annual, spent, remaining, and over-budget suggestion evidence.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/navigation/Screen.kt](app/src/main/java/com/example/ui/navigation/Screen.kt)
+- [app/src/main/java/com/example/ui/navigation/NavGraph.kt](app/src/main/java/com/example/ui/navigation/NavGraph.kt)
+- [app/src/main/java/com/example/ui/screens/contacts/ContactDetailScreen.kt](app/src/main/java/com/example/ui/screens/contacts/ContactDetailScreen.kt)
+- [app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt](app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt)
+- [app/src/main/res/values/strings.xml](app/src/main/res/values/strings.xml)
+- [app/src/main/res/values-hi/strings.xml](app/src/main/res/values-hi/strings.xml)
+- [app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt](app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt)
+- [app/src/test/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreenInteractionTest.kt](app/src/test/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreenInteractionTest.kt)
+- [app/src/test/java/com/example/ui/screenshots/GiftAdvisorScreenshotTest.kt](app/src/test/java/com/example/ui/screenshots/GiftAdvisorScreenshotTest.kt)
+- [app/src/test/java/com/example/ui/LocalizationParityTest.kt](app/src/test/java/com/example/ui/LocalizationParityTest.kt)
+- [SSOT.md](SSOT.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-01.md](CODEBASE_AUDIT_REPORT_2026-07-01.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- `Screen.ContactDetail.createRoute(...)` now supports an internal `openPreferences=true` route flag.
+- `NavGraph` passes that flag into `ContactDetailScreen`, which opens the existing preferences dialog on start.
+- Gift Advisor budget stats now include a localized Adjust budget action that routes to Contact Detail with preferences open.
+
+Why this improves UX:
+
+- Users can adjust the annual gift budget from the screen where budget pressure is visible.
+- Contact Detail remains the owner of preference editing and validation; Gift Advisor only navigates to the existing editor.
+
+Validation:
+
+```bash
+git diff --check
+xmllint --noout app/src/main/res/values/strings.xml app/src/main/res/values-hi/strings.xml
+rg -n "gift_advisor_adjust_budget|ADJUST_BUDGET_BUTTON|openPreferences|onAdjustBudget|UX-032|Gift Advisor budget stats route" app/src/main app/src/test SSOT.md CODEBASE_AUDIT_REPORT_2026-07-01.md IMPLEMENTATION_PROGRESS.md
+rg -n "Adjust-budget action|Add budget edit shortcut|User may leave to Contact Detail to adjust budget" CODEBASE_AUDIT_REPORT_2026-07-01.md SSOT.md
+```
+
+Result: passed. Static diff checks are clean, XML resources parse, Gift Advisor budget action/route wiring is present in UI, navigation, tests, localization, and docs, and stale adjust-budget audit wording is gone.
+
+Pending Gradle validation:
+
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest \
+  --tests com.example.ui.navigation.DeepLinkContractTest \
+  --tests com.example.ui.screens.giftadvisor.GiftAdvisorScreenInteractionTest \
+  --tests com.example.ui.LocalizationParityTest \
+  --no-configuration-cache
+```
+
+Result: not run because Gradle escalation is currently blocked by the approval system.
+
 ## 2026-07-01 - Memory Vault Edit Notes
 
 Completed tasks:
@@ -995,7 +3356,7 @@ What changed:
 
 - These files remain available locally but are no longer versioned.
 - `app/schemas` is now treated as a legacy/local generated path; active Room schemas remain under `core/data/schemas`.
-- `git ls-files -i -c --exclude-standard` now reports only `app/google-services.json` and `app/src/debug/google-services.json`, which need an explicit public/private repository policy decision.
+- `git ls-files -i -c --exclude-standard` now reports only `app/google-services.json` and `app/src/debug/google-services.json`, which needed an explicit public/private repository policy decision. Updated 2026-07-03: the approved app/debug client config allowlist is now documented and test-covered.
 
 Validation:
 
@@ -1089,7 +3450,7 @@ Result: passed.
 
 Remaining work:
 
-- Decide repository policy for tracked Google/Firebase service config files.
+- Provider config policy is resolved in the current working tree; release-owner Firebase project/OAuth/SHA evidence remains external.
 - Continue consolidating readiness state across Home, Messages, Wish Preview, AI Doctor, notifications, and dispatch.
 
 ## 2026-06-26 - ActivityLogType Producers and Filters

@@ -2,8 +2,19 @@ package com.example.core.automation.sender
 
 import android.content.Context
 import com.example.core.automation.notifications.NotificationHelper
-import com.example.core.data.R
+import com.example.domain.model.notification.SetupNotificationReason
+import com.example.domain.model.notification.SetupNotificationRequest
 import com.example.domain.model.notification.SmsPermissionSetupNotificationRequest
+
+internal fun setupNotificationRequest(
+    reason: SetupNotificationReason,
+    contactDisplayName: String? = null,
+): SetupNotificationRequest {
+    return SetupNotificationRequest(
+        reason = reason,
+        contactDisplayName = contactDisplayName,
+    )
+}
 
 internal fun smsPermissionSetupNotificationRequest(
     contactDisplayName: String,
@@ -13,10 +24,15 @@ internal fun smsPermissionSetupNotificationRequest(
     )
 }
 
+internal fun Context.showSetupNotification(request: SetupNotificationRequest) {
+    NotificationHelper.showSetupNotification(this, request)
+}
+
 internal fun Context.showSmsPermissionSetupNotification(request: SmsPermissionSetupNotificationRequest) {
-    NotificationHelper.showSetupNotification(
-        this,
-        getString(R.string.notification_setup_sms_permission_title),
-        getString(R.string.notification_setup_sms_permission_message, request.contactDisplayName),
+    showSetupNotification(
+        SetupNotificationRequest(
+            reason = SetupNotificationReason.SMS_PERMISSION_MISSING,
+            contactDisplayName = request.contactDisplayName,
+        )
     )
 }

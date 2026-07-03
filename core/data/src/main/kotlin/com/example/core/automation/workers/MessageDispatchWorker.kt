@@ -4,8 +4,9 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.core.automation.sender.MessageDispatcher
+import com.example.core.automation.sender.setupNotificationRequest
+import com.example.core.automation.sender.showSetupNotification
 import com.example.core.automation.scheduler.DailyScheduler
-import com.example.core.data.R
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.EventDao
@@ -13,17 +14,18 @@ import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.dao.saveMessageStatusUpdate
 import com.example.core.resilience.StructuredLogger
+import com.example.data.repository.toEntity
 import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchDecision
 import com.example.domain.automation.DispatchEligibilityPolicy
 import com.example.domain.dispatch.buildMessageDispatchRequest
 import com.example.domain.dispatch.newDispatchAttempt
-import com.example.domain.dispatch.toEntity
 import com.example.domain.model.MessageStatus
 import com.example.domain.model.dispatch.DispatchAttemptCreator
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.DispatchEligibilityRecord
 import com.example.domain.model.message.MessageDispatchState
+import com.example.domain.model.notification.SetupNotificationReason
 import com.example.domain.service.PreferencesRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -125,10 +127,11 @@ class MessageDispatchWorker @AssistedInject constructor(
                     reason = decision.reason.name,
                     resolvedAtMs = System.currentTimeMillis(),
                 )
-                com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
-                    context,
-                    context.getString(R.string.notification_setup_message_expired_title),
-                    context.getString(R.string.notification_setup_message_expired_message, recipient.displayName),
+                context.showSetupNotification(
+                    setupNotificationRequest(
+                        reason = SetupNotificationReason.MESSAGE_EXPIRED,
+                        contactDisplayName = recipient.displayName,
+                    )
                 )
                 return Result.success()
             }
@@ -146,10 +149,11 @@ class MessageDispatchWorker @AssistedInject constructor(
                     "reason" to decision.reason.name,
                 ))
                 if (decision.reason == DispatchBlockReason.ALREADY_HANDLED) {
-                    com.example.core.automation.notifications.NotificationHelper.showSetupNotification(
-                        context,
-                        context.getString(R.string.notification_setup_double_send_title),
-                        context.getString(R.string.notification_setup_double_send_message, recipient.displayName),
+                    context.showSetupNotification(
+                        setupNotificationRequest(
+                            reason = SetupNotificationReason.DOUBLE_SEND_GUARD,
+                            contactDisplayName = recipient.displayName,
+                        )
                     )
                 }
                 return Result.success()

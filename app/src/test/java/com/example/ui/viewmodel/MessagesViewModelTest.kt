@@ -3,7 +3,6 @@ package com.example.ui.viewmodel
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageStatus
@@ -14,10 +13,14 @@ import com.example.domain.model.contact.ContactMessageContext
 import com.example.domain.model.message.PendingMessageListItem
 import com.example.domain.model.occasion.EventListItem
 import com.example.domain.model.occasion.OccasionType
+import com.example.domain.readiness.RelationshipReadinessAction
+import com.example.domain.readiness.RelationshipReadinessReason
+import com.example.domain.readiness.RelationshipReadinessState
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
+import com.example.domain.service.PreferencesRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
 import com.example.domain.usecase.RevokeApprovalUseCase
@@ -35,6 +38,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import java.util.Calendar
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -54,7 +58,7 @@ class MessagesViewModelTest {
     private val revokeApprovalUseCase: RevokeApprovalUseCase = mockk(relaxed = true)
     private val retryFailedMessageUseCase: RetryFailedMessageUseCase = mockk(relaxed = true)
     private val activityLogRepository: ActivityLogRepository = mockk(relaxed = true)
-    private val securePrefs: SecurePrefs = mockk(relaxed = true)
+    private val preferencesRepository: PreferencesRepository = mockk(relaxed = true)
     private val dispatcher = StandardTestDispatcher()
     private lateinit var context: Context
     private lateinit var preferenceChanges: MutableSharedFlow<Unit>
@@ -68,10 +72,13 @@ class MessagesViewModelTest {
         every { messageRepository.getSentListItems() } returns MutableStateFlow(emptyList())
         every { contactRepository.getMessageContexts() } returns MutableStateFlow(emptyList())
         every { eventRepository.getEventListItems() } returns MutableStateFlow(emptyList())
-        every { securePrefs.observeChanges() } returns preferenceChanges
-        every { securePrefs.getChannelBlackout() } returns "[]"
-        every { securePrefs.getSenderEmail() } returns "sender@example.com"
-        every { securePrefs.getSenderEmailPassword() } returns "app-password"
+        every { preferencesRepository.observeChanges() } returns preferenceChanges
+        every { preferencesRepository.getChannelBlackout() } returns "[]"
+        every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
+        every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
+        every { preferencesRepository.getQuietHoursStart() } returns 0
+        every { preferencesRepository.getQuietHoursEnd() } returns 0
+        every { preferencesRepository.getBlackoutDates() } returns "[]"
     }
 
     @After
@@ -227,9 +234,9 @@ class MessagesViewModelTest {
     @Test
     fun `pending messages expose readiness labels from channel prerequisites`() = runTest(dispatcher) {
         val now = System.currentTimeMillis()
-        every { securePrefs.getChannelBlackout() } returns "[\"WHATSAPP\"]"
-        every { securePrefs.getSenderEmail() } returns ""
-        every { securePrefs.getSenderEmailPassword() } returns ""
+        every { preferencesRepository.getChannelBlackout() } returns "[\"WHATSAPP\"]"
+        every { preferencesRepository.getSenderEmail() } returns ""
+        every { preferencesRepository.getSenderEmailPassword() } returns ""
         every { messageRepository.getPendingListItems() } returns MutableStateFlow(
             listOf(
                 pending("pm_sms", "c_sms", "e_sms", MessageChannel.SMS.raw, now + 2 * 86_400_000L),
@@ -265,13 +272,25 @@ class MessagesViewModelTest {
         assertEquals(MessageReadiness.EMAIL_SETUP_MISSING, readinessById["pm_email"])
         assertEquals(MessageReadiness.CHANNEL_DISABLED, readinessById["pm_whatsapp"])
         assertEquals(MessageReadiness.MISSING_EMAIL, readinessById["pm_bad_email"])
+
+        val canonicalById = viewModel.uiState.value.blockedMessages.associateBy { it.id }
+        assertEquals(RelationshipReadinessState.ACTION_REQUIRED, canonicalById.getValue("pm_sms").actionReadiness.state)
+        assertEquals(RelationshipReadinessReason.MISSING_PHONE, canonicalById.getValue("pm_sms").actionReadiness.primaryReason)
+        assertEquals(RelationshipReadinessAction.CONFIGURE_CHANNEL, canonicalById.getValue("pm_sms").actionReadiness.primaryAction)
+        assertEquals(RelationshipReadinessAction.CONFIGURE_EMAIL, canonicalById.getValue("pm_email").actionReadiness.primaryAction)
+        assertEquals(RelationshipReadinessAction.CONFIGURE_CHANNEL, canonicalById.getValue("pm_whatsapp").actionReadiness.primaryAction)
+        assertEquals(RelationshipReadinessAction.CONFIGURE_CHANNEL, canonicalById.getValue("pm_bad_email").actionReadiness.primaryAction)
+        assertEquals(MessageActionRoute.CONTACT, canonicalById.getValue("pm_sms").primaryActionRoute)
+        assertEquals(MessageActionRoute.AUTOMATION_SETUP, canonicalById.getValue("pm_email").primaryActionRoute)
+        assertEquals(MessageActionRoute.AUTOMATION_SETUP, canonicalById.getValue("pm_whatsapp").primaryActionRoute)
+        assertEquals(MessageActionRoute.CONTACT, canonicalById.getValue("pm_bad_email").primaryActionRoute)
     }
 
     @Test
     fun `preference changes immediately recalculate message readiness`() = runTest(dispatcher) {
         val now = System.currentTimeMillis()
-        every { securePrefs.getSenderEmail() } returns ""
-        every { securePrefs.getSenderEmailPassword() } returns ""
+        every { preferencesRepository.getSenderEmail() } returns ""
+        every { preferencesRepository.getSenderEmailPassword() } returns ""
         every { messageRepository.getPendingListItems() } returns MutableStateFlow(
             listOf(
                 pending("pm_email", "c_email", "e_email", MessageChannel.EMAIL.raw, now + 3 * 86_400_000L),
@@ -294,21 +313,81 @@ class MessagesViewModelTest {
         assertEquals(listOf("pm_email"), viewModel.uiState.value.blockedMessages.map { it.id })
         assertEquals(emptyList<String>(), viewModel.uiState.value.needsReviewMessages.map { it.id })
 
-        every { securePrefs.getSenderEmail() } returns "not-an-email"
-        every { securePrefs.getSenderEmailPassword() } returns "app-password"
+        every { preferencesRepository.getSenderEmail() } returns "not-an-email"
+        every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
         preferenceChanges.tryEmit(Unit)
         advanceUntilIdle()
 
         assertEquals(listOf("pm_email"), viewModel.uiState.value.blockedMessages.map { it.id })
         assertEquals(emptyList<String>(), viewModel.uiState.value.needsReviewMessages.map { it.id })
 
-        every { securePrefs.getSenderEmail() } returns "sender@example.com"
-        every { securePrefs.getSenderEmailPassword() } returns "app-password"
+        every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
+        every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
         preferenceChanges.tryEmit(Unit)
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), viewModel.uiState.value.blockedMessages.map { it.id })
         assertEquals(listOf("pm_email"), viewModel.uiState.value.needsReviewMessages.map { it.id })
+    }
+
+    @Test
+    fun `approved future messages expose scheduled-time readiness`() = runTest(dispatcher) {
+        val now = System.currentTimeMillis()
+        every { messageRepository.getPendingListItems() } returns MutableStateFlow(
+            listOf(
+                pending(
+                    "scheduled",
+                    "c_ready",
+                    "e_ready",
+                    MessageChannel.SMS.raw,
+                    now + 86_400_000L,
+                    status = MessageStatus.APPROVED.raw,
+                ),
+            )
+        )
+        every { contactRepository.getMessageContexts() } returns MutableStateFlow(
+            listOf(contact("c_ready", "Ready", primaryPhone = "+919999900000"))
+        )
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val scheduled = viewModel.uiState.value.scheduledMessages.single()
+        assertEquals("scheduled", scheduled.id)
+        assertEquals(MessageReadiness.APPROVED_WAITING_FOR_SCHEDULE, scheduled.readiness)
+        assertEquals(RelationshipReadinessState.WAITING, scheduled.actionReadiness.state)
+        assertEquals(RelationshipReadinessReason.WAITING_FOR_SCHEDULE, scheduled.actionReadiness.primaryReason)
+        assertEquals(RelationshipReadinessAction.NONE, scheduled.actionReadiness.primaryAction)
+    }
+
+    @Test
+    fun `approved due messages expose allowed-window readiness during quiet hours`() = runTest(dispatcher) {
+        val now = System.currentTimeMillis()
+        val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        every { preferencesRepository.getQuietHoursStart() } returns currentHour
+        every { preferencesRepository.getQuietHoursEnd() } returns ((currentHour + 1) % 24)
+        every { messageRepository.getPendingListItems() } returns MutableStateFlow(
+            listOf(
+                pending(
+                    "paused",
+                    "c_ready",
+                    "e_ready",
+                    MessageChannel.SMS.raw,
+                    now - 60_000L,
+                    status = MessageStatus.APPROVED.raw,
+                ),
+            )
+        )
+        every { contactRepository.getMessageContexts() } returns MutableStateFlow(
+            listOf(contact("c_ready", "Ready", primaryPhone = "+919999900000"))
+        )
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        val scheduled = viewModel.uiState.value.scheduledMessages.single()
+        assertEquals("paused", scheduled.id)
+        assertEquals(MessageReadiness.APPROVED_WAITING_FOR_ALLOWED_WINDOW, scheduled.readiness)
     }
 
     @Test
@@ -365,7 +444,7 @@ class MessagesViewModelTest {
             revokeApprovalUseCase = revokeApprovalUseCase,
             retryFailedMessageUseCase = retryFailedMessageUseCase,
             activityLogRepository = activityLogRepository,
-            securePrefs = securePrefs,
+            preferencesRepository = preferencesRepository,
         )
     }
 }

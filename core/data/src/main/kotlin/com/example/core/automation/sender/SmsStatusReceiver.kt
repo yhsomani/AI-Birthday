@@ -7,9 +7,10 @@ import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.dispatch.SmsCallbackKind
+import com.example.domain.dispatch.SmsCallbackOutcome
+import com.example.domain.dispatch.SmsCallbackOutcomePolicy
 import com.example.domain.model.MessageChannel
-import com.example.domain.model.MessageDeliveryStatus
-import com.example.domain.model.dispatch.DispatchAttemptResult
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -46,48 +47,43 @@ class SmsStatusReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                when (action) {
-                    "com.example.SMS_SENT" -> {
-                        val status = if (code == android.app.Activity.RESULT_OK) {
-                            MessageDeliveryStatus.SENT.raw
-                        } else {
-                            MessageDeliveryStatus.FAILED.raw
+                val callbackKind = action.toSmsCallbackKind()
+                if (callbackKind != null) {
+                    val outcome = SmsCallbackOutcomePolicy.evaluate(
+                        kind = callbackKind,
+                        succeeded = code == android.app.Activity.RESULT_OK,
+                    )
+                    when (callbackKind) {
+                        SmsCallbackKind.SENT -> {
+                            val status = outcome.deliveryStatus.raw
+                            sentMessageDao.updateSmsCallbackDeliveryStatus(sentMessageId, status)
+                            pendingMessageDao.saveSmsCallbackPendingStatus(
+                                pendingMessageId = pendingMessageId,
+                                outcome = outcome,
+                            )
+                            dispatchAttemptDao.saveSmsCallbackOutcome(
+                                dispatchAttemptId = dispatchAttemptId,
+                                sentMessageId = sentMessageId,
+                                outcome = outcome,
+                                resultCode = code,
+                            )
+                            StructuredLogger.i(TAG, "SMS sent status updated to $status for message $sentMessageId")
                         }
-                        sentMessageDao.updateSmsCallbackDeliveryStatus(sentMessageId, status)
-                        pendingMessageDao.saveSmsCallbackPendingStatus(
-                            pendingMessageId = pendingMessageId,
-                            deliveryStatus = MessageDeliveryStatus.fromRaw(status),
-                        )
-                        dispatchAttemptDao.saveSmsCallbackOutcome(
-                            dispatchAttemptId = dispatchAttemptId,
-                            sentMessageId = sentMessageId,
-                            deliveryStatus = MessageDeliveryStatus.fromRaw(status),
-                            resultCode = code,
-                            failureType = "SMS_SENT_CALLBACK_FAILED",
-                            failureMessage = "Android SMS sent callback reported failure after send handoff.",
-                        )
-                        StructuredLogger.i(TAG, "SMS sent status updated to $status for message $sentMessageId")
-                    }
-                    "com.example.SMS_DELIVERED" -> {
-                        val status = if (code == android.app.Activity.RESULT_OK) {
-                            MessageDeliveryStatus.DELIVERED.raw
-                        } else {
-                            MessageDeliveryStatus.FAILED.raw
+                        SmsCallbackKind.DELIVERED -> {
+                            val status = outcome.deliveryStatus.raw
+                            sentMessageDao.updateSmsCallbackDeliveryStatus(sentMessageId, status)
+                            pendingMessageDao.saveSmsCallbackPendingStatus(
+                                pendingMessageId = pendingMessageId,
+                                outcome = outcome,
+                            )
+                            dispatchAttemptDao.saveSmsCallbackOutcome(
+                                dispatchAttemptId = dispatchAttemptId,
+                                sentMessageId = sentMessageId,
+                                outcome = outcome,
+                                resultCode = code,
+                            )
+                            StructuredLogger.i(TAG, "SMS delivery status updated to $status for message $sentMessageId")
                         }
-                        sentMessageDao.updateSmsCallbackDeliveryStatus(sentMessageId, status)
-                        pendingMessageDao.saveSmsCallbackPendingStatus(
-                            pendingMessageId = pendingMessageId,
-                            deliveryStatus = MessageDeliveryStatus.fromRaw(status),
-                        )
-                        dispatchAttemptDao.saveSmsCallbackOutcome(
-                            dispatchAttemptId = dispatchAttemptId,
-                            sentMessageId = sentMessageId,
-                            deliveryStatus = MessageDeliveryStatus.fromRaw(status),
-                            resultCode = code,
-                            failureType = "SMS_DELIVERY_CALLBACK_FAILED",
-                            failureMessage = "Android SMS delivery callback reported failure after send handoff.",
-                        )
-                        StructuredLogger.i(TAG, "SMS delivery status updated to $status for message $sentMessageId")
                     }
                 }
             } catch (e: Exception) {
@@ -103,12 +99,20 @@ class SmsStatusReceiver : BroadcastReceiver() {
     }
 }
 
+private fun String.toSmsCallbackKind(): SmsCallbackKind? {
+    return when (this) {
+        "com.example.SMS_SENT" -> SmsCallbackKind.SENT
+        "com.example.SMS_DELIVERED" -> SmsCallbackKind.DELIVERED
+        else -> null
+    }
+}
+
 private suspend fun PendingMessageDao.saveSmsCallbackPendingStatus(
     pendingMessageId: String?,
-    deliveryStatus: MessageDeliveryStatus,
+    outcome: SmsCallbackOutcome,
 ) {
     val id = pendingMessageId.takeUnless { it.isNullOrBlank() } ?: return
-    if (deliveryStatus == MessageDeliveryStatus.FAILED) {
+    if (outcome.shouldMarkPendingFailed) {
         markSmsCallbackFailed(id)
     }
 }
@@ -116,30 +120,21 @@ private suspend fun PendingMessageDao.saveSmsCallbackPendingStatus(
 private suspend fun DispatchAttemptDao.saveSmsCallbackOutcome(
     dispatchAttemptId: String?,
     sentMessageId: String,
-    deliveryStatus: MessageDeliveryStatus,
+    outcome: SmsCallbackOutcome,
     resultCode: Int,
-    failureType: String,
-    failureMessage: String,
 ) {
     val attemptId = dispatchAttemptId.takeUnless { it.isNullOrBlank() } ?: return
     val nowMs = System.currentTimeMillis()
-    val failed = deliveryStatus == MessageDeliveryStatus.FAILED
     updateSmsCallbackOutcome(
         id = attemptId,
         resolvedAtMs = nowMs,
-        result = when (deliveryStatus) {
-            MessageDeliveryStatus.DELIVERED -> DispatchAttemptResult.DELIVERED
-            MessageDeliveryStatus.SENT -> DispatchAttemptResult.SENT
-            MessageDeliveryStatus.FAILED -> DispatchAttemptResult.FAILED_FINAL
-            MessageDeliveryStatus.PENDING_DELIVERY -> DispatchAttemptResult.PENDING_DELIVERY
-            MessageDeliveryStatus.UNKNOWN -> DispatchAttemptResult.UNKNOWN
-        }.raw,
+        result = outcome.dispatchAttemptResult.raw,
         channel = MessageChannel.SMS.raw,
-        deliveryStatus = deliveryStatus.raw,
+        deliveryStatus = outcome.deliveryStatus.raw,
         providerMessageId = sentMessageId,
-        errorType = failureType.takeIf { failed },
-        errorCode = resultCode.toString().takeIf { failed },
-        redactedErrorMessage = failureMessage.takeIf { failed },
-        deadLetteredAtMs = nowMs.takeIf { failed },
+        errorType = outcome.failureType,
+        errorCode = resultCode.toString().takeIf { outcome.failureType != null },
+        redactedErrorMessage = outcome.failureMessage,
+        deadLetteredAtMs = nowMs.takeIf { outcome.deadLetter },
     )
 }

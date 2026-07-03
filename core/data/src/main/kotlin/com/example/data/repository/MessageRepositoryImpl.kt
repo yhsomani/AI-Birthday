@@ -3,8 +3,6 @@ package com.example.data.repository
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.dao.saveMessageStatusUpdate
-import com.example.core.db.entities.PendingMessageEntity
-import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.message.toMessageAnalyticsRecord
 import com.example.domain.message.toMessageApprovalState
 import com.example.domain.message.toMessageDispatchState
@@ -19,9 +17,11 @@ import com.example.domain.model.message.MessageAnalyticsRecord
 import com.example.domain.model.message.MessageDispatchState
 import com.example.domain.model.message.MessageGenerationHistory
 import com.example.domain.model.message.MessageStatusUpdate
+import com.example.domain.model.message.PendingMessageRecord
 import com.example.domain.model.message.PendingMessageListItem
 import com.example.domain.model.message.RetryQueuedMessageDraft
 import com.example.domain.model.message.RetryableMessageDraft
+import com.example.domain.model.message.SentMessageRecord
 import com.example.domain.model.message.SentMessageListItem
 import com.example.domain.model.message.WishPreviewDraft
 import com.example.domain.model.message.WishPreviewReviewItem
@@ -37,50 +37,62 @@ class MessageRepositoryImpl @Inject constructor(
     private val sentMessageDao: SentMessageDao
 ) : MessageRepository {
 
-    override fun getAllPending(): Flow<List<PendingMessageEntity>> = pendingMessageDao.getAll()
+    override fun getAllPending(): Flow<List<PendingMessageRecord>> {
+        return pendingMessageDao.getAll().map { messages ->
+            messages.toPendingMessageRecords()
+        }
+    }
 
     override fun getPendingListItems(): Flow<List<PendingMessageListItem>> {
         return pendingMessageDao.getAll().map { messages ->
-            messages.toPendingMessageListItems()
+            messages.toPendingMessageRecords().toPendingMessageListItems()
         }
     }
 
     override fun getWishPreviewReviewQueue(): Flow<List<WishPreviewReviewItem>> {
         return pendingMessageDao.getAll().map { messages ->
-            messages.map { it.toWishPreviewReviewItem() }
+            messages.map { it.toPendingMessageRecord().toWishPreviewReviewItem() }
         }
     }
 
-    override suspend fun getAllPendingSync(): List<PendingMessageEntity> = pendingMessageDao.getAllSync()
+    override suspend fun getAllPendingSync(): List<PendingMessageRecord> {
+        return pendingMessageDao.getAllSync().toPendingMessageRecords()
+    }
 
-    override suspend fun getAllApproved(): List<PendingMessageEntity> = pendingMessageDao.getAllApproved()
+    override suspend fun getAllApproved(): List<PendingMessageRecord> {
+        return pendingMessageDao.getAllApproved().toPendingMessageRecords()
+    }
 
-    override suspend fun getPendingById(id: String): PendingMessageEntity? = pendingMessageDao.getById(id)
+    override suspend fun getPendingById(id: String): PendingMessageRecord? {
+        return pendingMessageDao.getById(id)?.toPendingMessageRecord()
+    }
 
     override suspend fun getMessageApprovalStateById(id: String): MessageApprovalState? {
-        return pendingMessageDao.getById(id)?.toMessageApprovalState()
+        return pendingMessageDao.getById(id)?.toPendingMessageRecord()?.toMessageApprovalState()
     }
 
     override suspend fun getRetryableMessageDraftById(id: String): RetryableMessageDraft? {
-        return pendingMessageDao.getById(id)?.toRetryableMessageDraft()
+        return pendingMessageDao.getById(id)?.toPendingMessageRecord()?.toRetryableMessageDraft()
     }
 
     override suspend fun getMessageDispatchStateById(id: String): MessageDispatchState? {
-        return pendingMessageDao.getById(id)?.toMessageDispatchState()
+        return pendingMessageDao.getById(id)?.toPendingMessageRecord()?.toMessageDispatchState()
     }
 
-    override suspend fun getPendingByEventId(eventId: String): PendingMessageEntity? = pendingMessageDao.getByEventId(eventId)
+    override suspend fun getPendingByEventId(eventId: String): PendingMessageRecord? {
+        return pendingMessageDao.getByEventId(eventId)?.toPendingMessageRecord()
+    }
 
     override suspend fun getMessageDispatchStateByEventId(eventId: String): MessageDispatchState? {
-        return pendingMessageDao.getByEventId(eventId)?.toMessageDispatchState()
+        return pendingMessageDao.getByEventId(eventId)?.toPendingMessageRecord()?.toMessageDispatchState()
     }
 
     override suspend fun getWishPreviewDraftById(id: String): WishPreviewDraft? {
-        return pendingMessageDao.getById(id)?.toWishPreviewDraft()
+        return pendingMessageDao.getById(id)?.toPendingMessageRecord()?.toWishPreviewDraft()
     }
 
     override suspend fun getWishPreviewDraftByEventId(eventId: String): WishPreviewDraft? {
-        return pendingMessageDao.getByEventId(eventId)?.toWishPreviewDraft()
+        return pendingMessageDao.getByEventId(eventId)?.toPendingMessageRecord()?.toWishPreviewDraft()
     }
 
     override fun getWishPreviewDraftByRef(messageRef: String): Flow<WishPreviewDraft?> {
@@ -88,7 +100,7 @@ class MessageRepositoryImpl @Inject constructor(
             messages.firstOrNull { it.id == messageRef }
                 ?: messages.firstOrNull { it.eventId == messageRef }
         }.map { message ->
-            message?.toWishPreviewDraft()
+            message?.toPendingMessageRecord()?.toWishPreviewDraft()
         }
     }
 
@@ -96,7 +108,9 @@ class MessageRepositoryImpl @Inject constructor(
         contactId: String,
         eventId: String,
         scheduledYear: Int
-    ): PendingMessageEntity? = pendingMessageDao.getPendingMessage(contactId, eventId, scheduledYear)
+    ): PendingMessageRecord? {
+        return pendingMessageDao.getPendingMessage(contactId, eventId, scheduledYear)?.toPendingMessageRecord()
+    }
 
     override suspend fun pendingExistsForEvent(eventId: String): Boolean = pendingMessageDao.existsForEvent(eventId)
 
@@ -106,7 +120,9 @@ class MessageRepositoryImpl @Inject constructor(
         scheduledYear: Int
     ): Boolean = pendingMessageDao.existsForEventOccurrence(contactId, eventId, scheduledYear)
 
-    override suspend fun insertPending(message: PendingMessageEntity) = pendingMessageDao.insert(message)
+    override suspend fun insertPending(message: PendingMessageRecord) {
+        pendingMessageDao.insert(message.toPendingMessageEntity())
+    }
 
     override suspend fun saveMessageApprovalState(state: MessageApprovalState) {
         pendingMessageDao.updateApprovalState(
@@ -134,37 +150,50 @@ class MessageRepositoryImpl @Inject constructor(
 
     override suspend fun updatePendingStatusByEventId(eventId: String, status: String) = pendingMessageDao.updateStatusByEventId(eventId, status)
 
-    override fun getAllSent(): Flow<List<SentMessageEntity>> = sentMessageDao.getAll()
-
-    override fun getSentListItems(): Flow<List<SentMessageListItem>> {
+    override fun getAllSent(): Flow<List<SentMessageRecord>> {
         return sentMessageDao.getAll().map { messages ->
-            messages.toSentMessageListItems()
+            messages.toSentMessageRecords()
         }
     }
 
-    override suspend fun getSentByContact(contactId: String, limit: Int): List<SentMessageEntity> = sentMessageDao.getByContact(contactId, limit)
+    override fun getSentListItems(): Flow<List<SentMessageListItem>> {
+        return sentMessageDao.getAll().map { messages ->
+            messages.toSentMessageRecords().toSentMessageListItems()
+        }
+    }
 
-    override fun getSentByContactFlow(contactId: String, limit: Int): Flow<List<SentMessageEntity>> {
-        return sentMessageDao.getByContactFlow(contactId, limit)
+    override suspend fun getSentByContact(contactId: String, limit: Int): List<SentMessageRecord> {
+        return sentMessageDao.getByContact(contactId, limit).toSentMessageRecords()
+    }
+
+    override fun getSentByContactFlow(contactId: String, limit: Int): Flow<List<SentMessageRecord>> {
+        return sentMessageDao.getByContactFlow(contactId, limit).map { messages ->
+            messages.toSentMessageRecords()
+        }
     }
 
     override fun countSentByContact(contactId: String): Flow<Int> = sentMessageDao.countByContact(contactId)
 
     override suspend fun getGenerationHistoryByContact(contactId: String, limit: Int): MessageGenerationHistory {
-        return sentMessageDao.getByContact(contactId, limit).toMessageGenerationHistory()
+        return sentMessageDao.getByContact(contactId, limit).toSentMessageRecords().toMessageGenerationHistory()
     }
 
-    override suspend fun getRecentForStyleAnalysis(sinceMs: Long, limit: Int): List<SentMessageEntity> = sentMessageDao.getRecentForStyleAnalysis(sinceMs, limit)
+    override suspend fun getRecentForStyleAnalysis(sinceMs: Long, limit: Int): List<SentMessageRecord> {
+        return sentMessageDao.getRecentForStyleAnalysis(sinceMs, limit).toSentMessageRecords()
+    }
 
-    override suspend fun getSentSinceYearStart(yearStartMs: Long): List<SentMessageEntity> = sentMessageDao.getSentSinceYearStart(yearStartMs)
+    override suspend fun getSentSinceYearStart(yearStartMs: Long): List<SentMessageRecord> {
+        return sentMessageDao.getSentSinceYearStart(yearStartMs).toSentMessageRecords()
+    }
 
     override suspend fun getSentAnalyticsRecordsSince(sinceMs: Long): List<MessageAnalyticsRecord> {
-        return sentMessageDao.getSentSinceYearStart(sinceMs).map { it.toMessageAnalyticsRecord() }
+        return sentMessageDao.getSentSinceYearStart(sinceMs)
+            .map { it.toSentMessageRecord().toMessageAnalyticsRecord() }
     }
 
     override fun getSentAnalyticsRecordsSinceFlow(sinceMs: Long): Flow<List<MessageAnalyticsRecord>> {
         return sentMessageDao.getSentSinceFlow(sinceMs).map { messages ->
-            messages.map { it.toMessageAnalyticsRecord() }
+            messages.map { it.toSentMessageRecord().toMessageAnalyticsRecord() }
         }
     }
 
@@ -172,5 +201,7 @@ class MessageRepositoryImpl @Inject constructor(
 
     override fun countPending(): Flow<Int> = pendingMessageDao.countPending()
 
-    override suspend fun insertSent(message: SentMessageEntity) = sentMessageDao.insert(message)
+    override suspend fun insertSent(message: SentMessageRecord) {
+        sentMessageDao.insert(message.toSentMessageEntity())
+    }
 }

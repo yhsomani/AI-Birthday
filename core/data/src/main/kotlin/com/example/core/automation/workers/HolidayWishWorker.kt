@@ -4,9 +4,10 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.core.automation.notifications.NotificationHelper
+import com.example.core.automation.notifications.showApprovalNotification
 import com.example.core.automation.scheduler.DailyScheduler
-import com.example.core.data.R
+import com.example.core.automation.sender.setupNotificationRequest
+import com.example.core.automation.sender.showSetupNotification
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
@@ -32,6 +33,7 @@ import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus
 import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.OccasionId
+import com.example.domain.model.notification.SetupNotificationReason
 import com.example.domain.model.occasion.Occasion
 import com.example.domain.model.occasion.OccasionDate
 import com.example.domain.model.occasion.OccasionType
@@ -62,10 +64,10 @@ class HolidayWishWorker @AssistedInject constructor(
         val firebaseUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
         if (apiKey.isNullOrBlank() && firebaseUser == null) {
             StructuredLogger.w(TAG, "Gemini API key not configured and user not authenticated; skipping holiday worker")
-            NotificationHelper.showSetupNotification(
-                applicationContext,
-                applicationContext.getString(R.string.notification_setup_ai_title),
-                applicationContext.getString(R.string.notification_setup_ai_message),
+            applicationContext.showSetupNotification(
+                setupNotificationRequest(
+                    reason = SetupNotificationReason.AI_PROVIDER_MISSING,
+                )
             )
             return Result.failure()
         }
@@ -169,8 +171,7 @@ class HolidayWishWorker @AssistedInject constructor(
                             DailyScheduler.scheduleExactSend(applicationContext, pending.id)
                         }
                         if (ApprovalModeResolver.needsReviewNotification(approvalMode)) {
-                            NotificationHelper.showApprovalNotification(
-                                context = applicationContext,
+                            applicationContext.showApprovalNotification(
                                 request = buildApprovalNotificationRequest(contact.toHeader(), holidayEvent, pending.id),
                                 variants = suggestion.toVariants(),
                             )

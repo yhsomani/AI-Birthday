@@ -3,6 +3,7 @@ package com.example.domain.usecase
 import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchDecision
 import com.example.domain.automation.DispatchEligibilityPolicy
+import com.example.domain.dispatch.DispatchExceptionFailurePolicy
 import com.example.domain.dispatch.buildMessageDispatchRequest
 import com.example.domain.dispatch.newDispatchAttempt
 import com.example.domain.repository.ActivityLogRepository
@@ -10,7 +11,6 @@ import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
 import com.example.domain.model.DispatchActivityDecision
-import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.MessageStatus
 import com.example.domain.model.activity.ActivityLogRecord
 import com.example.domain.model.common.DispatchAttemptId
@@ -174,21 +174,22 @@ class DispatchMessageUseCase @Inject constructor(
             )
         } catch (e: Exception) {
             val failedAtMs = System.currentTimeMillis()
+            val failure = DispatchExceptionFailurePolicy.evaluate(e)
             runCatching {
                 dispatchAttemptRepository.updateOutcome(
                     id = DispatchAttemptId(attemptId),
                     attemptedAtMs = failedAtMs,
                     resolvedAtMs = failedAtMs,
-                    result = DispatchAttemptResult.FAILED_FINAL,
+                    result = failure.result,
                     channel = null,
-                    deliveryStatus = MessageDeliveryStatus.FAILED,
+                    deliveryStatus = failure.deliveryStatus,
                     providerMessageId = null,
-                    errorType = e::class.simpleName ?: "DISPATCH_EXCEPTION",
-                    errorCode = null,
-                    redactedErrorMessage = "Dispatcher failed before completing send.",
+                    errorType = failure.errorType,
+                    errorCode = failure.errorCode,
+                    redactedErrorMessage = failure.redactedErrorMessage,
                     retryCount = 0,
                     nextRetryAtMs = null,
-                    deadLetteredAtMs = failedAtMs,
+                    deadLetteredAtMs = if (failure.deadLetter) failedAtMs else null,
                 )
             }
             throw e

@@ -31,7 +31,6 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.paging.runtime)
     implementation(libs.javax.inject)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

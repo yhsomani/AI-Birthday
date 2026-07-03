@@ -23,10 +23,6 @@
 -dontwarn okhttp3.**
 -keep class okhttp3.** { *; }
 
-# Keep Retrofit
--dontwarn retrofit2.**
--keep class retrofit2.** { *; }
-
 # Keep Gemini client
 -keep class com.example.core.gemini.** { *; }
 

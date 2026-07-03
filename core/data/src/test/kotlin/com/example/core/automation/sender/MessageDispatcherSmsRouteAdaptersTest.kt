@@ -3,7 +3,6 @@ package com.example.core.automation.sender
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.automation.notifications.NotificationHelper
-import com.example.core.data.R
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.model.MessageDeliveryStatus
@@ -12,6 +11,7 @@ import com.example.domain.model.common.MessageDraftId
 import com.example.domain.model.common.OccasionId
 import com.example.domain.model.common.SentMessageId
 import com.example.domain.model.dispatch.MessageDispatchOccasion
+import com.example.domain.model.notification.SetupNotificationReason
 import com.example.domain.model.occasion.OccasionType
 import io.mockk.Runs
 import io.mockk.coEvery
@@ -47,7 +47,7 @@ class MessageDispatcherSmsRouteAdaptersTest {
         context = ApplicationProvider.getApplicationContext()
         mockkConstructor(SmsSender::class)
         mockkObject(NotificationHelper)
-        every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
+        every { NotificationHelper.showSetupNotification(any(), any()) } just Runs
     }
 
     @After
@@ -191,8 +191,10 @@ class MessageDispatcherSmsRouteAdaptersTest {
         verify {
             NotificationHelper.showSetupNotification(
                 context,
-                context.getString(R.string.notification_setup_sms_permission_title),
-                context.getString(R.string.notification_setup_sms_permission_message, "Amit"),
+                match {
+                    it.reason == SetupNotificationReason.SMS_PERMISSION_MISSING &&
+                        it.contactDisplayName == "Amit"
+                },
             )
         }
     }

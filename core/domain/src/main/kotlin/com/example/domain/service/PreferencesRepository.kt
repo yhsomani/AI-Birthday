@@ -40,8 +40,17 @@ interface PreferencesRepository {
     fun setChannelBlackout(channelsJson: String)
     fun getChannelBlackout(): String
 
+    fun setWhatsAppAutomationConsentGranted(granted: Boolean)
+    fun isWhatsAppAutomationConsentGranted(): Boolean
+
     fun setBiometricLockEnabled(enabled: Boolean)
     fun isBiometricLockEnabled(): Boolean
+
+    fun setLegacyUnencryptedDbQuarantined(quarantined: Boolean)
+    fun wasLegacyUnencryptedDbQuarantined(): Boolean
+
+    fun setSecurePrefsRebuiltNoticePending(pending: Boolean)
+    fun isSecurePrefsRebuiltNoticePending(): Boolean
 
     fun setBirthdayRemindersEnabled(enabled: Boolean)
     fun isBirthdayRemindersEnabled(): Boolean
@@ -56,6 +65,9 @@ interface PreferencesRepository {
 
     fun setOnboardingComplete(complete: Boolean)
     fun isOnboardingComplete(): Boolean
+
+    fun setLocalOnlyModeEnabled(enabled: Boolean)
+    fun isLocalOnlyModeEnabled(): Boolean
 
     fun setLastSyncError(error: String?)
     fun getLastSyncError(): String?

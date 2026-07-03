@@ -5,6 +5,7 @@ import com.example.core.db.entities.ContactEntity
 import com.example.domain.contact.toAnalyticsProfile
 import com.example.domain.contact.toAnalyticsSummary
 import com.example.domain.contact.toAutomationReadinessProfile
+import com.example.domain.contact.toClassificationProfile
 import com.example.domain.contact.toDetailProfile
 import com.example.domain.contact.toEventDiscoveryProfile
 import com.example.domain.contact.toGiftAdvisorProfile
@@ -13,28 +14,33 @@ import com.example.domain.contact.toHeader
 import com.example.domain.contact.toListItem
 import com.example.domain.contact.toMessageContext
 import com.example.domain.contact.toMessageDispatchRecipient
+import com.example.domain.contact.toMessageGenerationProfile
 import com.example.domain.contact.toPickerItem
 import com.example.domain.contact.toRelationshipAnalyticsCount
 import com.example.domain.contact.toWishContext
+import com.example.domain.model.ApprovalMode
+import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.ContactId
 import com.example.domain.model.contact.ContactAnalyticsProfile
 import com.example.domain.model.contact.ContactAnalyticsSummary
 import com.example.domain.model.contact.ContactAutomationReadinessProfile
+import com.example.domain.model.contact.ContactClassificationProfile
 import com.example.domain.model.contact.ContactDetailProfile
 import com.example.domain.model.contact.ContactEventDiscoveryProfile
 import com.example.domain.model.contact.ContactGiftAdvisorProfile
 import com.example.domain.model.contact.ContactHealthProfile
 import com.example.domain.model.contact.ContactHeader
 import com.example.domain.model.contact.ContactListItem
+import com.example.domain.model.contact.ContactMessageGenerationProfile
 import com.example.domain.model.contact.ContactMessageContext
 import com.example.domain.model.contact.ContactPickerItem
 import com.example.domain.model.contact.ContactPreferences
+import com.example.domain.model.contact.ContactSyncRecord
 import com.example.domain.model.contact.ContactWishContext
 import com.example.domain.model.contact.RelationshipAnalyticsCount
 import com.example.domain.model.dispatch.MessageDispatchRecipient
+import com.example.domain.model.occasion.OccasionType
 import com.example.domain.repository.ContactRepository
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
-import androidx.paging.PagingData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -44,8 +50,6 @@ import javax.inject.Singleton
 class ContactRepositoryImpl @Inject constructor(
     private val contactDao: ContactDao
 ) : ContactRepository {
-
-    override fun getAll(): Flow<List<ContactEntity>> = contactDao.getAll()
 
     override fun getContactListItems(): Flow<List<ContactListItem>> {
         return contactDao.getAll().map { contacts ->
@@ -64,13 +68,6 @@ class ContactRepositoryImpl @Inject constructor(
             contacts.map { it.toMessageContext() }
         }
     }
-
-    override fun getAllPaged(): Flow<PagingData<ContactEntity>> = Pager(
-        config = PagingConfig(pageSize = 20, enablePlaceholders = false),
-        pagingSourceFactory = { contactDao.getAllPaged() }
-    ).flow
-
-    override suspend fun getAllSync(): List<ContactEntity> = contactDao.getAllSync()
 
     override suspend fun getAnalyticsProfiles(): List<ContactAnalyticsProfile> {
         return contactDao.getAllSync().map { it.toAnalyticsProfile() }
@@ -96,6 +93,18 @@ class ContactRepositoryImpl @Inject constructor(
         return contactDao.getAllSync().map { it.toEventDiscoveryProfile() }
     }
 
+    override suspend fun getClassificationProfile(id: String): ContactClassificationProfile? {
+        return contactDao.getById(id)?.toClassificationProfile()
+    }
+
+    override suspend fun getUnclassifiedContactIds(): List<ContactId> {
+        return contactDao.getAllSync()
+            .filter { contact ->
+                contact.relationshipType.isBlank() || contact.relationshipType == "UNKNOWN"
+            }
+            .map { contact -> ContactId(contact.id) }
+    }
+
     override suspend fun getHealthProfiles(): List<ContactHealthProfile> {
         return contactDao.getAllSync().map { it.toHealthProfile() }
     }
@@ -106,7 +115,9 @@ class ContactRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getById(id: String): ContactEntity? = contactDao.getById(id)
+    override suspend fun getMessageGenerationProfile(id: String): ContactMessageGenerationProfile? {
+        return contactDao.getById(id)?.toMessageGenerationProfile()
+    }
 
     override suspend fun getMessageDispatchRecipient(id: String): MessageDispatchRecipient? {
         return contactDao.getById(id)?.toMessageDispatchRecipient()
@@ -146,9 +157,66 @@ class ContactRepositoryImpl @Inject constructor(
 
     override suspend fun contactExists(id: String): Boolean = contactDao.getById(id) != null
 
-    override suspend fun upsert(contact: ContactEntity) = contactDao.upsert(contact)
+    override suspend fun upsertSyncedContact(contact: ContactSyncRecord) {
+        contactDao.upsert(contact.toEntity())
+    }
 
-    override suspend fun update(contact: ContactEntity) = contactDao.update(contact)
+    override suspend fun updateAutomationOverride(
+        id: ContactId,
+        automationMode: ApprovalMode,
+        skipAutoWish: Boolean,
+        updatedAt: Long,
+    ) = contactDao.updateAutomationOverride(
+        id = id.value,
+        automationMode = automationMode.raw,
+        skipAutoWish = skipAutoWish,
+        updatedAt = updatedAt,
+    )
+
+    override suspend fun createManualContactForEvent(
+        id: ContactId,
+        displayName: String,
+        eventType: OccasionType,
+        day: Int,
+        month: Int,
+        year: Int?,
+        createdAt: Long,
+    ) {
+        val contact = ContactEntity(
+            id = id.value,
+            name = displayName,
+            contactGroup = "Manual",
+            relationshipType = "UNKNOWN",
+            preferredChannel = MessageChannel.SMS.raw,
+            createdAt = createdAt,
+            updatedAt = createdAt,
+        ).withEventDate(
+            eventType = eventType,
+            day = day,
+            month = month,
+            year = year,
+            updatedAt = createdAt,
+        )
+        contactDao.upsert(contact)
+    }
+
+    override suspend fun updateContactEventDate(
+        id: ContactId,
+        eventType: OccasionType,
+        day: Int,
+        month: Int,
+        year: Int?,
+        updatedAt: Long,
+    ) {
+        updateContactEventDate(
+            id = id.value,
+            eventType = eventType,
+            day = day,
+            month = month,
+            year = year,
+            updatedAt = updatedAt,
+        )
+    }
 
     override suspend fun updatePreferences(preferences: ContactPreferences): Boolean {
         val contact = contactDao.getById(preferences.contactId.value) ?: return false
@@ -194,15 +262,10 @@ class ContactRepositoryImpl @Inject constructor(
 
     override suspend fun incrementConsecutiveYearsWished(id: String) = contactDao.incrementConsecutiveYearsWished(id)
 
-    override suspend fun getContactsForRevival(lastInteractionBeforeMs: Long): List<ContactEntity> =
-        contactDao.getContactsForRevival(lastInteractionBeforeMs)
-
     override suspend fun updateLastRevivalAttempt(id: String, timestampMs: Long) =
         contactDao.updateLastRevivalAttempt(id, timestampMs)
 
     override fun countAll(): Flow<Int> = contactDao.countAll()
-
-    override fun countByRelationshipType(): Flow<List<com.example.core.db.dao.RelationshipTypeCount>> = contactDao.countByRelationshipType()
 
     override fun getRelationshipAnalyticsCounts(): Flow<List<RelationshipAnalyticsCount>> {
         return contactDao.countByRelationshipType().map { counts ->
@@ -233,12 +296,82 @@ class ContactRepositoryImpl @Inject constructor(
                 .sortedBy { it.healthScore }
                 .take(limit)
                 .map { it.toAnalyticsSummary() }
+            }
+    }
+
+    private suspend fun updateContactEventDate(
+        id: String,
+        eventType: OccasionType,
+        day: Int,
+        month: Int,
+        year: Int?,
+        updatedAt: Long,
+    ) {
+        when (eventType) {
+            OccasionType.BIRTHDAY -> contactDao.updateBirthdayDate(id, day, month, year, updatedAt)
+            OccasionType.ANNIVERSARY -> contactDao.updateAnniversaryDate(id, day, month, year, updatedAt)
+            OccasionType.WORK_ANNIVERSARY -> contactDao.updateWorkStartDate(id, day, month, year, updatedAt)
+            else -> Unit
         }
     }
 
-    override suspend fun getTopByHealthScore(limit: Int): List<ContactEntity> = contactDao.getTopByHealthScore(limit)
+    private fun ContactEntity.withEventDate(
+        eventType: OccasionType,
+        day: Int,
+        month: Int,
+        year: Int?,
+        updatedAt: Long,
+    ): ContactEntity {
+        return when (eventType) {
+            OccasionType.BIRTHDAY -> copy(
+                birthdayDay = day,
+                birthdayMonth = month,
+                birthdayYear = year,
+                updatedAt = updatedAt,
+            )
+            OccasionType.ANNIVERSARY -> copy(
+                anniversaryDay = day,
+                anniversaryMonth = month,
+                anniversaryYear = year,
+                updatedAt = updatedAt,
+            )
+            OccasionType.WORK_ANNIVERSARY -> copy(
+                workStartDay = day,
+                workStartMonth = month,
+                workStartYear = year,
+                updatedAt = updatedAt,
+            )
+            else -> copy(updatedAt = updatedAt)
+        }
+    }
 
-    override suspend fun getBottomByHealthScore(limit: Int): List<ContactEntity> = contactDao.getBottomByHealthScore(limit)
-
-    override suspend fun delete(contact: ContactEntity) = contactDao.delete(contact)
+    private fun ContactSyncRecord.toEntity(): ContactEntity {
+        return ContactEntity(
+            id = id,
+            googleContactId = googleContactId,
+            name = displayName,
+            nickname = nickname,
+            birthdayDay = birthdayDay,
+            birthdayMonth = birthdayMonth,
+            birthdayYear = birthdayYear,
+            anniversaryDay = anniversaryDay,
+            anniversaryMonth = anniversaryMonth,
+            anniversaryYear = anniversaryYear,
+            workStartDay = workStartDay,
+            workStartMonth = workStartMonth,
+            workStartYear = workStartYear,
+            primaryPhone = primaryPhone,
+            secondaryPhone = secondaryPhone,
+            primaryEmail = primaryEmail,
+            company = company,
+            jobTitle = jobTitle,
+            address = address,
+            profilePhotoUri = profilePhotoUri,
+            contactGroup = contactGroup,
+            relationshipType = relationshipType,
+            relationsJson = relationsJson,
+            notesText = notesText,
+            isDeleted = isDeleted,
+        )
+    }
 }

@@ -48,6 +48,7 @@ import com.example.ui.viewmodel.OnboardingViewModel
 internal object OnboardingTestTags {
     const val CONTINUE_BUTTON = "onboarding_continue_button"
     const val SETUP_CHECKLIST_BUTTON = "onboarding_setup_checklist_button"
+    const val LOCAL_MODE_BUTTON = "onboarding_local_mode_button"
 }
 
 data class OnboardingStep(
@@ -93,16 +94,22 @@ private val onboardingSteps = listOf(
 fun OnboardingScreen(
     onOnboardingComplete: () -> Unit,
     onOpenAutomationSetup: () -> Unit = {},
+    onStartLocalModeComplete: () -> Unit = {},
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
     val completeOnboarding = {
         viewModel.completeOnboarding()
         onOnboardingComplete()
     }
+    val startLocalOnlyMode = {
+        viewModel.startLocalOnlyMode()
+        onStartLocalModeComplete()
+    }
 
     OnboardingContent(
         onContinue = completeOnboarding,
         onOpenAutomationSetup = onOpenAutomationSetup,
+        onStartLocalMode = startLocalOnlyMode,
     )
 }
 
@@ -110,6 +117,7 @@ fun OnboardingScreen(
 internal fun OnboardingContent(
     onContinue: () -> Unit,
     onOpenAutomationSetup: () -> Unit,
+    onStartLocalMode: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -185,6 +193,26 @@ internal fun OnboardingContent(
                 color = MaterialTheme.colorScheme.onBackground,
             )
         }
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
+        OutlinedButton(
+            onClick = onStartLocalMode,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(OnboardingTestTags.LOCAL_MODE_BUTTON),
+            shape = RoundedCornerShape(RelateRadius.control),
+        ) {
+            Text(
+                text = stringResource(R.string.onboarding_start_local_only),
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
+        Spacer(modifier = Modifier.height(RelateSpacing.sm))
+        Text(
+            text = stringResource(R.string.onboarding_local_only_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
         Spacer(modifier = Modifier.height(RelateSpacing.lg))
     }
 }

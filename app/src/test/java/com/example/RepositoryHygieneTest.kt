@@ -53,6 +53,43 @@ class RepositoryHygieneTest {
     }
 
     @Test
+    fun providerConfigs_areAllowlistedAndDoNotContainServerSecrets() {
+        val gitignore = rootFile(".gitignore").readText()
+        val gitignoreLines = gitignore.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("#") }
+            .toSet()
+
+        assertTrue(gitignoreLines.contains("google-services.json"))
+        assertTrue(gitignoreLines.contains("!/app/google-services.json"))
+        assertTrue(gitignoreLines.contains("!/app/src/debug/google-services.json"))
+
+        val forbiddenMarkers = listOf(
+            "\"private_key\"",
+            "\"private_key_id\"",
+            "\"client_secret\"",
+            "\"refresh_token\"",
+            "\"type\": \"service_account\"",
+            "\"type\":\"service_account\"",
+        )
+
+        listOf(
+            "app/google-services.json",
+            "app/src/debug/google-services.json",
+        ).forEach { relativePath ->
+            val config = rootFile(relativePath)
+            val text = config.readText()
+
+            forbiddenMarkers.forEach { marker ->
+                assertFalse(
+                    "$relativePath must not contain server-side secret marker $marker",
+                    text.contains(marker),
+                )
+            }
+        }
+    }
+
+    @Test
     fun startupIdeaDocs_areExplicitlyArchivedWhenPresent() {
         val startupIdeaDir = rootFile("docs/startup-idea", mustBeFile = false)
         if (!startupIdeaDir.exists()) return
@@ -67,6 +104,34 @@ class RepositoryHygieneTest {
                 text.contains("Archived reference note") &&
                     text.contains("not the implemented RelateAI Android product"),
             )
+        }
+    }
+
+    @Test
+    fun removedRetrofitAndPagingStack_hasNoBuildOrProguardReferences() {
+        val checkedFiles = listOf(
+            "app/build.gradle.kts",
+            "core/data/build.gradle.kts",
+            "core/domain/build.gradle.kts",
+            "gradle/libs.versions.toml",
+            "app/proguard-rules.pro",
+        )
+        val removedReferences = listOf(
+            "retrofit",
+            "converter.moshi",
+            "logging.interceptor",
+            "androidx.paging",
+            "room.paging",
+        )
+
+        checkedFiles.forEach { relativePath ->
+            val text = rootFile(relativePath).readText()
+            removedReferences.forEach { reference ->
+                assertFalse(
+                    "$relativePath should not keep unused dependency reference $reference",
+                    text.contains(reference),
+                )
+            }
         }
     }
 

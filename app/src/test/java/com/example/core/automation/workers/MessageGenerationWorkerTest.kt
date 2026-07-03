@@ -10,6 +10,7 @@ import com.example.core.automation.notifications.NotificationHelper
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.OccasionId
+import com.example.domain.model.notification.SetupNotificationReason
 import com.example.domain.model.occasion.OccasionType
 import com.example.domain.model.occasion.UpcomingEventPreview
 import com.example.domain.repository.EventRepository
@@ -57,7 +58,7 @@ class MessageGenerationWorkerTest {
         every { firebaseAuth.currentUser } returns firebaseUser
         every { preferencesRepository.isAiWishGenerationEnabled() } returns true
         every { preferencesRepository.getGeminiApiKey() } returns "mock_key"
-        every { NotificationHelper.showSetupNotification(any(), any(), any()) } just Runs
+        every { NotificationHelper.showSetupNotification(any(), any()) } just Runs
         coEvery { eventRepository.getUpcomingPreviews(any()) } returns emptyList()
         coEvery {
             generateMessageUseCase(any<GenerateMessageUseCase.Request>())
@@ -88,7 +89,12 @@ class MessageGenerationWorkerTest {
         val result = buildWorker().doWork()
 
         assertEquals(ListenableWorker.Result.failure(), result)
-        verify { NotificationHelper.showSetupNotification(any(), any(), any()) }
+        verify {
+            NotificationHelper.showSetupNotification(
+                any(),
+                match { it.reason == SetupNotificationReason.AI_PROVIDER_MISSING },
+            )
+        }
         coVerify(exactly = 0) { eventRepository.getUpcomingPreviews(any()) }
         coVerify(exactly = 0) { generateMessageUseCase(any<GenerateMessageUseCase.Request>()) }
     }

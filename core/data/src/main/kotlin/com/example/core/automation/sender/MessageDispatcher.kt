@@ -52,6 +52,7 @@ class MessageDispatcher(
             senderEmail = prefs.getSenderEmail(),
             senderEmailPassword = prefs.getSenderEmailPassword(),
             channelBlackoutJson = prefs.getChannelBlackout(),
+            routeHistory = sentMessageDao.messageDispatchRouteHistoryByContact(request.contactId.value),
         )
         var finalChannel = routePlan.initialFinalChannel
 

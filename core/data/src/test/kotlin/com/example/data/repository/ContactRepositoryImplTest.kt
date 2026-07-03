@@ -7,6 +7,8 @@ import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.ContactId
 import com.example.domain.model.contact.ContactPreferences
+import com.example.domain.model.contact.ContactSyncRecord
+import com.example.domain.model.occasion.OccasionType
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -47,6 +49,173 @@ class ContactRepositoryImplTest {
                 confidence = 0.82,
             )
         }
+    }
+
+    @Test
+    fun updateAutomationOverride_persistsDomainAutomationFields() = runTest {
+        repository.updateAutomationOverride(
+            id = ContactId("c1"),
+            automationMode = ApprovalMode.DEFAULT,
+            skipAutoWish = false,
+            updatedAt = 1_700_000_000_000,
+        )
+
+        coVerify {
+            contactDao.updateAutomationOverride(
+                id = "c1",
+                automationMode = ApprovalMode.DEFAULT.raw,
+                skipAutoWish = false,
+                updatedAt = 1_700_000_000_000,
+            )
+        }
+    }
+
+    @Test
+    fun createManualContactForEvent_insertsManualContactWithEventDate() = runTest {
+        repository.createManualContactForEvent(
+            id = ContactId("manual_1"),
+            displayName = "Priya",
+            eventType = OccasionType.ANNIVERSARY,
+            day = 7,
+            month = 11,
+            year = null,
+            createdAt = 1_700_000_000_000,
+        )
+
+        coVerify {
+            contactDao.upsert(
+                match {
+                    it.id == "manual_1" &&
+                        it.name == "Priya" &&
+                        it.contactGroup == "Manual" &&
+                        it.relationshipType == "UNKNOWN" &&
+                        it.preferredChannel == MessageChannel.SMS.raw &&
+                        it.anniversaryDay == 7 &&
+                        it.anniversaryMonth == 11 &&
+                        it.anniversaryYear == null &&
+                        it.createdAt == 1_700_000_000_000 &&
+                        it.updatedAt == 1_700_000_000_000
+                },
+            )
+        }
+    }
+
+    @Test
+    fun updateContactEventDate_routesBirthdayUpdateToDao() = runTest {
+        repository.updateContactEventDate(
+            id = ContactId("c1"),
+            eventType = OccasionType.BIRTHDAY,
+            day = 12,
+            month = 6,
+            year = 1994,
+            updatedAt = 1_700_000_000_000,
+        )
+
+        coVerify {
+            contactDao.updateBirthdayDate(
+                id = "c1",
+                day = 12,
+                month = 6,
+                year = 1994,
+                updatedAt = 1_700_000_000_000,
+            )
+        }
+    }
+
+    @Test
+    fun upsertSyncedContact_mapsSyncRecordToRoomContact() = runTest {
+        repository.upsertSyncedContact(
+            ContactSyncRecord(
+                id = "google_1",
+                googleContactId = "people/c1",
+                displayName = "Asha",
+                primaryPhone = "+911234567890",
+                primaryEmail = "asha@example.com",
+                contactGroup = "College Friends",
+                relationshipType = "FRIEND",
+                birthdayDay = 9,
+                birthdayMonth = 4,
+            ),
+        )
+
+        coVerify {
+            contactDao.upsert(
+                match {
+                    it.id == "google_1" &&
+                        it.googleContactId == "people/c1" &&
+                        it.name == "Asha" &&
+                        it.primaryPhone == "+911234567890" &&
+                        it.primaryEmail == "asha@example.com" &&
+                        it.contactGroup == "College Friends" &&
+                        it.relationshipType == "FRIEND" &&
+                        it.birthdayDay == 9 &&
+                        it.birthdayMonth == 4
+                },
+            )
+        }
+    }
+
+    @Test
+    fun getClassificationProfile_mapsRoomContactToPureModel() = runTest {
+        coEvery { contactDao.getById("c1") } returns ContactEntity(
+            id = "c1",
+            name = "Asha",
+            relationshipType = "UNKNOWN",
+            notesText = "College friend",
+            interactionFrequencyPerMonth = 3.5f,
+        )
+
+        val profile = repository.getClassificationProfile("c1")
+
+        requireNotNull(profile)
+        assertEquals(ContactId("c1"), profile.id)
+        assertEquals("UNKNOWN", profile.relationshipType)
+        assertEquals(ContactId("c1"), profile.promptContext.id)
+        assertEquals("Asha", profile.promptContext.displayName)
+        assertEquals("College friend", profile.promptContext.notesText)
+        assertEquals(3.5f, profile.promptContext.interactionFrequencyPerMonth)
+    }
+
+    @Test
+    fun getUnclassifiedContactIds_returnsUnknownAndBlankRelationshipContacts() = runTest {
+        coEvery { contactDao.getAllSync() } returns listOf(
+            ContactEntity(id = "unknown", name = "Unknown", relationshipType = "UNKNOWN"),
+            ContactEntity(id = "blank", name = "Blank", relationshipType = ""),
+            ContactEntity(id = "family", name = "Family", relationshipType = "FAMILY"),
+        )
+
+        val ids = repository.getUnclassifiedContactIds()
+
+        assertEquals(listOf(ContactId("unknown"), ContactId("blank")), ids)
+    }
+
+    @Test
+    fun getMessageGenerationProfile_mapsRoomContactToPureModel() = runTest {
+        coEvery { contactDao.getById("c1") } returns ContactEntity(
+            id = "c1",
+            name = "Asha",
+            relationshipType = "FRIEND",
+            primaryPhone = "+911234567890",
+            preferredChannel = MessageChannel.SMS.raw,
+            automationMode = ApprovalMode.FULLY_AUTO.raw,
+            skipAutoWish = true,
+            customSendTimeHour = 14,
+            customSendTimeMinute = 45,
+        )
+
+        val profile = repository.getMessageGenerationProfile("c1")
+
+        requireNotNull(profile)
+        assertEquals(ContactId("c1"), profile.id)
+        assertEquals("FRIEND", profile.relationshipType)
+        assertEquals(ApprovalMode.FULLY_AUTO, profile.automationMode)
+        assertTrue(profile.skipAutoWish)
+        assertEquals(MessageChannel.SMS, profile.deliveryRouteProfile.preferredChannel)
+        assertTrue(profile.deliveryRouteProfile.hasPrimaryPhone)
+        assertEquals("Asha", profile.promptContext.displayName)
+        assertEquals("Asha", profile.header.displayName)
+        assertEquals(14, profile.customSendTimeHour)
+        assertEquals(45, profile.customSendTimeMinute)
     }
 
     @Test
@@ -402,6 +571,7 @@ class ContactRepositoryImplTest {
                     profilePhotoUri = "content://avatar",
                     primaryPhone = "+911234567890",
                     primaryEmail = "asha@example.com",
+                    preferredChannel = MessageChannel.WHATSAPP.raw,
                 ),
             ),
         )
@@ -413,6 +583,7 @@ class ContactRepositoryImplTest {
         assertEquals("content://avatar", contexts.single().avatarUrl)
         assertEquals("+911234567890", contexts.single().primaryPhone)
         assertEquals("asha@example.com", contexts.single().primaryEmail)
+        assertEquals(MessageChannel.WHATSAPP, contexts.single().preferredChannel)
     }
 
     @Test

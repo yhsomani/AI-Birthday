@@ -1,2697 +1,1244 @@
 # RelateAI Single Source of Truth
 
-Last updated: 2026-07-01
+Last updated: 2026-07-03
 
-This is the canonical product and technical source of truth for this repository. It consolidates the former `features.md`, `SSOT_CONSOLIDATED.md`, `AUDIT_REPORT.md`, `CHANGELOG.md`, `docs/BRANCHING.md`, `docs/UI_VALIDATION.md`, `.kiro/steering/*.md`, `.kiro/specs/**/*.md`, and `.Jules/*.md` content.
+This is the authoritative project document for the current repository state. It is based on static repository analysis of source code, Gradle configuration, resources, CI, tests, schemas, and existing documentation. Code remains the final authority when this document and implementation disagree.
 
-Companion execution documents:
+Scope rule: `vs-extension-2/` is excluded by instruction. No evidence in this document comes from that subtree.
 
-- [PLAN.md](PLAN.md): current audit, stabilization plan, architecture decisions, and debt registry.
-- [PRODUCT_BLUEPRINT.md](PRODUCT_BLUEPRINT.md): refined product model, user journeys, operating principles, and release definition.
-- [IMPLEMENTATION_TASKS.md](IMPLEMENTATION_TASKS.md): micro-task backlog for building the major product step by step.
-- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md): completed incremental changes, UX rationale, and validation evidence.
+## 1. Project Identity
 
-Code remains the final authority. If this document conflicts with source, update this document after inspecting the source.
+RelateAI is a local-first Android relationship assistant. It syncs Google and device contacts, discovers relationship occasions, stores relationship context, drafts AI-assisted messages, routes messages through approval modes, schedules delivery, sends through SMS, WhatsApp, or Gmail SMTP, records activity, reports relationship health, and supports encrypted backup and restore.
 
-## 1. Product Definition
-
-RelateAI is a local-first Android relationship assistant. It imports Google and device contacts, discovers birthdays and relationship events, learns relationship context and writing style, generates personalized wishes with Gemini, routes messages through approval modes, schedules delivery, and dispatches through SMS, WhatsApp, or Gmail SMTP without a custom backend.
-
-Primary goals:
-
-- Reduce forgotten birthdays, anniversaries, work anniversaries, and custom relationship moments.
-- Generate relationship-aware wishes that match contact context, event type, channel, language, and user writing style.
-- Support approval-first automation through global and per-contact modes.
-- Keep relationship data on device except for explicit external integrations.
-- Provide encrypted local storage and explicit encrypted backup/restore.
-
-Target users:
-
-- Android users on API 24+ who manage many family, friend, colleague, client, or professional relationships.
-- Users who want different automation levels for normal contacts, VIP contacts, and manual-review contacts.
-- Users who value privacy, local storage, and controllable AI-assisted messaging.
-
-There is no custom server in this repository. External network surfaces are Google/Firebase/Gemini, Google People API, Gmail SMTP, and platform APIs.
-
-## 2. Current Implementation Snapshot
+Verified implementation facts:
 
 | Area | Current value |
-|---|---|
+| --- | --- |
 | Root Gradle project | `RelateAI` |
+| Android application id | `com.aistudio.relateai.qxtjrk` |
+| App namespace | `com.example` |
 | Active modules | `:app`, `:core:model`, `:core:domain`, `:core:data`, `:core:ui` |
-| Application namespace | `com.example` |
-| Release applicationId | `com.aistudio.relateai.qxtjrk` |
-| Debug applicationId | `com.aistudio.relateai.qxtjrk` |
-| Min SDK | 24 |
+| Minimum SDK | 24 |
 | Target SDK | 36 |
 | Compile SDK | 37 |
+| App version | `versionCode = 1`, `versionName = "1.0"` |
 | Gradle wrapper | 9.4.1 |
 | Android Gradle Plugin | 9.2.1 |
 | Kotlin | 2.2.10 |
 | JDK toolchain | 21 |
 | JVM bytecode target | 17 |
-| Compose BOM | 2024.12.01 |
-| Room | 2.7.0 |
 | Room schema version | 16 |
-| Hilt | 2.59.2 |
-| WorkManager | 2.9.0 |
-| SQLCipher | 4.5.4 |
-| Firebase BOM | 34.12.0 |
-| Firebase Vertex AI | 16.5.0 |
-| Google AI client | 0.9.0 |
-| JaCoCo | 0.8.12 |
+| Backup format version | 3 |
+| Production theme mode | Dark-only validated theme |
 
-Core stack:
+There is no custom backend in this repository. External services are provider integrations used directly by the Android app: Firebase Auth, Google Sign-In, Google People API, Firebase Vertex AI or Google AI Gemini client, Gmail SMTP, Android SMS APIs, and Android Accessibility for optional WhatsApp automation.
 
-- Jetpack Compose and Material 3 for UI.
-- Hilt for dependency injection.
-- Clean Architecture split into UI, pure/shared model, domain, data, and shared UI modules.
-- Room with SQLCipher for encrypted local database storage.
-- EncryptedSharedPreferences for auth/config/preferences.
-- WorkManager and AlarmManager for recurring automation and exact message/reminder scheduling.
-- Firebase Auth and Google Sign-In for identity.
-- Google People API and Android ContactsProvider for contact import.
-- Gemini through Firebase Vertex AI and API-key-backed Google AI client paths.
-- JavaMail/Gmail SMTP, Android SMS APIs, WhatsApp Accessibility Service.
-- JUnit, Robolectric, Compose UI tests, Android instrumented smoke tests, lint, and aggregate JaCoCo coverage.
+## 2. Evidence Map
+
+Primary evidence used:
+
+| Area | Evidence paths |
+| --- | --- |
+| Build graph and toolchain | `settings.gradle.kts`, `build.gradle.kts`, `gradle/libs.versions.toml`, module `build.gradle.kts` files |
+| App runtime | `app/src/main/AndroidManifest.xml`, `app/src/main/java/com/example/RelateAIApp.kt`, `app/src/main/java/com/example/MainActivity.kt` |
+| Navigation | `app/src/main/java/com/example/ui/navigation/Screen.kt`, `NavGraph.kt`, `core/domain/src/main/kotlin/com/example/domain/navigation/RelateDeepLinks.kt` |
+| UI and state | `app/src/main/java/com/example/ui/screens`, `app/src/main/java/com/example/ui/viewmodel` |
+| Domain | `core/domain/src/main/kotlin/com/example/domain`, `core/model/src/main/kotlin/com/example/domain/model` |
+| Data and integrations | `core/data/src/main/kotlin/com/example/core`, `core/data/src/main/kotlin/com/example/data/repository`, `core/data/src/main/kotlin/com/example/di` |
+| Database | `core/data/src/main/kotlin/com/example/core/db/AppDatabase.kt`, `core/data/schemas/com.example.core.db.AppDatabase/16.json` |
+| Android resources | `app/src/main/res`, `core/data/src/main/res` |
+| Tests | `app/src/test`, `app/src/androidTest`, `core/model/src/test`, `core/domain/src/test`, `core/data/src/test` |
+| CI and release gates | `.github/workflows/android.yml`, `app/build.gradle.kts`, `app/src/test/java/com/example/ProductionReadinessConfigTest.kt` |
+| Existing docs | Root Markdown files and `docs/**`, validated against source where possible |
+
+Generated build output, Gradle caches, and local diagnostics are not treated as product documentation unless a checked-in source or test references them as an intentional artifact.
 
 ## 3. Repository Layout
 
 ```text
 .
-+-- app/                         Android app, Compose screens, ViewModels, manifest, resources
++-- app/                         Android application, Compose screens, ViewModels, manifest, app resources, app tests
 +-- core/
-|   +-- model/                   Pure Kotlin shared model/value types
-|   +-- domain/                  Domain models, repository/service contracts, use cases, policies
-|   +-- data/                    Room, repositories, integrations, workers, senders, prefs, backup
-|   +-- ui/                      Shared Compose theme and reusable components
-+-- gradle/                      Gradle wrapper support and version catalog
+|   +-- model/                   Pure Kotlin model/value module
+|   +-- domain/                  Use cases, policies, repositories, service contracts, mappers; also currently Room entities
+|   +-- data/                    Room database, DAOs, repositories, workers, integrations, senders, prefs, backup
+|   +-- ui/                      Shared Compose theme, tokens, and components
++-- docs/                        Historical and supporting documentation now consolidated by this SSOT
++-- gradle/                      Wrapper and version catalog
 +-- scripts/                     Helper scripts
-+-- .github/workflows/           Android CI workflow
++-- .github/workflows/           Android CI
 +-- SSOT.md                      This document
 ```
 
 Important source roots:
 
-```text
-app/src/main/java/com/example/
-app/src/main/java/com/example/ui/navigation/
-app/src/main/java/com/example/ui/screens/
-app/src/main/java/com/example/ui/viewmodel/
-app/src/main/res/
-core/model/src/main/kotlin/com/example/domain/model/
-core/domain/src/main/kotlin/com/example/domain/
-core/domain/src/main/kotlin/com/example/core/db/entities/
-core/data/src/main/kotlin/com/example/core/
-core/data/src/main/kotlin/com/example/data/repository/
-core/data/src/main/kotlin/com/example/di/
-core/ui/src/main/kotlin/com/example/core/ui/
-```
+| Root | Purpose |
+| --- | --- |
+| `app/src/main/java/com/example/ui/screens` | Compose screen implementations |
+| `app/src/main/java/com/example/ui/viewmodel` | Hilt ViewModels and UI state |
+| `app/src/main/java/com/example/ui/navigation` | App routes and navigation graph |
+| `core/model/src/main/kotlin/com/example/domain/model` | Pure domain data models and enums |
+| `core/domain/src/main/kotlin/com/example/domain` | Domain policies and use cases |
+| `core/domain/src/main/kotlin/com/example/core/db/entities` | Current Room entities; this is intentional current state but violates target domain purity |
+| `core/data/src/main/kotlin/com/example/core/db` | Room database, SQLCipher open path, migrations |
+| `core/data/src/main/kotlin/com/example/core/automation` | WorkManager, alarms, notifications, dispatch and senders |
+| `core/data/src/main/kotlin/com/example/core/gemini` | AI prompt, parser, rate limit, Gemini client |
+| `core/data/src/main/kotlin/com/example/core/backup` | Backup DTOs, encryption, import/export service |
+| `core/ui/src/main/kotlin/com/example/core/ui` | Design system |
 
-Do not add active UI code under any old `feature/` structure. Active feature UI lives under `app/src/main/java/com/example/ui`.
+## 4. Architecture Summary
 
-## 4. Architecture
-
-Layering:
+The intended dependency direction is:
 
 ```text
 Compose UI and ViewModels (:app)
-    -> domain use cases and service/repository contracts (:core:domain)
+    -> domain use cases, repository/service contracts, policies (:core:domain)
+    -> pure shared models (:core:model)
     -> data implementations, Room, external integrations (:core:data)
-    -> platform/external services
-
-Shared UI components/theme (:core:ui) are used by :app.
 ```
 
-Dependency rules:
+Actual Gradle dependencies:
 
-- `:app` depends on `:core:model`, `:core:domain`, `:core:data`, and `:core:ui`.
-- `:core:data` exposes `api(project(":core:domain"))`.
-- `:core:domain` exposes `api(project(":core:model"))` for compatibility while model extraction continues.
-- `:core:domain` should not depend on app or data implementation classes, except current Room entity files are physically located under `core/domain/src/main/kotlin/com/example/core/db/entities`.
-- `:core:ui` contains shared Compose primitives and must stay independent of domain/data implementation details.
+| Module | Current purpose | Key dependencies |
+| --- | --- | --- |
+| `:app` | Android app, Compose UI, navigation, ViewModels, widgets, tests | `:core:domain`, `:core:data`, `:core:ui`, Hilt, Compose, Firebase, WorkManager, SQLCipher, JavaMail, Room runtime |
+| `:core:model` | JVM-only shared model/value types | Kotlin JVM, JUnit tests |
+| `:core:domain` | Use cases, policies, repository/service contracts, mappers, current Room entities | `api(:core:model)`, coroutines, Room runtime, Paging, javax.inject |
+| `:core:data` | Room, repositories, workers, contacts, AI, backup, prefs, auth, senders | `api(:core:domain)`, Hilt, Room/KSP, WorkManager, Firebase, Google auth, OkHttp/Retrofit/Moshi, SQLCipher, JavaMail |
+| `:core:ui` | Shared Compose theme and UI primitives | Compose Material 3, Navigation Compose, Lifecycle Compose, Coil |
+
+Architectural caveat: `:core:domain` is not pure today. It contains Room entities under `com.example.core.db.entities` and has Room/Paging dependencies. ADR 0001 describes the target pure-domain direction, but implementation remains partial.
 
 Dependency injection:
 
 - `RelateAIApp` is annotated with `@HiltAndroidApp`.
-- `AppModule` provides `AppDatabase`, DAOs, `SecurePrefs`, `AuthManager`, `OkHttpClient`, `GenerativeModel`, and `GeminiClient`.
-- `AppModuleBinds` binds repository interfaces to data implementations.
-- `ServiceModule` binds domain service interfaces to data implementations.
-- Workers use Hilt WorkManager integration and `HiltWorkerFactory`.
-
-Runtime startup:
-
-- `RelateAIApp.onCreate()` checks certificate pin expiry, creates notification channels, warms database key and secure prefs, and schedules recurring workers unless under Robolectric.
-- `MainActivity` enables edge-to-edge Compose, gates app access through biometric lock when enabled, shows the app shell, and requests SMS/notification permissions only after an in-app rationale.
-- `RelateNavGraph` owns splash, onboarding, auth, home, contacts, events, messages, analytics, settings, activity, wish preview, style coach, backup, memory vault, gift advisor, chat history, and automation setup routes.
-
-## 5. Recreate From Scratch
-
-These steps rebuild the project from an empty directory or verify a fresh clone.
-
-1. Install prerequisites:
-
-```bash
-# Required toolchain
-JDK 21
-Android SDK Platform 37
-Android SDK Build Tools compatible with AGP 9.2.1
-Android Studio or command-line SDK tools
-Git
-```
-
-2. Create the root project and Gradle wrapper:
-
-```bash
-mkdir RelateAI
-cd RelateAI
-gradle wrapper --gradle-version 9.4.1
-chmod +x gradlew
-```
-
-3. Create `settings.gradle.kts` with Google, Maven Central, and Gradle Plugin Portal plugin repositories, `RepositoriesMode.FAIL_ON_PROJECT_REPOS`, root name `RelateAI`, and module includes:
-
-```kotlin
-include(":app")
-include(":core:model")
-include(":core:domain")
-include(":core:data")
-include(":core:ui")
-```
-
-4. Create `gradle/libs.versions.toml` with the versions listed in section 2 and aliases for AndroidX, Compose, Hilt, Room, WorkManager, Firebase, Google APIs, Retrofit/OkHttp/Moshi, SQLCipher, JavaMail, Robolectric, MockK, and JaCoCo support.
-
-5. Create the root `build.gradle.kts`:
-
-- Apply Android application/library, Kotlin Android, Kotlin Compose, KSP, Hilt, Google Services, secrets plugin aliases with `apply false`.
-- Apply `jacoco`.
-- Set Kotlin Android `jvmToolchain(21)` and Kotlin compile `JvmTarget.JVM_17`.
-- Configure all `Test` tasks to use JDK 21.
-- If `.gradle/trust/cacerts-zscaler` exists, pass it as the test JVM truststore.
-- Register aggregate `jacocoDebugUnitTestReport` across `:app`, `:core:data`, `:core:domain`, and `:core:ui`.
-
-6. Create module Gradle files:
-
-- `app/build.gradle.kts`: Android application, Kotlin Compose, KSP, Hilt, Google Services, baseline profile, namespace `com.example`, applicationId `com.aistudio.relateai.qxtjrk`, debug suffix `.debug`, compileSdk 37, minSdk 24, targetSdk 36, versionCode 1, versionName `1.0`, release minify/shrink, release signing guard, Compose enabled. The app module still has a legacy Room schema export argument, but active database schemas are owned by `:core:data`.
-- `core/domain/build.gradle.kts`: Android library, namespace `com.example.core.domain`, compileSdk 37, minSdk 24, Java 17, dependencies for coroutines, Room runtime, Paging, javax.inject, tests.
-- `core/data/build.gradle.kts`: Android library, KSP, Hilt, namespace `com.example.core.data`, compileSdk 37, minSdk 24, Room schema export to `core/data/schemas`, test assets from schemas, dependencies for domain, Room, Hilt, WorkManager, security crypto, SQLCipher, Google APIs, Firebase, JavaMail, networking, tests.
-- `core/ui/build.gradle.kts`: Android library, Kotlin Compose, namespace `com.example.core.ui`, compileSdk 37, minSdk 24, Compose enabled, Material 3, Navigation Compose, lifecycle Compose, Coil.
-
-7. Add app source:
-
-- Application shell: `RelateAIApp.kt`, `MainActivity.kt`, `SecurityChecks.kt`, `BiometricLockPolicy.kt`.
-- Navigation: `Screen.kt`, `RouteArgumentCodec.kt`, `NavGraph.kt`.
-- Screens: splash, onboarding, auth, home, contacts, events, messages, wish preview, analytics, activity history, settings, setup/AI Doctor, style coach, backup/restore, memory vault, gift advisor, chat history.
-- ViewModels matching each screen plus shared `UiText`/feedback primitives.
-- Widget provider: `BirthdayWidgetProvider`.
-
-8. Add domain source:
-
-- Models: `AutomationMode`, `ApprovalMode`, `OccasionType`, `MessageChannel`, `MessageStatus`.
-- Automation policy: `AutomationSchedulePolicy`.
-- Repository interfaces: contacts, events, messages, style profiles, message feedback, gifts, activity logs, memory notes.
-- Service interfaces: AI, contact sync, message dispatcher, scheduler, event reminder scheduler, notification, preferences, backup, analytics report, test send.
-- Use cases: sync contacts, discover events, generate/regenerate messages, approve/reject/revoke pending messages, dispatch message, test send, save manual event, update contact preferences, classify contacts, style analysis, dashboard metrics, analytics, health scoring.
-
-9. Add data source:
-
-- Room: `AppDatabase`, DAOs, migrations 2->13, schema JSON exports, SQLCipher support factory, `DatabaseKeyDerivation`, `LegacyDatabaseQuarantine`.
-- Repositories: one implementation per domain repository.
-- Preferences: `SecurePrefs`, `PreferencesRepositoryImpl`.
-- AI: `GeminiClient`, `AiServiceImpl`, prompt builder, response parser, model types, rate limiter.
-- Contacts: Google People sync, device contacts reader, merge/dedupe service.
-- Automation: workers, daily scheduler, exact send scheduler, event reminder scheduler, receivers, notifications.
-- Senders: dispatcher, SMS, WhatsApp, email, test send, SMS status receiver, email subject builder.
-- Security/resilience: backup encryption/service, structured logging, sensitive redaction, retry, circuit breaker, fallback, health monitor, dead-letter queue.
-
-10. Add resources and manifests:
-
-- `app/src/main/AndroidManifest.xml` with permissions, main activity, deep links, WhatsApp accessibility service, receivers, FileProvider, widget, custom WorkManager initializer removal.
-- `app/src/main/res/values/strings.xml` and `values-hi/strings.xml` with parity.
-- `core/data/src/main/res/values/strings.xml` and `values-hi/strings.xml` for notification/system copy.
-- XML configs: `network_security_config.xml`, `data_extraction_rules.xml`, `backup_rules.xml`, `accessibility_service_config.xml`, `shortcuts.xml`, `widget_birthday_info.xml`, `analytics_export_paths.xml`.
-- Widget layout and launcher drawables/mipmaps.
-
-11. Add Firebase config files:
-
-- `app/google-services.json` for release applicationId `com.aistudio.relateai.qxtjrk` when a release config is provided.
-- `app/src/debug/google-services.json` for the repository debug build applicationId `com.aistudio.relateai.qxtjrk`.
-- Do not paste API keys into docs. Keep local config files out of public history when possible.
-- Firebase/Google Cloud must enable Auth, Google Sign-In OAuth clients for the correct package/signing SHA-1, People API, and Gemini/Vertex access.
-
-12. Add release signing environment variables only in CI or local shell:
-
-```bash
-export KEYSTORE_PATH=/absolute/path/to/release.keystore
-export STORE_PASSWORD=...
-export KEY_ALIAS=...
-export KEY_PASSWORD=...
-```
-
-13. Run validation:
-
-```bash
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug jacocoDebugUnitTestReport --no-configuration-cache
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:assembleDebugAndroidTest --no-configuration-cache
-```
-
-14. Optional connected validation with an idle unlocked device:
-
-```bash
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.ui.MainActivityNavigationSmokeTest --no-configuration-cache
-```
-
-15. Release build:
-
-```bash
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleRelease --no-configuration-cache
-```
-
-Release artifact tasks must fail fast when release signing variables are missing.
-
-## 6. Feature Hierarchy
-
-```text
-RelateAI
-+-- Entry, Navigation, and Account
-|   +-- Splash routing
-|   +-- Onboarding setup checklist
-|   +-- Google authentication
-|   +-- Settings
-|   +-- Sign-out and local data purge
-+-- Relationship Data
-|   +-- Google contacts sync
-|   +-- Device contacts import
-|   +-- Deduplication and merge
-|   +-- Contact list/search/filter/sort
-|   +-- Contact detail personalization
-|   +-- Memory notes
-|   +-- Gift history
-+-- Events
-|   +-- Birthday discovery
-|   +-- Anniversary discovery
-|   +-- Work anniversary discovery
-|   +-- Manual/custom event creation
-|   +-- Event list/search/filter
-|   +-- Event reminder notifications
-+-- AI and Personalization
-|   +-- Contact classification
-|   +-- Message generation
-|   +-- Message regeneration from feedback
-|   +-- Style Coach
-|   +-- Gift suggestions
-|   +-- Fallback message generation
-+-- Messages and Automation
-|   +-- Pending message inventory
-|   +-- Wish preview, edit, variant selection
-|   +-- Approval, rejection, retry, revoke
-|   +-- WorkManager daily chain
-|   +-- Exact send alarms
-|   +-- Boot rescheduling
-|   +-- Automatic delivery route fallback
-|   +-- SMS dispatch
-|   +-- WhatsApp dispatch
-|   +-- Email dispatch
-+-- Insights and Operations
-|   +-- Home dashboard
-|   +-- Analytics
-|   +-- Activity history
-|   +-- Relationship health scoring
-|   +-- Revival suggestions
-|   +-- Automation setup / AI Doctor
-|   +-- Widget and shortcuts
-+-- Security, Data, and Developer Support
-    +-- SQLCipher Room database
-    +-- Encrypted preferences
-    +-- Database key derivation
-    +-- Encrypted backup/restore
-    +-- Legacy DB quarantine
-    +-- Network pinning
-    +-- Resilience, logging, health monitor, dead-letter queue
-    +-- Gradle build, CI, lint, unit tests, coverage
-```
-
-## 7. Feature Inventory
-
-Status definitions:
-
-- Fully Implemented: production path exists with meaningful tests and documented validation.
-- Partially Implemented: usable but missing live validation, coverage, or hardening.
-- Not Implemented: documented behavior has no active implementation.
-- Broken: active implementation exists but fails required workflow.
-- Outdated: code or docs describe obsolete behavior.
-- Workspace-Specific: depends on a local path, fixed environment, or hardcoded project/device assumption.
-- Deprecated: intentionally inactive and superseded.
-- Experimental: present but not production path.
-
-| ID | Feature | Status | Current evidence and required follow-up |
-|---|---|---|---|
-| F-001 | App shell, navigation, routes, permissions | Fully Implemented | Compose smoke coverage exists for permission rationale and bottom navigation; connected run needs idle device. |
-| F-002 | Splash and onboarding | Fully Implemented | First-run onboarding-to-auth routing covered; connected run needs idle device. |
-| F-003 | Google authentication and session state | Fully Implemented | Auth ViewModel and smoke action coverage exists; Google/Firebase OAuth requires credentials/device validation. Alternate login paths are not supported. |
-| F-004 | Settings and secure configuration | Fully Implemented | Biometric, quiet-hour, reminder, channel blackout, sync, Gmail, AI, and sign-out settings implemented; live handoffs pending. |
-| F-005 | Home dashboard and relationship planner | Fully Implemented | `HomeScreenInteractionTest` covers dashboard links, sync-error controls, and setup progress routing. |
-| F-006 | Contact sync, import, and deduplication | Fully Implemented | Foreground/background sync share Google + device merge and event discovery. |
-| F-007 | Contact list search, filter, sort | Fully Implemented | `ContactListScreenInteractionTest` covers search, filter, sort, retry/dismiss, row navigation. |
-| F-008 | Contact detail personalization | Fully Implemented | Custom send time and skip-auto-wish affect generation/scheduling; live seeded validation pending. |
-| F-009 | Event discovery | Fully Implemented | Leap-day and deactivation behavior covered by domain/worker tests. |
-| F-010 | Manual and custom event creation | Fully Implemented | `SaveManualEventUseCase` creates contacts/events and schedules reminders. |
-| F-011 | Messages inbox and bulk actions | Fully Implemented | `MessagesScreenInteractionTest` covers tabs, filters, row actions, and bulk actions. |
-| F-012 | Wish preview, editing, feedback, regeneration | Fully Implemented | `WishPreviewScreenInteractionTest` covers variants, edit, why-signals, regenerate, test-send, approve/reject. |
-| F-013 | Chat history | Fully Implemented | `ChatHistoryScreenInteractionTest` covers populated, loading, empty, and error states. |
-| F-014 | Analytics and CSV export | Fully Implemented | Screen interaction and FileProvider CSV attachment tests exist; live share sheet pending. |
-| F-015 | Activity history and audit log | Fully Implemented | Screen/ViewModel/repository coverage exists; live real-data validation pending. |
-| F-016 | Style Coach | Fully Implemented | Manual and recent-message analysis paths covered; live AI quality pending. |
-| F-017 | Memory Vault | Fully Implemented | Screen and ViewModel tests cover add, edit, validation, search/clear, pin/unpin, delete, and error states. |
-| F-018 | Gift Advisor | Fully Implemented | Screen and ViewModel tests cover records, AI suggestions, feedback, validation, errors. |
-| F-019 | Encrypted backup and restore | Fully Implemented | UI and selected-document service tests exist; live document picker pending. |
-| F-020 | Automation setup / AI Doctor | Fully Implemented | Diagnostics and actions implemented; live system-setting handoffs pending. |
-| F-021 | Room database, schema, migrations | Fully Implemented | SQLCipher Room v13, exported schemas, migration/quarantine tests. |
-| F-022 | AI contact classification | Fully Implemented | AI-disabled and generated classification outcomes covered; live AI pending. |
-| F-023 | AI message generation and fallback | Fully Implemented | `GenerateMessageUseCase` owns prompt/AI/approval/quality/channel/persistence behavior for foreground and weekly-worker generation; respects skip-auto-wish, custom send time, quiet hours, blackout dates. |
-| F-024 | Approval lifecycle | Fully Implemented | Approve/reject/retry/revoke domain and notification actions implemented. |
-| F-025 | Exact scheduling and boot recovery | Fully Implemented | Exact send scheduling and boot rescheduling restore approved and pending Smart Approve auto-sends; live alarm validation pending. |
-| F-026 | WorkManager automation chain | Fully Implemented | Daily chain covers sync, event discovery, message generation, holiday wishes, follow-ups, reminders, revival, style analysis. |
-| F-027 | Dispatch orchestration and automatic delivery routing | Fully Implemented | `DispatchEligibilityPolicy` owns future-time, quiet-hour, and blackout-date deferral; dispatch resolves available delivery routes across enabled channels and recovers failed worker status. |
-| F-028 | SMS delivery and status callbacks | Fully Implemented | SMS sender/status receiver implemented; live SMS requires safe test recipient/SIM. |
-| F-029 | WhatsApp Accessibility delivery | Fully Implemented | Service and sender implemented; live WhatsApp/accessibility validation pending. |
-| F-030 | Gmail SMTP delivery and test send | Fully Implemented | Event-aware subject and test-send paths implemented; live credentials pending. |
-| F-031 | Notifications and action receivers | Fully Implemented | Approval, reminder, setup, backup, revival notifications implemented; live permission actions pending. |
-| F-032 | Revival suggestions | Fully Implemented | Low-health revival worker and notification path implemented. |
-| F-033 | Relationship health scoring | Fully Implemented | Health scoring use case and tests exist. |
-| F-034 | Widget, deep links, shortcuts | Fully Implemented | Manifest/widget/shortcut entries exist; live launcher/deep-link validation pending. |
-| F-035 | Security, privacy, and local encryption | Fully Implemented | SQLCipher, encrypted prefs, backup exclusion, pinning, redaction tests. |
-| F-036 | Sign-out data purge | Fully Implemented | AuthManager and settings flow clear local app data; test only with disposable data. |
-| F-037 | Resilience, logging, health, dead-letter queue | Fully Implemented | Retry, circuit breaker, fallback, redaction, health, dead-letter coverage exists; production logging routes through `StructuredLogger`. |
-| F-038 | External API and service interfaces | Fully Implemented | Domain/data boundaries exist for all integrations. |
-| F-039 | Build, CI, release guard, coverage | Fully Implemented | CI runs test/lint/assemble/coverage and release-signing guard. |
-| F-040 | Design system and localization | Fully Implemented | Shared theme/components and English/Hindi resource parity tests. |
-| F-041 | Developer helper scripts and docs | Fully Implemented | `scripts/extract_strings.sh` resolves repo root dynamically; this SSOT replaces split docs. |
-| F-042 | Biometric app lock enforcement | Fully Implemented | Cold start/resume gate and policy test exist; live prompt pending. |
-| F-043 | Quiet hours, blackout dates, reminder toggles | Fully Implemented | `AutomationSchedulePolicy` enforces scheduling rules. |
-| F-044 | Event reminder scheduling | Fully Implemented | Schedules/cancels/reschedules alarms from `notifyDaysBefore` and reminder toggle. |
-| F-045 | Mood logs | Deprecated | Historical migration only. |
-| F-046 | Dedicated birthday quick-add FAB/modal | Deprecated | Superseded by manual event creation. |
-| F-047 | Legacy Retrofit Gemini model layer | Experimental | Present but not the primary production Gemini path. |
-
-## 8. Feature Dependency Map
-
-| Feature | Depends on | Enables |
-|---|---|---|
-| Google authentication | Firebase Auth, Google Sign-In, People API scope | Google contacts sync, authenticated Gemini path |
-| Contact sync | Auth, People API, ContactsProvider, Room, dedupe logic | Events, classification, messages, analytics |
-| Event discovery | Contact repository, event repository, date normalization | Message generation, reminders, dashboard |
-| AI classification | Contact sync, Gemini client | Relationship-aware defaults and personalization |
-| Message generation | Contact, event, style, memory, gift, AI settings | Pending messages and approval workflow |
-| Approval workflow | Pending messages, notifications, scheduler | Dispatch eligibility |
-| Exact scheduling | Pending approvals, AlarmManager, WorkManager fallback | On-time automated dispatch |
-| Dispatch | Message dispatcher, channel senders, preferences | Sent history, delivery analytics, health scoring |
-| Analytics | Contacts, events, sent messages, pending messages | Dashboard, CSV export, insights |
-| Backup/restore | Room repositories, encryption, passphrase | Data portability |
-| AI Doctor | Auth, prefs, workers, health monitor, dead-letter queue | Operational readiness and troubleshooting |
-| Security storage | SecurePrefs, SQLCipher, key derivation | Safe local storage and sign-out purge |
-| CI/build | Gradle modules, lint, tests, coverage, release guard | Release confidence |
-
-## 9. Data Model and Database
-
-Primary entities:
-
-- `ContactEntity`: identity, Google id, name, phone/email, relationship classification, personalization settings, automation preferences, health score, budgets, lifecycle flags.
-- `EventEntity`: contact id, event type, label, date/year, next occurrence, notification lead time, source, confidence, verification.
-- `PendingMessageEntity`: generated variants, selected draft, channel, approval mode, status, scheduled time/year, model metadata, signals, fallback flag.
-- `SentMessageEntity`: sent text, channel, sent time, delivery status, AI metadata, reply metadata.
-- `StyleProfileEntity` and `StyleProfileHistoryEntity`: current and historical writing style.
-- `MemoryNoteEntity`: per-contact notes for preferences, events, gifts, milestones, and general context.
-- `GiftHistoryEntity`: per-contact gifts, cost/budget, occasion, feedback.
-- `ActivityLogEntity`: activity/audit trail with type, severity, status, route, contact/event/message references.
-- `MessageFeedbackEntity`: feedback from wish preview/regeneration.
-
-Database facts:
-
-- Active Room database: `AppDatabase`.
-- Active schema version: 16.
-- Exported schema location: `core/data/schemas/com.example.core.db.AppDatabase/16.json`. Legacy local `app/schemas/` exports are ignored and not part of the tracked source of truth.
-- SQLCipher is used through Room SupportFactory.
-- Destructive migration fallback must stay disabled.
-- Legacy plaintext `relateai.db`, WAL, and SHM files are quarantined under protected no-backup storage before encrypted open.
-- Platform backup and data extraction exclude database and encrypted preference files.
-- Mood logs are not active; they are migration history only.
-
-DAOs:
-
-- `ContactDao`
-- `EventDao`
-- `PendingMessageDao`
-- `SentMessageDao`
-- `StyleProfileDao`
-- `MemoryNoteDao`
-- `GiftHistoryDao`
-- `ActivityLogDao`
-- `MessageFeedbackDao`
-
-Migration rule:
-
-- Every schema change must add a non-destructive Room migration, update exported schemas, and add/adjust migration tests.
-- Explicit `@Index(name = "...")` values must match manually created index names.
-
-## 10. Runtime Surfaces
-
-Manifest permissions:
-
-- `SEND_SMS`
-- `READ_CONTACTS`
-- `INTERNET`
-- `ACCESS_NETWORK_STATE`
-- `SCHEDULE_EXACT_ALARM`
-- `USE_EXACT_ALARM`
-- `RECEIVE_BOOT_COMPLETED`
-- `FOREGROUND_SERVICE`
-- `FOREGROUND_SERVICE_DATA_SYNC`
-- `POST_NOTIFICATIONS`
-- `WAKE_LOCK`
-
-Optional hardware:
-
-- `android.hardware.telephony` is not required, so non-SMS-capable devices can install.
-
-Deep links:
-
-- `relateai://wish/{contactId}/{messageRef}`
-- `relateai://contact/{contactId}`
-- `relateai://settings`
-
-Receivers:
-
-- `MessageDispatchReceiver`: AlarmManager dispatch entry point.
-- `BootReceiver`: reschedules exact sends, reminders, and periodic workers after reboot.
-- `ApprovalReceiver`: handles notification approve/reject/retry actions.
-- `EventReminderReceiver`: shows event reminder notifications.
-- `SmsStatusReceiver`: updates SMS sent/delivered state.
-- `BirthdayWidgetProvider`: app widget updates.
-
-Services/providers:
-
-- `WhatsAppAccessibilityService`: sends queued WhatsApp jobs by observing WhatsApp/WhatsApp Business UI.
-- `androidx.core.content.FileProvider`: shares analytics CSV exports from cache.
-- WorkManager initializer is removed from AndroidX Startup and replaced by the Hilt-aware configuration provider.
-
-Shortcuts/widget:
-
-- Dynamic shortcuts: compose message and view contacts.
-- Widget: birthday/upcoming event widget with hourly update period.
-
-## 11. Preferences and Configuration
-
-Sensitive preferences live in encrypted preference files through `SecurePrefs`.
-
-Important stored values:
-
-- Google OAuth token.
-- Firebase UID.
-- Gemini API key.
-- Gmail sender email and app password.
-- Global automation mode.
-- Theme mode.
-- Quiet hours start/end.
-- Channel blackout list.
-- Blackout date list.
-- Biometric lock toggle.
-- Birthday reminder toggle.
-- AI wish generation toggle.
-- Contact sync token.
-- Onboarding completion.
-- Last sync error.
-- Last backup timestamp.
-- Legacy unencrypted DB quarantine notice flag.
-- Secure preferences rebuild recovery notice flag.
-
-Defaults:
-
-- Global automation mode: `SMART_APPROVE`.
-- Theme mode: `SYSTEM`.
-- Quiet hours: 22 to 8.
-- Birthday reminders enabled: true.
-- AI wish generation enabled: true.
-- Biometric lock enabled: false.
-
-Security rule:
-
-- Secure storage initialization must fail securely. Do not fall back to plaintext `Context.MODE_PRIVATE` preferences when encrypted storage fails.
-- If encrypted preferences must be rebuilt after secure storage initialization failure, Settings must show a dismissible recovery notice telling the user to re-enter protected setup values, run AI Doctor, and create a fresh encrypted backup.
-
-## 12. AI and Message Generation
-
-AI responsibilities:
-
-- Contact relationship classification.
-- Personalized message variant generation.
-- Regeneration from user feedback.
-- Style Coach analysis.
-- Gift suggestions.
-- Revival suggestions for neglected contacts.
-- Fallback message generation when AI is disabled or unavailable.
-
-Primary files:
-
-- `core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt`
-- `GeminiClient.kt`
-- `PromptBuilder.kt`
-- `ResponseParser.kt`
-- `RateLimiter.kt`
-- `GeminiModels.kt`
-- `core/domain/src/main/kotlin/com/example/domain/service/AiService.kt`
-- `GenerateMessageUseCase.kt`
-- `RegeneratePendingMessageUseCase.kt`
-- `StyleAnalysisUseCase.kt`
-- `ClassifyContactUseCase.kt`
-
-Rules:
-
-- If AI wish generation is disabled, use cases must return a visible disabled outcome instead of calling Gemini.
-- Prompt building must avoid sending unnecessary PII.
-- Response parsing must be defensive against malformed JSON, partial variants, and error JSON.
-- AI errors surfaced to users must be stable and redacted.
-- Six generated variants are supported where available.
-- Wish Preview must show why-signals explaining personalization inputs.
-
-## 13. Automation and Delivery
-
-Workers:
-
-| Worker | Purpose |
-|---|---|
-| `DailyTriggerWorker` | Starts daily automation and backup reminder checks. |
-| `ContactSyncWorker` | Runs background contact sync and optional classification. |
-| `EventDiscoveryWorker` | Rebuilds upcoming events from contacts. |
-| `MessageGenerationWorker` | Generates pending messages for upcoming events. |
-| `MessageDispatchWorker` | Dispatches approved/due messages and recovers unexpected failures. |
-| `RevivalWorker` | Suggests reconnect messages for low-health contacts. |
-| `StyleAnalysisWorker` | Refreshes writing style from sent history. |
-
-Schedulers:
-
-- `WorkerScheduler.scheduleAll()` registers periodic daily, revival, and style-analysis work.
-- `WorkerScheduler.scheduleDailyAutomationChain()` chains contact sync -> event discovery -> message generation.
-- `DailyScheduler.scheduleExactSend()` schedules exact send alarms by pending-message id.
-- `EventReminderScheduler` schedules reminder alarms from event occurrence and `notifyDaysBefore`.
-- Boot recovery reschedules pending exact sends, event reminders, and recurring workers.
-
-Delivery channels:
-
-- SMS uses Android `SmsManager` plus sent/delivered broadcasts.
-- WhatsApp uses an Accessibility Service plus WhatsApp deep-link/open-chat flow and falls back to SMS where configured.
-- Email uses Gmail SMTP through JavaMail on port 587 with STARTTLS.
-
-Dispatch rules:
-
-- Pending messages must be approved or eligible by automation mode before dispatch.
-- Dispatch must defer during quiet hours or blackout dates.
-- Disabled channel preferences must be respected.
-- A message set to `DISPATCHING` must be moved to `FAILED` if an unexpected dispatcher exception occurs.
-- Exact alarm request codes must be based on pending-message id to avoid collisions.
-
-Automation modes:
-
-- Default/global.
-- Smart approve.
-- VIP approve.
-- Fully auto.
-- Always ask.
-
-## 14. Security, Privacy, and Reliability
-
-Implemented controls:
-
-- SQLCipher encrypted Room database.
-- EncryptedSharedPreferences for auth/config state.
-- Deterministic database key derivation with cached-key validation.
-- Legacy plaintext DB quarantine instead of deletion.
-- Auto Backup disabled and sensitive files excluded in legacy and API 31+ backup rules.
-- Explicit encrypted backup/restore with passphrase, bounded import reads, transaction rollback, and stable failure reasons.
-- Network pinning for Google/Firebase/Gmail-related hosts with expiration `2027-06-01`.
-- Release owners must schedule network pin rotation no later than `2027-04-01`; see `docs/operations/release-checklist.md`.
-- Release signing guard requiring production signing variables.
-- Sensitive log redaction for emails, tokens, API keys, passphrases, phone-like values, People API URLs, and fallback/provider errors. Production direct Android logging is limited to `StructuredLogger` by release-readiness tests.
-- Biometric app lock gate on cold start/resume when enabled.
-- Dead-letter queue, health monitor, retry, circuit breaker, and fallback primitives.
-
-Do not:
-
-- Commit secrets, keystores, app passwords, or private API keys.
-- Re-enable destructive Room migration fallback.
-- Add plaintext preference fallbacks.
-- Log raw OAuth tokens, API keys, email passwords, full People API URLs, backup passphrases, or phone numbers.
-- Use release builds signed with debug credentials.
-
-## 15. UI, Navigation, and Localization
-
-Primary routes:
+- `AppModuleBinds` binds repositories such as `ContactRepository`, `EventRepository`, `MessageRepository`, `StyleProfileRepository`, `MemoryNoteRepository`, `GiftHistoryRepository`, `ActivityLogRepository`, `MessageFeedbackRepository`, `DispatchAttemptRepository`, and `DiagnosticSnapshotRepository`.
+- `AppModule` provides `AppDatabase`, DAOs, `SecurePrefs`, `OkHttpClient`, `AuthManager`, Firebase Vertex `GenerativeModel`, and `GeminiClient`.
+- `ServiceModule` binds `AiService`, `PreferencesRepository`, contact sync, dispatcher, test-send, scheduler, event reminder scheduler, notification, backup, and analytics report services.
+- WorkManager uses Hilt worker integration through `HiltWorkerFactory`.
+
+## 5. Technology Stack
+
+| Category | Technologies |
+| --- | --- |
+| Language/build | Kotlin 2.2.10, Gradle Kotlin DSL, JDK toolchain 21, JVM target 17 |
+| Android | AGP 9.2.1, compileSdk 37, minSdk 24, targetSdk 36 |
+| UI | Jetpack Compose, Material 3, Navigation Compose, lifecycle Compose, Coil |
+| DI | Hilt 2.59.2, Hilt WorkManager |
+| Persistence | Room 2.7.0, SQLCipher 4.5.4, AndroidX SQLite, schema export in `core/data/schemas` |
+| Preferences/security | AndroidX Security Crypto, EncryptedSharedPreferences, Android Keystore-backed MasterKey |
+| Auth/cloud | Firebase Auth, Google Sign-In, Firebase Analytics, Firebase Vertex AI |
+| AI | Firebase Vertex AI `gemini-1.5-flash`; optional user API key path via Google AI client |
+| Contacts | Google People API via OkHttp, Android ContactsProvider |
+| Scheduling | WorkManager, AlarmManager exact alarms with WorkManager fallback, boot/time recovery receivers |
+| Delivery | Android SMS, Gmail SMTP through JavaMail, WhatsApp AccessibilityService |
+| Serialization/network | Moshi, OkHttp, Retrofit dependency present |
+| Testing | JUnit, Robolectric, MockK, coroutines test, Room testing, Compose UI tests, Roborazzi, Android instrumented smoke tests |
+| Coverage | JaCoCo aggregate `jacocoDebugUnitTestReport` |
+
+## 6. Runtime Surfaces
+
+Primary bottom navigation:
+
+- Home
+- Contacts
+- Events
+- Messages
+- Analytics
+
+Secondary routes:
 
 - Splash
 - Onboarding
 - Auth
-- Home
-- Contacts
 - Contact Detail
-- Events
-- Messages
 - Wish Preview
-- Analytics
-- Activity History
 - Settings
+- Activity History
 - Style Coach
 - Backup/Restore
 - Automation Setup / AI Doctor
+- Chat History
 - Memory Vault
 - Gift Advisor
-- Chat History
 
-Bottom navigation:
+Deep links:
 
-- Home
-- Contacts
-- Events
-- Messages
-- Analytics
+| URI shape | Destination |
+| --- | --- |
+| `relateai://home` | Home |
+| `relateai://contacts` | Contacts |
+| `relateai://contact/{contactId}` | Contact Detail |
+| `relateai://messages` | Messages |
+| `relateai://wish/{contactId}/{messageRef}` | Wish Preview |
+| `relateai://settings` | Settings |
+| `relateai://backup-restore` | Backup/Restore |
 
-UI conventions:
+Static shortcuts:
 
-- Compose + Material 3.
-- Shared colors/type/theme live in `core/ui`.
-- Visible strings should come from resources.
-- English and Hindi resource key parity is tested.
-- Search fields should include conditional clear buttons with accessible descriptions.
-- `LazyColumn` and `LazyRow` items must use stable keys for dynamic lists.
-- Do not add hardcoded visible strings in screens covered by `NoHardcodedStringsRegressionTest`.
-- Use `collectAsStateWithLifecycle()` for lifecycle-aware state collection.
+- `compose_message` -> `relateai://messages`
+- `view_contacts` -> `relateai://contacts`
 
-## 16. Testing and Validation
+Widget:
 
-Standard full validation:
+- `BirthdayWidgetProvider` shows today birthday count, names, next events, and pending approval count.
+- Widget tap routes to Messages when pending approvals exist; otherwise it routes to Home.
 
-```bash
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug jacocoDebugUnitTestReport --no-configuration-cache
-```
+## 7. Data Model
 
-Optional local truststore:
+Current Room database:
 
-```bash
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug jacocoDebugUnitTestReport --no-configuration-cache -Djavax.net.ssl.trustStore=.gradle/trust/cacerts-zscaler -Djavax.net.ssl.trustStorePassword=changeit
-```
+| Table | Purpose |
+| --- | --- |
+| `contacts` | Contact aggregate with Google/device identity, communication methods, relationship metadata, preferences, gift budgets, health, personalization JSON fields, lifecycle flags |
+| `events` | Current occasion/event table for birthdays, anniversaries, work anniversaries, custom/manual events, synthetic holiday/revival/follow-up events |
+| `pending_messages` | Generated drafts and approval/schedule state; unique `(contactId, eventId, scheduledYear)` |
+| `sent_messages` | Sent history, delivery status, AI metadata, reply marker |
+| `style_profiles` | Current learned user writing style |
+| `style_profile_history` | Snapshots of learned style |
+| `memory_notes` | Contact memory notes, categories, pinned state |
+| `gift_history` | Contact gift records |
+| `activity_logs` | User-visible operational activity history |
+| `message_feedback` | Regeneration feedback and instructions |
+| `dispatch_attempts` | Durable send attempt, eligibility, retry/dead-letter, and provider result history |
+| `diagnostic_snapshots` | Local redacted AI Doctor and health diagnostics; excluded from backup |
 
-Instrumentation build:
+Current migration chain:
 
-```bash
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-configuration-cache
-```
+- `AppDatabase` is at version 16.
+- Migrations exist from 2 through 16.
+- SQLCipher open path uses `SupportFactory`.
+- `core/data/schemas/com.example.core.db.AppDatabase/16.json` is the active schema export.
+- Legacy app-level schema exports under `app/schemas` are ignored local/generated artifacts, not the active schema authority.
 
-Connected smoke:
+Important current relationships:
 
-```bash
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.ui.MainActivityNavigationSmokeTest --no-configuration-cache
-```
+- `pending_messages.contactId` cascades on contact delete.
+- `pending_messages.eventId` participates in uniqueness but is not a Room foreign key in version 16.
+- `sent_messages.contactId` sets null on contact delete.
+- `dispatch_attempts` links to pending message ids and uses nullable contact/occasion references.
+- `diagnostic_snapshots` are local diagnostics and are not exported/imported by backup.
 
-Fresh validation evidence from 2026-06-11:
+Target but not implemented:
 
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug jacocoDebugUnitTestReport --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 1m 23s`, 221 actionable tasks, 17 executed, 204 up-to-date.
-- Unit test XML aggregate: 76 suites, 277 tests, 0 failures, 0 errors, 0 skipped.
-- Lint passed for debug.
-- Debug APK assembled successfully.
-- Aggregate JaCoCo XML counters: 66,058 covered / 136,016 total instructions (48.6%), 7,895 covered / 14,972 total lines (52.7%), and 3,225 covered / 10,006 total branches (32.2%).
-- JaCoCo HTML report: `build/reports/jacoco/jacocoDebugUnitTestReport/html/index.html`.
-- Lint reports: `app/build/reports/lint-results-debug.*`, `core/data/build/reports/lint-results-debug.*`, `core/domain/build/reports/lint-results-debug.*`, and `core/ui/build/reports/lint-results-debug.*`.
-- Debug APK exists under `app/build/outputs/apk/debug/`.
+- First-class `occasions` and `message_drafts` tables are design targets in architecture docs.
+- Room entities should move out of `:core:domain` or into a dedicated database/data boundary.
 
-Focused validation evidence from 2026-06-25:
+## 8. State Management
 
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.home.HomeScreenInteractionTest --tests com.example.ui.viewmodel.HomeViewModelTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 53s`, 89 actionable tasks, 11 executed, 78 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.SettingsViewModelTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 26s`, 89 actionable tasks, 21 executed, 68 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.MemoryVaultViewModelTest --tests com.example.ui.screens.memoryvault.MemoryVaultScreenInteractionTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 27s`, 89 actionable tasks, 21 executed, 68 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.MessagesViewModelTest --tests com.example.ui.screens.messages.MessagesScreenInteractionTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 12s`, 89 actionable tasks, 4 executed, 85 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.AutomationSetupViewModelTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 20s`, 89 actionable tasks, 11 executed, 78 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.contacts.ContactDetailPersonalizationQualityCardTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 24s`, 89 actionable tasks, 19 executed, 70 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.HomeViewModelTest --tests com.example.ui.screens.home.HomeScreenInteractionTest --tests com.example.ui.viewmodel.AutomationSetupViewModelTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 44s`, 89 actionable tasks, 22 executed, 67 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.domain.usecase.SaveManualEventUseCaseTest --tests com.example.ui.viewmodel.EventsViewModelTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 39s`, 89 actionable tasks, 27 executed, 62 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.settings.SettingsScreenInteractionTest --tests com.example.ui.viewmodel.SettingsViewModelTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 34s`, 89 actionable tasks, 10 executed, 79 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.MessagesViewModelTest --tests com.example.ui.screens.messages.MessagesScreenInteractionTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 1m 2s`, 89 actionable tasks, 9 executed, 80 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.WishPreviewViewModelTest --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 37s`, 89 actionable tasks, 21 executed, 68 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.HomeViewModelTest --tests com.example.ui.screens.home.HomeScreenInteractionTest --tests com.example.ui.LocalizationParityTest --tests com.example.ui.NoHardcodedStringsRegressionTest --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 43s`, 89 actionable tasks, 11 executed, 78 up-to-date.
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:testDebugUnitTest :app:lintDebug --no-configuration-cache` passed.
-- Gradle result: `BUILD SUCCESSFUL in 54s`, 161 actionable tasks, 26 executed, 135 up-to-date. Lint report: `app/build/reports/lint-results-debug.html`.
+The app uses Hilt ViewModels plus Kotlin `StateFlow`/`MutableStateFlow` for screen state. Compose screens observe ViewModel state and route callbacks through `NavGraph`.
 
-Representative automated coverage:
+Key examples:
 
-- Domain use cases for sync, event discovery, generation, approval, rejection, regeneration, dispatch, analytics, health scoring, manual event save, contact preferences, test send.
-- Room DAOs, migrations, SQLCipher key derivation, plaintext DB quarantine.
-- Backup encryption, export/import, wrong passphrase, malformed input, oversized import, rollback.
-- Gemini prompt/response parsing and fallback behavior.
-- WorkManager workers and automation pipeline.
-- Scheduler and event reminder policy.
-- SMS status receiver and email subject builder.
-- Resilience primitives and redaction.
-- ViewModels for primary screens.
-- Compose/Robolectric screen interactions for home, contacts, messages, wish preview, analytics, activity history, style coach, memory vault, gift advisor, backup/restore, chat history.
-- Localization parity and hardcoded-string regression.
-- Production readiness config and helper script portability.
+- `HomeViewModel` combines dashboard metrics, setup readiness inputs, domain-derived setup progress, domain-derived backup freshness, and domain-ranked next actions.
+- `ContactListViewModel` owns search, filters, sort, and contact quality labels.
+- `EventsViewModel` owns event filters, manual event saves, duplicate/conflict warnings, and conflict resolution.
+- `MessagesViewModel` owns tabs, channel filter, sort, selection, approve/reject/retry/revoke, and domain-derived route/status/dispatch-window readiness labels.
+- `WishPreviewViewModel` owns selected variant, edited text, test send, feedback, regeneration, approve/reject, review-next queue, and why signals; draft text readiness and send-summary route choice/route setup/device setup/quiet-hours and blackout dispatch projection are domain-derived.
+- `AutomationSetupViewModel` computes AI Doctor readiness check details and diagnostic snapshots; account/provider checks, quality checks, system readiness checks, summary classification, setup progress, and recommended-fix ranking use shared domain policies.
+- `BackupRestoreViewModel` owns passphrase strength, export, import preview, and replace restore confirmation.
 
-Live validation still needed:
+Known state-management debt:
 
-| Surface | Status | Missing prerequisite |
-|---|---|---|
-| Connected app shell smoke | Blocked | Idle, unlocked device; previous run on `1b87b5db` stalled while another app was foregrounded. |
-| Google OAuth and People API | Blocked | Configured Google account, OAuth clients, contacts permission, idle device. |
-| Device ContactsProvider sync | Blocked | Real or manually prepared contacts plus contact permission on device. |
-| Gemini live generation/classification | Blocked | Gemini API key or authenticated Firebase Vertex path, test data. |
-| Gmail SMTP live send | Blocked | Gmail sender and app password. |
-| SMS live send/status | Blocked | SIM/SMS-capable device and safe test recipient. |
-| WhatsApp live automation | Blocked | WhatsApp installed, accessibility service enabled, safe test recipient. |
-| Notification actions | Blocked | Notification permission and generated pending/reminder data. |
-| Exact alarms/boot recovery | Blocked | Exact alarm permission and scheduling window. |
-| Widget | Blocked | Launcher widget placement. |
-| Dynamic shortcuts | Blocked | Launcher shortcut inspection. |
-| Deep links | Blocked | Installed debug app and `adb shell am start` validation. |
-| Biometric lock | Blocked | Device credential/biometric enrollment and live prompt validation. |
+- Operational readiness logic still exists across remaining dispatch/recovery timing surfaces outside Messages scheduled readiness, exact-send scheduling, exact-send stale-dispatch recovery, SMS stale delivery-status recovery, event-reminder scheduling, foreground/worker dispatch exception failure classification, SMS callback delivery/attempt outcome mapping, and the Wish Preview review summary, plus remaining notification surfaces outside typed approval/setup/system-alert/revival/event-reminder requests. `DeliveryRouteReadinessPolicy`, `AutoSendChannelSelector`, `DispatchEligibilityPolicy`, `ExactSendSchedulePolicy`, `ExactSendRecoveryPolicy`, `SmsDeliveryStatusRecoveryPolicy`, `EventReminderSchedulePolicy`, `DispatchExceptionFailurePolicy`, `SmsCallbackOutcomePolicy`, `MessageOperationalReadinessPolicy`, `WishDraftReadinessPolicy`, `WishPreviewSendSummaryPolicy`, `ApprovalNotificationActionPolicy`, `SetupNotificationRequest`, `SystemAlertNotificationRequest`, `RevivalNotificationRequest`, `SetupAccountProviderReadinessPolicy`, `SetupAutomationReadinessPolicy`, `SetupChannelReadinessPolicy`, `SetupEmailReadinessPolicy`, `SetupQualityReadinessPolicy`, `SetupSystemReadinessPolicy`, `SetupReadinessSummaryPolicy`, `SetupReadinessProgressPolicy`, `SetupReadinessRecommendationPolicy`, and `HomeNextActionPolicy` improved sharing for route prerequisites, history-aware route selection and final dispatch fallback ordering, exact-send scheduling, exact-send stale-dispatch recovery classification, SMS stale delivery-status recovery cutoff/status decisions, event-reminder cancel/exact/inexact scheduling decisions, foreground/worker dispatch exception final-failure classification, SMS callback delivery/attempt outcome mapping, already-handled `SENT`/`DISPATCHING` dispatch blockers, Messages route/status/scheduled-time/allowed-window readiness, Wish Preview draft validation/send summary/route choice/route setup/device setup/quiet-hours and blackout dispatch context, approval notification actions, dispatch/AI-provider/revival-AI/exact-alarm setup notification request reasons and Android helper payloads, AI-fallback/stale-backup system alert reasons and Android helper payloads, revival notification request payloads, AI Doctor account/provider readiness, AI Doctor automation prerequisites, SMS/WhatsApp setup channel readiness, channel verification routing, AI Doctor email setup readiness, AI Doctor quality readiness, AI Doctor system readiness, setup summary/progress, AI Doctor fix ranking, Home readiness banner classification, and Home next-action ranking, but there is not yet one complete readiness use case for all surfaces.
+- Approval notification display copy and domain-to-data message-variant mapping now use `ApprovalNotificationAdapters` and `ApprovalNotificationCopy` after workers or the notification service build `ApprovalNotificationRequest`; remaining notification debt excludes this covered helper path.
+- Revival notification display copy now uses `RevivalNotificationAdapters` and `RevivalNotificationCopy` after `RevivalWorker` builds `RevivalNotificationRequest`; remaining notification debt excludes this covered helper path.
+- Event-reminder notification display copy now uses `EventReminderNotificationAdapters` and `EventReminderNotificationCopy` after `EventReminderReceiver` builds `EventReminderNotificationRequest`; remaining notification debt excludes this covered helper path.
+- Initial recurring automation scheduling and boot recovery now share `BootRecoveryRecurringWorkCommand` and `enqueueRecurringAutomationWork` for daily trigger, revival, and style-analysis periodic work definitions.
+- Several ViewModels are large and own mixed workflow/presentation logic.
 
-## 17. CI and Release
+## 9. Authentication and Authorization
 
-CI workflow: `.github/workflows/android.yml`.
+Implemented:
 
-CI triggers:
+- Google Sign-In and Firebase Auth through `AuthManager` and `AuthViewModel`.
+- Splash routes to onboarding, auth, or Home based on onboarding/auth state.
+- Authenticated routes use `RequireSignedIn` in `NavGraph`.
+- No guest/demo/local-only mode is implemented.
+- Sign-out cancels WorkManager work, cancels notifications, clears Room tables, closes/resets the database, clears secure prefs, clears cached database key material, deletes database files, signs out Firebase, and attempts Google access revocation.
 
-- Push to `main` or `master`.
-- Pull request targeting `main` or `master`.
+Runtime lock:
 
-CI steps:
+- `MainActivity` gates UI with biometric lock when the preference is enabled.
+- Biometric availability and session state are resolved by `BiometricLockPolicy`.
 
-- Checkout.
-- Set up Temurin JDK 21 with Gradle cache.
-- `chmod +x gradlew`.
-- `./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`.
-- `./gradlew jacocoDebugUnitTestReport --no-configuration-cache`.
-- Verify `assembleRelease` fails when signing environment variables are absent.
-- Upload lint, unit-test, coverage, and debug APK artifacts.
+Limitations:
 
-Release behavior:
+- Google sign-in is required before authenticated app use.
+- Local-only use without Google/Firebase is not implemented.
+- Sign-out table cleanup uses `database.clearAllTables()` and the source comment now describes wiping all Room tables without a stale table count.
 
-- `release` build enables minification and resource shrinking.
-- Release signing is configured only when `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD` are present and valid.
-- Release artifact tasks fail early when signing is missing.
-- Baseline profile plugin is enabled with `mergeIntoMain = true`.
+## 10. Configuration
 
-Branching strategy:
+Repository configuration:
 
-- `main`: production-ready; do not push directly.
-- `phase/N-*`: one branch per phase, merged after checkpoint validation.
-- `fix/ID-*`: one branch per specific bug fix.
-- `feature/*`: one branch per UI screen or feature.
+| Config | Purpose |
+| --- | --- |
+| `.env.example` | Documents `GEMINI_API_KEY` for local AI key configuration |
+| `app/google-services.json` | Approved Firebase/Google client config intentionally tracked for the checked-in app id |
+| `app/src/debug/google-services.json` | Approved debug Firebase/Google client config intentionally tracked for the checked-in app id |
+| `app/src/main/res/xml/network_security_config.xml` | Pins Google/Firebase/Gmail domains until `2027-06-01` |
+| `app/src/main/res/xml/data_extraction_rules.xml` | Excludes sensitive stores from cloud backup and device transfer |
+| `app/src/main/res/xml/backup_rules.xml` | Legacy backup exclusions for sensitive stores |
+| `app/src/main/res/xml/accessibility_service_config.xml` | WhatsApp AccessibilityService scope and event configuration |
+| `app/src/main/res/xml/shortcuts.xml` | Static launcher shortcuts |
+| `app/src/main/res/xml/widget_birthday_info.xml` | Birthday widget metadata |
+| `app/src/main/res/xml/analytics_export_paths.xml` | FileProvider paths for analytics export |
 
-Merge rules:
+Environment variables:
 
-- Never commit secrets, `.env`, local properties, keystores, or private signing files.
-- Run at least `./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache` before merging.
-- Feature branches should update this `SSOT.md` when behavior, setup, validation, or architecture changes.
-- Pull requests should describe changes, validation, risks, and live-validation gaps.
+| Variable | Required for | Source |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | Optional local Google AI SDK path through secrets/env setup | `.env.example`, `SecurePrefs` stores user-entered key |
+| `KEYSTORE_PATH` | Release signing | `app/build.gradle.kts` |
+| `STORE_PASSWORD` | Release signing | `app/build.gradle.kts` |
+| `KEY_ALIAS` | Release signing | `app/build.gradle.kts` |
+| `KEY_PASSWORD` | Release signing | `app/build.gradle.kts` |
 
-## 18. Developer Commands
+Provider config policy: `.gitignore` ignores generic `google-services.json` files and explicitly allowlists only `app/google-services.json` and `app/src/debug/google-services.json`. Service account JSON, private keys, OAuth access or refresh tokens, client secrets, signing material, SMTP credentials, Gemini keys, and local Firebase variants must stay untracked.
+
+Secure runtime preferences include OAuth token, Gemini API key, Gmail sender address/password, last successful email test, global automation mode, theme mode, blackout dates, quiet hours, channel blackout, WhatsApp automation consent, biometric lock, reminders, AI generation, sync token, onboarding state, backup timestamps, sync errors, and secure-pref recovery notices.
+
+Default automation mode:
+
+- `SecurePrefs` and `GlobalAutomationModePrefsMapper` default global automation to `ALWAYS_ASK`.
+- `BackupPreferencesDto.defaults()` also defaults `globalAutomationMode` to `ALWAYS_ASK` in the current working tree, so backup preference fallback aligns with the review-first default.
+
+## 11. Build, Test, and Release
+
+Local build commands:
 
 ```bash
-# Full local verification
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug jacocoDebugUnitTestReport --no-configuration-cache
+# Full debug gate used by docs/release checklist
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
 
-# Unit tests only
+# Unit tests
 JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest --no-configuration-cache
 
-# Lint
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew lintDebug --no-configuration-cache
-
-# Debug APK
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleDebug --no-configuration-cache
-
-# Release APK, requires release signing env vars
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleRelease --no-configuration-cache
+# Screenshot verification
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:verifyRoborazziDebug -Pscreenshot --tests 'com.example.ui.screenshots.*' --no-configuration-cache
 
 # Coverage
 JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew jacocoDebugUnitTestReport --no-configuration-cache
 
-# Android test APK
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:assembleDebugAndroidTest --no-configuration-cache
+# Debug APK
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleDebug --no-configuration-cache
 
-# Connected smoke
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.ui.MainActivityNavigationSmokeTest --no-configuration-cache
-
-# Find hardcoded Compose Text literals
-scripts/extract_strings.sh
+# Release build, requires signing environment variables
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleRelease --no-configuration-cache
 ```
 
-## 19. Historical Change Log
+Release signing:
 
-Unreleased changes:
+- Release artifact tasks validate `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`.
+- Missing/invalid signing variables fail release artifact requests with a clear Gradle exception.
+- Release builds enable R8 minification and resource shrinking.
 
-- Added automatic delivery route fallback so AI-generated messages can send through the best available enabled channel when the preferred channel is unavailable.
-- Added smart initial channel selection for AI-created pending messages using contact availability, disabled-channel settings, email setup, and past successful delivery history before dispatch fallback runs.
-- Smart Approve generated wishes now schedule exact due-time dispatch while still notifying the user for review before send time.
-- Daily AI message generation now prepares a 7-day queue of upcoming event drafts so automatic sends are scheduled earlier and Smart Approve has more review time.
-- Revival AI reconnect messages now respect contact/global automation modes and schedule automatic send for Fully Auto and Smart Approve.
-- Added AI auto-send quality gate so fallback or generic text is scored and surfaced while blank/invalid drafts are held for review before any automatic dispatch.
-- Added post-event AI follow-ups that scan recent unreplied AI wishes, draft a light follow-up, and schedule it with the same automation, quality, quiet-hour, and channel-routing rules.
-- Added fixed-date holiday AI wishes that generate personalized New Year, Republic Day, Women's Day, Independence Day, Gandhi Jayanti, and Christmas messages and schedule them automatically through the same approval and dispatch rules.
-- Added Failed tab recovery assistant in Messages with direct AI Doctor routing while keeping retry manual.
-- Added Settings sign-out confirmation checklist before local data is cleared.
-- Added duplicate manual event detection with an explicit Save anyway override.
-- Added shared setup progress summary on Home and AI Doctor so setup status is visible before opening detailed diagnostics.
-- Added AI Doctor ranked recommended fix so the first setup repair is visible before the grouped checklist.
-- Added AI Doctor generic-message risk check from contact personalization context.
-- Added Activity History task filters for dispatch, AI, sync, backup, and settings troubleshooting.
-- Added Contact Detail personalization next-step prompts to reduce generic AI wish inputs.
-- Grouped AI Doctor readiness checks into Required, Quality, Reliability, and Recovery sections.
-- Added Messages readiness labels for review, approved, failed, and channel/setup prerequisite states.
-- Added inline Memory Vault validation for whitespace-only notes and a defensive ViewModel guard against empty note saves.
-- Added Settings backup freshness so users can see the last encrypted backup status before opening Backup & Restore.
-- Routed Home pending-approval readiness and planner items directly to Messages while keeping setup problems routed to AI Doctor.
-- Added feature source of truth, compliance specs, UI validation ledger, now consolidated here.
-- Enforced biometric app lock at cold start/resume.
-- Added automation scheduling policy for custom send time, quiet hours, blackout dates, reminders, and channel blackout.
-- Added AlarmManager-backed event reminders and boot/daily rescheduling.
-- Added event-aware Gmail SMTP subjects.
-- Added localization parity and helper-script portability tests.
-- Added Compose/instrumented smoke coverage; debug builds now use the checked-in Firebase-compatible application id.
-- Added screen interaction coverage for home, contacts, messages, wish preview, chat history, analytics, activity history, style coach, memory vault, gift advisor, backup/restore.
-- Added FileProvider CSV sharing for analytics export.
-- Added selected-document backup export/import coverage.
-- Refreshed Hindi strings for touched features.
-- Background contact sync now shares foreground Google/device merge and event-discovery behavior.
-- Message generation respects skip-auto-wish, quiet hours, blackout dates, and custom send time.
-- Dispatch defers newly blocked sends.
-- Backup/restore actions are safer on small screens and disabled during active operations.
+CI:
 
-Version 1.0.0, 2026-06-08:
+- GitHub Actions workflow `Android CI` runs on pushes and pull requests to `main` and `master`.
+- Pull requests run Dependency Review, failing on moderate-or-higher vulnerabilities and GPL/LGPL/AGPL denied licenses.
+- CI sets up JDK 21, runs `testDebugUnitTest lintDebug assembleDebug`, verifies Roborazzi screenshots, verifies `ProductionReadinessConfigTest`, generates coverage, verifies release signing guard failure, and uploads reports/APK artifacts.
 
-- Added SMS delivery tracking and confirmation.
-- Hardened SMS/WhatsApp exception handling.
-- Built primary Compose screens for dashboard, contacts, events, messages, analytics, settings, style coach, backup, memory, gifts.
-- Added initial runtime permission flows.
-- Added Room schema v11 migrations.
-- Improved Google sync and cleanup for legacy non-user contact rows.
-- Expanded automated tests to use cases, workers, migrations, and SMS receiver.
+Test inventory verified by file count:
 
-Version 0.1.0, 2026-06-07:
+- 194 Kotlin test files under app, Android test, core model, core domain, and core data test roots.
+- 1145 `@Test` annotations across those Kotlin test files.
+- 177 approved Roborazzi baseline PNGs under `app/src/test/screenshots/baseline`.
 
-- Added SQLCipher and encrypted preference security.
-- Added sign-out cache wiping.
-- Added automation engine duplicate guards and leap-year logic.
-- Added WhatsApp accessibility validation loop.
-- Added Style Coach writing profile configuration.
+This document update itself was not a code behavior change. Run the above gates before release or before deleting migrated docs.
 
-## 20. Audit History Condensed
+## 12. Security, Privacy, and Reliability
 
-Major audit/fix passes that shaped the current project:
+Implemented controls:
 
-- App shell permissions, navigation, route encoding, bottom nav localization, theme/accessibility cleanup.
-- Contact sync sensitive logging redaction.
-- Shared sync error UI and retry/dismiss behavior.
-- Google Sign-In configuration hardening and structured auth failures.
-- Database data-safety hardening, no destructive migration fallback, legacy DB quarantine.
-- Backup service abstraction, transactional restore, malformed backup handling, bounded import size.
-- Platform Auto Backup disabled and sensitive backup exclusions.
-- Release signing guard and CI release-signing verification.
-- Style Coach localization, lifecycle collection, recent-message analysis.
-- AI Doctor localization, diagnostics, redacted failures, Firebase degradation.
-- Memory Vault localization, validation, category normalization.
-- Gift Advisor localization, validation, dialog behavior, AI suggestions.
-- Contact detail preference hardening and typed controls.
-- Home discoverability quick actions.
-- Fallback/provider log redaction.
-- Dispatch worker failure recovery from stuck `DISPATCHING`.
-- Cached database key validation.
-- Aggregate JaCoCo coverage reporting.
-- Resilience primitive test coverage.
-- Device contact import, real test-send email, visible email/quiet-hour/channel/biometric settings, onboarding setup checklist.
+- SQLCipher-backed Room database.
+- Fresh installs generate random 256-bit database key material and store it in Keystore-backed encrypted preferences.
+- Existing database files with missing cached key material may use legacy identifier-derived recovery.
+- EncryptedSharedPreferences stores secrets and configuration.
+- Legacy plaintext database files are quarantined before opening the encrypted database.
+- Android auto backup is disabled in the manifest and sensitive stores are also excluded in backup rules.
+- Exported backups use AES-GCM with PBKDF2-HMAC-SHA256 passphrase derivation.
+- Backup import validates decrypt/authentication, JSON, version, size limit, and manifest checksum before restore.
+- Logs route through `StructuredLogger`, which redacts messages/extras, key-aware generated message body fields, and inline body assignments while keeping an in-memory bounded history.
+- `ProductionReadinessConfigTest` blocks direct Android `Log.*` usage outside `StructuredLogger`.
+- Network security config pins Google/Firebase/Gmail-related domains until `2027-06-01`; release guard warns/fails inside the 60-day support gate.
+- WhatsApp automation requires app-level consent and the Android AccessibilityService enablement path.
+- Boot/time/package replacement receivers reschedule work rather than sending directly.
 
-## 21. Engineering Guardrails
+Privacy-sensitive data handled:
 
-Security:
+- Contacts, phone numbers, email addresses, birthdays/events, relationship notes, memory notes, gift history, generated drafts, sent message history, preferences, diagnostics, and backup payloads.
+- AI prompts may include relationship context, event context, memory notes except private notes, gift history, style profile, and previous wishes.
+- OAuth tokens, API keys, Gmail app passwords, SQLCipher key material, and backup passphrases must not appear in logs, exports, analytics reports, or documentation.
 
-- Never fall back to plaintext SharedPreferences when encrypted storage fails.
-- Redact secrets and PII before Logcat, structured logs, health snapshots, AI fallback JSON, or user-visible diagnostics.
-- Preserve legacy plaintext DBs through quarantine, not deletion.
-- Keep platform backup disabled for sensitive local data.
+Release blockers and risks:
 
-Room:
+- WhatsApp Accessibility automation requires Play policy review and release-owner signoff.
+- Data Safety and privacy policy text are not present in this repository as final public release artifacts.
+- Approved app/debug `google-services.json` client configs are explicitly allowlisted; other local provider variants and server-side secrets must remain untracked.
+- The current local diagnostics are not remote monitoring. There is no backend observability pipeline.
 
-- Add explicit index names in `@Entity(indices = ...)` when migrations create indexes manually.
-- Keep migrations non-destructive and schema-exported.
-- Add tests for every supported upgrade path touched.
+## 13. Feature Catalog
 
-Compose:
+Status definitions:
 
-- Use stable keys in `LazyColumn` and `LazyRow` for dynamic lists.
-- Use conditional clear buttons for search fields and provide accessible descriptions.
-- Keep visible strings in resources and maintain English/Hindi parity.
-- Prefer lifecycle-aware state collection.
+- Fully Implemented: source, UI or service path, tests or direct wiring exist.
+- Partially Implemented: source exists but known important behavior or target design is incomplete.
+- Planned: documented target but not implemented in current source.
+- Documentation Only: present only in docs, not current product source.
+- Broken or Incomplete: source or docs show a current conflict or release blocker.
 
-AI/prompting:
+### 13.1 App Shell, Navigation, Lock, Deep Links
 
-- Use `buildString { appendLine(...) }` for large dynamic prompt strings.
-- Keep prompts minimal and privacy-conscious.
-- Treat malformed or partial model output as expected input, not a crash.
+Status: Fully Implemented.
 
-Android compatibility:
-
-- With minSdk 24, use core library desugaring for Java Time or prefer `Calendar` in worker/scheduler logic.
-- Keep exact alarm, notification, SMS, contacts, and accessibility behavior behind explicit setup/permission flows.
-
-Docs:
-
-- Update this `SSOT.md` in the same change as any feature, architecture, build, validation, or release behavior change.
-- Do not recreate split feature/audit/changelog docs unless explicitly requested.
-
-## 22. Generated and Local Artifacts
-
-Raw logs and generated reports are not maintained documentation:
-
-- `app_logs*.txt`
-- `logcat*.txt`
-- `lint_baseline_pre_fixes.txt`
-- Gradle build directories
-- JaCoCo/lint/test output directories
-
-They may be useful evidence, but this SSOT is the maintained documentation.
-
-Patch helper Python files in the root appear to be historical one-off helpers. Do not use them as reconstruction inputs unless a future task explicitly validates and documents them.
-
-## 23. Feature Compliance Requirements and Task Status
-
-Compliance goal:
-
-- Keep the Android app aligned with this SSOT, with each documented feature implemented, accurately classified, tested, documented, and validated on device where possible.
-
-Compliance requirements:
-
-- The repository must use this root `SSOT.md` as the feature, architecture, validation, changelog, and process source of truth.
-- The implementation must avoid local workspace assumptions such as `/workspace` paths and stale module names.
-- Biometric lock must block app access on protected cold start/resume when enabled and use localized text.
-- Message automation must respect contact custom send time, contact skip-auto-wish, global quiet hours, blackout dates, channel blackout, reminder toggles, and event `notifyDaysBefore`.
-- Background contact sync must use the same Google + device merge and event-discovery behavior as foreground sync.
-- Gmail SMTP subjects must describe the actual event type instead of always using a birthday subject.
-- Event reminders must be scheduled, canceled, and rescheduled from active events and user preferences.
-- Unit, Robolectric, Compose/instrumented, lint, build, coverage, and manual device validation must be recorded here.
-- Deprecated features F-045 and F-046 must remain deprecated unless explicitly re-scoped.
-- Experimental feature F-047 must remain experimental unless it enters the active Gemini call path.
-
-Acceptance criteria:
-
-- `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest lintDebug assembleDebug jacocoDebugUnitTestReport --no-configuration-cache` passes.
-- Every primary screen and interactive workflow has pass/fail/blocked evidence recorded in this file.
-- New or changed behavior has focused tests.
-- Feature status in section 7 matches implementation.
-- Feature-scoped commits describe implemented changes.
-
-Task status:
-
-| Task | Status |
-|---|---|
-| F-001-F-003: verify app shell, onboarding, Google auth, and navigation on device. | Blocked by idle unlocked device. |
-| F-001-F-003: add Compose UI smoke coverage for onboarding/auth and app-shell bottom navigation. | Done. |
-| F-001-F-003: make debug UI validation install side-by-side with a debug-only suffix. | Superseded by checked-in Firebase-compatible debug application id. |
-| F-004/F-042: implement biometric lock enforcement. | Done. |
-| F-004/F-042: validate biometric lock prompt and resume behavior on device. | Blocked by live device validation. |
-| F-006/F-026: route background contact sync through foreground sync use case. | Done. |
-| F-008/F-023/F-025/F-027/F-043: implement automation schedule policy for custom send time, skip-auto-wish, quiet hours, blackout dates, and dispatch deferral. | Done. |
-| F-010/F-031/F-044: implement event reminder scheduling from `notifyDaysBefore` and user reminder toggle. | Done. |
-| F-008/F-023/F-025/F-027/F-043/F-044: validate scheduling, deferral, and reminders on device. | Blocked by live device validation. |
-| F-005: add Home dashboard Compose/Robolectric interaction coverage. | Done. |
-| F-007: add Contact List Compose/Robolectric interaction coverage. | Done. |
-| F-011: add Messages inbox Compose/Robolectric interaction coverage. | Done. |
-| F-012: add Wish Preview Compose/Robolectric interaction coverage. | Done. |
-| F-013: add Chat History Compose/Robolectric interaction coverage. | Done. |
-| F-014: add Analytics Compose/Robolectric interaction coverage and FileProvider CSV export validation. | Done. |
-| F-015: add Activity History Compose/Robolectric interaction coverage and repository-error handling. | Done. |
-| F-016: add Style Coach Compose/Robolectric interaction coverage and refresh touched Hindi strings. | Done. |
-| F-017: add Memory Vault Compose/Robolectric interaction coverage and refresh touched Hindi strings. | Done. |
-| F-018: add Gift Advisor Compose/Robolectric interaction coverage and refresh touched Hindi strings. | Done. |
-| F-019: add Backup/Restore Compose/Robolectric interaction coverage and selected-document export/import tests. | Done. |
-| F-019: validate Android document picker export/import on an idle, unlocked device. | Blocked by live device validation. |
-| F-030: make Gmail SMTP subject event-aware. | Done. |
-| F-040: add localization parity tests and resource-back touched notification strings. | Done. |
-| F-041: make helper scripts repo-root aware and consolidate stale steering docs into this SSOT. | Done. |
-| F-011-F-020/F-028/F-029/F-032-F-034/F-036-F-038: run targeted code inspection, tests, and UI/device validation. | Automated coverage done for many flows; live system integrations still blocked as listed in section 16. |
-| F-045-F-047: confirm deprecated/experimental classification remains accurate. | Done. |
-| Run full Gradle validation and update documentation. | Done on 2026-06-11; see section 16. |
-
-## 24. Complete Feature Details
-
-This section documents each user-facing and operational feature at implementation level: what starts it, what inputs it accepts, what data it reads, how it works, what it outputs, what it stores, and what failures the user can see. Source code is still the final authority, but this is the intended feature reference for product, QA, and future development.
-
-### 24.1 App Entry, Navigation, Permissions, and Shell
-
-Purpose:
-
-- Provide the app root, bottom navigation, permission rationale, biometric gate, and route ownership.
-
-Main files:
-
-- `app/src/main/java/com/example/MainActivity.kt`
-- `app/src/main/java/com/example/ui/navigation/Screen.kt`
-- `app/src/main/java/com/example/ui/navigation/NavGraph.kt`
-- `app/src/main/java/com/example/ui/navigation/RouteArgumentCodec.kt`
-
-Inputs:
-
-- App launch intent.
-- Deep links: `relateai://wish/{contactId}/{messageRef}`, `relateai://contact/{contactId}`, `relateai://settings`.
-- Runtime permission state for SMS and notifications.
-- Biometric-lock preference.
-- Navigation actions from screens and notification intents.
+Purpose: Provide app entry, biometric gate, bottom navigation, permission rationale, authenticated routes, deep links, shortcuts, and widget click-through.
 
 How it works:
 
-- `MainActivity` creates the Compose shell and Hilt-aware navigation graph.
-- If biometric lock is enabled, `BiometricLockPolicy` decides whether the shell is unlocked, locked, unavailable, authenticating, or in error state.
-- The bottom bar is shown only on primary routes: Home, Contacts, Events, Messages, Analytics.
-- When a bottom-bar route is tapped, navigation uses `launchSingleTop`, state restore, and pop-up-to Home behavior.
-- A permission rationale dialog is shown once per composition when the bottom bar is visible and SMS or notification permission is missing.
+- `RelateAIApp.onCreate()` checks pin expiry, creates notification channels, starts health diagnostics, warms DB key and secure prefs, and schedules recurring workers outside Robolectric.
+- `MainActivity` owns edge-to-edge Compose, biometric gate, SMS/notification permission rationale, and bottom navigation.
+- `NavGraph` declares all routes and wraps authenticated routes in `RequireSignedIn`.
+- `DeepLinkContractTest` verifies external deep-linked signed-in routes use the auth gate and `MainActivity` renders the nav graph only from the unlocked biometric branch.
+- `RelateDeepLinks` defines internal deep-link URI patterns.
 
-Outputs:
+Dependencies: Firebase Auth for route gating, `SecurePrefs` for lock preference, Biometric APIs, Navigation Compose.
 
-- A routed Compose app surface.
-- Bottom navigation with Home, Contacts, Events, Messages, and Analytics.
-- Permission request launcher for `SEND_SMS` and `POST_NOTIFICATIONS` where applicable.
-- Biometric lock screen with unlock/retry states when enabled.
+Related files: `RelateAIApp.kt`, `MainActivity.kt`, `Screen.kt`, `NavGraph.kt`, `RelateDeepLinks.kt`, `shortcuts.xml`, `BirthdayWidgetProvider.kt`.
 
-Failure and edge behavior:
+Limitations: Contacts permission is not requested by the core permission rationale; it is handled through sync/setup flows.
 
-- If biometric/device credential is unavailable while lock is enabled, the app shows an unavailable state instead of exposing data.
-- Permission denial does not block browsing the app, but SMS sends and notifications may fail later and are surfaced by setup diagnostics.
+### 13.2 Splash, Onboarding, Authentication, Sign-Out
 
-### 24.2 Splash, Onboarding, Authentication, and Sign-Out
+Status: Fully Implemented, with local-only mode Not Implemented.
 
-Purpose:
+Purpose: Route first launch, mark onboarding completion, sign in through Google/Firebase, and securely clear local data on sign-out.
 
-- Decide first screen, complete setup education, authenticate the user through Google/Firebase, and securely wipe local data at sign-out.
+User flow: Splash -> Onboarding when not complete -> Auth -> Home or Automation Setup based on onboarding action. Existing signed-in users go to Home.
 
-Main files:
+Dependencies: Firebase Auth, Google Sign-In, `SecurePrefs`, `AuthManager`, `AppDatabase`.
 
-- `SplashViewModel.kt`
-- `OnboardingViewModel.kt`
-- `AuthViewModel.kt`
-- `AuthManager.kt`
-- `SettingsViewModel.kt`
+Limitations: No guest/local-only mode. Google/Firebase configuration correctness cannot be proven from static source alone.
 
-Inputs:
+### 13.3 Home Dashboard
 
-- `SecurePrefs.isOnboardingComplete()`.
-- Firebase/Google sign-in state.
-- Google sign-in result intent and result code.
-- Google web client id resource.
-- Sign-out action from Settings.
+Status: Fully Implemented.
 
-How it works:
+Purpose: Daily command center for upcoming events, pending approvals, setup progress, backup freshness, low-health relationships, and next actions.
 
-- Splash routes to Home if already signed in, Auth if onboarding is complete but not signed in, or Onboarding for a fresh install.
-- Onboarding marks `onboarding_complete=true` and can open AI Doctor setup checklist.
-- Google sign-in requests email, ID token, and Google Contacts readonly scope.
-- AuthManager signs into Firebase with Google credentials and stores profile state.
-- Alternate login, demo login, and fake local account sessions are not supported.
-- Settings shows a destructive-action checklist before sign-out so the user sees what local data, preferences, credentials, and external access state are affected.
-- Sign-out cancels WorkManager jobs, clears notifications, clears Room tables, closes and resets the database, clears encrypted preferences, clears cached DB key material, deletes DB/WAL/SHM files, signs out from Firebase, and revokes Google access.
+How it works: `HomeViewModel` combines dashboard metrics, setup readiness inputs, backup timestamp, upcoming previews, pending counts, and contact health into planner items. `SetupReadinessProgressPolicy` computes setup-progress counts; `HomeNextActionPolicy` computes readiness banner classification, backup freshness, and ranked primary/supporting actions.
 
-Outputs:
+Dependencies: `GetDashboardMetricsUseCase`, contact/event/message repositories, preferences, setup summary helpers.
 
-- Authenticated user profile with display name, email, and optional photo URL.
-- Navigation to Home after successful auth.
-- Full local purge and navigation back to Auth after sign-out.
+Limitations: Home next-action ranking is now domain-derived, but it is not yet a shared cross-feature action service used by Messages, AI Doctor, notifications, or Activity History.
 
-Failure and edge behavior:
+### 13.4 Contacts and Contact Sync
 
-- Invalid OAuth configuration shows a Google config error before launching sign-in.
-- Google API status code 7 maps to network error; status code 10 maps to developer configuration error.
-- Firebase credential failure is shown as Firebase auth error.
-- Sign-out continues to Firebase/Google sign-out even if local purge has partial failures.
+Status: Fully Implemented.
 
-### 24.3 Home Dashboard
-
-Purpose:
-
-- Give the user a daily overview of relationship health, message workload, upcoming events, setup readiness, and high-value actions.
-
-Main files:
-
-- `HomeScreen.kt`
-- `HomeViewModel.kt`
-- `GetDashboardMetricsUseCase.kt`
-
-Dashboard contents:
-
-| Area | What it contains | Source |
-|---|---|---|
-| Header | Greeting with user name, optional profile photo, Settings button | `AuthManager.userProfile` |
-| Sync error card | Last contact-sync error with retry and dismiss actions | `PreferencesRepository.getLastSyncError()` |
-| Next best action | One ranked primary action plus supporting actions for setup blockers, pending approvals, backup freshness, or the lowest-health contact | Home ranking model |
-| Setup progress | Shared completed/total readiness summary with blocker or warning count; tap opens AI Doctor | `SetupProgressSummary` from contact/sync, AI, and approval signals |
-| Stats row 1 | Wishes Sent, Upcoming | Sent message count, events in next 30 days |
-| Stats row 2 | Contacts, Pending, Score | Contact count, pending message count, average contact health |
-| Quick actions | Analytics, Activity History, Style Coach, AI Doctor, Backup/Restore | Static navigation actions |
-| Relationship Planner | Additional action items for low-health contacts and next events; skips the contact already promoted to the ranked action | Contacts and upcoming events |
-| Upcoming Birthdays | Birthday events in the next 30 days with display date | Event repository |
-| Bottom navigation | Home, Contacts, Events, Messages, Analytics | App shell |
-| Permission rationale | SMS and notification permission request prompt | Runtime permission state |
-
-Inputs:
-
-- Contact list.
-- Pending message list.
-- Sent message count.
-- Upcoming events for the next 30 days.
-- User profile.
-- Last sync error.
-- AI wish generation toggle and Gemini API-key readiness.
-- User taps on quick actions, planner items, Settings, retry, and dismiss.
+Purpose: Import, merge, search, filter, and enrich contacts for personalization and delivery.
 
 How it works:
 
-- The ViewModel loads dashboard metrics through `GetDashboardMetricsUseCase`.
-- If there are zero contacts, it attempts an automatic contact sync once, then reloads metrics.
-- Average health score is computed from all contacts.
-- Birthday events are filtered from upcoming events and formatted as month/day display values.
-- Setup progress is computed from contacts/sync health, AI generation availability, and pending approval workload.
-- Relationship Planner adds:
-  - a pending-review item when pending count is greater than zero;
-  - up to three low-health contacts where health is under 50;
-  - up to two upcoming events.
-- Readiness state is computed in priority order: sync error, no contacts, pending approvals, otherwise no banner.
-- Planner and readiness cards route through typed action targets for Messages, Contact Detail, AI Doctor, and Backup/Restore instead of inferring behavior from nullable contact ids.
+- `GoogleContactsSync` fetches People API connections through the injected shared `OkHttpClient` and `PeopleConnectionsRequestFactory`, using cached/refreshed OAuth tokens, page tokens, and sync tokens.
+- `DeviceContactsReader` reads ContactsProvider rows when `READ_CONTACTS` is granted.
+- `SyncContactsUseCase` merges Google and device contacts by phone/email/name, gives Google records precedence, fills missing fields, infers relationship from contact group, upserts local contacts, then runs event discovery.
+- Contact list supports search/filter/sort and contact quality labels.
+- Contact Detail owns essentials, personalization, automation preferences, and links to wish generation, Memory Vault, Gift Advisor, and Chat History.
 
-Outputs:
+Dependencies: Google Sign-In OAuth scope, People API, ContactsProvider permission, Room repositories.
 
-- Dashboard cards and navigation actions.
-- Setup progress card opens AI Doctor for the full diagnostic checklist.
-- Retry action reloads metrics and may trigger contact sync.
-- Dismiss action clears `last_sync_error`.
-- Planner and readiness actions open the exact target represented by their typed action: Contact Detail, Messages, AI Doctor, or Backup/Restore.
+Limitations: Calendar provider sync is not implemented. Source identity normalization into separate contact source/method tables is planned, not implemented.
 
-Failure and edge behavior:
+### 13.5 Contact Classification and Relationship Health
 
-- Dashboard loading failures are logged and leave the screen usable.
-- Automatic launch sync failures are ignored except for persisted sync error messaging.
-- Empty birthday list shows the empty state text.
+Status: Fully Implemented.
 
-### 24.4 Contacts: Sync, Import, Deduplication, List, and Detail
-
-Purpose:
-
-- Import relationship data from Google and device contacts, merge it locally, let the user find contacts, and edit personalization controls that drive AI and automation.
-
-Main files:
-
-- `SyncContactsUseCase.kt`
-- `ContactSyncServiceImpl.kt`
-- `GoogleContactsSync.kt`
-- `DeviceContactsReader.kt`
-- `ContactListViewModel.kt`
-- `ContactDetailViewModel.kt`
-- `UpdateContactPreferencesUseCase.kt`
-
-Inputs:
-
-- Google OAuth token or signed-in Firebase user.
-- Android contacts permission for device contacts.
-- Google People API contacts.
-- Device ContactsProvider rows.
-- User search query.
-- Contact filters: All, Family, Friends, Work, Close Friends, Needs details.
-- Contact sorts: Name, Health high, Health low.
-- Personalization form fields:
-  - nickname;
-  - relationship type;
-  - preferred language;
-  - preferred channel: `SMS`, `WHATSAPP`, `EMAIL`;
-  - formality: `CASUAL`, `SEMI_FORMAL`, `FORMAL`;
-  - communication style: `WARM`, `FUNNY`, `PROFESSIONAL`, `EMOTIONAL`;
-  - automation mode: `DEFAULT`, `FULLY_AUTO`, `SMART_APPROVE`, `VIP_APPROVE`, `ALWAYS_ASK`;
-  - custom send time as hour/minute;
-  - gift budget and annual budget in INR;
-  - skip automatic wishes;
-  - interests;
-  - sensitive topics;
-  - current life phase;
-  - notes.
+Purpose: Improve relationship metadata and compute health/analytics state.
 
 How it works:
 
-- Contact sync clears any legacy non-user contact rows before importing fetched contacts.
-- Google contacts are fetched first; sync errors are stored in preferences.
-- Device contacts are fetched separately and can still be imported when Google sync partially fails.
-- Contacts are merged by normalized phone, normalized email, then normalized name. Google rows win conflicts; missing fields are filled from device rows.
-- Contact groups infer relationship defaults when relationship type is still unknown.
-- If Google and device contact sources are empty, sync imports no contacts rather than creating synthetic contacts.
-- Event discovery runs immediately after sync so birthdays/anniversaries are available.
-- Contact List filters and sorts the current contact stream locally.
-- "Needs details" means nickname is blank, notes are blank, interests/shared history are empty, and classification confidence is below 0.6.
-- Contact Detail loads the contact and first upcoming event within 365 days, then can generate a wish or save personalization preferences.
+- `ClassifyContactUseCase` uses `AiService.classifyContact` and persists relationship type, subtype, language, formality, communication style, and confidence.
+- `RefreshHealthScoresUseCase` computes a 0-100 score from interaction frequency, recency, consecutive wishes, and stale/no-wish penalty.
 
-Outputs:
+Dependencies: Gemini, contact repository, model mappers.
 
-- Upserted `ContactEntity` rows.
-- Discovered `EventEntity` rows.
-- Contact list with search/filter/sort state.
-- Contact detail with contact info, health score, engagement score, upcoming event, automation settings, Memory Vault/Gift Advisor/Chat History links, and Generate AI Wish action.
-- Saved preference updates on the contact row.
+Limitations: Health scoring is deterministic but basic. There is no single product-wide personalization quality score yet.
 
-Validation and failure behavior:
+### 13.6 Events and Reminders
 
-- Preferred channel must be SMS, WhatsApp, or Email.
-- Automation mode must be one of the supported values.
-- Custom send time must set both hour and minute, with hour 0-23 and minute 0-59.
-- Budgets cannot be negative.
-- Missing contact returns Contact Not Found.
-- If Google sync fails and no device contacts exist, sync throws a visible error.
+Status: Fully Implemented for contact-derived birthdays, anniversaries, work anniversaries, and manual/custom events. Target `occasions` schema is Planned.
 
-### 24.5 Contact Classification and Relationship Health
-
-Purpose:
-
-- Classify unknown contacts for relationship-aware defaults and compute health scores for analytics, planner, and revival.
-
-Main files:
-
-- `ClassifyContactUseCase.kt`
-- `RefreshHealthScoresUseCase.kt`
-- `PromptBuilder.kt`
-- `AiServiceImpl.kt`
-
-Inputs:
-
-- Contact name, notes, and interaction frequency.
-- Gemini access through API key or authenticated Firebase path.
-- Existing contact health fields:
-  - interaction frequency per month;
-  - last interaction timestamp;
-  - last wished timestamp;
-  - consecutive years wished.
+Purpose: Discover relationship occasions, let users add manual events, expose duplicate/conflict states, and schedule reminders.
 
 How it works:
 
-- Classification only runs when `relationshipType` is `UNKNOWN`.
-- The classifier prompt asks for relationship type, confidence, language, and formality in JSON.
-- Parsed classification updates relationship type, subtype, language, formality, style, and confidence.
-- Health score starts at 50 and applies:
-  - up to +40 from interaction frequency;
-  - +20 for contact within 30 days;
-  - +10 for contact within 7 days;
-  - up to +25 from consecutive wished years;
-  - -20 when never wished and last contact is older than 180 days.
-- Final health score is clamped to 0-100.
+- `DiscoverEventsUseCase` builds events from contact birthday, anniversary, and work-start dates.
+- `SaveManualEventUseCase` validates date/type/contact, creates manual contacts when needed, detects duplicates/conflicts, upserts occasions into the current `events` table, and schedules reminders.
+- `EventResolutionPolicy` marks duplicate/date-conflict groups and supports keep-separate source suffixes.
+- `EventReminderScheduler` and `EventReminderReceiver` handle reminders.
 
-Outputs:
+Dependencies: contact/event repositories, `EventDatePolicy`, `EventIdentityPolicy`, `EventReminderSchedulerService`.
 
-- Contact classification fields.
-- Updated health scores.
-- Planner/revival/analytics inputs.
+Limitations: Current storage table is still named `events`. Target first-class `occasions` persistence is not implemented.
 
-Failure and edge behavior:
+### 13.7 AI Message Generation and Regeneration
 
-- Already-classified contacts are skipped.
-- Missing contact returns Contact Not Found.
-- Gemini failures are handled by the AI client/parser path and should not crash the pipeline.
+Status: Fully Implemented.
 
-### 24.6 Events and Event Reminders
-
-Purpose:
-
-- Track birthdays, anniversaries, work anniversaries, and manual custom events; list and filter them; notify before important dates.
-
-Main files:
-
-- `DiscoverEventsUseCase.kt`
-- `SaveManualEventUseCase.kt`
-- `EventsViewModel.kt`
-- `EventReminderScheduler.kt`
-- `EventReminderReceiver.kt`
-
-Inputs:
-
-- Contact birthday, anniversary, and work start date fields.
-- Manual event form:
-  - existing contact id or new contact name;
-  - event type;
-  - label;
-  - month;
-  - day;
-  - optional year;
-  - reminder lead days.
-- Event search query.
-- Type filter: All, Birthday, Anniversary, Work, Custom.
-- Horizon filter: All, next 7 days, next 30 days, next 90 days.
-- Birthday reminder toggle.
+Purpose: Generate personalized drafts using contact, event, style, memory, gift, and previous-message context.
 
 How it works:
 
-- Event discovery builds stable event ids from contact id plus event type for contact-derived events.
-- Next occurrence is computed for the current year or next year when the date has passed.
-- Manual event creation can attach to an existing contact or create a manual local contact.
-- Manual date validation uses non-lenient `Calendar`.
-- Manual reminders clamp `notifyDaysBefore` to 0-30.
-- Manual save checks active same-contact, same-type, same-day/month events before persistence and returns a duplicate warning unless the user explicitly chooses Save anyway.
-- Manual save checks active same-contact, same-type, different-date events before persistence and returns a date-conflict warning unless the user explicitly chooses Save anyway.
-- Events are upserted and their reminder alarms are scheduled.
-- Event list combines events and contacts, derives source/verification/duplicate/date-conflict trust labels, exposes explicit merge/keep-separate actions for conflict rows, then filters by query/type/horizon and sorts by next occurrence.
-- Merging an event conflict keeps the selected event active, verifies it, reschedules its reminder, deactivates sibling events, and cancels sibling reminders without physically deleting event history.
-- Keeping events separate verifies and marks the active conflict group as user-reviewed while preserving all active reminders.
-- Event reminder alarms fire through `EventReminderReceiver`, which rechecks the reminder toggle, loads contact/event, and shows an event reminder notification.
+- `GenerateMessageUseCase` prevents duplicate pending rows per event occurrence, loads contact/event/style/history/memory/gift context, calls `AiService.generateMessage`, retries up to two times when the standard variant is too similar to prior wishes, applies AI fallback alerting, resolves approval mode, runs the AI auto-send quality gate, selects an available channel, schedules automatic dispatch when eligible, and sends review notifications when needed.
+- `RegeneratePendingMessageUseCase` regenerates with optional feedback and fallback handling.
+- `PromptBuilder`, `ResponseParser`, `RateLimiter`, `GeminiClient`, and `AiServiceImpl` own provider prompting/parsing.
 
-Outputs:
+Dependencies: Gemini, Firebase Vertex AI, optional Google AI API key, repositories, preferences, scheduler, notification service.
 
-- `EventEntity` rows with type, date, next occurrence, source, confidence, verification, and reminder lead time.
-- Event list UI with source, verification, duplicate, date-conflict trust labels, and explicit conflict resolution controls.
-- Manual event success/error feedback.
-- Reminder notifications deep-linking to contact detail.
-- Activity log entry when a manual event is saved.
+Limitations: AI quality scoring is heuristic. Runtime provider access and quotas are not verifiable from source.
 
-Failure and edge behavior:
+### 13.8 Wish Preview
 
-- Manual save requires either an existing contact or a new contact name.
-- Invalid dates return a visible input error.
-- Likely duplicate manual events show a visible warning and require explicit override before a second reminder is saved.
-- Missing selected contact returns Contact Not Found.
-- Inactive events or disabled reminders cancel reminder alarms.
-- If exact alarm permission is unavailable, reminders fall back to inexact while-idle scheduling.
+Status: Fully Implemented.
 
-### 24.7 AI Wish Generation
+Purpose: Review one generated draft, choose variants, edit text, submit feedback, regenerate, test-send, approve, reject, and move to the next review item.
 
-Purpose:
+How it works: `WishPreviewViewModel` observes `WishPreviewDraft`, tracks selected variant and edited text, computes draft text readiness through `WishDraftReadinessPolicy`, projects event/channel/route choice/route setup/device setup/schedule/approval/fallback plus quiet-hours and blackout dispatch context through `WishPreviewSendSummaryPolicy`, builds why signals, and invokes test-send, regeneration, approval, and rejection use cases.
 
-- Generate personalized event wishes using contact, event, style, memory, gift, and previous-message context.
+Dependencies: message repository, event repository, feedback repository, preferences repository, `WishPreviewDeviceReadinessReader`, test send, regenerate, approve, reject use cases.
 
-Main files:
+Limitations: Draft text readiness, preferred-vs-fallback route choice, route setup, SMS/WhatsApp device setup, quiet-hours/blackout dispatch context, approval/setup/system-alert/revival/event-reminder notification reasons and payloads, and send-summary projection are shared, but quality, remaining notification surfaces outside those typed requests, and end-to-end dispatch readiness are not yet one shared review/dispatch readiness model.
 
-- `GenerateMessageUseCase.kt`
-- `MessageGenerationWorker.kt`
-- `AiServiceImpl.kt`
-- `PromptBuilder.kt`
-- `ResponseParser.kt`
-- `RegeneratePendingMessageUseCase.kt`
+### 13.9 Messages Queue and Approval Lifecycle
 
-Inputs:
+Status: Fully Implemented.
 
-- Event id.
-- Contact row.
-- Event row.
-- AI wish generation toggle.
-- Global and per-contact automation mode.
-- Contact preferred channel and custom send time.
-- Quiet hours and blackout dates.
-- Style profile.
-- Last 10 sent messages for the contact.
-- Non-private Memory Vault notes for the contact.
-- Gift history for the contact.
-- Gemini response.
+Purpose: Operational queue for pending, scheduled/approved, blocked, failed, and sent messages.
 
 How it works:
 
-- Generation rejects duplicate pending messages for the same contact, event, and scheduled year.
-- The prompt context includes:
-  - first name and nickname;
-  - relationship type;
-  - age/event occurrence when known;
-  - interests and shared history;
-  - days since last contact;
-  - preferred language and channel;
-  - current life phase;
-  - memory notes;
-  - gift history;
-  - sensitive topics to avoid;
-  - writing samples, emoji preference, average length, and common phrases;
-  - previous wishes to avoid repetition.
-- Gemini is rate-limited before calls.
-- Response parsing produces six variants: short, standard, long, formal, funny, emotional, plus a recommended variant.
-- If the standard variant is too similar to previous sent messages by word-set overlap above 0.65, generation retries up to two times.
-- Approval mode is selected from contact override, global mode, relationship defaults, and skip-auto-wish.
-- Scheduled time is computed from event date plus custom/default send time, then moved out of quiet hours and blackout dates.
-- A pending message is saved as APPROVED for `FULLY_AUTO` when it has nonblank dispatch text and an available route; otherwise it is saved as PENDING for review.
-- Approved messages are scheduled for exact send; review-first pending messages create approval notifications.
+- `MessagesViewModel` observes pending/sent read models, channel filter, sort, search, selection, domain-derived readiness, and bulk actions.
+- Users can approve, reject, retry failed messages, revoke approval, bulk approve, bulk reject, and bulk retry.
+- Readiness labels use `MessageOperationalReadinessPolicy`, which combines route blockers from `DeliveryRouteReadinessPolicy` with pending-message status.
 
-Outputs:
+Dependencies: message repository, contact repository, preferences, approve/reject/retry/revoke use cases, activity log repository.
 
-- `PendingMessageEntity` with all variants, selected variant, channel, approval mode, status, scheduled time/year, fallback flag, and model metadata.
-- Approval notification or exact send alarm.
-- Generated pending id returned to Contact Detail or worker logs.
+Limitations: Readiness and recovery state are partly duplicated with AI Doctor and dispatch policies.
 
-Failure and edge behavior:
+### 13.10 Scheduling, Workers, and Automation
 
-- Missing event returns Event Not Found.
-- Missing contact returns Contact Not Found.
-- Existing pending message returns Already Exists.
-- Disabled AI returns AI Disabled.
-- Fallback variants can be saved and are surfaced in Wish Preview as template/fallback quality messaging.
+Status: Fully Implemented for current scheduling and worker chain; automatic retry execution beyond scheduled retry metadata is Partially Implemented.
 
-### 24.8 Wish Preview, Editing, AI Feedback, Regeneration, and Test Send
-
-Purpose:
-
-- Let users inspect, understand, edit, test, regenerate, approve, or reject a generated wish before delivery.
-
-Main files:
-
-- `WishPreviewViewModel.kt`
-- `WishPreviewScreen.kt`
-- `EventRepository`
-- `MessageFeedbackRepository`
-- `TestSendUseCase.kt`
-
-Inputs:
-
-- Message ref, resolved by pending message id first and event id second.
-- Event stream for resolving the pending message event type.
-- Variant selection: short, standard, long, formal, funny, emotional.
-- Edited draft text.
-- Draft readiness state: ready, edited-ready, very short, blank.
-- Feedback reason:
-  - too generic;
-  - too formal;
-  - wrong language;
-  - too long;
-  - not warm enough;
-  - repetitive.
-- Gmail sender email/app password for test-send.
-- Approve or reject action.
-- Pending review queue, read from pending messages with `PENDING` status.
+Purpose: Keep contact sync, event discovery, message generation, dispatch, style analysis, revival, holiday wishes, and follow-up work running safely.
 
 How it works:
 
-- The screen loads the pending message and sets edited text to the selected variant text.
-- The screen derives an approval-plan summary with event type, delivery route, scheduled time, approval mode, and AI/template-fallback quality.
-- Variant selection replaces the edit box content with that variant.
-- Variant selection, text edits, regeneration, and approval attempts recalculate draft readiness against the current selected variant.
-- Blank drafts disable approval and are blocked in the ViewModel before the approval use case runs.
-- Very short drafts show a warning but remain user-approvable after review.
-- "Why this draft" signals are built from relationship, language, channel, selected tone/variant, memory note count, gift record count, and previous wish count.
-- Feedback records a `MessageFeedbackEntity`, stores the instruction that should be applied next, and writes an AI activity log.
-- Regenerate loads contact/event/style/previous messages/memory/gifts and calls the AI regeneration path with the selected feedback instruction if present.
-- When regeneration succeeds, pending variants are replaced and any matching latest feedback is marked applied.
-- Test-send sends the current edited text to the configured sender email via Gmail SMTP.
-- Approve saves the edited text when changed, marks the pending message APPROVED, and schedules exact send.
-- Reject marks the pending message REJECTED and cancels scheduled send if needed.
-- While loading the draft, the ViewModel computes the next pending review target by scheduled time, excluding the current draft and ignoring non-pending statuses.
-- After approval or rejection, the result state can show a Review next action when another pending wish exists; approval still returns automatically when there is no next pending wish.
+- `WorkerScheduler.scheduleAll()` schedules daily trigger, daily automation chain, revival worker, style analysis worker, exact-send recovery, SMS status recovery, and event reminders; daily trigger, revival, and style-analysis periodic work reuse the same `BootRecoveryRecurringWorkCommand` definitions as boot recovery.
+- Daily automation chain runs contact sync -> event discovery -> message generation -> holiday wishes -> post-event follow-up.
+- `DailyScheduler` schedules exact alarm sends when available or WorkManager delayed fallback when exact alarms are unavailable.
+- `BootReceiver` recovers exact sends, SMS delivery status, event reminders, and recurring work after boot/package/time changes.
+- `DispatchEligibilityPolicy` blocks early sends, defers quiet hours/blackout windows, requires approvals, expires VIP approvals after window, and blocks terminal states.
 
-Outputs:
+Dependencies: WorkManager, AlarmManager, BootReceiver, `SecurePrefs`, Room DAOs, domain policies.
 
-- Updated visible draft text.
-- Approval-plan summary before the editable draft.
-- Draft-readiness message below the editable draft.
-- Feedback saved message and quality message.
-- Regenerated pending message variants.
-- Test-send success/error event.
-- Approved or rejected state.
-- Next-review target and remaining pending-review count when available.
-- Activity log for AI feedback.
+Limitations: ADR 0003 says automatic retry execution remains pending. Manual retry paths and retry metadata exist.
 
-Failure and edge behavior:
+### 13.11 Delivery Channels
 
-- Missing pending message shows message-not-found.
-- Missing contact/event context during regeneration shows context-not-found.
-- Disabled AI blocks regeneration.
-- Blank test message fails validation.
-- Blank approval is blocked before mutation or scheduling.
-- Missing Gmail setup blocks test-send.
-- Gmail send exceptions return test-send failed.
-- Review-queue lookup is fail-soft; if it cannot be read, the preview still loads and approval keeps the existing no-queue behavior.
+Status: Fully Implemented, with policy/runtime risks.
 
-### 24.9 Messages Inbox and Approval Lifecycle
-
-Purpose:
-
-- Manage all generated, scheduled, approved, sent, and failed messages in one operational inbox.
-
-Main files:
-
-- `MessagesViewModel.kt`
-- `MessagesScreen.kt`
-- `ApprovePendingMessageUseCase.kt`
-- `RejectPendingMessageUseCase.kt`
-- `RevokeApprovalUseCase.kt`
-- `ApprovalReceiver.kt`
-
-Inputs:
-
-- Pending messages stream.
-- Sent messages stream.
-- Contacts stream.
-- Events stream.
-- Search query.
-- Channel filter: All, SMS, WhatsApp, Email.
-- Sort: scheduled oldest, scheduled newest, contact name.
-- Row actions: review/edit, approve, reject, revoke, retry.
-- Failed recovery action: open AI Doctor for setup checks before retry.
-- Bulk selected message ids.
-- Notification actions: approve, reject, retry.
+Purpose: Send approved messages by SMS, WhatsApp, or email.
 
 How it works:
 
-- Pending rows are grouped into Needs review, Scheduled, Blocked, and Failed task queues.
-- Contact/channel/setup route prerequisites are evaluated through `DeliveryRouteReadinessPolicy`, shared with automatic channel selection.
-- Needs review contains PENDING/UNKNOWN messages whose contact, channel, and setup prerequisites are currently satisfied.
-- Scheduled contains APPROVED/DISPATCHING messages whose contact, channel, and setup prerequisites are currently satisfied.
-- Blocked contains PENDING/UNKNOWN/APPROVED/DISPATCHING messages with missing contact, disabled channel, missing phone/email, missing email setup, or unknown channel prerequisites.
-- Blocked rows keep edit and reject actions available, but hide approve until the blocker is resolved.
-- Failed contains FAILED messages.
-- Sent contains delivered rows from `SentMessageEntity`.
-- Failed tab includes a recovery assistant summary with failure count, setup-blocker guidance, and an AI Doctor action.
-- Rejected, Sent, and Expired pending rows are excluded from active pending lists.
-- Sent rows come from `SentMessageEntity`.
-- Search matches contact, event type, channel, message text, delivery status, or variant text.
-- Approve marks APPROVED and schedules exact send.
-- Reject marks REJECTED and cancels send if already approved.
-- Revoke changes APPROVED back to PENDING and cancels exact send.
-- Retry marks FAILED messages APPROVED, sets schedule to now, and schedules exact send.
-- Bulk approve/reject/retry loops over selected ids and writes a summary activity log.
-- Notification approval actions cancel the notification, update pending state, and either schedule or enqueue immediate dispatch if due.
+- `AutoSendChannelSelector` chooses SMS, WhatsApp, or email from available routes, contact preference, and historical successful routes; final dispatch route ordering also uses the same history-aware ordered route list.
+- `MessageDispatcher` builds a route plan, attempts delivery routes, records lifecycle logs, persists finalization, and schedules retry when finalization requires it.
+- `SmsSender` uses multipart SMS and sent/delivered broadcasts.
+- `WhatsAppSender` uses `WhatsAppAccessibilityService` with explicit service callback result and timeout.
+- `EmailSender` uses Gmail SMTP with sender/recipient address validation and JavaMail.
 
-Outputs:
+Dependencies: SMS permission, WhatsApp install and AccessibilityService, WhatsApp consent, Gmail app password, sender/recipient email, channel blackout settings.
 
-- Filtered and sorted tab lists.
-- Failed send recovery assistant and AI Doctor route.
-- Pending status transitions.
-- Exact-send alarms or immediate WorkManager dispatch jobs.
-- Activity log entries for message actions.
+Limitations: WhatsApp Accessibility is a high-risk Play policy area. SMS/email/WhatsApp sends require real device/provider validation.
 
-Failure and edge behavior:
+### 13.12 Notifications, Widget, Shortcuts
 
-- Missing pending message returns not found in use cases.
-- Revoking a non-approved message returns Not Approved.
-- Message action failures show stable screen errors.
-- Failed retry remains explicit; the recovery assistant does not retry or change messages automatically.
-- Notification actions resolve by message id first, then legacy event id.
+Status: Fully Implemented.
 
-### 24.10 Scheduling, Automation Modes, and Delivery Channels
-
-Purpose:
-
-- Convert approved messages into actual sends while respecting automation mode, user review windows, quiet hours, blackout dates, disabled channels, permissions, and channel-specific delivery mechanics.
-
-Main files:
-
-- `AutomationSchedulePolicy.kt`
-- `DailyScheduler.kt`
-- `MessageDispatchWorker.kt`
-- `DispatchMessageUseCase.kt`
-- `DeliveryChannelResolver.kt`
-- `MessageDispatcher.kt`
-- `SmsSender.kt`
-- `WhatsAppSender.kt`
-- `EmailSender.kt`
-- `SmsStatusReceiver.kt`
-
-Inputs:
-
-- Pending message id or event id.
-- Pending message status and approval mode.
-- Scheduled send time.
-- Quiet hours start/end.
-- Blackout dates.
-- Channel blackout list.
-- Contact phone/email.
-- SMS permission.
-- WhatsApp Accessibility Service state.
-- Gmail sender credentials.
+Purpose: Surface approvals, fallback alerts, event reminders, setup/recovery diagnostics, widget summaries, and launcher shortcuts.
 
 How it works:
 
-- Send time is event date at custom contact time or default 09:00.
-- Candidate times are moved out of blackout dates and quiet hours.
-- Exact send scheduling uses AlarmManager `setAlarmClock` when exact alarm access is available.
-- If exact alarm access is unavailable, a setup notification is shown and WorkManager dispatch is enqueued.
-- Dispatch worker accepts pending-message id first, or legacy event id.
-- Message generation prepares upcoming event drafts 7 days ahead and schedules exact dispatch for `FULLY_AUTO` and `SMART_APPROVE`; Smart Approve also shows a review notification before its due-time auto-send.
-- Revival/reconnect suggestions use the same contact/global automation modes; Fully Auto and Smart Approve revival messages are scheduled automatically.
-- Boot recovery reschedules approved pending messages and pending `SMART_APPROVE` messages that can auto-send at their due time.
-- `AiAutoSendQualityGate` scores generated drafts, records fallback/generic/too-short risk, and downgrades automatic modes to review when the score is below the automatic-send threshold. Nonblank fallback or generic `FULLY_AUTO` drafts must not remain automatic merely because text exists.
-- `AutoSendChannelSelector` chooses the initial pending-message channel from contact availability, channel blackout preferences, Gmail setup, and previous successful delivery history.
-- `HolidayWishWorker` runs in the daily automation chain, checks a fixed-date holiday catalog, asks Gemini for relationship-aware holiday wishes, and creates deterministic `HOLIDAY_<holiday>_<contact>_<year>` pending messages to avoid duplicates.
-- `PostEventFollowUpWorker` runs in the daily automation chain after message generation, finds recent unreplied AI wishes, asks Gemini for a short low-pressure follow-up, and creates deterministic `FOLLOWUP_<sent_message_id>` pending messages to avoid duplicates.
-- Dispatch checks status:
-  - APPROVED sends;
-  - SENT/DISPATCHING aborts to avoid duplicate sends and shows setup warning;
-  - REJECTED skips;
-  - PENDING with FULLY_AUTO sends;
-  - PENDING with SMART_APPROVE sends after scheduled time;
-  - PENDING with VIP_APPROVE expires two hours after scheduled time if not approved;
-  - other pending modes wait.
-- Before sending, dispatch passes quiet-hour and blackout-date settings into `DispatchEligibilityPolicy`, which returns a deferred decision when sending is blocked.
-- Dispatch marks the pending row DISPATCHING before calling channel code.
-- `DeliveryChannelResolver` builds preferred-first automatic routes from the pending message channel, available contact phone/email, configured Gmail credentials, and disabled-channel preferences.
-- Dispatch tries each available delivery route in order and stops at the first successful send.
-- SMS inserts a sent row as PENDING_DELIVERY, calls SmsSender, then SMS broadcasts update SENT/DELIVERED/FAILED.
-- WhatsApp, SMS, and Email failures move to the next available route when one exists.
-- Email routes require sender email/app password and primary contact email.
-- Successful dispatch marks pending SENT, inserts sent history if not already inserted, updates contact last wished date, increments consecutive years wished, and adds +5 health score.
-- Failed dispatch marks pending FAILED, updates sent row if needed, records HealthMonitor error, and enqueues a dead-letter item.
+- `NotificationHelper` creates channels and displays notifications; `SetupNotificationRequest` maps typed setup/remediation reasons and helper payloads for SMS permission, expired messages, duplicate-send prevention, missing AI provider setup, missing revival AI provider setup, and exact-alarm permission setup; `SystemAlertNotificationRequest` maps typed AI fallback and stale-backup alert reasons and helper payloads.
+- Approval and event reminder receivers route notification actions.
+- `BirthdayWidgetProvider` queries local DB and shows today birthdays, next events, and pending approval count.
+- Static shortcuts open Messages and Contacts.
 
-Outputs:
+Dependencies: notification permission on API 33+, AppWidgetManager, deep links, local database.
 
-- Alarm or WorkManager dispatch job.
-- Sent SMS, WhatsApp, or email message.
-- `SentMessageEntity` history.
-- Pending status: SENT, FAILED, EXPIRED, or left waiting.
-- Contact health/last-wished updates.
-- Setup notifications for missing permissions/configuration.
-- Dead-letter entry on full dispatch failure.
+Limitations: Widget validation is mostly unit/test evidence; connected launcher behavior depends on device/launcher.
 
-Failure and edge behavior:
+### 13.13 Analytics and Activity History
 
-- Disabled channel blocks that channel and allows fallback to the next enabled route.
-- Missing phone/email or Gmail credentials removes that route from automatic dispatch.
-- If no automatic route is available, pending dispatch fails with a dead-letter entry.
-- SMS permission failure shows a setup notification.
-- Unexpected dispatch exception marks pending FAILED so it does not remain stuck DISPATCHING.
+Status: Fully Implemented.
 
-### 24.11 Background Automation Workers
-
-Purpose:
-
-- Keep sync, event discovery, generation, reminders, revival, style analysis, and scheduled dispatch running without manual app use.
-
-Main files:
-
-- `WorkerScheduler.kt`
-- `DailyTriggerWorker.kt`
-- `ContactSyncWorker.kt`
-- `EventDiscoveryWorker.kt`
-- `MessageGenerationWorker.kt`
-- `MessageDispatchWorker.kt`
-- `RevivalWorker.kt`
-- `StyleAnalysisWorker.kt`
-- `BootReceiver`
-
-Inputs:
-
-- WorkManager periodic schedules.
-- Network, battery, and storage constraints.
-- Contact/event/message/style data.
-- Gemini and Gmail configuration.
-- Boot completed broadcast.
+Purpose: Show relationship metrics, health buckets, neglected contacts, delivery/response/personalization percentages, CSV export, and operational logs.
 
 How it works:
 
-- App startup registers:
-  - daily trigger every 24 hours;
-  - revival check every 7 days;
-  - style analysis every 14 days with network.
-- Daily trigger checks for stale backups, schedules the daily chain, and reschedules all event reminders.
-- Daily automation chain runs contact sync -> event discovery -> message generation -> holiday wishes -> post-event follow-ups.
-- Contact sync worker also classifies unknown contacts when Gemini/auth is available.
-- Event discovery worker deactivates generated event types when matching contact date fields disappear.
-- Message generation worker scans events due within 7 days and delegates each event to `GenerateMessageUseCase`; the use case handles AI generation, failed-occurrence replacement for worker retries, approval mode, channel readiness, persistence, notifications, and automatic scheduling.
-- Revival worker scans contacts with health below 40 and no recent revival attempt, generates a short reconnect suggestion, resolves approval mode, and schedules Fully Auto or Smart Approve revival messages automatically.
-- Holiday wish and post-event follow-up workers create deterministic AI pending messages so repeated daily runs do not duplicate them.
-- Style analysis worker analyzes sent messages from the last 30 days.
-- Boot receiver reschedules approved exact sends, pending Smart Approve exact sends, active event reminders, and missing periodic workers.
+- `GetAnalyticsUseCase` and repositories build reactive analytics snapshots.
+- `AnalyticsViewModel` computes delivery reliability, response rate, personalization coverage, monthly sent counts, health buckets, and neglected contacts.
+- `AnalyticsReportServiceImpl` emits a CSV relationship report and records an analytics activity log entry.
+- `ActivityHistoryViewModel` supports type/date/status filters and text search.
 
-Outputs:
+Dependencies: contact/event/message/activity repositories, FileProvider export share.
 
-- Refreshed contacts/events/messages/style profiles.
-- Backup reminder notifications after 30 days without backup.
-- Revival pending messages and notifications.
-- Rescheduled alarms after reboot.
+Limitations: Analytics report is a compact CSV, not a full external BI export. Large activity histories may need paging/indexing later.
 
-Failure and edge behavior:
+### 13.14 Style Coach
 
-- Most worker exceptions return retry with exponential backoff.
-- Message generation skips when AI wish generation is disabled or no Gemini/auth path exists.
-- Existing PENDING/processed messages are skipped; FAILED messages can be regenerated.
+Status: Fully Implemented.
 
-### 24.12 Analytics and CSV Export
-
-Purpose:
-
-- Show relationship health and messaging metrics, then export a shareable CSV report.
-
-Main files:
-
-- `AnalyticsViewModel.kt`
-- `GetAnalyticsUseCase.kt`
-- `AnalyticsReportServiceImpl.kt`
-- `AnalyticsScreen.kt`
-- `AnalyticsExportShare.kt`
-
-Inputs:
-
-- Count of sent messages.
-- Count of pending messages.
-- Contact count.
-- Relationship type counts.
-- Upcoming events in next 30 days.
-- Sent messages since start of current year.
-- Contact health scores.
-- Personalization fields on contacts.
-- Export action.
+Purpose: Learn user writing style from manual samples or recent sent messages.
 
 How it works:
 
-- `GetAnalyticsUseCase` combines sent count, pending count, contact count, and relationship breakdown as a live flow.
-- ViewModel derives:
-  - health buckets: healthy 70+, needs attention 30-69, at risk under 30;
-  - monthly sent-message counts for the current year up to current month;
-  - delivery reliability as non-failed sent messages divided by sent messages this year;
-  - response rate as reply-received sent messages divided by sent messages this year;
-  - personalization coverage as contacts with nickname, notes, interests, or shared history divided by all contacts;
-  - top neglected contacts from bottom health scores.
-- Export builds CSV with summary, health, messages, and relationship-type rows.
-- Export records an analytics activity log.
+- `StyleAnalysisUseCase` computes average length, emoji density, preferred language, common phrases/greetings/closings, tone descriptors, sample count, and profile history.
+- `StyleCoachViewModel` supports manual training and recent sent-message analysis.
 
-Outputs:
+Dependencies: sent message history and style profile repository.
 
-- Analytics screen metrics:
-  - total wishes sent;
-  - total contacts;
-  - pending approvals;
-  - upcoming events;
-  - monthly wishes;
-  - contact distribution;
-  - relationship health;
-  - delivery reliability;
-  - response rate;
-  - personalization coverage;
-  - top neglected contacts with Contact Detail actions.
-- `AnalyticsReport` with filename `relateai-relationship-report-YYYYMMDD-HHmm.csv`, MIME type `text/csv`, and CSV content.
-- Share intent through FileProvider.
+Limitations: Style analysis is heuristic and local. There is no model training beyond profile extraction.
 
-Failure and edge behavior:
+### 13.15 Memory Vault
 
-- Percent metrics return 0 when denominator is 0.
-- Export failure sets `exportError=true`.
-- Monthly chart is hidden when there are no sent messages this year.
+Status: Fully Implemented.
 
-### 24.13 Activity History
-
-Purpose:
-
-- Provide an audit/operations timeline for user and automation actions.
-
-Main files:
-
-- `ActivityHistoryViewModel.kt`
-- `ActivityHistoryScreen.kt`
-- `ActivityLogRepository`
-
-Inputs:
-
-- Last 100 `ActivityLogEntity` rows.
-- Type filter: All, Dispatch, AI, Sync, Backup, Settings, Message, Event, Analytics.
-- Date filter: All, Today, Last 7 days, Last 30 days.
-- Status filter: All, Open, Resolved.
-- Search query.
-- Action route on activity rows.
+Purpose: Store contact-specific notes that can improve personalization or remain private.
 
 How it works:
 
-- The ViewModel streams recent entries.
-- Filters are applied locally by type, status, date cutoff, and query.
-- Dispatch filter includes explicit `DISPATCH` rows and current dispatch records stored as `MESSAGE` with decision metadata.
-- Backup filter includes explicit `BACKUP` rows and backup/restore activity text while avoiding generic analytics exports.
-- Query matches title, detail, type, severity, status, and action route.
-- Rows sort by newest first.
-- Screen can open an activity action route through navigation.
+- `MemoryVaultViewModel` loads notes, filters by search query, adds notes, updates notes, pins/unpins, and deletes.
+- `MemoryNotePromptPolicy` excludes category `PRIVATE` from AI prompt context.
 
-Outputs:
+Dependencies: memory note repository, contact route.
 
-- Filtered activity timeline.
-- Empty, loading, and error states.
-- Optional navigation from an activity row to its action route.
+Limitations: There is no separate per-note "use in AI" toggle; prompt inclusion is category-based.
 
-Failure and edge behavior:
+### 13.16 Gift Advisor
 
-- Repository stream failure shows a localized load error and empty entries.
-- Missing action route means the row is informational only.
+Status: Fully Implemented.
 
-### 24.14 Style Coach
-
-Purpose:
-
-- Learn the user's writing style locally and feed it into AI message prompts.
-
-Main files:
-
-- `StyleCoachViewModel.kt`
-- `StyleAnalysisUseCase.kt`
-- `StyleProfileRepository`
-- `StyleCoachScreen.kt`
-
-Inputs:
-
-- Manual pasted samples split by the screen before calling ViewModel.
-- Recent sent messages from the last 30 days, up to 100.
-- Existing style profile and history.
+Purpose: Track gift history, budget usage, AI suggestions, duplicate warnings, and shortcut budget adjustment.
 
 How it works:
 
-- Manual training passes non-empty sample texts to `analyzeAndSave`.
-- Auto analysis loads recent sent messages; if none exist, it returns false with an empty-state message.
-- Analysis computes:
-  - average message length;
-  - emoji density and top emojis;
-  - Devanagari detection for Hindi language preference;
-  - common bigrams/phrases;
-  - common greetings and closings;
-  - formality from opener patterns;
-  - tone descriptors such as casual, friendly, polite, uses_hindi, hinglish_mix, funny, warm, expressive, concise, detailed.
-- The current style profile is updated and a JSON snapshot is inserted into history.
+- `GiftAdvisorViewModel` loads contact profile and gift records, validates add/delete actions, calculates current-year spend, generates AI suggestions, enriches suggestions with budget fit, confidence, and potential duplicate evidence, supports dismissing local suggestions, and can record a suggestion as a gift.
+- `GiftAdvisorScreen` exposes an Adjust budget action that routes to `ContactDetail` with `openPreferences=true`; Contact Detail remains the preference save owner.
 
-Outputs:
+Dependencies: gift history repository, contact repository, AI service, Contact Detail preferences route.
 
-- `StyleProfileEntity` with samples, emoji use, average length, phrases, greetings, formality, preferred language, emoji set, tone descriptors, sample count, and update timestamp.
-- `StyleProfileHistoryEntity` snapshots.
-- Style Coach screen with current profile and history.
-- Success, empty, or error status messages.
+Limitations: Suggestion dismissals are local UI state. There is not yet a persisted "use in message" or suggestion feedback workflow.
 
-Failure and edge behavior:
+### 13.17 Chat History
 
-- Empty manual sample list is ignored.
-- Analysis exceptions surface as manual or auto analysis failure messages.
+Status: Fully Implemented.
 
-### 24.15 Memory Vault
+Purpose: Show prior sent messages for a contact with text/channel search.
 
-Purpose:
+How it works: `ChatHistoryViewModel` observes sent history as `ChatHistoryMessageItem`, not raw `SentMessageEntity`, and filters by message text or channel.
 
-- Store per-contact relationship facts that enrich AI wishes and gift suggestions.
+Dependencies: message repository, contact id route.
 
-Main files:
+Limitations: It is read-only; replies are tracked as a flag/timestamp, not full conversation sync.
 
-- `MemoryVaultViewModel.kt`
-- `MemoryVaultScreen.kt`
-- `MemoryNoteRepository`
+### 13.18 Settings and AI Doctor
 
-Inputs:
+Status: Fully Implemented, with readiness unification Partially Implemented.
 
-- Contact id route argument.
-- Note text.
-- Search query.
-- Category: `GENERAL`, `PRIVATE`, `PREFERENCE`, `EVENT`, `GIFT`, `MILESTONE`.
-- Edit text/category for an existing note.
-- Pin/unpin and delete actions.
+Purpose: Configure AI, Gmail SMTP, automation mode, quiet hours, blackouts, biometric lock, sync, WhatsApp consent, backup state, sign-out, and setup diagnostics.
 
 How it works:
 
-- Screen loads contact and notes by contact id.
-- Notes are sorted with pinned notes first, then newest first.
-- Search filters the visible list by note text or category while preserving the underlying sorted notes.
-- Add note trims text, disables/guards blank input with validation feedback, rejects text longer than 500 chars, and normalizes unknown category to GENERAL.
-- Edit note reuses the same trim, category normalization, blank, and length validation while preserving the note id, contact id, timestamp, and pin state.
-- Private notes remain in Memory Vault but are excluded from AI message prompt context.
-- Pin toggles `isPinned`.
-- Delete removes the note.
-- Prompt building takes up to six non-private notes, pinned first/newest first, and redacts email/phone-like content before sending to AI.
+- `SettingsViewModel` reads/writes encrypted preferences, validates and saves Gemini/email settings, toggles features, updates automation mode, quiet hours, channel blackout, biometric lock, runs sync, handles secure-pref recovery notice, and signs out.
+- `AutomationSetupViewModel` builds grouped readiness checks, test AI generation, safe generation checks, test email send, WhatsApp consent, persisted diagnostic snapshots, recovery diagnostics, domain-derived SMS/WhatsApp setup-channel and channel-verification checks, a domain-classified setup summary/progress state, and a domain-ranked recommended fix.
 
-Outputs:
+Dependencies: preferences, contact/message/dispatch/diagnostic repositories, AI/test-send services, permissions, package manager, Firebase user, WorkManager diagnostics.
 
-- `MemoryNoteEntity` rows with id, contact id, text, category, timestamp, and pin state.
-- Memory list, inline edit form, filtered no-results state, empty state, and error states.
-- Better AI personalization in wish generation/regeneration.
+Limitations: AI Doctor can still be technical. The readiness model is not one shared domain API across every feature.
 
-Failure and edge behavior:
+### 13.19 Backup and Restore
 
-- Load/add/pin/delete failures show specific error messages.
-- Notes over 500 characters are blocked.
-- Blank edits are blocked before persistence and surface the same validation copy as blank adds.
-- Blank search shows the full sorted list; unmatched search shows a no-results state without deleting notes.
+Status: Fully Implemented for encrypted export, preview, and replace import. Merge restore is Not Implemented.
 
-### 24.16 Gift Advisor
-
-Purpose:
-
-- Track gifts by contact, calculate budget usage, and generate AI gift suggestions that avoid repeats.
-
-Main files:
-
-- `GiftAdvisorViewModel.kt`
-- `GiftAdvisorScreen.kt`
-- `GiftHistoryRepository`
-- `AiServiceImpl.generateGiftSuggestions`
-- `PromptBuilder.buildGiftSuggestionsPrompt`
-
-Inputs:
-
-- Contact id route argument.
-- Gift form:
-  - gift name;
-  - category;
-  - occasion;
-  - cost;
-  - liked/disliked/unknown feedback;
-  - notes.
-- Generate suggestions action.
-- Delete gift action.
+Purpose: Let users explicitly export and restore relationship data without relying on Android auto backup.
 
 How it works:
 
-- Screen loads contact and gift history.
-- Current-year spending is the sum of gift costs for records whose year equals the current year.
-- Remaining budget is contact gift budget minus current-year spending, clamped at zero.
-- Gift form validates required fields, cost, text lengths, and note length.
-- Saved gifts use the current year.
-- AI prompt includes relationship, interests, annual gift budget, and previous gifts.
-- Parsed suggestions are filtered to items with estimated cost from 1 through contact gift budget; if all are filtered out, raw suggestions are returned.
-- Gift history is also included in wish-generation prompts.
+- `BackupServiceImpl` exports contacts, events, pending messages, sent messages, style profile, memory notes, gift history, activity logs, message feedback, dispatch attempts, and non-secret preferences.
+- Export encrypts payload with passphrase-derived AES-GCM and writes a `.enc` file or selected URI.
+- Preview decrypts and validates version/checksum/counts before mutation.
+- Import replaces restorable local data transactionally and restores non-secret preferences.
+- Diagnostic snapshots are cleared/rebuilt and are not backup contents.
+
+Dependencies: Room transaction, Moshi, `BackupEncryption`, `SecurePrefs`, user passphrase.
+
+Limitations: Merge restore is not implemented. Backup passphrases are not stored and cannot recover the live SQLCipher key directly.
+
+### 13.20 Documentation-Only or Planned Features
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| LeadRescue AI missed-call/business CRM product | Documentation Only | `docs/startup-idea/*`, explicitly archived as unrelated |
+| Custom backend/server-side product | Not Implemented | No server module or backend API source exists |
+| Multi-device sync | Not Implemented | No backend or sync service beyond Google/device contact import |
+| Calendar provider sync | Not Implemented | No calendar provider integration source found |
+| Local-only/guest mode | Not Implemented | Authenticated routes require Firebase user |
+| Merge restore | Not Implemented | Backup docs and service implement replace mode |
+| Light/dynamic theme | Planned | Design docs say production is dark-only |
+| Pure domain without Room/Paging | Planned/Partially Implemented | `:core:model` exists, but entities remain in `:core:domain` |
+| Target `occasions` and `message_drafts` tables | Planned | Architecture docs target them; Room v16 still uses `events` and `pending_messages` |
+
+## 14. User Workflows
+
+### First Setup
+
+1. User opens app.
+2. Splash routes to onboarding, auth, or Home.
+3. User completes onboarding and signs in with Google.
+4. User grants contacts permissions or Google contacts scope when using sync.
+5. Sync imports contacts and runs event discovery.
+6. User configures AI key/provider path as needed, Gmail sender credentials, WhatsApp consent/accessibility, SMS/notification/exact-alarm permissions, automation mode, quiet hours, blackouts, style, and backup.
+7. AI Doctor shows readiness checks and recommended fix.
+
+### Daily Relationship Work
+
+1. Home shows upcoming events, pending reviews, setup progress, backup freshness, and ranked actions.
+2. User opens a contact, event, message, setup fix, backup, or analytics insight.
+3. Activity logs and analytics update from completed work.
+
+### Contact Sync and Enrichment
 
-Outputs:
+1. User triggers sync from Settings, Home, AI Doctor, or Contacts.
+2. Google and/or device contacts are fetched.
+3. Contacts are merged and upserted.
+4. Events are discovered and reminders scheduled.
+5. User enriches contact details, memories, gift budget/history, and style context.
+
+### Event to Message
+
+1. Event discovery or manual event creates an active event.
+2. User or worker invokes generation.
+3. Generation builds prompt context from contact, event, style, memory, gift, and history data.
+4. Gemini returns variants or parser fallback variants are used.
+5. Quality gate and route readiness decide whether the draft can remain automatic or must be reviewed.
+6. Pending message is stored, scheduled, and/or notification is shown.
+
+### Review and Dispatch
 
-- Gift history list sorted by year descending.
-- Budget stats: annual budget, spent, remaining.
-- Three AI gift suggestions when available.
-- `GiftHistoryEntity` rows.
+1. User opens Messages or Wish Preview.
+2. User edits/selects/regenerates/tests/approves/rejects.
+3. Approved or eligible automatic messages are scheduled.
+4. Dispatch policy checks status, approval mode, schedule, quiet hours, and blackout dates.
+5. Dispatcher tries eligible routes and persists attempts/results.
+6. Sent history, activity logs, analytics, and contact health are updated.
+
+### Backup and Recovery
+
+1. User enters passphrase and exports an encrypted backup.
+2. Import preview validates passphrase, manifest, checksum, version, and counts.
+3. Confirmed import replaces local restorable data transactionally.
+4. Secrets such as OAuth token, Gmail password, Gemini key, and live DB key are not backup contents.
+
+## 15. Internal APIs and Contracts
+
+There are no public HTTP APIs implemented by this repository. Internal contracts are Kotlin interfaces:
+
+| Contract | Purpose |
+| --- | --- |
+| `AiService` | Generate/regenerate messages, classify contacts, generate gift suggestions |
+| `ContactSyncService` | Fetch Google and device contact records |
+| `MessageDispatcherService` | Dispatch a prepared `MessageDispatchRequest` |
+| `TestSendService` | Send test email to self |
+| `PreferencesRepository` | Read/write secure configuration and observe preference changes |
+| `SchedulerService` | Schedule/cancel exact sends |
+| `EventReminderSchedulerService` | Schedule/cancel/reschedule event reminders |
+| `NotificationService` | Show approval and AI fallback notifications |
+| `BackupService` | Export, preview, and import encrypted backups |
+| `AnalyticsReportService` | Build CSV relationship report |
 
-Validation and failure behavior:
+Primary domain use cases include contact sync, event discovery/manual save/conflict resolution, message generation/regeneration/approval/rejection/retry/revoke/dispatch/test send, contact classification/preferences, health scoring, dashboard metrics, analytics, style analysis, and full automation enablement.
+
+## 16. Quality, Testing, and CI Strategy
+
+Test coverage by layer:
+
+- Pure model and enum parsing tests in `core:model`.
+- Domain policy/use-case tests in `core:domain` and app unit tests.
+- Data-layer tests for repositories, Room migrations, backup, senders, scheduler adapters, contacts URL building, preferences, diagnostics, and resilience in `core:data`.
+- ViewModel and Compose interaction tests in `app/src/test`.
+- Roborazzi screenshot tests for primary and secondary screens, large font, Hindi variants, loading/empty/error/populated states.
+- Android instrumented smoke tests for package and navigation.
+- Release-readiness tests for manifest, backup exclusions, network pins, signing guard, CI workflow, structured logging, and auth copy.
 
-- Name/category/occasion are required.
-- Cost must be numeric after comma removal and from 0 to 10,000,000 INR.
-- Name/category/occasion must be 80 characters or fewer.
-- Notes must be 500 characters or fewer.
-- Missing contact blocks AI suggestions.
-- AI suggestion failure shows a localized error.
+CI gates:
 
-### 24.17 Chat History
+- Dependency review on PRs.
+- Unit tests, lint, assemble debug.
+- Roborazzi screenshot verification.
+- Production readiness guardrails.
+- Coverage report generation.
+- Release signing guard failure check.
 
-Purpose:
+Known test gaps:
 
-- Show messages already sent for a specific contact.
+- Final native-language Hindi copy review remains a human/release task.
+- Runtime provider checks for SMS, Gmail, WhatsApp Accessibility, exact alarms, and Google/Firebase setup require device or release-owner validation.
+- Automatic retry execution remains a gap beyond persisted retry metadata/manual retry scheduling.
 
-Main files:
+## 17. Monitoring, Logging, and Diagnostics
 
-- `ChatHistoryScreen.kt`
-- `ChatHistoryViewModel.kt`
-- `MessageRepository.getSentByContact`
+Implemented:
 
-Inputs:
+- `StructuredLogger` provides redacted in-memory log history and routes Android logging through one allowed file.
+- `SensitiveLogRedactor` redacts sensitive values.
+- `HealthMonitor` tracks circuit-breaker/provider health.
+- `HealthMonitorDiagnosticRecorder` persists warning snapshots to `diagnostic_snapshots`.
+- AI Doctor persists redacted reports and reads recent health warnings after process restart.
+- Activity logs provide user-visible operational history with type, severity, status, action route, and metadata.
+- Dispatch attempts persist durable send/retry/dead-letter evidence.
 
-- Contact id route argument.
-- Sent message history for the contact.
+Not implemented:
 
-How it works:
+- Remote observability backend.
+- Crash reporting configuration evidence.
+- Production analytics dashboards beyond Firebase Analytics dependency and local app analytics/reporting.
 
-- The screen loads sent messages for the contact.
-- Sent rows include message text, channel, sent timestamp, delivery status, variant used, and reply metadata where available.
+## 18. Performance Considerations
 
-Outputs:
+Implemented performance/reliability measures:
 
-- Per-contact sent-message timeline.
-- Loading, empty, and error states.
-
-Failure and edge behavior:
-
-- Missing or deleted contacts can still have sent rows with deleted-contact handling through `SentMessageEntity.contactId`.
-
-### 24.18 Settings and Secure Configuration
-
-Purpose:
-
-- Let the user control AI, automation, credentials, reminders, biometric lock, channels, sync, backup, and sign-out.
-
-Main files:
-
-- `SettingsViewModel.kt`
-- `SettingsScreen.kt`
-- `SecurePrefs.kt`
-- `PreferencesRepositoryImpl.kt`
-
-Inputs:
-
-- Birthday reminder toggle.
-- AI wish generation toggle.
-- Gemini API key.
-- Gmail sender email and app password.
-- Global automation mode.
-- Quiet hours start/end.
-- Biometric lock toggle.
-- Disabled channel toggles for SMS, WhatsApp, Email.
-- Sync contacts action.
-- Legacy DB notice dismiss action.
-- Sign-out action.
-
-How it works:
-
-- Settings loads persisted encrypted preferences at ViewModel init.
-- Gemini key is trimmed and stored.
-- Gmail settings require both email and app password before saving.
-- Quiet hours input is restricted to digits and max two characters, then validated 0-23.
-- Channel blackout is stored as a JSON array of disabled channels.
-- Sync contacts calls foreground sync with force refresh and reports success/failure.
-- Sign-out delegates to AuthManager and clears database key/preferences/database file.
-
-Outputs:
-
-- Updated encrypted preferences.
-- Feedback events for saved key, saved email, quiet hours, biometric lock, channel preferences, and sync.
-- Sync timestamp text.
-- Legacy DB notice state.
-
-Failure and edge behavior:
-
-- Missing email/password blocks save.
-- Invalid quiet hours blocks save.
-- Sync failures show the exception message or stable fallback text.
-
-### 24.19 Backup and Restore
-
-Purpose:
-
-- Export and import encrypted local data without relying on platform backup.
-
-Main files:
-
-- `BackupRestoreViewModel.kt`
-- `BackupServiceImpl.kt`
-- `BackupEncryption.kt`
-- `BackupRestoreScreen.kt`
-
-Inputs:
-
-- Passphrase.
-- Export destination URI, optional.
-- Import source URI.
-
-How it works:
-
-- ViewModel calculates password strength:
-  - weak for length under 6 or low score;
-  - score points for length at least 8, uppercase, digit, and symbol from `!@#$%^&*-_`;
-  - 4 points is very strong, 3 strong, 2 fair.
-- Export requires a non-blank passphrase and rejects weak passphrases.
-- Export reads contacts, events, pending messages, sent messages, style profile, memory notes, and gift history.
-- Backup data is JSON serialized, encrypted, and written to `relateai_backup_yyyyMMdd_HHmmss.enc` under app files.
-- When an output URI is provided, the encrypted backup is copied to that destination.
-- Import reads UTF-8 text with a 25 MB limit.
-- Import decrypts with the passphrase, validates backup JSON/version, and restores in one Room transaction.
-- Restore upserts contacts/events/style/memory/gifts and inserts pending/sent messages.
-
-Outputs:
-
-- Encrypted `.enc` backup file name and byte size.
-- Import success count of restored records.
-- Last backup timestamp in encrypted preferences.
-
-Failure and edge behavior:
-
-- Blank passphrase, weak export passphrase, create/write/read failure, invalid file, wrong passphrase, unsupported backup version, and database failure all map to stable user-facing errors.
-- AES-GCM authentication failure maps to wrong passphrase.
-- Malformed Base64 or JSON maps to invalid backup file.
-- Database restore errors roll back the transaction.
-
-### 24.20 AI Doctor / Automation Setup
-
-Purpose:
-
-- Diagnose why AI, sync, personalization, approvals, or delivery automation may fail or sound generic.
-
-Main files:
-
-- `AutomationSetupViewModel.kt`
-- `AutomationSetupScreen.kt`
-- `HealthMonitor.kt`
-- `DeadLetterQueue.kt`
-- `StructuredLogger.kt`
-
-Inputs:
-
-- Refresh action.
-- Sync contacts action.
-- Dry-run generation check.
-- Test AI action.
-- Test email action.
-- Runtime state:
-  - Google auth/OAuth token;
-  - Gemini key or Firebase user;
-  - AI wish toggle;
-  - style profile sample count;
-  - contacts and personalization fields;
-  - Gemini circuit breaker state;
-  - notification permission;
-  - SMS permission;
-  - email credentials and email-preferred contacts;
-  - WhatsApp accessibility service enabled state;
-  - exact alarm access;
-  - daily WorkManager status;
-  - recent structured errors and health errors;
-  - dead-letter count.
-
-How it works:
-
-- `buildReport()` creates a list of readiness checks with status OK, WARNING, or ACTION_REQUIRED.
-- Summary status is based on number of blockers first, then warnings.
-- A typed recommended fix is derived from actionable non-OK checks by ranking ACTION_REQUIRED before WARNING, Required before Reliability before Quality before Recovery, then original check order for deterministic ties.
-- Personalization is OK when at least 50 percent of contacts have nickname, notes, interests, or shared history.
-- Generic message risk warns when contacts lack AI personalization context from nickname, notes, interests, shared history, or strong classification confidence, then routes to Contacts cleanup.
-- Style Coach is OK at 3 or more samples, warning with 1-2, action required with zero.
-- Email is action required only when email-preferred contacts exist and credentials are missing; otherwise missing email is a warning/optional state.
-- Dry run checks whether AI generation can theoretically run and reports the ranked blocker without creating messages.
-- Test AI asks Gemini for a fixed JSON shape and diagnoses error responses.
-- AI error diagnosis maps quota, auth, network, JSON, circuit breaker, and other redacted recent errors to stable messages.
-- Test email sends a fixed test message through the same Gmail test-send path.
-
-Outputs:
-
-- Diagnostic summary.
-- Single recommended fix with action label and destination.
-- Readiness check cards with action labels and destinations.
-- Operation message for sync, dry run, AI test, or email test.
-- Navigation/action intents to Settings, Style Coach, Contacts, Activity History, Accessibility settings, Battery settings, and App settings.
-
-Failure and edge behavior:
-
-- WorkManager status lookup failures produce an empty work list rather than crashing.
-- AI test exceptions show generic AI test failure.
-- Sensitive error text is redacted before display.
-
-### 24.21 Notifications, Widget, Shortcuts, and Deep Links
-
-Purpose:
-
-- Surface key work outside the main app screen.
-
-Main files:
-
-- `NotificationHelper.kt`
-- `ApprovalReceiver.kt`
-- `EventReminderReceiver.kt`
-- `BirthdayWidgetProvider.kt`
-- `app/src/main/res/xml/shortcuts.xml`
-- `app/src/main/AndroidManifest.xml`
-
-Inputs:
-
-- Notification permission.
-- Generated pending messages.
-- Event reminders.
-- Revival suggestions.
-- Setup/system alerts.
-- Widget update broadcasts.
-- Launcher shortcut actions.
-- Deep link intents.
-
-How it works:
-
-- App startup creates notification channels:
-  - approval required;
-  - revival suggestion;
-  - event reminders;
-  - system alerts;
-  - dispatch status.
-- Approval notification includes approve, reject, and edit actions.
-- Edit opens `relateai://wish/{contactId}/{messageId}`.
-- Event reminder opens `relateai://contact/{contactId}`.
-- System backup/setup alert opens the relevant app surface.
-- Widget reads events, contacts, and pending approvals, then displays today's birthday count, names, next three events, and pending approval count.
-- Static shortcuts expose compose/message and contacts entry points.
-
-Outputs:
-
-- Approval, revival, reminder, setup, backup, and dispatch notifications.
-- Widget title/subtitle.
-- Deep-link navigation into specific app screens.
-
-Failure and edge behavior:
-
-- Notification SecurityException from missing permission is caught.
-- Widget update failures are logged and do not crash the app.
-- Unknown widget contact names show "Unknown Contact".
-
-### 24.22 Storage, Data Model, Security, and Reliability
-
-Purpose:
-
-- Keep relationship data local, encrypted, recoverable, and observable.
-
-Main files:
-
-- `AppDatabase.kt`
-- `DatabaseKeyDerivation.kt`
-- `LegacyDatabaseQuarantine.kt`
-- `SecurePrefs.kt`
-- `BackupEncryption.kt`
-- `SensitiveLogRedactor.kt`
-- `Retry.kt`
-- `CircuitBreaker.kt`
-- `Fallback.kt`
-- `HealthMonitor.kt`
-- `DeadLetterQueue.kt`
-
-Inputs:
-
-- Room entity data.
-- Database key derivation inputs.
-- Encrypted preference values.
-- Backup passphrases.
-- Structured log/error events.
-- Dispatch failures.
-
-How it works:
-
-- Room stores the active entity model under SQLCipher.
-- EncryptedSharedPreferences stores credentials/configuration in separate auth and config files.
-- If encrypted prefs initialization fails, files and AndroidKeyStore aliases are cleared and retried; plaintext fallback is forbidden. A successful rebuild sets a Settings recovery notice so the user can re-enter protected setup values and refresh their encrypted backup.
-- Legacy plaintext DB files are quarantined instead of silently reused.
-- Backup encryption uses AES/GCM/NoPadding with a PBKDF2WithHmacSHA256 256-bit key, 65,536 iterations, 16-byte salt, 12-byte IV, and 128-bit tag.
-- SensitiveLogRedactor removes secrets and PII-like values from logs and diagnostics.
-- Production code must route operational logging through `StructuredLogger`; `ProductionReadinessConfigTest` allows direct Android `Log` calls only inside the logger backend.
-- HealthMonitor records recent errors and circuit breaker states.
-- DeadLetterQueue stores failed dispatch payload metadata for troubleshooting.
-
-Outputs:
-
-- Encrypted local database.
-- Encrypted auth/config preferences.
-- Quarantine notice for legacy plaintext DB.
-- Redacted diagnostics.
-- Health and dead-letter inputs for AI Doctor.
-
-Failure and edge behavior:
-
-- Encrypted storage initialization failure throws securely after retry.
-- Backup import rejects oversized, malformed, unauthenticated, unsupported, or constraint-breaking payloads.
-- Dispatch failures are not silently dropped; they are marked FAILED and visible through diagnostics.
-
-## 25. Product UX Automation Audit and Improvement Backlog
-
-This audit translates the current implementation into product, UX, workflow, and technical improvement work. It prioritizes automation that reduces effort while keeping critical relationship, message, privacy, and delivery decisions visible and reversible.
-
-### 25.1 Current State Analysis
-
-Modules and feature groups:
-
-| Module | Features | Primary users | Main output |
-|---|---|---|---|
-| Entry and account | Splash, onboarding, Google auth, biometric lock, sign-out | End user, tester | Authenticated app session |
-| Dashboard | Home metrics, readiness banner, relationship planner, quick actions | End user | Daily relationship command center |
-| Contacts | Google/device sync, dedupe, list filters, contact detail, personalization | End user | Local contact graph with preferences |
-| Events | Discovery, manual event creation, event filters, reminders | End user | Upcoming relationship moments |
-| AI personalization | Classification, style profile, wish generation, regeneration, gift suggestions, revival | End user | Drafts, suggestions, and context intelligence |
-| Messages | Inbox tabs, approve/reject/retry/revoke, preview, test send | End user | Controlled message lifecycle |
-| Automation | Daily chain, exact send alarms, boot recovery, dispatch, reminders | App runtime, end user | Reliable low-touch execution |
-| Insights | Analytics, CSV export, activity history, health scoring | End user, operator | Performance and audit visibility |
-| Data and security | SQLCipher, encrypted prefs, backup/restore, redaction, dead-letter queue | End user, operator | Private durable local data |
-| External integrations | Google/Firebase/Gemini, People API, Android Contacts, SMS, WhatsApp, Gmail SMTP | End user, platform | Contact import and message delivery |
-
-Primary user journeys:
-
-| Journey | Current path | Current friction |
-|---|---|---|
-| First setup | Splash -> Onboarding -> Auth -> Home -> Settings/AI Doctor | Setup work is split between onboarding, Settings, permissions, Style Coach, and AI Doctor. |
-| Import contacts | Settings/Home/AI Doctor -> Sync -> Contacts -> Contact Detail | Sync status exists, but next best action after partial sync is not always obvious. |
-| Personalize a contact | Contacts -> Contact Detail -> Edit personalization -> Memory/Gift screens | Rich controls create cognitive load; user must know which fields improve AI quality. |
-| Generate a wish manually | Contact Detail -> Generate AI Wish -> Wish Preview | Clear, but duplicate/disabled/context errors need stronger recovery routes. |
-| Review approvals | Home/Messages/notification -> Wish Preview or inbox action | Previously Home routed approval prompts to AI Doctor; direct Messages routing is the right behavior. |
-| Configure automation | Settings -> AI Doctor -> system settings/Style Coach/Contacts | Diagnostic quality is strong, but setup actions are spread across several surfaces. |
-| Recover failed delivery | Messages Failed tab -> retry; AI Doctor -> Activity History | Good visibility, but dead-letter details are operational and not task-oriented yet. |
-| Backup data | Home/Settings -> Backup/Restore -> passphrase -> export/import | Secure, but reminder and last-backup status are not prominent in dashboard. |
-| Understand relationship health | Home/Analytics/Contact Detail | Metrics exist, but explanations and recommended actions are scattered. |
-
-Roles and permissions:
-
-| Role | Capabilities | Limits |
-|---|---|---|
-| Signed-in user | Google contacts sync, authenticated profile, Firebase/Gemini path where configured | Needs OAuth/Firebase configuration and runtime permissions. |
-| App runtime | Background sync, event discovery, generation, reminders, dispatch, boot recovery | Must respect user toggles, permissions, quiet hours, blackout dates, approval mode, and disabled channels. |
-| Platform services | ContactsProvider, AlarmManager, WorkManager, SMS, Accessibility, notifications, FileProvider | Can be unavailable or permission-gated. |
-
-Manual versus automated processes:
-
-| Process | Manual today | Automated today | Gap |
-|---|---|---|---|
-| Setup | User signs in, grants permissions, configures Gemini/Gmail, trains Style Coach | AI Doctor detects blockers; Home and AI Doctor share setup progress counts | Needs a guided resume path that opens each remaining fix step. |
-| Contact import | User taps sync or foreground refresh | Daily sync chain and auto event discovery | Partial failures need clearer recovery and import summaries. |
-| Personalization | User fills rich fields, memories, gifts | Classification and inferred group relationship | Needs smarter prompts for missing details and one-tap enrichment. |
-| Event management | User adds manual events, can override duplicate warnings, and can merge or keep duplicate/conflict families from the Events list | Contact-derived event discovery, duplicate warning before manual saves, trust labels, and reminders | Needs richer source-history audit and edit-date flow beyond the initial row actions. |
-| Wish writing | User generates/reviews/regenerates | AI generates variants and learns feedback | Needs batch preview and smarter default variant/channel suggestions. |
-| Approval | User reviews, approves, rejects, revokes | Notifications and automation modes | Needs more direct task routing and clearer send-risk labels. |
-| Delivery | User configures channel credentials/permissions | Exact scheduling, dispatch, fallback, retries | Needs pre-send channel readiness checks in context. |
-| Insights | User opens Analytics/Activity | Metrics and CSV generated | Needs action recommendations tied to metrics. |
-| Backup | User exports/imports | 30-day reminder | Needs last-backup status and safer recovery guidance. |
-
-Data flow:
+- WorkManager constraints require battery/storage not low and network where needed.
+- Exact alarms are used for user-visible scheduled sends when permission allows; WorkManager delayed fallback exists.
+- Boot/time recovery reconciles alarms, reminders, SMS delivery status, and workers.
+- SQLCipher key and secure prefs are warmed asynchronously on app startup.
+- `RateLimiter`, retry, and circuit breaker wrap Gemini generation.
+- Lists use stable models and screen-local components in many high-risk screens.
+- Roborazzi baselines guard large-font and narrow-width layout behavior.
+
+Risks:
+
+- Large local lists may need paging or indexed filtering in Contacts, Messages, Events, and Activity History.
+- `AppDatabase.kt`, `AutomationSetupViewModel`, and some screen/ViewModel files remain large.
+- AI, contacts sync, backup import/export, and screenshot tests are expensive and should stay off the main thread or be constrained.
+
+## 19. Known Issues, Debt, and Risks
+
+| ID | Area | Status | Evidence | Impact | Recommended action |
+| --- | --- | --- | --- | --- | --- |
+| D-001 | Domain purity | Partially Implemented | Room entities remain under `core/domain/src/main/kotlin/com/example/core/db/entities`; `core/domain/build.gradle.kts` depends on Room/Paging | Domain is not persistence-independent | Move entities/DAOs/schema to data/database module and map at repository boundary |
+| D-002 | Readiness model | Partially Implemented | Messages uses `MessageOperationalReadinessPolicy` plus `DispatchEligibilityPolicy` for route/status/scheduled-time/allowed-window readiness; `DispatchEligibilityPolicy` blocks already-handled `SENT` and `DISPATCHING` states; exact-send scheduling uses `ExactSendSchedulePolicy`; exact-send stale-dispatch recovery classification uses `ExactSendRecoveryPolicy`; SMS stale pending-delivery recovery cutoff and recovered status use `SmsDeliveryStatusRecoveryPolicy`; event-reminder cancel/exact/inexact scheduling decisions use `EventReminderSchedulePolicy`; foreground and worker dispatcher exception outcomes use `DispatchExceptionFailurePolicy`; SMS sent/delivered callback delivery status, dispatch-attempt result, pending failure marking, and failure metadata use `SmsCallbackOutcomePolicy`; Wish Preview draft text uses `WishDraftReadinessPolicy`; Wish Preview send summary, route choice context, route setup context, device setup context, and quiet-hours/blackout dispatch context use `WishPreviewSendSummaryPolicy`; approval notification actions use `ApprovalNotificationActionPolicy`; dispatch, AI-provider, revival-AI-provider, and exact-alarm setup notification request reasons/helper rendering use `SetupNotificationRequest`; AI fallback and stale-backup alert reasons/helper rendering use `SystemAlertNotificationRequest`; revival review notifications use `RevivalNotificationRequest`; AI Doctor account/provider readiness uses `SetupAccountProviderReadinessPolicy`; AI Doctor full-automation, event, route, and selected-channel count decisions use `SetupAutomationReadinessPolicy`; SMS/WhatsApp setup readiness and channel verification routing use `SetupChannelReadinessPolicy`; AI Doctor email setup readiness uses `SetupEmailReadinessPolicy`; AI Doctor Style Coach, personalization, and generic-message risk checks use `SetupQualityReadinessPolicy`; AI Doctor notification permission, exact-send permission, daily scheduler, recent-health, and dispatch-recovery checks use `SetupSystemReadinessPolicy`; setup summary/progress uses `SetupReadinessSummaryPolicy` and `SetupReadinessProgressPolicy`; AI Doctor recommended-fix ranking uses `SetupReadinessRecommendationPolicy`; route selector and final dispatch fallback ordering use `DeliveryRouteReadinessPolicy` and `AutoSendChannelSelector`; Home readiness banner and next actions use `HomeNextActionPolicy`; remaining notification surfaces outside typed approval/setup/system-alert/revival/event-reminder requests and dispatch/recovery timing surfaces outside Messages/Wish Preview/exact-send scheduling/exact-send recovery/SMS delivery-status recovery/event-reminder scheduling/dispatch-exception failure/SMS callback outcomes still compute related states separately | Users can still see fragmented setup/recovery reasoning outside the shared route/status/scheduled-window/exact-send-scheduling/exact-send-recovery/SMS-delivery-status-recovery/event-reminder-scheduling/dispatch-exception-failure/SMS-callback-outcome/draft-text/send-summary/route-choice/route-setup/device-setup/dispatch-context/approval-notification/setup-notification/system-alert/revival-notification/account-provider/automation-prerequisite/channel-setup/channel-verification/email-readiness/quality-readiness/system-readiness/setup-summary/setup-progress/fix-ranking/Home slices | Create one operational readiness use case/read model |
+| D-003 | Backup automation default mismatch | Resolved in current working tree | `GlobalAutomationModePrefsMapper.DEFAULT_GLOBAL_AUTOMATION_MODE = ALWAYS_ASK`; `BackupPreferencesDto.defaults()` uses `ALWAYS_ASK` | No current user impact; keep regression coverage | Keep backup defaults aligned with review-first automation |
+| D-004 | Provider config policy | Resolved in current working tree | `.gitignore` allowlists approved app/debug client config files and release/security docs define forbidden secrets | Keep Firebase project/OAuth/SHA verification in release evidence |
+| D-005 | WhatsApp release policy | Open Release Blocker | Security/release docs and manifest AccessibilityService | Play distribution risk | Complete Accessibility declaration/signoff or disable channel for Play |
+| D-006 | Target data model | Planned | ADRs target `occasions` and `message_drafts`; Room v16 uses `events` and `pending_messages` | Naming/schema mismatch with target model | Plan migration after mapper and backup compatibility tests |
+| D-007 | Local-only mode | Not Implemented | Authenticated routes require Firebase auth | Privacy-conscious/manual-only users cannot use app signed out | Product decision needed |
+| D-008 | Merge restore | Not Implemented | Backup service replace mode only | Users cannot merge backup into current data | Keep documented or design merge restore |
+| D-009 | Automatic retry execution | Partially Implemented | Retry/dead-letter metadata and manual retry exist; ADR says automatic execution pending | Some provider failures need user/manual retry flow | Implement scheduled retry worker loop if product requires |
+| D-010 | Stale comments/docs | Partially Resolved | AuthManager's stale sign-out table-count comment is fixed; some older docs still claim SSOT/plan authority | Maintainer confusion from remaining older docs | Continue consolidating docs and fix stale comments opportunistically |
+| D-011 | Release evidence | Unverified | Release checklist has TBD signoffs | Cannot claim Play-ready | Attach privacy, Data Safety, Accessibility, device smoke evidence per release |
+
+Current working-tree note: exact-send enqueue-now/exact-alarm/WorkManager-fallback scheduling now uses `ExactSendSchedulePolicy`; initial recurring automation scheduling and boot recovery now share `BootRecoveryRecurringWorkCommand`; approval, revival, and event-reminder notification copy/helper rendering now use `ApprovalNotificationAdapters`, `RevivalNotificationAdapters`, `EventReminderNotificationAdapters`, and typed notification requests. Remaining D-002 dispatch/notification debt excludes those helper paths.
+
+## 20. Troubleshooting and Runbooks
+
+### Gradle cannot run
+
+- Verify JDK 21 is installed and `JAVA_HOME` points to it.
+- Run `./gradlew --version`.
+- Use `--no-configuration-cache` for current documented validation commands.
+
+### Release build fails signing
+
+- Set `KEYSTORE_PATH`, `STORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`.
+- `KEYSTORE_PATH` must point to an existing keystore file.
+- Missing values are expected to fail release artifact tasks.
+
+### Google contacts sync fails
+
+- Confirm user is signed in with Google.
+- Confirm the contacts readonly scope is granted.
+- If sync token is rejected, code clears it and performs full sync.
+- Device contacts require Android `READ_CONTACTS`; denial is a distinct outcome.
+
+### Gemini generation fails or returns fallback
+
+- Confirm Firebase/Google AI setup or user Gemini API key.
+- Check AI Doctor.
+- Fallback output is allowed for review but should downgrade automatic modes through `AiAutoSendQualityGate`.
+
+### Email send fails
+
+- Confirm sender email and Gmail app password are configured.
+- Confirm last successful email test state.
+- Sender and recipient addresses are validated before SMTP send.
+
+### WhatsApp send fails
+
+- Confirm app-level WhatsApp automation consent is granted.
+- Confirm WhatsApp or WhatsApp Business is installed.
+- Confirm Android AccessibilityService is enabled for RelateAI.
+- Provider failure should be redacted and recorded in dispatch attempts.
+
+### Exact alarm denied
+
+- Scheduler checks `canScheduleExactAlarms()`.
+- If exact alarms are unavailable, app shows setup notification and enqueues WorkManager delayed fallback.
+
+### Backup restore fails
+
+- Check passphrase.
+- Check file is a RelateAI encrypted backup and below size limit.
+- Wrong passphrase, malformed file, checksum mismatch, unsupported future version, or database constraint errors stop restore before or during transaction.
+
+## 21. Documentation Consolidation Report
+
+This section is the cleanup report. No files are deleted automatically. Remove only after the SSOT is reviewed and accepted.
+
+| File | Purpose found | Migration status | Removal recommendation | Reason |
+| --- | --- | --- | --- | --- |
+| `SSOT.md` | Canonical project document | Replaced by this consolidated version | Keep | Authoritative single source |
+| `PLAN.md` | Rebuild plan and debt registry | Useful current state and debt migrated | Remove after acceptance, or archive as historical | It claims to be single source of truth and duplicates this file |
+| `PRODUCT_BLUEPRINT.md` | Product model and journeys | Current product intent migrated | Remove after acceptance | Duplicates product/UX sections |
+| `IMPLEMENTATION_TASKS.md` | Historical backlog | Open debt migrated at higher level | Remove or archive | It is a task backlog, not current truth; many entries are complete/stale |
+| `IMPLEMENTATION_PROGRESS.md` | Incremental change log | Key implemented features migrated, including Gift Advisor budget shortcut | Archive outside active docs or keep as changelog only with SSOT pointer | Historical detail is useful but fragmented |
+| `CODEBASE_AUDIT_REPORT_2026-07-01.md` | Audit report | Findings migrated and validated where current | Remove or archive | Contains stale/internal contradictions and duplicates SSOT |
+| `PRODUCT_UX_WORKFLOW_TECHNICAL_ANALYSIS.md` | UX/product audit | Useful recommendations migrated as gaps/debt | Remove | Older than current implementation and duplicates feature catalog |
+| `docs/architecture/target-room-schema.md` | Target schema design | Current and planned data model migrated | Archive as design history or remove after migration plan is tracked elsewhere | It is a target design, not current implementation truth |
+| `docs/architecture/adr/0001-domain-purity-and-module-boundaries.md` | ADR | Decision and current partial state migrated | Keep only as immutable ADR archive or remove from active docs | Context says four modules and target not fully implemented |
+| `docs/architecture/adr/0002-occasion-model.md` | ADR | Target occasion model migrated | Keep only as immutable ADR archive or remove from active docs | Planned schema is not current DB |
+| `docs/architecture/adr/0003-durable-dispatch-attempts.md` | ADR | Dispatch attempt state migrated | Keep only as immutable ADR archive or remove from active docs | Some retry execution remains pending |
+| `docs/architecture/adr/0004-database-keying-and-backup-recovery.md` | ADR | Security/keying decisions migrated | Keep only as immutable ADR archive or remove from active docs | Decision is useful but duplicates SSOT security section |
+| `docs/security/privacy-and-permissions.md` | Privacy/permission release notes | Migrated into security and release risks | Keep until privacy policy/release owner signoff exists, then archive | High-risk release evidence still needs owner review |
+| `docs/security/dependency-review.md` | Dependency review policy | Migrated into CI/release section | Remove after acceptance | CI workflow is the source of enforceable behavior |
+| `docs/operations/release-checklist.md` | Release checklist | Migrated into build/release/security sections | Keep until next release record exists, then archive or generate from SSOT | Contains required signoff checklist |
+| `docs/testing/test-strategy.md` | Test strategy | Migrated into testing section | Remove after acceptance | Duplicates current test strategy |
+| `docs/testing/screenshot-strategy.md` | Roborazzi strategy | Summarized in tests; baselines remain source artifacts | Remove after acceptance or keep only baseline-update procedure | Duplicates screenshot coverage narrative |
+| `docs/design/design-system.md` | Design system | Core tokens/theme policy migrated at summary level | Keep only if design token details must remain expanded, otherwise move token details into SSOT | Current SSOT does not repeat every token to avoid duplication |
+| `docs/design/ux-audit-checklist.md` | UX audit checklist | Gaps migrated | Remove after acceptance | Historical checklist duplicates implementation progress |
+| `docs/user/complete-user-guide.md` | User guide | Workflows/runbooks migrated | Remove after generating user-facing docs from SSOT | Very large and duplicates product behavior |
+| `docs/user/backup-restore.md` | User backup guide | Migrated into backup and troubleshooting | Remove after acceptance | Duplicates SSOT backup section |
+| `docs/startup-idea/idea-evaluation.md` | Archived LeadRescue idea | Marked Documentation Only | Remove from product repo or keep outside active docs | Unrelated to implemented RelateAI |
+| `docs/startup-idea/business-requirements-document.md` | Archived LeadRescue BRD | Marked Documentation Only | Remove from product repo or keep outside active docs | Unrelated to implemented RelateAI |
+| `docs/startup-idea/product-requirements-document.md` | Archived LeadRescue PRD | Marked Documentation Only | Remove from product repo or keep outside active docs | Unrelated to implemented RelateAI |
+| Root `app_logs*.txt`, `logcat*.txt`, `lint_baseline_pre_fixes.txt` | Local diagnostic/log snapshots | Not migrated as authoritative docs | Remove | Generated/local diagnostics, not current source of truth |
+| `metadata.json` | App/tool metadata | Not documentation | Keep if required by tooling | Mentions server-side Gemini capability, but source has no custom server |
+| `app/src/main/baseline-prof.txt` | Baseline profile source artifact | Not documentation | Keep | Build/runtime optimization artifact |
+
+## 22. Documentation Gap Analysis
+
+| Gap | Impact | Evidence | Recommended action |
+| --- | --- | --- | --- |
+| Final privacy policy and Data Safety text absent | Cannot claim production Play readiness | Release/security docs have requirements and TBD signoffs | Create release-owned privacy/Data Safety artifacts from SSOT |
+| WhatsApp Accessibility declaration evidence absent | Play distribution risk | Release checklist status blocked | Attach signoff/evidence or disable WhatsApp automation in Play build |
+| Provider config policy | Resolved in current working tree | `.gitignore` allowlists approved app/debug client config files and `RepositoryHygieneTest` checks for server-side secret markers | Keep release-owner OAuth/SHA verification external |
+| Domain purity migration plan not tracked in one current task source | Architecture drift persists | ADR target vs code reality | Create scoped migration plan after SSOT cleanup |
+| Runtime smoke evidence not current in SSOT | Static analysis cannot prove provider/device behavior | Tests exist, but this doc pass did not run device checks | Attach release records per build |
+| Native-language Hindi review incomplete | Localization quality risk | Testing docs list remaining review gaps | Schedule human language review |
+| Automatic retry execution unclear | Recovery behavior may be overestimated | ADR says pending; code has manual retry metadata/scheduling | Document product decision and implement if required |
+| Design token detail split | Full token table is currently in design doc | This SSOT summarizes rather than duplicates every token | Either migrate token table into SSOT or explicitly keep design doc as generated/reference |
+
+## 23. Inconsistency Report
+
+| Inconsistency | Current evidence | Correct source of truth | Resolution |
+| --- | --- | --- | --- |
+| Multiple docs claim to be single source of truth | `PLAN.md` and old `SSOT.md` both made authority claims | This `SSOT.md` | Remove or archive older authority claims |
+| ADR 0001 says current Gradle graph has four modules | `settings.gradle.kts` has five modules including `:core:model` | Build files | Update/archive ADR context or mark historical |
+| Older SSOT recreate notes mentioned debug suffix `.debug` | `app/build.gradle.kts` has no `applicationIdSuffix` in debug | Build file | Do not repeat debug suffix claim |
+| Audit report says older SSOT references schema v13 | Current DB is v16 and this SSOT records v16 | `AppDatabase.kt` and schema export | Treat audit statement as historical |
+| Backup fallback automation default conflict | Current working tree shows both normal and backup fallback defaults as `ALWAYS_ASK` | `GlobalAutomationModePrefsMapper` and `BackupPreferencesDto.defaults()` | Treat older reports claiming `FULLY_AUTO` backup fallback as historical |
+| Sign-out comment used a stale fixed table count | `database.clearAllTables()` clears all current Room tables | `AuthManager.kt` and `AppDatabase.kt` | Resolved: source comment now says all Room tables |
+| Provider config allowlist needed | Approved app/debug `google-services.json` files are tracked; other local variants should remain ignored | `.gitignore`, release/security docs, `RepositoryHygieneTest` | Resolved: exact approved paths are explicitly allowlisted and checked for server-side secret markers |
+| Metadata says server-side Gemini capability | No backend/server module exists | Source tree and Gradle modules | Treat `metadata.json` as tool metadata, not architecture |
+| LeadRescue docs describe another product | Startup docs are archived as unrelated | Current source and product docs | Remove from active docs |
+
+## 24. Unverified Information Report
+
+These items are not claimed as verified implementation truth:
+
+| Item | Why unverified | How to verify |
+| --- | --- | --- |
+| Firebase project correctness, OAuth SHA-1, People API enablement | Config files not inspected for secrets and cloud state is external | Firebase/Google Cloud console and release smoke |
+| Gemini runtime availability/quota | External provider state not in repo | Device/integration test with configured provider |
+| Gmail SMTP app password validity | User secret not in repo | AI Doctor email test |
+| SMS deliverability | Carrier/SIM/device dependent | Device test with safe recipient |
+| WhatsApp Accessibility Play approval | Requires policy review outside source | Release-owner signoff and Play Console declaration |
+| Public privacy policy/Data Safety form | Not present as final release artifact | Store/release evidence |
+| Current CI pass/fail status | Static source review only in this pass | Run GitHub Actions or local Gradle gates |
+| External market claims in startup docs | Archived docs cite external sources not checked here | External source review if those docs are retained |
+| Production deployment | No published release evidence in repo | Release record and signed artifact |
+
+## 25. Feature Status Matrix
+
+| Feature/module/workflow | Status | Primary evidence | Notes |
+| --- | --- | --- | --- |
+| App shell, navigation, permission rationale | Fully Implemented | `MainActivity.kt`, `NavGraph.kt`, `Screen.kt` | Bottom nav plus secondary routes |
+| Biometric lock | Fully Implemented | `MainActivity.kt`, `BiometricLockPolicy.kt`, `DeepLinkContractTest.kt`, tests | Preference-gated session lock covers deep-linked app entry before nav graph rendering |
+| Splash/onboarding/auth | Fully Implemented | Splash/Onboarding/Auth ViewModels and screens | No guest mode |
+| Secure sign-out | Fully Implemented | `AuthManager.kt` | Comment now matches all-table cleanup behavior |
+| Google/device contact sync | Fully Implemented | `SyncContactsUseCase`, `GoogleContactsSync`, `PeopleConnectionsRequestFactory`, `DeviceContactsReader` | Uses injected shared People API request/client seam; requires permissions/scopes |
+| Contact list/detail/preferences | Fully Implemented | Contact screens/ViewModels, `UpdateContactPreferencesUseCase` | Budget adjustment stays in Contact Detail |
+| Contact classification | Fully Implemented | `ClassifyContactUseCase`, `AiServiceImpl` | AI/provider dependent |
+| Event discovery | Fully Implemented | `DiscoverEventsUseCase` | Birthday, anniversary, work anniversary |
+| Manual/custom events | Fully Implemented | `SaveManualEventUseCase`, `EventsViewModel` | Duplicate/conflict handling exists |
+| Event reminders | Fully Implemented | `EventReminderScheduler`, receiver | Exact scheduling/recovery exists |
+| AI wish generation | Fully Implemented | `GenerateMessageUseCase`, Gemini package | Quality gate downgrades weak automatic drafts |
+| Regeneration with feedback | Fully Implemented | `RegeneratePendingMessageUseCase`, `WishPreviewViewModel` | Uses feedback records |
+| Wish Preview review | Fully Implemented | `WishPreviewViewModel`, `WishPreviewScreen` | Includes test-send path |
+| Messages queue and bulk actions | Fully Implemented | `MessagesViewModel`, messages screen components | Tabs/filter/sort/search/selection |
+| Dispatch eligibility policy | Fully Implemented | `DispatchEligibilityPolicy` tests | Covers approval, schedule, quiet hours, blackouts |
+| Exact alarm scheduling/fallback | Fully Implemented | `DailyScheduler`, scheduler tests | WorkManager fallback exists |
+| Background automation workers | Fully Implemented | Worker package and tests | Daily, sync, discovery, generation, holiday, follow-up, revival, style |
+| Durable dispatch attempts | Fully Implemented | `dispatch_attempts`, DAO, mappers, worker/dispatcher | Automatic retry execution still pending |
+| SMS sending | Fully Implemented | `SmsSender`, `SmsStatusReceiver` | Device/SIM/permission dependent |
+| Email sending | Fully Implemented | `EmailSender`, test-send service | Gmail app password needed |
+| WhatsApp sending | Fully Implemented with release risk | `WhatsAppSender`, Accessibility service | Play policy blocker |
+| Notifications | Fully Implemented | `NotificationHelper`, approval/event receivers | Notification permission on API 33+ |
+| Widget/shortcuts/deep links | Fully Implemented | Widget provider, shortcut XML, deep-link tests | Launcher/device behavior may vary |
+| Analytics and CSV export | Fully Implemented | `AnalyticsViewModel`, `AnalyticsReportServiceImpl` | Local/reporting only |
+| Activity History | Fully Implemented | `ActivityHistoryViewModel` | May need paging later |
+| Style Coach | Fully Implemented | `StyleAnalysisUseCase`, style screen/ViewModel | Heuristic extraction |
+| Memory Vault | Fully Implemented | `MemoryVaultViewModel`, `MemoryNotePromptPolicy` | Private category excludes AI prompts |
+| Gift Advisor | Fully Implemented | `GiftAdvisorViewModel`, `GiftAdvisorScreen` | Budget shortcut routes to Contact Detail preferences |
+| Backup export/preview/import | Fully Implemented | `BackupServiceImpl`, `BackupEncryption` | Replace-only restore |
+| SQLCipher and encrypted prefs | Fully Implemented | `AppDatabase`, `DatabaseKeyDerivation`, `SecurePrefs` | Legacy recovery path remains |
+| Dark design system | Fully Implemented | `core/ui`, design tests | Light/dynamic theme planned only |
+| CI build/test/release guard | Fully Implemented | `.github/workflows/android.yml`, readiness tests | Runtime release signoffs remain external |
+| Pure domain architecture | Partially Implemented | `:core:model` exists; entities still in domain | Planned migration |
+| Target occasions/message drafts schema | Planned | ADRs and target schema doc | Not current DB |
+| Merge restore | Not Implemented | Backup service/docs | Replace-only |
+| Local-only mode | Not Implemented | Auth gate | Product decision needed |
+| LeadRescue AI product | Documentation Only | `docs/startup-idea/*` | Unrelated archived idea |
+
+## 26. Product and UX Assessment
+
+Product assessment:
+
+| Perspective | Current assessment | Primary gap | Recommended direction |
+| --- | --- | --- | --- |
+| Product Owner | The product is a relationship operations assistant, not only a birthday reminder. It has contact import, occasions, AI writing, approval, delivery, analytics, backup, and diagnostics. | Activation still depends on users understanding many setup and readiness concepts. | Make the top-level product promise "what needs attention now" and route every insight to one next action. |
+| End User | Users can sync contacts, enrich people, generate/review wishes, automate sends, inspect failures, and back up data. | The same user problem can appear in Home, Messages, AI Doctor, Settings, and Activity History with different language. | Use one shared operational state and plain-language status copy across screens. |
+| UX Designer | Main screens have loading/empty/error/populated states and screenshot coverage. Secondary surfaces are dense but feature-complete. | Settings, AI Doctor, Events, Wish Preview, and Gift Advisor carry too many decisions per screen. | Split routine actions from advanced diagnostics and progressively reveal risk details. |
+| QA Engineer | The repo has broad unit, interaction, screenshot, migration, policy, and readiness tests. | External provider behavior, Play policy signoff, device delivery, and release evidence remain outside static tests. | Keep CI gates and add release-run evidence records for provider/device smoke. |
+| Software Architect | Modular Gradle graph exists with app/model/domain/data/ui layers and extensive policies/use cases. | Domain still contains Room entities and readiness logic remains fragmented. | Continue extracting pure domain/read models and one readiness use case before larger feature expansion. |
+
+User expectation summary:
+
+| User type | Expected behavior | Current alignment | Gap |
+| --- | --- | --- | --- |
+| First-time user | Sign in, import or create a contact, understand required setup, generate one safe message, and know whether it will send. | Onboarding/Auth/Home/AI Doctor provide the path, but setup spans screens. | Guided setup should resume at the next blocker until one end-to-end message is achieved. |
+| Daily power user | Open the app and immediately see pending reviews, failed sends, upcoming events, stale backup, and low-health contacts. | Home and Messages support this, with analytics and activity history as supporting surfaces. | Ranking and cross-screen state should become one shared command model. |
+| Business stakeholder | Trustworthy automation, lower support burden, measurable engagement and delivery reliability. | Approval modes, dispatch attempts, activity logs, analytics, and backup exist. | Release signoffs, provider policy evidence, and outcome dashboards are not final. |
+| Privacy-sensitive user | Know what data stays local, what is sent to providers, and how to recover or delete it. | SQLCipher, encrypted prefs, backup, biometric lock, private memory category, and sign-out purge exist. | Public privacy/Data Safety docs and prompt-inclusion controls need release-owner completion. |
+
+## 27. Feature Expectation Gap Matrix
+
+This matrix extends the feature catalog with ideal behavior and improvement priority.
+
+| Feature | Business goal | User goal | Ideal user experience | Current implementation summary | User expectation gap | Suggested redesign | Priority | Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| App shell and lock | Secure entry without blocking work | Open, unlock, navigate | Deep links, shortcuts, and notifications respect auth and lock while landing on exact task | Biometric gate, bottom nav, auth guard, deep links, shortcuts, widget | Contacts permission is not part of the central permission rationale | Add global readiness/status affordance and route-specific blocked-state copy | Medium | `MainActivity.kt`, `NavGraph.kt`, manifest |
+| Onboarding/Auth | Activate real users safely | Finish setup fast | Guided first-run checklist ends in a verified first message | Onboarding, Google/Firebase auth, no guest mode | Manual/local-only trial is impossible | Decide local-only mode or make Google-required onboarding explicit through all setup states | High | `OnboardingScreen.kt`, `AuthManager.kt`, `RequireSignedIn` |
+| Home | Daily command center | Know what to do now | One primary ranked action plus supporting context | Dashboard metrics, setup state, backup freshness, next actions | Next action is Home-local, not product-wide | Create shared next-best-action use case | High | `HomeViewModel.kt` |
+| Contacts | Relationship data quality engine | Find and improve contacts | Search/filter by missing dates, channel, health, personalization gaps | Sync, search/filter/sort, quality labels, detail links | Missing-data remediation still requires manual inspection | Add "needs attention" filter presets and contact quality explanations | Medium | `ContactListViewModel.kt`, `ContactDetailViewModel.kt` |
+| Events | Prevent missed occasions | Track accurate moments | Event source/confidence/duplicate state is obvious and mergeable | Contact-derived and manual events, conflict policy, reminders | Current `events` table is a legacy shape and source trust is still nuanced | Move toward occasion model and expose source/merge controls in user copy | Medium | `SaveManualEventUseCase.kt`, `EventResolutionPolicy.kt` |
+| AI generation | Produce safe personalized drafts | Get good wishes quickly | Drafts explain why they are personal, what context was used, and whether fallback was used | Gemini, parser, fallback, quality gate, duplicate prevention | Quality is heuristic and provider runtime is external | Show prompt-quality contributors and fallback reason in Wish Preview/Messages | High | `GenerateMessageUseCase.kt`, `AiAutoSendQualityGate.kt` |
+| Wish Preview | Safe review and editing | Approve, reject, edit, regenerate | Event, route, schedule, quality, variants, and next review are all visible | Variants, edit, feedback, regenerate, test send, approve/reject, review next | Readiness is screen-local and can diverge from AI Doctor | Use shared readiness model and stronger "why this can/cannot send" panel | High | `WishPreviewViewModel.kt` |
+| Messages | Operational control room | Process queues efficiently | Needs review, scheduled, blocked, failed, sent, and recovery are task-first | Tabs/filter/sort/search/selection/bulk actions and domain-derived readiness labels | Recovery state still splits across Messages, AI Doctor, Activity History | Make failed rows link to exact fix and retry after fix | High | `MessagesViewModel.kt`, `MessageOperationalReadinessPolicy.kt`, message components |
+| Automation setup/AI Doctor | Reduce setup failures | Fix blockers one at a time | Ranked fix wizard with success confirmation after each fix | Grouped checks and recommended fix | Diagnostic details can overwhelm non-technical users | Convert checks into guided repair sequence | High | `AutomationSetupViewModel.kt` |
+| Delivery channels | Reliable sends | Configure and trust SMS/WhatsApp/email | Channel readiness is explicit before approval and route fallback is predictable | SMS, WhatsApp Accessibility, Gmail SMTP, route selection, dispatcher attempts | WhatsApp release policy and real-device provider behavior need external validation | Add provider-specific setup wizard and release policy switch | High | sender package, manifest |
+| Analytics/Activity | Turn data into action | Know who needs attention and why | Every metric row has a clear action or explanation | Local metrics, CSV export, activity filters | Metrics still need more product-level recommendations | Add actionable insight cards backed by shared next-action model | Medium | `AnalyticsViewModel.kt`, `ActivityHistoryViewModel.kt` |
+| Style/Memory/Gifts | Improve personalization | Teach the app useful context | Users see which context improves the next draft and can exclude sensitive details | Style Coach, private memory category, gift history and AI suggestions | Memory AI inclusion is category-based; gift suggestions have local-only dismissal | Add per-note AI-use toggle and persisted gift suggestion feedback | Medium | `StyleAnalysisUseCase.kt`, `MemoryNotePromptPolicy.kt`, `GiftAdvisorViewModel.kt` |
+| Backup/Restore | Protect local data | Export and recover safely | Users see freshness, know passphrase risk, preview restore, and rehearse recovery | Encrypted export, preview, replace import, Home/Settings freshness | Merge restore is absent and release runbooks are not final evidence | Add restore rehearsal and merge design only if product requires it | Medium | `BackupServiceImpl.kt` |
+
+## 28. Workflow Analysis and Effort Reduction
+
+| Workflow | Current user journey | Ideal user journey | Pain points | Recommended improvement | Estimated effort reduction |
+| --- | --- | --- | --- | --- | --- |
+| First setup to first safe message | Onboarding -> Auth -> Home/Settings/AI Doctor -> sync/manual data -> configure AI/channel -> generate -> review | Guided setup resumes at next blocker and ends at one verified draft or send | Too many surfaces and permissions to interpret | One first-run checklist powered by setup/readiness state | 30-50 percent fewer decisions |
+| Daily review | Home or Messages -> open queue -> inspect status -> open Wish Preview -> approve/reject -> maybe review next | Home primary action opens exact queue item or review-next sequence | Users may scan multiple tabs | Shared next action and deep links into filtered queue | 20-40 percent fewer taps |
+| Failed-send recovery | Messages failed tab or Activity History -> read reason -> AI Doctor/Settings -> fix -> retry | Failed row explains root cause and opens exact fix, then returns to retry | Recovery language is technical and split across screens | Failure taxonomy mapped to fix routes and retry readiness | 40-60 percent less searching |
+| Contact enrichment | Contacts -> search/filter -> Contact Detail -> memory/gift/style/preferences | Contacts show missing context and why it matters, then open focused editor | User has to infer what improves AI | Contact quality model with focused edit routes | 25-45 percent faster enrichment |
+| Manual event creation | Events -> form -> duplicate/conflict decision -> save -> reminders | Event form validates source/conflict early and explains merge/keep separate | Duplicate/conflict concepts require care | Source/confidence copy plus suggested merge | 20-35 percent fewer corrections |
+| Automation enablement | Settings/Home -> AI Doctor -> grouped checks -> external settings -> return | Guided fix sequence checks one blocker at a time and confirms ready state | External permissions and provider setup are high-friction | Checklist with return-to-app verification and provider test actions | 30-50 percent less setup uncertainty |
+| Backup and restore | Settings -> Backup Restore -> passphrase -> export/preview/import | Home/Settings freshness prompt, restore rehearsal, clear post-restore setup | Passphrase and external secrets are easy to misunderstand | Backup readiness card plus post-restore checklist | Lower support risk more than tap reduction |
+
+## 29. Technical Audit Report
+
+| ID | Description | Root cause | User impact | Business impact | Severity | Recommended fix | Files involved |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| T-001 | Readiness state is not a single source | Messages uses shared route/status/scheduled-time/allowed-window readiness policy, exact-send scheduling uses a shared scheduling policy, exact-send stale-dispatch recovery uses a shared recovery decision policy, SMS stale delivery-status recovery uses a shared recovery policy, event reminders use a shared cancel/exact/inexact scheduling decision policy, foreground and worker dispatch exception outcomes use a shared final-failure policy, SMS callback delivery/attempt outcomes use a shared callback outcome policy, already-handled `SENT`/`DISPATCHING` dispatch states use a shared blocker decision, Wish Preview draft text uses a shared draft-readiness policy, Wish Preview send summary, route choice context, route setup context, device setup context, and quiet-hours/blackout dispatch context use a shared projection policy, approval notification actions plus approval/setup/system-alert/revival/event-reminder notification request payloads use shared domain/model contracts or Android adapters, route selection and final dispatch fallback ordering use shared history-aware route policy, AI Doctor account/provider readiness and automation prerequisites use shared domain policies, SMS/WhatsApp setup channel checks and channel verification routing use a shared domain policy, AI Doctor email setup, quality, and system checks use shared domain policies, setup summary/progress uses shared domain policies, AI Doctor recommended-fix ranking uses a shared domain policy, and Home readiness banner/next actions use a shared domain policy; remaining notification surfaces outside typed approval/setup/system-alert/revival/event-reminder requests and dispatch/recovery timing surfaces outside Messages/Wish Preview/exact-send scheduling/exact-send recovery/SMS delivery-status recovery/event-reminder scheduling/dispatch-exception failure/SMS callback outcomes still compute related states separately | Conflicting or confusing "ready/blocked" explanations remain possible outside the shared slices | Trust risk for automation | High | Continue toward one operational readiness use case/read model and migrate remaining surfaces | `MessageOperationalReadinessPolicy.kt`, `ExactSendSchedulePolicy.kt`, `ExactSendRecoveryPolicy.kt`, `SmsDeliveryStatusRecoveryPolicy.kt`, `EventReminderSchedulePolicy.kt`, `DispatchExceptionFailurePolicy.kt`, `SmsCallbackOutcomePolicy.kt`, `ExactSendRecovery.kt`, `SmsDeliveryStatusRecovery.kt`, `EventReminderScheduler.kt`, `SmsStatusReceiver.kt`, `DispatchMessageUseCase.kt`, `WorkerMessageDispatchAdapters.kt`, `WishDraftReadinessPolicy.kt`, `WishPreviewSendSummaryPolicy.kt`, `ApprovalNotificationActionPolicy.kt`, `SetupNotificationRequest.kt`, `SystemAlertNotificationRequest.kt`, `ApprovalNotificationRequest.kt`, `NotificationMappers.kt`, `NotificationHelper.kt`, `RevivalWorker.kt`, `SetupAccountProviderReadinessPolicy.kt`, `SetupAutomationReadinessPolicy.kt`, `SetupChannelReadinessPolicy.kt`, `SetupEmailReadinessPolicy.kt`, `SetupQualityReadinessPolicy.kt`, `SetupSystemReadinessPolicy.kt`, `SetupReadinessSummaryPolicy.kt`, `SetupReadinessProgressPolicy.kt`, `SetupReadinessRecommendationPolicy.kt`, `HomeNextActionPolicy.kt`, `AutomationSetupViewModel.kt`, `HomeViewModel.kt`, `WishPreviewViewModel.kt`, `WishPreviewDeviceReadinessReader.kt`, `DispatchEligibilityPolicy.kt`, `DeliveryRouteReadinessPolicy.kt`, `AutoSendChannelSelector.kt` |
+| T-002 | Domain module still contains Room entities | Historical storage model lives under `core/domain/.../core/db/entities` | Schema changes can leak into domain/UI contracts | Slower feature changes and harder test isolation | Medium | Move entities to data/database module or add database module; keep mappers at repository boundary | `core/domain/src/main/kotlin/com/example/core/db/entities`, `core/domain/build.gradle.kts` |
+| T-003 | Large UI/ViewModel files concentrate behavior | Complex screens grew organically | Higher regression risk and harder review | Slower delivery velocity | Medium | Split by sub-feature and extract reducers/state calculators | `AutomationSetupViewModel.kt`, `GiftAdvisorScreen.kt`, `EventsScreen.kt`, `WishPreviewScreen.kt`, `SettingsScreen.kt` |
+| T-004 | Provider config policy | `google-services.json` was tracked while ignored by `.gitignore` | Resolved in current working tree with explicit allowlist, release/security policy, and repository hygiene coverage | Remaining Firebase project/OAuth/SHA correctness is external release evidence | High | Implemented: approved app/debug configs are allowlisted; local variants and server-side secrets remain forbidden | `.gitignore`, `RepositoryHygieneTest.kt`, release/security docs |
+| T-005 | Release evidence not complete | Static source has controls but not store artifacts/signoffs | Users cannot rely on Play-ready claims | Release blocker | High | Add privacy policy, Data Safety, Accessibility declaration, and device smoke records | `docs/security/*`, `docs/operations/release-checklist.md` |
+| T-006 | WhatsApp automation is high-risk for distribution | AccessibilityService automates a third-party app | Users need explicit consent and clear fallback | Play policy risk | High | Keep opt-in, add policy signoff, or disable per release flavor | manifest, `WhatsAppAccessibilityService.kt`, `WhatsAppSender.kt` |
+| T-007 | Activity/log history may need paging as data grows | Current local query limits and lists are sufficient for early use but not proven at scale | Older logs may become harder to scan | Support and performance risk | Medium | Add paging/indexed filters when volume warrants | `ActivityLogDao.kt`, `ActivityHistoryViewModel.kt` |
+| T-008 | Stale sign-out comment used a fixed table count | Comment was not updated after schema growth | Resolved in current working tree; no runtime behavior changed | Low direct impact | Low | Implemented: comment now says "all Room tables" | `AuthManager.kt` |
+| T-009 | Runtime provider behavior is not statically verifiable | SMS, Gmail, WhatsApp, Google/Firebase, Gemini depend on external state | Sends/sync/generation can fail despite green unit tests | Support risk | Medium | Keep AI Doctor and add release smoke records per provider | sender, contacts, gemini, auth packages |
+
+Current working-tree note: T-001 now also covers exact-send scheduling through `ExactSendSchedulePolicy.kt` and `ExactSendSchedulePolicyTest.kt`, already-handled `SENT`/`DISPATCHING` dispatch blockers through `DispatchEligibilityPolicyTest.kt`, recurring automation scheduling through `BootRecoveryWorkCommands.kt` and `WorkerSchedulerTest.kt`, plus approval, revival, and event-reminder notification helper rendering through `ApprovalNotificationAdapters.kt`, `ApprovalNotificationAdaptersTest.kt`, `RevivalNotificationAdapters.kt`, `RevivalNotificationAdaptersTest.kt`, `EventReminderNotificationAdapters.kt`, and `EventReminderNotificationAdaptersTest.kt`.
+
+## 30. Dead Code and Unused Resource Report
+
+No production Kotlin source file was classified as safe to remove solely from static analysis. The verified cleanup candidates are documentation, local diagnostics, tool state, or one-off helper artifacts. No files were deleted.
+
+| Path | Purpose | Usage references | Dependency impact | Risk | Safe to remove | Recommended action |
+| --- | --- | --- | --- | --- | --- | --- |
+| `docs/startup-idea/*` | Archived LeadRescue AI business idea | No app/runtime references found; unrelated product content | None for RelateAI app | Low | Yes, from active product repo | Archive outside app repo or remove after approval |
+| `PRODUCT_UX_WORKFLOW_TECHNICAL_ANALYSIS.md` | Older UX/technical analysis | Superseded by `CODEBASE_AUDIT_REPORT_2026-07-01.md` and SSOT | None if SSOT accepted | Low | Yes after review | Remove/archive once SSOT accepted |
+| `CODEBASE_AUDIT_REPORT_2026-07-01.md` | Historical audit | Useful findings migrated and updated | None if SSOT accepted | Medium | Archive rather than delete if audit trail matters | Keep as dated artifact outside active docs |
+| `PLAN.md`, `PRODUCT_BLUEPRINT.md`, `IMPLEMENTATION_TASKS.md` | Planning/backlog/product docs | Duplicated by current SSOT sections | None if SSOT accepted | Medium | Yes after review | Remove authority claims or archive |
+| `IMPLEMENTATION_PROGRESS.md` | Detailed changelog | Historical evidence only | None for build | Medium | Keep only if changelog required | Archive as historical changelog with SSOT pointer |
+| `app_logs*.txt`, `logcat*.txt`, `lint_baseline_pre_fixes.txt` | Local diagnostic snapshots | Ignored by `.gitignore`; no build refs found | None | Low | Yes | Remove from tracking/files after approval |
+| `.codepulse/`, `.intelligence/`, `.gradle-user-home/` | Tool/local diagnostics/cache | Ignored by `.gitignore`; no app refs found | None | Low | Yes | Keep out of git; regenerate when needed |
+| `app/schemas/com.example.core.db.AppDatabase/4-6.json` | Legacy app-level schema exports | Active schemas are in `core/data/schemas`; `app/schemas` ignored | None for current Room export authority | Medium | Yes after confirming no migration tests use them | Remove legacy app-level schema exports |
+| `scripts/patch_app_dep.py`, `scripts/patch_settings.py`, `scripts/patch_app_build2.py`, `scripts/patch_ui.py` | One-off patch helpers | No references found by repository scan | None for build/tests | Low | Yes after approval | Remove or move to archived tooling notes |
+| `scripts/extract_strings.sh` | String extraction helper | Referenced by `HelperScriptsTest` | Test would fail if removed | Medium | No | Keep |
+| `metadata.json` | Tool metadata, says server-side Gemini capability | No Gradle/app references found | Unknown tool impact | Medium | No, unless tool owner confirms | Keep as tool metadata, not architecture evidence |
+| `app/src/test/screenshots/greeting.png` | Stray generated screenshot named in `.gitignore` | No code reference found in scans | None likely | Low | Yes after visual/test owner review | Remove if not intentionally retained |
+| `mood_logs` migration table | Dropped legacy schema table | Mentioned only in migrations/tests | Must remain in migration history | High | No | Keep migration SQL; do not recreate feature |
+| `DeadLetterQueue` | Legacy in-memory diagnostic supplement | Referenced by tests and failure side-effect code | Still part of diagnostics/tests | High | No | Do not remove until durable diagnostics fully replace it |
+
+## 31. Folder Structure Review
+
+Current problems:
+
+| Problem | Evidence | Risk |
+| --- | --- | --- |
+| Feature UI and ViewModels are split into separate screen/viewmodel package roots | `app/src/main/java/com/example/ui/screens`, `app/src/main/java/com/example/ui/viewmodel` | Feature ownership requires cross-folder navigation |
+| Domain purity is incomplete | Room entities are under `core/domain`, domain depends on Room/Paging | Storage concerns leak upward |
+| Data package contains many infrastructure subdomains under one module | `core/data/src/main/kotlin/com/example/core/...` | Module is large but still coherent for current project size |
+| Docs are fragmented | Root docs and `docs/**` contain overlapping authority claims | Maintainers may use stale docs |
+| Local/tool artifacts are present near source | root logs, `.codepulse`, `.intelligence`, `app/schemas` | Repository noise |
+
+Proposed target structure:
 
 ```text
-Auth/Prefs
-  -> Contact sync
-  -> ContactEntity
-  -> Event discovery/manual events
-  -> EventEntity
-  -> AI context: contact + event + style + memory + gifts + previous sent
-  -> PendingMessageEntity
-  -> approval/review/edit/regenerate
-  -> scheduler/dispatch
-  -> SentMessageEntity + contact health updates + activity logs
-  -> dashboard + analytics + activity history + widget
+app/src/main/java/com/example/
+  app/
+  navigation/
+  feature/
+    home/{ui,viewmodel}
+    contacts/{ui,viewmodel}
+    events/{ui,viewmodel}
+    messages/{ui,viewmodel}
+    wish/{ui,viewmodel}
+    setup/{ui,viewmodel}
+    settings/{ui,viewmodel}
+    analytics/{ui,viewmodel}
+    backup/{ui,viewmodel}
+    memory/{ui,viewmodel}
+    gifts/{ui,viewmodel}
+    style/{ui,viewmodel}
+  widget/
+
+core/model/
+  contact/
+  occasion/
+  message/
+  automation/
+  backup/
+  activity/
+
+core/domain/
+  contact/
+  occasion/
+  message/
+  automation/
+  analytics/
+  backup/
+  style/
+  memory/
+  gift/
+
+core/data/
+  db/{entities,dao,migrations}
+  repository/
+  contacts/
+  ai/
+  dispatch/
+  backup/
+  prefs/
+  workers/
+  notifications/
+
+core/ui/
+  theme/
+  component/
 ```
 
-Dependencies and integrations:
+Migration plan:
 
-- Google Sign-In and Firebase Auth enable account identity and Google Contacts scope.
-- Google People API and Android ContactsProvider feed contact sync.
-- Gemini/Google AI powers classification, wishes, regeneration, gifts, and revival suggestions.
-- Room/SQLCipher stores local data.
-- WorkManager and AlarmManager drive background jobs, reminders, and exact sends.
-- SMS, WhatsApp Accessibility, and Gmail SMTP deliver messages.
-- Android notification, exact alarm, contacts, SMS, accessibility, and document picker permissions are operational gates.
+1. Freeze new authoritative docs into this SSOT and archive redundant docs only after review.
+2. Extract shared readiness/read-model contracts before reorganizing UI packages.
+3. Move feature screen and ViewModel files together one feature at a time, with package-level tests unchanged in behavior.
+4. Move Room entities out of `:core:domain` only after repository mappings cover affected workflows.
+5. Move from `events`/`pending_messages` naming toward `occasions`/`message_drafts` only through explicit Room migrations and backup compatibility tests.
 
-### 25.2 UX and Product Audit by Feature
+Benefits: clearer ownership, easier onboarding, cleaner domain tests, smaller review scope, and less documentation drift.
 
-| Feature | Current behavior | UX issue | Accessibility issue | Performance concern | Click/cognitive load | Recommended improvement |
-|---|---|---|---|---|---|---|
-| Onboarding and setup | Explains value and links to setup checklist; Home and AI Doctor now show shared setup progress | Setup still spans onboarding, Settings, permissions, Style Coach, and AI Doctor | Progress and blocker changes should be announced, not only visually shown | Rechecking setup state can become expensive if every surface recomputes independently | User must infer which setup step to resume | Extend setup progress into a guided resume flow with exact next actions. |
-| Auth | Google sign-in through Firebase/Google only | Missing OAuth/Firebase setup blocks entry instead of being hidden by a bypass | Auth error text must remain readable and announceable during provider failures | OAuth retries can feel stalled without progress feedback | User cannot continue until the real login works | Improve retry progress and route users to exact OAuth/Firebase setup fixes. |
-| Home dashboard | Metrics, ranked next action, supporting actions, setup blocker summary, setup progress, backup freshness, quick actions, planner, birthdays | Initial ranking covers contact sync, AI access, AI generation, approvals, backup, and the lowest-health relationship; failed-delivery and upcoming-event scoring still need refinement | Status cards need non-color status labels and semantic actions | Home can attempt sync on zero contacts; keep bounded to avoid load stalls | Many cards still compete below the primary action on small screens | Extend ranking with failed delivery and upcoming-event urgency signals. |
-| Contacts list | Search, filter, sort, sync error controls, quality labels, and action filters for missing relationship, missing channel, low health, and VIP | Quality labels and filters explain the first missing prerequisite; quick completion actions still need to use those states | Filter chips, quality labels, and search clear controls need labels and 48 dp targets | Large imports may make local filtering slow without profiling | User can scan and filter missing prerequisites, but still opens detail to fix them | Add quick complete-details action. |
-| Contact detail | Essentials, personalization, automation, and history sections with quality card, AI quality impact, generate wish, memory/gift/chat links, and explicit shortcuts | Grouping reduces the mixed-list problem; advanced preference editing is still dense | Dense dialog controls need grouped headings and clear field labels | Loading contact, events, memories, gifts, and history together can grow costly | User can scan by task intent and see why missing context matters, but still needs detail editing for deeper changes | Continue progressive disclosure inside the personalization editor. |
-| Event list | Search/filter/horizon, manual event creation with duplicate/date-conflict warning, row trust labels, and explicit Merge here / Keep separate controls for duplicate or conflicting event families | Existing/new-contact choice can appear before impact is clear | Date inputs, duplicate warnings, and row action feedback need clear focus and error announcement | Duplicate checks should stay indexed as event volume grows | Manual event creation has several required decisions, but saved conflicts can now be resolved from the list | Add smarter contact suggestions, edit-date shortcuts, and source-history details. |
-| Messages inbox | Needs review/Scheduled/Blocked/Sent/Failed task tabs, bulk actions, shared route-readiness labels, failed recovery assistant | Blocked and failed rows still need deeper direct fix targets beyond route prerequisites | Status labels must not rely on color alone; bulk selection needs clear selected-state labels | Large message queues need stable keys and incremental filtering | User can start from the task queue, but still needs setup/detail navigation to fix blockers | Improve failure reason depth and direct fix-and-retry paths. |
-| Wish preview | Variant tabs, approval-plan summary, edit-readiness message, feedback, why signals, approve/reject/test, review-next | High-value screen is dense; feedback only applies after regenerate | Long editable draft and result actions need clear focus order and button labels | Regeneration and queue lookup must stay cancellable/fail-soft | User can see approval context and edit readiness before acting, but still decides among edit, test, feedback, regenerate, approve, reject | Group actions by intent and show selected feedback as pending regeneration input. |
-| Scheduling/delivery | Honors approvals, quiet hours, blackout dates, disabled channels | Some channel readiness can still be discovered late | Permission and channel blockers need screen-reader-readable reason text | Exact alarms and workers must avoid duplicate scheduling under retries | User may approve before seeing every delivery constraint | Show pre-send readiness on pending rows and Contact Detail before approval. |
-| Analytics | Metrics, charts, export, actionable neglected-contact rows | Reliability, response, and personalization metrics still need direct actions | Charts need text alternatives and non-color bucket labels | Large sent histories may require DAO aggregates instead of recomputing flows | User can jump from a neglected contact insight to Contact Detail, but must still translate other metrics into tasks | Attach recommended actions to low personalization, failed channels, and response-rate drops. |
-| Activity history | Filtered log with optional action route and task filters for Dispatch, AI, Sync, Backup, Settings, Messages, Events, and Analytics | Operational language can still be too technical | Log severity and status should be textual, not color-only | Long logs need pagination or indexed filtering over time | User can isolate key operational areas, but still has to interpret whether action is required | Convert common entries into user-facing task names and safe resolve/mark-reviewed actions. |
-| Style Coach | Manual and auto style analysis | Users may not know how many samples are enough | Sample quality messages need concise labels and not just progress colors | Recent-message analysis can grow expensive with large histories | User may paste text repeatedly without knowing readiness | Show sample count target, quality state, and examples of what AI learned. |
-| Memory Vault | Add/edit/pin/delete/search memory notes with inline blank validation, clear-search control, and a Private category excluded from AI prompts | Categories and memory usefulness may still be unclear; privacy is category-based rather than a separate toggle | Validation, edit controls, search empty state, clear-search action, and AI-use copy should stay near the related controls and be announced | Memory lists should keep stable keys as notes grow | User can find and correct saved facts by note text or category and keep private notes out of AI writing, but still has to invent useful content | Add prompt preview, category descriptions, and a separate use-for-AI toggle. |
-| Gift Advisor | Gift history, budget, AI suggestions | Contact-level budget source may not be discoverable | Budget and suggestion cards need readable labels and affordances | AI suggestions should not block local gift history browsing | User may leave to Contact Detail to adjust budget | Add budget edit shortcut and avoid-repeat explanation. |
-| Backup/Restore | Secure passphrase export/import with last-backup freshness in Home and Settings | Strong security creates anxiety around passphrase loss | Password visibility, strength, and status messages need clear announcements | Large exports/imports need progress and must stay off the UI thread | User must remember passphrase implications | Add restore rehearsal checklist and recovery guidance. |
-| AI Doctor | Diagnostic checklist grouped by Required, Quality, Reliability, Recovery, with one ranked recommended fix and generic-message risk from personalization context | Diagnostic terminology can still overwhelm non-technical users | Check status should be textual and grouped for screen-reader navigation | WorkManager/permission checks should stay cancellable and cached where safe | User gets one starting point and a generic-message explanation, but may still need to inspect grouped details for follow-up fixes | Extend the recommendation into a guided fix sequence after the first issue is resolved. |
-| Widget/shortcuts | Birthday/upcoming/pending summary | Widget is mostly passive | Widget content descriptions and tap targets depend on launcher support | Widget refresh should avoid heavy dashboard queries | User may see pending count but still open app manually to locate review | Add deep-link actions where launcher/widget APIs allow. |
-| Security/sign-out | Strong local wipe with destructive-action checklist | External service data and backup implications still require understanding | Destructive confirmation must keep clear focus order and explicit cancel path | Sign-out cleanup can span DB, prefs, WorkManager, notifications, and auth | User must parse several consequences before confirmation | Keep checklist explicit and offer Backup & Restore before final confirmation. |
+Risks: package moves can create noisy diffs; Room/entity moves require careful migration/test sequencing; feature moves should not happen in the same change as behavior changes.
 
-Cross-cutting accessibility issues and improvements:
+## 32. New Feature Discovery and Innovation Analysis
 
-- Use explicit content descriptions for actionable icons beyond decorative cases.
-- Ensure all error/status cards are announced through semantic live regions where appropriate.
-- Avoid color-only status in AI Doctor, messages, analytics health buckets, and password strength.
-- Keep tap targets at least 48 dp, especially compact action chips and row icons.
-- Maintain resource-backed text and Hindi parity for every new visible string.
+| Category | Feature | Problem it solves | Target users | Technical complexity | Dependencies | Risks | Priority | Expected impact | Implementation recommendation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Quick Win | Shared blocked-state copy library | Users see different language for similar blockers | All users | Low | Readiness policy strings | Copy churn | High | Higher trust and lower support | Centralize blocker labels and actions |
+| Quick Win | Contact quality filter presets | Users do not know which contacts need enrichment | Daily users | Low/Medium | Contact read models | More UI states | Medium | Faster personalization cleanup | Add filters for missing event, no channel, low health, weak context |
+| Quick Win | Backup freshness action card | Backup can be forgotten until recovery is needed | All users | Low | SecurePrefs timestamps | Notification fatigue | High | Lower data-loss risk | Show stale/never-backed-up card with direct export route |
+| High Impact | Unified operational readiness use case | Readiness is fragmented across screens | Automation users, QA, support | Medium/High | Preferences, permissions, route policy, diagnostics | Refactor risk | Critical | Trustworthy automation | Define one read model and migrate Home/Messages/AI Doctor/Wish Preview |
+| High Impact | Guided setup/fix wizard | AI Doctor is diagnostic-heavy | First-time users | Medium | Readiness use case, navigation | External settings returns | High | Higher activation | Step through required blockers with post-fix verification |
+| High Impact | Failed-send recovery assistant | Users must interpret failures | Automation users | Medium | Dispatch attempts, provider taxonomy | Overpromising auto-fix | High | Lower support burden | Map failure reason -> fix route -> retry readiness |
+| High Impact | Prompt context preview | Users cannot see why AI is generic | Reviewers, privacy-sensitive users | Medium | Message prompt context, memory/gift/style summaries | Exposing sensitive content | High | Better AI trust | Show summarized included context, not raw secrets |
+| Strategic | Local-only/manual mode | Google sign-in blocks privacy-conscious/manual users | Privacy-sensitive users | High | Auth/nav/data ownership decisions | Product/support complexity | Medium | Broader adoption | Decide product scope before implementation |
+| Strategic | Occasion/message-draft schema migration | Current names do not match target domain | Architects/devs | High | Room migrations, backup versioning | Data migration risk | Medium | Cleaner architecture | Stage after entity-boundary cleanup |
+| Strategic | Per-note AI inclusion control | Private category is coarse | Privacy-sensitive users | Medium | Memory note schema/UI | More user decisions | Medium | Stronger privacy trust | Add explicit use-for-AI flag with conservative default |
+| Strategic | Persisted gift suggestion feedback | Dismissals are local only | Gift Advisor users | Medium | New table/fields | Data bloat | Medium | Better suggestions over time | Store accepted/dismissed reasons and use in prompts |
+| Roadmap | Release evidence center | Store/release readiness is outside repo | Product/release owners | Medium | CI artifacts, manual signoffs | Process overhead | High before release | Auditability | Generate release record from SSOT checklist |
+| Innovation | Relationship maintenance planner | Turns analytics into a weekly plan | Power users | Medium/High | Analytics, health, next actions | Recommendation quality | Medium | Product differentiation | Rank relationship actions with explainable reasons |
+| Innovation | Safe automation simulator | Users can preview what would send and why | Automation-first users | High | Scheduler, dispatch, readiness, fake clock | Complexity | Medium | Trust before full automation | Dry-run next 7/30 days without sending |
 
-Cross-cutting performance concerns:
+## 33. Architecture and Dependency Summary
 
-- Home can trigger sync on zero contacts during dashboard load; keep it bounded and visible to avoid perceived stalls.
-- Large contact/message lists need stable keys and incremental filtering; current local filters are acceptable but should be profiled with large imports.
-- AI Doctor calls WorkManager `.get()` from IO, which is acceptable, but diagnostics should stay cancellable and avoid UI blocking.
-- Analytics currently recomputes derived metrics when source flows emit; large sent histories may need repository-level aggregate queries later.
+Dependency summary:
 
-### 25.3 Automation Opportunities
+| Layer | Owns | Must not own | Current caveat |
+| --- | --- | --- | --- |
+| `:app` | UI, navigation, ViewModels, Android app shell, widget | Room schema, provider internals, business policy | ViewModels still call some storage/config primitives directly |
+| `:core:ui` | Design tokens, theme, reusable Compose components | Feature state/business decisions | Healthy boundary |
+| `:core:model` | Pure models/enums/read models | Android, Room, Hilt, network | Healthy boundary and growing |
+| `:core:domain` | Use cases, policies, repository/service contracts, mappers | Android UI, Room entities long term, data implementation | Room entities and Room/Paging deps remain |
+| `:core:data` | Room, repositories, workers, senders, integrations, prefs, backup | UI rendering | Large but coherent integration module |
 
-| Opportunity | Business value | User benefit | Implementation approach | Risks and safeguards |
-|---|---|---|---|---|
-| Setup progress automation | Improves activation and reduces support issues | User sees exactly what remains before reliable automation | Initial shared `SetupProgressSummary` powers Home and AI Doctor, and AI Doctor now surfaces one ranked recommended fix; next extend it to onboarding and multi-step guided routing | Do not auto-enable permissions or credentials; every external/system action remains explicit. |
-| Direct task routing from dashboard | Faster task completion | One tap from insight to relevant work queue | Typed dashboard action targets now cover Messages, Contact Detail, AI Doctor, and Backup/Restore for readiness/planner cards | Critical actions still open task screens; no message approval, send, sync, or backup runs without user action. |
-| Smart personalization prompts | Better AI quality and retention | User adds useful details without opening advanced form | Initial Contacts quality state and action filters expose missing relationship, channel, event, and context; AI Doctor now warns when contacts can produce generic wishes; next suggest one small prompt at a time | User chooses what to save; never infer sensitive notes without confirmation. |
-| Batch approval queue | Faster review of many wishes | Review multiple pending drafts in a focused flow | Initial Wish Preview Review next action implemented from the pending queue; future work can add Messages queue context and bulk review mode | No bulk auto-send without explicit user confirmation. |
-| Channel readiness precheck | Fewer failed sends | User knows before approval if SMS/email/WhatsApp is not ready | `DeliveryChannelResolver` now powers dispatch routing; next expose the resolved route/readiness in Messages and Wish Preview | Do not block manual approval unless send is impossible; show override/retry paths. |
-| Smart default channel | Better deliverability | Preferred channel is suggested based on available phone/email and prior success | Initial automatic fallback is implemented; next add local scoring from sent history and contact fields | User can override per contact; automatic routing must respect disabled channels and available contact destinations. |
-| Event duplicate detection | Cleaner reminders | Avoids duplicate birthday/custom events | Initial same-contact, same-type, same-day/month warning is implemented before save | Users can cancel or explicitly Save anyway; future work can add merge/keep options. |
-| Backup reminder surfacing | Reduces data loss | User sees stale or missing backup before a problem | Home now shows never-backed-up and stale-backup prompts, Settings shows last-backup freshness, and reminder throttling no longer fakes an export timestamp | No automatic export; user must choose destination and passphrase. |
-| Smart regeneration feedback | Faster better drafts | Feedback immediately suggests likely fix | Persist selected feedback and show "Regenerate with X" primary action | User can edit prompt/draft manually; feedback is stored locally. |
-| Recovery assistant for failed sends | Lower support burden | User sees exact fix and retry path | Initial Failed tab assistant links to AI Doctor while row readiness explains blockers; next add deeper Activity History details | Automatic fallback is limited to `DeliveryChannelResolver` routes; user-visible retry remains explicit. |
+External dependency risk summary:
 
-### 25.3.1 AI-First Automatic Messaging Feature Candidates
+| Dependency | Used for | Current mitigation | Residual risk |
+| --- | --- | --- | --- |
+| Firebase Auth/Google Sign-In | Required authentication | Auth failures typed; route guard | Cloud config and SHA-1 not verifiable locally |
+| Google People API/ContactsProvider | Contact import | Sync outcomes and token handling | Permission/scope/provider failures need device validation |
+| Gemini/Firebase Vertex AI | Message generation, classification, gifts | Parser fallback, quality gate, rate limiter, AI Doctor | Quota/runtime quality external |
+| WorkManager/AlarmManager | Scheduling and recovery | Exact alarm fallback and boot/time recovery | OEM/background behavior needs device testing |
+| SMS/Gmail/WhatsApp | Delivery | Readiness checks, route selection, dispatch attempts | Real provider/device and Play policy risks |
+| SQLCipher/EncryptedSharedPreferences | Local privacy | Random key, quarantine, backup encryption | Recovery and key migration remain sensitive |
 
-All new messaging features should satisfy this product rule: AI creates or improves the message, the scheduler handles send timing, `DeliveryChannelResolver` chooses an enabled available route, and automation modes decide whether the message sends automatically or waits for review.
+## 34. Maintenance Rules
 
-| Feature candidate | AI behavior | Automatic message behavior | Priority |
-|---|---|---|---|
-| Festival and holiday wishes | Generate culturally appropriate wishes from contact language, relationship, and user style. | Implemented for fixed-date holidays; pending messages are created automatically and sent by Fully Auto or Smart Approve rules. | P1 |
-| Post-event follow-up | Generate a short follow-up after birthdays, anniversaries, or important custom events. | Implemented for recent unreplied AI-sent wishes; follow-ups are scheduled through the same automation modes, quality gate, quiet-hour policy, and dispatch routing. | P1 |
-| Relationship revival cadence | Improve reconnect text using memories, interests, last interaction, and health score. | Initial revival auto-scheduling is implemented; next add user-controlled cadence and per-contact limits. | P1 |
-| Gift-to-message assistant | Turn selected AI gift suggestions into a warm note or reminder message. | Schedule gift reminder or gift-accompanying message before the event. | P2 |
-| Bulk AI wish preparation | Generate messages for upcoming events in a review queue. | Implemented as 7-day AI draft preparation; Smart Approve can auto-send unchanged drafts at due time and Always Ask requires review. | P2 |
-| AI quality gate before auto-send | Initial gate scores fallback, blank, too-short, and generic AI drafts. | Implemented for generated wishes, regeneration, holiday, revival, and follow-up paths by preserving low quality scores/fallback metadata while holding blank or invalid text for review before automatic dispatch. | P0 |
-| Smart channel recommendation | Learn which channel works best per contact from delivery history and configured availability. | Implemented for AI-created pending messages via `AutoSendChannelSelector`; dispatcher fallback still handles send-time failures. | P1 |
-
-### 25.4 User Experience Improvement Plan
-
-Information architecture:
-
-- Make Home the command center for the next action: setup blocker, pending approval, failed delivery, stale backup, or upcoming event.
-- Keep Messages as the operational work queue for approvals and delivery recovery.
-- Keep AI Doctor as diagnostics, not the destination for ordinary review work.
-- Keep Contact Detail focused on relationship context; move advanced automation into a collapsed section.
-
-Workflow simplification:
-
-- Pending approval from Home -> Messages or Wish Preview, not AI Doctor.
-- Wish Preview approved/rejected result -> Review next when another pending wish exists.
-- Contact needing details -> Contact Detail edit section with missing fields pre-highlighted.
-- Failed message -> Failed tab -> failure reason -> fix action -> retry.
-- Setup -> one progress checklist, each row opens exactly one fix location.
-
-Feedback and status indicators:
-
-- Add "ready to send", "needs permission", "missing phone/email", "blocked by quiet hours", and "waiting for approval" labels in Messages.
-- Keep last sync and last backup freshness visible from Home/Settings.
-- Add Style Coach quality state: no samples, learning, ready.
-- Add contact personalization quality state near Generate AI Wish.
-
-Error prevention and recovery:
-
-- Validate manual event duplicates before save.
-- Warn before approving a message with missing channel prerequisites.
-- Confirm destructive sign-out with a data-deletion checklist.
-- Make backup passphrase expectations persistent and clear before export/import.
-
-Mobile-first improvements:
-
-- Use progressive disclosure for complex settings and personalization forms.
-- Prefer short section headers, chips, and inline status over dense paragraphs.
-- Keep primary actions sticky where long forms exist, especially Wish Preview and Backup/Restore.
-
-### 25.5 Prioritized Roadmap
-
-Quick Wins, 1-3 days:
-
-| Item | Priority | Impact | Effort | Dependencies | Business value |
-|---|---|---|---|---|---|
-| Route Home pending approvals directly to Messages | P0 | High | Low | Home ViewModel/UI/Nav tests | Faster approvals and fewer confused setup visits |
-| Add setup/progress summary card to Home from AI Doctor status | P0 | High | Medium | AutomationSetup state extraction | Better activation |
-| Add last backup freshness in Settings/Home | P1 | Medium | Low | SecurePrefs last backup timestamp | Implemented; reduced data-loss risk |
-| Add Messages row readiness labels | P1 | High | Medium | Permission/prefs/contact checks | Fewer failed sends |
-| Add inline Memory Vault blank-note validation | P2 | Medium | Low | New strings/tests | Clearer data entry |
-
-Short-term, 1-2 weeks:
-
-| Item | Priority | Impact | Effort | Dependencies | Business value |
-|---|---|---|---|---|---|
-| Guided setup flow with grouped AI Doctor checks | P0 | High | Medium | Existing checks, UI grouping | Higher completion rate |
-| Contact personalization score and missing-detail prompts | P0 | High | Medium | Contact quality state now exists for Contacts list; next share helper with Contact Detail, AI Doctor, and Analytics | Better AI output |
-| Failed-send recovery assistant in Messages | P1 | High | Medium | Activity/health/dead-letter mapping | Lower support load |
-| Duplicate manual event detection | P1 | Medium | Medium | Event repository query | Cleaner reminders |
-| Wish Preview "review next" queue flow | P2 | Medium | Medium | Navigation queue context | Initial implementation complete for sequential pending review |
-
-Medium-term, 2-6 weeks:
-
-| Item | Priority | Impact | Effort | Dependencies | Business value |
-|---|---|---|---|---|---|
-| Smart channel recommendation engine | P1 | High | Medium | Sent history, contact capabilities | Better deliverability |
-| Batch approval mode with per-message transparency | P1 | High | High | Messages/Wish Preview state | Power-user efficiency |
-| Relationship action recommendations in Analytics | P2 | Medium | Medium | Analytics action model | Initial neglected-contact action implemented; next convert reliability, response, and personalization insights into retention actions |
-| Backup restore rehearsal and export health | P2 | Medium | Medium | Backup metadata | Trust and safety |
-
-Long-term strategic improvements:
-
-| Item | Priority | Impact | Effort | Dependencies | Business value |
-|---|---|---|---|---|---|
-| Local relationship intelligence engine | P1 | Very high | High | Quality signals, opt-in inference controls | Differentiated personalization |
-| End-to-end automation policy center | P1 | Very high | High | Unified rules model | Enterprise-grade control |
-| Privacy-preserving explainability layer | P2 | High | High | Prompt/context tracing | User trust and compliance |
-| Robust live validation harness for SMS/WhatsApp/alarms | P2 | High | High | Device lab or scripted device state | Release confidence |
-
-### 25.6 Implementation Plan
-
-Technical architecture changes:
-
-- Extract reusable setup/readiness aggregation from `AutomationSetupViewModel` into a domain-facing service or use case so Home, Onboarding, Settings, and AI Doctor share one truth.
-- Typed action destinations now cover dashboard planner/readiness items instead of inferring from nullable contact ids; future dashboard cards should reuse this target model.
-- Add contact personalization quality helper shared by Contact Detail, Contacts List, AI Doctor, and Analytics.
-- Add message readiness helper shared by Messages, Wish Preview, Dispatch, and AI Doctor.
-
-Frontend improvements:
-
-- Home: task-specific routing, setup progress, last backup freshness, and clearer next-best action cards.
-- Messages: readiness labels, failure reason cards, fix-and-retry actions, and clearer bulk action confirmation.
-- Contact Detail: progressive disclosure for advanced personalization and automation fields.
-- Wish Preview: grouped controls for edit, improve, test, and approve, plus review-next.
-- AI Doctor: group checks by Required, Quality, Reliability, and Recovery.
-
-Backend/domain/workers improvements:
-
-- Keep automation business rules in domain use cases/services; workers should orchestrate cadence, input lookup, and retries without duplicating prompt, approval, quality, or dispatch policy.
-- Centralize duplicate-event, readiness, scheduling, and policy checks so background jobs and foreground actions behave consistently.
-- Keep worker retry, dead-letter, and failure-recovery state observable through Messages, AI Doctor, and Activity History.
-- Keep AI and delivery integrations behind repository/service interfaces so live provider behavior can be swapped or mocked safely.
-
-Data and database changes:
-
-- Short term: no schema change required for routing, setup progress, backup freshness, readiness labels, or duplicate detection.
-- Medium term: consider storing per-message delivery failure reason and last readiness check result for better recovery UX.
-- Long term: consider storing explicit automation policy entities if rules outgrow encrypted preference JSON.
-
-API and integration enhancements:
-
-- Keep Google/Gemini/Gmail/SMS/WhatsApp actions behind explicit setup and permission flows.
-- Add readiness preflight before scheduling or approval to reduce late failures.
-- Keep all AI suggestions inspectable and editable before persistence or send.
-
-State management improvements:
-
-- Prefer typed UI state actions over nullable routing hints.
-- Keep one source of truth for setup readiness and message readiness.
-- Record user-visible operation outcomes as feedback events rather than ad hoc strings where possible.
-
-Performance optimizations:
-
-- Move heavy analytics aggregates toward DAO-level queries if large sent histories become slow.
-- Profile contact and message filtering with large datasets.
-- Avoid repeated background sync on Home reload after known failures; show explicit retry.
-
-Analytics and tracking recommendations:
-
-- Track local, privacy-safe counters for setup completed, contacts enriched, approvals reviewed, failed sends fixed, backups exported, and AI regenerations accepted.
-- Do not track message content, personal notes, phone numbers, emails, or prompt bodies.
-- Use Activity History for user-visible audit and separate aggregate counters for product analytics if introduced later.
-
-### 25.7 Improvement Backlog
-
-| ID | Backlog item | Priority | Status |
-|---|---|---|---|
-| UX-001 | Route Home pending approvals directly to Messages | P0 | Implemented in code after this audit section was added. |
-| UX-002 | Add typed dashboard action destinations for all planner/readiness cards | P0 | Implemented typed action targets for Messages, Contact Detail, AI Doctor, and Backup/Restore. |
-| UX-003 | Create setup progress summary shared by Home and AI Doctor | P0 | Implemented initial shared summary and Home/AI Doctor UI. |
-| UX-004 | Add contact personalization score and missing-detail prompts | P0 | Implemented initial Contact Detail next-step prompts. |
-| UX-005 | Add per-message readiness and failure reason labels | P1 | Implemented initial readiness labels for Messages rows. |
-| UX-006 | Add last backup freshness to Home or Settings | P1 | Implemented in Settings and Home. |
-| UX-013 | Add ranked Home next-action model | P0 | Implemented primary action and supporting actions for setup, approvals, and backup. |
-| UX-014 | Surface setup blocker summary from AI Doctor on Home | P0 | Implemented top setup blocker copy for contact sync, AI access, and AI generation. |
-| UX-015 | Add low-health relationship action to Home ranking | P1 | Implemented worst-health contact action routed to Contact Detail. |
-| UX-016 | Add Contacts quality labels for ready, missing event, missing channel, and missing context | P0 | Implemented initial computed state and list badges. |
-| UX-017 | Add Contacts action filters for missing relationship, missing channel, low health, and VIP | P0 | Implemented resource-backed filter chips. |
-| UX-018 | Group Contact Detail into essentials, personalization, automation, and history | P0 | Implemented sectioned body with existing actions preserved. |
-| UX-019 | Show Contact Detail personalization quality impact | P0 | Implemented low/partial/ready AI-impact copy in quality card. |
-| UX-020 | Show Events source, verification, duplicate, and date-conflict trust labels | P0 | Implemented derived trust state and row chips. |
-| UX-021 | Add Events duplicate/conflict merge and keep-separate actions | P0 | Implemented row actions backed by event resolution use case. |
-| UX-022 | Split Messages into Needs review/Scheduled/Blocked/Sent/Failed task tabs | P0 | Implemented task-state buckets with blocked approval hidden. |
-| UX-023 | Show Wish Preview approval plan with event, route, schedule, approval, and quality | P0 | Implemented approval-plan card before the editable draft. |
-| UX-024 | Recalculate Wish Preview draft readiness after edits | P0 | Implemented inline edit-readiness state and blank-approval guard. |
-| UX-025 | Rank AI Doctor blockers and show one recommended fix | P0 | Implemented deterministic recommended-fix state and dashboard action. |
-| UX-026 | Add AI Doctor generic-message diagnostic from personalization quality | P0 | Implemented warning-level context-risk check with Contacts action. |
-| UX-027 | Add Activity History task filters for dispatch, AI, sync, backup, and settings | P0 | Implemented task-oriented filters with dispatch and backup alias matching. |
-| UX-028 | Localize cleaned ViewModel and validation-use-case user copy | P0 | Implemented resource-backed copy for Home/Contacts/Events/Messages flows and typed validation reasons for manual events/contact preferences. |
-| UX-029 | Guard icon-only actions with accessibility labels | P0 | Audited cleaned screens and added regression coverage for non-null labels on IconButton/FAB actions. |
-| UX-007 | Group AI Doctor checks by Required, Quality, Reliability, Recovery | P1 | Implemented. |
-| UX-008 | Add duplicate manual event detection | P1 | Implemented initial warning with explicit Save anyway override. |
-| UX-009 | Add failed-send recovery assistant | P1 | Implemented initial Failed tab assistant with AI Doctor route. |
-| UX-010 | Add Wish Preview review-next queue | P2 | Implemented initial explicit Review next action after approval/rejection. |
-| UX-011 | Add Memory Vault inline validation for blank notes | P2 | Implemented. |
-| UX-012 | Add sign-out destructive-action checklist | P2 | Implemented Settings confirmation checklist. |
-| UX-030 | Add Memory Vault note search | P2 | Implemented note/category search with clear and distinct no-results states. |
-| UX-031 | Add Memory Vault note editing | P2 | Implemented inline text/category editing with existing validation rules. |
-
-### 25.8 Incremental Implementation Log
-
-| Change | Why it improves UX | User effort reduction | User control preserved | Validation |
-|---|---|---|---|---|
-| UX-031: Memory Vault notes can be edited inline. | Users can correct or recategorize saved relationship facts without deleting and recreating the note. | Reduces repair work from delete/re-add to one in-place edit. | Edit preserves note id, contact id, timestamp, pin state, private category behavior, search, add, pin, and delete semantics. | Static validation passed on 2026-07-01: `git diff --check`, XML parsing, focused Memory Vault edit wiring scans, and stale no-edit wording scan. Gradle target remains pending because escalation is blocked. |
-| UX-030: Memory Vault now supports note/category search with clear and no-results states. | Users can find saved relationship facts without scanning the full journal. | Reduces repeated scrolling when a contact has many saved memories. | Search only changes the visible list; add, pin, delete, privacy category, and AI prompt eligibility behavior remain explicit and unchanged. | Static validation passed on 2026-07-01: `git diff --check`, XML parsing, focused Memory Vault wiring scans, and stale no-search wording scan. Gradle target remains pending because escalation is blocked. |
-| ARCH-046: Activity-log producers and filters now use `ActivityLogType`. | Dispatch, analytics, event, message, and AI-feedback activity producers share one log-type model with Activity History filters and icons. | Users get more reliable Activity History filtering and scanning across message, event, AI, analytics, backup, sync, settings, and dispatch records. | Room still stores raw activity-log type strings, and Activity History search/filter semantics, dispatch detection, logging, analytics export, event save/resolution, feedback, and message activity behavior are unchanged. | Focused ActivityLogType, analytics report, Activity History ViewModel, dispatch, Wish Preview, Messages, and Events tests plus targeted scans and `git diff --check` passed on 2026-06-26. |
-| ARCH-045: Activity-log severity now uses `ActivityLogSeverity`. | Dispatch logs, Wish Preview feedback logs, entity defaults, and Activity History color mapping share one typed info/warning/error severity model. | Users get clearer and more consistent visual priority cues while scanning Activity History. | Room still stores raw activity-log severity strings, and dispatch, approval, scheduling, feedback, retry, filtering, and navigation behavior are unchanged. | Focused ActivityLogSeverity, dispatch use-case, and Wish Preview ViewModel tests plus targeted scans and `git diff --check` passed on 2026-06-26. |
-| ARCH-044: Dispatch audit metadata decisions now use `DispatchActivityDecision`. | Dispatch activity recording shares one typed decision vocabulary for deferred, approval-gated, expired, blocked, and sent outcomes. | Users get more reliable Activity History explanations when reviewing why dispatch was delayed, blocked, expired, or sent. | Activity metadata JSON still stores the same raw decision labels, and dispatch eligibility, approval, scheduling, sending, and retry behavior are unchanged. | Focused DispatchActivityDecision and dispatch use-case tests plus targeted scans and `git diff --check` passed on 2026-06-26. |
-| ARCH-043: Activity-log open/resolved statuses now use `ActivityLogStatus`. | Dispatch audit records, Wish Preview feedback logs, and ActivityLogEntity defaults share one typed open/resolved status model. | Users get more trustworthy audit states when troubleshooting dispatch, feedback, and recovery workflows. | Room still stores raw activity-log status strings, and dispatch, approval, scheduling, feedback, retry, and navigation behavior are unchanged. | Focused ActivityLogStatus, dispatch use-case, and Wish Preview ViewModel tests plus targeted scans and `git diff --check` passed on 2026-06-26. |
-| ARCH-042: Sent-message delivery status now uses `MessageDeliveryStatus`. | Route-history selection, SMS dispatch writes, SMS callback updates, and Analytics reliability filtering share one typed delivery-status parser/model. | Users get more trustworthy delivery reliability and fewer route suggestions based on stale or misread delivery history. | Room still stores raw delivery-status strings, and approval, scheduling, retry, send, and route controls are unchanged. | Focused delivery-status model, route selector, SMS receiver, and Analytics ViewModel tests plus targeted scans and `git diff --check` passed on 2026-06-26. |
-| ARCH-041: Supported channel literal sweep is complete. | Production and test scans now leave supported SMS/WhatsApp/Email raw literals only in `MessageChannel` itself or explicit legacy/casing parser coverage. | Users are less likely to hit stale route labels, blocked states, or dispatch assumptions caused by duplicated channel tokens. | No runtime behavior changed; legacy/casing parser coverage and raw persistence payload compatibility remain explicit. | Supported-channel test and production scans plus `git diff --check` passed on 2026-06-26. |
-| ARCH-040: Automation Setup display channel fixtures now use `MessageChannel`. | Automation Setup recommendation tests derive SMS readiness-title values from the active channel model while keeping unsupported-channel coverage explicit. | Safer setup guidance reduces stale labels when users diagnose SMS permission blockers. | Readiness grouping, recommendation ranking, actions, permissions, settings navigation, generation, approval, and dispatch behavior are unchanged. | Focused AutomationSetup ViewModel test, targeted Automation Setup display fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-039: Settings blackout channel fixtures now use `MessageChannel`. | Settings ViewModel tests derive supported SMS, WhatsApp, and Email blackout JSON tokens from the active channel model while retaining legacy-channel coverage. | Safer blackout settings reduce confusing blocked-route states after users change channel availability. | Blackout toggles, legacy filtering, save order, unknown-channel guards, scheduling, approval, and dispatch behavior are unchanged. | Focused Settings ViewModel test, targeted Settings blackout fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-038: Messages interaction channel fixtures now use `MessageChannel`. | Messages screen interaction tests derive supported SMS, WhatsApp, and Email queue route values from the active channel model while keeping casing-parser coverage explicit. | Safer queue scanning reduces misleading route labels, blocked states, or recovery cues in Messages. | Tab navigation, filters, bulk actions, edit, approve, revoke, reject, retry, and setup navigation behavior are unchanged. | Focused Messages screen interaction test, targeted Messages interaction fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-037: Wish Preview interaction channel fixtures now use `MessageChannel`. | Wish Preview screen interaction tests derive supported SMS review route values from the active channel model while keeping casing-normalization coverage explicit. | Safer preview/review behavior reduces misleading route summaries before approval. | Editing, feedback, regeneration, test-send, rejection, approval, draft readiness, and navigation behavior are unchanged. | Focused Wish Preview screen interaction test, targeted Wish Preview interaction fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-036: Chat History channel fixtures now use `MessageChannel`. | Chat History ViewModel and screen interaction tests derive supported WhatsApp sent-message route values from the active channel model. | Safer message-history presentation reduces confusion when users trace past WhatsApp wishes. | Chat history loading, back navigation, message content, sent timestamps, and delivery-status behavior are unchanged. | Focused Chat History ViewModel and screen interaction tests, targeted chat history fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-035: Contact UI channel fixtures now use `MessageChannel`. | Contact Detail quality/body-section and Contact List tests derive supported SMS/Email preference values from the active channel model. | Safer contact cleanup cues reduce misleading missing-channel states and repeated profile edits after channel-model changes. | Contact filters, quality labels, detail actions, preference saves, generation, approval, and dispatch behavior are unchanged. | Focused Contact Detail quality/body-section and Contact List tests, targeted contact UI fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-034: Dashboard/style channel fixtures now use `MessageChannel`. | Dashboard metrics and style-analysis tests derive supported SMS route values from the active channel model. | Safer dashboard summaries and style-learning inputs reduce confusing metrics or stale route assumptions during diagnosis. | Dashboard metrics, style analysis, profile saves, scheduling, approval, and dispatch behavior are unchanged. | Focused dashboard metrics and style-analysis tests, targeted dashboard/style fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-033: Automation policy channel fixtures now use `MessageChannel`. | Dispatch eligibility, revival cadence, notification approval, SMS receiver, and automation pipeline tests derive supported route values from the active SMS model. | Safer automation reduces manual retries, duplicate draft investigations, and delivery-status troubleshooting caused by stale route tokens. | Approval gates, quiet hours, revival cadence, notification actions, SMS status transitions, generation, scheduling, and dispatch behavior are unchanged. | Focused domain automation, notification policy, SMS receiver, and automation pipeline tests, targeted automation-policy fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-032: Persistence/reporting channel fixtures now use `MessageChannel`. | Analytics report, backup, DAO, and pending-entity tests derive persistence-shaped SMS route values from the active channel model. | Safer reports and backups reduce restored-route surprises and troubleshooting when users inspect audit/report data. | Report generation, backup export/import, DAO behavior, pending defaults, scheduling, approval, and dispatch are unchanged. | Focused analytics/backup, DAO, and pending-entity tests, targeted persistence/reporting fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-031: Review read-model channel fixtures now use `MessageChannel`. | Wish Preview and Messages ViewModel tests derive review-summary, channel-filter, readiness, and task-bucket route values from the active channel model. | Safer review queues reduce manual corrections, filter mismatches, and no-route surprises caused by stale route tokens. | Review summary, filtering, readiness bucketing, approval, rejection, regeneration, scheduling, and send behavior are unchanged. | Focused Wish Preview and Messages ViewModel tests, targeted read-model fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-030: Review-action channel fixtures now use `MessageChannel`. | Approve, reject, and revoke tests derive pending-message route values from the active SMS model. | Safer review actions reduce route-related surprises after users approve, reject, or revoke a draft. | Approve, reject, revoke, schedule, cancel, and status behavior are unchanged. | Focused approve/reject/revoke use-case tests, targeted review-action fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-029: Regenerate use-case channel fixtures now use `MessageChannel`. | User-triggered regeneration tests derive pending-message defaults, no-route contact fixtures, and saved-channel assertions from the active SMS route model. | Safer regeneration reduces mismatched routes, no-route surprises, and repeated manual edits after users ask AI for a better draft. | Regeneration behavior, feedback forwarding, edited-text clearing, approval downgrade, no-route review forcing, scheduling, and dispatch are unchanged. | Focused RegeneratePendingMessageUseCase test, targeted regenerate fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-028: Message dispatch worker channel fixtures now use `MessageChannel`. | Scheduled dispatch, smart-approve, quiet-hours, failure, and double-send guard tests derive pending-message route values from the active SMS model. | Safer scheduled dispatch reduces manual retries, duplicate-send investigations, and setup checks caused by route-token drift. | Dispatch worker behavior, approval gates, quiet-hours deferral, double-send guard, failure handling, and scheduling are unchanged. | Focused MessageDispatchWorker test, targeted dispatch-worker fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-027: Background-worker channel fixtures now use `MessageChannel`. | Holiday, follow-up, and revival worker tests derive background-generated draft channel values and no-route assertions from the active SMS channel model. | Safer background automation reduces manual corrections, retries, and setup investigations after worker-created drafts. | Holiday, follow-up, revival, approval downgrade, no-route review forcing, scheduling, notifications, and dispatch behavior are unchanged. | Focused worker tests, targeted worker fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-026: Generation use-case channel fixtures now use `MessageChannel`. | AI draft-generation tests derive contact preferred-channel values and pending-message route assertions from the active channel model. | Safer generation changes reduce mismatched routes, no-route surprises, and manual corrections before approval. | Generation behavior, approval downgrades, no-route review forcing, scheduling, notifications, and dispatch are unchanged. | Focused GenerateMessageUseCase test, targeted generation fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-025: Dispatch use-case channel fixtures now use `MessageChannel`. | Final-send tests derive pending-message route values and dispatch outcome assertions from the active SMS channel model. | Safer dispatch changes reduce the chance users need manual retries, setup investigation, or re-approval because of stale route tokens. | Dispatch behavior, approval checks, deferred sends, expiration handling, and activity logging are unchanged. | Focused DispatchMessageUseCase test, targeted dispatch fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-024: Prompt-builder channel fixtures now use `MessageChannel`. | Gemini prompt-context tests derive supported previous-wish and prompt channel values from the active channel model. | Fixture drift is less likely to produce route-inappropriate AI context or require users to repair legacy contact data after channel changes. | Runtime prompt generation, fallback, approval, routing, scheduling, and dispatch are unchanged; unsupported legacy fallback remains explicitly tested. | Focused PromptBuilder test, targeted prompt-builder fixture scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-023: Auto-send route selector fixtures now use `MessageChannel`. | Route-selection tests derive supported contact, history, and blackout channel fixtures from the active channel model. | Safer routing changes reduce the chance users see failed sends or incorrect no-route warnings caused by stale test literals. | Runtime route choice, approval gates, blackout behavior, no-route review handling, and dispatch are unchanged; explicit legacy normalization tests remain. | Focused AutoSendChannelSelector test, targeted fixture raw-channel scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-022: Review-screen channel labels now use `MessageChannel`. | Wish Preview and Messages render channel labels/icons through the active parser so legacy-cased SMS, WhatsApp, and Email values display consistently. | Users do not need to re-save drafts or contacts to clean up visible channel casing in review surfaces. | Unknown legacy channel values remain visible as stored, and approval, rejection, retry, scheduling, and dispatch behavior is unchanged. | Focused Wish Preview and Messages Compose tests, targeted review-screen raw channel display scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-021: Automation Setup email readiness now uses `MessageChannel`. | The AI Doctor email readiness card counts email-preferred contacts through the active channel parser instead of a raw string check. | Users with legacy-cased channel values do not need to re-save contacts before Gmail setup warnings appear. | The check only reports readiness; contact preferences, Gmail settings, approval, scheduling, and dispatch remain under explicit user control. | Focused AutomationSetup ViewModel test, targeted setup raw-email comparison scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-020: Contact preferred-channel defaults now derive from `MessageChannel`. | New contacts and manual-event-created contacts use the active channel model for their default SMS storage value. | Users are less likely to see divergent default route behavior after adding manual contacts. | The persisted default remains `SMS`; users still control preferred channel changes through Contact Detail and Settings. | Focused ContactEntity and SaveManualEventUseCase tests, default-channel raw literal scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-019: Channel blackout policy now uses `MessageChannel`. | Messages readiness and blackout checks use the same typed SMS, WhatsApp, and Email model while raw pending-message strings are parsed at the read edge. | Users do not need to repair old blackout payloads or channel casing before Messages can explain blocked drafts. | Blackout settings and blocked-route recovery remain explicit; no approval, scheduling, retry, rejection, or dispatch action is automatic. | Focused AutomationSchedulePolicy and Messages ViewModel tests, raw blackout call scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-018: AI prompt channel context now uses `MessageChannel`. | Gemini prompt context stores typed SMS, WhatsApp, and Email values while raw contact channel strings are mapped at the prompt-builder edge. | Users do not need to repair legacy contact channel values before generating AI wishes; unsupported prompt channel data falls back to SMS. | Prompt text still emits compatible channel labels, and approval, route selection, dispatch, scheduling, contact preferences, and stored channel values are unchanged. | Focused PromptBuilder, AI service, parser tests, prompt raw-channel scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-017: Delivery route selection now uses `MessageChannel`. | Generation-time channel selection and runtime dispatch route resolution now return typed SMS, WhatsApp, and Email decisions while raw pending/sent storage strings are written only at persistence edges. | Users are less likely to approve or wait on drafts whose generated route and dispatch route disagree; future channel changes have one active model. | Persisted pending/sent channel strings remain compatible; no approval, no-route, scheduling, fallback, retry, or dispatch gate is bypassed. | Focused selector, delivery resolver, generation/regeneration, worker, dispatch tests, routing raw-channel scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-016: Settings channel blackout controls now use `MessageChannel`. | Settings blackout switches pass typed SMS, WhatsApp, and Email values while raw `SecurePrefs` JSON is parsed/written only at the preference edge. | Users do not need to repair legacy blackout payloads before changing Settings; unknown stored channels are filtered out. | The same explicit SMS, WhatsApp, and Email switches remain; storage and backup payload shapes stay compatible, and approval/scheduling/dispatch behavior is unchanged. | Focused Settings ViewModel and Settings screen interaction tests, Settings raw-channel scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-015: Contact preference channel saves now use `MessageChannel`. | Contact Detail quick actions, the personalization channel picker, and preference saves now use typed SMS, WhatsApp, and Email options while mapping raw persisted channel values at the UI/use-case edge. | Users do not need to repair unsupported legacy channel values before saving preferences; unsupported stored channel values fall back to SMS in the picker. | The same explicit SMS, WhatsApp, and Email choices remain; persisted Room strings remain compatible, and approval, scheduling, dispatch, global settings, and backup/restore behavior are unchanged. | Focused contact preference use-case, preferences dialog, Contact Detail ViewModel/body tests, channel raw-string scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-014: Pending-message status defaults, reject, review filters, and dispatch completion now use `MessageStatus`. | Reject actions, notification approval/retry/reject, pending defaults, Wish Preview review-next filtering, widget pending counts, regeneration scheduling checks, and dispatch sent/failed writes now use the active status model. | Users are less likely to miss review items or lose reject/revoke control because of legacy status formatting, and maintainers have one model for pending-message state transitions. | Persisted Room status values remain compatible; approve, reject, retry, review-next, and dispatch still follow existing explicit user actions and automation gates. | Focused pending entity, reject, regenerate, dispatch use-case, dispatch worker, Wish Preview tests, production status scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-013: Approved/pending message-status writes now use `MessageStatus`. | Holiday, follow-up, revival, approve, revoke, and retry paths write approved/pending status through the active status model instead of duplicated literals. | Users are less likely to be stuck by legacy status casing, and status changes now have one model to update across review and retry flows. | Persisted status strings remain compatible; approval, revoke, retry, review notification, and automatic scheduling gates are unchanged. | Focused worker, approve, revoke, Messages ViewModel tests, production status-literal scan, and `git diff --check` passed on 2026-06-26. |
-| ARCH-012: Approval-mode storage defaults now derive from the active `ApprovalMode` model. | New contact defaults, SecurePrefs global-mode defaults, and backup preference defaults no longer depend on detached raw literals, and the dead duplicate automation/channel/relationship taxonomy was removed. | Users are less likely to hit divergent default behavior after future mode changes, and maintainers have one active approval-mode model to update. | Stored string values and backup schema fields remain compatible; visible mode choices and contact/global automation controls are unchanged. | Focused ContactEntity and BackupServiceImpl tests, duplicate taxonomy scans, and `git diff --check` passed on 2026-06-26. |
-| ARCH-011: Contact Detail automation picker now uses typed `ApprovalMode` state. | The personalization dialog stores typed automation options and shows a clean "Automation mode" label instead of raw enum names. | Users can save personalization without understanding or repairing legacy raw automation strings; unsupported stored values fall back to Default in the picker. | The same explicit Default, Smart Approve, VIP Approve, Fully Auto, and Always Ask choices remain; global settings, generation, review, scheduling, dispatch, and backup/restore are unchanged. | Focused Contact preferences dialog, Contact Detail body, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| ARCH-010: `SecurePrefs` exposes typed global approval-mode helpers. | Settings, the preferences repository adapter, and holiday/follow-up/revival workers consume typed global approval mode values through one mapper. | Users do not need to repair unsupported stored values before background workers make review/scheduling decisions; unsupported values fall back to Smart Approve. | Visible mode choices, review gates, scheduling, and approval actions are unchanged; backup/restore still round-trips raw stored values. | Focused global approval mapper, preferences adapter, Settings ViewModel/screen, holiday worker, follow-up worker, revival worker tests, and `git diff --check` passed on 2026-06-26. |
-| ARCH-009: `PreferencesRepository` global automation mode now uses `ApprovalMode`. | Generation and regeneration receive typed global mode values, while raw `SecurePrefs` values are normalized in the data adapter. | Users do not need to repair old unsupported stored values; the adapter falls back to Smart Approve before policy decisions run. | Visible Settings choices, contact overrides, review notifications, scheduling, dispatch, and approval actions are unchanged; only unsupported stored values are normalized. | Focused PreferencesRepository adapter, generation use-case, regeneration use-case tests, and `git diff --check` passed on 2026-06-26. |
-| ARCH-008: Settings global automation mode now uses typed `ApprovalMode` state. | Settings maps raw `SecurePrefs` values at load/save boundaries and keeps the dropdown/view state typed. | Gives users consistent settings labels and defaults unknown legacy values to Smart Approve in UI state. | User-triggered selection, contact overrides, generation, approval, scheduling, dispatch, and review gates are unchanged. | Focused Settings ViewModel, Settings screen, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| ARCH-007: Selected UI/read-model approval-mode comparisons now use `ApprovalMode`. | Messages, Wish Preview, Contact Detail VIP state, and Contacts VIP filtering parse raw values before display or filtering. | Gives users localized mode labels and prevents legacy/unknown values from surfacing as confusing raw text. | This is read-only presentation/filtering logic; stored preferences, pending messages, generation, approval, scheduling, dispatch, and review gates are unchanged. | Focused Contact List ViewModel, Messages screen, Wish Preview screen, Contact Detail body, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| ARCH-006: Generation and approval use-case outcomes now return typed `ApprovalMode`. | Workers and ViewModels receive typed approval outcomes instead of raw strings after generation or explicit approval succeeds. | Reduces repeated parsing/string comparison in downstream consumers and makes unsupported legacy modes explicit as `UNKNOWN`. | Persistence, review notifications, approval scheduling, dispatch, editing, and fallback behavior are unchanged. | Focused generation use-case, approval use-case, message generation worker, Contact Detail ViewModel, Wish Preview ViewModel, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| ARCH-005: Dispatch eligibility now accepts typed `ApprovalMode` values. | Dispatch use case, dispatch worker, and notification approval actions map pending-message approval strings before invoking the shared dispatch policy. | Reduces mismatched send/defer/approval/expiry decisions between Messages, notification approval, and background dispatch. | Existing schedule, quiet-hour, blackout, approval, VIP, Always Ask, failed, rejected, and already-handled gates are preserved. | Focused dispatch eligibility, approval notification policy, dispatch use-case, dispatch worker, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| ARCH-004: `ApprovalModeResolver` now accepts typed `ApprovalMode` values. | Foreground generation, regeneration, holiday, follow-up, and revival paths map persisted/preference strings before calling the domain policy. | Reduces inconsistent approval/schedule behavior caused by raw strings flowing into resolver logic. | Existing approval outcomes, review notifications, quality downgrades, missing-route fallback, scheduling, VIP, and Always Ask safeguards are preserved. | Focused approval resolver, generation/regeneration, holiday/follow-up/revival worker, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| ARCH-003: Contact preference automation mode now crosses the domain boundary as `ApprovalMode`. | Unsupported contact automation values are rejected before they can become stored policy, and the quick VIP action and full preferences editor share the same typed use-case boundary. | Reduces confusing preference states caused by raw strings being saved and interpreted differently later. | Only explicit contact preference saves are validated and persisted; approval, scheduling, dispatch, global defaults, and VIP/Always Ask gates are unchanged. | Focused contact-preference use-case, Contact Detail ViewModel, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| ARCH-002: Dispatch quiet-hour and blackout deferral now lives in `DispatchEligibilityPolicy`. | Worker dispatch, domain dispatch, and notification approval checks share the same send/defer/approval/expire/block decision shape. | Reduces inconsistent ready/send states and makes timing-rule changes cheaper to apply across entry points. | The policy only returns decisions; the worker still schedules deferrals and never bypasses approval, quiet hours, blackout dates, or user-configured timing. | Focused dispatch policy, dispatch worker, dispatch use-case, automation pipeline tests, and `git diff --check` passed on 2026-06-26. |
-| ARCH-001: Weekly message generation worker now delegates generation policy to `GenerateMessageUseCase`. | Background-created drafts and foreground-created drafts follow the same quality gate, approval mode, route-readiness, skip-auto-wish, scheduling, and notification rules. | Reduces inconsistent draft states and lets failed generated occurrences recover on the next worker pass without duplicate pending rows. | Worker retry replacement is limited to previously failed occurrences; VIP/Always Ask review gates, user edits, approval, scheduling, and dispatch controls remain intact. | Focused generation use-case, message generation worker, automation pipeline, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-029: Cleaned icon-only actions are now guarded by an accessibility-label regression test. | Screen reader users can rely on named back, export, add, clear, delete, pin, and visibility actions after UI refactors. | Reduces guesswork for assistive-technology users and catches missing labels during unit tests. | The test only verifies labels on existing explicit actions; it does not trigger navigation, export, delete, approval, sync, generation, scheduling, restore, or sending. | Accessibility label regression, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-028: Events, Messages, Home, Contact List, and Contact Detail now route cleaned ViewModel copy through resources, while manual-event and contact-preference validation use typed reasons. | Users get localized errors, feedback, planner text, and activity-log copy instead of English leaking from ViewModels/domain validation. | Reduces confusion during event creation, preference editing, message recovery, sync troubleshooting, and dashboard planning in non-English locales. | This only changes presentation text and validation result shape; sync, generation, approval, scheduling, dispatch, restore, and data edits remain explicit. | Focused Events, Messages, Home, Contact List, Contact Detail, manual-event, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-027: Activity History now has task filters for Dispatch, AI, Sync, Backup, Settings, Messages, Events, and Analytics. | Users can troubleshoot a specific operational area without searching raw log text. | Dispatch logs and backup/restore records are isolated into task-oriented buckets, reducing audit scanning during recovery. | Filters only change the visible audit list; retry, restore, export, approval, scheduling, settings changes, and sends remain explicit user actions. | Focused Activity History ViewModel, Activity History screen interaction, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-026: AI Doctor now warns when contact personalization quality can produce generic messages. | Users can diagnose generic AI output from the operational support screen instead of discovering it only after generation. | Reduces trial-and-error regeneration by showing the number of low-context contacts and routing to Contacts cleanup. | The warning only navigates to Contacts; it does not infer private memories, edit contacts, regenerate drafts, approve, schedule, or send. | Focused Automation Setup ViewModel, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-025: AI Doctor ranks actionable setup problems and shows one recommended fix above the checklist. | Users get a clear starting point before reading detailed diagnostics. | Reduces setup scanning by promoting required blockers and reliability problems ahead of quality warnings, with stable ordering across refreshes. | The recommendation only invokes the same explicit row action; permissions, credentials, sync, tests, scheduling, approval, and sending remain user-controlled. | Focused Automation Setup ViewModel, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-024: Wish Preview recalculates draft readiness after edits and blocks blank approval. | Users see whether the current edited draft is ready, edited, too short, or blank before scheduling. | Reduces failed approval attempts and explains whether the edited text will be saved. | Only blank content is blocked; edited and very short drafts still require explicit user approval, regeneration, test-send, or rejection. | Focused Wish Preview ViewModel, Wish Preview screen interaction, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-023: Wish Preview now shows an approval-plan card with event, route, schedule, approval mode, and AI/fallback quality. | Users understand what approval will schedule before they act. | Reduces cross-checking Messages, Events, and Settings for route/timing/mode context. | The card is informational only; editing, regeneration, test-send, approval, rejection, scheduling, and dispatch remain explicit user actions. | Focused Wish Preview ViewModel, Wish Preview screen interaction, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-022: Messages now uses Needs review, Scheduled, Blocked, Sent, and Failed task tabs. | Users find the queue that matches their current task instead of interpreting date and lifecycle buckets. | Separates reviewable drafts from blocked drafts, reducing scanning and failed approval attempts. | No message action is automatic; Blocked rows still allow edit/reject but hide approval until prerequisites are fixed. | Focused Messages ViewModel, Messages screen interaction, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-021: Event duplicate/conflict rows now expose Merge here and Keep separate actions. | Users can resolve the trust warning from the row that shows it, selecting which event survives a merge or confirming intentional separate reminders. | Reduces cleanup navigation and repeated warnings for reviewed separate reminders. | No merge, deactivation, reminder cancellation, verification, or keep-separate marker is applied without an explicit row action. | Focused event resolution use case, Events ViewModel, Events screen interaction, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-020: Event rows now show source, verification, duplicate-reminder, and conflicting-date trust labels. | Users can understand whether a moment is imported, manual, verified, low-confidence, duplicated, or date-conflicted before relying on it. | Reduces reopening event forms or scanning raw source values to explain why multiple reminders exist. | Labels are informational only; merge, delete, edit, verification, generation, approval, and sending remain explicit user actions. | Focused Events ViewModel, Events screen interaction, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-019: Contact Detail quality card explains AI impact for low, partial, and ready personalization states. | Users understand how missing context affects whether AI wishes sound generic or relationship-specific. | Reduces guesswork and avoidable regeneration caused by incomplete contact context. | The impact line is advisory only; users still choose whether to edit context, generate, review, approve, or send. | Focused Contact Detail quality-card, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-018: Contact Detail now groups content into Essentials, Personalization, Automation, and History. | Dense contact controls are easier to scan by user intent. | Reduces cognitive sorting when users only want contact facts, context improvements, automation shortcuts, or history. | All controls remain explicit; grouping does not edit preferences, change automation, generate wishes, or navigate without a tap. | Focused Contact Detail body, personalization quality, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-017: Contacts list adds action filters for missing relationship, missing channel, low health, and VIP. | Users can isolate cleanup and review groups directly from Contacts. | Reduces full-list scanning and repeated profile opens when fixing contact data or reviewing VIPs. | Filters only change the visible list; users still choose every classification, channel edit, VIP change, draft, approval, and send. | Focused Contact List ViewModel, screen interaction, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-016: Contacts list rows now show ready, missing event, missing channel, or missing context quality labels. | Users can understand the first prerequisite blocking useful automation before opening Contact Detail. | Reduces one-by-one profile inspection and creates a reusable basis for upcoming quality filters. | Labels are advisory only; no contact edits, AI generation, automation changes, or sends happen automatically. | Focused Contact List ViewModel, screen interaction, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-015: Home can promote the lowest-health relationship into the ranked next-action section. | A neglected relationship can become the clear next task when setup, approvals, and backup are not more urgent. | Reduces scanning across planner cards and opens the exact contact profile in one tap. | The action only opens Contact Detail; adding context, generating drafts, approving, or sending remains explicit. | Focused Home ViewModel, Home screen interaction, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-014: Home next actions now name the top setup blocker for contact sync, missing AI access, or disabled AI generation. | Users know what setup issue they are about to fix before opening AI Doctor. | Reduces diagnostic scanning by replacing a generic setup count with the first concrete blocker. | The Home card only navigates to AI Doctor; permissions, credentials, AI settings, and sync still require explicit user action. | Focused Home ViewModel, Home screen interaction, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-013: Home now has a ranked next-action model with one primary action and supporting actions for setup, approval, and backup work. | The dashboard gives users one clear next step before secondary tasks instead of showing unrelated prompts as equal-weight cards. | Reduces scanning effort and wrong turns when approvals, setup issues, and backup risk are present together. | Ranked cards only navigate to the relevant workflow; syncing, approval, export, restore, and setup changes still require explicit user action on the destination screen. | Focused Home ViewModel, Home screen interaction, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-006 extension: Home now shows never-backed-up and stale-backup prompts, and backup reminder throttling no longer writes fake backup timestamps. | Users see recoverability risk in the daily command center instead of only inside Settings, and "never backed up" remains truthful until a real export succeeds. | Reduces the chance users forget backups and removes the need to open Settings just to discover backup risk. | The Home card only navigates to Backup/Restore; export destination, passphrase, restore preview, and replace confirmation remain explicit user choices. | Focused Home ViewModel, Home screen interaction, DailyTriggerWorker, localization parity, hardcoded-string regression tests, and `git diff --check` passed on 2026-06-26. |
-| UX-002: Home planner and readiness cards now use a shared typed action target model for Messages, Contact Detail, AI Doctor, and Backup/Restore. | Dashboard insights route to the exact task surface without relying on nullable contact ids or ad hoc fallback logic. | Reduces wrong turns from dashboard prompts and makes future dashboard actions cheaper to add consistently. | Cards only navigate; setup, backup, approval, sync, and send actions still require explicit user action on the destination screen. | Focused Home ViewModel, screen interaction, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
-| UX-010: Wish Preview now offers an explicit Review next action after approval or rejection when another pending wish exists. | Users can continue a review session from the result state instead of backing out and finding the next pending draft manually. | Reduces repeated navigation through Messages or Contact Detail during sequential approvals. | The app never auto-approves, auto-rejects, or silently advances to the next draft; users choose Review next, and approval still returns automatically only when no next item exists. | Focused Wish Preview ViewModel, screen interaction, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
-| UX-009: Messages Failed tab now includes a recovery assistant with failed count, setup guidance, retry reminder, and direct AI Doctor route. | Users get a single recovery entry point instead of interpreting failed rows alone. | Reduces diagnostic navigation by pointing failed-send work straight to setup checks. | The assistant does not retry or alter messages; users still review fixes and retry individual or selected rows explicitly. | Focused Messages ViewModel, screen interaction, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
-| UX-012: Settings now requires a sign-out confirmation dialog with a checklist of local data deletion, cleared preferences/keys, external access behavior, and backup recommendation. | Users see the consequences before a destructive local wipe. | Reduces recovery effort caused by accidental sign-out or misunderstanding what is deleted. | Sign-out only runs after explicit confirmation; cancel keeps all local data untouched. | Focused Settings screen interaction, Settings ViewModel, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
-| UX-008: Manual event save now detects likely duplicate active events for the same contact, event type, and day/month before persistence. | Users are warned before creating duplicate reminders that can cause repeated notifications or duplicate AI wish generation. | Prevents cleanup work caused by accidental duplicate manual entries. | Users can cancel by editing/dismissing or explicitly choose Save anyway when a separate reminder is intentional. | Focused SaveManualEventUseCase, EventsViewModel, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
-| UX-003: Home and AI Doctor now share a setup progress summary with completed/total readiness counts, blocker count, warning count, and progress indicator. | Users can understand setup health from Home before opening detailed diagnostics, then inspect the full AI Doctor checklist when needed. | Reduces navigation and scanning effort by surfacing readiness status on the dashboard and summarizing AI Doctor checks before the long list. | The summary is informational and routes to AI Doctor; it does not auto-enable permissions, credentials, channels, or sends. | Focused Home ViewModel, Home screen interaction, Automation Setup ViewModel, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
-| UX-004: Contact Detail personalization quality card now shows the next missing detail to add, or a ready state when core signals are complete. | Users can see which input will most improve message personalization before generating a wish. | Reduces guesswork around which relationship fields matter for AI quality. | The prompt is advisory; users still choose whether to edit preferences, add memories, or generate immediately. | Focused Contact Detail quality-card, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
-| UX-004 extension: Memory Vault now offers suggested memory prompts, and Contact Detail quality uses real Memory Vault note counts plus category summaries. | Users can add high-value relationship facts faster, and the personalization score now reflects context that AI generation actually consumes. | Reduces blank-page effort when adding memory notes and makes AI-quality guidance more accurate. | Prompt chips only prefill editable text and category; users still choose what to save, delete, pin, or send. | Focused AI/personalization tests, app debug unit tests, localization parity, hardcoded-string regression, and `git diff --check` passed on 2026-06-25 using Android Studio JBR 21. |
-| UX-007: AI Doctor checks are grouped into Required, Quality, Reliability, and Recovery sections. | The diagnostic list is easier to scan and separates setup blockers from quality and recovery concerns. | Reduces cognitive load when deciding what to fix first. | Existing check actions remain explicit; no permission, credential, or send behavior is changed automatically. | Focused Automation Setup ViewModel, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
-| UX-005: Messages rows show readiness labels for review, approval, sending, failed retry, missing contact, disabled channel, missing phone/email, and Gmail setup gaps. | Users see likely send blockers directly in the work queue instead of discovering them after approval or retry. | Reduces diagnostic navigation and failed retry loops by showing the next problem at row level. | Labels are informational; approve, edit, reject, revoke, and retry actions remain explicit user choices. | Focused Messages ViewModel, screen interaction, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
-| UX-011: Memory Vault shows inline validation for whitespace-only notes and rejects blank saves defensively. | Users understand why the Add button stays disabled instead of facing a silent no-op. | Avoids repeated taps or confusion when whitespace was entered accidentally. | Users decide what note to save; the app only blocks empty data that would not be useful. | Focused Memory Vault ViewModel, screen interaction, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
-| UX-006: Settings Backup & Restore row shows last backup freshness from existing secure preferences. | Data-protection status is visible before the user enters the backup flow. | Reduces the need to open Backup & Restore just to check whether a recent backup exists. | The app only surfaces status; export and restore remain explicit user actions. | Focused Settings ViewModel, localization parity, and hardcoded-string regression tests passed on 2026-06-25. |
-| UX-001: Home pending-approval readiness and planner items route directly to Messages. | Approval review is a message task, not a setup diagnosis task. | Reduces path from Home alert to review queue to one tap. | User still reviews, edits, approves, rejects, or revokes before critical sends. | Focused Home interaction tests passed on 2026-06-25. |
-
-## 26. SSOT Maintenance Checklist
-
-When changing the project:
-
-- Inspect the source files related to the change.
-- Update feature status/evidence in section 7.
-- Update architecture, setup, commands, validation, or security sections if affected.
-- Record fresh validation commands and outcomes.
-- Separate local automated evidence from live device/integration evidence.
-- Preserve known live-validation blockers with concrete prerequisites.
-- Do not paste secrets, API keys, app passwords, OAuth tokens, or keystore values into this file.
-- Keep this file as the canonical source of truth, and keep `PLAN.md`, `PRODUCT_BLUEPRINT.md`, and `IMPLEMENTATION_TASKS.md` aligned when product scope, debt status, or execution order changes.
+1. Update this file in the same change that alters architecture, features, permissions, persistence, release gates, or user workflows.
+2. Do not add new authoritative Markdown documents. Add sections here or generate external docs from this file.
+3. If a supporting document must remain, mark it as historical/reference and point back to this SSOT.
+4. Keep claims evidence-based. Mark external, runtime, or release-owner-only facts as unverified until validated.
+5. Do not store secrets, API keys, tokens, message bodies, or personal contact fixtures in documentation.
+6. Do not delete migrated documents until this cleanup report is reviewed and removal is explicitly approved.

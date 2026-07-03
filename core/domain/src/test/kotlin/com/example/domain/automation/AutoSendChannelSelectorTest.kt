@@ -72,6 +72,59 @@ class AutoSendChannelSelectorTest {
     }
 
     @Test
+    fun `orderedRoutes puts strongest successful historical channel before fallback routes`() {
+        val contact = contact(
+            preferredChannel = MessageChannel.SMS,
+            primaryPhone = "+15551234567",
+            primaryEmail = "alex@example.com",
+        )
+        val history = listOf(
+            sent(MessageChannel.EMAIL, MessageDeliveryStatus.DELIVERED),
+            sent(MessageChannel.EMAIL, MessageDeliveryStatus.SENT),
+            sent(MessageChannel.WHATSAPP, MessageDeliveryStatus.SENT),
+            sent(MessageChannel.SMS, MessageDeliveryStatus.FAILED),
+        )
+
+        val routes = AutoSendChannelSelector.orderedRoutes(
+            contact = contact,
+            routeHistory = history,
+            channelBlackoutJson = blackoutJson(),
+            senderEmail = "me@example.com",
+            senderEmailPassword = "app-password",
+        )
+
+        assertEquals(
+            listOf(MessageChannel.EMAIL, MessageChannel.SMS, MessageChannel.WHATSAPP),
+            routes,
+        )
+    }
+
+    @Test
+    fun `orderedRoutes keeps preferred route first when no successful history is usable`() {
+        val contact = contact(
+            preferredChannel = MessageChannel.WHATSAPP,
+            primaryPhone = "+15551234567",
+            primaryEmail = "alex@example.com",
+        )
+        val history = listOf(
+            sent(MessageChannel.EMAIL, MessageDeliveryStatus.DELIVERED),
+        )
+
+        val routes = AutoSendChannelSelector.orderedRoutes(
+            contact = contact,
+            routeHistory = history,
+            channelBlackoutJson = blackoutJson(MessageChannel.EMAIL),
+            senderEmail = "me@example.com",
+            senderEmailPassword = "app-password",
+        )
+
+        assertEquals(
+            listOf(MessageChannel.WHATSAPP, MessageChannel.SMS),
+            routes,
+        )
+    }
+
+    @Test
     fun `select ignores historical channels that are unavailable now`() {
         val contact = contact(
             preferredChannel = MessageChannel.SMS,

@@ -1,6 +1,5 @@
 package com.example.domain.usecase
 
-import com.example.domain.contact.toClassificationPromptContext
 import com.example.domain.repository.ContactRepository
 import com.example.domain.service.AiService
 import com.example.domain.service.ContactClassificationContract
@@ -22,17 +21,18 @@ class ClassifyContactUseCase @Inject constructor(
     private val aiService: AiService
 ) {
     suspend operator fun invoke(contactId: String): ClassificationOutcome {
-        val contact = contactRepository.getById(contactId) ?: return ClassificationOutcome.ContactNotFound
+        val contact = contactRepository.getClassificationProfile(contactId)
+            ?: return ClassificationOutcome.ContactNotFound
 
         if (contact.relationshipType != "UNKNOWN" && contact.relationshipType.isNotEmpty()) {
             return ClassificationOutcome.AlreadyClassified(contact.relationshipType)
         }
 
-        val result = aiService.classifyContact(contact.toClassificationPromptContext())
+        val result = aiService.classifyContact(contact.promptContext)
         val normalizedType = ContactClassificationContract.normalizeRelationshipType(result.type)
 
         contactRepository.updateClassification(
-            id = contact.id,
+            id = contact.id.value,
             type = normalizedType,
             subtype = result.subtype,
             lang = ContactClassificationContract.normalizeLanguage(result.language),

@@ -115,9 +115,10 @@ class MemoryVaultScreenInteractionTest {
             .assertIsDisplayed()
             .performTextInput("Met at Jaipur trip")
         composeRule.onNodeWithText(context.getString(R.string.memory_vault_ai_usage_note))
+            .performScrollTo()
             .assertIsDisplayed()
+        composeRule.assertLazyItemVisible(MemoryVaultTestTags.CATEGORY_PREFIX + MemoryVaultViewModel.CATEGORY_PRIVATE)
         composeRule.onNodeWithTag(MemoryVaultTestTags.CATEGORY_PREFIX + MemoryVaultViewModel.CATEGORY_PRIVATE)
-            .assertIsDisplayed()
             .performClick()
         composeRule.assertLazyItemVisible(MemoryVaultTestTags.ADD_BUTTON)
         composeRule.onNodeWithTag(MemoryVaultTestTags.ADD_BUTTON)
@@ -136,9 +137,8 @@ class MemoryVaultScreenInteractionTest {
             .performTextClearance()
         composeRule.onNodeWithTag(MemoryVaultTestTags.EDIT_FIELD_PREFIX + "note_plain")
             .performTextInput("Likes kesar chai")
-        composeRule.onNodeWithTag(MemoryVaultTestTags.EDIT_CATEGORY_PREFIX + "GIFT")
-            .assertIsDisplayed()
-            .performClick()
+        composeRule.clickLazyTag(MemoryVaultTestTags.EDIT_CATEGORY_PREFIX + "GIFT")
+        composeRule.assertLazyItemVisible(MemoryVaultTestTags.EDIT_SAVE_PREFIX + "note_plain")
         composeRule.onNodeWithTag(MemoryVaultTestTags.EDIT_SAVE_PREFIX + "note_plain")
             .assertIsEnabled()
             .performClick()
@@ -308,8 +308,7 @@ class MemoryVaultScreenInteractionTest {
 
         composeRule.onNodeWithTag(MemoryVaultTestTags.NOTE_FIELD)
             .assertTextContains(context.getString(R.string.memory_prompt_gift_preference_template))
-        composeRule.onNodeWithTag(MemoryVaultTestTags.CATEGORY_PREFIX + "GIFT")
-            .assertIsDisplayed()
+        composeRule.assertLazyItemVisible(MemoryVaultTestTags.CATEGORY_PREFIX + "GIFT")
         assertEquals("GIFT", selectedCategory)
     }
 

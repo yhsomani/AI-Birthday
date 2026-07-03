@@ -4,10 +4,11 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.core.automation.notifications.NotificationHelper
+import com.example.core.automation.notifications.showSystemAlert
 import com.example.core.automation.scheduler.WorkerScheduler
-import com.example.core.data.R
 import com.example.core.prefs.SecurePrefs
+import com.example.domain.model.notification.SystemAlertNotificationReason
+import com.example.domain.model.notification.SystemAlertNotificationRequest
 import com.example.domain.service.EventReminderSchedulerService
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -34,10 +35,10 @@ class DailyTriggerWorker @AssistedInject constructor(
             now - backupReferenceMs > thirtyDaysMs &&
             (lastReminderMs == 0L || now - lastReminderMs > thirtyDaysMs)
         ) {
-            NotificationHelper.showSystemAlert(
-                applicationContext,
-                applicationContext.getString(R.string.notification_backup_reminder_title),
-                applicationContext.getString(R.string.notification_backup_reminder_message),
+            applicationContext.showSystemAlert(
+                SystemAlertNotificationRequest(
+                    reason = SystemAlertNotificationReason.BACKUP_STALE,
+                )
             )
             prefs.setLastBackupReminderMs(now)
         }

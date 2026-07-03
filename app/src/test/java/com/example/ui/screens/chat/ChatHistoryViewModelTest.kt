@@ -2,10 +2,12 @@ package com.example.ui.screens.chat
 
 import androidx.lifecycle.SavedStateHandle
 import com.example.R
-import com.example.core.db.entities.SentMessageEntity
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.SentMessageId
 import com.example.domain.model.message.ChatHistoryMessageItem
+import com.example.domain.model.message.SentMessageRecord
 import com.example.domain.repository.MessageRepository
 import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
@@ -36,7 +38,7 @@ class ChatHistoryViewModelTest {
     private lateinit var messageRepository: MessageRepository
 
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var sentMessages: MutableStateFlow<List<SentMessageEntity>>
+    private lateinit var sentMessages: MutableStateFlow<List<SentMessageRecord>>
 
     @Before
     fun setUp() {
@@ -108,12 +110,12 @@ class ChatHistoryViewModelTest {
         val birthday = sentMessage(
             id = "sent_1",
             messageText = "Happy birthday!",
-            channel = MessageChannel.WHATSAPP.raw,
+            channel = MessageChannel.WHATSAPP,
         )
         val project = sentMessage(
             id = "sent_2",
             messageText = "Project milestone note",
-            channel = MessageChannel.EMAIL.raw,
+            channel = MessageChannel.EMAIL,
         )
         sentMessages.value = listOf(birthday, project)
         val viewModel = ChatHistoryViewModel(
@@ -131,7 +133,7 @@ class ChatHistoryViewModelTest {
         val projectFollowUp = sentMessage(
             id = "sent_3",
             messageText = "Project celebration follow-up",
-            channel = MessageChannel.SMS.raw,
+            channel = MessageChannel.SMS,
         )
         sentMessages.value = listOf(birthday, project, projectFollowUp)
         advanceUntilIdle()
@@ -147,23 +149,23 @@ class ChatHistoryViewModelTest {
     private fun sentMessage(
         id: String = "sent_1",
         messageText: String = "Happy birthday!",
-        channel: String = MessageChannel.WHATSAPP.raw,
-    ): SentMessageEntity = SentMessageEntity(
-        id = id,
-        contactId = "contact_1",
+        channel: MessageChannel = MessageChannel.WHATSAPP,
+    ): SentMessageRecord = SentMessageRecord(
+        id = SentMessageId(id),
+        contactId = ContactId("contact_1"),
         eventType = "BIRTHDAY",
         eventYear = 2026,
         messageText = messageText,
         channel = channel,
         sentAtMs = 1_700_000_000_000L,
-        deliveryStatus = "SENT",
+        deliveryStatus = MessageDeliveryStatus.SENT,
     )
 
-    private fun SentMessageEntity.toChatHistoryItem(): ChatHistoryMessageItem {
+    private fun SentMessageRecord.toChatHistoryItem(): ChatHistoryMessageItem {
         return ChatHistoryMessageItem(
-            id = SentMessageId(id),
+            id = id,
             messageText = messageText,
-            channel = MessageChannel.fromRaw(channel),
+            channel = channel,
             sentAtMs = sentAtMs,
         )
     }

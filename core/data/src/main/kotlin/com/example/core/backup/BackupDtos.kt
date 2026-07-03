@@ -132,7 +132,7 @@ internal data class BackupPreferencesDto(
 
     companion object {
         fun defaults() = BackupPreferencesDto(
-            globalAutomationMode = ApprovalMode.FULLY_AUTO.raw,
+            globalAutomationMode = ApprovalMode.ALWAYS_ASK.raw,
             themeMode = "SYSTEM",
             blackoutDatesJson = "[]",
             quietHoursStart = 22,

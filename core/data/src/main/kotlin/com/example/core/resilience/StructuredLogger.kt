@@ -54,7 +54,9 @@ object StructuredLogger {
         return entry.copy(
             message = SensitiveLogRedactor.redact(entry.message),
             throwable = null,
-            extras = entry.extras.mapValues { (_, value) -> SensitiveLogRedactor.redact(value) } + throwableExtras,
+            extras = entry.extras.mapValues { (key, value) ->
+                SensitiveLogRedactor.redactValue(key, value)
+            } + throwableExtras,
         )
     }
 
