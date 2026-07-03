@@ -8,17 +8,19 @@ Source backlog: [IMPLEMENTATION_TASKS.md](IMPLEMENTATION_TASKS.md)
 
 Completed tasks:
 
-- A-005 architecture slice: reduce `AutomationSetupViewModel` concentration by moving setup UI contracts, account/provider check presentation, pure readiness presentation reduction, and Android capability probing into focused collaborators.
+- A-005 architecture slice: reduce `AutomationSetupViewModel` concentration by moving setup UI contracts, account/provider check presentation, quality check presentation, pure readiness presentation reduction, and Android capability probing into focused collaborators.
 
 Changed files:
 
 - [app/src/main/java/com/example/ui/viewmodel/AutomationSetupUiState.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupUiState.kt)
 - [app/src/main/java/com/example/ui/viewmodel/AutomationSetupReadinessPresenter.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupReadinessPresenter.kt)
 - [app/src/main/java/com/example/ui/viewmodel/AutomationSetupAccountProviderCheckPresenter.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupAccountProviderCheckPresenter.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupQualityCheckPresenter.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupQualityCheckPresenter.kt)
 - [app/src/main/java/com/example/ui/viewmodel/AutomationSetupCapabilityProbe.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupCapabilityProbe.kt)
 - [app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt)
 - [app/src/test/java/com/example/ui/viewmodel/AutomationSetupReadinessPresenterTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupReadinessPresenterTest.kt)
 - [app/src/test/java/com/example/ui/viewmodel/AutomationSetupAccountProviderCheckPresenterTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupAccountProviderCheckPresenterTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/AutomationSetupQualityCheckPresenterTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupQualityCheckPresenterTest.kt)
 - [app/src/test/java/com/example/ui/viewmodel/AutomationSetupCapabilityProbeTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupCapabilityProbeTest.kt)
 - [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
 - [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
@@ -28,14 +30,15 @@ What changed:
 - Moved `AiDoctorAction`, `AiDoctorSummary`, `ReadinessCheck`, `AiDoctorRecommendedFix`, and `AutomationSetupUiState` out of the ViewModel into a dedicated setup UI contract file.
 - Extracted `AutomationSetupReadinessPresenter` for summary copy, recommended-fix ranking, setup progress projection, and canonical setup-action readiness.
 - Extracted `AutomationSetupAccountProviderCheckPresenter` for Google Contacts, Gemini access, AI wish generation, and Gemini circuit check presentation.
+- Extracted `AutomationSetupQualityCheckPresenter` for Style Coach, personalization, and generic-message-risk check presentation.
 - Extracted `AutomationSetupCapabilityProbe` for permission, package, accessibility-service, Google Contacts, and Firebase-auth checks.
-- Updated the ViewModel to keep setup orchestration while delegating account/provider check presentation, pure presentation reduction, and platform probing.
+- Updated the ViewModel to keep setup orchestration while delegating account/provider check presentation, quality check presentation, pure presentation reduction, and platform probing.
 - Added direct unit coverage for the extracted presenters and capability probe.
 
 Validation:
 
 ```bash
-JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.AutomationSetupAccountProviderCheckPresenterTest --tests com.example.ui.viewmodel.AutomationSetupCapabilityProbeTest --tests com.example.ui.viewmodel.AutomationSetupReadinessPresenterTest --tests com.example.ui.viewmodel.AutomationSetupViewModelTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.AutomationSetupAccountProviderCheckPresenterTest --tests com.example.ui.viewmodel.AutomationSetupCapabilityProbeTest --tests com.example.ui.viewmodel.AutomationSetupQualityCheckPresenterTest --tests com.example.ui.viewmodel.AutomationSetupReadinessPresenterTest --tests com.example.ui.viewmodel.AutomationSetupViewModelTest --no-configuration-cache
 ```
 
 Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`; KSP printed its known non-fatal headless AWT warning.

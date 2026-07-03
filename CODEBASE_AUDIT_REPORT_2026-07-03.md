@@ -21,7 +21,7 @@ Top findings:
 | P1 | Readiness consistency now needs broader journey-level regression coverage. | Home, Messages, Wish Preview, Setup, setup notifications, and system alerts now have contract-level readiness journey coverage; the domain message lifecycle now has generate -> approve -> dispatch -> failed retry -> recovered dispatch coverage; the worker-to-dispatcher attempt-id handoff is guarded. UI navigation and real device/provider finalization can still regress between focused tests. | Add UI lifecycle and device/provider finalization end-to-end tests around the canonical readiness contract. |
 | Resolved | Domain persistence/platform leakage through Room/Paging/entity/Android contracts. | `core:domain` is now a Kotlin/JVM module; Room entities, DAO projections, Room-backed mappers, raw entity repository APIs, Android `Uri` backup parameters, Android imports, and `org.json` runtime reliance have been removed from domain. | Keep the guard tests green and route future platform/storage work through app/data adapters. |
 | Resolved | Windows/IDE Android builds now fail fast when Gradle runs on a JRE without `jlink`. | The pasted `:app:assembleDebug` failure used the Antigravity/Red Hat extension JRE, which lacks the `jlink` executable AGP needs for `JdkImageTransform`. | Keep the root Gradle preflight guard green and configure IDE Gradle JDK/JAVA_HOME to Android Studio JBR or Temurin JDK 21. |
-| P1 | Large presentation files concentrate workflow logic. | `AutomationSetupViewModel.kt` is now 1187 lines after extracting setup UI contracts, account/provider readiness presentation, overall readiness presentation, and Android capability probing; several screens are still 700-1000+ lines. This raises regression and review cost. | Continue splitting by feature state reducers, route-level coordinators, and reusable domain use cases. |
+| P1 | Large presentation files concentrate workflow logic. | `AutomationSetupViewModel.kt` is now 1097 lines after extracting setup UI contracts, account/provider and quality readiness presentation, overall readiness presentation, and Android capability probing; several screens are still 700-1000+ lines. This raises regression and review cost. | Continue splitting by feature state reducers, route-level coordinators, and reusable domain use cases. |
 | Resolved | AI generated message text logging risk. | `AiServiceImpl` now logs `recommendedVariantName` metadata only, and tests verify generated copy is absent from `StructuredLogger` history and Android logs. | Keep generated body fields omitted or keyed as redacted message-body text in future changes. |
 | P2 | Product has too many diagnostics surfaces without a guided fix sequence. | AI Doctor, Settings, Home, Messages, Wish Preview, and setup notifications all expose parts of readiness. | Convert setup and recovery into a ranked "Fix next" flow with one primary action at a time. |
 | P2 | Some dependencies appear unused or over-broad. | Retrofit, converter-moshi, and logging-interceptor are declared broadly; source usage is limited or absent. | Remove candidates one by one with compile and test verification. |
@@ -625,7 +625,7 @@ Ideal UX: a guided repair wizard with a ranked top issue, fix button, verificati
 
 Current implementation:
 
-- `AutomationSetupViewModel.kt` remains the largest ViewModel, now 1187 lines after focused A-005 splits.
+- `AutomationSetupViewModel.kt` remains the largest ViewModel, now 1097 lines after focused A-005 splits.
 - It imports many setup and readiness policies.
 - It checks Google contacts, Gemini, AI generation, circuit breaker, notifications, exact send, daily automation, health, dispatch recovery, email, style, personalization, generic messages, full automation, event routes, SMS/WhatsApp, and channel verification.
 - Android permission, package, Google Sign-In, Firebase-auth, and accessibility-service checks now live in `AutomationSetupCapabilityProbe.kt`.
@@ -1387,10 +1387,11 @@ Status:
 
 Evidence:
 
-- `AutomationSetupViewModel.kt` is now 1187 lines after extracting setup UI contracts, account/provider readiness presentation, overall readiness presentation reduction, and Android capability probes.
+- `AutomationSetupViewModel.kt` is now 1097 lines after extracting setup UI contracts, account/provider and quality readiness presentation, overall readiness presentation reduction, and Android capability probes.
 - `AutomationSetupUiState.kt` owns the AI Doctor setup state/action contracts.
 - `AutomationSetupReadinessPresenter.kt` owns summary, recommended-fix, progress, and setup-action-readiness projection, with focused unit coverage.
 - `AutomationSetupAccountProviderCheckPresenter.kt` owns Google Contacts, Gemini access, AI wish generation, and Gemini circuit check presentation, with focused unit coverage.
+- `AutomationSetupQualityCheckPresenter.kt` owns Style Coach, personalization, and generic-message-risk check presentation, with focused unit coverage.
 - `AutomationSetupCapabilityProbe.kt` owns SMS/notification permissions, WhatsApp installation/accessibility checks, Google Contacts access, and Firebase-auth probing, with focused unit coverage.
 - `WishPreviewScreen.kt`, `GiftAdvisorScreen.kt`, `EventsScreen.kt`, `SettingsScreen.kt`, `AutomationSetupScreen.kt`, and `HomeScreen.kt` are large.
 
@@ -1409,7 +1410,7 @@ Fix:
 
 Progress:
 
-- The first A-005 slices moved Automation Setup UI state models, account/provider check presentation, overall readiness presentation reduction, and Android capability probes out of the ViewModel. Remaining work is to extract setup readiness loading, the rest of the check presenters, and command execution.
+- The first A-005 slices moved Automation Setup UI state models, account/provider check presentation, quality check presentation, overall readiness presentation reduction, and Android capability probes out of the ViewModel. Remaining work is to extract setup readiness loading, the rest of the check presenters, and command execution.
 
 ### P2: Direct SecurePrefs In Presentation
 
@@ -1747,7 +1748,7 @@ Phase 5: Advanced product improvements
 | --- | --- | --- | --- |
 | A-003 | Expand journey-level regression coverage beyond the current contract-level review/channel/setup readiness paths into UI/use-case flows across Home, Messages, Wish Preview, Setup, and notifications. | P1 | App/QA |
 | A-004 | Keep `core:domain` JVM/persistence boundary guards green while adding future domain policies. | P2 | Architecture |
-| A-005 | Continue splitting `AutomationSetupViewModel`; UI contracts, account/provider readiness presentation, overall readiness presentation, and Android capability probes have been extracted, but readiness loading, remaining check presenters, and command execution remain. | P1 | App/Architecture |
+| A-005 | Continue splitting `AutomationSetupViewModel`; UI contracts, account/provider readiness presentation, quality readiness presentation, overall readiness presentation, and Android capability probes have been extracted, but readiness loading, remaining check presenters, and command execution remain. | P1 | App/Architecture |
 | A-006 | Expand message lifecycle journey coverage from the current domain and worker-attempt bridge regressions into UI navigation and real device/provider finalization paths. | P1 | QA |
 | A-007 | Expand failed dispatch recovery coverage from the current domain retry and worker-attempt bridge regressions into real provider finalization and UI recovery flows. | P1 | QA |
 | A-008 | Clean local logs, patch scripts, and legacy app schemas after approval. | P2 | Repo Hygiene |

@@ -24,10 +24,6 @@ import com.example.domain.automation.ChannelVerificationReadiness
 import com.example.domain.automation.ChannelVerificationReadinessReason
 import com.example.domain.automation.FullAutomationReadiness
 import com.example.domain.automation.FullAutomationReadinessReason
-import com.example.domain.automation.GenericMessageReadiness
-import com.example.domain.automation.GenericMessageReadinessReason
-import com.example.domain.automation.PersonalizationReadiness
-import com.example.domain.automation.PersonalizationReadinessReason
 import com.example.domain.automation.SetupAccountProviderReadinessPolicy
 import com.example.domain.automation.SetupAutomationReadinessPolicy
 import com.example.domain.automation.SetupChannelReadinessPolicy
@@ -49,8 +45,6 @@ import com.example.domain.automation.SetupSystemReadinessPolicy
 import com.example.domain.automation.SetupProviderCircuitState
 import com.example.domain.automation.SmsSetupReadiness
 import com.example.domain.automation.SmsSetupReadinessReason
-import com.example.domain.automation.StyleCoachReadiness
-import com.example.domain.automation.StyleCoachReadinessReason
 import com.example.domain.automation.WhatsAppSetupReadiness
 import com.example.domain.automation.WhatsAppSetupReadinessReason
 import com.example.domain.readiness.RelationshipActionReadiness
@@ -130,6 +124,7 @@ class AutomationSetupViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AutomationSetupUiState())
     private val readinessPresenter = AutomationSetupReadinessPresenter(appContext)
     private val accountProviderCheckPresenter = AutomationSetupAccountProviderCheckPresenter(appContext)
+    private val qualityCheckPresenter = AutomationSetupQualityCheckPresenter(appContext)
     private val capabilityProbe = AutomationSetupCapabilityProbe(appContext)
     val uiState: StateFlow<AutomationSetupUiState> = _uiState.asStateFlow()
 
@@ -399,9 +394,11 @@ class AutomationSetupViewModel @Inject constructor(
                 selectedChannels = selectedChannels,
                 successfulChannels = successfulChannels,
             ),
-            SetupQualityReadinessPolicy.evaluateStyleCoach(
-                styleSampleCount = styleSampleCount,
-            ).toReadinessCheck(),
+            qualityCheckPresenter.styleCoach(
+                SetupQualityReadinessPolicy.evaluateStyleCoach(
+                    styleSampleCount = styleSampleCount,
+                ),
+            ),
             personalizationCheck(contacts),
             genericMessagesCheck(contacts),
             accountProviderCheckPresenter.geminiCircuit(
@@ -626,97 +623,6 @@ class AutomationSetupViewModel @Inject constructor(
                 SetupEmailReadinessReason.OPTIONAL -> AiDoctorAction.OPEN_SETTINGS
                 SetupEmailReadinessReason.UNVERIFIED -> AiDoctorAction.TEST_EMAIL
                 SetupEmailReadinessReason.VERIFIED -> AiDoctorAction.NONE
-            },
-            group = group,
-        )
-    }
-
-    private fun StyleCoachReadiness.toReadinessCheck(): ReadinessCheck {
-        return ReadinessCheck(
-            title = text(R.string.automation_setup_check_style_coach),
-            detail = when (reason) {
-                StyleCoachReadinessReason.TRAINED ->
-                    text(R.string.automation_setup_style_trained, sampleCount)
-                StyleCoachReadinessReason.NEEDS_MORE ->
-                    text(R.string.automation_setup_style_needs_more, samplesNeeded)
-                StyleCoachReadinessReason.EMPTY ->
-                    text(R.string.automation_setup_style_empty)
-            },
-            status = status,
-            actionLabel = when (reason) {
-                StyleCoachReadinessReason.TRAINED -> null
-                StyleCoachReadinessReason.NEEDS_MORE,
-                StyleCoachReadinessReason.EMPTY -> text(R.string.automation_setup_action_open_style_coach)
-            },
-            action = when (reason) {
-                StyleCoachReadinessReason.TRAINED -> AiDoctorAction.NONE
-                StyleCoachReadinessReason.NEEDS_MORE,
-                StyleCoachReadinessReason.EMPTY -> AiDoctorAction.OPEN_STYLE_COACH
-            },
-            group = group,
-        )
-    }
-
-    private fun PersonalizationReadiness.toReadinessCheck(): ReadinessCheck {
-        return ReadinessCheck(
-            title = text(R.string.automation_setup_check_personalization),
-            detail = when (reason) {
-                PersonalizationReadinessReason.EMPTY ->
-                    text(R.string.automation_setup_personalization_empty)
-                PersonalizationReadinessReason.READY -> text(
-                    R.string.automation_setup_personalization_ok,
-                    enrichedContactCount,
-                    totalContactCount,
-                )
-                PersonalizationReadinessReason.LOW -> text(
-                    R.string.automation_setup_personalization_low,
-                    enrichedContactCount,
-                    totalContactCount,
-                )
-            },
-            status = status,
-            actionLabel = when (reason) {
-                PersonalizationReadinessReason.EMPTY ->
-                    text(R.string.automation_setup_action_sync_contacts)
-                PersonalizationReadinessReason.READY -> null
-                PersonalizationReadinessReason.LOW ->
-                    text(R.string.automation_setup_action_review_contacts)
-            },
-            action = when (reason) {
-                PersonalizationReadinessReason.EMPTY -> AiDoctorAction.SYNC_CONTACTS
-                PersonalizationReadinessReason.READY -> AiDoctorAction.NONE
-                PersonalizationReadinessReason.LOW -> AiDoctorAction.OPEN_CONTACTS
-            },
-            group = group,
-        )
-    }
-
-    private fun GenericMessageReadiness.toReadinessCheck(): ReadinessCheck {
-        return ReadinessCheck(
-            title = text(R.string.automation_setup_check_generic_messages),
-            detail = when (reason) {
-                GenericMessageReadinessReason.EMPTY ->
-                    text(R.string.automation_setup_generic_messages_empty)
-                GenericMessageReadinessReason.READY ->
-                    text(R.string.automation_setup_generic_messages_ok)
-                GenericMessageReadinessReason.RISK -> text(
-                    R.string.automation_setup_generic_messages_low,
-                    genericRiskCount,
-                    totalContactCount,
-                )
-            },
-            status = status,
-            actionLabel = when (reason) {
-                GenericMessageReadinessReason.EMPTY ->
-                    text(R.string.automation_setup_action_sync_contacts)
-                GenericMessageReadinessReason.READY -> null
-                GenericMessageReadinessReason.RISK ->
-                    text(R.string.automation_setup_action_review_contacts)
-            },
-            action = when (reason) {
-                GenericMessageReadinessReason.EMPTY -> AiDoctorAction.SYNC_CONTACTS
-                GenericMessageReadinessReason.READY -> AiDoctorAction.NONE
-                GenericMessageReadinessReason.RISK -> AiDoctorAction.OPEN_CONTACTS
             },
             group = group,
         )
@@ -1091,11 +997,15 @@ class AutomationSetupViewModel @Inject constructor(
     }
 
     private fun personalizationCheck(contacts: List<ContactAutomationReadinessProfile>): ReadinessCheck {
-        return SetupQualityReadinessPolicy.evaluatePersonalization(contacts).toReadinessCheck()
+        return qualityCheckPresenter.personalization(
+            SetupQualityReadinessPolicy.evaluatePersonalization(contacts),
+        )
     }
 
     private fun genericMessagesCheck(contacts: List<ContactAutomationReadinessProfile>): ReadinessCheck {
-        return SetupQualityReadinessPolicy.evaluateGenericMessages(contacts).toReadinessCheck()
+        return qualityCheckPresenter.genericMessages(
+            SetupQualityReadinessPolicy.evaluateGenericMessages(contacts),
+        )
     }
 
     private fun countJsonArrayItems(raw: String?): Int {
