@@ -1,7 +1,7 @@
 package com.example.core.gemini
 
 import com.example.core.db.entities.ContactEntity
-import com.example.domain.contact.toMessagePromptContact
+import com.example.core.db.toMessagePromptContact
 import com.example.domain.memory.MemoryNotePromptPolicy
 import com.example.domain.message.buildMessagePromptContext
 import com.example.domain.model.contact.ContactClassificationPromptContext

@@ -18,12 +18,12 @@ Top findings:
 
 | Priority | Finding | Why it matters | Recommended action |
 | --- | --- | --- | --- |
-| P1 | Readiness and trust state is distributed across Home, Messages, Wish Preview, AI Doctor, dispatch workers, and setup policies. | Users may see multiple "blocked", "ready", or "needs setup" explanations for the same underlying condition. | `RelationshipActionReadiness` now defines the canonical contract; migrate Home, Messages, Wish Preview, Setup, and notifications to consume it consistently. |
-| P1 | Domain purity is incomplete. `core/domain` depends on Room and Paging and exposes `ContactEntity` plus paging types. | This locks business logic to persistence details and makes future persistence/model migration harder. | Move Room entities/DAOs to data/database, expose domain models from repositories, remove Paging from domain unless it is a first-class domain contract. |
+| P1 | Readiness consistency now needs journey-level regression coverage. | Home, Messages, Wish Preview, Setup, and setup/system notifications now consume `RelationshipActionReadiness`, but cross-surface setup/generate/review/send/recover flows can still regress between focused tests. | Add message lifecycle and failed-recovery journey tests around the canonical readiness contract. |
+| Resolved | Domain persistence leakage through Room/Paging/entity contracts. | Room entities, DAO projections, Room-backed mappers, raw entity repository APIs, and Android `Uri` backup service parameters have been removed from `core/domain`; boundary tests now guard this. | Keep the guard tests and evaluate converting `core:domain` from an Android library module to a JVM module. |
 | P1 | Large presentation files concentrate workflow logic. | `AutomationSetupViewModel.kt` is about 1435 lines; several screens are 700-1000+ lines. This raises regression and review cost. | Split by feature state reducers, route-level coordinators, and reusable domain use cases. |
 | Resolved | AI generated message text logging risk. | `AiServiceImpl` now logs `recommendedVariantName` metadata only, and tests verify generated copy is absent from `StructuredLogger` history and Android logs. | Keep generated body fields omitted or keyed as redacted message-body text in future changes. |
 | P2 | Product has too many diagnostics surfaces without a guided fix sequence. | AI Doctor, Settings, Home, Messages, Wish Preview, and setup notifications all expose parts of readiness. | Convert setup and recovery into a ranked "Fix next" flow with one primary action at a time. |
-| P2 | Some dependencies appear unused or over-broad. | Retrofit, converter-moshi, logging-interceptor, and Paging are declared broadly; source usage is limited or absent. | Remove candidates one by one with compile and test verification. |
+| P2 | Some dependencies appear unused or over-broad. | Retrofit, converter-moshi, and logging-interceptor are declared broadly; source usage is limited or absent. | Remove candidates one by one with compile and test verification. |
 | P2 | Local/generated artifacts remain near source. | Logs, legacy schemas, one-off patch scripts, and generated screenshots create noise and review risk. | Delete after approval or archive outside the repo; keep active schemas and test baselines. |
 
 ## Product Assessment
@@ -102,11 +102,10 @@ The module split is directionally correct:
 - `:core:data`
 - `:core:ui`
 
-However, boundaries are not yet clean:
+However, boundaries are not yet fully clean:
 
-- `core/domain` imports Room runtime and Paging.
-- Domain repository interfaces expose database entities.
-- Some domain use cases still operate on persistence-shaped message records.
+- `core/domain` main source is now free of Android, AndroidX, Room entity, DAO, and Paging imports, but the module is still configured as an Android library.
+- Repository interfaces no longer expose Room entities for the audited contact, message, event, dispatch, and pure-record paths; boundary tests now guard this.
 - ViewModels still access `SecurePrefs` directly in several places.
 - Android worker/scheduler code sometimes constructs data dependencies directly.
 
@@ -120,7 +119,7 @@ This is manageable but should be addressed before adding larger features.
 | --- | --- | --- |
 | `app` | Compose UI, navigation, ViewModels, Android app shell, tests. | Works but screen and ViewModel files are large. Feature package boundaries exist but are not consistently separated by domain workflow. |
 | `core:model` | JVM model module. | Good direction. More entity-free domain models should move here or be exposed from domain. |
-| `core:domain` | Use cases, policies, repository/service interfaces, many business rules. | Strong policy extraction work, but still polluted by Room/Paging/entity contracts. |
+| `core:domain` | Use cases, policies, repository/service interfaces, many business rules. | Strong policy extraction work. Main source is now persistence/platform-neutral, but the Gradle module is still an Android library and should be evaluated for JVM conversion. |
 | `core:data` | Room, workers, Firebase/Gemini, contacts sync, dispatch senders, backup, preferences. | Functionally rich. Contains Android-specific orchestration that should stay here, but some decisions are better delegated to domain policies. |
 | `core:ui` | Shared Compose components/theme. | Good, backed by token tests. Continue moving repeated patterns here carefully. |
 
@@ -141,10 +140,10 @@ This is manageable but should be addressed before adding larger features.
 
 | Problem | Evidence | Impact |
 | --- | --- | --- |
-| Domain depends on persistence frameworks. | `core/domain/build.gradle.kts` still includes Room, Room entities still live under `core/domain/src/main/kotlin/com/example/core/db/entities`, and `ContactRepository` still exposes `ContactEntity` for several mutation/use-case paths. | Harder to test and evolve model/storage separately. |
+| Domain module remains Android-configured. | `core/domain` main source no longer imports Android, AndroidX, Room entities, DAOs, or Paging, and Room runtime was removed from `core/domain/build.gradle.kts`; however, the module still uses the Android library plugin. | JVM conversion would reduce build overhead and make the intended pure-domain boundary explicit. |
 | App layer still owns too much orchestration. | `AutomationSetupViewModel.kt`, `WishPreviewViewModel.kt`, `MessagesViewModel.kt`, and `HomeViewModel.kt` coordinate many policies and repositories directly. | UI changes risk business behavior regressions. |
 | Screens are large. | `WishPreviewScreen.kt`, `GiftAdvisorScreen.kt`, `EventsScreen.kt`, `SettingsScreen.kt`, `AutomationSetupScreen.kt`, and `HomeScreen.kt` are large files. | Harder accessibility, layout, localization, and state review. |
-| Some repository APIs exposed persistence details unnecessarily. | `ContactRepository` exposed DAO relationship-count projections and raw health-ranking entity methods even though pure analytics methods already existed. These API leaks have been removed; broader entity cleanup remains. | Smaller domain API surface, but remaining entity contracts still need migration. |
+| Some repository APIs exposed persistence details unnecessarily. | `ContactRepository` exposed DAO relationship-count projections and raw health-ranking entity methods even though pure analytics methods already existed. These API leaks have been removed and are covered by boundary tests. | Smaller domain API surface and lower risk of persistence details returning. |
 | Documentation is abundant but can become stale. | Multiple audit, plan, progress, and SSOT docs overlap. | New contributors need a clear source of truth. |
 
 ### Proposed Structure
@@ -198,11 +197,10 @@ core/
 
 Recommended migration order:
 
-1. Remove Paging from `ContactRepository` or move paged contact access into a data/app-specific gateway.
-2. Move Room entities out of `core/domain`.
-3. Convert repository interfaces to return domain models.
-4. Replace direct `SecurePrefs` access in ViewModels with use cases or a `PreferencesRepository`.
-5. Split the largest ViewModels into route coordinator plus pure reducers/readers.
+1. Convert `core:domain` from an Android library module to a JVM module after confirming no Android Gradle plugin assumptions remain.
+2. Keep repository interfaces returning pure domain/model records and maintain the boundary guard tests.
+3. Replace direct `SecurePrefs` access in ViewModels with use cases or a `PreferencesRepository`.
+4. Split the largest ViewModels into route coordinator plus pure reducers/readers.
 
 ## Feature-By-Feature Audit
 
@@ -1281,12 +1279,15 @@ Related files:
 
 ## Technical Debt And Code Quality
 
-### P1: Domain Boundary Leakage
+### Resolved: Domain Persistence Boundary Leakage
 
 Evidence:
 
-- `core/domain/build.gradle.kts` depends on Room runtime.
-- Room entity classes still live under `core/domain/src/main/kotlin/com/example/core/db/entities`.
+- `core/domain/build.gradle.kts` no longer depends on Room runtime.
+- Room entity classes now live under `core/data/src/main/kotlin/com/example/core/db/entities`.
+- The DAO projection `RelationshipTypeCount` now lives next to `ContactDao` under `core:data`.
+- `core/domain/src/main/kotlin` no longer contains `com/example/core/db` source files.
+- `core/domain/src/main/kotlin` no longer imports Android, AndroidX, Room entities, DAOs, or Paging.
 - `core/domain/src/main/kotlin/com/example/domain/repository/ContactRepository.kt` now exposes pure contact models and commands; its legacy raw `ContactEntity` methods were removed.
 - Removed ContactRepository's unused DAO projection `countByRelationshipType()`, raw health-ranking entity methods, unused raw `getAll()` stream, unused raw `delete(ContactEntity)` command, and remaining legacy raw entity methods; pure `RelationshipAnalyticsCount` and `ContactAnalyticsSummary` methods remain.
 - Classification flows now use pure `ContactClassificationProfile` and unclassified `ContactId` lookups instead of fetching full `ContactEntity` records through use-case and worker paths.
@@ -1297,18 +1298,22 @@ Evidence:
 - Manual event saving now uses `ContactHeader` plus narrow manual-contact create/event-date update commands instead of fetching and upserting full `ContactEntity` records.
 - Contact sync now merges `ContactSyncRecord` directly and persists through data-layer `upsertSyncedContact()` mapping; the domain `ContactSyncMappers` entity mapper was removed.
 - Activity log, diagnostic snapshot, gift history, memory note, message feedback, and style profile persistence mappers now live in `core:data` instead of `core/domain`.
+- Dispatch-attempt persistence mappers now live in `core:data` instead of `core/domain`.
+- Event entity mappers for `Occasion`, `EventListItem`, and upcoming-event previews now live in `core:data`; domain event mappers only convert between pure event/list models.
+- Contact entity mappers for automation, readiness, analytics, prompt, routing, header, list, picker, and dispatch recipient projections now live in `core:data`.
+- `BackupService` now accepts pure `BackupDocumentReference` values instead of `android.net.Uri`; app/data layers do Android URI conversion at their boundaries.
+- `RepositoryBoundaryContractTest` now guards against recreating the removed mapper files in `core/domain`, against reintroducing Room entity imports into domain event mappers, and against Android/AndroidX/Room/DAO imports in domain main source.
 
 Impact:
 
-- Domain cannot stay pure.
-- Future storage changes require domain changes.
-- Tests need Android/framework dependencies unnecessarily.
+- The previously identified Room/Paging/entity contract leakage is addressed in current code.
+- Future storage changes are less likely to require domain-interface changes.
+- The remaining hardening step is build-level: `core:domain` can be evaluated for JVM module conversion now that main source is platform-neutral.
 
-Fix:
+Status:
 
-1. Continue moving remaining entity-to-domain mappers that depend on Room entities into data: contact, event, and dispatch mapper leftovers.
-2. Move Room entities out of `core/domain`.
-3. Remove Room dependency from `core/domain`.
+- Resolved in source and covered by regression tests.
+- Follow-up: convert `core:domain` from Android library to JVM module if the build graph allows it cleanly.
 
 ### P1: Readiness Model Duplication
 
@@ -1413,7 +1418,6 @@ Fix:
 Evidence:
 
 - `retrofit`, `converter-moshi`, and `logging-interceptor` are declared in app/core-data Gradle files, but no source references to Retrofit or `HttpLoggingInterceptor` were found in the searched source tree.
-- Paging is not currently visible in `core/domain`; keep checking app/core-data dependency declarations for unused paging after domain entity cleanup.
 
 Impact:
 
@@ -1497,7 +1501,6 @@ Do not delete files automatically without approval because the working tree is d
 | Path/pattern | Why | Required verification |
 | --- | --- | --- |
 | `app/schemas/com.example.core.db.AppDatabase/4.json`, `5.json`, `6.json`, `.gitkeep` | Active Room schema export is `core/data/schemas`. Docs already mark `app/schemas` as legacy/local generated. | Run migration tests and compile after deletion. |
-| `ContactRepository.getAllPaged()` and supporting app/domain Paging dependencies | No UI/use case consumer found beyond DAO/impl/interface. | Remove API, compile, run contact repository and contact screen tests. |
 | Retrofit and converter-moshi dependencies | No Retrofit source usage found. | Remove Gradle entries one by one and compile all modules. |
 | Logging interceptor dependency | No `HttpLoggingInterceptor` usage found. | Remove and compile. |
 
@@ -1520,7 +1523,7 @@ Strengths:
 - Exact alarm fallback exists.
 - Boot/timezone recovery exists.
 - SQLCipher and Room provide structured local persistence.
-- Paging exists for contacts, although current usage is questionable.
+- Contact list loading no longer exposes Paging through the domain boundary.
 
 Risks:
 
@@ -1643,7 +1646,7 @@ Recommended additions:
 
 1. Create canonical readiness/action model.
 2. Reuse readiness model in Home, Messages, Wish Preview, Setup, and notifications.
-3. Remove Room/Paging from `core/domain`.
+3. Convert `core:domain` from Android library to JVM module if the build graph allows it.
 4. Split `AutomationSetupViewModel` into:
    - setup readiness loader
    - check command executor
@@ -1670,10 +1673,10 @@ Phase 2: Readiness unification
 
 Phase 3: Domain purity
 
-- Move Room entities to data/database.
-- Introduce pure domain models at repository boundaries.
-- Remove Room/Paging dependencies from domain.
-- Keep mapping tests.
+- Keep Room entities and DAO projections in data/database.
+- Keep repository boundaries on pure domain/model records.
+- Convert `core:domain` to a JVM module if the Android plugin is no longer needed.
+- Keep mapping and boundary tests.
 
 Phase 4: UX simplification
 
@@ -1706,11 +1709,11 @@ Phase 5: Advanced product improvements
 - Refactor Home/Messages/Wish Preview to use it.
 - Convert AI Doctor to ranked fix flow.
 - Add message lifecycle end-to-end test.
-- Remove domain Paging if unused.
+- Evaluate JVM conversion for `core:domain`.
 
 ### 6-12 Weeks
 
-- Complete domain/entity separation.
+- Complete domain module build cleanup.
 - Add manual/local-only onboarding path.
 - Add prompt context controls.
 - Add dispatch timeline UI.
@@ -1728,13 +1731,13 @@ Phase 5: Advanced product improvements
 
 | ID | Task | Priority | Owner area |
 | --- | --- | --- | --- |
-| A-003 | Update Home, Messages, Wish Preview, Setup to consume canonical readiness. | P1 | App/Domain |
-| A-004 | Remove Room/Paging dependencies from `core/domain`. | P1 | Architecture |
+| A-003 | Add journey-level regression coverage for canonical readiness across Home, Messages, Wish Preview, Setup, and notifications. | P1 | App/QA |
+| A-004 | Convert `core:domain` from Android library to JVM module if compile/test verification stays clean. | P2 | Architecture |
 | A-005 | Split `AutomationSetupViewModel`. | P1 | App/Architecture |
 | A-006 | Add message lifecycle journey test. | P1 | QA |
 | A-007 | Add failed dispatch recovery journey test. | P1 | QA |
 | A-008 | Clean local logs, patch scripts, and legacy app schemas after approval. | P2 | Repo Hygiene |
-| A-009 | Remove unused Retrofit/logging/Paging dependencies after compile verification. | P2 | Build |
+| A-009 | Remove unused Retrofit/logging dependencies after compile verification. | P2 | Build |
 | A-010 | Add manual/local-only onboarding mode. | P2 | Product/App |
 | A-011 | Add prompt context preview and controls. | P2 | Product/AI |
 | A-012 | Add backup import diff and export-before-signout prompt. | P2 | Security/Product |

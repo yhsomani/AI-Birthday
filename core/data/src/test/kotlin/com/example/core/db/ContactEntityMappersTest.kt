@@ -1,4 +1,4 @@
-package com.example.domain.contact
+package com.example.core.db
 
 import com.example.core.db.entities.ContactEntity
 import com.example.domain.model.MessageChannel
@@ -8,9 +8,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ContactMappersTest {
+class ContactEntityMappersTest {
     @Test
-    fun `contact maps to message dispatch recipient`() {
+    fun contactMapsToMessageDispatchRecipient() {
         val recipient = ContactEntity(
             id = "contact_1",
             name = "Asha",
@@ -25,7 +25,7 @@ class ContactMappersTest {
     }
 
     @Test
-    fun `contact route readiness requires usable email syntax`() {
+    fun contactRouteReadinessRequiresUsableEmailSyntax() {
         val valid = ContactEntity(
             id = "valid",
             name = "Asha",

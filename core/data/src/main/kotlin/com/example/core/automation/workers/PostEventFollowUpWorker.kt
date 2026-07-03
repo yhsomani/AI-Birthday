@@ -20,13 +20,13 @@ import com.example.core.gemini.PromptBuilder
 import com.example.core.gemini.RateLimiter
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
+import com.example.core.db.toDeliveryRouteProfile
+import com.example.core.db.toHeader
+import com.example.core.db.toRelationshipPromptContext
 import com.example.domain.automation.AiAutoSendQualityGate
 import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.ApprovalModeResolver
 import com.example.domain.automation.AutomationSchedulePolicy
-import com.example.domain.contact.toDeliveryRouteProfile
-import com.example.domain.contact.toHeader
-import com.example.domain.contact.toRelationshipPromptContext
 import com.example.core.db.toEventEntity
 import com.example.core.db.toOccasion
 import com.example.domain.notification.buildApprovalNotificationRequest

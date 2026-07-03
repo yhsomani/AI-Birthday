@@ -2,6 +2,7 @@ package com.example.ui.viewmodel
 
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
+import com.example.domain.service.BackupDocumentReference
 import com.example.domain.service.BackupExportResult
 import com.example.domain.service.BackupFailureReason
 import com.example.domain.service.BackupImportResult
@@ -187,7 +188,7 @@ class BackupRestoreViewModelTest {
 
             assertEquals(3, viewModel.uiState.value.importSuccessCount)
             assertNull(viewModel.uiState.value.importPreview)
-            assertEquals(Uri.parse("content://backup"), service.importUri)
+            assertEquals(BackupDocumentReference("content://backup"), service.importDocument)
         } finally {
             Dispatchers.resetMain()
         }
@@ -220,10 +221,10 @@ class BackupRestoreViewModelTest {
         var exportCalled = false
         var previewCalled = false
         var importCalled = false
-        var importUri: Uri? = null
+        var importDocument: BackupDocumentReference? = null
 
         override suspend fun exportBackup(
-            outputUri: Uri?,
+            outputDocument: BackupDocumentReference?,
             passphrase: String,
         ): BackupOperationResult<BackupExportResult> {
             exportCalled = true
@@ -231,7 +232,7 @@ class BackupRestoreViewModelTest {
         }
 
         override suspend fun previewBackup(
-            inputUri: Uri,
+            inputDocument: BackupDocumentReference,
             passphrase: String,
         ): BackupOperationResult<BackupPreviewResult> {
             previewCalled = true
@@ -239,11 +240,11 @@ class BackupRestoreViewModelTest {
         }
 
         override suspend fun importBackup(
-            inputUri: Uri,
+            inputDocument: BackupDocumentReference,
             passphrase: String,
         ): BackupOperationResult<BackupImportResult> {
             importCalled = true
-            importUri = inputUri
+            importDocument = inputDocument
             return importResult
         }
     }

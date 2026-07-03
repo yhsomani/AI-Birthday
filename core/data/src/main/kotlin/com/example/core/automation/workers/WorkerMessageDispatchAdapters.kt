@@ -7,8 +7,8 @@ import com.example.core.automation.sender.saveDispatchAttemptOutcome
 import com.example.core.db.dao.ContactDao
 import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.PendingMessageDao
+import com.example.core.db.toMessageDispatchRecipient
 import com.example.domain.dispatch.DispatchExceptionFailurePolicy
-import com.example.domain.contact.toMessageDispatchRecipient
 import com.example.data.repository.toPendingMessageRecord
 import com.example.domain.message.toMessageDispatchState
 import com.example.domain.model.MessageStatus

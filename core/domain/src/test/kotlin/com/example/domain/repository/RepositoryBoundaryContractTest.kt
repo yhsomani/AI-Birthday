@@ -95,6 +95,7 @@ class RepositoryBoundaryContractTest {
             "core/domain/src/main/kotlin/com/example/domain/message/MessageFeedbackMappers.kt",
             "core/domain/src/main/kotlin/com/example/domain/style/StyleProfileMappers.kt",
             "core/domain/src/main/kotlin/com/example/domain/dispatch/DispatchAttemptMappers.kt",
+            "core/domain/src/main/kotlin/com/example/domain/contact/ContactMappers.kt",
         ).forEach { relativePath ->
             assertFalse(
                 "$relativePath should stay in core:data because it maps Room entities.",
@@ -116,6 +117,30 @@ class RepositoryBoundaryContractTest {
                 source.contains("toEventEntity") ||
                 source.contains("toOccasions"),
         )
+    }
+
+    @Test
+    fun domainMainSources_doNotImportAndroidOrPersistenceFrameworks() {
+        val contactRepositoryFile = rootFile(
+            "core/domain/src/main/kotlin/com/example/domain/repository/ContactRepository.kt",
+        )
+        val sourceRoot = requireNotNull(
+            contactRepositoryFile.parentFile?.parentFile?.parentFile?.parentFile?.parentFile,
+        ) { "Could not resolve core/domain/src/main/kotlin from $contactRepositoryFile" }
+
+        sourceRoot.walkTopDown()
+            .filter { file -> file.isFile && file.extension == "kt" }
+            .forEach { file ->
+                val source = file.readText()
+                val relativePath = file.toRelativeString(sourceRoot)
+                assertFalse(
+                    "$relativePath should stay platform and persistence neutral.",
+                    source.contains("import android.") ||
+                        source.contains("import androidx.") ||
+                        source.contains("com.example.core.db.entities") ||
+                        source.contains("com.example.core.db.dao"),
+                )
+            }
     }
 
     private fun rootFile(relativePath: String): File {

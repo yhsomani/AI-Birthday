@@ -1,10 +1,13 @@
 package com.example.domain.service
 
-import android.net.Uri
-
 data class BackupExportResult(
     val fileName: String,
     val sizeBytes: Long,
+)
+
+@JvmInline
+value class BackupDocumentReference(
+    val uriString: String,
 )
 
 data class BackupImportResult(
@@ -71,9 +74,18 @@ sealed class BackupOperationResult<out T> {
 }
 
 interface BackupService {
-    suspend fun exportBackup(outputUri: Uri?, passphrase: String): BackupOperationResult<BackupExportResult>
+    suspend fun exportBackup(
+        outputDocument: BackupDocumentReference?,
+        passphrase: String,
+    ): BackupOperationResult<BackupExportResult>
 
-    suspend fun previewBackup(inputUri: Uri, passphrase: String): BackupOperationResult<BackupPreviewResult>
+    suspend fun previewBackup(
+        inputDocument: BackupDocumentReference,
+        passphrase: String,
+    ): BackupOperationResult<BackupPreviewResult>
 
-    suspend fun importBackup(inputUri: Uri, passphrase: String): BackupOperationResult<BackupImportResult>
+    suspend fun importBackup(
+        inputDocument: BackupDocumentReference,
+        passphrase: String,
+    ): BackupOperationResult<BackupImportResult>
 }

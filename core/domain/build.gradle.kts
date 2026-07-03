@@ -30,7 +30,6 @@ dependencies {
     api(project(":core:model"))
 
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.androidx.room.runtime)
     implementation(libs.javax.inject)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

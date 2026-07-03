@@ -15,6 +15,7 @@ import com.example.core.prefs.SecurePrefs
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
+import com.example.domain.service.BackupDocumentReference
 import com.example.domain.service.BackupFailureReason
 import com.example.domain.service.BackupOperationResult
 import com.example.domain.service.BackupRestoreMode
@@ -143,7 +144,7 @@ class BackupServiceImplTest {
     fun exportBackup_returnsFileNameAndSize() = runTest {
         database.contactDao().upsert(ContactEntity(id = "contact_1", name = "Alice"))
 
-        val result = service.exportBackup(outputUri = null, passphrase = PASSPHRASE)
+        val result = service.exportBackup(outputDocument = null, passphrase = PASSPHRASE)
 
         assertTrue(result is BackupOperationResult.Success)
         val value = (result as BackupOperationResult.Success).value
@@ -156,7 +157,7 @@ class BackupServiceImplTest {
         val selectedFile = File(context.filesDir, "selected-backup.enc").apply { delete() }
         database.contactDao().upsert(ContactEntity(id = "contact_1", name = "Alice"))
 
-        val result = service.exportBackup(Uri.fromFile(selectedFile), PASSPHRASE)
+        val result = service.exportBackup(Uri.fromFile(selectedFile).toBackupDocumentReference(), PASSPHRASE)
 
         assertTrue(result is BackupOperationResult.Success)
         assertTrue(selectedFile.exists())
@@ -171,7 +172,7 @@ class BackupServiceImplTest {
         val selectedFile = File(context.filesDir, "selected-backup.enc").apply { delete() }
         seedBackupRows()
 
-        val result = service.exportBackup(Uri.fromFile(selectedFile), PASSPHRASE)
+        val result = service.exportBackup(Uri.fromFile(selectedFile).toBackupDocumentReference(), PASSPHRASE)
 
         assertTrue(result is BackupOperationResult.Success)
         val decrypted = BackupEncryption.decrypt(selectedFile.readText(), PASSPHRASE)
@@ -262,7 +263,7 @@ class BackupServiceImplTest {
         val selectedFile = File(context.filesDir, "selected-backup.enc").apply { delete() }
         seedBackupRows()
 
-        val exportResult = service.exportBackup(Uri.fromFile(selectedFile), PASSPHRASE)
+        val exportResult = service.exportBackup(Uri.fromFile(selectedFile).toBackupDocumentReference(), PASSPHRASE)
         assertTrue(exportResult is BackupOperationResult.Success)
 
         database.close()
@@ -271,7 +272,7 @@ class BackupServiceImplTest {
             .build()
         service = BackupServiceImpl(context, database, securePrefs)
 
-        val importResult = service.importBackup(Uri.fromFile(selectedFile), PASSPHRASE)
+        val importResult = service.importBackup(Uri.fromFile(selectedFile).toBackupDocumentReference(), PASSPHRASE)
 
         assertTrue(importResult is BackupOperationResult.Success)
         assertEquals("Alice", database.contactDao().getById("contact_1")?.name)
@@ -285,7 +286,7 @@ class BackupServiceImplTest {
         val selectedFile = File(context.filesDir, "selected-backup.enc").apply { delete() }
         seedBackupRows()
 
-        val exportResult = service.exportBackup(Uri.fromFile(selectedFile), PASSPHRASE)
+        val exportResult = service.exportBackup(Uri.fromFile(selectedFile).toBackupDocumentReference(), PASSPHRASE)
         assertTrue(exportResult is BackupOperationResult.Success)
 
         database.close()
@@ -294,7 +295,7 @@ class BackupServiceImplTest {
             .build()
         service = BackupServiceImpl(context, database, securePrefs)
 
-        val previewResult = service.previewBackup(Uri.fromFile(selectedFile), PASSPHRASE)
+        val previewResult = service.previewBackup(Uri.fromFile(selectedFile).toBackupDocumentReference(), PASSPHRASE)
 
         assertTrue(previewResult is BackupOperationResult.Success)
         val preview = (previewResult as BackupOperationResult.Success).value
@@ -354,10 +355,14 @@ class BackupServiceImplTest {
         assertTrue(result.exceptionOrNull() is BackupFileTooLargeException)
     }
 
-    private fun encryptedFixture(json: String): Uri {
+    private fun encryptedFixture(json: String): BackupDocumentReference {
         val file = File(context.filesDir, "backup-test.enc")
         file.writeText(BackupEncryption.encrypt(json, PASSPHRASE))
-        return Uri.fromFile(file)
+        return Uri.fromFile(file).toBackupDocumentReference()
+    }
+
+    private fun Uri.toBackupDocumentReference(): BackupDocumentReference {
+        return BackupDocumentReference(toString())
     }
 
     private fun generatedBackupFiles(): List<File> {

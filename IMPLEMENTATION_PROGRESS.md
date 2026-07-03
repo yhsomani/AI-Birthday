@@ -4,6 +4,159 @@ Version: 1.0.0
 Date: 2026-06-26
 Source backlog: [IMPLEMENTATION_TASKS.md](IMPLEMENTATION_TASKS.md)
 
+## 2026-07-03 - Domain Persistence Source Boundary Cleanup
+
+Completed tasks:
+
+- A-004 architecture slice: move the remaining Room entity source files and DAO projection source out of `core/domain` and into `core:data`.
+- A-004 architecture slice: move entity tests from `core/domain` to `core:data`.
+- A-004 architecture slice: remove the Room runtime dependency from `core/domain`.
+- A-004 architecture slice: replace `android.net.Uri` in the domain backup service contract with a pure `BackupDocumentReference`.
+- A-004 architecture slice: add a domain-source guard preventing Android, AndroidX, Room entity, and DAO imports from returning to `core/domain` main source.
+
+Changed files:
+
+- Moved `core/domain/src/main/kotlin/com/example/core/db/entities/*.kt` to [core/data/src/main/kotlin/com/example/core/db/entities](core/data/src/main/kotlin/com/example/core/db/entities)
+- Moved [core/domain/src/main/kotlin/com/example/core/db/dao/RelationshipTypeCount.kt](core/domain/src/main/kotlin/com/example/core/db/dao/RelationshipTypeCount.kt) to [core/data/src/main/kotlin/com/example/core/db/dao/RelationshipTypeCount.kt](core/data/src/main/kotlin/com/example/core/db/dao/RelationshipTypeCount.kt)
+- Moved `core/domain/src/test/kotlin/com/example/core/db/entities/*.kt` to [core/data/src/test/kotlin/com/example/core/db/entities](core/data/src/test/kotlin/com/example/core/db/entities)
+- [core/domain/build.gradle.kts](core/domain/build.gradle.kts)
+- [core/domain/src/main/kotlin/com/example/domain/service/BackupService.kt](core/domain/src/main/kotlin/com/example/domain/service/BackupService.kt)
+- [core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt](core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt)
+- [app/src/main/java/com/example/ui/viewmodel/BackupRestoreViewModel.kt](app/src/main/java/com/example/ui/viewmodel/BackupRestoreViewModel.kt)
+- [app/src/test/java/com/example/ui/viewmodel/BackupRestoreViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/BackupRestoreViewModelTest.kt)
+- [core/data/src/test/kotlin/com/example/core/backup/BackupServiceImplTest.kt](core/data/src/test/kotlin/com/example/core/backup/BackupServiceImplTest.kt)
+- [core/domain/src/test/kotlin/com/example/domain/repository/RepositoryBoundaryContractTest.kt](core/domain/src/test/kotlin/com/example/domain/repository/RepositoryBoundaryContractTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Relocated all Room entity classes to `core:data` while preserving their package names for DAO/database compatibility.
+- Relocated `RelationshipTypeCount` next to `ContactDao`, where the DAO projection is produced and consumed.
+- Removed `implementation(libs.androidx.room.runtime)` from `core/domain`.
+- Added `BackupDocumentReference` as a string-backed pure domain value for backup document selection.
+- Converted `BackupRestoreViewModel` and `BackupServiceImpl` at their app/data edges so Android `Uri` remains outside the domain contract.
+- Extended `RepositoryBoundaryContractTest` to scan all `core/domain/src/main/kotlin` files for Android, AndroidX, Room entity, and DAO imports.
+
+Validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.repository.RepositoryBoundaryContractTest \
+  :core:data:testDebugUnitTest \
+  --tests com.example.core.backup.BackupServiceImplTest \
+  --tests com.example.data.repository.ContactRepositoryImplTest \
+  :app:testDebugUnitTest \
+  --tests com.example.ui.viewmodel.BackupRestoreViewModelTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional broad validation:
+
+```bash
+./gradlew :app:testDebugUnitTest :core:domain:testDebugUnitTest :core:data:testDebugUnitTest --no-configuration-cache
+```
+
+Result: passed.
+
+## 2026-07-03 - Remaining Domain Mapper Boundary Cleanup
+
+Completed tasks:
+
+- A-004 partial architecture slice: move dispatch-attempt, event, and contact Room entity mappers out of `core/domain`.
+- A-004 partial architecture slice: keep event and contact conversion next to the Room entity package in `core:data`.
+- A-004 partial architecture slice: leave only pure `EventListItem`/`Occasion` conversion in domain event mappers.
+- A-004 partial architecture slice: extend boundary tests so persistence mapper files and Room-backed event mapper logic cannot return to `core/domain`.
+
+Changed files:
+
+- Deleted [core/domain/src/main/kotlin/com/example/domain/dispatch/DispatchAttemptMappers.kt](core/domain/src/main/kotlin/com/example/domain/dispatch/DispatchAttemptMappers.kt)
+- Deleted [core/domain/src/test/kotlin/com/example/domain/dispatch/DispatchAttemptMappersTest.kt](core/domain/src/test/kotlin/com/example/domain/dispatch/DispatchAttemptMappersTest.kt)
+- Deleted [core/domain/src/main/kotlin/com/example/domain/contact/ContactMappers.kt](core/domain/src/main/kotlin/com/example/domain/contact/ContactMappers.kt)
+- Deleted [core/domain/src/test/kotlin/com/example/domain/contact/ContactMappersTest.kt](core/domain/src/test/kotlin/com/example/domain/contact/ContactMappersTest.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/DispatchAttemptRecordMappers.kt](core/data/src/main/kotlin/com/example/data/repository/DispatchAttemptRecordMappers.kt)
+- [core/data/src/test/kotlin/com/example/data/repository/DispatchAttemptRecordMappersTest.kt](core/data/src/test/kotlin/com/example/data/repository/DispatchAttemptRecordMappersTest.kt)
+- [core/data/src/main/kotlin/com/example/core/db/EventEntityMappers.kt](core/data/src/main/kotlin/com/example/core/db/EventEntityMappers.kt)
+- [core/data/src/test/kotlin/com/example/core/db/EventEntityMappersTest.kt](core/data/src/test/kotlin/com/example/core/db/EventEntityMappersTest.kt)
+- [core/data/src/main/kotlin/com/example/core/db/ContactEntityMappers.kt](core/data/src/main/kotlin/com/example/core/db/ContactEntityMappers.kt)
+- [core/data/src/test/kotlin/com/example/core/db/ContactEntityMappersTest.kt](core/data/src/test/kotlin/com/example/core/db/ContactEntityMappersTest.kt)
+- [core/domain/src/main/kotlin/com/example/domain/event/EventMappers.kt](core/domain/src/main/kotlin/com/example/domain/event/EventMappers.kt)
+- [core/domain/src/test/kotlin/com/example/domain/repository/RepositoryBoundaryContractTest.kt](core/domain/src/test/kotlin/com/example/domain/repository/RepositoryBoundaryContractTest.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/ContactRepositoryImpl.kt](core/data/src/main/kotlin/com/example/data/repository/ContactRepositoryImpl.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/EventRepositoryImpl.kt](core/data/src/main/kotlin/com/example/data/repository/EventRepositoryImpl.kt)
+- [core/data/src/main/kotlin/com/example/data/repository/DispatchAttemptRepositoryImpl.kt](core/data/src/main/kotlin/com/example/data/repository/DispatchAttemptRepositoryImpl.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/MessageDispatchWorker.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/HolidayWishWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/HolidayWishWorker.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/PostEventFollowUpWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/PostEventFollowUpWorker.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt](core/data/src/main/kotlin/com/example/core/automation/workers/RevivalWorker.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/workers/WorkerMessageDispatchAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/workers/WorkerMessageDispatchAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/notifications/EventReminderReceiver.kt](core/data/src/main/kotlin/com/example/core/automation/notifications/EventReminderReceiver.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/scheduler/EventReminderScheduler.kt](core/data/src/main/kotlin/com/example/core/automation/scheduler/EventReminderScheduler.kt)
+- [core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherPersistenceAdapters.kt](core/data/src/main/kotlin/com/example/core/automation/sender/MessageDispatcherPersistenceAdapters.kt)
+- [core/data/src/main/kotlin/com/example/core/backup/BackupDtos.kt](core/data/src/main/kotlin/com/example/core/backup/BackupDtos.kt)
+- [app/src/main/java/com/example/widget/BirthdayWidgetProvider.kt](app/src/main/java/com/example/widget/BirthdayWidgetProvider.kt)
+- [app/src/test/java/com/example/core/gemini/PromptBuilderTest.kt](app/src/test/java/com/example/core/gemini/PromptBuilderTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added data-layer dispatch attempt record mappers and moved their mapping tests from `core/domain` to `core:data`.
+- Added data-layer event entity mappers for `Occasion`, `EventListItem`, and upcoming-event previews; `core/domain` event mappers now only convert between pure domain/list models.
+- Added data-layer contact entity mappers for automation, readiness, analytics, prompt, routing, header, list, picker, and dispatch recipient projections.
+- Updated repositories, automation workers, backup DTOs, schedulers, notification receivers, widget code, and prompt tests to import persistence-backed mappers from `core:data`.
+- Tightened `RepositoryBoundaryContractTest` so contact, dispatch, and pure-repository mapper files cannot be recreated in `core/domain`, and so domain event mappers cannot import Room entities.
+
+Validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.repository.RepositoryBoundaryContractTest \
+  :core:data:testDebugUnitTest \
+  --tests com.example.core.db.ContactEntityMappersTest \
+  --tests com.example.data.repository.ContactRepositoryImplTest \
+  :app:testDebugUnitTest \
+  --tests com.example.core.gemini.PromptBuilderTest \
+  --tests com.example.widget.BirthdayWidgetProviderTest \
+  --tests com.example.core.automation.workers.HolidayWishWorkerTest \
+  --tests com.example.core.automation.workers.PostEventFollowUpWorkerTest \
+  --tests com.example.core.automation.workers.RevivalWorkerTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional focused validation:
+
+```bash
+./gradlew :core:domain:testDebugUnitTest \
+  --tests com.example.domain.repository.RepositoryBoundaryContractTest \
+  :core:data:testDebugUnitTest \
+  --tests com.example.core.db.EventEntityMappersTest \
+  --tests com.example.data.repository.EventRepositoryImplTest \
+  --tests com.example.data.repository.DispatchAttemptRecordMappersTest \
+  --tests com.example.core.automation.scheduler.EventReminderSchedulerTest \
+  --tests com.example.core.automation.sender.MessageDispatcherPersistenceAdaptersTest \
+  :app:testDebugUnitTest \
+  --tests com.example.widget.BirthdayWidgetProviderTest \
+  --tests com.example.core.automation.workers.HolidayWishWorkerTest \
+  --tests com.example.core.automation.workers.PostEventFollowUpWorkerTest \
+  --tests com.example.core.automation.workers.RevivalWorkerTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
+Additional broad validation:
+
+```bash
+./gradlew :app:testDebugUnitTest :core:domain:testDebugUnitTest :core:data:testDebugUnitTest --no-configuration-cache
+```
+
+Result: passed.
+
 ## 2026-07-03 - Pure Repository Mapper Boundary Cleanup
 
 Completed tasks:

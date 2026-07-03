@@ -7,6 +7,7 @@ import androidx.room.withTransaction
 import com.example.core.db.AppDatabase
 import com.example.core.prefs.SecurePrefs
 import com.example.core.resilience.StructuredLogger
+import com.example.domain.service.BackupDocumentReference
 import com.example.domain.service.BackupExportResult
 import com.example.domain.service.BackupFailureReason
 import com.example.domain.service.BackupImportResult
@@ -52,7 +53,7 @@ class BackupServiceImpl @Inject constructor(
         .indent("  ")
 
     override suspend fun exportBackup(
-        outputUri: Uri?,
+        outputDocument: BackupDocumentReference?,
         passphrase: String,
     ): BackupOperationResult<BackupExportResult> = withContext(Dispatchers.IO) {
         if (passphrase.isBlank()) {
@@ -63,6 +64,7 @@ class BackupServiceImpl @Inject constructor(
             val backupFile = createEncryptedBackupFile(passphrase)
             val backupFileName = backupFile.name
             val backupSizeBytes = backupFile.length()
+            val outputUri = outputDocument?.toAndroidUri()
             if (outputUri != null) {
                 val didWrite = try {
                     context.contentResolver.openOutputStream(outputUri)?.use { outputStream ->
@@ -106,14 +108,14 @@ class BackupServiceImpl @Inject constructor(
     }
 
     override suspend fun importBackup(
-        inputUri: Uri,
+        inputDocument: BackupDocumentReference,
         passphrase: String,
     ): BackupOperationResult<BackupImportResult> = withContext(Dispatchers.IO) {
         if (passphrase.isBlank()) {
             return@withContext BackupOperationResult.Failure(BackupFailureReason.BLANK_PASSPHRASE)
         }
 
-        val backup = when (val result = readValidatedBackup(inputUri, passphrase)) {
+        val backup = when (val result = readValidatedBackup(inputDocument, passphrase)) {
             is BackupOperationResult.Success -> result.value
             is BackupOperationResult.Failure -> return@withContext result
         }
@@ -167,23 +169,24 @@ class BackupServiceImpl @Inject constructor(
     }
 
     override suspend fun previewBackup(
-        inputUri: Uri,
+        inputDocument: BackupDocumentReference,
         passphrase: String,
     ): BackupOperationResult<BackupPreviewResult> = withContext(Dispatchers.IO) {
         if (passphrase.isBlank()) {
             return@withContext BackupOperationResult.Failure(BackupFailureReason.BLANK_PASSPHRASE)
         }
 
-        when (val result = readValidatedBackup(inputUri, passphrase)) {
+        when (val result = readValidatedBackup(inputDocument, passphrase)) {
             is BackupOperationResult.Success -> BackupOperationResult.Success(result.value.toPreviewResult())
             is BackupOperationResult.Failure -> result
         }
     }
 
     private fun readValidatedBackup(
-        inputUri: Uri,
+        inputDocument: BackupDocumentReference,
         passphrase: String,
     ): BackupOperationResult<BackupPayloadDto> {
+        val inputUri = inputDocument.toAndroidUri()
         val encryptedJson = try {
             context.contentResolver.openInputStream(inputUri)?.use { inputStream ->
                 readUtf8TextWithLimit(inputStream)
@@ -228,6 +231,8 @@ class BackupServiceImpl @Inject constructor(
 
         return BackupOperationResult.Success(backup)
     }
+
+    private fun BackupDocumentReference.toAndroidUri(): Uri = Uri.parse(uriString)
 
     private fun deleteInternalExportCopy(backupFile: File) {
         if (!backupFile.exists()) return
