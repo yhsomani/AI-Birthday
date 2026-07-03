@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -43,6 +44,20 @@ class MainActivityNavigationSmokeTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             waitForText(context.getString(R.string.onboarding_setup_title))
             composeRule.onNodeWithText(context.getString(R.string.onboarding_continue_to_sign_in))
+                .performClick()
+
+            waitForText(context.getString(R.string.auth_sign_in_google))
+        }
+    }
+
+    @Test
+    fun freshInstallSetupChecklist_showsAuthActions() {
+        seedSignedOutFreshInstall()
+
+        ActivityScenario.launch(MainActivity::class.java).use {
+            waitForText(context.getString(R.string.onboarding_setup_title))
+            composeRule.onNodeWithText(context.getString(R.string.onboarding_open_setup_checklist))
+                .performScrollTo()
                 .performClick()
 
             waitForText(context.getString(R.string.auth_sign_in_google))

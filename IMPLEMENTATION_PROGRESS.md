@@ -4,6 +4,197 @@ Version: 1.0.0
 Date: 2026-06-26
 Source backlog: [IMPLEMENTATION_TASKS.md](IMPLEMENTATION_TASKS.md)
 
+## 2026-07-03 - Gift Advisor Add Gift Dialog Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce remaining Gift Advisor presentation concentration by extracting the add-gift dialog, validation rendering, feedback controls, and shared error card into a focused component file.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt](app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt)
+- [app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorDialogComponents.kt](app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorDialogComponents.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved `AddGiftDialog`, `AddGiftDialogBody`, required text fields, feedback buttons, cost validation display, notes counter, and `GiftAdvisorErrorCard` out of `GiftAdvisorScreen.kt`.
+- Reduced `GiftAdvisorScreen.kt` from 856 lines to 571 lines while preserving `GiftAdvisorContent`, dialog test tags, validation behavior, suggestion-to-record flow, and callback contracts.
+- Added `GiftAdvisorDialogComponents.kt` as a 315-line focused dialog/form file; screenshot tests still import `AddGiftDialogBody` directly.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.giftadvisor.GiftAdvisorScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`; KSP printed its known non-fatal headless AWT warning during the focused test run.
+
+## 2026-07-03 - Events Manual Dialog Component Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce remaining Events presentation concentration by extracting manual-event dialog state, validation, contact picker, type chips, and duplicate/conflict warning rendering into a focused component file.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/events/EventsScreen.kt](app/src/main/java/com/example/ui/screens/events/EventsScreen.kt)
+- [app/src/main/java/com/example/ui/screens/events/EventsManualEventDialogComponents.kt](app/src/main/java/com/example/ui/screens/events/EventsManualEventDialogComponents.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved `ManualEventDialog`, `ManualEventDialogBody`, manual-event type options, local form state, local validation, contact dropdown rendering, and duplicate/date-conflict warning rendering out of `EventsScreen.kt`.
+- Reduced `EventsScreen.kt` from 737 lines to 365 lines while preserving `EventsContent`, `EventsList`, test tags, and save/dismiss callback contracts.
+- Added `EventsManualEventDialogComponents.kt` as a 396-line focused form/dialog file; screenshot tests still import `ManualEventDialogBody` directly.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.events.EventsScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-03 - Events Card Component Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce large-screen concentration in Events by extracting event-card presentation, source/verification labels, conflict chips, and resolution action rendering into a focused component file.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/events/EventsScreen.kt](app/src/main/java/com/example/ui/screens/events/EventsScreen.kt)
+- [app/src/main/java/com/example/ui/screens/events/EventsEventCardComponents.kt](app/src/main/java/com/example/ui/screens/events/EventsEventCardComponents.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved `EventCard`, source/verification/conflict chips, event-source normalization, type icon mapping, and merge/keep-separate row actions out of `EventsScreen.kt`.
+- Reduced `EventsScreen.kt` from 978 lines to 737 lines while preserving `EventsList`, manual-event form behavior, test tags, and callback contracts.
+- Added `EventsEventCardComponents.kt` as a 272-line focused rendering file shared by the Events list and manual-event type labels.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.events.EventsScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`; KSP printed its known non-fatal headless AWT warning during the focused test and final compile runs.
+
+## 2026-07-03 - Gift Advisor Suggestions Component Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce large-screen concentration in Gift Advisor by extracting AI gift-suggestion presentation and evidence rendering into a focused component file.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt](app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt)
+- [app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorSuggestionsComponents.kt](app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorSuggestionsComponents.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved `GiftSuggestionsPanel`, suggestion cards, budget/history evidence lines, progress/empty states, and record/dismiss controls out of `GiftAdvisorScreen.kt`.
+- Reduced `GiftAdvisorScreen.kt` from 1066 lines to 856 lines while preserving `GiftAdvisorContent`, test tags, and callback contracts.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.giftadvisor.GiftAdvisorScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`; KSP printed its known non-fatal headless AWT warning during the focused test run.
+
+## 2026-07-03 - Wish Preview Send Summary Component Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce large-screen concentration in Wish Preview by extracting the send-summary presentation and label mapping helpers into a focused component file.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt)
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewSendSummaryComponents.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewSendSummaryComponents.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved `WishSendSummaryCard`, its metadata row renderer, readiness title coloring, event/channel/approval labels, and route/device/dispatch context label mapping out of `WishPreviewScreen.kt`.
+- Reduced `WishPreviewScreen.kt` from 1086 lines to 823 lines while preserving the existing `WishPreviewScreenContent` entry point and test tags.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-03 - Onboarding Setup Journey Navigation Guards
+
+Completed tasks:
+
+- A-003/A-006 QA slice: add first-run setup-checklist navigation coverage for the onboarding path into Auth and the post-auth Automation Setup target.
+
+Changed files:
+
+- [app/src/androidTest/java/com/example/ui/MainActivityNavigationSmokeTest.kt](app/src/androidTest/java/com/example/ui/MainActivityNavigationSmokeTest.kt)
+- [app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt](app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added an instrumented `MainActivity` smoke for a signed-out fresh install that opens the onboarding setup checklist action and verifies the Auth actions appear.
+- Added a JVM NavGraph contract proving the onboarding setup checklist action stores `Screen.AutomationSetup.route` as the post-auth target before navigating to Auth.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.navigation.DeepLinkContractTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugAndroidTestKotlin --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`. Connected-device execution was not run because `adb` is not available on PATH in this shell.
+
+## 2026-07-03 - Current Tree Verification Sweep
+
+Completed tasks:
+
+- Validation slice: verify the current app, core-domain, core-data, and debug assembly paths after the A-005/A-007 changes.
+
+Changed files:
+
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Ran broader verification beyond the focused regressions so current worktree correctness is backed by full app debug unit tests, core domain/data unit tests, and the original debug assembly path.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :core:domain:test :core:data:testDebugUnitTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
 ## 2026-07-03 - Messages Recovery Setup Navigation Contract
 
 Completed tasks:

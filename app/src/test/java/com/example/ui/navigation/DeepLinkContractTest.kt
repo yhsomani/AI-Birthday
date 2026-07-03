@@ -151,6 +151,27 @@ class DeepLinkContractTest {
     }
 
     @Test
+    fun onboardingSetupChecklistRoutesThroughAuthToAutomationSetup() {
+        val source = rootFile("app/src/main/java/com/example/ui/navigation/NavGraph.kt").readText()
+        val onboardingBlock = source
+            .substringAfter("composable(Screen.Onboarding.route)")
+            .substringBefore("composable(Screen.Auth.route)")
+
+        assertTrue(
+            "Onboarding setup checklist action must be wired",
+            onboardingBlock.contains("onOpenAutomationSetup = {"),
+        )
+        assertTrue(
+            "Onboarding setup checklist must store Automation Setup as the post-auth target",
+            onboardingBlock.contains("postAuthDestination = Screen.AutomationSetup.route"),
+        )
+        assertTrue(
+            "Onboarding setup checklist must continue through Auth before opening signed-in setup",
+            onboardingBlock.contains("navController.navigate(Screen.Auth.route)"),
+        )
+    }
+
+    @Test
     fun messagesRoutesWireRecoverySetupActionsToAutomationSetup() {
         val source = rootFile("app/src/main/java/com/example/ui/navigation/NavGraph.kt").readText()
 

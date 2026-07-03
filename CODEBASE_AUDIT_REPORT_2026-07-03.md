@@ -18,10 +18,10 @@ Top findings:
 
 | Priority | Finding | Why it matters | Recommended action |
 | --- | --- | --- | --- |
-| P1 | Readiness consistency now needs broader journey-level regression coverage. | Home, Messages, Wish Preview, Setup, setup notifications, and system alerts now have contract-level readiness journey coverage; the domain message lifecycle now has generate -> approve -> dispatch -> failed retry -> recovered dispatch coverage; the worker-to-dispatcher attempt-id handoff, dispatcher retry-limit finalization, SMS delivered-failure receiver callback, Messages failed-row retry success path, and Messages recovery setup route wiring are guarded. Full UI journeys and physical-device provider flows can still regress between focused tests. | Add UI lifecycle and device/provider callback/finalization end-to-end tests around the canonical readiness contract. |
+| P1 | Readiness consistency now needs broader journey-level regression coverage. | Home, Messages, Wish Preview, Setup, setup notifications, and system alerts now have contract-level readiness journey coverage; the domain message lifecycle now has generate -> approve -> dispatch -> failed retry -> recovered dispatch coverage; the worker-to-dispatcher attempt-id handoff, dispatcher retry-limit finalization, SMS delivered-failure receiver callback, Messages failed-row retry success path, Messages recovery setup route wiring, and onboarding setup post-auth target are guarded. Full connected UI journeys and physical-device provider flows can still regress between focused tests. | Add UI lifecycle and device/provider callback/finalization end-to-end tests around the canonical readiness contract. |
 | Resolved | Domain persistence/platform leakage through Room/Paging/entity/Android contracts. | `core:domain` is now a Kotlin/JVM module; Room entities, DAO projections, Room-backed mappers, raw entity repository APIs, Android `Uri` backup parameters, Android imports, and `org.json` runtime reliance have been removed from domain. | Keep the guard tests green and route future platform/storage work through app/data adapters. |
 | Resolved | Windows/IDE Android builds now fail fast when Gradle runs on a JRE without `jlink`. | The pasted `:app:assembleDebug` failure used the Antigravity/Red Hat extension JRE, which lacks the `jlink` executable AGP needs for `JdkImageTransform`. | Keep the root Gradle preflight guard green and configure IDE Gradle JDK/JAVA_HOME to Android Studio JBR or Temurin JDK 21. |
-| P1 | Large presentation files concentrate workflow logic. | `AutomationSetupViewModel.kt` is now 214 lines after extracting setup UI contracts, account/provider, automation/channel, email, quality, system/recovery readiness presentation, command execution, readiness report loading, AI failure diagnosis, diagnostic snapshot persistence, overall readiness presentation, and Android capability probing; several screens are still 700-1000+ lines. This raises regression and review cost. | Continue splitting remaining large screens by feature state reducers, route-level coordinators, and reusable domain use cases. |
+| P1 | Large presentation files concentrate workflow logic. | `AutomationSetupViewModel.kt` is now 214 lines after extracting setup UI contracts, account/provider, automation/channel, email, quality, system/recovery readiness presentation, command execution, readiness report loading, AI failure diagnosis, diagnostic snapshot persistence, overall readiness presentation, and Android capability probing; `EventsScreen.kt` is now 365 lines after extracting card and manual-dialog components; `GiftAdvisorScreen.kt` is now 571 lines after extracting suggestions and add-gift dialog components. `WishPreviewScreen.kt` is still 823 lines, and several other screens remain large. This raises regression and review cost. | Continue splitting remaining large screens by feature state reducers, route-level coordinators, and reusable domain use cases. |
 | Resolved | AI generated message text logging risk. | `AiServiceImpl` now logs `recommendedVariantName` metadata only, and tests verify generated copy is absent from `StructuredLogger` history and Android logs. | Keep generated body fields omitted or keyed as redacted message-body text in future changes. |
 | P2 | Product has too many diagnostics surfaces without a guided fix sequence. | AI Doctor, Settings, Home, Messages, Wish Preview, and setup notifications all expose parts of readiness. | Convert setup and recovery into a ranked "Fix next" flow with one primary action at a time. |
 | P2 | Some dependencies appear unused or over-broad. | Retrofit, converter-moshi, and logging-interceptor are declared broadly; source usage is limited or absent. | Remove candidates one by one with compile and test verification. |
@@ -143,7 +143,7 @@ This is manageable but should be addressed before adding larger features.
 | --- | --- | --- |
 | Domain module boundary must stay guarded. | `core/domain` is now Kotlin/JVM and no longer imports Android, AndroidX, Room entities, DAOs, or Paging. Boundary tests scan for regressions. | Future platform/storage shortcuts can reintroduce coupling if the guards are weakened. |
 | App layer still owns too much orchestration. | `AutomationSetupViewModel.kt`, `WishPreviewViewModel.kt`, `MessagesViewModel.kt`, and `HomeViewModel.kt` coordinate many policies and repositories directly. | UI changes risk business behavior regressions. |
-| Screens are large. | `WishPreviewScreen.kt`, `GiftAdvisorScreen.kt`, `EventsScreen.kt`, `SettingsScreen.kt`, `AutomationSetupScreen.kt`, and `HomeScreen.kt` are large files. | Harder accessibility, layout, localization, and state review. |
+| Screens are large. | `WishPreviewScreen.kt`, `SettingsScreen.kt`, `AutomationSetupScreen.kt`, and `HomeScreen.kt` are large files. `EventsScreen.kt` is now decomposed to 365 lines with card and manual-dialog companion components; `GiftAdvisorScreen.kt` is now 571 lines with suggestions and add-gift dialog companion components. | Harder accessibility, layout, localization, and state review. |
 | Some repository APIs exposed persistence details unnecessarily. | `ContactRepository` exposed DAO relationship-count projections and raw health-ranking entity methods even though pure analytics methods already existed. These API leaks have been removed and are covered by boundary tests. | Smaller domain API surface and lower risk of persistence details returning. |
 | Documentation is abundant but can become stale. | Multiple audit, plan, progress, and SSOT docs overlap. | New contributors need a clear source of truth. |
 
@@ -475,12 +475,12 @@ Ideal UX: event creation should be fast, conflict-aware, and explain whether it 
 Current implementation:
 
 - `EventsViewModel` supports event filters, manual event save, duplicate and date conflict warnings, conflict resolution, and activity logging.
-- `EventsScreen.kt` is a large Compose screen with many UI states.
+- `EventsScreen.kt` is now 365 lines after moving event-card/trust-chip rendering into `EventsEventCardComponents.kt` and manual-event form/dialog rendering into `EventsManualEventDialogComponents.kt`.
 
 Gaps:
 
 - Manual event creation should preview downstream automation impact.
-- The screen is large and likely hard to maintain.
+- The code is now decomposed, but the manual event journey still needs stronger product guidance around downstream automation impact.
 
 Missing functionality:
 
@@ -508,6 +508,8 @@ Related files:
 
 - `app/src/main/java/com/example/ui/viewmodel/EventsViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/events/EventsScreen.kt`
+- `app/src/main/java/com/example/ui/screens/events/EventsEventCardComponents.kt`
+- `app/src/main/java/com/example/ui/screens/events/EventsManualEventDialogComponents.kt`
 - `core/domain/src/main/kotlin/com/example/domain/usecase/SaveManualEventUseCase.kt`
 
 ### 7. Message Queue
@@ -918,6 +920,7 @@ Current implementation:
 
 - `GiftAdvisorViewModel` loads contact gift profile, history, suggestions, budget status, duplicate warnings/confidence, add/delete/dismiss suggestion, and generates with AI.
 - Suggestions are filtered by budget when possible.
+- `GiftAdvisorScreen.kt` is now 571 lines after moving AI suggestion presentation into `GiftAdvisorSuggestionsComponents.kt` and add-gift dialog/form presentation into `GiftAdvisorDialogComponents.kt`.
 
 Gaps:
 
@@ -950,6 +953,8 @@ Related files:
 
 - `app/src/main/java/com/example/ui/viewmodel/GiftAdvisorViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt`
+- `app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorSuggestionsComponents.kt`
+- `app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorDialogComponents.kt`
 - `core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt`
 
 ### 16. Style Coach
@@ -1366,6 +1371,8 @@ data class RelationshipActionReadiness(
 - SMS receiver tests now cover delivered-callback provider failure through the Android callback adapter, proving the sent-message row is marked failed, the dispatch attempt is finalized with delivery-callback failure metadata and a dead-letter timestamp, and the pending message is marked failed.
 - Messages ViewModel tests now cover successful manual retry for a failed row, proving the UI recovery command queues `RetryFailedMessageUseCase`, records retry activity, clears the retry in-flight marker, and leaves no retry error.
 - Navigation contract tests now guard that both default and filtered Messages routes wire failed-send recovery setup actions to `Screen.AutomationSetup.route`. Remaining risk is full UI journey execution plus physical-device provider callback coverage.
+- Current-tree verification passed for `:app:testDebugUnitTest`, `:core:domain:test`, `:core:data:testDebugUnitTest`, and `:app:assembleDebug` using Android Studio JBR with the temporary local trust store.
+- First-run setup coverage now includes a compile-verified `MainActivity` instrumentation smoke for the onboarding setup checklist action reaching Auth, plus a JVM NavGraph contract proving the same action stores `Screen.AutomationSetup.route` as the post-auth destination. Connected-device execution remains unverified in this shell because `adb` is not on PATH.
 
 ### Resolved: Sensitive Message Logging
 
@@ -1403,7 +1410,10 @@ Evidence:
 - `AutomationSetupAiFailureDiagnoser.kt` owns provider failure classification and redacted AI failure copy, with focused unit coverage.
 - `AutomationSetupDiagnosticSnapshotStore.kt` owns persisted HealthMonitor snapshot lookup and redacted AI Doctor snapshot creation, with focused unit coverage.
 - `AutomationSetupCapabilityProbe.kt` owns SMS/notification permissions, WhatsApp installation/accessibility checks, Google Contacts access, and Firebase-auth probing, with focused unit coverage.
-- `WishPreviewScreen.kt`, `GiftAdvisorScreen.kt`, `EventsScreen.kt`, `SettingsScreen.kt`, `AutomationSetupScreen.kt`, and `HomeScreen.kt` are large.
+- `WishPreviewScreen.kt` is now 823 lines after moving send-summary presentation into `WishPreviewSendSummaryComponents.kt`; focused interaction coverage still validates summary labels and actions.
+- `GiftAdvisorScreen.kt` is now 571 lines after moving AI suggestion cards, evidence labels, progress/empty states, and record/dismiss controls into `GiftAdvisorSuggestionsComponents.kt`, and add-gift dialog/form rendering into `GiftAdvisorDialogComponents.kt`; focused interaction coverage still validates suggestion actions, dialog validation, record feedback, and delete actions.
+- `EventsScreen.kt` is now 365 lines after moving event-card source, verification, conflict, and resolution-action rendering into `EventsEventCardComponents.kt`, and manual-event dialog/form rendering into `EventsManualEventDialogComponents.kt`; focused interaction coverage still validates trust labels, merge/keep actions, and manual event type options.
+- `SettingsScreen.kt`, `AutomationSetupScreen.kt`, `HomeScreen.kt`, and several other UI surfaces are still large.
 
 Impact:
 
@@ -1421,6 +1431,9 @@ Fix:
 Progress:
 
 - The A-005 slices moved Automation Setup UI state models, account/provider check presentation, automation/channel check presentation, email check presentation, quality check presentation, system/recovery check presentation, command execution, readiness report loading, AI failure diagnosis, diagnostic snapshot persistence, overall readiness presentation reduction, and Android capability probes out of the ViewModel. The ViewModel now mainly observes inputs, applies reports to state, toggles in-flight flags, and exposes test delegates.
+- The Wish Preview send-summary card, readiness title coloring, metadata row renderer, and route/device/dispatch label helpers now live in `WishPreviewSendSummaryComponents.kt`; `WishPreviewScreen.kt` dropped from 1086 to 823 lines. `WishPreviewScreenInteractionTest` and `:app:assembleDebug` passed after the split.
+- Gift Advisor AI suggestion presentation now lives in `GiftAdvisorSuggestionsComponents.kt`, and add-gift dialog/form presentation now lives in `GiftAdvisorDialogComponents.kt`; `GiftAdvisorScreen.kt` dropped from 1066 to 571 lines across the two splits. `GiftAdvisorScreenInteractionTest` and `:app:assembleDebug` passed across the split checks.
+- Events event-card presentation now lives in `EventsEventCardComponents.kt`, and manual-event dialog/form presentation now lives in `EventsManualEventDialogComponents.kt`; `EventsScreen.kt` dropped from 978 to 365 lines across the two splits. `EventsScreenInteractionTest`, `:app:assembleDebug`, and `:app:compileDebugKotlin` passed across the split checks.
 
 ### P2: Direct SecurePrefs In Presentation
 
@@ -1755,8 +1768,8 @@ Phase 5: Advanced product improvements
 | --- | --- | --- | --- |
 | A-003 | Expand journey-level regression coverage beyond the current contract-level review/channel/setup readiness paths into UI/use-case flows across Home, Messages, Wish Preview, Setup, and notifications. | P1 | App/QA |
 | A-004 | Keep `core:domain` JVM/persistence boundary guards green while adding future domain policies. | P2 | Architecture |
-| A-005 | Primary `AutomationSetupViewModel` split is complete; keep the new collaborators covered and shift large-presentation cleanup to remaining oversized screens. | P2 | App/Architecture |
-| A-006 | Expand message lifecycle journey coverage from the current domain, worker-attempt bridge, dispatcher retry-limit, SMS receiver callback, Messages retry-command, and Messages recovery route-contract regressions into full UI journey execution and physical-device provider finalization paths. | P1 | QA |
+| A-005 | Primary `AutomationSetupViewModel` split is complete; keep the new collaborators covered and continue large-presentation cleanup across remaining oversized screens. | P2 | App/Architecture |
+| A-006 | Expand message lifecycle journey coverage from the current domain, worker-attempt bridge, dispatcher retry-limit, SMS receiver callback, Messages retry-command, Messages recovery route-contract, and onboarding setup post-auth route regressions into connected UI journey execution and physical-device provider finalization paths. | P1 | QA |
 | A-007 | Expand failed dispatch recovery coverage from the current domain retry, worker-attempt bridge, dispatcher retry-limit finalization, delivered-callback receiver, Messages retry-command, and Messages recovery route-contract regressions into physical-device provider callback and full UI recovery flows. | P1 | QA |
 | A-008 | Clean local logs, patch scripts, and legacy app schemas after approval. | P2 | Repo Hygiene |
 | A-009 | Remove unused Retrofit/logging dependencies after compile verification. | P2 | Build |
