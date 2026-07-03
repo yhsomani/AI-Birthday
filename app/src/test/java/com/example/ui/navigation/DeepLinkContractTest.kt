@@ -151,6 +151,31 @@ class DeepLinkContractTest {
     }
 
     @Test
+    fun messagesRoutesWireRecoverySetupActionsToAutomationSetup() {
+        val source = rootFile("app/src/main/java/com/example/ui/navigation/NavGraph.kt").readText()
+
+        listOf(
+            "Screen.Messages.route",
+            "Screen.Messages.filteredRoute",
+        ).forEach { routeReference ->
+            val routeBlock = source.authenticatedRouteBlock(routeReference)
+
+            assertTrue(
+                "$routeReference must render MessagesScreen",
+                routeBlock.contains("MessagesScreen("),
+            )
+            assertTrue(
+                "$routeReference must expose the Messages recovery setup callback",
+                routeBlock.contains("onNavigateToAutomationSetup = {"),
+            )
+            assertTrue(
+                "$routeReference must route failed-send recovery setup actions to Automation Setup",
+                routeBlock.contains("navController.navigate(Screen.AutomationSetup.route)"),
+            )
+        }
+    }
+
+    @Test
     fun notificationHelperUsesSharedDeepLinksForRoutedNotifications() {
         val source = rootFile("core/data/src/main/kotlin/com/example/core/automation/notifications/NotificationHelper.kt").readText()
 
@@ -188,6 +213,16 @@ class DeepLinkContractTest {
 
         return candidates.firstOrNull { it.isFile }
             ?: error("Could not find source file: $relativePath from $start")
+    }
+
+    private fun String.authenticatedRouteBlock(routeReference: String): String {
+        val routeStart = indexOf("route = $routeReference")
+        require(routeStart >= 0) { "Could not find authenticated route block for $routeReference" }
+
+        val nextRouteStart = indexOf("authenticatedComposable(", startIndex = routeStart + routeReference.length)
+            .takeIf { it >= 0 }
+            ?: length
+        return substring(routeStart, nextRouteStart)
     }
 
     private companion object {

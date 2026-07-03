@@ -4,23 +4,132 @@ Version: 1.0.0
 Date: 2026-06-26
 Source backlog: [IMPLEMENTATION_TASKS.md](IMPLEMENTATION_TASKS.md)
 
+## 2026-07-03 - Messages Recovery Setup Navigation Contract
+
+Completed tasks:
+
+- A-003/A-007 QA slice: guard the Messages failed-send recovery setup route wiring at the NavGraph contract level.
+
+Changed files:
+
+- [app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt](app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added a navigation contract regression proving both the default Messages route and filtered Messages route render `MessagesScreen`, expose `onNavigateToAutomationSetup`, and wire that recovery/setup callback to `Screen.AutomationSetup.route`.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.navigation.DeepLinkContractTest --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-03 - Messages Failed Retry Success Regression
+
+Completed tasks:
+
+- A-007 QA slice: cover the Messages UI recovery success path from a single failed row into `RetryFailedMessageUseCase`.
+
+Changed files:
+
+- [app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt](app/src/test/java/com/example/ui/viewmodel/MessagesViewModelTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added a ViewModel regression proving `retryMessage` queues a failed message through `RetryFailedMessageUseCase`, records the retry activity entry, clears the retry in-flight marker, and does not leave a retry error on success.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.MessagesViewModelTest --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-03 - SMS Delivered Callback Failure Regression
+
+Completed tasks:
+
+- A-007 QA slice: cover the Android SMS delivery callback adapter path when the provider reports delivery failure after send handoff.
+
+Changed files:
+
+- [app/src/test/java/com/example/core/automation/sender/SmsStatusReceiverTest.kt](app/src/test/java/com/example/core/automation/sender/SmsStatusReceiverTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added a receiver-level regression for `com.example.SMS_DELIVERED` failure callbacks, proving the callback updates the sent-message delivery status to `FAILED`, writes a `FAILED_FINAL` dispatch-attempt outcome with delivery-callback metadata, records a dead-letter timestamp, and marks the pending message failed.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.core.automation.sender.SmsStatusReceiverTest --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-03 - Dispatcher Retry-Limit Finalization Regression
+
+Completed tasks:
+
+- A-007 QA slice: cover the real `MessageDispatcher` provider-finalization path when retryable SMS provider failures reach the automatic retry limit.
+
+Changed files:
+
+- [app/src/test/java/com/example/core/automation/sender/MessageDispatcherTest.kt](app/src/test/java/com/example/core/automation/sender/MessageDispatcherTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added a dispatcher-level regression that reads previous retry history from `DispatchAttemptDao`, simulates an SMS provider failure, stops automatic retry at `MAX_AUTOMATIC_RETRY_FAILURES`, marks the pending message failed, writes a final failed dispatch-attempt outcome, avoids scheduling another exact-send retry, and records the dead-letter side effect.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.core.automation.sender.MessageDispatcherTest --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
 ## 2026-07-03 - Automation Setup Presentation, Checks, and Capability Split
 
 Completed tasks:
 
-- A-005 architecture slice: reduce `AutomationSetupViewModel` concentration by moving setup UI contracts, account/provider check presentation, quality check presentation, pure readiness presentation reduction, and Android capability probing into focused collaborators.
+- A-005 architecture slice: reduce `AutomationSetupViewModel` concentration by moving setup UI contracts, account/provider check presentation, automation/channel check presentation, email check presentation, quality check presentation, system/recovery check presentation, command execution, readiness report loading, AI failure diagnosis, diagnostic snapshot persistence, pure readiness presentation reduction, and Android capability probing into focused collaborators.
 
 Changed files:
 
 - [app/src/main/java/com/example/ui/viewmodel/AutomationSetupUiState.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupUiState.kt)
 - [app/src/main/java/com/example/ui/viewmodel/AutomationSetupReadinessPresenter.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupReadinessPresenter.kt)
 - [app/src/main/java/com/example/ui/viewmodel/AutomationSetupAccountProviderCheckPresenter.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupAccountProviderCheckPresenter.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupAutomationChannelCheckPresenter.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupAutomationChannelCheckPresenter.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupEmailCheckPresenter.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupEmailCheckPresenter.kt)
 - [app/src/main/java/com/example/ui/viewmodel/AutomationSetupQualityCheckPresenter.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupQualityCheckPresenter.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupSystemRecoveryCheckPresenter.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupSystemRecoveryCheckPresenter.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupAiFailureDiagnoser.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupAiFailureDiagnoser.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupDiagnosticSnapshotStore.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupDiagnosticSnapshotStore.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupCommandRunner.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupCommandRunner.kt)
+- [app/src/main/java/com/example/ui/viewmodel/AutomationSetupReadinessReportBuilder.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupReadinessReportBuilder.kt)
 - [app/src/main/java/com/example/ui/viewmodel/AutomationSetupCapabilityProbe.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupCapabilityProbe.kt)
 - [app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt](app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt)
 - [app/src/test/java/com/example/ui/viewmodel/AutomationSetupReadinessPresenterTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupReadinessPresenterTest.kt)
 - [app/src/test/java/com/example/ui/viewmodel/AutomationSetupAccountProviderCheckPresenterTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupAccountProviderCheckPresenterTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/AutomationSetupAutomationChannelCheckPresenterTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupAutomationChannelCheckPresenterTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/AutomationSetupEmailCheckPresenterTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupEmailCheckPresenterTest.kt)
 - [app/src/test/java/com/example/ui/viewmodel/AutomationSetupQualityCheckPresenterTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupQualityCheckPresenterTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/AutomationSetupSystemRecoveryCheckPresenterTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupSystemRecoveryCheckPresenterTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/AutomationSetupAiFailureDiagnoserTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupAiFailureDiagnoserTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/AutomationSetupDiagnosticSnapshotStoreTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupDiagnosticSnapshotStoreTest.kt)
+- [app/src/test/java/com/example/ui/viewmodel/AutomationSetupCommandRunnerTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupCommandRunnerTest.kt)
 - [app/src/test/java/com/example/ui/viewmodel/AutomationSetupCapabilityProbeTest.kt](app/src/test/java/com/example/ui/viewmodel/AutomationSetupCapabilityProbeTest.kt)
 - [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
 - [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
@@ -30,15 +139,22 @@ What changed:
 - Moved `AiDoctorAction`, `AiDoctorSummary`, `ReadinessCheck`, `AiDoctorRecommendedFix`, and `AutomationSetupUiState` out of the ViewModel into a dedicated setup UI contract file.
 - Extracted `AutomationSetupReadinessPresenter` for summary copy, recommended-fix ranking, setup progress projection, and canonical setup-action readiness.
 - Extracted `AutomationSetupAccountProviderCheckPresenter` for Google Contacts, Gemini access, AI wish generation, and Gemini circuit check presentation.
+- Extracted `AutomationSetupAutomationChannelCheckPresenter` for full automation, automatable events, delivery routes, channel verification, SMS, and WhatsApp setup check presentation.
+- Extracted `AutomationSetupEmailCheckPresenter` for Gmail sender setup check presentation.
 - Extracted `AutomationSetupQualityCheckPresenter` for Style Coach, personalization, and generic-message-risk check presentation.
+- Extracted `AutomationSetupSystemRecoveryCheckPresenter` for notification, exact-send, daily-automation, recent-health, and dispatch-recovery check presentation.
+- Extracted `AutomationSetupAiFailureDiagnoser` for Gemini/provider failure classification and redacted fallback messages.
+- Extracted `AutomationSetupDiagnosticSnapshotStore` for persisted HealthMonitor snapshot lookup and redacted AI Doctor snapshot creation.
+- Extracted `AutomationSetupCommandRunner` for contact sync, dry-run generation checks, AI test, email test, and WhatsApp consent command messages.
+- Extracted `AutomationSetupReadinessReportBuilder` for readiness input loading, policy orchestration, check assembly, dispatch recovery detail loading, channel parsing, and AI Doctor snapshot recording.
 - Extracted `AutomationSetupCapabilityProbe` for permission, package, accessibility-service, Google Contacts, and Firebase-auth checks.
-- Updated the ViewModel to keep setup orchestration while delegating account/provider check presentation, quality check presentation, pure presentation reduction, and platform probing.
-- Added direct unit coverage for the extracted presenters and capability probe.
+- Updated the ViewModel to keep only state observation, UI flag updates, refresh scheduling, and test delegates while delegating account/provider check presentation, automation/channel check presentation, email check presentation, quality check presentation, system/recovery check presentation, command execution, readiness report loading, AI failure diagnosis, diagnostic snapshot persistence, pure presentation reduction, and platform probing.
+- Added direct unit coverage for the extracted presenters, command runner, diagnostics collaborators, and capability probe.
 
 Validation:
 
 ```bash
-JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.AutomationSetupAccountProviderCheckPresenterTest --tests com.example.ui.viewmodel.AutomationSetupCapabilityProbeTest --tests com.example.ui.viewmodel.AutomationSetupQualityCheckPresenterTest --tests com.example.ui.viewmodel.AutomationSetupReadinessPresenterTest --tests com.example.ui.viewmodel.AutomationSetupViewModelTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.viewmodel.AutomationSetupCommandRunnerTest --tests com.example.ui.viewmodel.AutomationSetupAiFailureDiagnoserTest --tests com.example.ui.viewmodel.AutomationSetupDiagnosticSnapshotStoreTest --tests com.example.ui.viewmodel.AutomationSetupSystemRecoveryCheckPresenterTest --tests com.example.ui.viewmodel.AutomationSetupAutomationChannelCheckPresenterTest --tests com.example.ui.viewmodel.AutomationSetupAccountProviderCheckPresenterTest --tests com.example.ui.viewmodel.AutomationSetupCapabilityProbeTest --tests com.example.ui.viewmodel.AutomationSetupEmailCheckPresenterTest --tests com.example.ui.viewmodel.AutomationSetupQualityCheckPresenterTest --tests com.example.ui.viewmodel.AutomationSetupReadinessPresenterTest --tests com.example.ui.viewmodel.AutomationSetupViewModelTest --no-configuration-cache
 ```
 
 Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`; KSP printed its known non-fatal headless AWT warning.

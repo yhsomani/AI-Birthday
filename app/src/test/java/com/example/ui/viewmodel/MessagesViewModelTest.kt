@@ -175,6 +175,34 @@ class MessagesViewModelTest {
     }
 
     @Test
+    fun `retryMessage queues failed message and records retry activity`() = runTest(dispatcher) {
+        coEvery { retryFailedMessageUseCase("pm_1") } returns RetryFailedMessageUseCase.RetryOutcome.RetryQueued(
+            pendingMessageId = "pm_1",
+            retryCount = 1,
+            previousAttempt = null,
+        )
+
+        val viewModel = newViewModel()
+        advanceUntilIdle()
+
+        viewModel.retryMessage("pm_1")
+        advanceUntilIdle()
+
+        coVerify { retryFailedMessageUseCase("pm_1") }
+        coVerify {
+            activityLogRepository.record(
+                match { entry ->
+                    entry.title == context.getString(com.example.R.string.message_activity_retried_title) &&
+                        entry.detail == context.getString(com.example.R.string.message_activity_retried_detail) &&
+                        entry.messageId == "pm_1"
+                }
+            )
+        }
+        assertEquals(null, viewModel.uiState.value.retryingMessageId)
+        assertEquals(null, viewModel.uiState.value.error)
+    }
+
+    @Test
     fun `retryMessage surfaces error when retry use case rejects row`() = runTest(dispatcher) {
         coEvery { retryFailedMessageUseCase("pm_1") } returns RetryFailedMessageUseCase.RetryOutcome.NotFailed(
             pendingMessageId = "pm_1",

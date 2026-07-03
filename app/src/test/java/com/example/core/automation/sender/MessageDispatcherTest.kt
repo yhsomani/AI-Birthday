@@ -40,6 +40,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -210,6 +211,53 @@ class MessageDispatcherTest {
             )
         }
         assertEquals(0, DeadLetterQueue.count())
+    }
+
+    @Test
+    fun `dispatch stops automatic retry when retryable provider failure reaches retry limit`() = runTest {
+        every { anyConstructed<SecurePrefs>().getChannelBlackout() } returns "[\"WHATSAPP\"]"
+        every { anyConstructed<SmsSender>().send(any(), any(), any()) } throws RuntimeException("radio unavailable")
+        every { anyConstructed<SmsSender>().send(any(), any(), any(), any(), any()) } throws
+            RuntimeException("radio unavailable")
+        coEvery { dispatchAttemptDao.getMaxRetryCountForMessageDraft("pending_1") } returns
+            DispatchProviderRetryPolicy.MAX_AUTOMATIC_RETRY_FAILURES - 1
+
+        dispatcher().dispatch(dispatchRequest(eventId = "event_1", dispatchAttemptId = "attempt_retry_limit"))
+
+        coVerify { sentMessageDao.updateDeliveryStatus(any(), MessageDeliveryStatus.FAILED.raw) }
+        coVerify { pendingMessageDao.updateStatus("pending_1", "FAILED") }
+        coVerify(exactly = 0) {
+            pendingMessageDao.updateRetryState(
+                id = "pending_1",
+                status = any(),
+                scheduledForMs = any(),
+            )
+        }
+        verify(exactly = 0) { DailyScheduler.scheduleExactSend(any(), any()) }
+        coVerify {
+            dispatchAttemptDao.updateOutcome(
+                id = "attempt_retry_limit",
+                attemptedAtMs = any(),
+                resolvedAtMs = any(),
+                result = DispatchAttemptResult.FAILED_FINAL.raw,
+                channel = MessageChannel.SMS.raw,
+                deliveryStatus = MessageDeliveryStatus.FAILED.raw,
+                providerMessageId = null,
+                errorType = DispatchProviderRetryPolicy.ERROR_SMS_TRANSIENT_PROVIDER_FAILURE,
+                errorCode = "RuntimeException",
+                redactedErrorMessage = match { it.contains("Automatic retry limit reached") },
+                retryCount = DispatchProviderRetryPolicy.MAX_AUTOMATIC_RETRY_FAILURES,
+                nextRetryAtMs = null,
+                deadLetteredAtMs = any(),
+            )
+        }
+
+        val deadLetter = DeadLetterQueue.getAll().single()
+        assertEquals("pending_1", deadLetter.id)
+        assertEquals("Selected", deadLetter.payload)
+        assertEquals(DispatchProviderRetryPolicy.ERROR_SMS_TRANSIENT_PROVIDER_FAILURE, deadLetter.errorType)
+        assertEquals(DispatchProviderRetryPolicy.MAX_AUTOMATIC_RETRY_FAILURES, deadLetter.retryCount)
+        assertTrue(deadLetter.errorMessage.contains("Automatic retry limit reached"))
     }
 
     @Test

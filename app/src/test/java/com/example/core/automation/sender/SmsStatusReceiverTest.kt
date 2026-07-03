@@ -227,4 +227,59 @@ class SmsStatusReceiverTest {
         }
         coVerify(exactly = 0) { pendingMessageDao.markSmsCallbackFailed(any()) }
     }
+
+    @Test
+    fun `test SMS_DELIVERED updates deliveryStatus to FAILED on error`() = runTest {
+        val messageId = UUID.randomUUID().toString()
+        val sentMessage = SentMessageEntity(
+            id = messageId,
+            contactId = null,
+            eventType = "BIRTHDAY",
+            eventYear = 2026,
+            messageText = "Happy Birthday",
+            channel = MessageChannel.SMS.raw,
+            sentAtMs = System.currentTimeMillis(),
+            deliveryStatus = MessageDeliveryStatus.SENT.raw,
+            aiGenerated = true
+        )
+        sentMessageDao.insert(sentMessage)
+
+        val intent = Intent("com.example.SMS_DELIVERED").apply {
+            putExtra("sent_message_id", messageId)
+            putExtra("dispatch_attempt_id", "attempt_delivery_failed")
+            putExtra("pending_message_id", "pending_delivery_failed")
+        }
+
+        val receiver = SmsStatusReceiver()
+        val controller = spyk(receiver)
+        every { controller.getResultCode() } returns 5
+
+        controller.onReceive(context, intent)
+
+        var updated: SentMessageEntity? = null
+        val start = System.currentTimeMillis()
+        while (System.currentTimeMillis() - start < 2000) {
+            updated = sentMessageDao.getAll().first().find { it.id == messageId }
+            if (updated?.deliveryStatus == MessageDeliveryStatus.FAILED.raw) break
+            Thread.sleep(50)
+        }
+
+        assertNotNull(updated)
+        assertEquals(MessageDeliveryStatus.FAILED.raw, updated!!.deliveryStatus)
+        coVerify {
+            dispatchAttemptDao.updateSmsCallbackOutcome(
+                id = "attempt_delivery_failed",
+                resolvedAtMs = any(),
+                result = DispatchAttemptResult.FAILED_FINAL.raw,
+                channel = MessageChannel.SMS.raw,
+                deliveryStatus = MessageDeliveryStatus.FAILED.raw,
+                providerMessageId = messageId,
+                errorType = "SMS_DELIVERY_CALLBACK_FAILED",
+                errorCode = "5",
+                redactedErrorMessage = "Android SMS delivery callback reported failure after send handoff.",
+                deadLetteredAtMs = any(),
+            )
+        }
+        coVerify { pendingMessageDao.markSmsCallbackFailed("pending_delivery_failed") }
+    }
 }
