@@ -16,10 +16,12 @@ import com.example.core.db.dao.EventDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
+import com.example.core.db.entities.DispatchAttemptEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.dispatch.DispatchAttemptResult
 import com.example.domain.model.dispatch.DispatchEligibilityRecord
+import com.example.domain.model.dispatch.MessageDispatchRequest
 import com.example.domain.model.notification.SetupNotificationReason
 import com.example.domain.service.PreferencesRepository
 import io.mockk.*
@@ -109,6 +111,8 @@ class MessageDispatchWorkerTest {
 
     @Test
     fun `doWork sends message and returns success on APPROVED status`() = runTest {
+        val attempt = slot<DispatchAttemptEntity>()
+        val request = slot<MessageDispatchRequest>()
         val pendingMsg = PendingMessageEntity(
             id = "msg_1", contactId = "c1", eventId = "e1",
             shortVariant = "", standardVariant = "Happy Birthday", longVariant = "",
@@ -146,20 +150,18 @@ class MessageDispatchWorkerTest {
             )
         }
         coVerify {
-            anyConstructed<MessageDispatcher>().dispatch(match {
-                it.messageId.value == pendingMsg.id &&
-                    it.contactId.value == contact.id &&
-                    it.messageText == "Happy Birthday" &&
-                    it.dispatchAttemptId != null
-            })
+            anyConstructed<MessageDispatcher>().dispatch(capture(request))
         }
+        assertEquals(pendingMsg.id, request.captured.messageId.value)
+        assertEquals(contact.id, request.captured.contactId.value)
+        assertEquals("Happy Birthday", request.captured.messageText)
         coVerify {
-            dispatchAttemptDao.upsert(match {
-                it.messageDraftId == "msg_1" &&
-                    it.eligibilityDecision == DispatchEligibilityRecord.SEND_NOW.raw &&
-                    it.result == DispatchAttemptResult.QUEUED.raw
-            })
+            dispatchAttemptDao.upsert(capture(attempt))
         }
+        assertEquals("msg_1", attempt.captured.messageDraftId)
+        assertEquals(DispatchEligibilityRecord.SEND_NOW.raw, attempt.captured.eligibilityDecision)
+        assertEquals(DispatchAttemptResult.QUEUED.raw, attempt.captured.result)
+        assertEquals(attempt.captured.id, request.captured.dispatchAttemptId?.value)
     }
 
     @Test

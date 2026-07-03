@@ -1,13 +1,9 @@
 package com.example.ui.viewmodel
 
-import android.Manifest
 import android.app.AlarmManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
-import android.provider.Settings
 import androidx.annotation.StringRes
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
@@ -20,8 +16,6 @@ import com.example.core.resilience.HealthMonitor
 import com.example.core.resilience.LogEntry
 import com.example.core.resilience.SensitiveLogRedactor
 import com.example.core.resilience.StructuredLogger
-import com.example.domain.automation.AiWishGenerationReadiness
-import com.example.domain.automation.AiWishGenerationReadinessReason
 import com.example.domain.automation.AutomatableEventsReadiness
 import com.example.domain.automation.AutomatableEventsReadinessReason
 import com.example.domain.automation.AutomaticDeliveryRoutesReadiness
@@ -30,14 +24,8 @@ import com.example.domain.automation.ChannelVerificationReadiness
 import com.example.domain.automation.ChannelVerificationReadinessReason
 import com.example.domain.automation.FullAutomationReadiness
 import com.example.domain.automation.FullAutomationReadinessReason
-import com.example.domain.automation.GeminiAccessReadiness
-import com.example.domain.automation.GeminiAccessReadinessReason
-import com.example.domain.automation.GeminiCircuitReadiness
-import com.example.domain.automation.GeminiCircuitReadinessReason
 import com.example.domain.automation.GenericMessageReadiness
 import com.example.domain.automation.GenericMessageReadinessReason
-import com.example.domain.automation.GoogleContactsReadiness
-import com.example.domain.automation.GoogleContactsReadinessReason
 import com.example.domain.automation.PersonalizationReadiness
 import com.example.domain.automation.PersonalizationReadinessReason
 import com.example.domain.automation.SetupAccountProviderReadinessPolicy
@@ -55,9 +43,6 @@ import com.example.domain.automation.SetupExactSendReadinessReason
 import com.example.domain.automation.SetupNotificationReadiness
 import com.example.domain.automation.SetupNotificationReadinessReason
 import com.example.domain.automation.SetupQualityReadinessPolicy
-import com.example.domain.automation.SetupReadinessRecommendationCandidate
-import com.example.domain.automation.SetupReadinessRecommendationPolicy
-import com.example.domain.automation.SetupReadinessSummaryPolicy
 import com.example.domain.automation.SetupRecentHealthReadiness
 import com.example.domain.automation.SetupRecentHealthReadinessReason
 import com.example.domain.automation.SetupSystemReadinessPolicy
@@ -69,7 +54,6 @@ import com.example.domain.automation.StyleCoachReadinessReason
 import com.example.domain.automation.WhatsAppSetupReadiness
 import com.example.domain.automation.WhatsAppSetupReadinessReason
 import com.example.domain.readiness.RelationshipActionReadiness
-import com.example.domain.readiness.RelationshipActionReadinessPolicy
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.DiagnosticSnapshotId
@@ -86,8 +70,6 @@ import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.service.PreferencesRepository
 import com.example.domain.usecase.SyncContactsUseCase
 import com.example.domain.usecase.TestSendUseCase
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.common.api.Scope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -105,81 +87,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.json.JSONArray
 import java.util.UUID
-
-enum class AiDoctorAction {
-    NONE,
-    REFRESH,
-    TEST_AI,
-    TEST_EMAIL,
-    SYNC_CONTACTS,
-    OPEN_SETTINGS,
-    OPEN_STYLE_COACH,
-    OPEN_CONTACTS,
-    OPEN_MESSAGES,
-    OPEN_SMS_MESSAGES,
-    OPEN_WHATSAPP_MESSAGES,
-    OPEN_ACTIVITY_HISTORY,
-    OPEN_ACCESSIBILITY_SETTINGS,
-    OPEN_BATTERY_SETTINGS,
-    OPEN_APP_SETTINGS,
-}
-
-data class AiDoctorSummary(
-    val title: String = "",
-    val detail: String = "",
-    val status: ReadinessStatus = ReadinessStatus.WARNING,
-)
-
-data class ReadinessCheck(
-    val title: String,
-    val detail: String,
-    val status: ReadinessStatus,
-    val actionLabel: String? = null,
-    val action: AiDoctorAction = AiDoctorAction.NONE,
-    val group: ReadinessGroup = ReadinessGroup.REQUIRED,
-    val actionReadiness: RelationshipActionReadiness = RelationshipActionReadinessPolicy.fromSetupCandidates(
-        listOf(
-            SetupReadinessRecommendationCandidate(
-                status = status,
-                group = group,
-                hasAction = action != AiDoctorAction.NONE && !actionLabel.isNullOrBlank(),
-            )
-        )
-    ),
-)
-
-data class AiDoctorRecommendedFix(
-    val title: String,
-    val detail: String,
-    val actionLabel: String,
-    val action: AiDoctorAction,
-    val status: ReadinessStatus,
-    val group: ReadinessGroup,
-    val actionReadiness: RelationshipActionReadiness = RelationshipActionReadinessPolicy.fromSetupCandidates(
-        listOf(
-            SetupReadinessRecommendationCandidate(
-                status = status,
-                group = group,
-                hasAction = action != AiDoctorAction.NONE && actionLabel.isNotBlank(),
-            )
-        )
-    ),
-)
-
-data class AutomationSetupUiState(
-    val checks: List<ReadinessCheck> = emptyList(),
-    val summary: AiDoctorSummary = AiDoctorSummary(),
-    val recommendedFix: AiDoctorRecommendedFix? = null,
-    val setupProgress: SetupProgressSummary = SetupProgressSummary(),
-    val setupActionReadiness: RelationshipActionReadiness =
-        RelationshipActionReadinessPolicy.fromSetupCandidates(emptyList()),
-    val isRefreshing: Boolean = false,
-    val isSyncingContacts: Boolean = false,
-    val isTestingAi: Boolean = false,
-    val isTestingEmail: Boolean = false,
-    val whatsAppAutomationConsentGranted: Boolean = false,
-    val operationMessage: String? = null,
-)
 
 private data class AiDoctorReport(
     val summary: AiDoctorSummary,
@@ -217,12 +124,13 @@ class AutomationSetupViewModel @Inject constructor(
     private companion object {
         const val PERSISTED_HEALTH_SNAPSHOT_TTL_MS = 7L * 24 * 60 * 60 * 1000
         const val CHANNEL_VERIFICATION_WINDOW_MS = 30L * 24 * 60 * 60 * 1000
-        const val GOOGLE_CONTACTS_SCOPE_URI = "https://www.googleapis.com/auth/contacts.readonly"
         val CHANNEL_TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")
-        val GOOGLE_CONTACTS_SCOPE = Scope(GOOGLE_CONTACTS_SCOPE_URI)
     }
 
     private val _uiState = MutableStateFlow(AutomationSetupUiState())
+    private val readinessPresenter = AutomationSetupReadinessPresenter(appContext)
+    private val accountProviderCheckPresenter = AutomationSetupAccountProviderCheckPresenter(appContext)
+    private val capabilityProbe = AutomationSetupCapabilityProbe(appContext)
     val uiState: StateFlow<AutomationSetupUiState> = _uiState.asStateFlow()
 
     init {
@@ -313,8 +221,9 @@ class AutomationSetupViewModel @Inject constructor(
     }
 
     fun runSafeGenerationCheck() {
-        val ready = preferencesRepository.isAiWishGenerationEnabled() &&
-            (preferencesRepository.getGeminiApiKey().isNotBlank() || currentFirebaseUserOrNull() != null)
+        val hasAiAccess = preferencesRepository.getGeminiApiKey().isNotBlank() ||
+            capabilityProbe.currentFirebaseUserOrNull() != null
+        val ready = preferencesRepository.isAiWishGenerationEnabled() && hasAiAccess
         val rankedBlocker = _uiState.value.recommendedFix
             ?.takeIf { it.status == ReadinessStatus.ACTION_REQUIRED }
             ?.let { it.title to it.detail }
@@ -399,7 +308,7 @@ class AutomationSetupViewModel @Inject constructor(
         }
         val health = HealthMonitor.snapshot()
         val recentErrors = StructuredLogger.getErrors().takeLast(3)
-        val currentUser = currentFirebaseUserOrNull()
+        val currentUser = capabilityProbe.currentFirebaseUserOrNull()
         val alarmManager = appContext.getSystemService(AlarmManager::class.java)
         val contacts = inputs?.contacts
             ?: runCatching { contactRepository.getAutomationReadinessProfiles() }.getOrDefault(emptyList())
@@ -409,16 +318,20 @@ class AutomationSetupViewModel @Inject constructor(
             styleProfile?.sampleCount ?: 0,
             countJsonArrayItems(styleProfile?.sampleMessagesJson),
         )
-        val hasGoogleContactsAccess = hasGoogleContactsAccess()
+        val hasGoogleContactsAccess = capabilityProbe.hasGoogleContactsAccess(
+            hasCachedGoogleOAuthToken = preferencesRepository.getGoogleOAuthToken().isNotBlank(),
+        )
         val hasGeminiApiKey = preferencesRepository.getGeminiApiKey().isNotBlank()
         val hasFirebaseAuth = currentUser != null
         val hasGeminiAccess = hasGeminiApiKey || hasFirebaseAuth
         val globalAutomationMode = preferencesRepository.getGlobalAutomationMode()
         val aiEnabled = preferencesRepository.isAiWishGenerationEnabled()
-        val notificationsAllowed = runCatching { hasNotificationPermission() }.getOrDefault(false)
-        val smsAllowed = runCatching { hasSmsPermission() }.getOrDefault(false)
+        val notificationsAllowed = runCatching { capabilityProbe.hasNotificationPermission() }.getOrDefault(false)
+        val smsAllowed = runCatching { capabilityProbe.hasSmsPermission() }.getOrDefault(false)
         val whatsAppConsentGranted = preferencesRepository.isWhatsAppAutomationConsentGranted()
-        val whatsAppAutomationEnabled = runCatching { isWhatsAppAutomationServiceEnabled() }.getOrDefault(false)
+        val whatsAppAutomationEnabled = runCatching {
+            capabilityProbe.isWhatsAppAutomationServiceEnabled()
+        }.getOrDefault(false)
         val exactSendsAllowed = runCatching {
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
         }.getOrDefault(false)
@@ -450,22 +363,28 @@ class AutomationSetupViewModel @Inject constructor(
         val emailPreferredContacts = contacts.count {
             it.preferredChannel == MessageChannel.EMAIL
         }
-        val whatsAppInstalled = runCatching { isWhatsAppInstalled() }.getOrDefault(false)
+        val whatsAppInstalled = runCatching { capabilityProbe.isWhatsAppInstalled() }.getOrDefault(false)
         val hasRecentHealthEvidence = recentErrors.isNotEmpty() ||
             health.recentErrors.isNotEmpty() ||
             persistedHealthSnapshot != null
 
         val checks = listOf(
-            SetupAccountProviderReadinessPolicy.evaluateGoogleContacts(
-                hasGoogleContactsAccess = hasGoogleContactsAccess,
-            ).toReadinessCheck(),
-            SetupAccountProviderReadinessPolicy.evaluateGeminiAccess(
-                hasGeminiApiKey = hasGeminiApiKey,
-                hasFirebaseAuth = hasFirebaseAuth,
-            ).toReadinessCheck(),
-            SetupAccountProviderReadinessPolicy.evaluateAiWishGeneration(
-                aiWishGenerationEnabled = aiEnabled,
-            ).toReadinessCheck(),
+            accountProviderCheckPresenter.googleContacts(
+                SetupAccountProviderReadinessPolicy.evaluateGoogleContacts(
+                    hasGoogleContactsAccess = hasGoogleContactsAccess,
+                ),
+            ),
+            accountProviderCheckPresenter.geminiAccess(
+                SetupAccountProviderReadinessPolicy.evaluateGeminiAccess(
+                    hasGeminiApiKey = hasGeminiApiKey,
+                    hasFirebaseAuth = hasFirebaseAuth,
+                ),
+            ),
+            accountProviderCheckPresenter.aiWishGeneration(
+                SetupAccountProviderReadinessPolicy.evaluateAiWishGeneration(
+                    aiWishGenerationEnabled = aiEnabled,
+                ),
+            ),
             fullAutomationModeCheck(
                 globalAutomationMode = globalAutomationMode,
                 contacts = contacts,
@@ -485,9 +404,11 @@ class AutomationSetupViewModel @Inject constructor(
             ).toReadinessCheck(),
             personalizationCheck(contacts),
             genericMessagesCheck(contacts),
-            SetupAccountProviderReadinessPolicy.evaluateGeminiCircuit(
-                circuitState = health.circuitBreakerStates["gemini"].toSetupProviderCircuitState(),
-            ).toReadinessCheck(),
+            accountProviderCheckPresenter.geminiCircuit(
+                SetupAccountProviderReadinessPolicy.evaluateGeminiCircuit(
+                    circuitState = health.circuitBreakerStates["gemini"].toSetupProviderCircuitState(),
+                ),
+            ),
             SetupSystemReadinessPolicy.evaluateNotificationPermission(
                 notificationsAllowed = notificationsAllowed,
             ).toReadinessCheck(),
@@ -528,11 +449,11 @@ class AutomationSetupViewModel @Inject constructor(
             ).toReadinessCheck(dispatchRecovery),
         )
         return AiDoctorReport(
-            summary = checks.toSummary(),
+            summary = readinessPresenter.summarize(checks),
             checks = checks,
-            recommendedFix = checks.toRecommendedFix(),
-            setupProgress = checks.toSetupProgressSummary(),
-            setupActionReadiness = checks.toSetupActionReadiness(),
+            recommendedFix = readinessPresenter.recommendedFix(checks),
+            setupProgress = readinessPresenter.setupProgress(checks),
+            setupActionReadiness = readinessPresenter.setupActionReadiness(checks),
         ).also { report ->
             persistAiDoctorSnapshot(report)
         }
@@ -551,112 +472,6 @@ class AutomationSetupViewModel @Inject constructor(
             )
             else -> text(R.string.automation_setup_recent_errors_none)
         }
-    }
-
-    private fun GoogleContactsReadiness.toReadinessCheck(): ReadinessCheck {
-        return ReadinessCheck(
-            title = text(R.string.automation_setup_check_google_contacts),
-            detail = when (reason) {
-                GoogleContactsReadinessReason.READY ->
-                    text(R.string.automation_setup_google_contacts_ok)
-                GoogleContactsReadinessReason.ACCESS_MISSING ->
-                    text(R.string.automation_setup_google_contacts_missing)
-            },
-            status = status,
-            actionLabel = when (reason) {
-                GoogleContactsReadinessReason.READY -> null
-                GoogleContactsReadinessReason.ACCESS_MISSING ->
-                    text(R.string.automation_setup_action_sync_contacts)
-            },
-            action = when (reason) {
-                GoogleContactsReadinessReason.READY -> AiDoctorAction.NONE
-                GoogleContactsReadinessReason.ACCESS_MISSING -> AiDoctorAction.SYNC_CONTACTS
-            },
-            group = group,
-        )
-    }
-
-    private fun GeminiAccessReadiness.toReadinessCheck(): ReadinessCheck {
-        return ReadinessCheck(
-            title = text(R.string.automation_setup_check_gemini),
-            detail = when (reason) {
-                GeminiAccessReadinessReason.API_KEY_CONFIGURED ->
-                    text(R.string.automation_setup_gemini_key_ok)
-                GeminiAccessReadinessReason.FIREBASE_AUTH_AVAILABLE ->
-                    text(R.string.automation_setup_gemini_auth_ok)
-                GeminiAccessReadinessReason.MISSING_ACCESS ->
-                    text(R.string.automation_setup_gemini_auth_missing)
-            },
-            status = status,
-            actionLabel = when (reason) {
-                GeminiAccessReadinessReason.API_KEY_CONFIGURED,
-                GeminiAccessReadinessReason.FIREBASE_AUTH_AVAILABLE ->
-                    text(R.string.automation_setup_action_test_ai)
-                GeminiAccessReadinessReason.MISSING_ACCESS ->
-                    text(R.string.automation_setup_action_open_settings)
-            },
-            action = when (reason) {
-                GeminiAccessReadinessReason.API_KEY_CONFIGURED,
-                GeminiAccessReadinessReason.FIREBASE_AUTH_AVAILABLE -> AiDoctorAction.TEST_AI
-                GeminiAccessReadinessReason.MISSING_ACCESS -> AiDoctorAction.OPEN_SETTINGS
-            },
-            group = group,
-        )
-    }
-
-    private fun AiWishGenerationReadiness.toReadinessCheck(): ReadinessCheck {
-        return ReadinessCheck(
-            title = text(R.string.automation_setup_check_ai_wish_generation),
-            detail = when (reason) {
-                AiWishGenerationReadinessReason.ENABLED ->
-                    text(R.string.automation_setup_ai_wish_enabled)
-                AiWishGenerationReadinessReason.DISABLED ->
-                    text(R.string.automation_setup_ai_wish_disabled)
-            },
-            status = status,
-            actionLabel = when (reason) {
-                AiWishGenerationReadinessReason.ENABLED -> null
-                AiWishGenerationReadinessReason.DISABLED ->
-                    text(R.string.automation_setup_action_open_settings)
-            },
-            action = when (reason) {
-                AiWishGenerationReadinessReason.ENABLED -> AiDoctorAction.NONE
-                AiWishGenerationReadinessReason.DISABLED -> AiDoctorAction.OPEN_SETTINGS
-            },
-            group = group,
-        )
-    }
-
-    private fun GeminiCircuitReadiness.toReadinessCheck(): ReadinessCheck {
-        return ReadinessCheck(
-            title = text(R.string.automation_setup_check_gemini_circuit),
-            detail = when (reason) {
-                GeminiCircuitReadinessReason.NO_STATE ->
-                    text(R.string.automation_setup_gemini_circuit_none)
-                GeminiCircuitReadinessReason.CLOSED ->
-                    text(R.string.automation_setup_gemini_circuit_ok)
-                GeminiCircuitReadinessReason.HALF_OPEN,
-                GeminiCircuitReadinessReason.OPEN -> text(
-                    R.string.automation_setup_gemini_circuit_state,
-                    circuitState.name,
-                )
-            },
-            status = status,
-            actionLabel = when (reason) {
-                GeminiCircuitReadinessReason.OPEN ->
-                    text(R.string.automation_setup_action_test_ai)
-                GeminiCircuitReadinessReason.NO_STATE,
-                GeminiCircuitReadinessReason.CLOSED,
-                GeminiCircuitReadinessReason.HALF_OPEN -> null
-            },
-            action = when (reason) {
-                GeminiCircuitReadinessReason.OPEN -> AiDoctorAction.TEST_AI
-                GeminiCircuitReadinessReason.NO_STATE,
-                GeminiCircuitReadinessReason.CLOSED,
-                GeminiCircuitReadinessReason.HALF_OPEN -> AiDoctorAction.NONE
-            },
-            group = group,
-        )
     }
 
     private fun SetupNotificationReadiness.toReadinessCheck(): ReadinessCheck {
@@ -1283,63 +1098,6 @@ class AutomationSetupViewModel @Inject constructor(
         return SetupQualityReadinessPolicy.evaluateGenericMessages(contacts).toReadinessCheck()
     }
 
-    private fun List<ReadinessCheck>.toSummary(): AiDoctorSummary {
-        val decision = SetupReadinessSummaryPolicy.summarize(map { it.status })
-        val firstProblem = decision.firstProblemIndex?.let(::get)
-
-        return when (decision.status) {
-            ReadinessStatus.ACTION_REQUIRED -> AiDoctorSummary(
-                title = text(R.string.automation_setup_summary_blockers, decision.blockerCount),
-                detail = firstProblem?.let {
-                    text(R.string.automation_setup_summary_start_with, it.title, it.detail)
-                } ?: text(R.string.automation_setup_summary_required),
-                status = ReadinessStatus.ACTION_REQUIRED,
-            )
-            ReadinessStatus.WARNING -> AiDoctorSummary(
-                title = text(R.string.automation_setup_summary_warnings),
-                detail = firstProblem?.let {
-                    text(R.string.automation_setup_summary_problem, it.title, it.detail)
-                } ?: text(R.string.automation_setup_summary_review_warnings),
-                status = ReadinessStatus.WARNING,
-            )
-            ReadinessStatus.OK -> AiDoctorSummary(
-                title = text(R.string.automation_setup_summary_ok),
-                detail = text(R.string.automation_setup_summary_ok_detail),
-                status = ReadinessStatus.OK,
-            )
-        }
-    }
-
-    private fun List<ReadinessCheck>.toRecommendedFix(): AiDoctorRecommendedFix? {
-        val index = SetupReadinessRecommendationPolicy.selectRecommendedIndex(
-            toRecommendationCandidates(),
-        ) ?: return null
-        val check = this[index]
-        return AiDoctorRecommendedFix(
-            title = check.title,
-            detail = check.detail,
-            actionLabel = check.actionLabel.orEmpty(),
-            action = check.action,
-            status = check.status,
-            group = check.group,
-            actionReadiness = check.actionReadiness,
-        )
-    }
-
-    private fun List<ReadinessCheck>.toSetupActionReadiness(): RelationshipActionReadiness {
-        return RelationshipActionReadinessPolicy.fromSetupCandidates(toRecommendationCandidates())
-    }
-
-    private fun List<ReadinessCheck>.toRecommendationCandidates(): List<SetupReadinessRecommendationCandidate> {
-        return map { check ->
-            SetupReadinessRecommendationCandidate(
-                status = check.status,
-                group = check.group,
-                hasAction = check.action != AiDoctorAction.NONE && !check.actionLabel.isNullOrBlank(),
-            )
-        }
-    }
-
     private fun countJsonArrayItems(raw: String?): Int {
         if (raw.isNullOrBlank()) return 0
         return try {
@@ -1371,13 +1129,14 @@ class AutomationSetupViewModel @Inject constructor(
 
     internal fun diagnoseAiFailureForTesting(raw: String): String = diagnoseAiFailure(raw)
 
-    internal fun summarizeForTesting(checks: List<ReadinessCheck>): AiDoctorSummary = checks.toSummary()
+    internal fun summarizeForTesting(checks: List<ReadinessCheck>): AiDoctorSummary =
+        readinessPresenter.summarize(checks)
 
     internal fun setupProgressForTesting(checks: List<ReadinessCheck>): SetupProgressSummary =
-        checks.toSetupProgressSummary()
+        readinessPresenter.setupProgress(checks)
 
     internal fun recommendedFixForTesting(checks: List<ReadinessCheck>): AiDoctorRecommendedFix? =
-        checks.toRecommendedFix()
+        readinessPresenter.recommendedFix(checks)
 
     internal suspend fun buildChecksForTesting(): List<ReadinessCheck> = buildReport().checks
 
@@ -1386,50 +1145,6 @@ class AutomationSetupViewModel @Inject constructor(
 
     private fun text(@StringRes resId: Int, vararg args: Any): String {
         return appContext.getString(resId, *args)
-    }
-
-    private fun hasSmsPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(appContext, Manifest.permission.SEND_SMS) ==
-            PackageManager.PERMISSION_GRANTED
-    }
-
-    private fun hasNotificationPermission(): Boolean {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-            ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) ==
-                PackageManager.PERMISSION_GRANTED
-    }
-
-    private fun isWhatsAppAutomationServiceEnabled(): Boolean {
-        val expectedService = "${appContext.packageName}/com.example.core.accessibility.WhatsAppAccessibilityService"
-        val enabledServices = Settings.Secure.getString(
-            appContext.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-        ) ?: return false
-        return enabledServices.split(':').any {
-            it.equals(expectedService, ignoreCase = true)
-        }
-    }
-
-    private fun isWhatsAppInstalled(): Boolean {
-        return isPackageInstalled("com.whatsapp") || isPackageInstalled("com.whatsapp.w4b")
-    }
-
-    private fun isPackageInstalled(packageName: String): Boolean {
-        return runCatching {
-            appContext.packageManager.getPackageInfo(packageName, 0)
-        }.isSuccess
-    }
-
-    private fun currentFirebaseUserOrNull() = runCatching {
-        com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
-    }.getOrNull()
-
-    private fun hasGoogleContactsAccess(): Boolean {
-        if (preferencesRepository.getGoogleOAuthToken().isNotBlank()) return true
-        val account = runCatching { GoogleSignIn.getLastSignedInAccount(appContext) }.getOrNull()
-            ?: return false
-        return runCatching { GoogleSignIn.hasPermissions(account, GOOGLE_CONTACTS_SCOPE) }
-            .getOrDefault(false)
     }
 
     private fun String.toChannelSet(): Set<MessageChannel> {
