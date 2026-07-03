@@ -155,7 +155,11 @@ class ProductionReadinessConfigTest {
         assertTrue(workflow.contains("fail-on-severity: moderate"))
         assertTrue(workflow.contains("deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, LGPL-2.1, LGPL-3.0"))
         assertTrue(workflow.contains("java-version: \"21\""))
-        assertTrue(workflow.contains("./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache"))
+        assertTrue(
+            workflow.contains(
+                "./gradlew :core:domain:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache"
+            )
+        )
         assertTrue(workflow.contains("Verify screenshot baselines"))
         assertTrue(
             workflow.contains(
@@ -177,6 +181,8 @@ class ProductionReadinessConfigTest {
         assertTrue(workflow.contains("actions/upload-artifact@v4"))
         assertTrue(workflow.contains("lint-reports"))
         assertTrue(workflow.contains("unit-test-reports"))
+        assertTrue(workflow.contains("**/build/reports/tests/test/**"))
+        assertTrue(workflow.contains("**/build/test-results/test/**"))
         assertTrue(workflow.contains("roborazzi-reports"))
         assertTrue(workflow.contains("app/build/reports/roborazzi/**"))
         assertTrue(workflow.contains("app/build/outputs/roborazzi/**"))
@@ -194,10 +200,25 @@ class ProductionReadinessConfigTest {
         assertTrue(buildScript.contains("coverageReportRequested"))
         assertTrue(buildScript.contains("xml.required.set(true)"))
         assertTrue(buildScript.contains("html.required.set(true)"))
+        assertTrue(buildScript.contains("\":core:domain\" to \"test\""))
         assertTrue(buildScript.contains("testDebugUnitTest"))
         assertTrue(buildScript.contains("intermediates/classes/debug/transformDebugClassesWithAsm/dirs"))
+        assertTrue(buildScript.contains("\":core:domain\" to \"classes/kotlin/main\""))
         assertTrue(buildScript.contains("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes"))
+        assertTrue(buildScript.contains("jacoco/test.exec"))
         assertTrue(buildScript.contains("jacoco/testDebugUnitTest.exec"))
+    }
+
+    @Test
+    fun rootGradle_failsFastWhenAndroidBuildUsesJreWithoutJlink() {
+        val buildScript = File(projectRoot(), "build.gradle.kts").readText()
+
+        assertTrue(buildScript.contains("requestedTasksNeedAndroidJdkImage"))
+        assertTrue(buildScript.contains("jlinkCandidatePaths"))
+        assertTrue(buildScript.contains("Android Gradle tasks require a full JDK 21"))
+        assertTrue(buildScript.contains("Android Studio JBR or Temurin JDK 21"))
+        assertTrue(buildScript.contains("Antigravity/Red Hat extension JRE"))
+        assertTrue(buildScript.contains("AGP's JdkImageTransform needs jlink"))
     }
 
     @Test

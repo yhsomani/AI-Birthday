@@ -1,28 +1,16 @@
 plugins {
-    alias(libs.plugins.android.library)
+    id("org.jetbrains.kotlin.jvm")
 }
 
-android {
-    namespace = "com.example.core.domain"
-    compileSdk = 37
+kotlin {
+    jvmToolchain(21)
+}
 
-    defaultConfig {
-        minSdk = 24
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
 

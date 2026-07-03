@@ -9,8 +9,8 @@ import com.example.domain.model.message.MessagePromptContext
 import com.example.domain.model.message.StylePromptProfile
 import com.example.domain.model.occasion.Occasion
 import com.example.domain.model.occasion.OccasionType
-import org.json.JSONArray
-import org.json.JSONObject
+import com.example.domain.util.parseJsonStringArray
+import com.example.domain.util.readJsonStringField
 
 fun buildMessagePromptContext(
     contact: ContactMessagePromptContext,
@@ -78,20 +78,11 @@ private fun firstName(fullName: String): String {
 }
 
 private fun parseJsonArray(raw: String): List<String> {
-    return try {
-        val arr = JSONArray(raw)
-        List(arr.length()) { arr.getString(it) }
-    } catch (e: Exception) {
-        emptyList()
-    }
+    return parseJsonStringArray(raw)
 }
 
 private fun parseLifePhase(raw: String): String? {
-    return try {
-        JSONObject(raw).optString("phase").takeIf { it.isNotBlank() }
-    } catch (e: Exception) {
-        null
-    }
+    return readJsonStringField(raw, "phase")
 }
 
 private fun sanitizeNotes(notes: String): String {

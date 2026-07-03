@@ -7,7 +7,9 @@ This checklist is the production gate for RelateAI. A release is not ready until
 ## Build and Test Gate
 
 - Run the full debug gate:
-  `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`
+  `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test :core:domain:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache`
+- Confirm Gradle is running on a full JDK 21/JBR with `bin/jlink` available. On Windows,
+  Android Studio JBR or Temurin JDK 21 is valid; the Antigravity/Red Hat extension JRE is not.
 - Run focused release-risk tests when changing permissions, dispatch, backup, auth, localization, or navigation.
 - Confirm pull requests with dependency changes pass GitHub Dependency Review for moderate-or-higher vulnerabilities and denied licenses; see `docs/security/dependency-review.md`.
 - Run `git diff --check` before handoff.

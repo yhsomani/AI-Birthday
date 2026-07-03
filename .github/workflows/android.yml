@@ -34,7 +34,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run verification
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
+        run: ./gradlew :core:domain:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
 
       - name: Verify screenshot baselines
         run: ./gradlew :app:verifyRoborazziDebug -Pscreenshot --tests 'com.example.ui.screenshots.*' --no-configuration-cache
@@ -76,7 +76,9 @@ jobs:
         with:
           name: unit-test-reports
           path: |
+            **/build/reports/tests/test/**
             **/build/reports/tests/testDebugUnitTest/**
+            **/build/test-results/test/**
             **/build/test-results/testDebugUnitTest/**
 
       - name: Upload Roborazzi reports

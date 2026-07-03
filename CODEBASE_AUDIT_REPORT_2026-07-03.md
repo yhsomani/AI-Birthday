@@ -18,8 +18,9 @@ Top findings:
 
 | Priority | Finding | Why it matters | Recommended action |
 | --- | --- | --- | --- |
-| P1 | Readiness consistency now needs journey-level regression coverage. | Home, Messages, Wish Preview, Setup, and setup/system notifications now consume `RelationshipActionReadiness`, but cross-surface setup/generate/review/send/recover flows can still regress between focused tests. | Add message lifecycle and failed-recovery journey tests around the canonical readiness contract. |
-| Resolved | Domain persistence leakage through Room/Paging/entity contracts. | Room entities, DAO projections, Room-backed mappers, raw entity repository APIs, and Android `Uri` backup service parameters have been removed from `core/domain`; boundary tests now guard this. | Keep the guard tests and evaluate converting `core:domain` from an Android library module to a JVM module. |
+| P1 | Readiness consistency now needs broader journey-level regression coverage. | Home, Messages, Wish Preview, Setup, setup notifications, and system alerts now have contract-level readiness journey coverage; the domain message lifecycle now has generate -> approve -> dispatch coverage. UI navigation, worker/device dispatch, and failed-recovery flows can still regress between focused tests. | Add UI/worker lifecycle and failed-recovery end-to-end tests around the canonical readiness contract. |
+| Resolved | Domain persistence/platform leakage through Room/Paging/entity/Android contracts. | `core:domain` is now a Kotlin/JVM module; Room entities, DAO projections, Room-backed mappers, raw entity repository APIs, Android `Uri` backup parameters, Android imports, and `org.json` runtime reliance have been removed from domain. | Keep the guard tests green and route future platform/storage work through app/data adapters. |
+| Resolved | Windows/IDE Android builds now fail fast when Gradle runs on a JRE without `jlink`. | The pasted `:app:assembleDebug` failure used the Antigravity/Red Hat extension JRE, which lacks the `jlink` executable AGP needs for `JdkImageTransform`. | Keep the root Gradle preflight guard green and configure IDE Gradle JDK/JAVA_HOME to Android Studio JBR or Temurin JDK 21. |
 | P1 | Large presentation files concentrate workflow logic. | `AutomationSetupViewModel.kt` is about 1435 lines; several screens are 700-1000+ lines. This raises regression and review cost. | Split by feature state reducers, route-level coordinators, and reusable domain use cases. |
 | Resolved | AI generated message text logging risk. | `AiServiceImpl` now logs `recommendedVariantName` metadata only, and tests verify generated copy is absent from `StructuredLogger` history and Android logs. | Keep generated body fields omitted or keyed as redacted message-body text in future changes. |
 | P2 | Product has too many diagnostics surfaces without a guided fix sequence. | AI Doctor, Settings, Home, Messages, Wish Preview, and setup notifications all expose parts of readiness. | Convert setup and recovery into a ranked "Fix next" flow with one primary action at a time. |
@@ -90,7 +91,7 @@ The repository has unusually strong guardrails for a mobile side project:
 - Tests verify release signing policy, backup exclusions, direct Android Log usage, provider config allowlists, repository hygiene, icon content descriptions, hardcoded string regressions, and design token usage.
 - Roborazzi screenshot baselines cover many screens and large-font/Hindi cases.
 
-The QA gap is journey-level testing. There are many focused tests, but the highest business risk is cross-feature workflow correctness: setup to contact import to event detection to generation to approval to dispatch to recovery.
+The QA gap is broader journey-level testing. There are many focused tests, the canonical readiness policy now has cross-surface contract coverage for review, channel repair, and setup/provider repair journeys, and the domain message lifecycle has generate -> approve -> dispatch coverage. The highest remaining business risk is UI/worker workflow correctness: setup to contact import to event detection to generation to approval to device/provider dispatch to recovery.
 
 ### Software Architect View
 
@@ -104,7 +105,7 @@ The module split is directionally correct:
 
 However, boundaries are not yet fully clean:
 
-- `core/domain` main source is now free of Android, AndroidX, Room entity, DAO, and Paging imports, but the module is still configured as an Android library.
+- `core/domain` is now a Kotlin/JVM module and its main source is free of Android, AndroidX, Room entity, DAO, and Paging imports.
 - Repository interfaces no longer expose Room entities for the audited contact, message, event, dispatch, and pure-record paths; boundary tests now guard this.
 - ViewModels still access `SecurePrefs` directly in several places.
 - Android worker/scheduler code sometimes constructs data dependencies directly.
@@ -119,7 +120,7 @@ This is manageable but should be addressed before adding larger features.
 | --- | --- | --- |
 | `app` | Compose UI, navigation, ViewModels, Android app shell, tests. | Works but screen and ViewModel files are large. Feature package boundaries exist but are not consistently separated by domain workflow. |
 | `core:model` | JVM model module. | Good direction. More entity-free domain models should move here or be exposed from domain. |
-| `core:domain` | Use cases, policies, repository/service interfaces, many business rules. | Strong policy extraction work. Main source is now persistence/platform-neutral, but the Gradle module is still an Android library and should be evaluated for JVM conversion. |
+| `core:domain` | Use cases, policies, repository/service interfaces, many business rules. | Strong policy extraction work. Now a Kotlin/JVM module with a persistence/platform-neutral main source. |
 | `core:data` | Room, workers, Firebase/Gemini, contacts sync, dispatch senders, backup, preferences. | Functionally rich. Contains Android-specific orchestration that should stay here, but some decisions are better delegated to domain policies. |
 | `core:ui` | Shared Compose components/theme. | Good, backed by token tests. Continue moving repeated patterns here carefully. |
 
@@ -140,7 +141,7 @@ This is manageable but should be addressed before adding larger features.
 
 | Problem | Evidence | Impact |
 | --- | --- | --- |
-| Domain module remains Android-configured. | `core/domain` main source no longer imports Android, AndroidX, Room entities, DAOs, or Paging, and Room runtime was removed from `core/domain/build.gradle.kts`; however, the module still uses the Android library plugin. | JVM conversion would reduce build overhead and make the intended pure-domain boundary explicit. |
+| Domain module boundary must stay guarded. | `core/domain` is now Kotlin/JVM and no longer imports Android, AndroidX, Room entities, DAOs, or Paging. Boundary tests scan for regressions. | Future platform/storage shortcuts can reintroduce coupling if the guards are weakened. |
 | App layer still owns too much orchestration. | `AutomationSetupViewModel.kt`, `WishPreviewViewModel.kt`, `MessagesViewModel.kt`, and `HomeViewModel.kt` coordinate many policies and repositories directly. | UI changes risk business behavior regressions. |
 | Screens are large. | `WishPreviewScreen.kt`, `GiftAdvisorScreen.kt`, `EventsScreen.kt`, `SettingsScreen.kt`, `AutomationSetupScreen.kt`, and `HomeScreen.kt` are large files. | Harder accessibility, layout, localization, and state review. |
 | Some repository APIs exposed persistence details unnecessarily. | `ContactRepository` exposed DAO relationship-count projections and raw health-ranking entity methods even though pure analytics methods already existed. These API leaks have been removed and are covered by boundary tests. | Smaller domain API surface and lower risk of persistence details returning. |
@@ -197,10 +198,9 @@ core/
 
 Recommended migration order:
 
-1. Convert `core:domain` from an Android library module to a JVM module after confirming no Android Gradle plugin assumptions remain.
-2. Keep repository interfaces returning pure domain/model records and maintain the boundary guard tests.
-3. Replace direct `SecurePrefs` access in ViewModels with use cases or a `PreferencesRepository`.
-4. Split the largest ViewModels into route coordinator plus pure reducers/readers.
+1. Keep repository interfaces returning pure domain/model records and maintain the boundary guard tests.
+2. Replace direct `SecurePrefs` access in ViewModels with use cases or a `PreferencesRepository`.
+3. Split the largest ViewModels into route coordinator plus pure reducers/readers.
 
 ## Feature-By-Feature Audit
 
@@ -1284,6 +1284,7 @@ Related files:
 Evidence:
 
 - `core/domain/build.gradle.kts` no longer depends on Room runtime.
+- `core/domain/build.gradle.kts` now applies the Kotlin/JVM plugin instead of the Android library plugin.
 - Room entity classes now live under `core/data/src/main/kotlin/com/example/core/db/entities`.
 - The DAO projection `RelationshipTypeCount` now lives next to `ContactDao` under `core:data`.
 - `core/domain/src/main/kotlin` no longer contains `com/example/core/db` source files.
@@ -1302,18 +1303,19 @@ Evidence:
 - Event entity mappers for `Occasion`, `EventListItem`, and upcoming-event previews now live in `core:data`; domain event mappers only convert between pure event/list models.
 - Contact entity mappers for automation, readiness, analytics, prompt, routing, header, list, picker, and dispatch recipient projections now live in `core:data`.
 - `BackupService` now accepts pure `BackupDocumentReference` values instead of `android.net.Uri`; app/data layers do Android URI conversion at their boundaries.
+- Domain JSON string handling now uses a small Kotlin helper instead of Android's bundled `org.json` runtime.
 - `RepositoryBoundaryContractTest` now guards against recreating the removed mapper files in `core/domain`, against reintroducing Room entity imports into domain event mappers, and against Android/AndroidX/Room/DAO imports in domain main source.
 
 Impact:
 
 - The previously identified Room/Paging/entity contract leakage is addressed in current code.
 - Future storage changes are less likely to require domain-interface changes.
-- The remaining hardening step is build-level: `core:domain` can be evaluated for JVM module conversion now that main source is platform-neutral.
+- Domain tests now run as pure JVM tests through `:core:domain:test`.
 
 Status:
 
 - Resolved in source and covered by regression tests.
-- Follow-up: convert `core:domain` from Android library to JVM module if the build graph allows it cleanly.
+- Keep as an architectural invariant.
 
 ### P1: Readiness Model Duplication
 
@@ -1356,7 +1358,9 @@ data class RelationshipActionReadiness(
 - Wish Preview now exposes canonical draft action readiness and uses it for blank/short draft approval blocking and readiness copy while preserving the existing localized labels.
 - Wish Preview send summary now exposes canonical readiness for route blockers, device setup blockers, and dispatch timing/review state; the summary card severity follows canonical readiness state while preserving existing row copy.
 - Setup and system-alert notifications now map typed notification requests into `RelationshipActionReadiness` and use canonical primary actions for click-through routing. This also fixes AI fallback alerts opening the stale-backup destination.
-- A-003 named-surface adoption is now covered for Home, Messages, Wish Preview, Setup, and setup/system notifications. Remaining risk is journey-level regression coverage across those surfaces.
+- A-003 named-surface adoption is now covered for Home, Messages, Wish Preview, Setup, and setup/system notifications.
+- Contract-level readiness journey regression now covers review, channel-repair, and setup/provider-repair paths across those adapters. Remaining risk is UI and recovery journey coverage around the same readiness contract.
+- Domain-level message lifecycle regression now runs generation, approval, and dispatch together against one in-memory pending-message store. Remaining risk is UI navigation, worker/device/provider finalization, and failed-recovery journey coverage.
 
 ### Resolved: Sensitive Message Logging
 
@@ -1646,7 +1650,7 @@ Recommended additions:
 
 1. Create canonical readiness/action model.
 2. Reuse readiness model in Home, Messages, Wish Preview, Setup, and notifications.
-3. Convert `core:domain` from Android library to JVM module if the build graph allows it.
+3. Keep `core:domain` as a JVM module and prevent platform/storage imports from returning.
 4. Split `AutomationSetupViewModel` into:
    - setup readiness loader
    - check command executor
@@ -1675,7 +1679,7 @@ Phase 3: Domain purity
 
 - Keep Room entities and DAO projections in data/database.
 - Keep repository boundaries on pure domain/model records.
-- Convert `core:domain` to a JVM module if the Android plugin is no longer needed.
+- Keep `core:domain` as a JVM module.
 - Keep mapping and boundary tests.
 
 Phase 4: UX simplification
@@ -1709,7 +1713,7 @@ Phase 5: Advanced product improvements
 - Refactor Home/Messages/Wish Preview to use it.
 - Convert AI Doctor to ranked fix flow.
 - Add message lifecycle end-to-end test.
-- Evaluate JVM conversion for `core:domain`.
+- Keep domain JVM boundary guards green.
 
 ### 6-12 Weeks
 
@@ -1731,10 +1735,10 @@ Phase 5: Advanced product improvements
 
 | ID | Task | Priority | Owner area |
 | --- | --- | --- | --- |
-| A-003 | Add journey-level regression coverage for canonical readiness across Home, Messages, Wish Preview, Setup, and notifications. | P1 | App/QA |
-| A-004 | Convert `core:domain` from Android library to JVM module if compile/test verification stays clean. | P2 | Architecture |
+| A-003 | Expand journey-level regression coverage beyond the current contract-level review/channel/setup readiness paths into UI/use-case flows across Home, Messages, Wish Preview, Setup, and notifications. | P1 | App/QA |
+| A-004 | Keep `core:domain` JVM/persistence boundary guards green while adding future domain policies. | P2 | Architecture |
 | A-005 | Split `AutomationSetupViewModel`. | P1 | App/Architecture |
-| A-006 | Add message lifecycle journey test. | P1 | QA |
+| A-006 | Expand message lifecycle journey coverage from the current domain generate -> approve -> dispatch regression into UI navigation, worker/device dispatch, and provider finalization paths. | P1 | QA |
 | A-007 | Add failed dispatch recovery journey test. | P1 | QA |
 | A-008 | Clean local logs, patch scripts, and legacy app schemas after approval. | P2 | Repo Hygiene |
 | A-009 | Remove unused Retrofit/logging dependencies after compile verification. | P2 | Build |

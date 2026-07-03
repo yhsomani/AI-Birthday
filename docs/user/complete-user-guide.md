@@ -156,10 +156,12 @@ Use this when testing from the repository.
 
 1. Install JDK 21 and an Android SDK that supports compile SDK 37.
 2. Open the repository root in Android Studio.
-3. Use the approved tracked Firebase `google-services.json` file for the checked-in application id, or replace it only for a deliberate local Firebase project switch.
-4. Let Gradle sync.
-5. Select the `app` run configuration.
-6. Run on an emulator or physical device.
+3. Configure the IDE Gradle JDK to a full JDK 21/JBR with `bin/jlink`, such as Android Studio JBR or Temurin JDK 21.
+4. On Windows, do not use the Antigravity/Red Hat extension JRE for Gradle; it can miss `jlink` and fail `:app:assembleDebug` during AGP's Android JDK image transform.
+5. Use the approved tracked Firebase `google-services.json` file for the checked-in application id, or replace it only for a deliberate local Firebase project switch.
+6. Let Gradle sync.
+7. Select the `app` run configuration.
+8. Run on an emulator or physical device.
 
 Repository debug builds use the checked-in application id, so Firebase OAuth clients and SHA-1 fingerprints must match `com.aistudio.relateai.qxtjrk` and the signing key used for the build. If a future local variant reintroduces an application-id suffix, that variant needs its own matching Firebase OAuth client and `google-services.json`, and local variants must not be committed unless they are added to the approved provider-config policy.
 

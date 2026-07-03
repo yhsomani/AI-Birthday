@@ -43,10 +43,15 @@ Screenshot and large-font validation:
 
 ## Standard Commands
 
+Android Gradle tasks require JDK 21 or an IDE JBR with `bin/jlink` available.
+On Windows, set the IDE Gradle JDK or `JAVA_HOME` to Android Studio JBR or Temurin
+JDK 21; the Antigravity/Red Hat extension JRE does not provide the `jlink` tool
+needed by AGP's Android JDK image transform.
+
 Full debug gate:
 
 ```bash
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test :core:domain:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
 ```
 
 UI foundation gate:

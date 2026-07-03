@@ -11,6 +11,9 @@ import com.example.domain.message.WishDraftReadiness
 import com.example.domain.message.WishPreviewDeviceSetupContext
 import com.example.domain.message.WishPreviewDeviceSetupReason
 import com.example.domain.message.WishPreviewDeviceSetupState
+import com.example.domain.message.WishPreviewDispatchContext
+import com.example.domain.message.WishPreviewDispatchReason
+import com.example.domain.message.WishPreviewDispatchState
 import com.example.domain.message.WishPreviewRouteContext
 import com.example.domain.message.WishPreviewRouteReason
 import com.example.domain.message.WishPreviewRouteState
@@ -170,6 +173,187 @@ class RelationshipActionReadinessPolicyTest {
     }
 
     @Test
+    fun `review journey remains review-oriented across home messages wish preview and notifications`() {
+        val homeReview = RelationshipActionReadinessPolicy.fromHomeNextActionCandidate(
+            HomeNextActionCandidate(
+                kind = HomeNextActionKind.REVIEW_PENDING,
+                targetKind = HomeNextActionTargetKind.MESSAGES,
+                count = 2,
+            )
+        )
+        val messagesReview = RelationshipActionReadinessPolicy.fromMessageOperationalReadiness(
+            readiness = MessageOperationalReadiness.READY_FOR_REVIEW,
+            relatedMessageId = "message_1",
+            relatedContactId = "contact_1",
+            relatedEventId = "event_1",
+        )
+        val wishPreviewReview = RelationshipActionReadinessPolicy.fromWishPreviewSendSummary(
+            summary = wishPreviewSummary(
+                dispatchContext = WishPreviewDispatchContext(
+                    state = WishPreviewDispatchState.NEEDS_APPROVAL,
+                    reason = WishPreviewDispatchReason.APPROVAL_REQUIRED,
+                ),
+            ),
+            relatedMessageId = "message_1",
+            relatedContactId = "contact_1",
+            relatedEventId = "event_1",
+        )
+        val expiredNotificationReview = RelationshipActionReadinessPolicy.fromSetupNotificationRequest(
+            SetupNotificationRequest(
+                reason = SetupNotificationReason.MESSAGE_EXPIRED,
+                contactDisplayName = "Amit",
+            )
+        )
+
+        assertReadinessContract(
+            surface = "Home pending action",
+            readiness = homeReview,
+            state = RelationshipReadinessState.NEEDS_REVIEW,
+            reason = RelationshipReadinessReason.PENDING_MESSAGES,
+            action = RelationshipReadinessAction.REVIEW_MESSAGES,
+            blockerCount = 0,
+        )
+        assertReadinessContract(
+            surface = "Messages queue",
+            readiness = messagesReview,
+            state = RelationshipReadinessState.NEEDS_REVIEW,
+            reason = RelationshipReadinessReason.MESSAGE_NEEDS_REVIEW,
+            action = RelationshipReadinessAction.REVIEW_MESSAGE,
+            blockerCount = 0,
+        )
+        assertReadinessContract(
+            surface = "Wish Preview",
+            readiness = wishPreviewReview,
+            state = RelationshipReadinessState.NEEDS_REVIEW,
+            reason = RelationshipReadinessReason.MESSAGE_NEEDS_REVIEW,
+            action = RelationshipReadinessAction.REVIEW_MESSAGE,
+            blockerCount = 0,
+        )
+        assertReadinessContract(
+            surface = "Expired-message notification",
+            readiness = expiredNotificationReview,
+            state = RelationshipReadinessState.WARNING,
+            reason = RelationshipReadinessReason.PENDING_MESSAGES,
+            action = RelationshipReadinessAction.REVIEW_MESSAGES,
+            blockerCount = 1,
+        )
+    }
+
+    @Test
+    fun `channel repair journey uses configure-channel contract across messages wish preview and notifications`() {
+        val messagesChannelBlocker = RelationshipActionReadinessPolicy.fromMessageOperationalReadiness(
+            readiness = MessageOperationalReadiness.CHANNEL_DISABLED,
+            relatedMessageId = "message_2",
+            relatedContactId = "contact_2",
+            relatedEventId = "event_2",
+        )
+        val wishPreviewRouteBlocker = RelationshipActionReadinessPolicy.fromWishPreviewSendSummary(
+            summary = wishPreviewSummary(
+                routeContext = WishPreviewRouteContext(
+                    state = WishPreviewRouteState.BLOCKED,
+                    reason = WishPreviewRouteReason.CHANNEL_DISABLED,
+                ),
+            ),
+            relatedMessageId = "message_2",
+            relatedContactId = "contact_2",
+            relatedEventId = "event_2",
+        )
+        val wishPreviewDeviceBlocker = RelationshipActionReadinessPolicy.fromWishPreviewSendSummary(
+            summary = wishPreviewSummary(
+                deviceSetupContext = WishPreviewDeviceSetupContext(
+                    state = WishPreviewDeviceSetupState.ACTION_REQUIRED,
+                    reason = WishPreviewDeviceSetupReason.SMS_PERMISSION_MISSING,
+                ),
+            ),
+        )
+        val setupNotificationBlocker = RelationshipActionReadinessPolicy.fromSetupNotificationRequest(
+            SetupNotificationRequest(
+                reason = SetupNotificationReason.SMS_PERMISSION_MISSING,
+                contactDisplayName = "Amit",
+            )
+        )
+
+        listOf(
+            "Messages queue" to messagesChannelBlocker,
+            "Wish Preview route summary" to wishPreviewRouteBlocker,
+            "Wish Preview device summary" to wishPreviewDeviceBlocker,
+            "Setup notification" to setupNotificationBlocker,
+        ).forEach { (surface, readiness) ->
+            assertReadinessContract(
+                surface = surface,
+                readiness = readiness,
+                state = RelationshipReadinessState.ACTION_REQUIRED,
+                reason = RelationshipReadinessReason.CHANNEL_DISABLED,
+                action = RelationshipReadinessAction.CONFIGURE_CHANNEL,
+                blockerCount = 1,
+            )
+        }
+    }
+
+    @Test
+    fun `setup repair journey routes setup surfaces to setup or provider actions`() {
+        val homeAiSetup = RelationshipActionReadinessPolicy.fromHomeNextActionCandidate(
+            HomeNextActionCandidate(
+                kind = HomeNextActionKind.CONNECT_AI,
+                targetKind = HomeNextActionTargetKind.AUTOMATION_SETUP,
+            )
+        )
+        val setupRecommendedFix = RelationshipActionReadinessPolicy.fromSetupCandidates(
+            listOf(
+                SetupReadinessRecommendationCandidate(
+                    status = SetupReadinessStatus.ACTION_REQUIRED,
+                    group = SetupReadinessGroup.REQUIRED,
+                    hasAction = true,
+                )
+            )
+        )
+        val aiProviderNotification = RelationshipActionReadinessPolicy.fromSetupNotificationRequest(
+            SetupNotificationRequest(
+                reason = SetupNotificationReason.AI_PROVIDER_MISSING,
+                contactDisplayName = null,
+            )
+        )
+        val aiFallbackSystemAlert = RelationshipActionReadinessPolicy.fromSystemAlertNotificationRequest(
+            SystemAlertNotificationRequest(
+                reason = SystemAlertNotificationReason.AI_FALLBACK_USED,
+            )
+        )
+
+        assertReadinessContract(
+            surface = "Home AI setup",
+            readiness = homeAiSetup,
+            state = RelationshipReadinessState.ACTION_REQUIRED,
+            reason = RelationshipReadinessReason.AI_ACCESS_MISSING,
+            action = RelationshipReadinessAction.CONNECT_AI,
+            blockerCount = 1,
+        )
+        assertReadinessContract(
+            surface = "Automation Setup recommended fix",
+            readiness = setupRecommendedFix,
+            state = RelationshipReadinessState.ACTION_REQUIRED,
+            reason = RelationshipReadinessReason.SETUP_ACTION_REQUIRED,
+            action = RelationshipReadinessAction.OPEN_SETUP,
+            blockerCount = 1,
+        )
+        assertReadinessContract(
+            surface = "AI-provider notification",
+            readiness = aiProviderNotification,
+            state = RelationshipReadinessState.ACTION_REQUIRED,
+            reason = RelationshipReadinessReason.AI_ACCESS_MISSING,
+            action = RelationshipReadinessAction.CONNECT_AI,
+            blockerCount = 1,
+        )
+        assertReadinessContract(
+            surface = "AI-fallback system alert",
+            readiness = aiFallbackSystemAlert,
+            state = RelationshipReadinessState.WARNING,
+            reason = RelationshipReadinessReason.SETUP_WARNING,
+            action = RelationshipReadinessAction.OPEN_SETUP,
+            blockerCount = 1,
+        )
+    }
+
+    @Test
     fun `home pending review action maps to canonical review readiness`() {
         val readiness = RelationshipActionReadinessPolicy.fromHomeNextActionCandidate(
             HomeNextActionCandidate(
@@ -256,6 +440,7 @@ class RelationshipActionReadinessPolicyTest {
     }
 
     private fun wishPreviewSummary(
+        dispatchContext: WishPreviewDispatchContext = WishPreviewDispatchContext(),
         routeContext: WishPreviewRouteContext? = null,
         deviceSetupContext: WishPreviewDeviceSetupContext? = null,
     ): WishPreviewSendSummary {
@@ -265,8 +450,27 @@ class RelationshipActionReadinessPolicyTest {
             scheduledForMs = 1_700_000_000_000L,
             approvalMode = "VIP_APPROVE",
             usesFallback = false,
+            dispatchContext = dispatchContext,
             routeContext = routeContext,
             deviceSetupContext = deviceSetupContext,
         )
+    }
+
+    private fun assertReadinessContract(
+        surface: String,
+        readiness: RelationshipActionReadiness,
+        state: RelationshipReadinessState,
+        reason: RelationshipReadinessReason,
+        action: RelationshipReadinessAction,
+        blockerCount: Int,
+    ) {
+        assertEquals("$surface state", state, readiness.state)
+        assertEquals("$surface primary reason", reason, readiness.primaryReason)
+        assertEquals("$surface primary action", action, readiness.primaryAction)
+        assertEquals("$surface blocker count", blockerCount, readiness.blockers.size)
+        readiness.blockers.forEach { blocker ->
+            assertEquals("$surface blocker reason", reason, blocker.reason)
+            assertEquals("$surface blocker action", action, blocker.action)
+        }
     }
 }

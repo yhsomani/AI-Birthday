@@ -4,6 +4,146 @@ Version: 1.0.0
 Date: 2026-06-26
 Source backlog: [IMPLEMENTATION_TASKS.md](IMPLEMENTATION_TASKS.md)
 
+## 2026-07-03 - Message Lifecycle Journey Test
+
+Completed tasks:
+
+- A-006 QA slice: add an end-to-end domain journey regression for generate -> review notification -> approve with edited text -> exact-send scheduling -> dispatch.
+- A-006 QA slice: back the journey with one in-memory pending-message repository so generation, approval, and dispatch must operate on the same pending record instead of independent mocks.
+
+Changed files:
+
+- [app/src/test/java/com/example/domain/journey/MessageLifecycleJourneyTest.kt](app/src/test/java/com/example/domain/journey/MessageLifecycleJourneyTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added a domain-level lifecycle journey test that runs the real `GenerateMessageUseCase`, `ApprovePendingMessageUseCase`, and `DispatchMessageUseCase` together.
+- Verified generation creates a pending Always Ask SMS draft, posts one approval notification, and does not schedule dispatch before approval.
+- Verified approval saves the edited text, marks the same pending record approved, and schedules exact-send work.
+- Verified dispatch sends the edited text through the dispatcher, records a `SEND_NOW` queued dispatch attempt, and writes a resolved "Dispatch sent" activity log.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.domain.journey.MessageLifecycleJourneyTest --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-03 - Canonical Readiness Journey Regression
+
+Completed tasks:
+
+- A-003 QA slice: add cross-surface regression coverage for the canonical readiness/action contract.
+- A-003 QA slice: lock the review, channel-repair, and setup/provider-repair journeys to the correct canonical state, reason, action, and blocker family across Home, Messages, Wish Preview, Setup, setup notifications, and system alerts.
+
+Changed files:
+
+- [core/domain/src/test/kotlin/com/example/domain/readiness/RelationshipActionReadinessPolicyTest.kt](core/domain/src/test/kotlin/com/example/domain/readiness/RelationshipActionReadinessPolicyTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added a review-journey invariant proving Home pending-review actions, Messages review rows, Wish Preview approval state, and expired-message notifications stay on review routes rather than setup repair routes.
+- Added a channel-repair invariant proving Messages, Wish Preview route summaries, Wish Preview device summaries, and SMS-permission setup notifications all use the `CONFIGURE_CHANNEL` contract.
+- Added a setup/provider-repair invariant proving Home AI setup, Automation Setup recommended fixes, AI-provider notifications, and AI-fallback system alerts route to setup/provider actions consistently.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :core:domain:test --tests com.example.domain.readiness.RelationshipActionReadinessPolicyTest --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-03 - Android Gradle JDK Preflight
+
+Completed tasks:
+
+- Build environment hardening: detect Android Gradle tasks running under a Java runtime that lacks `jlink`.
+- Build environment hardening: convert the Windows Antigravity/Red Hat extension JRE failure into a clear Gradle exception before AGP's `JdkImageTransform` produces a nested configuration-cache error.
+- Documentation: record the Windows/IDE Gradle JDK fix in the SSOT, release checklist, test strategy, and local-build user guide.
+
+Changed files:
+
+- [build.gradle.kts](build.gradle.kts)
+- [app/src/test/java/com/example/ProductionReadinessConfigTest.kt](app/src/test/java/com/example/ProductionReadinessConfigTest.kt)
+- [SSOT.md](SSOT.md)
+- [docs/operations/release-checklist.md](docs/operations/release-checklist.md)
+- [docs/testing/test-strategy.md](docs/testing/test-strategy.md)
+- [docs/user/complete-user-guide.md](docs/user/complete-user-guide.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Added `requestedTasksNeedAndroidJdkImage()` to the root Gradle script so Android-facing build, test, lint, package, Roborazzi, and coverage tasks require a runtime with `bin/jlink`.
+- Checked both `java.home/bin` and `java.home/../bin` for `jlink` so normal JDK/JBR layouts work.
+- Added an actionable failure message that names the active `java.home` and tells Windows IDE users to select Android Studio JBR or Temurin JDK 21 instead of the Antigravity/Red Hat extension JRE.
+- Extended `ProductionReadinessConfigTest` so the guard and its troubleshooting copy remain part of release-readiness checks.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ProductionReadinessConfigTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew jacocoDebugUnitTestReport --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :core:model:test :core:domain:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`; the only notable focused-test output was a non-fatal KSP headless AWT warning, and the Gradle process exited successfully.
+
+## 2026-07-03 - Domain JVM Module Conversion
+
+Completed tasks:
+
+- A-004 architecture slice: convert `core:domain` from an Android library module to a Kotlin/JVM module.
+- A-004 architecture slice: keep domain tests on the JVM `:core:domain:test` task and update CI/release commands so those tests remain part of the required gates.
+- A-004 architecture slice: update aggregate JaCoCo coverage to combine JVM domain test output with Android debug unit-test output.
+- A-004 architecture slice: remove domain reliance on Android's bundled `org.json` runtime by adding a small Kotlin JSON helper for stored style/prompt JSON strings.
+
+Changed files:
+
+- [core/domain/build.gradle.kts](core/domain/build.gradle.kts)
+- [build.gradle.kts](build.gradle.kts)
+- [.github/workflows/android.yml](.github/workflows/android.yml)
+- [app/src/test/java/com/example/ProductionReadinessConfigTest.kt](app/src/test/java/com/example/ProductionReadinessConfigTest.kt)
+- [core/domain/src/main/kotlin/com/example/domain/util/DomainJson.kt](core/domain/src/main/kotlin/com/example/domain/util/DomainJson.kt)
+- [core/domain/src/main/kotlin/com/example/domain/message/MessagePromptContextMappers.kt](core/domain/src/main/kotlin/com/example/domain/message/MessagePromptContextMappers.kt)
+- [core/domain/src/main/kotlin/com/example/domain/usecase/StyleAnalysisUseCase.kt](core/domain/src/main/kotlin/com/example/domain/usecase/StyleAnalysisUseCase.kt)
+- [SSOT.md](SSOT.md)
+- [docs/architecture/adr/0001-domain-purity-and-module-boundaries.md](docs/architecture/adr/0001-domain-purity-and-module-boundaries.md)
+- [docs/operations/release-checklist.md](docs/operations/release-checklist.md)
+- [docs/testing/test-strategy.md](docs/testing/test-strategy.md)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Replaced `alias(libs.plugins.android.library)` in `core/domain` with `org.jetbrains.kotlin.jvm`.
+- Removed Android namespace/SDK/build-type configuration from `core/domain`.
+- Added JVM toolchain/source compatibility configuration for the domain module.
+- Updated the root `jacocoDebugUnitTestReport` task so `:core:domain` contributes `:core:domain:test`, `classes/kotlin/main`, and `jacoco/test.exec` while Android modules keep debug unit-test coverage.
+- Updated GitHub Actions and `ProductionReadinessConfigTest` so CI runs `:core:domain:test testDebugUnitTest lintDebug assembleDebug`.
+- Added `DomainJson` helpers for string-array parsing, string-array encoding, simple object encoding, and string-field lookup.
+- Updated prompt context and style analysis code to use the domain helper instead of `org.json`.
+- Updated current-state docs to mark the domain source/build boundary as JVM/persistence clean.
+
+Validation:
+
+```bash
+./gradlew :core:domain:test \
+  --tests com.example.domain.repository.RepositoryBoundaryContractTest \
+  :app:testDebugUnitTest \
+  --tests com.example.ProductionReadinessConfigTest \
+  --no-configuration-cache
+```
+
+Result: passed.
+
 ## 2026-07-03 - Domain Persistence Source Boundary Cleanup
 
 Completed tasks:
@@ -41,7 +181,7 @@ What changed:
 Validation:
 
 ```bash
-./gradlew :core:domain:testDebugUnitTest \
+./gradlew :core:domain:test \
   --tests com.example.domain.repository.RepositoryBoundaryContractTest \
   :core:data:testDebugUnitTest \
   --tests com.example.core.backup.BackupServiceImplTest \
@@ -56,7 +196,7 @@ Result: passed.
 Additional broad validation:
 
 ```bash
-./gradlew :app:testDebugUnitTest :core:domain:testDebugUnitTest :core:data:testDebugUnitTest --no-configuration-cache
+./gradlew :app:testDebugUnitTest :core:domain:test :core:data:testDebugUnitTest --no-configuration-cache
 ```
 
 Result: passed.

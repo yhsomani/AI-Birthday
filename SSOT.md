@@ -103,11 +103,11 @@ Actual Gradle dependencies:
 | --- | --- | --- |
 | `:app` | Android app, Compose UI, navigation, ViewModels, widgets, tests | `:core:domain`, `:core:data`, `:core:ui`, Hilt, Compose, Firebase, WorkManager, SQLCipher, JavaMail, Room runtime |
 | `:core:model` | JVM-only shared model/value types | Kotlin JVM, JUnit tests |
-| `:core:domain` | Use cases, policies, repository/service contracts, pure mappers | `api(:core:model)`, coroutines, javax.inject; Android library plugin remains pending JVM conversion |
+| `:core:domain` | JVM-only use cases, policies, repository/service contracts, pure mappers | Kotlin JVM, `api(:core:model)`, coroutines, javax.inject |
 | `:core:data` | Room, repositories, workers, contacts, AI, backup, prefs, auth, senders | `api(:core:domain)`, Hilt, Room/KSP, WorkManager, Firebase, Google auth, OkHttp/Retrofit/Moshi, SQLCipher, JavaMail |
 | `:core:ui` | Shared Compose theme and UI primitives | Compose Material 3, Navigation Compose, Lifecycle Compose, Coil |
 
-Architectural caveat: `:core:domain` main source is now free of Android, AndroidX, Room entity, DAO, and Paging imports, and Room entities/DAO projections live in `:core:data`. The module still uses the Android library plugin; ADR 0001 remains the target direction for converting it to a JVM module.
+Architectural caveat: `:core:domain` is now a Kotlin/JVM module. Its main source is free of Android, AndroidX, Room entity, DAO, and Paging imports, and Room entities/DAO projections live in `:core:data`.
 
 Dependency injection:
 
@@ -306,14 +306,19 @@ Default automation mode:
 
 ## 11. Build, Test, and Release
 
+Android Gradle tasks require a full JDK 21/JBR whose `bin` directory contains `jlink`.
+On Windows, configure the IDE Gradle JDK or `JAVA_HOME` to Android Studio JBR or
+Temurin JDK 21. Do not run Android builds through the Antigravity/Red Hat extension
+JRE path, because AGP's `JdkImageTransform` needs `jlink`.
+
 Local build commands:
 
 ```bash
 # Full debug gate used by docs/release checklist
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:model:test :core:domain:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
 
 # Unit tests
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew testDebugUnitTest --no-configuration-cache
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :core:domain:test testDebugUnitTest --no-configuration-cache
 
 # Screenshot verification
 JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:verifyRoborazziDebug -Pscreenshot --tests 'com.example.ui.screenshots.*' --no-configuration-cache
@@ -338,7 +343,7 @@ CI:
 
 - GitHub Actions workflow `Android CI` runs on pushes and pull requests to `main` and `master`.
 - Pull requests run Dependency Review, failing on moderate-or-higher vulnerabilities and GPL/LGPL/AGPL denied licenses.
-- CI sets up JDK 21, runs `testDebugUnitTest lintDebug assembleDebug`, verifies Roborazzi screenshots, verifies `ProductionReadinessConfigTest`, generates coverage, verifies release signing guard failure, and uploads reports/APK artifacts.
+- CI sets up JDK 21, runs `:core:domain:test testDebugUnitTest lintDebug assembleDebug`, verifies Roborazzi screenshots, verifies `ProductionReadinessConfigTest`, generates coverage, verifies release signing guard failure, and uploads reports/APK artifacts.
 
 Test inventory verified by file count:
 
@@ -698,7 +703,7 @@ Limitations: Merge restore is not implemented. Backup passphrases are not stored
 | Local-only/guest mode | Not Implemented | Authenticated routes require Firebase user |
 | Merge restore | Not Implemented | Backup docs and service implement replace mode |
 | Light/dynamic theme | Planned | Design docs say production is dark-only |
-| Pure domain without Room/Paging | Implemented for source/dependencies; build cleanup pending | `:core:model` exists, Room entities and DAO projections live in `:core:data`, and `:core:domain` has no Room/Paging imports; Android library plugin remains |
+| Pure domain without Room/Paging | Implemented | `:core:model` exists, Room entities and DAO projections live in `:core:data`, and `:core:domain` is a Kotlin/JVM module with no Android/Room/Paging imports |
 | Target `occasions` and `message_drafts` tables | Planned | Architecture docs target them; Room v16 still uses `events` and `pending_messages` |
 
 ## 14. User Workflows
@@ -838,7 +843,7 @@ Risks:
 
 | ID | Area | Status | Evidence | Impact | Recommended action |
 | --- | --- | --- | --- | --- | --- |
-| D-001 | Domain purity | Source boundary resolved; build cleanup pending | Room entities and DAO projections live under `core/data`; `core/domain/build.gradle.kts` no longer depends on Room/Paging; boundary tests guard Android/AndroidX/Room/DAO imports | Domain is persistence-independent at the source/API level; Android library plugin remains | Evaluate converting `:core:domain` to a JVM module |
+| D-001 | Domain purity | Resolved for current architecture | Room entities and DAO projections live under `core/data`; `core/domain/build.gradle.kts` is Kotlin/JVM and no longer depends on Room/Paging; boundary tests guard Android/AndroidX/Room/DAO imports | Domain is persistence-independent at the source/API/build level | Keep boundary tests green and continue feature-level reducer/read-model cleanup |
 | D-002 | Readiness model | Partially Implemented | Messages uses `MessageOperationalReadinessPolicy` plus `DispatchEligibilityPolicy` for route/status/scheduled-time/allowed-window readiness; `DispatchEligibilityPolicy` blocks already-handled `SENT` and `DISPATCHING` states; exact-send scheduling uses `ExactSendSchedulePolicy`; exact-send stale-dispatch recovery classification uses `ExactSendRecoveryPolicy`; SMS stale pending-delivery recovery cutoff and recovered status use `SmsDeliveryStatusRecoveryPolicy`; event-reminder cancel/exact/inexact scheduling decisions use `EventReminderSchedulePolicy`; foreground and worker dispatcher exception outcomes use `DispatchExceptionFailurePolicy`; SMS sent/delivered callback delivery status, dispatch-attempt result, pending failure marking, and failure metadata use `SmsCallbackOutcomePolicy`; Wish Preview draft text uses `WishDraftReadinessPolicy`; Wish Preview send summary, route choice context, route setup context, device setup context, and quiet-hours/blackout dispatch context use `WishPreviewSendSummaryPolicy`; approval notification actions use `ApprovalNotificationActionPolicy`; dispatch, AI-provider, revival-AI-provider, and exact-alarm setup notification request reasons/helper rendering use `SetupNotificationRequest`; AI fallback and stale-backup alert reasons/helper rendering use `SystemAlertNotificationRequest`; revival review notifications use `RevivalNotificationRequest`; AI Doctor account/provider readiness uses `SetupAccountProviderReadinessPolicy`; AI Doctor full-automation, event, route, and selected-channel count decisions use `SetupAutomationReadinessPolicy`; SMS/WhatsApp setup readiness and channel verification routing use `SetupChannelReadinessPolicy`; AI Doctor email setup readiness uses `SetupEmailReadinessPolicy`; AI Doctor Style Coach, personalization, and generic-message risk checks use `SetupQualityReadinessPolicy`; AI Doctor notification permission, exact-send permission, daily scheduler, recent-health, and dispatch-recovery checks use `SetupSystemReadinessPolicy`; setup summary/progress uses `SetupReadinessSummaryPolicy` and `SetupReadinessProgressPolicy`; AI Doctor recommended-fix ranking uses `SetupReadinessRecommendationPolicy`; route selector and final dispatch fallback ordering use `DeliveryRouteReadinessPolicy` and `AutoSendChannelSelector`; Home readiness banner and next actions use `HomeNextActionPolicy`; remaining notification surfaces outside typed approval/setup/system-alert/revival/event-reminder requests and dispatch/recovery timing surfaces outside Messages/Wish Preview/exact-send scheduling/exact-send recovery/SMS delivery-status recovery/event-reminder scheduling/dispatch-exception failure/SMS callback outcomes still compute related states separately | Users can still see fragmented setup/recovery reasoning outside the shared route/status/scheduled-window/exact-send-scheduling/exact-send-recovery/SMS-delivery-status-recovery/event-reminder-scheduling/dispatch-exception-failure/SMS-callback-outcome/draft-text/send-summary/route-choice/route-setup/device-setup/dispatch-context/approval-notification/setup-notification/system-alert/revival-notification/account-provider/automation-prerequisite/channel-setup/channel-verification/email-readiness/quality-readiness/system-readiness/setup-summary/setup-progress/fix-ranking/Home slices | Create one operational readiness use case/read model |
 | D-003 | Backup automation default mismatch | Resolved in current working tree | `GlobalAutomationModePrefsMapper.DEFAULT_GLOBAL_AUTOMATION_MODE = ALWAYS_ASK`; `BackupPreferencesDto.defaults()` uses `ALWAYS_ASK` | No current user impact; keep regression coverage | Keep backup defaults aligned with review-first automation |
 | D-004 | Provider config policy | Resolved in current working tree | `.gitignore` allowlists approved app/debug client config files and release/security docs define forbidden secrets | Keep Firebase project/OAuth/SHA verification in release evidence |
@@ -857,6 +862,10 @@ Current working-tree note: exact-send enqueue-now/exact-alarm/WorkManager-fallba
 ### Gradle cannot run
 
 - Verify JDK 21 is installed and `JAVA_HOME` points to it.
+- Verify the active Gradle runtime has `bin/jlink` (`bin/jlink.exe` on Windows).
+- If `:app:assembleDebug` fails with `JdkImageTransform` or `jlink executable ... does not exist`,
+  configure the IDE Gradle JDK to Android Studio JBR or Temurin JDK 21.
+- On Windows, avoid the Antigravity/Red Hat extension JRE path for Gradle builds.
 - Run `./gradlew --version`.
 - Use `--no-configuration-cache` for current documented validation commands.
 
@@ -1032,7 +1041,7 @@ Product assessment:
 | End User | Users can sync contacts, enrich people, generate/review wishes, automate sends, inspect failures, and back up data. | The same user problem can appear in Home, Messages, AI Doctor, Settings, and Activity History with different language. | Use one shared operational state and plain-language status copy across screens. |
 | UX Designer | Main screens have loading/empty/error/populated states and screenshot coverage. Secondary surfaces are dense but feature-complete. | Settings, AI Doctor, Events, Wish Preview, and Gift Advisor carry too many decisions per screen. | Split routine actions from advanced diagnostics and progressively reveal risk details. |
 | QA Engineer | The repo has broad unit, interaction, screenshot, migration, policy, and readiness tests. | External provider behavior, Play policy signoff, device delivery, and release evidence remain outside static tests. | Keep CI gates and add release-run evidence records for provider/device smoke. |
-| Software Architect | Modular Gradle graph exists with app/model/domain/data/ui layers and extensive policies/use cases. Domain source is now free of Room/Paging/entity and Android imports. | Readiness logic still needs journey-level regression coverage, and `:core:domain` still uses the Android library plugin. | Add cross-surface readiness journey tests and evaluate JVM conversion for `:core:domain`. |
+| Software Architect | Modular Gradle graph exists with app/model/domain/data/ui layers and extensive policies/use cases. Domain is now a Kotlin/JVM module free of Room/Paging/entity and Android imports. | Readiness logic still needs journey-level regression coverage and presentation files remain large. | Add cross-surface readiness journey tests and split the largest route coordinators/screens. |
 
 User expectation summary:
 
@@ -1080,7 +1089,7 @@ This matrix extends the feature catalog with ideal behavior and improvement prio
 | ID | Description | Root cause | User impact | Business impact | Severity | Recommended fix | Files involved |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | T-001 | Readiness state is not a single source | Messages uses shared route/status/scheduled-time/allowed-window readiness policy, exact-send scheduling uses a shared scheduling policy, exact-send stale-dispatch recovery uses a shared recovery decision policy, SMS stale delivery-status recovery uses a shared recovery policy, event reminders use a shared cancel/exact/inexact scheduling decision policy, foreground and worker dispatch exception outcomes use a shared final-failure policy, SMS callback delivery/attempt outcomes use a shared callback outcome policy, already-handled `SENT`/`DISPATCHING` dispatch states use a shared blocker decision, Wish Preview draft text uses a shared draft-readiness policy, Wish Preview send summary, route choice context, route setup context, device setup context, and quiet-hours/blackout dispatch context use a shared projection policy, approval notification actions plus approval/setup/system-alert/revival/event-reminder notification request payloads use shared domain/model contracts or Android adapters, route selection and final dispatch fallback ordering use shared history-aware route policy, AI Doctor account/provider readiness and automation prerequisites use shared domain policies, SMS/WhatsApp setup channel checks and channel verification routing use a shared domain policy, AI Doctor email setup, quality, and system checks use shared domain policies, setup summary/progress uses shared domain policies, AI Doctor recommended-fix ranking uses a shared domain policy, and Home readiness banner/next actions use a shared domain policy; remaining notification surfaces outside typed approval/setup/system-alert/revival/event-reminder requests and dispatch/recovery timing surfaces outside Messages/Wish Preview/exact-send scheduling/exact-send recovery/SMS delivery-status recovery/event-reminder scheduling/dispatch-exception failure/SMS callback outcomes still compute related states separately | Conflicting or confusing "ready/blocked" explanations remain possible outside the shared slices | Trust risk for automation | High | Continue toward one operational readiness use case/read model and migrate remaining surfaces | `MessageOperationalReadinessPolicy.kt`, `ExactSendSchedulePolicy.kt`, `ExactSendRecoveryPolicy.kt`, `SmsDeliveryStatusRecoveryPolicy.kt`, `EventReminderSchedulePolicy.kt`, `DispatchExceptionFailurePolicy.kt`, `SmsCallbackOutcomePolicy.kt`, `ExactSendRecovery.kt`, `SmsDeliveryStatusRecovery.kt`, `EventReminderScheduler.kt`, `SmsStatusReceiver.kt`, `DispatchMessageUseCase.kt`, `WorkerMessageDispatchAdapters.kt`, `WishDraftReadinessPolicy.kt`, `WishPreviewSendSummaryPolicy.kt`, `ApprovalNotificationActionPolicy.kt`, `SetupNotificationRequest.kt`, `SystemAlertNotificationRequest.kt`, `ApprovalNotificationRequest.kt`, `NotificationMappers.kt`, `NotificationHelper.kt`, `RevivalWorker.kt`, `SetupAccountProviderReadinessPolicy.kt`, `SetupAutomationReadinessPolicy.kt`, `SetupChannelReadinessPolicy.kt`, `SetupEmailReadinessPolicy.kt`, `SetupQualityReadinessPolicy.kt`, `SetupSystemReadinessPolicy.kt`, `SetupReadinessSummaryPolicy.kt`, `SetupReadinessProgressPolicy.kt`, `SetupReadinessRecommendationPolicy.kt`, `HomeNextActionPolicy.kt`, `AutomationSetupViewModel.kt`, `HomeViewModel.kt`, `WishPreviewViewModel.kt`, `WishPreviewDeviceReadinessReader.kt`, `DispatchEligibilityPolicy.kt`, `DeliveryRouteReadinessPolicy.kt`, `AutoSendChannelSelector.kt` |
-| T-002 | Domain module still uses Android library plugin | Domain source is now persistence/platform-neutral, but the Gradle module is still Android-configured | Minor build overhead and a weaker signal that domain is pure JVM | Slightly slower builds and less clear module intent | Low | Evaluate converting `:core:domain` to a JVM module; keep boundary tests | `core/domain/build.gradle.kts`, `RepositoryBoundaryContractTest.kt` |
+| T-002 | Domain module Android/persistence leakage | Domain source and build now avoid Android, AndroidX, Room, DAO, and Paging dependencies | Resolved for current architecture | Lower build overhead and clearer module intent | Resolved | Keep boundary tests | `core/domain/build.gradle.kts`, `RepositoryBoundaryContractTest.kt` |
 | T-003 | Large UI/ViewModel files concentrate behavior | Complex screens grew organically | Higher regression risk and harder review | Slower delivery velocity | Medium | Split by sub-feature and extract reducers/state calculators | `AutomationSetupViewModel.kt`, `GiftAdvisorScreen.kt`, `EventsScreen.kt`, `WishPreviewScreen.kt`, `SettingsScreen.kt` |
 | T-004 | Provider config policy | `google-services.json` was tracked while ignored by `.gitignore` | Resolved in current working tree with explicit allowlist, release/security policy, and repository hygiene coverage | Remaining Firebase project/OAuth/SHA correctness is external release evidence | High | Implemented: approved app/debug configs are allowlisted; local variants and server-side secrets remain forbidden | `.gitignore`, `RepositoryHygieneTest.kt`, release/security docs |
 | T-005 | Release evidence not complete | Static source has controls but not store artifacts/signoffs | Users cannot rely on Play-ready claims | Release blocker | High | Add privacy policy, Data Safety, Accessibility declaration, and device smoke records | `docs/security/*`, `docs/operations/release-checklist.md` |
@@ -1119,7 +1128,7 @@ Current problems:
 | Problem | Evidence | Risk |
 | --- | --- | --- |
 | Feature UI and ViewModels are split into separate screen/viewmodel package roots | `app/src/main/java/com/example/ui/screens`, `app/src/main/java/com/example/ui/viewmodel` | Feature ownership requires cross-folder navigation |
-| Domain module build cleanup remains | Domain source is persistence/platform-neutral, but `:core:domain` still uses the Android library plugin | Module intent is less explicit and builds may do extra Android work |
+| Journey-level readiness coverage remains | Canonical readiness is adopted on named surfaces, but cross-surface workflows still need end-to-end regression checks | Users may see inconsistent recovery if a flow regresses between focused tests |
 | Data package contains many infrastructure subdomains under one module | `core/data/src/main/kotlin/com/example/core/...` | Module is large but still coherent for current project size |
 | Docs are fragmented | Root docs and `docs/**` contain overlapping authority claims | Maintainers may use stale docs |
 | Local/tool artifacts are present near source | root logs, `.codepulse`, `.intelligence`, `app/schemas` | Repository noise |
@@ -1185,7 +1194,7 @@ Migration plan:
 1. Freeze new authoritative docs into this SSOT and archive redundant docs only after review.
 2. Extract shared readiness/read-model contracts before reorganizing UI packages.
 3. Move feature screen and ViewModel files together one feature at a time, with package-level tests unchanged in behavior.
-4. Convert `:core:domain` to a JVM module only after compile, coverage, and CI task references are updated.
+4. Keep `:core:domain` as a JVM module and update CI/coverage commands whenever test task names change.
 5. Move from `events`/`pending_messages` naming toward `occasions`/`message_drafts` only through explicit Room migrations and backup compatibility tests.
 
 Benefits: clearer ownership, easier onboarding, cleaner domain tests, smaller review scope, and less documentation drift.
@@ -1220,7 +1229,7 @@ Dependency summary:
 | `:app` | UI, navigation, ViewModels, Android app shell, widget | Room schema, provider internals, business policy | ViewModels still call some storage/config primitives directly |
 | `:core:ui` | Design tokens, theme, reusable Compose components | Feature state/business decisions | Healthy boundary |
 | `:core:model` | Pure models/enums/read models | Android, Room, Hilt, network | Healthy boundary and growing |
-| `:core:domain` | Use cases, policies, repository/service contracts, pure mappers | Android UI, Room entities, data implementation | Android library plugin remains pending JVM conversion |
+| `:core:domain` | Use cases, policies, repository/service contracts, pure mappers | Android UI, Room entities, data implementation | Healthy JVM boundary; keep guard tests green |
 | `:core:data` | Room, repositories, workers, senders, integrations, prefs, backup | UI rendering | Large but coherent integration module |
 
 External dependency risk summary:
