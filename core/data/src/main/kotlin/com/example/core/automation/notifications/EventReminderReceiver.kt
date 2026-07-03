@@ -5,9 +5,9 @@ import android.content.Context
 import android.content.Intent
 import com.example.core.automation.scheduler.EventReminderScheduler
 import com.example.core.db.AppDatabase
+import com.example.core.db.toOccasion
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.contact.toHeader
-import com.example.domain.event.toOccasion
 import com.example.domain.notification.buildEventReminderNotificationRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

@@ -1,12 +1,12 @@
 package com.example.data.repository
 
 import com.example.core.db.dao.EventDao
-import com.example.domain.event.toEventListItems
-import com.example.domain.event.toEventEntity
-import com.example.domain.event.toOccasion
-import com.example.domain.event.toOccasions
-import com.example.domain.event.toUpcomingEventPreview
-import com.example.domain.event.toUpcomingEventPreviews
+import com.example.core.db.toEventListItems
+import com.example.core.db.toEventEntity
+import com.example.core.db.toOccasion
+import com.example.core.db.toOccasions
+import com.example.core.db.toUpcomingEventPreview
+import com.example.core.db.toUpcomingEventPreviews
 import com.example.domain.model.common.ContactId
 import com.example.domain.model.occasion.EventListItem
 import com.example.domain.model.occasion.Occasion

@@ -9,9 +9,9 @@ import android.net.Uri
 import android.widget.RemoteViews
 import com.example.R
 import com.example.core.db.AppDatabase
+import com.example.core.db.toOccasions
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.contact.toHeader
-import com.example.domain.event.toOccasions
 import com.example.domain.model.MessageStatus
 import com.example.domain.model.contact.ContactHeader
 import com.example.domain.model.occasion.Occasion

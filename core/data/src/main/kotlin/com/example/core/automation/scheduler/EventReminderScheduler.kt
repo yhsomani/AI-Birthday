@@ -7,10 +7,10 @@ import android.content.Intent
 import android.os.Build
 import com.example.core.automation.notifications.EventReminderReceiver
 import com.example.core.db.AppDatabase
+import com.example.core.db.toOccasion
 import com.example.core.prefs.SecurePrefs
 import com.example.domain.automation.EventReminderScheduleDecision
 import com.example.domain.automation.EventReminderSchedulePolicy
-import com.example.domain.event.toOccasion
 import com.example.domain.model.notification.EventReminderScheduleRequest
 import com.example.domain.notification.buildEventReminderScheduleRequest
 import com.example.domain.service.EventReminderSchedulerService

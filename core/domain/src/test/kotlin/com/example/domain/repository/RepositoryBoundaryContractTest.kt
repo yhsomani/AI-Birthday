@@ -17,6 +17,7 @@ class RepositoryBoundaryContractTest {
             "core/domain/src/main/kotlin/com/example/domain/repository/ContactRepository.kt",
             "core/domain/src/main/kotlin/com/example/domain/repository/MessageRepository.kt",
             "core/domain/src/main/kotlin/com/example/domain/repository/DispatchAttemptRepository.kt",
+            "core/domain/src/main/kotlin/com/example/domain/repository/EventRepository.kt",
         ).forEach { relativePath ->
             val source = rootFile(relativePath).readText()
 
@@ -32,7 +33,8 @@ class RepositoryBoundaryContractTest {
                     source.contains("ContactEntity") ||
                     source.contains("PendingMessageEntity") ||
                     source.contains("SentMessageEntity") ||
-                    source.contains("DispatchAttemptEntity"),
+                    source.contains("DispatchAttemptEntity") ||
+                    source.contains("EventEntity"),
             )
         }
     }
@@ -99,6 +101,21 @@ class RepositoryBoundaryContractTest {
                 rootFileOrNull(relativePath)?.isFile == true,
             )
         }
+    }
+
+    @Test
+    fun eventMappers_doNotDependOnRoomEntities() {
+        val source = rootFile(
+            "core/domain/src/main/kotlin/com/example/domain/event/EventMappers.kt",
+        ).readText()
+
+        assertFalse(
+            "Domain event mappers should only map pure event models; EventEntity mapping belongs in core:data.",
+            source.contains("com.example.core.db.entities") ||
+                source.contains("EventEntity") ||
+                source.contains("toEventEntity") ||
+                source.contains("toOccasions"),
+        )
     }
 
     private fun rootFile(relativePath: String): File {

@@ -7,7 +7,7 @@ import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.dao.saveMessageStatusUpdate
 import com.example.core.db.entities.SentMessageEntity
-import com.example.domain.event.toOccasion
+import com.example.core.db.toOccasion
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.MessageStatus

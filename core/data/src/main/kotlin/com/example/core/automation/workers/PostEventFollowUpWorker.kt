@@ -27,8 +27,8 @@ import com.example.domain.automation.AutomationSchedulePolicy
 import com.example.domain.contact.toDeliveryRouteProfile
 import com.example.domain.contact.toHeader
 import com.example.domain.contact.toRelationshipPromptContext
-import com.example.domain.event.toEventEntity
-import com.example.domain.event.toOccasion
+import com.example.core.db.toEventEntity
+import com.example.core.db.toOccasion
 import com.example.domain.notification.buildApprovalNotificationRequest
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus

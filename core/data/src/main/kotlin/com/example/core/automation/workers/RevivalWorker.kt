@@ -29,7 +29,7 @@ import com.example.domain.contact.toAutomationProfile
 import com.example.domain.contact.toDeliveryRouteProfile
 import com.example.domain.contact.toHeader
 import com.example.domain.contact.toRelationshipPromptContext
-import com.example.domain.event.toEventEntity
+import com.example.core.db.toEventEntity
 import com.example.domain.message.toMessageDraft
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageStatus

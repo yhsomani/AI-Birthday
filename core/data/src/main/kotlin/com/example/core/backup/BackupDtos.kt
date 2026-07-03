@@ -11,8 +11,8 @@ import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.db.entities.StyleProfileEntity
 import com.example.core.prefs.SecurePrefs
-import com.example.domain.event.toEventEntity
-import com.example.domain.event.toOccasion
+import com.example.core.db.toEventEntity
+import com.example.core.db.toOccasion
 import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ApprovalMode
