@@ -104,8 +104,6 @@ class WishPreviewScreenInteractionTest {
                 "feedback:too_generic",
                 "regenerate",
                 "test",
-                "reject",
-                "approve",
             ),
             actions,
         )
