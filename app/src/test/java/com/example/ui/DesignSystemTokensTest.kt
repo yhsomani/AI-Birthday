@@ -361,14 +361,17 @@ class DesignSystemTokensTest {
 
     @Test
     fun styleCoachScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt").readText()
+        val source = sourceDirectory("app/src/main/java/com/example/ui/screens/stylecoach")
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .joinToString(separator = "\n") { it.readText() }
 
         assertTrue(
-            "StyleCoachScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            "Style Coach presentation should resolve Material colors through MaterialTheme.colorScheme.",
             source.contains("MaterialTheme.colorScheme"),
         )
         assertTrue(
-            "StyleCoachScreen should resolve success status colors through MaterialTheme.relateSemanticColors.",
+            "Style Coach presentation should resolve success status colors through MaterialTheme.relateSemanticColors.",
             source.contains("MaterialTheme.relateSemanticColors"),
         )
         listOf(
@@ -376,7 +379,7 @@ class DesignSystemTokensTest {
             "RelateSuccess",
         ).forEach { rawColor ->
             assertTrue(
-                "StyleCoachScreen should not import or reference $rawColor directly.",
+                "Style Coach presentation should not import or reference $rawColor directly.",
                 !Regex("""\b$rawColor\b""").containsMatchIn(source),
             )
         }
@@ -384,7 +387,13 @@ class DesignSystemTokensTest {
 
     @Test
     fun backupRestoreScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt").readText()
+        val source = listOf(
+            "app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt",
+            "app/src/main/java/com/example/ui/screens/backup/BackupRestoreSecurityComponents.kt",
+            "app/src/main/java/com/example/ui/screens/backup/BackupRestoreActionComponents.kt",
+        ).joinToString(separator = "\n") { path ->
+            sourceFile(path).readText()
+        }
 
         assertTrue(
             "BackupRestoreScreen should resolve Material colors through MaterialTheme.colorScheme.",
@@ -489,8 +498,13 @@ class DesignSystemTokensTest {
 
     @Test
     fun homeScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/home/HomeScreen.kt")
-            .readText()
+        val source = listOf(
+            "app/src/main/java/com/example/ui/screens/home/HomeScreen.kt",
+            "app/src/main/java/com/example/ui/screens/home/HomeDashboardComponents.kt",
+            "app/src/main/java/com/example/ui/screens/home/HomeActionComponents.kt",
+        ).joinToString(separator = "\n") { path ->
+            sourceFile(path).readText()
+        }
 
         assertTrue(
             "HomeScreen should resolve Material colors through MaterialTheme.colorScheme.",
@@ -516,8 +530,14 @@ class DesignSystemTokensTest {
 
     @Test
     fun wishPreviewScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt")
-            .readText()
+        val source = listOf(
+            "app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt",
+            "app/src/main/java/com/example/ui/screens/wish/WishPreviewEditorComponents.kt",
+            "app/src/main/java/com/example/ui/screens/wish/WishPreviewReviewComponents.kt",
+            "app/src/main/java/com/example/ui/screens/wish/WishPreviewSendSummaryComponents.kt",
+        ).joinToString(separator = "\n") { path ->
+            sourceFile(path).readText()
+        }
 
         assertTrue(
             "WishPreviewScreen should resolve Material colors through MaterialTheme.colorScheme.",
@@ -539,8 +559,14 @@ class DesignSystemTokensTest {
 
     @Test
     fun automationSetupScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt")
-            .readText()
+        val source = listOf(
+            "app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt",
+            "app/src/main/java/com/example/ui/screens/setup/AutomationSetupDashboardComponents.kt",
+            "app/src/main/java/com/example/ui/screens/setup/AutomationSetupReadinessComponents.kt",
+            "app/src/main/java/com/example/ui/screens/setup/AutomationSetupSupportCards.kt",
+        ).joinToString(separator = "\n") { path ->
+            sourceFile(path).readText()
+        }
 
         assertTrue(
             "AutomationSetupScreen should resolve Material colors through MaterialTheme.colorScheme.",
@@ -566,8 +592,14 @@ class DesignSystemTokensTest {
 
     @Test
     fun settingsScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt")
-            .readText()
+        val source = listOf(
+            "app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt",
+            "app/src/main/java/com/example/ui/screens/settings/SettingsConfigurationComponents.kt",
+            "app/src/main/java/com/example/ui/screens/settings/SettingsAutomationComponents.kt",
+            "app/src/main/java/com/example/ui/screens/settings/SettingsDataComponents.kt",
+        ).joinToString(separator = "\n") { path ->
+            sourceFile(path).readText()
+        }
 
         assertTrue(
             "SettingsScreen should resolve Material colors through MaterialTheme.colorScheme.",
@@ -655,8 +687,12 @@ class DesignSystemTokensTest {
 
     @Test
     fun analyticsScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt")
-            .readText()
+        val source = listOf(
+            "app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt",
+            "app/src/main/java/com/example/ui/screens/analytics/AnalyticsReportComponents.kt",
+        ).joinToString(separator = "\n") { path ->
+            sourceFile(path).readText()
+        }
 
         assertTrue(
             "AnalyticsScreen should resolve Material colors through MaterialTheme.colorScheme.",
@@ -686,8 +722,14 @@ class DesignSystemTokensTest {
 
     @Test
     fun giftAdvisorScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt")
-            .readText()
+        val source = listOf(
+            "app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt",
+            "app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorSuggestionsComponents.kt",
+            "app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorDialogComponents.kt",
+            "app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorHistoryComponents.kt",
+        ).joinToString(separator = "\n") { path ->
+            sourceFile(path).readText()
+        }
 
         assertTrue(
             "GiftAdvisorScreen should resolve Material colors through MaterialTheme.colorScheme.",

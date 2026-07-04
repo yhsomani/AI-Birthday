@@ -42,20 +42,23 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.core.auth.BiometricAuthManager
-import com.example.core.prefs.SecurePrefs
 import com.example.core.ui.theme.RelateAITheme
 import com.example.core.ui.theme.RelateElevation
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
+import com.example.domain.service.PreferencesRepository
 import com.example.ui.navigation.RelateNavGraph
 import com.example.ui.navigation.Screen
 import com.example.ui.navigation.bottomNavItems
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
-    private lateinit var securePrefs: SecurePrefs
+    @Inject
+    lateinit var preferencesRepository: PreferencesRepository
+
     private lateinit var biometricAuthManager: BiometricAuthManager
     private var biometricSessionUnlocked = false
     private var biometricPromptInFlight = false
@@ -64,7 +67,6 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        securePrefs = SecurePrefs(this)
         biometricAuthManager = BiometricAuthManager(this)
         refreshBiometricGate(autoPrompt = false)
 
@@ -84,7 +86,7 @@ class MainActivity : FragmentActivity() {
                                 }
                             },
                             isSignedIn = {
-                                securePrefs.isLocalOnlyModeEnabled() ||
+                                preferencesRepository.isLocalOnlyModeEnabled() ||
                                     FirebaseAuth.getInstance().currentUser != null
                             },
                         )
@@ -107,13 +109,13 @@ class MainActivity : FragmentActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations && securePrefs.isBiometricLockEnabled()) {
+        if (!isChangingConfigurations && preferencesRepository.isBiometricLockEnabled()) {
             biometricSessionUnlocked = false
         }
     }
 
     private fun refreshBiometricGate(autoPrompt: Boolean) {
-        val isEnabled = runCatching { securePrefs.isBiometricLockEnabled() }.getOrDefault(false)
+        val isEnabled = runCatching { preferencesRepository.isBiometricLockEnabled() }.getOrDefault(false)
         val isAvailable = if (isEnabled) biometricAuthManager.isAvailable() else true
         biometricGateState = when (
             BiometricLockPolicy.resolve(
@@ -133,7 +135,7 @@ class MainActivity : FragmentActivity() {
 
     private fun authenticateWithBiometric() {
         if (biometricPromptInFlight) return
-        if (!securePrefs.isBiometricLockEnabled()) {
+        if (!preferencesRepository.isBiometricLockEnabled()) {
             biometricSessionUnlocked = true
             biometricGateState = BiometricGateState.Unlocked
             return

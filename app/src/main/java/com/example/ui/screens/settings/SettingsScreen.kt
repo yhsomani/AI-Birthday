@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,67 +17,32 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.ContextCompat
-import coil.compose.AsyncImage
-import androidx.compose.runtime.LaunchedEffect
-import com.example.BuildConfig
 import com.example.R
 import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.theme.RelateAlpha
-import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
 import com.example.domain.model.ApprovalMode
@@ -188,8 +152,6 @@ internal fun SettingsContent(
     onNavigateToActivityHistory: () -> Unit = {},
     onSignOut: () -> Unit = {},
 ) {
-    val focusManager = LocalFocusManager.current
-    var showModeMenu by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -213,353 +175,51 @@ internal fun SettingsContent(
             ) {
                 Spacer(modifier = Modifier.height(RelateSpacing.xl))
 
-                SettingsSection(stringResource(R.string.settings_account_section)) {
-                    SettingsCard {
-                        Row(
-                            modifier = Modifier.padding(RelateSpacing.cardContent),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            if (state.userPhotoUrl != null) {
-                                AsyncImage(
-                                    model = state.userPhotoUrl,
-                                    contentDescription = stringResource(R.string.profile_photo),
-                                    modifier = Modifier
-                                        .size(RelateSize.minTouchTarget)
-                                        .clip(CircleShape),
-                                    contentScale = ContentScale.Crop,
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(RelateSize.minTouchTarget)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        state.userName.take(1).uppercase(),
-                                        color = MaterialTheme.colorScheme.onBackground,
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(RelateSpacing.md))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(state.userName, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                                Text(state.userEmail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(RelateSpacing.sm))
-                }
+                SettingsAccountSection(state = state)
 
                 Spacer(modifier = Modifier.height(RelateSpacing.xl))
-                SettingsSection(stringResource(R.string.settings_preferences_section)) {
-                    SettingsCard {
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_birthday_reminders),
-                            icon = Icons.Filled.Notifications,
-                            checked = state.birthdayReminders,
-                        ) { onBirthdayRemindersChange(it) }
-                        SettingsDivider()
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_ai_wish_generation),
-                            icon = Icons.Filled.SmartToy,
-                            checked = state.aiWishGeneration,
-                        ) { onAiWishGenerationChange(it) }
-                        SettingsDivider()
-                        SettingsToggle(
-                            title = stringResource(R.string.settings_biometric_lock),
-                            icon = Icons.Filled.Security,
-                            checked = state.biometricLockEnabled,
-                        ) { onBiometricLockChange(it) }
-                        SettingsDivider()
-                        SettingsRow(
-                            icon = Icons.Filled.Person,
-                            title = stringResource(R.string.settings_ai_style_coach),
-                            subtitle = stringResource(R.string.settings_ai_style_coach_subtitle),
-                            onClick = onNavigateToStyleCoach
-                        )
-                        SettingsDivider()
-                        SettingsRow(
-                            icon = Icons.Filled.Security,
-                            title = stringResource(R.string.settings_automation_setup),
-                            subtitle = stringResource(R.string.settings_automation_setup_subtitle),
-                            onClick = onNavigateToAutomationSetup
-                        )
-                    }
-                }
+                SettingsPreferencesSection(
+                    state = state,
+                    onBirthdayRemindersChange = onBirthdayRemindersChange,
+                    onAiWishGenerationChange = onAiWishGenerationChange,
+                    onBiometricLockChange = onBiometricLockChange,
+                    onNavigateToStyleCoach = onNavigateToStyleCoach,
+                    onNavigateToAutomationSetup = onNavigateToAutomationSetup,
+                )
 
-                // AI configuration and send readiness
-            Spacer(modifier = Modifier.height(RelateSpacing.xl))
-            SettingsSection(
-                title = stringResource(R.string.settings_ai_configuration_section),
-                modifier = Modifier.testTag(SettingsScreenTestTags.AI_CONFIGURATION_SECTION),
-            ) {
-                SettingsCard {
-                    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
-                        Text(
-                            text = stringResource(R.string.settings_gemini_api_key),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = stringResource(R.string.settings_gemini_api_key_help),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(RelateSpacing.sm))
-                        OutlinedTextField(
-                            value = state.geminiApiKey,
-                            onValueChange = onGeminiApiKeyChange,
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = {
-                                Text(
-                                    stringResource(R.string.settings_gemini_api_key_placeholder),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            },
-                            visualTransformation = PasswordVisualTransformation(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = {
-                                focusManager.clearFocus()
-                                onSaveGeminiApiKey()
-                            }),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                            ),
-                            shape = RoundedCornerShape(RelateRadius.control),
-                        )
-                        Spacer(modifier = Modifier.height(RelateSpacing.sm))
-                        Button(
-                            onClick = {
-                                focusManager.clearFocus()
-                                onSaveGeminiApiKey()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(RelateRadius.control),
-                        ) {
-                            if (state.geminiApiKeySaved) {
-                                Icon(
-                                    Icons.Filled.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(RelateSize.iconSm),
-                                    tint = MaterialTheme.colorScheme.background,
-                                )
-                                Spacer(modifier = Modifier.width(RelateSpacing.xs))
-                                Text(stringResource(R.string.saved), color = MaterialTheme.colorScheme.background)
-                            } else {
-                                Icon(
-                                    Icons.Filled.Key,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(RelateSize.iconSm),
-                                    tint = MaterialTheme.colorScheme.background,
-                                )
-                                Spacer(modifier = Modifier.width(RelateSpacing.xs))
-                                Text(
-                                    stringResource(R.string.settings_save_api_key),
-                                    color = MaterialTheme.colorScheme.background,
-                                )
-                            }
-                        }
-                    }
-                    SettingsDivider()
-                    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
-                        Text(
-                            text = stringResource(R.string.settings_email_sending_title),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = stringResource(R.string.settings_email_sending_help),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(RelateSpacing.sm))
-                        OutlinedTextField(
-                            value = state.senderEmail,
-                            onValueChange = onSenderEmailChange,
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text(stringResource(R.string.settings_sender_email)) },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                            ),
-                            shape = RoundedCornerShape(RelateRadius.control),
-                        )
-                        Spacer(modifier = Modifier.height(RelateSpacing.sm))
-                        OutlinedTextField(
-                            value = state.senderEmailPassword,
-                            onValueChange = onSenderEmailPasswordChange,
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text(stringResource(R.string.settings_app_password)) },
-                            visualTransformation = PasswordVisualTransformation(),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.fieldContainer),
-                                focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                            ),
-                            shape = RoundedCornerShape(RelateRadius.control),
-                        )
-                        Text(
-                            text = stringResource(R.string.settings_email_app_password_security_note),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = RelateSpacing.xs),
-                        )
-                        Spacer(modifier = Modifier.height(RelateSpacing.sm))
-                        Button(
-                            onClick = {
-                                focusManager.clearFocus()
-                                onSaveSenderEmailSettings()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(RelateRadius.control),
-                        ) {
-                            Text(
-                                text = if (state.senderEmailSaved) {
-                                    stringResource(R.string.saved)
-                                } else {
-                                    stringResource(R.string.settings_save_email_settings)
-                                },
-                                color = MaterialTheme.colorScheme.background,
-                            )
-                        }
-                    }
-                    SettingsDivider()
-                    // Automation Mode selector
-                    Box {
-                        SettingsRow(
-                            icon = Icons.Filled.SmartToy,
-                            title = stringResource(R.string.settings_automation_mode),
-                            subtitle = state.automationMode.automationModeLabel(),
-                            onClick = { showModeMenu = true }
-                        )
-                        DropdownMenu(
-                            expanded = showModeMenu,
-                            onDismissRequest = { showModeMenu = false },
-                        ) {
-                            listOf(
-                                ApprovalMode.FULLY_AUTO to stringResource(R.string.automation_mode_fully_auto),
-                                ApprovalMode.SMART_APPROVE to stringResource(R.string.automation_mode_smart_approve_default),
-                                ApprovalMode.VIP_APPROVE to stringResource(R.string.automation_mode_vip_approve),
-                                ApprovalMode.ALWAYS_ASK to stringResource(R.string.automation_mode_always_ask),
-                            ).forEach { (mode, label) ->
-                                DropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        onAutomationModeChange(mode)
-                                        showModeMenu = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    SettingsDivider()
-                    QuietHoursEditor(
-                        start = state.quietHoursStart,
-                        end = state.quietHoursEnd,
-                        onStartChange = onQuietHoursStartChange,
-                        onEndChange = onQuietHoursEndChange,
-                        onSave = onSaveQuietHours,
-                    )
-                    SettingsDivider()
-                    ChannelBlackoutEditor(
-                        smsDisabled = state.channelBlackoutSms,
-                        whatsAppDisabled = state.channelBlackoutWhatsApp,
-                        emailDisabled = state.channelBlackoutEmail,
-                        onSmsChange = { onChannelBlackoutChange(MessageChannel.SMS, it) },
-                        onWhatsAppChange = { onChannelBlackoutChange(MessageChannel.WHATSAPP, it) },
-                        onEmailChange = { onChannelBlackoutChange(MessageChannel.EMAIL, it) },
-                    )
-                }
+                Spacer(modifier = Modifier.height(RelateSpacing.xl))
+                SettingsAiConfigurationSection(
+                    state = state,
+                    onGeminiApiKeyChange = onGeminiApiKeyChange,
+                    onSaveGeminiApiKey = onSaveGeminiApiKey,
+                    onSenderEmailChange = onSenderEmailChange,
+                    onSenderEmailPasswordChange = onSenderEmailPasswordChange,
+                    onSaveSenderEmailSettings = onSaveSenderEmailSettings,
+                    onAutomationModeChange = onAutomationModeChange,
+                    onQuietHoursStartChange = onQuietHoursStartChange,
+                    onQuietHoursEndChange = onQuietHoursEndChange,
+                    onSaveQuietHours = onSaveQuietHours,
+                    onChannelBlackoutChange = onChannelBlackoutChange,
+                )
+
+                Spacer(modifier = Modifier.height(RelateSpacing.xl))
+                SettingsDataSyncSection(
+                    state = state,
+                    onDismissLegacyDbNotice = onDismissLegacyDbNotice,
+                    onDismissSecurePrefsRecoveryNotice = onDismissSecurePrefsRecoveryNotice,
+                    onSyncContacts = onSyncContacts,
+                    onNavigateToBackupRestore = onNavigateToBackupRestore,
+                    onNavigateToActivityHistory = onNavigateToActivityHistory,
+                )
+
+                Spacer(modifier = Modifier.height(RelateSpacing.xl))
+                SettingsAboutSection()
+
+                Spacer(modifier = Modifier.height(RelateSpacing.xl))
+                SettingsSignOutAction(onClick = { showSignOutDialog = true })
+
+                Spacer(modifier = Modifier.height(RelateSpacing.xl))
             }
-
-            Spacer(modifier = Modifier.height(RelateSpacing.xl))
-            SettingsSection(
-                title = stringResource(R.string.settings_data_sync_section),
-                modifier = Modifier.testTag(SettingsScreenTestTags.DATA_SYNC_SECTION),
-            ) {
-                SettingsCard {
-                    if (state.showLegacyDbNotice) {
-                        LegacyDbNotice(onDismiss = onDismissLegacyDbNotice)
-                        SettingsDivider()
-                    }
-                    if (state.showSecurePrefsRecoveryNotice) {
-                        SecurePrefsRecoveryNotice(onDismiss = onDismissSecurePrefsRecoveryNotice)
-                        SettingsDivider()
-                    }
-                    val subtitle = if (state.isSyncing) {
-                        stringResource(R.string.settings_syncing)
-                    } else {
-                        stringResource(R.string.settings_last_synced_format, state.lastSyncTimestamp)
-                    }
-                    SettingsRow(
-                        icon = Icons.Filled.CloudSync,
-                        title = stringResource(R.string.settings_sync_contacts),
-                        subtitle = subtitle,
-                        onClick = { if (!state.isSyncing) onSyncContacts() }
-                    )
-                    SettingsDivider()
-                    SettingsRow(
-                        icon = Icons.Filled.Storage,
-                        title = stringResource(R.string.backup_restore_title),
-                        subtitle = stringResource(
-                            R.string.settings_backup_restore_subtitle_with_status,
-                            state.lastBackupTimestamp,
-                        ),
-                        onClick = onNavigateToBackupRestore
-                    )
-                    SettingsDivider()
-                    SettingsRow(
-                        icon = Icons.Filled.History,
-                        title = stringResource(R.string.activity_history_title),
-                        subtitle = stringResource(R.string.settings_activity_history_subtitle),
-                        onClick = onNavigateToActivityHistory
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(RelateSpacing.xl))
-            SettingsSection(stringResource(R.string.settings_about)) {
-                SettingsCard {
-                    SettingsRow(Icons.Filled.Info, stringResource(R.string.app_version), subtitle = BuildConfig.VERSION_NAME)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(RelateSpacing.xl))
-            Text(
-                text = stringResource(R.string.sign_out),
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = {
-                        showSignOutDialog = true
-                    })
-                    .testTag(SettingsScreenTestTags.SIGN_OUT_TRIGGER)
-                    .padding(vertical = RelateSpacing.cardContent),
-            )
-
-            Spacer(modifier = Modifier.height(RelateSpacing.xl))
-        }
         }
         SnackbarHost(
             hostState = snackbarHostState,
@@ -581,265 +241,7 @@ internal fun SettingsContent(
 }
 
 @Composable
-internal fun SignOutConfirmationDialog(
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    AlertDialog(
-        modifier = Modifier.testTag(SettingsScreenTestTags.SIGN_OUT_DIALOG),
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Filled.Warning,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-            )
-        },
-        title = {
-            Text(
-                text = stringResource(R.string.settings_sign_out_title),
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
-                Text(
-                    text = stringResource(R.string.settings_sign_out_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                SignOutChecklistItem(text = stringResource(R.string.settings_sign_out_check_local_data))
-                SignOutChecklistItem(text = stringResource(R.string.settings_sign_out_check_preferences))
-                SignOutChecklistItem(text = stringResource(R.string.settings_sign_out_check_external))
-                SignOutChecklistItem(text = stringResource(R.string.settings_sign_out_check_backup))
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm,
-                modifier = Modifier.testTag(SettingsScreenTestTags.SIGN_OUT_CONFIRM),
-            ) {
-                Text(
-                    text = stringResource(R.string.settings_sign_out_confirm),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.settings_sign_out_cancel))
-            }
-        },
-    )
-}
-
-@Composable
-private fun SignOutChecklistItem(text: String) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Check,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(RelateSize.iconSm),
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun QuietHoursEditor(
-    start: String,
-    end: String,
-    onStartChange: (String) -> Unit,
-    onEndChange: (String) -> Unit,
-    onSave: () -> Unit,
-) {
-    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
-        Text(
-            text = stringResource(R.string.settings_quiet_hours_title),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = stringResource(R.string.settings_quiet_hours_help),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(RelateSpacing.sm))
-        Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
-            OutlinedTextField(
-                value = start,
-                onValueChange = onStartChange,
-                label = { Text(stringResource(R.string.settings_quiet_hrs_start)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f),
-            )
-            OutlinedTextField(
-                value = end,
-                onValueChange = onEndChange,
-                label = { Text(stringResource(R.string.settings_quiet_hrs_end)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Spacer(modifier = Modifier.height(RelateSpacing.sm))
-        TextButton(onClick = onSave, modifier = Modifier.align(Alignment.End)) {
-            Text(stringResource(R.string.settings_save_quiet_hours))
-        }
-    }
-}
-
-@Composable
-private fun ChannelBlackoutEditor(
-    smsDisabled: Boolean,
-    whatsAppDisabled: Boolean,
-    emailDisabled: Boolean,
-    onSmsChange: (Boolean) -> Unit,
-    onWhatsAppChange: (Boolean) -> Unit,
-    onEmailChange: (Boolean) -> Unit,
-) {
-    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
-        Text(
-            text = stringResource(R.string.settings_channel_blackout_title),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = stringResource(R.string.settings_channel_blackout_help),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        ChannelBlackoutRow(stringResource(R.string.channel_sms), smsDisabled, onSmsChange)
-        ChannelBlackoutRow(stringResource(R.string.channel_whatsapp), whatsAppDisabled, onWhatsAppChange)
-        ChannelBlackoutRow(stringResource(R.string.channel_email), emailDisabled, onEmailChange)
-    }
-}
-
-@Composable
-private fun ChannelBlackoutRow(
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = RelateSpacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onBackground,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
-        )
-    }
-}
-
-@Composable
-private fun ApprovalMode.automationModeLabel(): String {
-    return when (this) {
-        ApprovalMode.FULLY_AUTO -> stringResource(R.string.automation_mode_fully_auto)
-        ApprovalMode.SMART_APPROVE -> stringResource(R.string.automation_mode_smart_approve_default)
-        ApprovalMode.VIP_APPROVE -> stringResource(R.string.automation_mode_vip_approve)
-        ApprovalMode.ALWAYS_ASK -> stringResource(R.string.automation_mode_always_ask)
-        ApprovalMode.DEFAULT,
-        ApprovalMode.UNKNOWN -> stringResource(R.string.automation_mode_default)
-    }
-}
-
-@Composable
-private fun LegacyDbNotice(onDismiss: () -> Unit) {
-    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(
-                Icons.Filled.Warning,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(RelateSize.iconMd),
-            )
-            Spacer(modifier = Modifier.width(RelateSpacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.settings_legacy_db_notice_title),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(modifier = Modifier.height(RelateSpacing.xs))
-                Text(
-                    text = stringResource(R.string.settings_legacy_db_notice_body),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        TextButton(
-            onClick = onDismiss,
-            modifier = Modifier.align(Alignment.End),
-        ) {
-            Text(text = stringResource(R.string.settings_legacy_db_notice_dismiss))
-        }
-    }
-}
-
-@Composable
-private fun SecurePrefsRecoveryNotice(onDismiss: () -> Unit) {
-    Column(modifier = Modifier.padding(horizontal = RelateSpacing.cardContent, vertical = RelateSpacing.md)) {
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(
-                Icons.Filled.Warning,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(RelateSize.iconMd),
-            )
-            Spacer(modifier = Modifier.width(RelateSpacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.settings_secure_prefs_recovery_notice_title),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(modifier = Modifier.height(RelateSpacing.xs))
-                Text(
-                    text = stringResource(R.string.settings_secure_prefs_recovery_notice_body),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        TextButton(
-            onClick = onDismiss,
-            modifier = Modifier.align(Alignment.End),
-        ) {
-            Text(text = stringResource(R.string.settings_secure_prefs_recovery_notice_dismiss))
-        }
-    }
-}
-
-@Composable
-private fun SettingsSection(
+internal fun SettingsSection(
     title: String,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
@@ -854,14 +256,14 @@ private fun SettingsSection(
 }
 
 @Composable
-private fun SettingsCard(content: @Composable () -> Unit) {
+internal fun SettingsCard(content: @Composable () -> Unit) {
     RelateGlassCard {
         content()
     }
 }
 
 @Composable
-private fun SettingsRow(icon: ImageVector, title: String, subtitle: String? = null, onClick: () -> Unit = {}) {
+internal fun SettingsRow(icon: ImageVector, title: String, subtitle: String? = null, onClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -894,7 +296,7 @@ private fun SettingsRow(icon: ImageVector, title: String, subtitle: String? = nu
 }
 
 @Composable
-private fun SettingsToggle(title: String, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+internal fun SettingsToggle(title: String, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -928,7 +330,7 @@ private fun SettingsToggle(title: String, icon: ImageVector, checked: Boolean, o
 }
 
 @Composable
-private fun SettingsDivider() {
+internal fun SettingsDivider() {
     HorizontalDivider(
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = RelateAlpha.divider),
         modifier = Modifier.padding(horizontal = RelateSpacing.cardContent),

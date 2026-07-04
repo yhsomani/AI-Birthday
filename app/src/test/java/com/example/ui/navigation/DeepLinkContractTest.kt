@@ -126,7 +126,12 @@ class DeepLinkContractTest {
 
         assertTrue(
             "MainActivity route gate must treat local-only mode as signed in",
-            mainActivitySource.contains("securePrefs.isLocalOnlyModeEnabled()"),
+            mainActivitySource.contains("preferencesRepository.isLocalOnlyModeEnabled()"),
+        )
+        assertTrue(
+            "MainActivity must route app-shell preferences through PreferencesRepository",
+            mainActivitySource.contains("PreferencesRepository") &&
+                !mainActivitySource.contains("com.example.core.prefs.SecurePrefs"),
         )
         assertTrue(
             "MainActivity route gate must still allow Firebase authenticated users",

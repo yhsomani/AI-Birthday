@@ -4,6 +4,615 @@ Version: 1.0.0
 Date: 2026-06-26
 Source backlog: [IMPLEMENTATION_TASKS.md](IMPLEMENTATION_TASKS.md)
 
+## 2026-07-04 - Style Coach History Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Style Coach display presentation concentration while preserving learned profile metrics, message-style preview, empty history, history snapshot source labels, saved-at display, and parsed history summary rendering.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachDisplayComponents.kt](app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachDisplayComponents.kt)
+- [app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachHistoryComponents.kt](app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachHistoryComponents.kt)
+- [app/src/test/java/com/example/ui/DesignSystemTokensTest.kt](app/src/test/java/com/example/ui/DesignSystemTokensTest.kt)
+- [app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt](app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt)
+- [app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt](app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved the empty-history row, history snapshot card, history source labels, and JSON snapshot summary rendering out of `StyleCoachDisplayComponents.kt`.
+- Reduced `StyleCoachDisplayComponents.kt` to 318 lines while preserving learned profile metrics, common greetings, emoji set rendering, style-impact preview, confidence labels, and formatting helpers.
+- Added `StyleCoachHistoryComponents.kt` as a 112-line focused history component file.
+- Expanded Style Coach design-token, hardcoded-string, and icon-action accessibility guards to cover the route, training, display, and history component files together.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.stylecoach.StyleCoachScreenInteractionTest --tests com.example.ui.DesignSystemTokensTest.styleCoachScreen_usesThemeBackedColorRoles --tests com.example.ui.NoHardcodedStringsRegressionTest.cleanedScreens_doNotIntroduceVisibleStringLiterals --tests com.example.ui.AccessibilityLabelsRegressionTest.iconOnlyActionsInCleanedScreens_haveScreenReaderLabels --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Contact Detail Preference Form Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Contact Detail preference presentation concentration while preserving editable nickname, relationship type, language, channel, formality, style, automation mode, custom send time validation, budgets, interests, sensitive topics, life phase, notes, skip-auto-wish, and save/cancel workflows.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/contacts/ContactDetailPreferencesComponents.kt](app/src/main/java/com/example/ui/screens/contacts/ContactDetailPreferencesComponents.kt)
+- [app/src/main/java/com/example/ui/screens/contacts/ContactDetailPreferenceFormComponents.kt](app/src/main/java/com/example/ui/screens/contacts/ContactDetailPreferenceFormComponents.kt)
+- [app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt](app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt)
+- [app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt](app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved the preference dialog form body, choice-chip rows, text fields, skip-auto-wish switch row, error rendering, and form layout helpers out of `ContactDetailPreferencesComponents.kt`.
+- Reduced `ContactDetailPreferencesComponents.kt` to 197 lines while preserving dialog state initialization, save request construction, invalid send-time handling, supported channel/mode coercion, JSON-to-form parsing, test tags, and callback contracts.
+- Added `ContactDetailPreferenceFormComponents.kt` as a 269-line focused form component file.
+- Updated hardcoded-string and icon-action accessibility guards to include the Contact Detail preference split files; the design-token guard already covers all `ContactDetail*` presentation files.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.contacts.ContactPreferencesDialogTest --tests com.example.ui.DesignSystemTokensTest.contactDetailScreen_usesThemeBackedColorRoles --tests com.example.ui.NoHardcodedStringsRegressionTest.cleanedScreens_doNotIntroduceVisibleStringLiterals --tests com.example.ui.AccessibilityLabelsRegressionTest.iconOnlyActionsInCleanedScreens_haveScreenReaderLabels --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Analytics Report Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Analytics presentation concentration while preserving export/share actions, activity-history navigation, loading state, stats, monthly chart, contact distribution, relationship health, growth metrics, and neglected-contact drill-in.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt](app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt)
+- [app/src/main/java/com/example/ui/screens/analytics/AnalyticsReportComponents.kt](app/src/main/java/com/example/ui/screens/analytics/AnalyticsReportComponents.kt)
+- [app/src/test/java/com/example/ui/DesignSystemTokensTest.kt](app/src/test/java/com/example/ui/DesignSystemTokensTest.kt)
+- [app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt](app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt)
+- [app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt](app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved analytics stats, monthly wishes chart, contact distribution, relationship health, growth metrics, neglected contacts, chart bars, denominator labels, and row renderers out of `AnalyticsScreen.kt`.
+- Reduced `AnalyticsScreen.kt` from 456 lines to 178 lines while preserving export/share side effects, activity-history/export header actions, loading state, section ordering, test tags, and navigation callbacks.
+- Added `AnalyticsReportComponents.kt` as a 359-line focused report component file.
+- Updated design-token, hardcoded-string, and icon-action accessibility guards to include the split Analytics report file.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.analytics.AnalyticsScreenInteractionTest --tests com.example.ui.DesignSystemTokensTest.analyticsScreen_usesThemeBackedColorRoles --tests com.example.ui.NoHardcodedStringsRegressionTest.cleanedScreens_doNotIntroduceVisibleStringLiterals --tests com.example.ui.AccessibilityLabelsRegressionTest.iconOnlyActionsInCleanedScreens_haveScreenReaderLabels --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Settings Automation Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Settings configuration presentation concentration while preserving automation mode, quiet hours, channel blackout toggles, Gemini key saving, Gmail sender settings, account display, and preference navigation.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/settings/SettingsConfigurationComponents.kt](app/src/main/java/com/example/ui/screens/settings/SettingsConfigurationComponents.kt)
+- [app/src/main/java/com/example/ui/screens/settings/SettingsAutomationComponents.kt](app/src/main/java/com/example/ui/screens/settings/SettingsAutomationComponents.kt)
+- [app/src/test/java/com/example/ui/DesignSystemTokensTest.kt](app/src/test/java/com/example/ui/DesignSystemTokensTest.kt)
+- [app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt](app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt)
+- [app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt](app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved automation mode picker, approval-mode labels, quiet-hours editor, channel blackout editor, and channel blackout row rendering out of `SettingsConfigurationComponents.kt`.
+- Reduced `SettingsConfigurationComponents.kt` from 487 lines to 325 lines while preserving account/profile, preference toggles, Style Coach/Automation Setup links, Gemini API key controls, Gmail sender controls, and the `SettingsAiConfigurationSection` entry point.
+- Added `SettingsAutomationComponents.kt` as a 222-line focused automation/delivery settings component file.
+- Updated design-token, hardcoded-string, and icon-action accessibility guards to include the split Settings automation file.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.settings.SettingsScreenInteractionTest --tests com.example.ui.DesignSystemTokensTest.settingsScreen_usesThemeBackedColorRoles --tests com.example.ui.NoHardcodedStringsRegressionTest.cleanedScreens_doNotIntroduceVisibleStringLiterals --tests com.example.ui.AccessibilityLabelsRegressionTest.iconOnlyActionsInCleanedScreens_haveScreenReaderLabels --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`; the known non-fatal KSP headless AWT warning appeared during compile.
+
+## 2026-07-04 - Automation Setup Readiness Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Automation Setup dashboard presentation concentration while preserving AI Doctor summary, setup progress, recommended fix, grouped readiness checks, diagnostic action buttons, operation messages, and platform support cards.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/setup/AutomationSetupDashboardComponents.kt](app/src/main/java/com/example/ui/screens/setup/AutomationSetupDashboardComponents.kt)
+- [app/src/main/java/com/example/ui/screens/setup/AutomationSetupReadinessComponents.kt](app/src/main/java/com/example/ui/screens/setup/AutomationSetupReadinessComponents.kt)
+- [app/src/test/java/com/example/ui/DesignSystemTokensTest.kt](app/src/test/java/com/example/ui/DesignSystemTokensTest.kt)
+- [app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt](app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt)
+- [app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt](app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved setup progress, recommended fix, grouped readiness checks, readiness action buttons, readiness status colors, and readiness status icons out of `AutomationSetupDashboardComponents.kt`.
+- Reduced `AutomationSetupDashboardComponents.kt` from 490 lines to 172 lines while preserving AI Doctor summary banner, dashboard card shell, operation-message placement, check group ordering, and callback contracts.
+- Added `AutomationSetupReadinessComponents.kt` as a 354-line focused readiness/detail component file.
+- Updated design-token, hardcoded-string, and icon-action accessibility guards to include the split Automation Setup files.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.setup.AutomationSetupScreenInteractionTest --tests com.example.ui.DesignSystemTokensTest.automationSetupScreen_usesThemeBackedColorRoles --tests com.example.ui.NoHardcodedStringsRegressionTest.cleanedScreens_doNotIntroduceVisibleStringLiterals --tests com.example.ui.AccessibilityLabelsRegressionTest.iconOnlyActionsInCleanedScreens_haveScreenReaderLabels --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Home Action Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Home dashboard presentation concentration while preserving quick actions, next-action routing, setup progress, relationship planner, stats, and upcoming birthday workflows.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/home/HomeDashboardComponents.kt](app/src/main/java/com/example/ui/screens/home/HomeDashboardComponents.kt)
+- [app/src/main/java/com/example/ui/screens/home/HomeActionComponents.kt](app/src/main/java/com/example/ui/screens/home/HomeActionComponents.kt)
+- [app/src/test/java/com/example/ui/DesignSystemTokensTest.kt](app/src/test/java/com/example/ui/DesignSystemTokensTest.kt)
+- [app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt](app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt)
+- [app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt](app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved quick actions, next-action cards, setup progress card, readiness color mapping, and action title/detail resource mapping out of `HomeDashboardComponents.kt`.
+- Reduced `HomeDashboardComponents.kt` from 550 lines to 219 lines while preserving stats grid, relationship planner, upcoming birthday rendering, planner test tags, and action-target keys.
+- Added `HomeActionComponents.kt` as a 360-line focused action/readiness component file.
+- Updated design-token, hardcoded-string, and icon-action accessibility guards to include the split Home files.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.home.HomeScreenInteractionTest --tests com.example.ui.DesignSystemTokensTest.homeScreen_usesThemeBackedColorRoles --tests com.example.ui.NoHardcodedStringsRegressionTest.cleanedScreens_doNotIntroduceVisibleStringLiterals --tests com.example.ui.AccessibilityLabelsRegressionTest.iconOnlyActionsInCleanedScreens_haveScreenReaderLabels --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Settings Data And Sign-Out Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Settings presentation concentration while preserving contact sync, legacy database recovery notice, secure preferences recovery notice, backup/restore route, activity history route, app version display, and destructive sign-out confirmation.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt](app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt)
+- [app/src/main/java/com/example/ui/screens/settings/SettingsDataComponents.kt](app/src/main/java/com/example/ui/screens/settings/SettingsDataComponents.kt)
+- [app/src/test/java/com/example/ui/DesignSystemTokensTest.kt](app/src/test/java/com/example/ui/DesignSystemTokensTest.kt)
+- [app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt](app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt)
+- [app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt](app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved data sync, recovery notices, backup/restore and activity history rows, about/version rendering, sign-out trigger, sign-out confirmation dialog, and sign-out checklist rendering out of `SettingsScreen.kt`.
+- Reduced `SettingsScreen.kt` from 550 lines to 338 lines while preserving route-level state collection, contacts permission launch, snackbar feedback, section ordering, shared row/card/toggle primitives, test tags, and callback contracts.
+- Added `SettingsDataComponents.kt` as a 261-line focused data/recovery/sign-out component file.
+- Updated design-token, hardcoded-string, and icon-action accessibility guards to include the split Settings files.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.settings.SettingsScreenInteractionTest --tests com.example.ui.DesignSystemTokensTest.settingsScreen_usesThemeBackedColorRoles --tests com.example.ui.NoHardcodedStringsRegressionTest.cleanedScreens_doNotIntroduceVisibleStringLiterals --tests com.example.ui.AccessibilityLabelsRegressionTest.iconOnlyActionsInCleanedScreens_haveScreenReaderLabels --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Wish Preview Editor Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Wish Preview presentation concentration while preserving tone selection, message editing, send summary, readiness/error/quality copy, rationale display, feedback chips, regenerate, test-send, approve/reject confirmations, approved/rejected result, and review-next workflows.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt)
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewEditorComponents.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewEditorComponents.kt)
+- [app/src/test/java/com/example/ui/DesignSystemTokensTest.kt](app/src/test/java/com/example/ui/DesignSystemTokensTest.kt)
+- [app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt](app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt)
+- [app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt](app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved `WishPreviewContent`, tone options, the editable message field, feedback/action controls, send summary, readiness/error/quality copy, rationale panel, and approve/reject dialog state out of `WishPreviewScreen.kt`.
+- Reduced `WishPreviewScreen.kt` from 553 lines to 214 lines while preserving route-level snackbar/load/approved effects, `WishPreviewScreenContent`, loading/error states, title/back navigation, test tags, and callback contracts.
+- Added `WishPreviewEditorComponents.kt` as a 370-line focused editor/action component file.
+- Updated design-token, hardcoded-string, and icon-action accessibility guards to include the split Wish Preview editor components.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest --tests com.example.ui.DesignSystemTokensTest.wishPreviewScreen_usesThemeBackedColorRoles --tests com.example.ui.NoHardcodedStringsRegressionTest.cleanedScreens_doNotIntroduceVisibleStringLiterals --tests com.example.ui.AccessibilityLabelsRegressionTest.iconOnlyActionsInCleanedScreens_haveScreenReaderLabels --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Gift Advisor Budget And History Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Gift Advisor presentation concentration while preserving add-gift, suggestion record/dismiss, budget adjustment, gift history, delete, loading, empty, and error workflows.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt](app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt)
+- [app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorHistoryComponents.kt](app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorHistoryComponents.kt)
+- [app/src/test/java/com/example/ui/DesignSystemTokensTest.kt](app/src/test/java/com/example/ui/DesignSystemTokensTest.kt)
+- [app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt](app/src/test/java/com/example/ui/NoHardcodedStringsRegressionTest.kt)
+- [app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt](app/src/test/java/com/example/ui/AccessibilityLabelsRegressionTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved budget stat cards, adjust-budget action, record-gift bottom bar, gift-history header/empty state, history cards, delete action, and feedback icons out of `GiftAdvisorScreen.kt`.
+- Reduced `GiftAdvisorScreen.kt` from 571 lines to 313 lines while preserving route-level add-form state, `GiftAdvisorContent`, loading/error/suggestions ordering, dialog wiring, test tags, and callback contracts.
+- Added `GiftAdvisorHistoryComponents.kt` as a 291-line focused budget/history component file.
+- Updated design-token, hardcoded-string, and icon-action accessibility guards to include the split Gift Advisor history components.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.giftadvisor.GiftAdvisorScreenInteractionTest --tests com.example.ui.DesignSystemTokensTest.giftAdvisorScreen_usesThemeBackedColorRoles --tests com.example.ui.NoHardcodedStringsRegressionTest.cleanedScreens_doNotIntroduceVisibleStringLiterals --tests com.example.ui.AccessibilityLabelsRegressionTest.iconOnlyActionsInCleanedScreens_haveScreenReaderLabels --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Backup Restore Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Backup Restore presentation concentration while preserving encrypted export, restore preview, confirm restore, passphrase visibility, strength display, status dismissal, and responsive action layout.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt](app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt)
+- [app/src/main/java/com/example/ui/screens/backup/BackupRestoreSecurityComponents.kt](app/src/main/java/com/example/ui/screens/backup/BackupRestoreSecurityComponents.kt)
+- [app/src/main/java/com/example/ui/screens/backup/BackupRestoreActionComponents.kt](app/src/main/java/com/example/ui/screens/backup/BackupRestoreActionComponents.kt)
+- [app/src/test/java/com/example/ui/DesignSystemTokensTest.kt](app/src/test/java/com/example/ui/DesignSystemTokensTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved the security warning, passphrase field, visibility toggle, and password-strength indicator out of `BackupRestoreScreen.kt`.
+- Moved export/import action cards, progress states, export/import success, import preview/confirm, error status, and status dismissal out of `BackupRestoreScreen.kt`.
+- Reduced `BackupRestoreScreen.kt` from 524 lines to 186 lines while preserving route-level launchers, `BackupRestoreContent`, scaffold, section ordering, test tags, and callback contracts.
+- Added `BackupRestoreSecurityComponents.kt` as a 204-line focused security/passphrase component file.
+- Added `BackupRestoreActionComponents.kt` as a 327-line focused action/status component file.
+- Updated `DesignSystemTokensTest` to validate the split Backup Restore UI files as a single styling surface.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.backup.BackupRestoreScreenInteractionTest --tests com.example.ui.DesignSystemTokensTest.backupRestoreScreen_usesThemeBackedColorRoles --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Messages Queue Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Messages queue presentation concentration while preserving review, approve, reject, retry, revoke, blocked setup routing, readiness badges, channel labels, and queue display behavior.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/messages/MessagesQueueComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesQueueComponents.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesActionButtonComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesActionButtonComponents.kt)
+- [app/src/main/java/com/example/ui/screens/messages/MessagesBadgeComponents.kt](app/src/main/java/com/example/ui/screens/messages/MessagesBadgeComponents.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved approve, reject, retry, revoke, edit/setup action buttons and approval-mode status rendering out of `MessagesQueueComponents.kt`.
+- Moved event-type, channel, sent-channel, readiness, and draft-source badge rendering out of `MessagesQueueComponents.kt`.
+- Reduced `MessagesQueueComponents.kt` from 617 lines to 101 lines while preserving queue list, selection checkbox, contact avatar, test tags, and public component names used by the Messages workflow.
+- Added `MessagesActionButtonComponents.kt` as a 251-line focused action/status component file.
+- Added `MessagesBadgeComponents.kt` as a 300-line focused badge/label component file.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.messages.MessagesScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Memory Vault Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Memory Vault presentation concentration while preserving add, prompt prefill, category selection, search, edit, pin/unpin, delete, empty, error, and validation workflows.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt](app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt)
+- [app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultEditorComponents.kt](app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultEditorComponents.kt)
+- [app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultNoteComponents.kt](app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultNoteComponents.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved prompt chips, category chips, add-note form, and inline edit form out of `MemoryVaultScreen.kt`.
+- Moved error-card and memory-note-card rendering out of `MemoryVaultScreen.kt`.
+- Reduced `MemoryVaultScreen.kt` from 678 lines to 318 lines while preserving route-level form/edit state, top app bar, search field, loading/empty states, list ordering, test tags, and callbacks.
+- Added `MemoryVaultEditorComponents.kt` as a 274-line focused add/edit component file.
+- Added `MemoryVaultNoteComponents.kt` as a 132-line focused note display component file.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.memoryvault.MemoryVaultScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Style Coach Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Style Coach presentation concentration while preserving manual training, auto analysis, learned profile, style preview, and history workflows.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt](app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt)
+- [app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachTrainingComponents.kt](app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachTrainingComponents.kt)
+- [app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachDisplayComponents.kt](app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachDisplayComponents.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved manual sample input, auto-analysis controls, progress indicators, and status feedback out of `StyleCoachScreen.kt`.
+- Moved learned profile metrics, style-impact preview, empty history, and profile-history card rendering out of `StyleCoachScreen.kt`.
+- Reduced `StyleCoachScreen.kt` from 723 lines to 186 lines while preserving route-level state collection, top app bar, list ordering, test tags, callbacks, and sample parsing.
+- Added `StyleCoachTrainingComponents.kt` as a 172-line focused training component file.
+- Added `StyleCoachDisplayComponents.kt` as the focused learned-profile/history display component file; a later split moved history rendering into `StyleCoachHistoryComponents.kt`.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.stylecoach.StyleCoachScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Automation Setup Screen Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Automation Setup presentation concentration while preserving the user-facing AI Doctor/setup repair workflow.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt](app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt)
+- [app/src/main/java/com/example/ui/screens/setup/AutomationSetupDashboardComponents.kt](app/src/main/java/com/example/ui/screens/setup/AutomationSetupDashboardComponents.kt)
+- [app/src/main/java/com/example/ui/screens/setup/AutomationSetupSupportCards.kt](app/src/main/java/com/example/ui/screens/setup/AutomationSetupSupportCards.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved readiness summary, setup progress, recommended fix, grouped readiness checks, operation messages, and diagnostic action buttons out of `AutomationSetupScreen.kt`.
+- Moved WhatsApp, battery optimization, notification settings, and approval support cards out of `AutomationSetupScreen.kt`.
+- Reduced `AutomationSetupScreen.kt` from 830 lines to 236 lines while preserving route-level state collection, Android permission/settings launchers, AI Doctor action routing, screen ordering, test tags, and callbacks.
+- Added `AutomationSetupDashboardComponents.kt` as a focused diagnostics component file; later setup progress, readiness checks, recommended fix, and diagnostic actions moved into `AutomationSetupReadinessComponents.kt`.
+- Added `AutomationSetupSupportCards.kt` as a 178-line focused platform setup card file.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.setup.AutomationSetupScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Home Dashboard Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Home presentation concentration while keeping the user-facing command-center workflow intact.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/home/HomeScreen.kt](app/src/main/java/com/example/ui/screens/home/HomeScreen.kt)
+- [app/src/main/java/com/example/ui/screens/home/HomeDashboardComponents.kt](app/src/main/java/com/example/ui/screens/home/HomeDashboardComponents.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved Home stats, quick actions, next-action cards, setup progress, relationship planner, and upcoming birthday rendering out of `HomeScreen.kt`.
+- Reduced `HomeScreen.kt` from 767 lines to 219 lines while preserving route-level state collection, header, sync error handling, loading state, section ordering, test tags, and navigation callbacks.
+- Added `HomeDashboardComponents.kt` as a focused dashboard/action component file; later Home action/readiness rendering moved into `HomeActionComponents.kt`.
+- Removed the unused `ReadinessBanner` composable because no Home workflow referenced it; the domain `HomeReadinessBannerCandidate` policy remains intact.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.home.HomeScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - Settings Configuration Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce Settings presentation concentration by extracting account/profile, preference toggles, AI key, email sender, automation mode, quiet hours, and channel blackout rendering into a focused component file.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt](app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt)
+- [app/src/main/java/com/example/ui/screens/settings/SettingsConfigurationComponents.kt](app/src/main/java/com/example/ui/screens/settings/SettingsConfigurationComponents.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved account/profile card, birthday/AI/biometric toggles, Style Coach and Automation Setup rows, Gemini API key controls, sender email settings, automation mode menu, quiet-hours editor, and channel blackout editor out of `SettingsScreen.kt`.
+- Reduced `SettingsScreen.kt` from 936 lines to 550 lines while preserving `SettingsContent`, test tags, settings callbacks, data sync, recovery notices, backup/history links, and sign-out confirmation behavior.
+- Added `SettingsConfigurationComponents.kt` as a focused configuration component file; later automation mode, quiet hours, and channel blackout controls moved into `SettingsAutomationComponents.kt`.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.settings.SettingsScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-04 - MainActivity Preferences Boundary Cleanup
+
+Completed tasks:
+
+- P2 architecture hygiene slice: remove the remaining direct `SecurePrefs` dependency from `MainActivity` while preserving local-only route gating and biometric-lock behavior.
+
+Changed files:
+
+- [app/src/main/java/com/example/MainActivity.kt](app/src/main/java/com/example/MainActivity.kt)
+- [app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt](app/src/test/java/com/example/ui/navigation/DeepLinkContractTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Injected `PreferencesRepository` into `MainActivity`.
+- Replaced direct local-only and biometric-lock reads from `SecurePrefs` with repository reads.
+- Kept the existing Firebase-auth route gate and biometric lock policy behavior.
+- Updated the deep-link route-gate contract to require `PreferencesRepository` in `MainActivity` and reject a direct `SecurePrefs` import there.
+- Updated the audit to mark direct `SecurePrefs` usage in presentation as resolved for app ViewModels and `MainActivity`; `SecurePrefs` remains in data/app infrastructure.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.navigation.DeepLinkContractTest --tests com.example.BiometricLockPolicyTest --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`.
+
+## 2026-07-03 - App Dependency Surface Cleanup
+
+Completed tasks:
+
+- A-009 build hygiene slice: remove app-level dependencies that are not used by app source and are either owned by `core:data` or not connected to an implemented user workflow.
+
+Changed files:
+
+- [app/build.gradle.kts](app/build.gradle.kts)
+- [gradle/libs.versions.toml](gradle/libs.versions.toml)
+- [app/src/test/java/com/example/RepositoryHygieneTest.kt](app/src/test/java/com/example/RepositoryHygieneTest.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Removed duplicate app runtime declarations for data-layer-only libraries: SQLite KTX, Security Crypto, Biometric, JavaMail, SQLCipher, Moshi, and OkHttp.
+- Removed app runtime dependencies with no app source or implemented user workflow usage: Firebase Analytics and legacy XML Material Components.
+- Kept business-critical capabilities in `core:data`, including encrypted storage, biometric lock support, AI JSON parsing, People API OkHttp sync, and email sending.
+- Kept JavaMail as an app test-only dependency because app unit tests verify provider exception handling.
+- Removed the now-unused Firebase Analytics and Material Components aliases from `gradle/libs.versions.toml`.
+- Added a repository hygiene guard that prevents these data-layer-only/runtime-unused app dependencies from being reintroduced at the app level.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:compileDebugKotlin --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.RepositoryHygieneTest --tests com.example.core.automation.sender.DispatchProviderRetryPolicyTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.RepositoryHygieneTest --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`; KSP printed its known non-fatal headless AWT warning during unit-test KSP.
+
+## 2026-07-03 - Wish Preview Review Components Split
+
+Completed tasks:
+
+- A-005 architecture slice: reduce remaining Wish Preview presentation concentration by extracting review/rationale controls, readiness copy, tone/feedback chips, review-next panel, and approve/reject confirmation dialogs into a focused component file.
+
+Changed files:
+
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt)
+- [app/src/main/java/com/example/ui/screens/wish/WishPreviewReviewComponents.kt](app/src/main/java/com/example/ui/screens/wish/WishPreviewReviewComponents.kt)
+- [CODEBASE_AUDIT_REPORT_2026-07-03.md](CODEBASE_AUDIT_REPORT_2026-07-03.md)
+- [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)
+
+What changed:
+
+- Moved draft readiness copy, review-next result panel, feedback chips, tone chips, why-this-message panel, quality-message resource helper, and approve/reject confirmation dialogs out of `WishPreviewScreen.kt`.
+- Reduced `WishPreviewScreen.kt` from 823 lines to 553 lines while preserving `WishPreviewScreenContent`, `WishPreviewContent`, review-next callback contracts, and all existing test tags.
+- Added `WishPreviewReviewComponents.kt` as a 297-line focused review/rationale component file.
+
+Validation:
+
+```bash
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:testDebugUnitTest --tests com.example.ui.screens.wish.WishPreviewScreenInteractionTest --no-configuration-cache
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' ./gradlew :app:assembleDebug --no-configuration-cache
+```
+
+Result: passed. Local execution used the temporary Zscaler trust store in `GRADLE_OPTS`; KSP printed its known non-fatal headless AWT warning during the focused test run.
+
 ## 2026-07-03 - Gift Advisor Add Gift Dialog Split
 
 Completed tasks:

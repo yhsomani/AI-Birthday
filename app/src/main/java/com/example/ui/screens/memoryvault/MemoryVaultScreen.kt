@@ -3,12 +3,7 @@ package com.example.ui.screens.memoryvault
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,14 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,9 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.surfaceColorAtElevation
@@ -53,53 +39,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.ui.components.EmptyState
-import com.example.core.ui.components.FilterChip
-import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.SectionHeader
-import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateElevation
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.relateSemanticColors
-import com.example.domain.memory.MemoryNotePromptPolicy
 import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.ui.viewmodel.MemoryVaultUiState
 import com.example.ui.viewmodel.MemoryVaultViewModel
 import java.text.DateFormat
 import java.util.Date
-
-private data class MemoryCategoryOption(
-    val value: String,
-    val shortLabelRes: Int,
-    val labelRes: Int,
-)
-
-private val memoryCategoryOptions = listOf(
-    MemoryCategoryOption("GENERAL", R.string.memory_category_general_short, R.string.memory_category_general),
-    MemoryCategoryOption(
-        MemoryNotePromptPolicy.PRIVATE_REFERENCE_CATEGORY,
-        R.string.memory_category_private_short,
-        R.string.memory_category_private,
-    ),
-    MemoryCategoryOption("PREFERENCE", R.string.memory_category_preference_short, R.string.memory_category_preference),
-    MemoryCategoryOption("EVENT", R.string.memory_category_event_short, R.string.memory_category_event),
-    MemoryCategoryOption("GIFT", R.string.memory_category_gift_short, R.string.memory_category_gift),
-    MemoryCategoryOption("MILESTONE", R.string.memory_category_milestone_short, R.string.memory_category_milestone),
-)
-
-private data class MemoryPromptOption(
-    val category: String,
-    val labelRes: Int,
-    val templateRes: Int,
-)
-
-private val memoryPromptOptions = listOf(
-    MemoryPromptOption("PREFERENCE", R.string.memory_prompt_favorite_food, R.string.memory_prompt_favorite_food_template),
-    MemoryPromptOption("MILESTONE", R.string.memory_prompt_recent_life_update, R.string.memory_prompt_recent_life_update_template),
-    MemoryPromptOption("GENERAL", R.string.memory_prompt_inside_joke, R.string.memory_prompt_inside_joke_template),
-    MemoryPromptOption("PREFERENCE", R.string.memory_prompt_things_to_avoid, R.string.memory_prompt_things_to_avoid_template),
-    MemoryPromptOption("GIFT", R.string.memory_prompt_gift_preference, R.string.memory_prompt_gift_preference_template),
-)
 
 internal object MemoryVaultTestTags {
     const val LOADING = "memory_vault_loading"
@@ -272,7 +220,7 @@ internal fun MemoryVaultContent(
 
                 uiState.errorMessageRes?.let { errorRes ->
                     item {
-                        ErrorCard(message = stringResource(errorRes))
+                        MemoryVaultErrorCard(message = stringResource(errorRes))
                     }
                 }
 
@@ -367,312 +315,4 @@ internal fun MemoryVaultContent(
             }
         }
     }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun AddMemoryCard(
-    newNoteText: String,
-    selectedCategory: String,
-    onNoteChange: (String) -> Unit,
-    onPromptSelected: (String, String) -> Unit,
-    onCategoryChange: (String) -> Unit,
-    onAdd: () -> Unit,
-) {
-    val noteHasOnlyWhitespace = newNoteText.isNotEmpty() && newNoteText.isBlank()
-
-    RelateGlassCard {
-        Column(
-            modifier = Modifier.padding(RelateSpacing.cardContent),
-            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
-        ) {
-            Text(
-                text = stringResource(R.string.memory_vault_add_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-
-            Text(
-                text = stringResource(R.string.memory_vault_suggested_prompts_title),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-                verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-            ) {
-                memoryPromptOptions.forEach { option ->
-                    val promptText = stringResource(option.templateRes)
-                    SuggestionChip(
-                        onClick = { onPromptSelected(promptText, option.category) },
-                        label = { Text(stringResource(option.labelRes)) },
-                        modifier = Modifier.testTag(MemoryVaultTestTags.PROMPT_PREFIX + option.category + "_" + option.labelRes),
-                    )
-                }
-            }
-
-            OutlinedTextField(
-                value = newNoteText,
-                onValueChange = onNoteChange,
-                placeholder = { Text(stringResource(R.string.memory_vault_note_placeholder)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(MemoryVaultTestTags.NOTE_FIELD),
-                minLines = 2,
-                maxLines = 4,
-                isError = noteHasOnlyWhitespace,
-                supportingText = {
-                    if (noteHasOnlyWhitespace) {
-                        Text(text = stringResource(R.string.memory_vault_error_blank_note))
-                    } else {
-                        Text(
-                            text = stringResource(
-                                R.string.memory_vault_note_counter,
-                                newNoteText.length,
-                                MemoryVaultViewModel.MAX_NOTE_LENGTH,
-                            ),
-                        )
-                    }
-                },
-            )
-
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-                verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-            ) {
-                memoryCategoryOptions.forEach { option ->
-                    FilterChip(
-                        label = stringResource(option.shortLabelRes),
-                        isSelected = selectedCategory == option.value,
-                        onClick = { onCategoryChange(option.value) },
-                        modifier = Modifier.testTag(MemoryVaultTestTags.CATEGORY_PREFIX + option.value),
-                    )
-                }
-            }
-
-            Text(
-                text = stringResource(R.string.memory_vault_ai_usage_note),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Button(
-                onClick = onAdd,
-                enabled = newNoteText.isNotBlank(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(MemoryVaultTestTags.ADD_BUTTON),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-            ) {
-                Text(stringResource(R.string.memory_vault_add_button))
-            }
-        }
-    }
-}
-
-@Composable
-private fun ErrorCard(message: String) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(MemoryVaultTestTags.ERROR_CARD),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-    ) {
-        Text(
-            text = message,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.padding(RelateSpacing.cardContent),
-        )
-    }
-}
-
-@Composable
-private fun MemoryNoteCard(
-    note: MemoryNoteRecord,
-    date: String,
-    onEdit: () -> Unit,
-    onTogglePin: () -> Unit,
-    onDelete: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (note.isPinned) {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.outline)
-            } else {
-                MaterialTheme.relateSemanticColors.cardContainer
-            },
-        ),
-    ) {
-        Column(modifier = Modifier.padding(RelateSpacing.cardContent)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SuggestionChip(
-                    onClick = {},
-                    label = { Text(memoryCategoryLabel(note.category)) },
-                )
-                Row {
-                    IconButton(
-                        onClick = onEdit,
-                        modifier = Modifier.testTag(MemoryVaultTestTags.EDIT_BUTTON_PREFIX + note.id.value),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Edit,
-                            contentDescription = stringResource(R.string.memory_vault_edit_note),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = RelateAlpha.subtle),
-                        )
-                    }
-                    IconButton(
-                        onClick = onTogglePin,
-                        modifier = Modifier.testTag(MemoryVaultTestTags.PIN_BUTTON_PREFIX + note.id.value),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.PushPin,
-                            contentDescription = if (note.isPinned) {
-                                stringResource(R.string.memory_vault_unpin_note)
-                            } else {
-                                stringResource(R.string.memory_vault_pin_note)
-                            },
-                            tint = if (note.isPinned) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = RelateAlpha.disabled)
-                            },
-                        )
-                    }
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.testTag(MemoryVaultTestTags.DELETE_BUTTON_PREFIX + note.id.value),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            contentDescription = stringResource(R.string.memory_vault_delete_note),
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = RelateAlpha.subtle),
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(RelateSpacing.sm))
-            Text(
-                text = note.noteText,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(modifier = Modifier.height(RelateSpacing.md))
-            Text(
-                text = date,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun EditMemoryNoteCard(
-    note: MemoryNoteRecord,
-    editNoteText: String,
-    editCategory: String,
-    onEditTextChange: (String) -> Unit,
-    onEditCategoryChange: (String) -> Unit,
-    onSave: () -> Unit,
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val noteHasOnlyWhitespace = editNoteText.isNotEmpty() && editNoteText.isBlank()
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.relateSemanticColors.cardContainer),
-    ) {
-        Column(
-            modifier = Modifier.padding(RelateSpacing.cardContent),
-            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
-        ) {
-            Text(
-                text = stringResource(R.string.memory_vault_edit_note),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-
-            OutlinedTextField(
-                value = editNoteText,
-                onValueChange = onEditTextChange,
-                placeholder = { Text(stringResource(R.string.memory_vault_note_placeholder)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(MemoryVaultTestTags.EDIT_FIELD_PREFIX + note.id.value),
-                minLines = 2,
-                maxLines = 4,
-                isError = noteHasOnlyWhitespace,
-                supportingText = {
-                    if (noteHasOnlyWhitespace) {
-                        Text(text = stringResource(R.string.memory_vault_error_blank_note))
-                    } else {
-                        Text(
-                            text = stringResource(
-                                R.string.memory_vault_note_counter,
-                                editNoteText.length,
-                                MemoryVaultViewModel.MAX_NOTE_LENGTH,
-                            ),
-                        )
-                    }
-                },
-            )
-
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-                verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-            ) {
-                memoryCategoryOptions.forEach { option ->
-                    FilterChip(
-                        label = stringResource(option.shortLabelRes),
-                        isSelected = editCategory == option.value,
-                        onClick = { onEditCategoryChange(option.value) },
-                        modifier = Modifier.testTag(MemoryVaultTestTags.EDIT_CATEGORY_PREFIX + option.value),
-                    )
-                }
-            }
-
-            Text(
-                text = stringResource(R.string.memory_vault_ai_usage_note),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(
-                    onClick = onCancel,
-                    modifier = Modifier.testTag(MemoryVaultTestTags.EDIT_CANCEL_PREFIX + note.id.value),
-                ) {
-                    Text(stringResource(R.string.memory_vault_cancel_edit))
-                }
-                Button(
-                    onClick = onSave,
-                    enabled = editNoteText.isNotBlank(),
-                    modifier = Modifier.testTag(MemoryVaultTestTags.EDIT_SAVE_PREFIX + note.id.value),
-                ) {
-                    Text(stringResource(R.string.memory_vault_save_edit))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun memoryCategoryLabel(category: String): String {
-    val option = memoryCategoryOptions.firstOrNull { it.value == category }
-    return option?.let { stringResource(it.labelRes) } ?: category
 }

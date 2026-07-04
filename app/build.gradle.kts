@@ -159,35 +159,25 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.work)
     ksp(libs.hilt.ext.compiler)
-    
+
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.vertexai)
-    implementation(libs.firebase.analytics)
-    
+
     // RelateAI app/data dependencies used by the active app UI and application shell.
     implementation(libs.androidx.work.runtime.ktx)
-    implementation(libs.androidx.sqlite.ktx)
-    implementation(libs.androidx.security.crypto)
-    implementation(libs.androidx.biometric)
-    implementation(libs.sun.mail.android)
-    implementation(libs.sun.mail.activation)
     implementation(libs.play.services.auth)
-    implementation(libs.sqlcipher)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.moshi.kotlin)
-    implementation(libs.okhttp)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     // Android core dependencies
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.google.material)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    
+
     // Room
     implementation(libs.androidx.room.runtime)
 
@@ -219,6 +209,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.androidx.work.testing)
+    testImplementation(libs.sun.mail.android)
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
 

@@ -21,10 +21,10 @@ Top findings:
 | P1 | Readiness consistency now needs broader journey-level regression coverage. | Home, Messages, Wish Preview, Setup, setup notifications, and system alerts now have contract-level readiness journey coverage; the domain message lifecycle now has generate -> approve -> dispatch -> failed retry -> recovered dispatch coverage; the worker-to-dispatcher attempt-id handoff, dispatcher retry-limit finalization, SMS delivered-failure receiver callback, Messages failed-row retry success path, Messages recovery setup route wiring, and onboarding setup post-auth target are guarded. Full connected UI journeys and physical-device provider flows can still regress between focused tests. | Add UI lifecycle and device/provider callback/finalization end-to-end tests around the canonical readiness contract. |
 | Resolved | Domain persistence/platform leakage through Room/Paging/entity/Android contracts. | `core:domain` is now a Kotlin/JVM module; Room entities, DAO projections, Room-backed mappers, raw entity repository APIs, Android `Uri` backup parameters, Android imports, and `org.json` runtime reliance have been removed from domain. | Keep the guard tests green and route future platform/storage work through app/data adapters. |
 | Resolved | Windows/IDE Android builds now fail fast when Gradle runs on a JRE without `jlink`. | The pasted `:app:assembleDebug` failure used the Antigravity/Red Hat extension JRE, which lacks the `jlink` executable AGP needs for `JdkImageTransform`. | Keep the root Gradle preflight guard green and configure IDE Gradle JDK/JAVA_HOME to Android Studio JBR or Temurin JDK 21. |
-| P1 | Large presentation files concentrate workflow logic. | `AutomationSetupViewModel.kt` is now 214 lines after extracting setup UI contracts, account/provider, automation/channel, email, quality, system/recovery readiness presentation, command execution, readiness report loading, AI failure diagnosis, diagnostic snapshot persistence, overall readiness presentation, and Android capability probing; `EventsScreen.kt` is now 365 lines after extracting card and manual-dialog components; `GiftAdvisorScreen.kt` is now 571 lines after extracting suggestions and add-gift dialog components. `WishPreviewScreen.kt` is still 823 lines, and several other screens remain large. This raises regression and review cost. | Continue splitting remaining large screens by feature state reducers, route-level coordinators, and reusable domain use cases. |
+| P1 | Large presentation files concentrate workflow logic. | `AutomationSetupViewModel.kt` is now 214 lines after extracting setup UI contracts, account/provider, automation/channel, email, quality, system/recovery readiness presentation, command execution, readiness report loading, AI failure diagnosis, diagnostic snapshot persistence, overall readiness presentation, and Android capability probing; `AutomationSetupScreen.kt` is now 236 lines after extracting diagnostics and support cards, and `AutomationSetupDashboardComponents.kt` is now 172 lines after extracting readiness/detail rendering; `BackupRestoreScreen.kt` is now 186 lines after extracting security/passphrase and action/status rendering; `StyleCoachScreen.kt` is now 186 lines after extracting training/profile/history rendering, and `StyleCoachDisplayComponents.kt` is now 318 lines after extracting history rendering; `MemoryVaultScreen.kt` is now 318 lines after extracting note editor and note-card rendering; `HomeScreen.kt` is now 219 lines after extracting dashboard/action rendering, and `HomeDashboardComponents.kt` is now 219 lines after extracting action/readiness rendering; `MessagesQueueComponents.kt` is now 101 lines after extracting action buttons/status and badge/label rendering; `GiftAdvisorScreen.kt` is now 313 lines after extracting suggestions, add-gift dialog, and budget/history rendering; `EventsScreen.kt` is now 365 lines after extracting card and manual-dialog components; `WishPreviewScreen.kt` is now 214 lines after extracting send-summary, review/rationale, and editor/action components; `SettingsScreen.kt` is now 338 lines after extracting account, preference, AI/send-readiness configuration, data/recovery, about, and sign-out components; `SettingsConfigurationComponents.kt` is now 325 lines after extracting automation/delivery controls; `AnalyticsScreen.kt` is now 178 lines after extracting report rendering; `ContactDetailPreferencesComponents.kt` is now 197 lines after extracting preference form rendering. Several other presentation files remain large. This raises regression and review cost. | Continue splitting remaining large screens by feature state reducers, route-level coordinators, and reusable domain use cases. |
 | Resolved | AI generated message text logging risk. | `AiServiceImpl` now logs `recommendedVariantName` metadata only, and tests verify generated copy is absent from `StructuredLogger` history and Android logs. | Keep generated body fields omitted or keyed as redacted message-body text in future changes. |
 | P2 | Product has too many diagnostics surfaces without a guided fix sequence. | AI Doctor, Settings, Home, Messages, Wish Preview, and setup notifications all expose parts of readiness. | Convert setup and recovery into a ranked "Fix next" flow with one primary action at a time. |
-| P2 | Some dependencies appear unused or over-broad. | Retrofit, converter-moshi, and logging-interceptor are declared broadly; source usage is limited or absent. | Remove candidates one by one with compile and test verification. |
+| Resolved | App dependency surface had duplicate or non-user-facing runtime declarations. | Retrofit/converter/logging references are absent in the current tree; the app module now no longer declares data-layer-only runtime dependencies for SQLite KTX, Security Crypto, Biometric, JavaMail, SQLCipher, Moshi, and OkHttp, and unused Firebase Analytics / XML Material Components aliases were removed. | Keep the repository hygiene guard green and add app runtime dependencies only when app source or an implemented user workflow needs them. |
 | P2 | Local/generated artifacts remain near source. | Logs, legacy schemas, one-off patch scripts, and generated screenshots create noise and review risk. | Delete after approval or archive outside the repo; keep active schemas and test baselines. |
 
 ## Product Assessment
@@ -107,7 +107,7 @@ However, boundaries are not yet fully clean:
 
 - `core/domain` is now a Kotlin/JVM module and its main source is free of Android, AndroidX, Room entity, DAO, and Paging imports.
 - Repository interfaces no longer expose Room entities for the audited contact, message, event, dispatch, and pure-record paths; boundary tests now guard this.
-- ViewModels still access `SecurePrefs` directly in several places.
+- App ViewModels and `MainActivity` now route app-shell and settings preference state through `PreferencesRepository`; `SecurePrefs` remains in data/app infrastructure.
 - Android worker/scheduler code sometimes constructs data dependencies directly.
 
 This is manageable but should be addressed before adding larger features.
@@ -143,7 +143,7 @@ This is manageable but should be addressed before adding larger features.
 | --- | --- | --- |
 | Domain module boundary must stay guarded. | `core/domain` is now Kotlin/JVM and no longer imports Android, AndroidX, Room entities, DAOs, or Paging. Boundary tests scan for regressions. | Future platform/storage shortcuts can reintroduce coupling if the guards are weakened. |
 | App layer still owns too much orchestration. | `AutomationSetupViewModel.kt`, `WishPreviewViewModel.kt`, `MessagesViewModel.kt`, and `HomeViewModel.kt` coordinate many policies and repositories directly. | UI changes risk business behavior regressions. |
-| Screens are large. | `WishPreviewScreen.kt`, `SettingsScreen.kt`, `AutomationSetupScreen.kt`, and `HomeScreen.kt` are large files. `EventsScreen.kt` is now decomposed to 365 lines with card and manual-dialog companion components; `GiftAdvisorScreen.kt` is now 571 lines with suggestions and add-gift dialog companion components. | Harder accessibility, layout, localization, and state review. |
+| Presentation files are still large in places. | `AutomationSetupScreen.kt` is now decomposed to 236 lines with diagnostics, readiness/detail, and support-card companion components; `AutomationSetupDashboardComponents.kt` is now decomposed to 172 lines after extracting `AutomationSetupReadinessComponents.kt`; `BackupRestoreScreen.kt` is now decomposed to 186 lines with security/passphrase and action/status companion components; `GiftAdvisorScreen.kt` is now decomposed to 313 lines with suggestion, dialog, and budget/history companion components; `StyleCoachScreen.kt` is now decomposed to 186 lines with training and profile/history companion components, and `StyleCoachDisplayComponents.kt` is now decomposed to 318 lines after extracting `StyleCoachHistoryComponents.kt`; `MemoryVaultScreen.kt` is now decomposed to 318 lines with note editor and note-card companion components; `HomeScreen.kt` is now decomposed to 219 lines with dashboard and action/readiness companion components; `HomeDashboardComponents.kt` is now decomposed to 219 lines after extracting `HomeActionComponents.kt`; `MessagesQueueComponents.kt` is now decomposed to 101 lines with action/status and badge companion components; `WishPreviewScreen.kt` is now decomposed to 214 lines with send-summary, review/rationale, and editor/action companion components; `SettingsScreen.kt` is now decomposed to 338 lines with configuration, automation/delivery, and data/sign-out companion components; `SettingsConfigurationComponents.kt` is now decomposed to 325 lines after extracting `SettingsAutomationComponents.kt`; `AnalyticsScreen.kt` is now decomposed to 178 lines after extracting `AnalyticsReportComponents.kt`; `ContactDetailPreferencesComponents.kt` is now decomposed to 197 lines after extracting `ContactDetailPreferenceFormComponents.kt`. Remaining large screens/components include `EventsManualEventDialogComponents.kt`, `ContactListScreen.kt`, `WishPreviewEditorComponents.kt`, `EventsScreen.kt`, and `HomeActionComponents.kt`. | Harder accessibility, layout, localization, and state review. |
 | Some repository APIs exposed persistence details unnecessarily. | `ContactRepository` exposed DAO relationship-count projections and raw health-ranking entity methods even though pure analytics methods already existed. These API leaks have been removed and are covered by boundary tests. | Smaller domain API surface and lower risk of persistence details returning. |
 | Documentation is abundant but can become stale. | Multiple audit, plan, progress, and SSOT docs overlap. | New contributors need a clear source of truth. |
 
@@ -199,7 +199,7 @@ core/
 Recommended migration order:
 
 1. Keep repository interfaces returning pure domain/model records and maintain the boundary guard tests.
-2. Replace direct `SecurePrefs` access in ViewModels with use cases or a `PreferencesRepository`.
+2. Keep presentation preference access routed through `PreferencesRepository` or focused use cases.
 3. Split the largest ViewModels into route coordinator plus pure reducers/readers.
 
 ## Feature-By-Feature Audit
@@ -274,7 +274,7 @@ Current implementation:
 
 - `SplashViewModel` resolves Auth/Home/Onboarding.
 - `AuthViewModel` handles Google sign-in, Firebase token, contacts scope, and config validation.
-- `OnboardingViewModel` records onboarding completion in `SecurePrefs`.
+- `OnboardingViewModel` records onboarding completion through `PreferencesRepository`.
 
 Gaps:
 
@@ -325,7 +325,10 @@ Ideal UX: Home shows one primary action, a short explanation, upcoming important
 
 Current implementation:
 
-- `HomeViewModel` combines dashboard metrics, upcoming events, setup progress, readiness banners, backup freshness, relationship health, and next actions.
+- `HomeViewModel` combines dashboard metrics, upcoming events, setup progress, backup freshness, relationship health, and next actions.
+- `HomeScreen.kt` owns route-level orchestration and high-level list flow.
+- `HomeDashboardComponents.kt` renders the stats grid, relationship planner, and upcoming birthday section.
+- `HomeActionComponents.kt` renders quick actions, next-action cards, and setup progress.
 - It can attempt initial contact sync when contact count is zero.
 - It uses domain policy work such as home next action logic.
 
@@ -362,6 +365,8 @@ Related files:
 
 - `app/src/main/java/com/example/ui/viewmodel/HomeViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/home/HomeScreen.kt`
+- `app/src/main/java/com/example/ui/screens/home/HomeDashboardComponents.kt`
+- `app/src/main/java/com/example/ui/screens/home/HomeActionComponents.kt`
 - `core/domain/src/main/kotlin/com/example/domain/home/`
 
 ### 4. Contacts List
@@ -460,6 +465,7 @@ Related files:
 - `app/src/main/java/com/example/ui/viewmodel/ContactDetailViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/contacts/ContactDetailScreen.kt`
 - `app/src/main/java/com/example/ui/screens/contacts/ContactDetailPreferencesComponents.kt`
+- `app/src/main/java/com/example/ui/screens/contacts/ContactDetailPreferenceFormComponents.kt`
 - `app/src/main/java/com/example/ui/screens/contacts/ContactDetailPersonalizationComponents.kt`
 
 ### 6. Events And Manual Occasion Management
@@ -532,7 +538,7 @@ Current implementation:
 Gaps:
 
 - Readiness is still one of several readiness interpretations in the app.
-- Direct `SecurePrefs` use in the ViewModel keeps preferences plumbing in presentation.
+- `MessagesViewModel` now receives preferences through `PreferencesRepository`, but readiness still competes with other readiness surfaces.
 
 Missing functionality:
 
@@ -562,6 +568,8 @@ Related files:
 - `app/src/main/java/com/example/ui/viewmodel/MessagesViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/messages/MessagesScreen.kt`
 - `app/src/main/java/com/example/ui/screens/messages/MessagesQueueComponents.kt`
+- `app/src/main/java/com/example/ui/screens/messages/MessagesActionButtonComponents.kt`
+- `app/src/main/java/com/example/ui/screens/messages/MessagesBadgeComponents.kt`
 - `core/domain/src/main/kotlin/com/example/domain/automation/MessageOperationalReadinessPolicy.kt`
 
 ### 8. Wish Preview
@@ -578,7 +586,7 @@ Current implementation:
 
 - `WishPreviewViewModel` loads drafts, contact context, memory/gift counts, event type, route/contact preferences, device readiness, review queue, variants, editing state, test send, feedback, regeneration, approve/reject, and review-next.
 - It uses `WishDraftReadinessPolicy` and `WishPreviewSendSummaryPolicy`.
-- `WishPreviewScreen.kt` is large and feature-rich.
+- `WishPreviewScreen.kt` is now 214 lines after moving approval-plan summary rendering into `WishPreviewSendSummaryComponents.kt`, review/rationale controls into `WishPreviewReviewComponents.kt`, and editor/action rendering into `WishPreviewEditorComponents.kt`.
 
 Gaps:
 
@@ -612,6 +620,9 @@ Related files:
 
 - `app/src/main/java/com/example/ui/viewmodel/WishPreviewViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt`
+- `app/src/main/java/com/example/ui/screens/wish/WishPreviewEditorComponents.kt`
+- `app/src/main/java/com/example/ui/screens/wish/WishPreviewSendSummaryComponents.kt`
+- `app/src/main/java/com/example/ui/screens/wish/WishPreviewReviewComponents.kt`
 - `core/domain/src/main/kotlin/com/example/domain/message/WishDraftReadinessPolicy.kt`
 - `core/domain/src/main/kotlin/com/example/domain/message/WishPreviewSendSummaryPolicy.kt`
 
@@ -630,7 +641,10 @@ Current implementation:
 - `AutomationSetupViewModel.kt` is now a 214-line observer/state applicator after focused A-005 splits.
 - `AutomationSetupReadinessReportBuilder.kt` owns readiness input loading and policy orchestration for Google contacts, Gemini, AI generation, circuit breaker, notifications, exact send, daily automation, health, dispatch recovery, email, style, personalization, generic messages, full automation, event routes, SMS/WhatsApp, and channel verification.
 - Android permission, package, Google Sign-In, Firebase-auth, and accessibility-service checks now live in `AutomationSetupCapabilityProbe.kt`.
-- `AutomationSetupScreen.kt` renders the diagnostics UI.
+- `AutomationSetupScreen.kt` owns route-level state, Android settings/permission actions, and section ordering.
+- `AutomationSetupDashboardComponents.kt` renders the AI Doctor summary banner and dashboard card shell.
+- `AutomationSetupReadinessComponents.kt` renders setup progress, recommended fix, grouped readiness checks, and diagnostic action buttons.
+- `AutomationSetupSupportCards.kt` renders WhatsApp, battery, notifications, and approval support cards.
 
 Gaps:
 
@@ -665,6 +679,9 @@ Related files:
 
 - `app/src/main/java/com/example/ui/viewmodel/AutomationSetupViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt`
+- `app/src/main/java/com/example/ui/screens/setup/AutomationSetupDashboardComponents.kt`
+- `app/src/main/java/com/example/ui/screens/setup/AutomationSetupReadinessComponents.kt`
+- `app/src/main/java/com/example/ui/screens/setup/AutomationSetupSupportCards.kt`
 - `core/domain/src/main/kotlin/com/example/domain/automation/Setup*ReadinessPolicy.kt`
 
 ### 10. Settings
@@ -679,8 +696,8 @@ Ideal UX: settings grouped by outcome: account, privacy, automation behavior, ch
 
 Current implementation:
 
-- `SettingsViewModel` directly uses `SecurePrefs`, `AuthManager`, contact repository, sync, and automation controls.
-- `SettingsScreen.kt` is large and has multiple settings cards.
+- `SettingsViewModel` uses `PreferencesRepository`, `AuthManager`, contact repository, sync, and automation controls.
+- `SettingsScreen.kt` is now 338 lines after moving account, preference, and AI/send-readiness configuration sections into `SettingsConfigurationComponents.kt`, automation/delivery controls into `SettingsAutomationComponents.kt`, and data sync, recovery notices, about/version, and sign-out confirmation rendering into `SettingsDataComponents.kt`; shared row/card/toggle primitives remain in the route file.
 - SecurePrefs recovery notice is visible.
 
 Gaps:
@@ -715,6 +732,9 @@ Related files:
 
 - `app/src/main/java/com/example/ui/viewmodel/SettingsViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt`
+- `app/src/main/java/com/example/ui/screens/settings/SettingsConfigurationComponents.kt`
+- `app/src/main/java/com/example/ui/screens/settings/SettingsAutomationComponents.kt`
+- `app/src/main/java/com/example/ui/screens/settings/SettingsDataComponents.kt`
 - `core/data/src/main/kotlin/com/example/core/prefs/SecurePrefs.kt`
 - `core/data/src/main/kotlin/com/example/core/auth/AuthManager.kt`
 
@@ -731,7 +751,8 @@ Ideal UX: analytics should generate actions, not only charts.
 Current implementation:
 
 - `AnalyticsViewModel` aggregates relationship counts, health buckets, monthly sent, delivery reliability, response, personalization coverage, top neglected contacts, and CSV export.
-- `AnalyticsScreen.kt` renders the dashboard.
+- `AnalyticsScreen.kt` owns export/share effects, header actions, loading state, and section ordering.
+- `AnalyticsReportComponents.kt` renders analytics stats, monthly chart, contact distribution, relationship health, growth metrics, and neglected contacts.
 
 Gaps:
 
@@ -764,6 +785,7 @@ Related files:
 
 - `app/src/main/java/com/example/ui/viewmodel/AnalyticsViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt`
+- `app/src/main/java/com/example/ui/screens/analytics/AnalyticsReportComponents.kt`
 
 ### 12. Activity History
 
@@ -857,6 +879,8 @@ Related files:
 
 - `app/src/main/java/com/example/ui/viewmodel/BackupRestoreViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt`
+- `app/src/main/java/com/example/ui/screens/backup/BackupRestoreSecurityComponents.kt`
+- `app/src/main/java/com/example/ui/screens/backup/BackupRestoreActionComponents.kt`
 - `core/data/src/main/kotlin/com/example/core/backup/BackupServiceImpl.kt`
 - `core/data/src/main/kotlin/com/example/core/backup/BackupDtos.kt`
 
@@ -874,6 +898,9 @@ Current implementation:
 
 - `MemoryVaultViewModel` handles contact header, note search, add, pin, edit, delete, categories, and private notes.
 - Private notes are excluded from AI prompt context.
+- `MemoryVaultScreen.kt` owns route-level form/edit state, top app bar, search field, loading/empty states, and list ordering.
+- `MemoryVaultEditorComponents.kt` renders prompt chips, category chips, add-note form, and inline edit form.
+- `MemoryVaultNoteComponents.kt` renders error and memory-note cards.
 
 Gaps:
 
@@ -905,6 +932,8 @@ Related files:
 
 - `app/src/main/java/com/example/ui/viewmodel/MemoryVaultViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt`
+- `app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultEditorComponents.kt`
+- `app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultNoteComponents.kt`
 
 ### 15. Gift Advisor
 
@@ -920,7 +949,7 @@ Current implementation:
 
 - `GiftAdvisorViewModel` loads contact gift profile, history, suggestions, budget status, duplicate warnings/confidence, add/delete/dismiss suggestion, and generates with AI.
 - Suggestions are filtered by budget when possible.
-- `GiftAdvisorScreen.kt` is now 571 lines after moving AI suggestion presentation into `GiftAdvisorSuggestionsComponents.kt` and add-gift dialog/form presentation into `GiftAdvisorDialogComponents.kt`.
+- `GiftAdvisorScreen.kt` is now 313 lines after moving AI suggestion presentation into `GiftAdvisorSuggestionsComponents.kt`, add-gift dialog/form presentation into `GiftAdvisorDialogComponents.kt`, and budget/history rendering into `GiftAdvisorHistoryComponents.kt`.
 
 Gaps:
 
@@ -955,6 +984,7 @@ Related files:
 - `app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt`
 - `app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorSuggestionsComponents.kt`
 - `app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorDialogComponents.kt`
+- `app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorHistoryComponents.kt`
 - `core/data/src/main/kotlin/com/example/core/gemini/AiServiceImpl.kt`
 
 ### 16. Style Coach
@@ -970,7 +1000,9 @@ Ideal UX: show current style profile, what evidence created it, and how it affec
 Current implementation:
 
 - `StyleCoachViewModel` supports profile/history, manual samples, auto analysis from sent messages, and status.
-- `StyleCoachScreen.kt` exposes the experience.
+- `StyleCoachScreen.kt` owns route-level state, top app bar, list ordering, and sample parsing.
+- `StyleCoachTrainingComponents.kt` renders manual samples, auto analysis, progress, and status feedback.
+- `StyleCoachDisplayComponents.kt` renders the learned profile and style preview; `StyleCoachHistoryComponents.kt` renders empty/history snapshot rows.
 
 Gaps:
 
@@ -1002,6 +1034,9 @@ Related files:
 
 - `app/src/main/java/com/example/ui/viewmodel/StyleCoachViewModel.kt`
 - `app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt`
+- `app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachTrainingComponents.kt`
+- `app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachDisplayComponents.kt`
+- `app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachHistoryComponents.kt`
 
 ### 17. Chat History
 
@@ -1410,10 +1445,18 @@ Evidence:
 - `AutomationSetupAiFailureDiagnoser.kt` owns provider failure classification and redacted AI failure copy, with focused unit coverage.
 - `AutomationSetupDiagnosticSnapshotStore.kt` owns persisted HealthMonitor snapshot lookup and redacted AI Doctor snapshot creation, with focused unit coverage.
 - `AutomationSetupCapabilityProbe.kt` owns SMS/notification permissions, WhatsApp installation/accessibility checks, Google Contacts access, and Firebase-auth probing, with focused unit coverage.
-- `WishPreviewScreen.kt` is now 823 lines after moving send-summary presentation into `WishPreviewSendSummaryComponents.kt`; focused interaction coverage still validates summary labels and actions.
-- `GiftAdvisorScreen.kt` is now 571 lines after moving AI suggestion cards, evidence labels, progress/empty states, and record/dismiss controls into `GiftAdvisorSuggestionsComponents.kt`, and add-gift dialog/form rendering into `GiftAdvisorDialogComponents.kt`; focused interaction coverage still validates suggestion actions, dialog validation, record feedback, and delete actions.
+- `WishPreviewScreen.kt` is now 214 lines after moving send-summary presentation into `WishPreviewSendSummaryComponents.kt`, review/rationale controls into `WishPreviewReviewComponents.kt`, and editor/action rendering into `WishPreviewEditorComponents.kt`; focused interaction coverage still validates summary labels, readiness copy, rationale panel, feedback/tone actions, confirmation dialogs, approved/rejected states, and review-next.
+- `GiftAdvisorScreen.kt` is now 313 lines after moving AI suggestion cards, evidence labels, progress/empty states, and record/dismiss controls into `GiftAdvisorSuggestionsComponents.kt`, add-gift dialog/form rendering into `GiftAdvisorDialogComponents.kt`, and budget/history rendering into `GiftAdvisorHistoryComponents.kt`; focused interaction coverage still validates suggestion actions, dialog validation, record feedback, budget adjustment, and delete actions.
 - `EventsScreen.kt` is now 365 lines after moving event-card source, verification, conflict, and resolution-action rendering into `EventsEventCardComponents.kt`, and manual-event dialog/form rendering into `EventsManualEventDialogComponents.kt`; focused interaction coverage still validates trust labels, merge/keep actions, and manual event type options.
-- `SettingsScreen.kt`, `AutomationSetupScreen.kt`, `HomeScreen.kt`, and several other UI surfaces are still large.
+- `SettingsScreen.kt` is now 338 lines after moving account/profile, preference toggles, AI key, and email sender rendering into `SettingsConfigurationComponents.kt`, automation mode, quiet hours, and channel blackout rendering into `SettingsAutomationComponents.kt`, and data sync, recovery notices, about/version, and sign-out confirmation rendering into `SettingsDataComponents.kt`; focused interaction coverage still validates navigation, save, sync, recovery notice, backup/history, and sign-out actions.
+- `HomeScreen.kt` is now 219 lines after moving dashboard rendering into companion files; `HomeDashboardComponents.kt` is now 219 lines after moving quick actions, next-action cards, and setup progress into `HomeActionComponents.kt`; focused interaction coverage still validates Home action navigation.
+- `AutomationSetupScreen.kt` is now 236 lines after moving dashboard rendering into companion files; `AutomationSetupDashboardComponents.kt` is now 172 lines after moving setup progress, recommended fix, grouped readiness checks, readiness status helpers, and diagnostic action buttons into `AutomationSetupReadinessComponents.kt`; focused interaction coverage still validates setup action buttons and readiness-row actions.
+- `StyleCoachScreen.kt` is now 186 lines after moving training input/status rendering into `StyleCoachTrainingComponents.kt` and profile/preview/history rendering into companion files; `StyleCoachDisplayComponents.kt` is now 318 lines after moving history rows into `StyleCoachHistoryComponents.kt`; focused interaction coverage still validates manual/auto analysis controls, status rendering, profile cards, preview, and history rows.
+- `MemoryVaultScreen.kt` is now 318 lines after moving prompt/category add and edit forms into `MemoryVaultEditorComponents.kt`, and error/note-card rendering into `MemoryVaultNoteComponents.kt`; focused interaction coverage still validates adding, prompt prefill, categories, search, edit, pin/unpin, delete, empty, error, and validation states.
+- `MessagesQueueComponents.kt` is now 101 lines after moving approve/reject/retry/revoke/edit/setup action buttons and approval-mode status into `MessagesActionButtonComponents.kt`, and event/channel/readiness/draft-source badge rendering into `MessagesBadgeComponents.kt`; focused interaction coverage still validates the Messages workflow.
+- `BackupRestoreScreen.kt` is now 186 lines after moving the security warning, passphrase input, strength indicator, export/import cards, status card, and confirm-import controls into `BackupRestoreSecurityComponents.kt` and `BackupRestoreActionComponents.kt`; focused interaction coverage and the split-file design-token guard still validate the Backup Restore workflow.
+- `ContactDetailPreferencesComponents.kt` is now 197 lines after moving preference dialog form body, choice rows, field rendering, skip-auto-wish row, and form helpers into `ContactDetailPreferenceFormComponents.kt`; focused dialog coverage still validates saving, validation, and disabled states.
+- Several other presentation files remain large, led by `EventsManualEventDialogComponents.kt`, `ContactListScreen.kt`, `WishPreviewEditorComponents.kt`, `EventsScreen.kt`, and `HomeActionComponents.kt`.
 
 Impact:
 
@@ -1431,42 +1474,58 @@ Fix:
 Progress:
 
 - The A-005 slices moved Automation Setup UI state models, account/provider check presentation, automation/channel check presentation, email check presentation, quality check presentation, system/recovery check presentation, command execution, readiness report loading, AI failure diagnosis, diagnostic snapshot persistence, overall readiness presentation reduction, and Android capability probes out of the ViewModel. The ViewModel now mainly observes inputs, applies reports to state, toggles in-flight flags, and exposes test delegates.
-- The Wish Preview send-summary card, readiness title coloring, metadata row renderer, and route/device/dispatch label helpers now live in `WishPreviewSendSummaryComponents.kt`; `WishPreviewScreen.kt` dropped from 1086 to 823 lines. `WishPreviewScreenInteractionTest` and `:app:assembleDebug` passed after the split.
-- Gift Advisor AI suggestion presentation now lives in `GiftAdvisorSuggestionsComponents.kt`, and add-gift dialog/form presentation now lives in `GiftAdvisorDialogComponents.kt`; `GiftAdvisorScreen.kt` dropped from 1066 to 571 lines across the two splits. `GiftAdvisorScreenInteractionTest` and `:app:assembleDebug` passed across the split checks.
+- The Wish Preview send-summary card, readiness title coloring, metadata row renderer, and route/device/dispatch label helpers now live in `WishPreviewSendSummaryComponents.kt`; draft readiness copy, review-next result panel, feedback/tone chips, why-this-message panel, quality-message helper, and approve/reject confirmation dialogs now live in `WishPreviewReviewComponents.kt`; tone options, editable message controls, regenerate/test-send actions, result states, and approve/reject dialog state now live in `WishPreviewEditorComponents.kt`. `WishPreviewScreen.kt` dropped from 1086 to 214 lines across the splits. `WishPreviewScreenInteractionTest`, static UI guards, `:app:compileDebugKotlin`, and `:app:assembleDebug` passed across the split checks.
+- Gift Advisor AI suggestion presentation now lives in `GiftAdvisorSuggestionsComponents.kt`, add-gift dialog/form presentation now lives in `GiftAdvisorDialogComponents.kt`, and budget/history rendering now lives in `GiftAdvisorHistoryComponents.kt`; `GiftAdvisorScreen.kt` dropped from 1066 to 313 lines across the splits. `GiftAdvisorScreenInteractionTest`, static UI guards, `:app:compileDebugKotlin`, and `:app:assembleDebug` passed across the split checks.
 - Events event-card presentation now lives in `EventsEventCardComponents.kt`, and manual-event dialog/form presentation now lives in `EventsManualEventDialogComponents.kt`; `EventsScreen.kt` dropped from 978 to 365 lines across the two splits. `EventsScreenInteractionTest`, `:app:assembleDebug`, and `:app:compileDebugKotlin` passed across the split checks.
+- Settings account/profile, preference toggles, AI key, and email sender rendering now live in `SettingsConfigurationComponents.kt`; automation mode, quiet hours, and channel blackout rendering now live in `SettingsAutomationComponents.kt`; data sync, recovery notices, about/version, sign-out trigger, sign-out confirmation dialog, and sign-out checklist rendering now live in `SettingsDataComponents.kt`. `SettingsScreen.kt` dropped from 936 to 338 lines and `SettingsConfigurationComponents.kt` dropped from 487 to 325 lines across the splits. `SettingsScreenInteractionTest`, static UI guards, `:app:compileDebugKotlin`, and `:app:assembleDebug` passed after the split.
+- Home stats, relationship planner, and birthday rendering now live in `HomeDashboardComponents.kt`; quick actions, next-action cards, setup progress card, readiness color mapping, and action title/detail resource mapping now live in `HomeActionComponents.kt`; `HomeScreen.kt` dropped from 767 to 219 lines and `HomeDashboardComponents.kt` dropped from 550 to 219 lines across the splits. The unused `ReadinessBanner` composable was removed because no Home workflow referenced it. `HomeScreenInteractionTest`, static UI guards, `:app:compileDebugKotlin`, and `:app:assembleDebug` passed after the split.
+- Automation Setup dashboard shell now lives in `AutomationSetupDashboardComponents.kt`; setup progress, recommended fix, grouped readiness checks, readiness status helpers, and diagnostic action buttons now live in `AutomationSetupReadinessComponents.kt`; WhatsApp/battery/notification/approval setup cards now live in `AutomationSetupSupportCards.kt`. `AutomationSetupScreen.kt` dropped from 830 to 236 lines and `AutomationSetupDashboardComponents.kt` dropped from 490 to 172 lines across the splits. `AutomationSetupScreenInteractionTest`, static UI guards, `:app:compileDebugKotlin`, and `:app:assembleDebug` passed after the split.
+- Style Coach training controls now live in `StyleCoachTrainingComponents.kt`, and learned profile, style preview, and history rendering now live in `StyleCoachDisplayComponents.kt`; `StyleCoachScreen.kt` dropped from 723 to 186 lines and now keeps route-level state collection, top app bar, list ordering, and sample parsing. `StyleCoachScreenInteractionTest`, `:app:compileDebugKotlin`, and `:app:assembleDebug` passed after the split.
+- Style Coach history rendering now lives in `StyleCoachHistoryComponents.kt`; `StyleCoachDisplayComponents.kt` is now 318 lines and focused on learned profile metrics plus style preview.
+- Memory Vault prompt/category add and edit form rendering now lives in `MemoryVaultEditorComponents.kt`, and error/note-card rendering now lives in `MemoryVaultNoteComponents.kt`; `MemoryVaultScreen.kt` dropped from 678 to 318 lines and now keeps route-level form/edit state, top app bar, search field, loading/empty states, and list ordering. `MemoryVaultScreenInteractionTest`, `:app:compileDebugKotlin`, and `:app:assembleDebug` passed after the split.
 
-### P2: Direct SecurePrefs In Presentation
+### Resolved: Direct SecurePrefs In Presentation
 
 Evidence:
 
-- `MainActivity`, `AutomationSetupViewModel`, `SettingsViewModel`, `SplashViewModel`, `MessagesViewModel`, and `OnboardingViewModel` reference `SecurePrefs`.
+- Source scans show `MainActivity` and app ViewModels no longer import or construct `SecurePrefs`.
+- `MainActivity` now injects `PreferencesRepository` for local-only route gating and biometric-lock preference reads.
+- `SplashViewModel`, `OnboardingViewModel`, `AutomationSetupViewModel`, `SettingsViewModel`, and `MessagesViewModel` use `PreferencesRepository`.
+- `RelateAIApp` still performs `SecurePrefs` warmup as app infrastructure; data-layer workers, backup, auth, Gemini, contacts sync, and dispatch components still use `SecurePrefs` where storage/provider infrastructure belongs.
 
 Impact:
 
-- Presentation layer knows storage/security details.
-- Harder to test and migrate settings behavior.
+- Presentation code is less coupled to encrypted storage implementation details.
+- App-shell route gating remains testable through source contracts while storage details stay behind the repository/data layer.
 
 Fix:
 
-- Route through `PreferencesRepository` or focused use cases.
+- Routed `MainActivity` local-only and biometric-lock preference reads through injected `PreferencesRepository`.
+- Updated the deep-link route-gate contract to require `PreferencesRepository` and reject a direct `SecurePrefs` import in `MainActivity`.
 - Keep `SecurePrefs` in data/app infrastructure only.
 
-### P2: Dependency And API Surface Cleanup
+### Resolved: Dependency And API Surface Cleanup
 
 Evidence:
 
-- `retrofit`, `converter-moshi`, and `logging-interceptor` are declared in app/core-data Gradle files, but no source references to Retrofit or `HttpLoggingInterceptor` were found in the searched source tree.
+- `retrofit`, `converter-moshi`, and `logging-interceptor` are absent from `app/build.gradle.kts`, `core/data/build.gradle.kts`, `core/domain/build.gradle.kts`, `gradle/libs.versions.toml`, and `app/proguard-rules.pro`.
+- App source does not import OkHttp, Moshi, SQLCipher, Security Crypto, Biometric, JavaMail, Firebase Analytics, or legacy XML Material Components directly.
+- `core:data` still owns the data-layer dependencies that support active business/user capabilities: encrypted Room storage, secure preferences, biometric lock support, People API OkHttp sync, Moshi backup/AI parsing, and email sending.
+- App unit tests still need JavaMail exception classes for provider retry-policy assertions, so JavaMail remains `testImplementation` in `app`.
 
 Impact:
 
-- Slower builds and larger dependency surface.
-- False architectural signals.
+- Smaller app-level dependency surface.
+- Clearer module ownership: app keeps app-shell/UI dependencies, while data-provider integrations stay in `core:data`.
+- Lower privacy and binary surface from removing unimplemented Firebase Analytics and legacy XML Material Components from the app runtime.
 
 Fix:
 
-- Remove candidates one by one.
-- Run compile/test after each removal.
-- Keep Moshi itself because backup and AI models use JSON parsing.
+- Removed the duplicate app runtime declarations for SQLite KTX, Security Crypto, Biometric, JavaMail, SQLCipher, Moshi, and OkHttp.
+- Removed unused app runtime declarations for Firebase Analytics and Google Material Components.
+- Removed the now-unused Firebase Analytics and Material Components version-catalog aliases.
+- Added `RepositoryHygieneTest.appBuild_doesNotDeclareDataLayerOnlyRuntimeDependencies()` to prevent regression.
+- Validated with `:app:compileDebugKotlin`, focused app unit tests, and `:app:assembleDebug`.
 
 ### P2: Worker/Use Case Dispatch Duplication
 
@@ -1539,8 +1598,7 @@ Do not delete files automatically without approval because the working tree is d
 | Path/pattern | Why | Required verification |
 | --- | --- | --- |
 | `app/schemas/com.example.core.db.AppDatabase/4.json`, `5.json`, `6.json`, `.gitkeep` | Active Room schema export is `core/data/schemas`. Docs already mark `app/schemas` as legacy/local generated. | Run migration tests and compile after deletion. |
-| Retrofit and converter-moshi dependencies | No Retrofit source usage found. | Remove Gradle entries one by one and compile all modules. |
-| Logging interceptor dependency | No `HttpLoggingInterceptor` usage found. | Remove and compile. |
+| Additional app-level runtime dependencies | App now keeps data-provider implementations in `core:data` and app-only declarations only where app source or tests need them. | Keep `RepositoryHygieneTest.appBuild_doesNotDeclareDataLayerOnlyRuntimeDependencies()` green. |
 
 ### Keep
 
@@ -1592,7 +1650,7 @@ Strengths:
 Risks:
 
 - AI generated message snippet logging under unredacted key.
-- Direct SecurePrefs usage in presentation increases secret-handling spread.
+- Keep `SecurePrefs` isolated to data/app infrastructure so secret-handling details do not spread back into presentation.
 - Gmail sender/password handling is sensitive and should have clear setup/testing/revocation UX.
 - Sign-out clears WorkManager, Room tables, prefs, DB files, and revokes accounts; this is thorough but highly destructive.
 - Prompt context sent to AI includes sensitive relationship data. The user needs stronger visibility and control.
@@ -1601,7 +1659,7 @@ Recommendations:
 
 - Adopt a strict "no message content in logs" rule.
 - Add tests for message content redaction using realistic generated messages.
-- Move SecurePrefs access behind repository/use-case APIs.
+- Keep SecurePrefs access behind repository/use-case APIs in presentation code.
 - Add a prompt context preview and opt-out controls.
 - Add export-before-destructive-signout UX.
 
@@ -1686,8 +1744,8 @@ Recommended additions:
 2. Reuse readiness model in Home, Messages, Wish Preview, Setup, and notifications.
 3. Keep `core:domain` as a JVM module and prevent platform/storage imports from returning.
 4. Keep the split `AutomationSetupViewModel` collaborators stable and covered while moving new setup behavior into focused collaborators.
-5. Split `WishPreviewScreen` into editor, readiness, context, variants, and action components.
-6. Split remaining large screens such as `GiftAdvisorScreen`, `EventsScreen`, `SettingsScreen`, `AutomationSetupScreen`, and `HomeScreen` into feature components.
+5. Keep Wish Preview split components stable while moving new editor/action behavior into focused companion files.
+6. Split remaining large screens or components such as `EventsManualEventDialogComponents`, `ContactListScreen`, `WishPreviewEditorComponents`, `EventsScreen`, and `HomeActionComponents`, and continue decomposing large component/helper files as needed.
 7. Extract shared dispatch orchestration used by manual dispatch and worker dispatch.
 
 ### Long-Term Architecture Roadmap
@@ -1772,7 +1830,7 @@ Phase 5: Advanced product improvements
 | A-006 | Expand message lifecycle journey coverage from the current domain, worker-attempt bridge, dispatcher retry-limit, SMS receiver callback, Messages retry-command, Messages recovery route-contract, and onboarding setup post-auth route regressions into connected UI journey execution and physical-device provider finalization paths. | P1 | QA |
 | A-007 | Expand failed dispatch recovery coverage from the current domain retry, worker-attempt bridge, dispatcher retry-limit finalization, delivered-callback receiver, Messages retry-command, and Messages recovery route-contract regressions into physical-device provider callback and full UI recovery flows. | P1 | QA |
 | A-008 | Clean local logs, patch scripts, and legacy app schemas after approval. | P2 | Repo Hygiene |
-| A-009 | Remove unused Retrofit/logging dependencies after compile verification. | P2 | Build |
+| A-009 | Keep dependency-surface hygiene guarded after removing app-level data-layer/runtime-unused declarations. | P2 | Build |
 | A-010 | Add manual/local-only onboarding mode. | P2 | Product/App |
 | A-011 | Add prompt context preview and controls. | P2 | Product/AI |
 | A-012 | Add backup import diff and export-before-signout prompt. | P2 | Security/Product |

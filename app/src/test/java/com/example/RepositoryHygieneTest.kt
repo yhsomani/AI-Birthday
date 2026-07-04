@@ -135,6 +135,35 @@ class RepositoryHygieneTest {
         }
     }
 
+    @Test
+    fun appBuild_doesNotDeclareDataLayerOnlyRuntimeDependencies() {
+        val appBuild = rootFile("app/build.gradle.kts").readText()
+        val dataOwnedRuntimeDependencies = listOf(
+            "implementation(libs.androidx.sqlite.ktx)",
+            "implementation(libs.androidx.security.crypto)",
+            "implementation(libs.androidx.biometric)",
+            "implementation(libs.sun.mail.android)",
+            "implementation(libs.sun.mail.activation)",
+            "implementation(libs.sqlcipher)",
+            "implementation(libs.moshi.kotlin)",
+            "implementation(libs.okhttp)",
+            "implementation(libs.google.material)",
+            "implementation(libs.firebase.analytics)",
+        )
+
+        dataOwnedRuntimeDependencies.forEach { dependency ->
+            assertFalse(
+                "app/build.gradle.kts should not declare app-level runtime dependency $dependency",
+                appBuild.contains(dependency),
+            )
+        }
+
+        assertTrue(
+            "JavaMail remains test-only because app unit tests verify provider exception handling",
+            appBuild.contains("testImplementation(libs.sun.mail.android)"),
+        )
+    }
+
     private fun rootFile(relativePath: String, mustBeFile: Boolean = true): File {
         val start = File(requireNotNull(System.getProperty("user.dir"))).absoluteFile
         val root = generateSequence(start) { it.parentFile }

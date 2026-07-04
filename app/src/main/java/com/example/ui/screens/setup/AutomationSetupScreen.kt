@@ -9,72 +9,32 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.BatterySaver
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
-import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.components.RelateScreen
-import com.example.core.ui.components.RelateStatusBanner
-import com.example.core.ui.theme.RelateAlpha
-import com.example.core.ui.theme.RelateRadius
-import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.core.ui.theme.relateSemanticColors
-import com.example.domain.readiness.RelationshipReadinessState
 import com.example.ui.viewmodel.AiDoctorAction
-import com.example.ui.viewmodel.AiDoctorRecommendedFix
-import com.example.ui.viewmodel.AiDoctorSummary
+import com.example.ui.viewmodel.AutomationSetupUiState
 import com.example.ui.viewmodel.AutomationSetupViewModel
 import com.example.ui.viewmodel.MessageChannelFilter
-import com.example.ui.viewmodel.ReadinessGroup
-import com.example.ui.viewmodel.ReadinessCheck
-import com.example.ui.viewmodel.ReadinessStatus
-import com.example.ui.viewmodel.SetupProgressSummary
 
 internal object AutomationSetupTestTags {
     const val DASHBOARD = "automation_setup_dashboard"
@@ -143,7 +103,7 @@ fun AutomationSetupScreen(
 
 @Composable
 internal fun AutomationSetupContent(
-    state: com.example.ui.viewmodel.AutomationSetupUiState,
+    state: AutomationSetupUiState,
     isIgnoringBatteryOptimizations: Boolean,
     onBack: () -> Unit = {},
     onRefresh: () -> Unit = {},
@@ -170,13 +130,9 @@ internal fun AutomationSetupContent(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(RelateSpacing.lg),
         ) {
-            val summaryColors = state.setupActionReadiness.state.statusColors()
-            RelateStatusBanner(
-                title = state.summary.title,
-                message = state.summary.detail,
-                icon = state.setupActionReadiness.state.statusIcon(),
-                containerColor = summaryColors.container,
-                contentColor = summaryColors.content,
+            AutomationSetupSummaryBanner(
+                summary = state.summary,
+                status = state.setupActionReadiness.state,
             )
 
             ReadinessDashboard(
@@ -198,45 +154,14 @@ internal fun AutomationSetupContent(
                 modifier = Modifier.testTag(AutomationSetupTestTags.DASHBOARD),
             )
 
-            SetupCard(
-                icon = Icons.AutoMirrored.Filled.Chat,
-                title = stringResource(R.string.automation_setup_whatsapp_card_title),
-                body = stringResource(R.string.automation_setup_whatsapp_card_body),
-                actionText = stringResource(R.string.automation_setup_action_open_accessibility),
-                onClick = onOpenAccessibilitySettings,
-                consentChecked = state.whatsAppAutomationConsentGranted,
-                consentText = stringResource(R.string.automation_setup_whatsapp_consent_label),
-                onConsentChange = onWhatsAppConsentChange,
-                modifier = Modifier.testTag(AutomationSetupTestTags.WHATSAPP_CARD),
-            )
-
-            SetupCard(
-                icon = Icons.Filled.BatterySaver,
-                title = stringResource(R.string.automation_setup_battery_card_title),
-                body = if (isIgnoringBatteryOptimizations) {
-                    stringResource(R.string.automation_setup_battery_card_ignored)
-                } else {
-                    stringResource(R.string.automation_setup_battery_card_body)
-                },
-                actionText = stringResource(R.string.automation_setup_action_open_battery_settings),
-                onClick = onOpenBatterySettings,
-            )
-
-            SetupCard(
-                icon = Icons.Filled.Notifications,
-                title = stringResource(R.string.automation_setup_notifications_card_title),
-                body = stringResource(R.string.automation_setup_notifications_card_body),
-                actionText = stringResource(R.string.automation_setup_action_app_settings),
-                onClick = onOpenAppSettings,
-            )
-
-            SetupCard(
-                icon = Icons.Filled.Security,
-                title = stringResource(R.string.automation_setup_approval_card_title),
-                body = stringResource(R.string.automation_setup_approval_card_body),
-                actionText = stringResource(R.string.automation_setup_action_done),
-                onClick = onBack,
-                secondary = true,
+            AutomationSetupSupportCards(
+                isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
+                whatsAppAutomationConsentGranted = state.whatsAppAutomationConsentGranted,
+                onWhatsAppConsentChange = onWhatsAppConsentChange,
+                onOpenAccessibilitySettings = onOpenAccessibilitySettings,
+                onOpenBatterySettings = onOpenBatterySettings,
+                onOpenAppSettings = onOpenAppSettings,
+                onBack = onBack,
             )
 
             Spacer(
@@ -246,433 +171,6 @@ internal fun AutomationSetupContent(
             )
         }
     }
-}
-
-@Composable
-private fun ReadinessDashboard(
-    summary: AiDoctorSummary,
-    setupProgress: SetupProgressSummary,
-    recommendedFix: AiDoctorRecommendedFix?,
-    checks: List<ReadinessCheck>,
-    isRefreshing: Boolean,
-    isSyncingContacts: Boolean,
-    isTestingAi: Boolean,
-    isTestingEmail: Boolean,
-    operationMessage: String?,
-    onRefresh: () -> Unit,
-    onSyncContacts: () -> Unit,
-    onDryRun: () -> Unit,
-    onTestAi: () -> Unit,
-    onTestEmail: () -> Unit,
-    onAction: (AiDoctorAction) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    RelateGlassCard(modifier = modifier) {
-        Column(
-            modifier = Modifier.padding(RelateSpacing.cardContent),
-            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(R.string.automation_setup_diagnostic_checks),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
-                if (isRefreshing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(RelateSize.iconSm),
-                        strokeWidth = RelateSpacing.xxs,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            Text(
-                text = summary.detail,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            SetupProgressStrip(summary = setupProgress)
-
-            recommendedFix?.let { fix ->
-                RecommendedFixSection(
-                    fix = fix,
-                    onAction = onAction,
-                )
-            }
-
-            readinessGroupOrder.forEach { group ->
-                val groupChecks = checks.filter { it.group == group }
-                if (groupChecks.isNotEmpty()) {
-                    ReadinessGroupSection(
-                        group = group,
-                        checks = groupChecks,
-                        onAction = onAction,
-                    )
-                }
-            }
-
-            operationMessage?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            ReadinessActionPanel(
-                isRefreshing = isRefreshing,
-                isSyncingContacts = isSyncingContacts,
-                isTestingAi = isTestingAi,
-                isTestingEmail = isTestingEmail,
-                onRefresh = onRefresh,
-                onDryRun = onDryRun,
-                onSyncContacts = onSyncContacts,
-                onTestAi = onTestAi,
-                onTestEmail = onTestEmail,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReadinessActionPanel(
-    isRefreshing: Boolean,
-    isSyncingContacts: Boolean,
-    isTestingAi: Boolean,
-    isTestingEmail: Boolean,
-    onRefresh: () -> Unit,
-    onDryRun: () -> Unit,
-    onSyncContacts: () -> Unit,
-    onTestAi: () -> Unit,
-    onTestEmail: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
-            OutlinedButton(
-                onClick = onRefresh,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = RelateSize.compactButtonHeight),
-                enabled = !isRefreshing,
-            ) {
-                Text(stringResource(R.string.automation_setup_action_refresh))
-            }
-            OutlinedButton(
-                onClick = onDryRun,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = RelateSize.compactButtonHeight),
-            ) {
-                Text(stringResource(R.string.automation_setup_action_dry_run))
-            }
-        }
-        PrimaryReadinessButton(
-            text = stringResource(R.string.automation_setup_action_sync_contacts),
-            loading = isSyncingContacts,
-            enabled = !isSyncingContacts,
-            onClick = onSyncContacts,
-        )
-        PrimaryReadinessButton(
-            text = stringResource(R.string.automation_setup_action_test_ai),
-            loading = isTestingAi,
-            enabled = !isTestingAi,
-            onClick = onTestAi,
-        )
-        PrimaryReadinessButton(
-            text = stringResource(R.string.automation_setup_action_test_email),
-            loading = isTestingEmail,
-            enabled = !isTestingEmail,
-            onClick = onTestEmail,
-        )
-    }
-}
-
-@Composable
-private fun PrimaryReadinessButton(
-    text: String,
-    loading: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = RelateSize.primaryButtonHeight),
-        enabled = enabled,
-        shape = RoundedCornerShape(RelateRadius.control),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-    ) {
-        if (loading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(RelateSize.iconSm),
-                color = MaterialTheme.colorScheme.background,
-                strokeWidth = RelateSpacing.xxs,
-            )
-        } else {
-            Text(
-                text = text,
-                color = MaterialTheme.colorScheme.background,
-            )
-        }
-    }
-}
-
-private val readinessGroupOrder = listOf(
-    ReadinessGroup.REQUIRED,
-    ReadinessGroup.QUALITY,
-    ReadinessGroup.RELIABILITY,
-    ReadinessGroup.RECOVERY,
-)
-
-@Composable
-private fun SetupProgressStrip(summary: SetupProgressSummary) {
-    if (summary.totalSteps == 0) return
-
-    val status = when {
-        summary.actionRequiredCount > 0 -> ReadinessStatus.ACTION_REQUIRED
-        summary.warningCount > 0 -> ReadinessStatus.WARNING
-        else -> ReadinessStatus.OK
-    }
-    val color = status.statusColors().content
-    val detail = when {
-        summary.actionRequiredCount > 0 -> stringResource(
-            R.string.setup_progress_blockers,
-            summary.actionRequiredCount,
-        )
-        summary.warningCount > 0 -> stringResource(
-            R.string.setup_progress_warnings,
-            summary.warningCount,
-        )
-        else -> stringResource(R.string.setup_progress_ready)
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.setup_progress_title),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = stringResource(
-                    R.string.setup_progress_count,
-                    summary.completedSteps,
-                    summary.totalSteps,
-                ),
-                style = MaterialTheme.typography.labelMedium,
-                color = color,
-            )
-        }
-        LinearProgressIndicator(
-            progress = { summary.progressFraction.coerceIn(0f, 1f) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(RelateSize.progressTrack),
-            color = color,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-        )
-        Text(
-            text = detail,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun RecommendedFixSection(
-    fix: AiDoctorRecommendedFix,
-    onAction: (AiDoctorAction) -> Unit,
-) {
-    val color = fix.status.statusColors().content
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                color = fix.status.statusColors().container,
-                shape = RoundedCornerShape(RelateRadius.card),
-            )
-            .padding(RelateSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-        ) {
-            Icon(
-                imageVector = fix.status.statusIcon(),
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(RelateSize.iconMd),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.automation_setup_recommended_fix),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = color,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = fix.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium,
-                )
-                Text(
-                    text = fix.detail,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Button(
-            onClick = { onAction(fix.action) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = RelateSize.primaryButtonHeight),
-            shape = RoundedCornerShape(RelateRadius.control),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-        ) {
-            Text(
-                text = fix.actionLabel,
-                color = MaterialTheme.colorScheme.background,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReadinessGroupSection(
-    group: ReadinessGroup,
-    checks: List<ReadinessCheck>,
-    onAction: (AiDoctorAction) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm)) {
-        Text(
-            text = group.label(),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold,
-        )
-        checks.forEach { check ->
-            ReadinessRow(check = check, onAction = onAction)
-        }
-    }
-}
-
-@Composable
-private fun ReadinessGroup.label(): String = when (this) {
-    ReadinessGroup.REQUIRED -> stringResource(R.string.automation_setup_group_required)
-    ReadinessGroup.QUALITY -> stringResource(R.string.automation_setup_group_quality)
-    ReadinessGroup.RELIABILITY -> stringResource(R.string.automation_setup_group_reliability)
-    ReadinessGroup.RECOVERY -> stringResource(R.string.automation_setup_group_recovery)
-}
-
-@Composable
-private fun ReadinessRow(
-    check: ReadinessCheck,
-    onAction: (AiDoctorAction) -> Unit,
-) {
-    val icon = check.status.statusIcon()
-    val color = check.status.statusColors().content
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(RelateSize.iconMd),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = check.title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = check.detail,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (check.actionLabel != null && check.action != AiDoctorAction.NONE) {
-                TextButton(
-                    onClick = { onAction(check.action) },
-                    modifier = Modifier.heightIn(min = RelateSize.compactButtonHeight),
-                ) {
-                    Text(check.actionLabel)
-                }
-            }
-        }
-    }
-}
-
-private data class StatusColors(
-    val container: androidx.compose.ui.graphics.Color,
-    val content: androidx.compose.ui.graphics.Color,
-)
-
-@Composable
-private fun ReadinessStatus.statusColors(): StatusColors = when (this) {
-    ReadinessStatus.OK -> StatusColors(
-        container = MaterialTheme.relateSemanticColors.success.copy(alpha = RelateAlpha.feedbackContainer),
-        content = MaterialTheme.relateSemanticColors.success,
-    )
-    ReadinessStatus.WARNING -> StatusColors(
-        container = MaterialTheme.relateSemanticColors.warning.copy(alpha = RelateAlpha.feedbackContainer),
-        content = MaterialTheme.relateSemanticColors.warning,
-    )
-    ReadinessStatus.ACTION_REQUIRED -> StatusColors(
-        container = MaterialTheme.colorScheme.error.copy(alpha = RelateAlpha.feedbackContainer),
-        content = MaterialTheme.colorScheme.error,
-    )
-}
-
-@Composable
-private fun RelationshipReadinessState.statusColors(): StatusColors = when (this) {
-    RelationshipReadinessState.READY,
-    RelationshipReadinessState.NEEDS_REVIEW,
-    RelationshipReadinessState.IN_PROGRESS -> StatusColors(
-        container = MaterialTheme.relateSemanticColors.success.copy(alpha = RelateAlpha.feedbackContainer),
-        content = MaterialTheme.relateSemanticColors.success,
-    )
-    RelationshipReadinessState.WARNING,
-    RelationshipReadinessState.WAITING -> StatusColors(
-        container = MaterialTheme.relateSemanticColors.warning.copy(alpha = RelateAlpha.feedbackContainer),
-        content = MaterialTheme.relateSemanticColors.warning,
-    )
-    RelationshipReadinessState.ACTION_REQUIRED -> StatusColors(
-        container = MaterialTheme.colorScheme.error.copy(alpha = RelateAlpha.feedbackContainer),
-        content = MaterialTheme.colorScheme.error,
-    )
-}
-
-private fun ReadinessStatus.statusIcon(): ImageVector = when (this) {
-    ReadinessStatus.OK -> Icons.Filled.CheckCircle
-    ReadinessStatus.WARNING -> Icons.Filled.Warning
-    ReadinessStatus.ACTION_REQUIRED -> Icons.Filled.Error
-}
-
-private fun RelationshipReadinessState.statusIcon(): ImageVector = when (this) {
-    RelationshipReadinessState.READY,
-    RelationshipReadinessState.NEEDS_REVIEW,
-    RelationshipReadinessState.IN_PROGRESS -> Icons.Filled.CheckCircle
-    RelationshipReadinessState.WARNING,
-    RelationshipReadinessState.WAITING -> Icons.Filled.Warning
-    RelationshipReadinessState.ACTION_REQUIRED -> Icons.Filled.Error
 }
 
 private fun handleAiDoctorAction(
@@ -701,98 +199,6 @@ private fun handleAiDoctorAction(
         AiDoctorAction.OPEN_ACCESSIBILITY_SETTINGS -> context.safeStartActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         AiDoctorAction.OPEN_BATTERY_SETTINGS -> context.openBatteryOptimizationSettings()
         AiDoctorAction.OPEN_APP_SETTINGS -> context.openAppSettings()
-    }
-}
-
-@Composable
-private fun SetupCard(
-    icon: ImageVector,
-    title: String,
-    body: String,
-    actionText: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    secondary: Boolean = false,
-    consentChecked: Boolean? = null,
-    consentText: String? = null,
-    onConsentChange: ((Boolean) -> Unit)? = null,
-) {
-    RelateGlassCard(modifier = modifier) {
-        Column(
-            modifier = Modifier.padding(RelateSpacing.cardContent),
-            verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(RelateSpacing.md),
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(RelateSize.iconLg),
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = body,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (consentChecked != null && consentText != null && onConsentChange != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-                ) {
-                    Checkbox(
-                        checked = consentChecked,
-                        onCheckedChange = onConsentChange,
-                    )
-                    Text(
-                        text = consentText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-            Button(
-                onClick = onClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = RelateSize.primaryButtonHeight),
-                shape = RoundedCornerShape(RelateRadius.control),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (secondary) {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                    contentColor = if (secondary) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.background
-                    },
-                ),
-            ) {
-                Text(actionText)
-                if (!secondary) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                        contentDescription = null,
-                        modifier = Modifier.padding(start = RelateSpacing.sm),
-                    )
-                }
-            }
-        }
     }
 }
 
