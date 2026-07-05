@@ -456,8 +456,13 @@ class DesignSystemTokensTest {
 
     @Test
     fun memoryVaultScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt")
-            .readText()
+        val source = listOf(
+            "app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt",
+            "app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultNoteComponents.kt",
+            "app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultEditorComponents.kt"
+        ).joinToString(separator = "\n") { path ->
+            sourceFile(path).readText()
+        }
 
         assertTrue(
             "MemoryVaultScreen should resolve Material colors through MaterialTheme.colorScheme.",
