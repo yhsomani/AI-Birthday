@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,27 +43,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.ui.components.EmptyState
 import com.example.core.ui.components.FilterChip
-import com.example.core.ui.components.HealthIndicatorDot
 import com.example.core.ui.components.ShimmerItem
 import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateFraction
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
-import com.example.domain.model.contact.ContactListItem
 import com.example.ui.components.SyncErrorCard
 import com.example.ui.viewmodel.ContactFilter
 import com.example.ui.viewmodel.ContactListUiState
 import com.example.ui.viewmodel.ContactListViewModel
-import com.example.ui.viewmodel.ContactQualityState
-import com.example.ui.viewmodel.ContactQualityStatus
 import com.example.ui.viewmodel.ContactSort
 
 internal object ContactListTestTags {
@@ -313,77 +307,4 @@ private fun ContactSort.label(): String = when (this) {
     ContactSort.NAME_ASC -> stringResource(R.string.contact_sort_name)
     ContactSort.HEALTH_DESC -> stringResource(R.string.contact_sort_health_high)
     ContactSort.HEALTH_ASC -> stringResource(R.string.contact_sort_health_low)
-}
-
-@Composable
-private fun ContactRow(
-    contact: ContactListItem,
-    quality: ContactQualityState?,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = RelateSpacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(RelateSize.minTouchTarget)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = contact.displayName.take(1),
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Medium,
-                style = MaterialTheme.typography.titleLarge,
-            )
-        }
-        Spacer(modifier = Modifier.width(RelateSpacing.md))
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = contact.displayName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.width(RelateSpacing.sm))
-                HealthIndicatorDot(health = contact.healthScore / 100f)
-            }
-            val group = contact.contactGroup ?: contact.relationshipType
-            Text(
-                text = group,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            quality?.let {
-                Text(
-                    text = it.label(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = it.labelColor(),
-                    modifier = Modifier.testTag(ContactListTestTags.QUALITY_PREFIX + contact.id.value),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ContactQualityState.label(): String = when (status) {
-    ContactQualityStatus.READY -> stringResource(R.string.contact_quality_ready)
-    ContactQualityStatus.MISSING_EVENT -> stringResource(R.string.contact_quality_missing_event)
-    ContactQualityStatus.MISSING_CHANNEL -> stringResource(R.string.contact_quality_missing_channel)
-    ContactQualityStatus.MISSING_CONTEXT -> stringResource(R.string.contact_quality_missing_context)
-}
-
-@Composable
-private fun ContactQualityState.labelColor() = when (status) {
-    ContactQualityStatus.READY -> MaterialTheme.colorScheme.onSurfaceVariant
-    ContactQualityStatus.MISSING_EVENT,
-    ContactQualityStatus.MISSING_CHANNEL,
-    ContactQualityStatus.MISSING_CONTEXT -> MaterialTheme.colorScheme.error
 }

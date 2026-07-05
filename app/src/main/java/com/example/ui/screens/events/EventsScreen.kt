@@ -80,6 +80,7 @@ internal object EventsTestTags {
     const val CONTENT_BOTTOM = "events_content_bottom"
     const val MANUAL_DIALOG = "events_manual_dialog"
     const val MANUAL_FORM_BODY = "events_manual_form_body"
+    const val MANUAL_CONTACT_FIELD = "events_manual_contact_field"
     const val MANUAL_YEAR_FIELD = "events_manual_year_field"
     const val MANUAL_WARNING = "events_manual_warning"
     const val MANUAL_SAVE = "events_manual_save"

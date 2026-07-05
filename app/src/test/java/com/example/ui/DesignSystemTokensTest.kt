@@ -252,14 +252,17 @@ class DesignSystemTokensTest {
 
     @Test
     fun eventsScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/events/EventsScreen.kt").readText()
+        val source = sourceDirectory("app/src/main/java/com/example/ui/screens/events")
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .joinToString(separator = "\n") { it.readText() }
 
         assertTrue(
-            "Events screen should resolve status accents through MaterialTheme.relateSemanticColors.",
+            "Events presentation should resolve status accents through MaterialTheme.relateSemanticColors.",
             source.contains("MaterialTheme.relateSemanticColors"),
         )
         assertTrue(
-            "Events screen should resolve Material colors through MaterialTheme.colorScheme.",
+            "Events presentation should resolve Material colors through MaterialTheme.colorScheme.",
             source.contains("MaterialTheme.colorScheme"),
         )
         listOf(
@@ -270,7 +273,7 @@ class DesignSystemTokensTest {
             "RelateWarning",
         ).forEach { rawColor ->
             assertTrue(
-                "EventsScreen should not import or reference $rawColor directly.",
+                "Events presentation should not import or reference $rawColor directly.",
                 !Regex("""\b$rawColor\b""").containsMatchIn(source),
             )
         }
@@ -391,6 +394,7 @@ class DesignSystemTokensTest {
             "app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt",
             "app/src/main/java/com/example/ui/screens/backup/BackupRestoreSecurityComponents.kt",
             "app/src/main/java/com/example/ui/screens/backup/BackupRestoreActionComponents.kt",
+            "app/src/main/java/com/example/ui/screens/backup/BackupRestoreStatusComponents.kt",
         ).joinToString(separator = "\n") { path ->
             sourceFile(path).readText()
         }
@@ -423,8 +427,12 @@ class DesignSystemTokensTest {
 
     @Test
     fun activityHistoryScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/activity/ActivityHistoryScreen.kt")
-            .readText()
+        val source = listOf(
+            "app/src/main/java/com/example/ui/screens/activity/ActivityHistoryScreen.kt",
+            "app/src/main/java/com/example/ui/screens/activity/ActivityHistoryLogComponents.kt",
+        ).joinToString(separator = "\n") { path ->
+            sourceFile(path).readText()
+        }
 
         assertTrue(
             "ActivityHistoryScreen should resolve Material colors through MaterialTheme.colorScheme.",
@@ -475,11 +483,13 @@ class DesignSystemTokensTest {
 
     @Test
     fun contactListScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/contacts/ContactListScreen.kt")
-            .readText()
+        val source = sourceDirectory("app/src/main/java/com/example/ui/screens/contacts")
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "kt" && it.name.startsWith("ContactList") }
+            .joinToString(separator = "\n") { it.readText() }
 
         assertTrue(
-            "ContactListScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            "Contact List presentation should resolve Material colors through MaterialTheme.colorScheme.",
             source.contains("MaterialTheme.colorScheme"),
         )
         listOf(
@@ -490,7 +500,7 @@ class DesignSystemTokensTest {
             "RelateSurfaceVariant",
         ).forEach { rawColor ->
             assertTrue(
-                "ContactListScreen should not import or reference $rawColor directly.",
+                "Contact List presentation should not import or reference $rawColor directly.",
                 !Regex("""\b$rawColor\b""").containsMatchIn(source),
             )
         }
@@ -502,6 +512,7 @@ class DesignSystemTokensTest {
             "app/src/main/java/com/example/ui/screens/home/HomeScreen.kt",
             "app/src/main/java/com/example/ui/screens/home/HomeDashboardComponents.kt",
             "app/src/main/java/com/example/ui/screens/home/HomeActionComponents.kt",
+            "app/src/main/java/com/example/ui/screens/home/HomeQuickActionComponents.kt",
         ).joinToString(separator = "\n") { path ->
             sourceFile(path).readText()
         }
@@ -533,6 +544,7 @@ class DesignSystemTokensTest {
         val source = listOf(
             "app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt",
             "app/src/main/java/com/example/ui/screens/wish/WishPreviewEditorComponents.kt",
+            "app/src/main/java/com/example/ui/screens/wish/WishPreviewActionComponents.kt",
             "app/src/main/java/com/example/ui/screens/wish/WishPreviewReviewComponents.kt",
             "app/src/main/java/com/example/ui/screens/wish/WishPreviewSendSummaryComponents.kt",
         ).joinToString(separator = "\n") { path ->
@@ -540,7 +552,7 @@ class DesignSystemTokensTest {
         }
 
         assertTrue(
-            "WishPreviewScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            "Wish Preview presentation should resolve Material colors through MaterialTheme.colorScheme.",
             source.contains("MaterialTheme.colorScheme"),
         )
         listOf(
@@ -551,7 +563,7 @@ class DesignSystemTokensTest {
             "RelateSurfaceVariant",
         ).forEach { rawColor ->
             assertTrue(
-                "WishPreviewScreen should not import or reference $rawColor directly.",
+                "Wish Preview presentation should not import or reference $rawColor directly.",
                 !Regex("""\b$rawColor\b""").containsMatchIn(source),
             )
         }
@@ -563,6 +575,7 @@ class DesignSystemTokensTest {
             "app/src/main/java/com/example/ui/screens/setup/AutomationSetupScreen.kt",
             "app/src/main/java/com/example/ui/screens/setup/AutomationSetupDashboardComponents.kt",
             "app/src/main/java/com/example/ui/screens/setup/AutomationSetupReadinessComponents.kt",
+            "app/src/main/java/com/example/ui/screens/setup/AutomationSetupActionComponents.kt",
             "app/src/main/java/com/example/ui/screens/setup/AutomationSetupSupportCards.kt",
         ).joinToString(separator = "\n") { path ->
             sourceFile(path).readText()
@@ -690,6 +703,7 @@ class DesignSystemTokensTest {
         val source = listOf(
             "app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt",
             "app/src/main/java/com/example/ui/screens/analytics/AnalyticsReportComponents.kt",
+            "app/src/main/java/com/example/ui/screens/analytics/AnalyticsChartComponents.kt",
         ).joinToString(separator = "\n") { path ->
             sourceFile(path).readText()
         }

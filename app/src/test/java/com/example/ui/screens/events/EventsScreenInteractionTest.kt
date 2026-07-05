@@ -9,6 +9,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -17,6 +18,7 @@ import com.example.R
 import com.example.core.ui.theme.RelateAITheme
 import com.example.domain.model.common.ContactId
 import com.example.domain.model.common.OccasionId
+import com.example.domain.model.contact.ContactPickerItem
 import com.example.domain.model.occasion.EventListItem
 import com.example.domain.model.occasion.OccasionType
 import com.example.ui.viewmodel.EventTrustConflictState
@@ -196,6 +198,43 @@ class EventsScreenInteractionTest {
         assertManualEventTypeOptionIsDisplayed(R.string.event_type_holiday)
         assertManualEventTypeOptionIsDisplayed(R.string.event_type_revival)
         assertManualEventTypeOptionIsDisplayed(R.string.event_type_follow_up)
+    }
+
+    @Test
+    fun manualEventDialogSwitchesBetweenExistingAndNewContactInputs() {
+        var inputChanges = 0
+
+        composeRule.setContent {
+            RelateAITheme {
+                EventsContent(
+                    state = EventsUiState(
+                        contacts = listOf(
+                            ContactPickerItem(ContactId("ada"), "Ada Lovelace"),
+                            ContactPickerItem(ContactId("grace"), "Grace Hopper"),
+                        ),
+                    ),
+                    showManualDialog = true,
+                    onManualInputChanged = { inputChanges += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(EventsTestTags.MANUAL_CONTACT_FIELD)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Ada Lovelace")
+            .assertIsDisplayed()
+
+        composeRule.onNodeWithText(context.getString(R.string.events_new_contact))
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText(context.getString(R.string.events_new_contact_name))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.events_existing_contact))
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag(EventsTestTags.MANUAL_CONTACT_FIELD)
+            .assertIsDisplayed()
+        assertEquals(2, inputChanges)
     }
 
     private fun assertManualEventTypeOptionIsDisplayed(labelRes: Int) {

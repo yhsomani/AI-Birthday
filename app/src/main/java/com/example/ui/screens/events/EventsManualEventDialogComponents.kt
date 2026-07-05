@@ -1,8 +1,6 @@
 package com.example.ui.screens.events
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -13,8 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -185,9 +181,6 @@ internal fun ManualEventDialogBody(
     onInputChanged: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var contactMenuExpanded by remember { mutableStateOf(false) }
-    val selectedContactName = contacts.firstOrNull { it.id.value == selectedContactId }?.displayName
-
     Column(
         modifier = modifier
             .height(RelateSize.dialogContentMaxHeight)
@@ -195,83 +188,16 @@ internal fun ManualEventDialogBody(
             .testTag(EventsTestTags.MANUAL_FORM_BODY),
         verticalArrangement = Arrangement.spacedBy(RelateSpacing.md),
     ) {
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-            verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
-        ) {
-            FilterChip(
-                label = stringResource(R.string.events_existing_contact),
-                isSelected = useExistingContact,
-                onClick = {
-                    onInputChanged()
-                    onUseExistingContactChange(true)
-                    if (selectedContactId == null) {
-                        onSelectedContactIdChange(contacts.firstOrNull()?.id?.value)
-                    }
-                },
-            )
-            FilterChip(
-                label = stringResource(R.string.events_new_contact),
-                isSelected = !useExistingContact,
-                onClick = {
-                    onInputChanged()
-                    onUseExistingContactChange(false)
-                },
-            )
-        }
-
-        if (useExistingContact) {
-            Box {
-                OutlinedTextField(
-                    value = selectedContactName
-                        ?: stringResource(R.string.events_choose_contact),
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = contacts.isNotEmpty()) {
-                            contactMenuExpanded = true
-                        },
-                    label = { Text(stringResource(R.string.events_contact_label)) },
-                    enabled = contacts.isNotEmpty(),
-                    colors = relateTextFieldColors(),
-                )
-                DropdownMenu(
-                    expanded = contactMenuExpanded,
-                    onDismissRequest = { contactMenuExpanded = false },
-                ) {
-                    contacts.forEach { contact ->
-                        DropdownMenuItem(
-                            text = { Text(contact.displayName) },
-                            onClick = {
-                                onInputChanged()
-                                onSelectedContactIdChange(contact.id.value)
-                                contactMenuExpanded = false
-                            },
-                        )
-                    }
-                }
-            }
-            if (contacts.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.events_no_contacts_for_manual),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else {
-            OutlinedTextField(
-                value = newContactName,
-                onValueChange = {
-                    onInputChanged()
-                    onNewContactNameChange(it)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.events_new_contact_name)) },
-                singleLine = true,
-                colors = relateTextFieldColors(),
-            )
-        }
+        ManualEventContactSection(
+            contacts = contacts,
+            useExistingContact = useExistingContact,
+            onUseExistingContactChange = onUseExistingContactChange,
+            selectedContactId = selectedContactId,
+            onSelectedContactIdChange = onSelectedContactIdChange,
+            newContactName = newContactName,
+            onNewContactNameChange = onNewContactNameChange,
+            onInputChanged = onInputChanged,
+        )
 
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
