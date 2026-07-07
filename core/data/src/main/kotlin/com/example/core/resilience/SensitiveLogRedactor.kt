@@ -29,8 +29,9 @@ object SensitiveLogRedactor {
     private val apiKeyPattern = Regex(
         pattern = "AIza[A-Za-z0-9_-]{20,}",
     )
+    // Enhanced regex to catch prefixed/compound secret keys (e.g., senderEmailPassword) to prevent accidental leakage
     private val secretAssignmentPattern = Regex(
-        pattern = "(?i)\\b(password|passphrase|api[_ -]?key|token|access_token|refresh_token)=([^,\\s]+)",
+        pattern = "(?i)\\b([a-zA-Z0-9_]*(?:password|passphrase|api[_ -]?key|token|access_token|refresh_token))=([^,\\s]+)",
     )
     private val phonePattern = Regex(
         pattern = "(?<!\\d)\\+?\\d[\\d\\s().-]{7,}\\d(?!\\d)",

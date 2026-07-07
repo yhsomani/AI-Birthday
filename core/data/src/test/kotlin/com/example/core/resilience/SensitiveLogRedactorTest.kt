@@ -58,6 +58,20 @@ class SensitiveLogRedactorTest {
     }
 
     @Test
+    fun redact_removesCompoundKeyValues() {
+        val input = "user=aarav@example.com senderEmailPassword=hunter2 userToken=secret-token myApiKey=AIzaSyFake"
+
+        val redacted = SensitiveLogRedactor.redact(input)
+
+        assertFalse(redacted.contains("hunter2"))
+        assertFalse(redacted.contains("secret-token"))
+        assertFalse(redacted.contains("AIzaSyFake"))
+        assertTrue(redacted.contains("senderEmailPassword=[REDACTED]"))
+        assertTrue(redacted.contains("userToken=[REDACTED]"))
+        assertTrue(redacted.contains("myApiKey=[REDACTED]"))
+    }
+
+    @Test
     fun googleContactsHttpErrorSummary_returnsSafeGenericMessages() {
         assertEquals(
             "HTTP 403: Google Contacts access is disabled or permission was denied",
