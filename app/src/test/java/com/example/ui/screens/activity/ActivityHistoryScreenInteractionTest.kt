@@ -97,15 +97,21 @@ class ActivityHistoryScreenInteractionTest {
             .performScrollTo()
             .performClick()
 
+        composeRule.onNodeWithContentDescription(context.getString(R.string.clear_search))
+            .assertIsDisplayed()
+            .performClick()
+
         assertEquals(
             listOf(
                 "back",
                 "search:error",
+
                 "type:DISPATCH",
                 "type:BACKUP",
                 "date:LAST_7_DAYS",
                 "status:RESOLVED",
                 "route:messages/today",
+                "search:",
             ),
             actions,
         )
