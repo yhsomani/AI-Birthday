@@ -60,7 +60,7 @@ internal fun MemoryNoteCard(
             containerColor = if (note.isPinned) {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = RelateAlpha.outline)
             } else {
-                MaterialTheme.relateSemanticColors.cardContainer
+                MaterialTheme.colorScheme.surfaceVariant
             },
         ),
     ) {
