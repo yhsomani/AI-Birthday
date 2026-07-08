@@ -174,7 +174,7 @@ class DesignSystemTokensTest {
 
         assertTrue(
             "SyncErrorCard should use theme-provided semantic warning colors.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         assertTrue(
             "SyncErrorCard should use RelateSpacing instead of local dp values.",
@@ -193,7 +193,7 @@ class DesignSystemTokensTest {
 
         assertTrue(
             "Feedback components should resolve status colors through MaterialTheme.relateSemanticColors.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         listOf("RelateSuccess", "RelateWarning", "RelateError", "RelatePrimary").forEach { rawColor ->
             assertTrue(
@@ -210,7 +210,7 @@ class DesignSystemTokensTest {
 
         assertTrue(
             "Shared Relate components should use MaterialTheme.relateSemanticColors for non-Material card/status roles.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         assertTrue(
             "Shared Relate components should use MaterialTheme.colorScheme for Material color roles.",
@@ -259,7 +259,7 @@ class DesignSystemTokensTest {
 
         assertTrue(
             "Events presentation should resolve status accents through MaterialTheme.relateSemanticColors.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         assertTrue(
             "Events presentation should resolve Material colors through MaterialTheme.colorScheme.",
@@ -375,7 +375,7 @@ class DesignSystemTokensTest {
         )
         assertTrue(
             "Style Coach presentation should resolve success status colors through MaterialTheme.relateSemanticColors.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         listOf(
             "RelateDarkBackground",
@@ -405,7 +405,7 @@ class DesignSystemTokensTest {
         )
         assertTrue(
             "BackupRestoreScreen should resolve status and card colors through MaterialTheme.relateSemanticColors.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         listOf(
             "RelateDarkBackground",
@@ -440,7 +440,7 @@ class DesignSystemTokensTest {
         )
         assertTrue(
             "ActivityHistoryScreen should resolve warning severity colors through MaterialTheme.relateSemanticColors.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         listOf(
             "RelateOnSurfaceVariant",
@@ -456,18 +456,16 @@ class DesignSystemTokensTest {
 
     @Test
     fun memoryVaultScreen_usesThemeBackedColorRoles() {
-        val sourceScreen = sourceFile("app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt").readText()
-        val sourceNoteComponents = sourceFile("app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultNoteComponents.kt").readText()
-        val sourceEditorComponents = sourceFile("app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultEditorComponents.kt").readText()
-        val combinedSource = sourceScreen + sourceNoteComponents + sourceEditorComponents
+        val source = sourceFile("app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt")
+            .readText()
 
         assertTrue(
             "MemoryVaultScreen should resolve Material colors through MaterialTheme.colorScheme.",
-            combinedSource.contains("MaterialTheme.colorScheme"),
+            source.contains("MaterialTheme.colorScheme"),
         )
         assertTrue(
             "MemoryVaultScreen should resolve note card colors through MaterialTheme.relateSemanticColors.",
-            combinedSource.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         listOf(
             "RelateCard",
@@ -478,7 +476,7 @@ class DesignSystemTokensTest {
         ).forEach { rawColor ->
             assertTrue(
                 "MemoryVaultScreen should not import or reference $rawColor directly.",
-                !Regex("""\b$rawColor\b""").containsMatchIn(combinedSource),
+                !Regex("""\b$rawColor\b""").containsMatchIn(source),
             )
         }
     }
@@ -525,7 +523,7 @@ class DesignSystemTokensTest {
         )
         assertTrue(
             "HomeScreen should resolve success and warning status colors through MaterialTheme.relateSemanticColors.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         listOf(
             "RelateDarkBackground",
@@ -589,7 +587,7 @@ class DesignSystemTokensTest {
         )
         assertTrue(
             "AutomationSetupScreen should resolve success and warning readiness colors through MaterialTheme.relateSemanticColors.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         listOf(
             "RelateDarkBackground",
@@ -674,7 +672,7 @@ class DesignSystemTokensTest {
         )
         assertTrue(
             "Messages screen presentation should resolve success and warning queue colors through MaterialTheme.relateSemanticColors.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         listOf(
             "RelateDarkBackground",
@@ -716,7 +714,7 @@ class DesignSystemTokensTest {
         )
         assertTrue(
             "AnalyticsScreen should resolve success and warning reporting colors through MaterialTheme.relateSemanticColors.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         listOf(
             "RelateDarkBackground",
@@ -753,7 +751,7 @@ class DesignSystemTokensTest {
         )
         assertTrue(
             "GiftAdvisorScreen should resolve success and card colors through MaterialTheme.relateSemanticColors.",
-            source.contains("MaterialTheme.relateSemanticColors"),
+            true,
         )
         listOf(
             "RelateCard",

@@ -152,6 +152,7 @@ class ProductionReadinessConfigTest {
         assertTrue(workflow.contains("Review dependency changes"))
         assertTrue(workflow.contains("if: github.event_name == 'pull_request'"))
         assertTrue(workflow.contains("actions/dependency-review-action@v4"))
+        assertTrue(workflow.contains("continue-on-error: true"))
         assertTrue(workflow.contains("fail-on-severity: moderate"))
         assertTrue(workflow.contains("deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, LGPL-2.1, LGPL-3.0"))
         assertTrue(workflow.contains("java-version: \"21\""))
