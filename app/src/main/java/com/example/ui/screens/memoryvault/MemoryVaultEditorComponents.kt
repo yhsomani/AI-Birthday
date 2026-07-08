@@ -172,7 +172,7 @@ internal fun EditMemoryNoteCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.relateSemanticColors.cardContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
             modifier = Modifier.padding(RelateSpacing.cardContent),

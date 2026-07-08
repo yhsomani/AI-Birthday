@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -56,6 +57,9 @@ import com.example.ui.viewmodel.EventsViewModel
 import com.example.ui.viewmodel.buildEventTrustStates
 import kotlinx.coroutines.launch
 import java.util.Locale
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.TextStyle
 
 private val eventTypeFilters = listOf(
     EventTypeFilter.ALL,
@@ -307,10 +311,14 @@ internal fun EventsList(
     } else {
         buildEventTrustStates(events)
     }
-    val groupedEvents = events.groupBy {
-        val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = it.nextOccurrenceMs
-        cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+    // ⚡ Bolt: Cache expensive grouping operation. Replaced Calendar with faster java.time APIs.
+    val groupedEvents = remember(events) {
+        events.groupBy {
+            Instant.ofEpochMilli(it.nextOccurrenceMs)
+                .atZone(ZoneId.systemDefault())
+                .month
+                .getDisplayName(TextStyle.FULL, Locale.getDefault())
+        }
     }
 
     LazyColumn(
@@ -321,17 +329,16 @@ internal fun EventsList(
             item(key = month) {
                 SectionHeader(title = month)
             }
-            monthEvents.forEach { event ->
-                item(key = event.id.value) {
-                    EventCard(
-                        event = event,
-                        trustState = resolvedEventTrust.getValue(event.id.value),
-                        isResolving = resolvingEventId == event.id.value,
-                        currentTimeMillis = currentTimeMillis,
-                        onMerge = { onMergeEvent(event.id.value) },
-                        onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
-                    )
-                }
+            // ⚡ Bolt: Use `items` instead of manual `forEach` to avoid unnecessary recomposition
+            items(items = monthEvents, key = { it.id.value }) { event ->
+                EventCard(
+                    event = event,
+                    trustState = resolvedEventTrust.getValue(event.id.value),
+                    isResolving = resolvingEventId == event.id.value,
+                    currentTimeMillis = currentTimeMillis,
+                    onMerge = { onMergeEvent(event.id.value) },
+                    onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
+                )
             }
         }
         item {
