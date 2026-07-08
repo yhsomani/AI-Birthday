@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -321,17 +322,16 @@ internal fun EventsList(
             item(key = month) {
                 SectionHeader(title = month)
             }
-            monthEvents.forEach { event ->
-                item(key = event.id.value) {
-                    EventCard(
-                        event = event,
-                        trustState = resolvedEventTrust.getValue(event.id.value),
-                        isResolving = resolvingEventId == event.id.value,
-                        currentTimeMillis = currentTimeMillis,
-                        onMerge = { onMergeEvent(event.id.value) },
-                        onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
-                    )
-                }
+            // Performance: Using `items` extension rather than manual `forEach` reduces memory allocations and lambda creations
+            items(items = monthEvents, key = { it.id.value }) { event ->
+                EventCard(
+                    event = event,
+                    trustState = resolvedEventTrust.getValue(event.id.value),
+                    isResolving = resolvingEventId == event.id.value,
+                    currentTimeMillis = currentTimeMillis,
+                    onMerge = { onMergeEvent(event.id.value) },
+                    onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
+                )
             }
         }
         item {
