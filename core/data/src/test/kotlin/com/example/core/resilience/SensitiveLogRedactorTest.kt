@@ -38,6 +38,19 @@ class SensitiveLogRedactorTest {
     }
 
     @Test
+    fun redact_removesCompoundVariableNames() {
+        val input = "senderEmailPassword=mySecretPass userToken=secret123 password=normalPass"
+        val redacted = SensitiveLogRedactor.redact(input)
+
+        assertFalse(redacted.contains("mySecretPass"))
+        assertFalse(redacted.contains("secret123"))
+        assertFalse(redacted.contains("normalPass"))
+        assertTrue(redacted.contains("senderEmailPassword=[REDACTED]"))
+        assertTrue(redacted.contains("userToken=[REDACTED]"))
+        assertTrue(redacted.contains("password=[REDACTED]"))
+    }
+
+    @Test
     fun redact_removesInlineMessageBodyAssignments() {
         val input = "messageText=\"Happy birthday Aarav, I hope your family dinner is warm\" " +
             "draftText=Personalized-memory-note recommendedVariantText=\"Private selected wish\" " +
