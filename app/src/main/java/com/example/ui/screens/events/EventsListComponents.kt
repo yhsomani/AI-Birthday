@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -17,6 +19,9 @@ import com.example.ui.viewmodel.EventHorizonFilter
 import com.example.ui.viewmodel.EventTrustState
 import com.example.ui.viewmodel.EventTypeFilter
 import com.example.ui.viewmodel.buildEventTrustStates
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 internal val eventTypeFilters = listOf(
@@ -47,15 +52,20 @@ internal fun EventsList(
     onMergeEvent: (String) -> Unit = {},
     onKeepSeparateEvent: (String) -> Unit = {},
 ) {
-    val resolvedEventTrust = if (events.all { eventTrust.containsKey(it.id.value) }) {
-        eventTrust
-    } else {
-        buildEventTrustStates(events)
+    val resolvedEventTrust = remember(events, eventTrust) {
+        if (events.all { eventTrust.containsKey(it.id.value) }) {
+            eventTrust
+        } else {
+            buildEventTrustStates(events)
+        }
     }
-    val groupedEvents = events.groupBy {
-        val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = it.nextOccurrenceMs
-        cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+    val groupedEvents = remember(events) {
+        events.groupBy {
+            // Bolt: Optimization - avoided Calendar.getInstance() and use modern time API inside remember block
+            Instant.ofEpochMilli(it.nextOccurrenceMs)
+                .atZone(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("MMMM", Locale.getDefault()))
+        }
     }
 
     LazyColumn(
@@ -66,17 +76,16 @@ internal fun EventsList(
             item(key = month) {
                 SectionHeader(title = month)
             }
-            monthEvents.forEach { event ->
-                item(key = event.id.value) {
-                    EventCard(
-                        event = event,
-                        trustState = resolvedEventTrust.getValue(event.id.value),
-                        isResolving = resolvingEventId == event.id.value,
-                        currentTimeMillis = currentTimeMillis,
-                        onMerge = { onMergeEvent(event.id.value) },
-                        onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
-                    )
-                }
+            // Bolt: Optimization - replaced forEach+item with items extension for better composition performance
+            items(items = monthEvents, key = { it.id.value }) { event ->
+                EventCard(
+                    event = event,
+                    trustState = resolvedEventTrust.getValue(event.id.value),
+                    isResolving = resolvingEventId == event.id.value,
+                    currentTimeMillis = currentTimeMillis,
+                    onMerge = { onMergeEvent(event.id.value) },
+                    onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
+                )
             }
         }
         item {
