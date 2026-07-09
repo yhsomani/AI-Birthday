@@ -136,4 +136,17 @@ class SensitiveLogRedactorTest {
         assertFalse(entry.extras.values.joinToString(" ").contains("private family note"))
         assertFalse(entry.extras.values.joinToString(" ").contains("private memory"))
     }
+
+    @Test
+    fun redact_removesCompoundVariableAssignments() {
+        val input = "senderEmailPassword=super_secret userToken=my_custom_token someOtherField=not_redacted"
+
+        val redacted = SensitiveLogRedactor.redact(input)
+
+        assertFalse(redacted.contains("super_secret"))
+        assertFalse(redacted.contains("my_custom_token"))
+        assertTrue(redacted.contains("senderEmailPassword=[REDACTED]"))
+        assertTrue(redacted.contains("userToken=[REDACTED]"))
+        assertTrue(redacted.contains("someOtherField=not_redacted"))
+    }
 }
