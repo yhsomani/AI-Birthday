@@ -105,7 +105,7 @@ private fun newDispatchAttempt(
         messageDraftId = messageDraftId,
         contactId = contactId,
         occasionId = occasionId,
-        channel = channel.takeUnless { it == MessageChannel.UNKNOWN } ?: MessageChannel.SMS,
+        channel = channel.orDefault(),
         routeRank = 0,
         eligibilityDecision = eligibilityDecision,
         blockOrDeferReason = blockOrDeferReason,

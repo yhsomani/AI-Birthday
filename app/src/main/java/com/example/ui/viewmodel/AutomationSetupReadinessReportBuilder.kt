@@ -15,6 +15,8 @@ import com.example.domain.automation.SetupQualityReadinessPolicy
 import com.example.domain.automation.SetupSystemReadinessPolicy
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageChannelSetCodec
+import com.example.domain.model.common.JsonTextCodec
 import com.example.domain.model.contact.ContactAutomationReadinessProfile
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.DispatchAttemptRepository
@@ -56,7 +58,7 @@ internal class AutomationSetupReadinessReportBuilder(
             ?: runCatching { styleProfileRepository.getProfileOnce() }.getOrNull()
         val styleSampleCount = maxOf(
             styleProfile?.sampleCount ?: 0,
-            countJsonArrayItems(styleProfile?.sampleMessagesJson),
+            JsonTextCodec.countStringArrayItems(styleProfile?.sampleMessagesJson),
         )
         val hasGoogleContactsAccess = capabilityProbe.hasGoogleContactsAccess(
             hasCachedGoogleOAuthToken = preferencesRepository.getGoogleOAuthToken().isNotBlank(),
@@ -84,7 +86,7 @@ internal class AutomationSetupReadinessReportBuilder(
             senderEmail = senderEmail,
             senderEmailPassword = senderEmailPassword,
         )
-        val blockedChannels = preferencesRepository.getChannelBlackout().toAutomationChannelSet()
+        val blockedChannels = MessageChannelSetCodec.parse(preferencesRepository.getChannelBlackout())
         val selectedChannelCounts = SetupAutomationReadinessPolicy.selectedAutomaticChannelCounts(
             contacts = contacts,
             senderEmailReady = senderEmailReady,

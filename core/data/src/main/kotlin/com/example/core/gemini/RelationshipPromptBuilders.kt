@@ -1,17 +1,19 @@
 package com.example.core.gemini
 
 import com.example.domain.model.contact.ContactRelationshipPromptContext
+import com.example.domain.model.common.JsonTextCodec
+import com.example.domain.model.message.PromptTextFormatter
 
 internal fun buildReconnectPromptText(
     contact: ContactRelationshipPromptContext,
     daysSince: Int,
 ): String {
-    val firstName = promptFirstName(contact.displayName)
-    val interestsList = parsePromptStringList(contact.interestsJson)
-    val hobbiesList = parsePromptStringList(contact.hobbiesJson)
-    val sharedHistoryList = parsePromptStringList(contact.sharedHistoryJson)
-    val sensitiveTopics = parsePromptStringList(contact.sensitiveTopicsJson)
-    val sanitizedNotes = sanitizePromptNotes(contact.notesText).take(180)
+    val firstName = PromptTextFormatter.firstName(contact.displayName)
+    val interestsList = JsonTextCodec.parseStringArray(contact.interestsJson)
+    val hobbiesList = JsonTextCodec.parseStringArray(contact.hobbiesJson)
+    val sharedHistoryList = JsonTextCodec.parseStringArray(contact.sharedHistoryJson)
+    val sensitiveTopics = JsonTextCodec.parseStringArray(contact.sensitiveTopicsJson)
+    val sanitizedNotes = PromptTextFormatter.sanitizeNotes(contact.notesText).take(180)
 
     return buildString {
         appendLine("Write a short, casual reconnect message from the user to ${contact.nickname ?: firstName}.")
@@ -55,8 +57,8 @@ internal fun buildPostEventFollowUpPromptText(
     eventType: String?,
     eventLabel: String?,
 ): String {
-    val firstName = promptFirstName(contact.displayName)
-    val interestsList = parsePromptStringList(contact.interestsJson)
+    val firstName = PromptTextFormatter.firstName(contact.displayName)
+    val interestsList = JsonTextCodec.parseStringArray(contact.interestsJson)
     val eventName = eventLabel?.takeIf { it.isNotBlank() } ?: eventType ?: "recent occasion"
 
     return buildString {
@@ -68,7 +70,7 @@ internal fun buildPostEventFollowUpPromptText(
         appendLine("- Preferred language: ${contact.preferredLanguage}")
         appendLine("- Formality: ${contact.formalityLevel}")
         appendLine("- Interests: ${interestsList.joinToString(", ")}")
-        appendLine("- Original message already sent: ${sanitizePromptNotes(originalMessage).take(240)}")
+        appendLine("- Original message already sent: ${PromptTextFormatter.sanitizeNotes(originalMessage).take(240)}")
         appendLine()
         appendLine("Requirements:")
         appendLine("- Sound natural, low-pressure, and personal")
@@ -86,9 +88,9 @@ internal fun buildHolidayWishPromptText(
     holidayName: String,
     holidayTone: String,
 ): String {
-    val firstName = promptFirstName(contact.displayName)
-    val interestsList = parsePromptStringList(contact.interestsJson)
-    val sharedHistoryList = parsePromptStringList(contact.sharedHistoryJson)
+    val firstName = PromptTextFormatter.firstName(contact.displayName)
+    val interestsList = JsonTextCodec.parseStringArray(contact.interestsJson)
+    val sharedHistoryList = JsonTextCodec.parseStringArray(contact.sharedHistoryJson)
 
     return buildString {
         appendLine("Write a short ${holidayName} message from the user to ${contact.nickname ?: firstName}.")

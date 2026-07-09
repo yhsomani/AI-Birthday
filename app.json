@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "RelateAI",
+    "slug": "relateai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "relateai",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.relateai.app",
+      "infoPlist": {
+        "NSContactsUsageDescription": "RelateAI imports contacts only when you ask, so it can find relationship events and help you prepare messages.",
+        "NSCalendarsUsageDescription": "RelateAI uses calendar access only when you ask to import or export relationship events.",
+        "NSFaceIDUsageDescription": "RelateAI uses biometric unlock only when you enable it to protect private relationship data."
+      }
+    },
+    "android": {
+      "package": "com.relateai.app",
+      "permissions": [
+        "READ_CONTACTS",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR",
+        "POST_NOTIFICATIONS",
+        "SEND_SMS",
+        "USE_BIOMETRIC"
+      ]
+    },
+    "plugins": [
+      "./plugins/with-relateai-shortcuts"
+    ],
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

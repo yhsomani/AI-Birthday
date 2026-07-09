@@ -15,7 +15,7 @@ Repository evidence:
 - `core/domain/build.gradle.kts` applies the Kotlin/JVM plugin and no longer declares Room/Paging dependencies.
 - `core/data/src/main/kotlin/com/example/core/db/entities/*Entity.kt` contains Room entities.
 - Domain repository/service contracts now avoid Room entities on the audited contact, event, message, dispatch, backup, and pure-record paths.
-- `PLAN.md` Sections 3.1, 8.2, and 9 require a pure domain layer and a separate target model layer.
+- `SSOT.md` records the current module graph, domain-purity status, and target package direction.
 
 This ADR remains relevant as a guardrail: `:core:domain` must stay a pure JVM module and data/database concerns must remain outside it.
 
@@ -67,4 +67,4 @@ The decision is implemented when:
 - `:core:domain` builds without Room, Paging, Android framework, or provider SDK dependencies.
 - Domain unit tests run as pure JVM tests.
 - Repository tests prove mapper parity for migrated aggregates.
-- `PLAN.md` Phase 1 exit criteria are satisfied.
+- Repository hygiene and boundary tests keep the domain module free of Android, Room, DAO, Paging, and provider SDK imports.

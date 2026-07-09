@@ -7,6 +7,7 @@ import com.example.R
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.JsonTextCodec
 import com.example.domain.model.contact.ContactListItem
 import com.example.domain.repository.ContactRepository
 import com.example.domain.usecase.SyncContactsUseCase
@@ -226,8 +227,8 @@ class ContactListViewModel @Inject constructor(
     private fun ContactListItem.needsPersonalization(): Boolean {
         return nickname.isNullOrBlank() &&
             notesText.isBlank() &&
-            !hasJsonArrayContent(interestsJson) &&
-            !hasJsonArrayContent(sharedHistoryJson) &&
+            !JsonTextCodec.hasStringArrayContent(interestsJson) &&
+            !JsonTextCodec.hasStringArrayContent(sharedHistoryJson) &&
             classificationConfidence < PERSONALIZATION_CONFIDENCE_THRESHOLD
     }
 
@@ -271,10 +272,5 @@ class ContactListViewModel @Inject constructor(
 
     private fun ContactListItem.hasPhone(): Boolean {
         return !primaryPhone.isNullOrBlank() || !secondaryPhone.isNullOrBlank()
-    }
-
-    private fun hasJsonArrayContent(raw: String): Boolean {
-        val trimmed = raw.trim()
-        return trimmed.isNotBlank() && trimmed != "[]"
     }
 }

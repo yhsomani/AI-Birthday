@@ -3,17 +3,13 @@ package com.example.core.automation.sender
 import com.example.domain.automation.AutoSendChannelSelector
 import com.example.domain.automation.EmailAddressSyntaxPolicy
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageChannelSetCodec
 import com.example.domain.model.contact.ContactDeliveryRouteProfile
 import com.example.domain.model.message.DeliveryRouteHistoryRecord
 
 internal object DeliveryChannelResolver {
-    private val channelTokenPattern = Regex("\"([A-Za-z_]+)\"")
-
     fun parseBlockedChannels(channelBlackoutJson: String): Set<MessageChannel> {
-        return channelTokenPattern.findAll(channelBlackoutJson)
-            .map { MessageChannel.fromRaw(it.groupValues[1]) }
-            .filter { it != MessageChannel.UNKNOWN }
-            .toSet()
+        return MessageChannelSetCodec.parse(channelBlackoutJson)
     }
 
     fun resolveRoutes(
@@ -39,6 +35,6 @@ internal object DeliveryChannelResolver {
     }
 
     private fun Set<MessageChannel>.toChannelBlackoutJson(): String {
-        return joinToString(prefix = "[", postfix = "]") { "\"${it.raw}\"" }
+        return MessageChannelSetCodec.toJsonArray(this)
     }
 }

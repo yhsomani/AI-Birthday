@@ -3,6 +3,7 @@ package com.example.domain.model.contact
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.JsonTextCodec
 
 data class ContactAutomationReadinessProfile(
     val id: ContactId,
@@ -27,14 +28,10 @@ data class ContactAutomationReadinessProfile(
     val hasPersonalizationData: Boolean
         get() = !nickname.isNullOrBlank() ||
             notesText.isNotBlank() ||
-            hasJsonListSignal(interestsJson) ||
-            hasJsonListSignal(sharedHistoryJson)
+            JsonTextCodec.hasStringArrayContent(interestsJson) ||
+            JsonTextCodec.hasStringArrayContent(sharedHistoryJson)
 
     fun hasPersonalizationContextForAi(minimumConfidence: Double): Boolean {
         return hasPersonalizationData || classificationConfidence >= minimumConfidence
-    }
-
-    private fun hasJsonListSignal(raw: String): Boolean {
-        return raw.trim().let { it.isNotBlank() && it != "[]" }
     }
 }

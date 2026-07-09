@@ -21,17 +21,17 @@ import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateElevation
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSpacing
+import com.example.domain.model.common.JsonTextCodec
 import com.example.domain.model.style.StyleProfileRecord
 import java.util.Locale
-import org.json.JSONArray
 
 @Composable
 internal fun LearnedProfileCard(
     profile: StyleProfileRecord,
     modifier: Modifier = Modifier,
 ) {
-    val commonGreetings = parseJsonArray(profile.commonGreetingsJson)
-    val emojiSet = parseJsonArray(profile.emojiSetJson)
+    val commonGreetings = JsonTextCodec.parseStringArray(profile.commonGreetingsJson)
+    val emojiSet = JsonTextCodec.parseStringArray(profile.emojiSetJson)
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -129,8 +129,8 @@ internal fun StyleImpactPreviewCard(
     profile: StyleProfileRecord,
     modifier: Modifier = Modifier,
 ) {
-    val commonGreetings = parseJsonArray(profile.commonGreetingsJson)
-    val emojiSet = parseJsonArray(profile.emojiSetJson)
+    val commonGreetings = JsonTextCodec.parseStringArray(profile.commonGreetingsJson)
+    val emojiSet = JsonTextCodec.parseStringArray(profile.emojiSetJson)
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -308,11 +308,4 @@ private fun styleConfidenceLabel(sampleCount: Int): String {
         sampleCount > 0 -> stringResource(R.string.style_coach_confidence_starting)
         else -> stringResource(R.string.style_coach_confidence_untrained)
     }
-}
-
-private fun parseJsonArray(raw: String): List<String> {
-    return runCatching {
-        val array = JSONArray(raw)
-        List(array.length()) { index -> array.getString(index) }
-    }.getOrDefault(emptyList())
 }

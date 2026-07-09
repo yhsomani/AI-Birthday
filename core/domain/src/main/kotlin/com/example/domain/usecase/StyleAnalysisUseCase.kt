@@ -1,12 +1,10 @@
 package com.example.domain.usecase
 
+import com.example.domain.model.common.JsonTextCodec
 import com.example.domain.model.style.StyleProfileHistoryRecord
 import com.example.domain.model.style.StyleProfileRecord
 import com.example.domain.repository.MessageRepository
 import com.example.domain.repository.StyleProfileRepository
-import com.example.domain.util.encodeJsonObject
-import com.example.domain.util.encodeJsonStringArray
-import com.example.domain.util.parseJsonStringArray
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -86,7 +84,7 @@ class StyleAnalysisUseCase @Inject constructor(
 
         // 6. Identify top emojis
         val topEmojis = findTopEmojis(texts)
-        val emojiSetJson = encodeJsonStringArray(topEmojis)
+        val emojiSetJson = JsonTextCodec.encodeStringArray(topEmojis)
 
         // 7. Tone & Formality analysis
         val toneList = mutableListOf<String>()
@@ -134,15 +132,15 @@ class StyleAnalysisUseCase @Inject constructor(
         }
 
         val distinctToneList = toneList.distinct()
-        val toneDescriptorsJson = encodeJsonStringArray(distinctToneList)
+        val toneDescriptorsJson = JsonTextCodec.encodeStringArray(distinctToneList)
         val currentProfile = styleProfileRepository.getProfileOnce() ?: StyleProfileRecord()
 
         val newProfile = currentProfile.copy(
             sampleMessagesJson = augmentSamplesWithAnalysis(currentProfile.sampleMessagesJson, texts),
             usesEmoji = emojiDensity > 0.01,
             avgMessageLength = avgLength.toInt(),
-            commonPhrasesJson = encodeJsonStringArray(topPhrases),
-            commonGreetingsJson = encodeJsonStringArray(topGreetings),
+            commonPhrasesJson = JsonTextCodec.encodeStringArray(topPhrases),
+            commonGreetingsJson = JsonTextCodec.encodeStringArray(topGreetings),
             formalityLevel = formality,
             preferredLanguage = preferredLanguage,
             emojiSetJson = emojiSetJson,
@@ -152,7 +150,7 @@ class StyleAnalysisUseCase @Inject constructor(
         )
 
         // Save style profile snapshot to history
-        val profileJson = encodeJsonObject(
+        val profileJson = JsonTextCodec.encodeObject(
             listOf(
                 "formalityLevel" to formality,
                 "preferredLanguage" to preferredLanguage,
@@ -189,13 +187,13 @@ class StyleAnalysisUseCase @Inject constructor(
     }
 
     private fun augmentSamplesWithAnalysis(existingJson: String, texts: List<String>): String {
-        val samples = parseJsonStringArray(existingJson).toMutableList()
+        val samples = JsonTextCodec.parseStringArray(existingJson).toMutableList()
 
         // Add top 3 most representative messages
         val sorted = texts.sortedByDescending { it.length }.take(3)
         samples.addAll(sorted)
 
-        return encodeJsonStringArray(samples.distinct())
+        return JsonTextCodec.encodeStringArray(samples.distinct())
     }
 
     private fun Int.isEmojiCodePoint(): Boolean {

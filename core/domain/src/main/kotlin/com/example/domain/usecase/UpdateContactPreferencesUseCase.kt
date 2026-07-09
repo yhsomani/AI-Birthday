@@ -3,6 +3,7 @@ package com.example.domain.usecase
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.common.ContactId
+import com.example.domain.model.common.JsonTextCodec
 import com.example.domain.model.contact.ContactPreferences
 import com.example.domain.repository.ContactRepository
 import javax.inject.Inject
@@ -121,24 +122,11 @@ class UpdateContactPreferencesUseCase @Inject constructor(
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .distinct()
-        return values.joinToString(prefix = "[", postfix = "]") { "\"${it.jsonEscape()}\"" }
+        return JsonTextCodec.encodeStringArray(values)
     }
 
     private fun String.toLifePhaseJson(): String {
         val value = trim()
-        return if (value.isBlank()) "{}" else "{\"phase\":\"${value.jsonEscape()}\"}"
-    }
-
-    private fun String.jsonEscape(): String = buildString {
-        this@jsonEscape.forEach { char ->
-            when (char) {
-                '\\' -> append("\\\\")
-                '"' -> append("\\\"")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                '\t' -> append("\\t")
-                else -> append(char)
-            }
-        }
+        return if (value.isBlank()) "{}" else JsonTextCodec.encodeObject(listOf("phase" to value))
     }
 }

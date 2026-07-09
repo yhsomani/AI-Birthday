@@ -27,8 +27,8 @@ import com.example.R
 import com.example.core.ui.theme.RelateAlpha
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSpacing
+import com.example.domain.model.common.JsonTextCodec
 import com.example.domain.model.style.StyleProfileHistoryRecord
-import org.json.JSONObject
 
 @Composable
 internal fun EmptyHistoryRow() {
@@ -59,8 +59,8 @@ internal fun HistorySnapshotCard(
     savedAt: String,
     modifier: Modifier = Modifier,
 ) {
-    val snapshotObj = remember(snapshot.profileJson) {
-        runCatching { JSONObject(snapshot.profileJson) }.getOrNull()
+    val summary = remember(snapshot.profileJson) {
+        StyleHistorySummary.fromJson(snapshot.profileJson)
     }
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -86,18 +86,36 @@ internal fun HistorySnapshotCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            snapshotObj?.let { obj ->
+            summary?.let {
                 Spacer(modifier = Modifier.height(RelateSpacing.xs))
                 Text(
                     text = stringResource(
                         R.string.style_coach_history_summary,
-                        formalityLabel(obj.optString("formalityLevel")),
-                        obj.optString("preferredLanguage"),
-                        obj.optInt("avgMessageLength"),
+                        formalityLabel(it.formalityLevel),
+                        it.preferredLanguage,
+                        it.avgMessageLength,
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+        }
+    }
+}
+
+private data class StyleHistorySummary(
+    val formalityLevel: String,
+    val preferredLanguage: String,
+    val avgMessageLength: Int,
+) {
+    companion object {
+        fun fromJson(raw: String): StyleHistorySummary? {
+            val trimmed = raw.trim()
+            if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return null
+            return StyleHistorySummary(
+                formalityLevel = JsonTextCodec.readStringField(trimmed, "formalityLevel").orEmpty(),
+                preferredLanguage = JsonTextCodec.readStringField(trimmed, "preferredLanguage").orEmpty(),
+                avgMessageLength = JsonTextCodec.readIntField(trimmed, "avgMessageLength") ?: 0,
+            )
         }
     }
 }

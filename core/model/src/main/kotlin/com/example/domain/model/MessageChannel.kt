@@ -6,6 +6,10 @@ enum class MessageChannel(val raw: String) {
     EMAIL("EMAIL"),
     UNKNOWN("UNKNOWN");
 
+    fun orDefault(default: MessageChannel = SMS): MessageChannel {
+        return takeIf { it != UNKNOWN } ?: default
+    }
+
     companion object {
         fun fromRaw(value: String?): MessageChannel {
             val normalized = value?.trim()?.uppercase().orEmpty()

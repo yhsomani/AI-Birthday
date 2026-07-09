@@ -15,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.R
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.JsonTextCodec
 import com.example.domain.model.contact.ContactDetailProfile
 import com.example.domain.usecase.UpdateContactPreferencesUseCase
 
@@ -28,10 +29,10 @@ internal fun ContactPreferencesDialog(
     var nickname by remember(contact.id.value) { mutableStateOf(contact.nickname.orEmpty()) }
     var relationshipType by remember(contact.id.value) { mutableStateOf(contact.relationshipType) }
     var language by remember(contact.id.value) { mutableStateOf(contact.preferredLanguage) }
-    var channel by remember(contact.id.value) { mutableStateOf(contact.preferredChannel.toSupportedContactMessageChannel()) }
+    var channel by remember(contact.id.value) { mutableStateOf(contact.preferredChannel.orDefault()) }
     var formality by remember(contact.id.value) { mutableStateOf(contact.formalityLevel) }
     var style by remember(contact.id.value) { mutableStateOf(contact.communicationStyle) }
-    var automationMode by remember(contact.id.value) { mutableStateOf(contact.automationMode.toSupportedContactApprovalMode()) }
+    var automationMode by remember(contact.id.value) { mutableStateOf(contact.automationMode.orDefault()) }
     var sendTime by remember(contact.id.value) {
         mutableStateOf(
             if (contact.customSendTimeHour != null && contact.customSendTimeMinute != null) {
@@ -44,9 +45,9 @@ internal fun ContactPreferencesDialog(
     var giftBudget by remember(contact.id.value) { mutableStateOf(contact.giftBudgetInr.toString()) }
     var annualBudget by remember(contact.id.value) { mutableStateOf(contact.annualBudgetInr.toString()) }
     var skipAutoWish by remember(contact.id.value) { mutableStateOf(contact.skipAutoWish) }
-    var interests by remember(contact.id.value) { mutableStateOf(contact.interestsJson.toCsvList()) }
-    var sensitiveTopics by remember(contact.id.value) { mutableStateOf(contact.sensitiveTopicsJson.toCsvList()) }
-    var lifePhase by remember(contact.id.value) { mutableStateOf(contact.currentLifePhaseJson.lifePhaseLabel()) }
+    var interests by remember(contact.id.value) { mutableStateOf(contact.interestsJson.toEditableList()) }
+    var sensitiveTopics by remember(contact.id.value) { mutableStateOf(contact.sensitiveTopicsJson.toEditableList()) }
+    var lifePhase by remember(contact.id.value) { mutableStateOf(contact.currentLifePhaseJson.toLifePhaseLabel()) }
     var notes by remember(contact.id.value) { mutableStateOf(contact.notesText) }
     var localError by remember(contact.id.value) { mutableStateOf<String?>(null) }
     val invalidSendTime = stringResource(R.string.contact_preferences_invalid_send_time)
@@ -148,18 +149,18 @@ internal fun ContactDetailProfile.toPreferenceRequest(): UpdateContactPreference
         nickname = nickname.orEmpty(),
         relationshipType = relationshipType,
         preferredLanguage = preferredLanguage,
-        preferredChannel = preferredChannel.toSupportedContactMessageChannel(),
+        preferredChannel = preferredChannel.orDefault(),
         formalityLevel = formalityLevel,
         communicationStyle = communicationStyle,
-        automationMode = automationMode.toSupportedContactApprovalMode(),
+        automationMode = automationMode.orDefault(),
         customSendTimeHour = customSendTimeHour,
         customSendTimeMinute = customSendTimeMinute,
         giftBudgetInr = giftBudgetInr,
         annualBudgetInr = annualBudgetInr,
         skipAutoWish = skipAutoWish,
-        interests = interestsJson.toCsvList(),
-        sensitiveTopics = sensitiveTopicsJson.toCsvList(),
-        currentLifePhase = currentLifePhaseJson.lifePhaseLabel(),
+        interests = interestsJson.toEditableList(),
+        sensitiveTopics = sensitiveTopicsJson.toEditableList(),
+        currentLifePhase = currentLifePhaseJson.toLifePhaseLabel(),
         notes = notesText,
     )
 
@@ -171,27 +172,10 @@ private fun String.parseSendTime(): Pair<Int, Int>? {
     return hour to minute
 }
 
-private fun ApprovalMode.toSupportedContactApprovalMode(): ApprovalMode {
-    return takeIf { it != ApprovalMode.UNKNOWN } ?: ApprovalMode.DEFAULT
+private fun String.toEditableList(): String {
+    return JsonTextCodec.parseStringArray(this).joinToString(", ")
 }
 
-private fun MessageChannel.toSupportedContactMessageChannel(): MessageChannel {
-    return takeIf { it != MessageChannel.UNKNOWN } ?: MessageChannel.SMS
-}
-
-private fun String.toCsvList(): String {
-    return try {
-        val array = org.json.JSONArray(this)
-        List(array.length()) { array.getString(it) }.joinToString(", ")
-    } catch (_: Exception) {
-        ""
-    }
-}
-
-private fun String.lifePhaseLabel(): String {
-    return try {
-        org.json.JSONObject(this).optString("phase")
-    } catch (_: Exception) {
-        ""
-    }
+private fun String.toLifePhaseLabel(): String {
+    return JsonTextCodec.readStringField(this, "phase").orEmpty()
 }

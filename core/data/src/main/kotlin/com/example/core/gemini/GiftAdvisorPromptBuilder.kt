@@ -1,14 +1,16 @@
 package com.example.core.gemini
 
 import com.example.domain.model.contact.ContactGiftAdvisorProfile
+import com.example.domain.model.common.JsonTextCodec
 import com.example.domain.model.gift.GiftHistoryRecord
+import com.example.domain.model.message.PromptTextFormatter
 
 internal fun buildGiftSuggestionsPromptText(
     contact: ContactGiftAdvisorProfile,
     history: List<GiftHistoryRecord>,
 ): String {
-    val firstName = promptFirstName(contact.displayName)
-    val interestsList = parsePromptStringList(contact.interestsJson)
+    val firstName = PromptTextFormatter.firstName(contact.displayName)
+    val interestsList = JsonTextCodec.parseStringArray(contact.interestsJson)
     val historyText = history.joinToString("\n") {
         "  - ${it.giftName} (Category: ${it.giftCategory}, Cost: \u20b9${it.approxCostInr}, Liked: ${it.receivedWell ?: "Unknown"})"
     }

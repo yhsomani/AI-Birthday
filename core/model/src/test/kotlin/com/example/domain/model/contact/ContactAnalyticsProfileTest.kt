@@ -20,7 +20,7 @@ class ContactAnalyticsProfileTest {
             profile(
                 nickname = " ",
                 notesText = " ",
-                interestsJson = " [] ",
+                interestsJson = " [ ] ",
                 sharedHistoryJson = "",
             ).hasPersonalizationSignals,
         )

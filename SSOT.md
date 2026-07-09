@@ -1,10 +1,16 @@
 # RelateAI Single Source of Truth
 
-Last updated: 2026-07-03
+Last updated: 2026-07-09
 
-This is the authoritative project document for the current repository state. It is based on static repository analysis of source code, Gradle configuration, resources, CI, tests, schemas, and existing documentation. Code remains the final authority when this document and implementation disagree.
+This document records the historical Kotlin/Android repository state. The project is now being migrated to React Native. For the active replacement app, use:
 
-Scope rule: `vs-extension-2/` is excluded by instruction. No evidence in this document comes from that subtree.
+- `README.md` for React Native run instructions.
+- `src/App.tsx` for the React Native entrypoint.
+- `docs/feature-fssot.md` for ideal feature behavior.
+- `docs/feature-roadmap-analysis.md` for product prioritization.
+- `docs/react-native-migration-status.md` for current React Native parity status.
+
+The Android/Gradle sections below are retained as migration reference until the React Native app reaches verified feature parity and the legacy tree can be archived or removed intentionally.
 
 ## 1. Project Identity
 
@@ -696,7 +702,7 @@ Limitations: Merge restore is not implemented. Backup passphrases are not stored
 
 | Item | Status | Evidence |
 | --- | --- | --- |
-| LeadRescue AI missed-call/business CRM product | Documentation Only | `docs/startup-idea/*`, explicitly archived as unrelated |
+| LeadRescue AI missed-call/business CRM product | Removed from active repo | No tracked `docs/startup-idea/*` product contract remains |
 | Custom backend/server-side product | Not Implemented | No server module or backend API source exists |
 | Multi-device sync | Not Implemented | No backend or sync service beyond Google/device contact import |
 | Calendar provider sync | Not Implemented | No calendar provider integration source found |
@@ -914,35 +920,34 @@ Current working-tree note: exact-send enqueue-now/exact-alarm/WorkManager-fallba
 
 ## 21. Documentation Consolidation Report
 
-This section is the cleanup report. No files are deleted automatically. Remove only after the SSOT is reviewed and accepted.
+This section is the cleanup report. Items marked removed have already been taken out of the active repository; remaining candidates should be removed only after the SSOT is reviewed and accepted.
 
 | File | Purpose found | Migration status | Removal recommendation | Reason |
 | --- | --- | --- | --- | --- |
 | `SSOT.md` | Canonical project document | Replaced by this consolidated version | Keep | Authoritative single source |
-| `PLAN.md` | Rebuild plan and debt registry | Useful current state and debt migrated | Remove after acceptance, or archive as historical | It claims to be single source of truth and duplicates this file |
-| `PRODUCT_BLUEPRINT.md` | Product model and journeys | Current product intent migrated | Remove after acceptance | Duplicates product/UX sections |
-| `IMPLEMENTATION_TASKS.md` | Historical backlog | Open debt migrated at higher level | Remove or archive | It is a task backlog, not current truth; many entries are complete/stale |
-| `IMPLEMENTATION_PROGRESS.md` | Incremental change log | Key implemented features migrated, including Gift Advisor budget shortcut | Archive outside active docs or keep as changelog only with SSOT pointer | Historical detail is useful but fragmented |
-| `CODEBASE_AUDIT_REPORT_2026-07-01.md` | Audit report | Findings migrated and validated where current | Remove or archive | Contains stale/internal contradictions and duplicates SSOT |
-| `PRODUCT_UX_WORKFLOW_TECHNICAL_ANALYSIS.md` | UX/product audit | Useful recommendations migrated as gaps/debt | Remove | Older than current implementation and duplicates feature catalog |
-| `docs/architecture/target-room-schema.md` | Target schema design | Current and planned data model migrated | Archive as design history or remove after migration plan is tracked elsewhere | It is a target design, not current implementation truth |
-| `docs/architecture/adr/0001-domain-purity-and-module-boundaries.md` | ADR | Decision and current partial state migrated | Keep only as immutable ADR archive or remove from active docs | Context says four modules and target not fully implemented |
-| `docs/architecture/adr/0002-occasion-model.md` | ADR | Target occasion model migrated | Keep only as immutable ADR archive or remove from active docs | Planned schema is not current DB |
-| `docs/architecture/adr/0003-durable-dispatch-attempts.md` | ADR | Dispatch attempt state migrated | Keep only as immutable ADR archive or remove from active docs | Some retry execution remains pending |
-| `docs/architecture/adr/0004-database-keying-and-backup-recovery.md` | ADR | Security/keying decisions migrated | Keep only as immutable ADR archive or remove from active docs | Decision is useful but duplicates SSOT security section |
+| `docs/feature-fssot.md` | Feature single source of truth | Dedicated ideal behavior and UX specification created from product feature surfaces | Keep | Separates final feature expectations from implementation/current-state reporting |
+| `PLAN.md` | Removed historical rebuild plan and debt registry | Useful current state and debt migrated into this SSOT, retained ADRs/design docs, and release checklist | Keep outside active docs unless task-history evidence is required | Duplicated current-state, target architecture, testing, release, and progress sections |
+| `PRODUCT_BLUEPRINT.md` | Removed product model and journeys doc | Current product intent migrated | Keep outside active docs unless product evidence is required | Duplicated product/UX sections |
+| `IMPLEMENTATION_TASKS.md` | Removed historical backlog | Open debt migrated at higher level | Keep outside active docs unless task-history evidence is required | It was a task backlog, not current truth; many entries were complete/stale |
+| `IMPLEMENTATION_PROGRESS.md` | Removed incremental change log | Key implemented features migrated, including Gift Advisor budget shortcut | Keep outside active docs unless a release audit needs it | Historical detail was useful but fragmented |
+| `CODEBASE_AUDIT_REPORT_2026-07-01.md` | Removed audit report | Findings migrated and validated where current | Keep outside active docs unless a release audit needs it | Contains stale/internal contradictions and duplicates SSOT |
+| `CODEBASE_AUDIT_REPORT_2026-07-03.md` | Removed audit report | Findings migrated into this SSOT, retained debt themes, retained design docs, and release checklist where current | Keep outside active docs unless a release audit needs it | Dated snapshot duplicated current product, UX, architecture, and cleanup sections |
+| `PRODUCT_UX_WORKFLOW_TECHNICAL_ANALYSIS.md` | Removed UX/product audit | Useful recommendations migrated as gaps/debt | Keep outside active docs unless a release audit needs it | Older than current implementation and duplicates feature catalog |
+| `docs/architecture/target-room-schema.md` | Removed target schema design | Current schema facts and target directions migrated into this SSOT and ADRs; detailed future migration shape belongs with the migration implementation | Keep outside active docs unless migration-design evidence is required | It was a target design, not current implementation truth |
+| `docs/architecture/adr/0001-domain-purity-and-module-boundaries.md` | Accepted ADR | Decision summary also migrated into SSOT | Keep as compact ADR archive | Current guardrail for the implemented pure-domain module boundary |
+| `docs/architecture/adr/0002-occasion-model.md` | Accepted ADR | Target occasion direction also migrated into SSOT | Keep as compact ADR archive | Current guardrail for future `events` to `occasions` migration work |
+| `docs/architecture/adr/0003-durable-dispatch-attempts.md` | Accepted ADR | Dispatch attempt state also migrated into SSOT | Keep as compact ADR archive | Current guardrail for durable attempt/retry semantics |
+| `docs/architecture/adr/0004-database-keying-and-backup-recovery.md` | Accepted ADR | Security/keying decisions also migrated into SSOT | Keep as compact ADR archive | Current guardrail for DB keying, backup, and destructive sign-out semantics |
 | `docs/security/privacy-and-permissions.md` | Privacy/permission release notes | Migrated into security and release risks | Keep until privacy policy/release owner signoff exists, then archive | High-risk release evidence still needs owner review |
-| `docs/security/dependency-review.md` | Dependency review policy | Migrated into CI/release section | Remove after acceptance | CI workflow is the source of enforceable behavior |
+| `docs/security/dependency-review.md` | Removed dependency review policy | Migrated into CI/release checklist | Keep outside active docs | CI workflow and `ProductionReadinessConfigTest` are the enforceable sources |
 | `docs/operations/release-checklist.md` | Release checklist | Migrated into build/release/security sections | Keep until next release record exists, then archive or generate from SSOT | Contains required signoff checklist |
-| `docs/testing/test-strategy.md` | Test strategy | Migrated into testing section | Remove after acceptance | Duplicates current test strategy |
-| `docs/testing/screenshot-strategy.md` | Roborazzi strategy | Summarized in tests; baselines remain source artifacts | Remove after acceptance or keep only baseline-update procedure | Duplicates screenshot coverage narrative |
+| `docs/testing/test-strategy.md` | Removed test strategy | Migrated into this SSOT and release checklist | Keep outside active docs | Duplicated current validation gates |
+| `docs/testing/screenshot-strategy.md` | Removed Roborazzi strategy | Durable rules moved into release checklist; baselines remain source artifacts | Keep outside active docs | Duplicated screenshot coverage narrative and baseline inventory |
 | `docs/design/design-system.md` | Design system | Core tokens/theme policy migrated at summary level | Keep only if design token details must remain expanded, otherwise move token details into SSOT | Current SSOT does not repeat every token to avoid duplication |
-| `docs/design/ux-audit-checklist.md` | UX audit checklist | Gaps migrated | Remove after acceptance | Historical checklist duplicates implementation progress |
-| `docs/user/complete-user-guide.md` | User guide | Workflows/runbooks migrated | Remove after generating user-facing docs from SSOT | Very large and duplicates product behavior |
-| `docs/user/backup-restore.md` | User backup guide | Migrated into backup and troubleshooting | Remove after acceptance | Duplicates SSOT backup section |
-| `docs/startup-idea/idea-evaluation.md` | Archived LeadRescue idea | Marked Documentation Only | Remove from product repo or keep outside active docs | Unrelated to implemented RelateAI |
-| `docs/startup-idea/business-requirements-document.md` | Archived LeadRescue BRD | Marked Documentation Only | Remove from product repo or keep outside active docs | Unrelated to implemented RelateAI |
-| `docs/startup-idea/product-requirements-document.md` | Archived LeadRescue PRD | Marked Documentation Only | Remove from product repo or keep outside active docs | Unrelated to implemented RelateAI |
-| Root `app_logs*.txt`, `logcat*.txt`, `lint_baseline_pre_fixes.txt` | Local diagnostic/log snapshots | Not migrated as authoritative docs | Remove | Generated/local diagnostics, not current source of truth |
+| `docs/design/ux-audit-checklist.md` | Removed UX audit checklist | Screen ownership and UX gaps migrated into this SSOT; durable UI rules live in the design system and release checklist | Keep outside active docs unless UI task-history evidence is required | Historical checklist duplicated implementation progress |
+| `docs/user/complete-user-guide.md` | Removed user guide | Workflows/runbooks migrated | Keep outside active docs unless user-facing guide generation is required | Very large and duplicated product behavior |
+| `docs/user/backup-restore.md` | Removed user backup guide | Migrated into backup, security, troubleshooting, and release-checklist sections | Keep outside active docs unless user-facing guide generation is required | Duplicated SSOT backup section |
+| Root `app_logs*.txt`, `logcat*.txt`, `lint_baseline_pre_fixes.txt` | Removed local diagnostic/log snapshots | Not migrated as authoritative docs | Keep ignored | Generated/local diagnostics, not current source of truth |
 | `metadata.json` | App/tool metadata | Not documentation | Keep if required by tooling | Mentions server-side Gemini capability, but source has no custom server |
 | `app/src/main/baseline-prof.txt` | Baseline profile source artifact | Not documentation | Keep | Build/runtime optimization artifact |
 
@@ -953,9 +958,8 @@ This section is the cleanup report. No files are deleted automatically. Remove o
 | Final privacy policy and Data Safety text absent | Cannot claim production Play readiness | Release/security docs have requirements and TBD signoffs | Create release-owned privacy/Data Safety artifacts from SSOT |
 | WhatsApp Accessibility declaration evidence absent | Play distribution risk | Release checklist status blocked | Attach signoff/evidence or disable WhatsApp automation in Play build |
 | Provider config policy | Resolved in current working tree | `.gitignore` allowlists approved app/debug client config files and `RepositoryHygieneTest` checks for server-side secret markers | Keep release-owner OAuth/SHA verification external |
-| Domain purity migration plan not tracked in one current task source | Architecture drift persists | ADR target vs code reality | Create scoped migration plan after SSOT cleanup |
 | Runtime smoke evidence not current in SSOT | Static analysis cannot prove provider/device behavior | Tests exist, but this doc pass did not run device checks | Attach release records per build |
-| Native-language Hindi review incomplete | Localization quality risk | Testing docs list remaining review gaps | Schedule human language review |
+| Native-language Hindi review incomplete | Localization quality risk | Release checklist requires Hindi/English primary-flow review before release | Schedule human language review |
 | Automatic retry execution unclear | Recovery behavior may be overestimated | ADR says pending; code has manual retry metadata/scheduling | Document product decision and implement if required |
 | Design token detail split | Full token table is currently in design doc | This SSOT summarizes rather than duplicates every token | Either migrate token table into SSOT or explicitly keep design doc as generated/reference |
 
@@ -963,15 +967,15 @@ This section is the cleanup report. No files are deleted automatically. Remove o
 
 | Inconsistency | Current evidence | Correct source of truth | Resolution |
 | --- | --- | --- | --- |
-| Multiple docs claim to be single source of truth | `PLAN.md` and old `SSOT.md` both made authority claims | This `SSOT.md` | Remove or archive older authority claims |
-| ADR 0001 says current Gradle graph has four modules | `settings.gradle.kts` has five modules including `:core:model` | Build files | Update/archive ADR context or mark historical |
+| Multiple docs claimed to be single source of truth | `PLAN.md` and older audit/progress docs were removed from active docs | This `SSOT.md` | Keep remaining supporting docs labeled as reference/history |
+| ADR 0001 module count drift | ADR 0001 now records the five-module graph matching `settings.gradle.kts` | Build files and ADR 0001 | Resolved; keep ADR 0001 as the domain-boundary guardrail |
 | Older SSOT recreate notes mentioned debug suffix `.debug` | `app/build.gradle.kts` has no `applicationIdSuffix` in debug | Build file | Do not repeat debug suffix claim |
 | Audit report says older SSOT references schema v13 | Current DB is v16 and this SSOT records v16 | `AppDatabase.kt` and schema export | Treat audit statement as historical |
 | Backup fallback automation default conflict | Current working tree shows both normal and backup fallback defaults as `ALWAYS_ASK` | `GlobalAutomationModePrefsMapper` and `BackupPreferencesDto.defaults()` | Treat older reports claiming `FULLY_AUTO` backup fallback as historical |
 | Sign-out comment used a stale fixed table count | `database.clearAllTables()` clears all current Room tables | `AuthManager.kt` and `AppDatabase.kt` | Resolved: source comment now says all Room tables |
 | Provider config allowlist needed | Approved app/debug `google-services.json` files are tracked; other local variants should remain ignored | `.gitignore`, release/security docs, `RepositoryHygieneTest` | Resolved: exact approved paths are explicitly allowlisted and checked for server-side secret markers |
 | Metadata says server-side Gemini capability | No backend/server module exists | Source tree and Gradle modules | Treat `metadata.json` as tool metadata, not architecture |
-| LeadRescue docs describe another product | Startup docs are archived as unrelated | Current source and product docs | Remove from active docs |
+| LeadRescue docs describe another product | Startup docs were removed from the active repo | Current source and product docs | Keep LeadRescue requirements out of this Android app |
 
 ## 24. Unverified Information Report
 
@@ -1025,11 +1029,11 @@ These items are not claimed as verified implementation truth:
 | SQLCipher and encrypted prefs | Fully Implemented | `AppDatabase`, `DatabaseKeyDerivation`, `SecurePrefs` | Legacy recovery path remains |
 | Dark design system | Fully Implemented | `core/ui`, design tests | Light/dynamic theme planned only |
 | CI build/test/release guard | Fully Implemented | `.github/workflows/android.yml`, readiness tests | Runtime release signoffs remain external |
-| Pure domain architecture | Partially Implemented | `:core:model` exists; entities still in domain | Planned migration |
-| Target occasions/message drafts schema | Planned | ADRs and target schema doc | Not current DB |
+| Pure domain architecture | Fully Implemented for current module boundary | `:core:model` exists; `:core:domain` is Kotlin/JVM; Room entities live in `:core:data` | Future feature extraction remains separate |
+| Target occasions/message drafts schema | Planned | ADRs and SSOT target data model | Room v16 still uses `events` and `pending_messages`; target schema note was removed |
 | Merge restore | Not Implemented | Backup service/docs | Replace-only |
 | Local-only mode | Not Implemented | Auth gate | Product decision needed |
-| LeadRescue AI product | Documentation Only | `docs/startup-idea/*` | Unrelated archived idea |
+| LeadRescue AI product | Removed from active repo | No tracked `docs/startup-idea/*` product contract remains | Unrelated product idea |
 
 ## 26. Product and UX Assessment
 
@@ -1102,22 +1106,27 @@ Current working-tree note: T-001 now also covers exact-send scheduling through `
 
 ## 30. Dead Code and Unused Resource Report
 
-No production Kotlin source file was classified as safe to remove solely from static analysis. The verified cleanup candidates are documentation, local diagnostics, tool state, or one-off helper artifacts. No files were deleted.
+No production Kotlin source file was classified as safe to remove solely from static analysis. The verified cleanup candidates are documentation, local diagnostics, tool state, or one-off helper artifacts.
 
 | Path | Purpose | Usage references | Dependency impact | Risk | Safe to remove | Recommended action |
 | --- | --- | --- | --- | --- | --- | --- |
-| `docs/startup-idea/*` | Archived LeadRescue AI business idea | No app/runtime references found; unrelated product content | None for RelateAI app | Low | Yes, from active product repo | Archive outside app repo or remove after approval |
-| `PRODUCT_UX_WORKFLOW_TECHNICAL_ANALYSIS.md` | Older UX/technical analysis | Superseded by `CODEBASE_AUDIT_REPORT_2026-07-01.md` and SSOT | None if SSOT accepted | Low | Yes after review | Remove/archive once SSOT accepted |
-| `CODEBASE_AUDIT_REPORT_2026-07-01.md` | Historical audit | Useful findings migrated and updated | None if SSOT accepted | Medium | Archive rather than delete if audit trail matters | Keep as dated artifact outside active docs |
-| `PLAN.md`, `PRODUCT_BLUEPRINT.md`, `IMPLEMENTATION_TASKS.md` | Planning/backlog/product docs | Duplicated by current SSOT sections | None if SSOT accepted | Medium | Yes after review | Remove authority claims or archive |
-| `IMPLEMENTATION_PROGRESS.md` | Detailed changelog | Historical evidence only | None for build | Medium | Keep only if changelog required | Archive as historical changelog with SSOT pointer |
-| `app_logs*.txt`, `logcat*.txt`, `lint_baseline_pre_fixes.txt` | Local diagnostic snapshots | Ignored by `.gitignore`; no build refs found | None | Low | Yes | Remove from tracking/files after approval |
-| `.codepulse/`, `.intelligence/`, `.gradle-user-home/` | Tool/local diagnostics/cache | Ignored by `.gitignore`; no app refs found | None | Low | Yes | Keep out of git; regenerate when needed |
-| `app/schemas/com.example.core.db.AppDatabase/4-6.json` | Legacy app-level schema exports | Active schemas are in `core/data/schemas`; `app/schemas` ignored | None for current Room export authority | Medium | Yes after confirming no migration tests use them | Remove legacy app-level schema exports |
-| `scripts/patch_app_dep.py`, `scripts/patch_settings.py`, `scripts/patch_app_build2.py`, `scripts/patch_ui.py` | One-off patch helpers | No references found by repository scan | None for build/tests | Low | Yes after approval | Remove or move to archived tooling notes |
+| `docs/startup-idea/*` | Removed LeadRescue AI business idea | No app/runtime references found; unrelated product content | None for RelateAI app | Low | Already removed from active product repo | Keep outside this repo unless a future product decision adopts it |
+| `docs/feature-fssot.md` | Feature single source of truth | Intentionally retained product specification; excludes implementation/current-state details | None for build | Low | Keep in active docs | Use as the definitive ideal feature behavior reference |
+| `PRODUCT_UX_WORKFLOW_TECHNICAL_ANALYSIS.md` | Removed older UX/technical analysis | Superseded by SSOT/current audit | None if SSOT accepted | Low | Removed from active product repo | Keep outside this repo unless release evidence requires it |
+| `CODEBASE_AUDIT_REPORT_2026-07-01.md`, `CODEBASE_AUDIT_REPORT_2026-07-03.md` | Removed historical audits | Useful findings migrated and updated | None if SSOT accepted | Medium | Removed from active product repo | Keep as dated artifacts outside active docs if audit trail matters |
+| `PLAN.md` | Removed historical rebuild/debt plan | Duplicated by current SSOT sections and retained supporting docs | None if SSOT accepted | Medium | Removed from active product repo | Keep outside this repo unless task-history evidence is required |
+| `PRODUCT_BLUEPRINT.md`, `IMPLEMENTATION_TASKS.md` | Removed planning/backlog/product docs | Duplicated by current SSOT sections | None if SSOT accepted | Medium | Removed from active product repo | Keep outside this repo unless historical evidence is required |
+| `IMPLEMENTATION_PROGRESS.md` | Removed detailed changelog | Historical evidence only | None for build | Medium | Removed from active product repo | Keep outside this repo unless changelog evidence is required |
+| `docs/user/complete-user-guide.md` | Removed broad user guide | Workflows/runbooks migrated into SSOT/current docs | None for build | Low | Removed from active product repo | Regenerate external user docs from SSOT if needed |
+| `docs/design/ux-audit-checklist.md` | Removed UX audit checklist | Screen ownership and UI validation rules migrated into SSOT/design-system/release-checklist | None for build | Low | Removed from active product repo | Keep outside this repo unless UI task-history evidence is required |
+| `docs/architecture/target-room-schema.md` | Removed target Room schema note | Current Room facts and target naming/migration direction migrated into SSOT/ADRs | None for build | Medium | Removed from active product repo | Recreate detailed schema design only inside the future migration change |
+| `app_logs*.txt`, `logcat*.txt`, `logs/*.log`, `lint_baseline_pre_fixes.txt` | Removed local diagnostic snapshots | Ignored by `.gitignore`; no build refs found | None | Low | Removed from local tree | Keep out of git; regenerate only when needed |
+| `.codepulse/`, `.intelligence/`, `.gradle-user-home/` | Removed tool/local diagnostics/cache | Ignored by `.gitignore`; no app refs found | None | Low | Removed from local tree | Keep out of git; regenerate only when needed |
+| `app/schemas/com.example.core.db.AppDatabase/4-6.json` | Legacy app-level schema exports | Active schemas are in `core/data/schemas`; `app/schemas` ignored | None for current Room export authority | Medium | Removed from local tree | Keep app-level schemas out of the repo; `RepositoryHygieneTest` guards this |
+| `scripts/patch_app_dep.py`, `scripts/patch_settings.py`, `scripts/patch_app_build2.py`, `scripts/patch_ui.py` | Removed one-off patch helpers | No references found by repository scan | None for build/tests | Low | Removed from local tree | Keep `scripts/` limited to maintained helpers |
 | `scripts/extract_strings.sh` | String extraction helper | Referenced by `HelperScriptsTest` | Test would fail if removed | Medium | No | Keep |
 | `metadata.json` | Tool metadata, says server-side Gemini capability | No Gradle/app references found | Unknown tool impact | Medium | No, unless tool owner confirms | Keep as tool metadata, not architecture evidence |
-| `app/src/test/screenshots/greeting.png` | Stray generated screenshot named in `.gitignore` | No code reference found in scans | None likely | Low | Yes after visual/test owner review | Remove if not intentionally retained |
+| `app/src/test/screenshots/greeting.png` | Removed stray generated screenshot named in `.gitignore` | No code reference found in scans | None likely | Low | Removed from local tree | Keep approved baselines under `app/src/test/screenshots/baseline/` |
 | `mood_logs` migration table | Dropped legacy schema table | Mentioned only in migrations/tests | Must remain in migration history | High | No | Keep migration SQL; do not recreate feature |
 | `DeadLetterQueue` | Legacy in-memory diagnostic supplement | Referenced by tests and failure side-effect code | Still part of diagnostics/tests | High | No | Do not remove until durable diagnostics fully replace it |
 
@@ -1131,7 +1140,7 @@ Current problems:
 | Journey-level readiness coverage remains | Canonical readiness is adopted on named surfaces, but cross-surface workflows still need end-to-end regression checks | Users may see inconsistent recovery if a flow regresses between focused tests |
 | Data package contains many infrastructure subdomains under one module | `core/data/src/main/kotlin/com/example/core/...` | Module is large but still coherent for current project size |
 | Docs are fragmented | Root docs and `docs/**` contain overlapping authority claims | Maintainers may use stale docs |
-| Local/tool artifacts are present near source | root logs, `.codepulse`, `.intelligence`, `app/schemas` | Repository noise |
+| Local/tool artifacts can accumulate near source | ignored logs and tool diagnostics | Review noise if accidentally reintroduced |
 
 Proposed target structure:
 
@@ -1250,4 +1259,4 @@ External dependency risk summary:
 3. If a supporting document must remain, mark it as historical/reference and point back to this SSOT.
 4. Keep claims evidence-based. Mark external, runtime, or release-owner-only facts as unverified until validated.
 5. Do not store secrets, API keys, tokens, message bodies, or personal contact fixtures in documentation.
-6. Do not delete migrated documents until this cleanup report is reviewed and removal is explicitly approved.
+6. When removing migrated documents, record the migration in this cleanup report and keep hygiene guards for superseded active-repo artifacts.

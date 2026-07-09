@@ -3,14 +3,14 @@ package com.example.domain.message
 import com.example.domain.model.MessageChannel
 import com.example.domain.memory.MemoryNotePromptPolicy
 import com.example.domain.model.contact.ContactMessagePromptContext
+import com.example.domain.model.common.JsonTextCodec
 import com.example.domain.model.gift.GiftHistoryRecord
 import com.example.domain.model.memory.MemoryNoteRecord
 import com.example.domain.model.message.MessagePromptContext
+import com.example.domain.model.message.PromptTextFormatter
 import com.example.domain.model.message.StylePromptProfile
 import com.example.domain.model.occasion.Occasion
 import com.example.domain.model.occasion.OccasionType
-import com.example.domain.util.parseJsonStringArray
-import com.example.domain.util.readJsonStringField
 
 fun buildMessagePromptContext(
     contact: ContactMessagePromptContext,
@@ -39,7 +39,7 @@ fun buildMessagePromptContext(
     return MessagePromptContext(
         contactId = contact.id,
         eventId = event.id,
-        firstName = firstName(contact.displayName),
+        firstName = PromptTextFormatter.firstName(contact.displayName),
         nickname = contact.nickname,
         relationshipType = contact.relationshipType,
         knownSince = null,
@@ -60,39 +60,21 @@ fun buildMessagePromptContext(
             .filter(MemoryNotePromptPolicy::canUseInAiPrompts)
             .sortedWith(compareByDescending<MemoryNoteRecord> { it.isPinned }.thenByDescending { it.dateMs })
             .take(6)
-            .map { "${it.category}: ${sanitizeNotes(it.noteText).take(180)}" },
+            .map { "${it.category}: ${PromptTextFormatter.sanitizeNotes(it.noteText).take(180)}" },
         giftHistory = giftHistory
             .sortedByDescending { it.year }
             .take(5)
             .map { "${it.year}: ${it.giftName} (${it.giftCategory}, liked: ${it.receivedWell ?: "unknown"})" },
         sensitiveTopics = parseJsonArray(contact.sensitiveTopicsJson),
         currentLifePhase = parseLifePhase(contact.currentLifePhaseJson),
-        preferredChannel = contact.preferredChannel.toSupportedMessageChannel(),
+        preferredChannel = MessageChannel.fromRaw(contact.preferredChannel).orDefault(),
     )
 }
 
-private fun firstName(fullName: String): String {
-    val trimmed = fullName.trim()
-    val spaceIdx = trimmed.indexOf(' ')
-    return if (spaceIdx == -1) trimmed else trimmed.substring(0, spaceIdx)
-}
-
 private fun parseJsonArray(raw: String): List<String> {
-    return parseJsonStringArray(raw)
+    return JsonTextCodec.parseStringArray(raw)
 }
 
 private fun parseLifePhase(raw: String): String? {
-    return readJsonStringField(raw, "phase")
-}
-
-private fun sanitizeNotes(notes: String): String {
-    return notes
-        .replace(Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"), "[EMAIL]")
-        .replace(Regex("\\+?\\d{1,4}?[-.\\s]?\\(?\\d{1,3}?\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}"), "[PHONE]")
-}
-
-private fun String.toSupportedMessageChannel(): MessageChannel {
-    return MessageChannel.fromRaw(this)
-        .takeIf { it != MessageChannel.UNKNOWN }
-        ?: MessageChannel.SMS
+    return JsonTextCodec.readStringField(raw, "phase")
 }

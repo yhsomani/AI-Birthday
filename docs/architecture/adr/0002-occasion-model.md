@@ -12,7 +12,7 @@ The current app uses an `events` Room table for contact dates, manual events, an
 - `PendingMessageEntity.eventId` references an event-like identifier and is unique with `(contactId, eventId, scheduledYear)`.
 - `SentMessageEntity` now separates `eventId`, `occasionType`, and `occasionLabel`, while retaining legacy `eventType` as a compatibility alias.
 - Holiday, revival, and follow-up workers now persist deterministic synthetic `EventEntity` rows before creating pending messages.
-- `PLAN.md` Sections 9 and 10 define a target `Occasion` aggregate and an `occasions` table.
+- `SSOT.md` records the target `Occasion` aggregate and `occasions` persistence direction; detailed Room migration shape belongs with the future migration implementation.
 
 The remaining issue is conceptual: birthdays, anniversaries, holidays, revival prompts, and follow-ups are all occasions, but the current name and schema still center on `events`.
 
@@ -96,4 +96,3 @@ The decision is implemented when:
 - Pending drafts reference target occasion ids.
 - Sent history contract tests cover resolved event/occasion ids, semantic types, and synthetic references.
 - Version 14 fixture data migrates successfully.
-

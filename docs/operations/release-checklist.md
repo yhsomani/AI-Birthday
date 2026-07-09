@@ -11,12 +11,29 @@ This checklist is the production gate for RelateAI. A release is not ready until
 - Confirm Gradle is running on a full JDK 21/JBR with `bin/jlink` available. On Windows,
   Android Studio JBR or Temurin JDK 21 is valid; the Antigravity/Red Hat extension JRE is not.
 - Run focused release-risk tests when changing permissions, dispatch, backup, auth, localization, or navigation.
-- Confirm pull requests with dependency changes pass GitHub Dependency Review for moderate-or-higher vulnerabilities and denied licenses; see `docs/security/dependency-review.md`.
+- App-side Robolectric tests default to `android.app.Application` through `app/src/test/resources/robolectric.properties`; tests that need production app startup must opt in explicitly.
+- Confirm pull requests with dependency changes pass GitHub Dependency Review for moderate-or-higher vulnerabilities and denied licenses.
 - Run `git diff --check` before handoff.
 - Confirm Room schema exports and migrations are committed when database versions change.
 - Confirm no generated, local, signing, or secret files are accidentally staged.
 - Confirm provider config changes follow the approved allowlist: only `app/google-services.json` and `app/src/debug/google-services.json` may be tracked as Firebase/Google client config files.
 - Produce a signed release build with the production signing configuration before Play upload.
+
+## Visual Regression Gate
+
+- Use Roborazzi for JVM screenshot validation. Screenshot tests must render deterministic fake state and avoid live APIs, keystore-backed preferences, production Room databases, WorkManager schedulers, notification channels, and external services.
+- Keep approved baselines under `app/src/test/screenshots/baseline`. Generated review artifacts belong under ignored Roborazzi output/diff directories unless they are visually approved and intentionally committed.
+- Verify approved baselines before release:
+  `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:verifyRoborazziDebug -Pscreenshot --no-configuration-cache`
+- Use focused visual verification for risky screen changes, for example:
+  `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:verifyRoborazziDebug -Pscreenshot --tests com.example.ui.screenshots.MessagesScreenshotTest --no-configuration-cache`
+- Record baselines locally only after visual review:
+  `JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew :app:recordRoborazziDebug -Pscreenshot --no-configuration-cache`
+- Baseline updates must be committed with the UI/code change that caused them and a release-record note explaining why the drift is expected.
+- Pull requests and pushes to `main`/`master` must keep CI Roborazzi verification enabled for `com.example.ui.screenshots.*` and must upload Roborazzi reports/outputs for mismatch review.
+- Screenshot coverage must remain paired with interaction or ViewModel tests for behavior; screenshots validate presentation, not business logic.
+- Dense form/dialog fixtures that stand in for unstable platform dialogs must include top and scrolled-bottom coverage when content can overflow, plus compact Hindi large-font coverage when localized labels or values are dense.
+- Theme-token migrations expected to be visually equivalent must run focused screen screenshots and the full Roborazzi suite before handoff.
 
 ## Play Policy Gate
 
@@ -89,13 +106,23 @@ Release requirements:
 
 - Network security pins are valid beyond the release support window. CI runs `ProductionReadinessConfigTest`, which fails release readiness when the soonest `network_security_config.xml` pin expiration is within 60 days.
 - Network pin rotation task is scheduled no later than 2027-04-01 for the current `2027-06-01` pin-set expiration. Each release after 2027-04-01 must either include refreshed pins with a new expiration date or attach explicit release-owner signoff accepting the remaining pin lifetime.
-- Dependency changes pass the CI dependency-review gate, and the final release branch has no unresolved dependency graph or Dependabot security alerts.
+- Dependency changes pass the CI dependency-review gate, and the final release branch has no unresolved dependency graph or Dependabot security alerts. The guarded CI gate uses `actions/dependency-review-action@v4`, fails on `moderate` or higher vulnerability severity, and denies `GPL-2.0`, `GPL-3.0`, `AGPL-3.0`, `LGPL-2.1`, and `LGPL-3.0`.
 - Approved Google/Firebase client config files may be tracked only at `app/google-services.json` and `app/src/debug/google-services.json`. Do not commit service account JSON, private keys, OAuth access or refresh tokens, client secrets, signing material, SMTP credentials, Gemini keys, or local project variants.
 - No API keys, OAuth tokens, SMTP passwords, database keys, phone/email fixtures, raw AI responses, or message bodies appear in logs, test output, backups, or analytics exports outside explicit user export flows.
 - SQLCipher key strategy and backup recovery limitations are reviewed.
 - Fresh-install database keying generates random local key material formatted as SQLCipher raw-key literals; legacy identifier-derived key recovery is treated as migration-only and must be tested before removal.
 - Sign-out clears local stores, workers, alarms, notifications, cached database keys, and auth state through one orchestrator.
 - Auto backup remains disabled or sensitive stores remain excluded.
+
+## Backup and Sign-Out Gate
+
+- Backup copy must make the risk model clear: exported backups use a user passphrase that RelateAI does not store; losing the passphrase means that backup file cannot be restored.
+- Backup copy must not imply that the backup passphrase can unlock the live SQLCipher database. The live database key is separate local key material stored through Keystore-backed encrypted preferences.
+- Restore remains replace-only unless a merge-restore design is implemented and tested. Backup preview, manifest/checksum validation, supported-version checks, and passphrase verification must succeed before any local mutation.
+- Wrong passphrase, checksum mismatch, malformed file, oversized file, unsupported future backup version, or database constraint failure must stop restore before or during the transaction without partial user-visible recovery claims.
+- Local diagnostic snapshots from AI Doctor and HealthMonitor must stay out of backups and be rebuilt after restore.
+- Sign-out copy and release notes must treat sign-out as destructive local cleanup: workers, alarms, notifications, Room data, database files, secure preferences, cached database key material, credentials, and auth state are cleared through the auth-layer orchestrator.
+- Before risky operations such as sign-out, device change, uninstall/clear-data guidance, beta migration, or replace import, the UI/release notes should direct users to create a restorable encrypted backup when preserving local data matters.
 
 ## UX and Accessibility Gate
 

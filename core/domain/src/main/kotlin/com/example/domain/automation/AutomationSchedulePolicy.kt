@@ -1,6 +1,7 @@
 package com.example.domain.automation
 
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageChannelSetCodec
 import java.util.Calendar
 import java.util.Locale
 
@@ -74,7 +75,7 @@ object AutomationSchedulePolicy {
     }
 
     fun isChannelBlocked(channel: MessageChannel, channelBlackoutJson: String): Boolean {
-        return channel != MessageChannel.UNKNOWN && channel in channelBlackoutJson.toChannelSet()
+        return channel != MessageChannel.UNKNOWN && channel in MessageChannelSetCodec.parse(channelBlackoutJson)
     }
 
     private fun adjustForQuietHours(
@@ -143,13 +144,5 @@ object AutomationSchedulePolicy {
             .toSet()
     }
 
-    private fun String.toChannelSet(): Set<MessageChannel> {
-        return TOKEN_PATTERN.findAll(this)
-            .map { MessageChannel.fromRaw(it.groupValues[1]) }
-            .filter { it != MessageChannel.UNKNOWN }
-            .toSet()
-    }
-
     private val DATE_PATTERN = Regex("\\d{4}-\\d{2}-\\d{2}")
-    private val TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")
 }

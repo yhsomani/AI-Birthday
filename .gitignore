@@ -58,6 +58,7 @@ google-services.json
 *.bks
 
 # Agent/IDE metadata
+.vscode/
 .jules/
 .kiro/
 .codepulse/
@@ -68,6 +69,14 @@ google-services.json
 /reports/
 /exports/
 /tmp/
+
+# React Native / Expo generated artifacts
+node_modules/
+.expo/
+.expo-shared/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Generated screenshot/report media. App assets and approved baselines stay trackable.
 /app/build/reports/

@@ -8,6 +8,10 @@ enum class ApprovalMode(val raw: String) {
     ALWAYS_ASK("ALWAYS_ASK"),
     UNKNOWN("UNKNOWN");
 
+    fun orDefault(default: ApprovalMode = DEFAULT): ApprovalMode {
+        return takeIf { it != UNKNOWN } ?: default
+    }
+
     companion object {
         fun fromRaw(value: String?): ApprovalMode {
             val normalized = value?.trim()?.uppercase().orEmpty()

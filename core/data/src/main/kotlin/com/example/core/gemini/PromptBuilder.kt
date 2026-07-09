@@ -5,12 +5,13 @@ import com.example.domain.model.contact.ContactGiftAdvisorProfile
 import com.example.domain.model.contact.ContactRelationshipPromptContext
 import com.example.domain.model.gift.GiftHistoryRecord
 import com.example.domain.model.message.MessagePromptContext
+import com.example.domain.model.message.PromptTextFormatter
 import com.example.domain.service.ContactClassificationContract
 
 class PromptBuilder {
     fun buildClassificationPrompt(contact: ContactClassificationPromptContext): String {
-        val firstName = promptFirstName(contact.displayName)
-        val sanitizedNotes = sanitizePromptNotes(contact.notesText)
+        val firstName = PromptTextFormatter.firstName(contact.displayName)
+        val sanitizedNotes = PromptTextFormatter.sanitizeNotes(contact.notesText)
         return buildString {
             appendLine("You are a contact classification engine. Based on the contact data below, ")
             appendLine("determine their relationship to the phone owner.")

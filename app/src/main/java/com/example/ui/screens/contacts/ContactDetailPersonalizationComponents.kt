@@ -30,6 +30,7 @@ import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.common.JsonTextCodec
 import com.example.domain.model.contact.ContactDetailProfile
 import com.example.domain.model.memory.MemoryNoteCategoryCount
 
@@ -49,7 +50,7 @@ internal fun PersonalizationQualityCard(
         PersonalizationQualityItem(
             labelRes = R.string.personalization_quality_interests,
             promptRes = R.string.personalization_quality_add_interests,
-            isComplete = contact.interestsJson.hasJsonArrayContent(),
+            isComplete = JsonTextCodec.hasStringArrayContent(contact.interestsJson),
         ),
         PersonalizationQualityItem(
             labelRes = R.string.personalization_quality_memory_notes,
@@ -175,11 +176,3 @@ private data class PersonalizationQualityItem(
     val promptRes: Int,
     val isComplete: Boolean,
 )
-
-private fun String.hasJsonArrayContent(): Boolean {
-    return try {
-        org.json.JSONArray(this).length() > 0
-    } catch (_: Exception) {
-        trim().isNotBlank() && trim() != "[]"
-    }
-}

@@ -3,6 +3,7 @@ package com.example.ui.viewmodel
 import android.content.Context
 import com.example.R
 import com.example.domain.model.MessageChannel
+import com.example.domain.model.MessageChannelSetCodec
 import com.example.domain.service.PreferencesRepository
 import com.example.domain.usecase.EnableFullAutomationUseCase
 import com.example.ui.feedback.UiText
@@ -45,16 +46,11 @@ internal fun PreferencesRepository.isChannelBlacklisted(channel: MessageChannel)
 }
 
 internal fun String.toMutableChannelSet(): MutableSet<MessageChannel> {
-    return CHANNEL_TOKEN_PATTERN.findAll(this)
-        .map { match -> MessageChannel.fromRaw(match.groupValues[1]) }
-        .filter { it != MessageChannel.UNKNOWN }
-        .toMutableSet()
+    return MessageChannelSetCodec.parse(this).toMutableSet()
 }
 
 internal fun Set<MessageChannel>.toJsonArray(): String {
-    return map { it.raw }
-        .sorted()
-        .joinToString(separator = ",", prefix = "[", postfix = "]") { channel -> "\"$channel\"" }
+    return MessageChannelSetCodec.toJsonArray(this)
 }
 
 internal fun settingsFullAutomationMessage(outcome: EnableFullAutomationUseCase.Outcome): UiText {
@@ -113,5 +109,3 @@ private fun formatLastBackupTimestamp(timestampMs: Long, appContext: Context): S
         else -> appContext.getString(R.string.settings_last_backup_days_ago, ageDays)
     }
 }
-
-private val CHANNEL_TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")

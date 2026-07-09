@@ -137,9 +137,27 @@ class ContactPreferencesDialogTest {
         assertEquals(MessageChannel.SMS, savedRequest?.preferredChannel)
     }
 
+    @Test
+    fun profileRequestMapsStoredJsonFieldsToEditableText() {
+        val request = contactProfile(
+            preferredChannel = MessageChannel.EMAIL,
+            interestsJson = """["music","coffee"]""",
+            sensitiveTopicsJson = """["work stress"]""",
+            currentLifePhaseJson = """{"phase":"Moved to \"Pune\""}""",
+        ).toPreferenceRequest()
+
+        assertEquals("music, coffee", request.interests)
+        assertEquals("work stress", request.sensitiveTopics)
+        assertEquals("Moved to \"Pune\"", request.currentLifePhase)
+        assertEquals(MessageChannel.EMAIL, request.preferredChannel)
+    }
+
     private fun contactProfile(
         automationMode: ApprovalMode = ApprovalMode.DEFAULT,
         preferredChannel: MessageChannel = MessageChannel.SMS,
+        interestsJson: String = "[]",
+        sensitiveTopicsJson: String = "[]",
+        currentLifePhaseJson: String = "{}",
     ): ContactDetailProfile {
         return ContactDetailProfile(
             id = ContactId("contact_1"),
@@ -162,9 +180,9 @@ class ContactPreferencesDialogTest {
             giftBudgetInr = 500,
             annualBudgetInr = 0,
             skipAutoWish = false,
-            interestsJson = "[]",
-            sensitiveTopicsJson = "[]",
-            currentLifePhaseJson = "{}",
+            interestsJson = interestsJson,
+            sensitiveTopicsJson = sensitiveTopicsJson,
+            currentLifePhaseJson = currentLifePhaseJson,
             notesText = "",
         )
     }

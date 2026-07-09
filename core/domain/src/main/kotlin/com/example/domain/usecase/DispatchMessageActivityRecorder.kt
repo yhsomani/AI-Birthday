@@ -6,6 +6,7 @@ import com.example.domain.model.ActivityLogStatus
 import com.example.domain.model.ActivityLogType
 import com.example.domain.model.DispatchActivityDecision
 import com.example.domain.model.activity.ActivityLogRecord
+import com.example.domain.model.common.JsonTextCodec
 import com.example.domain.model.message.MessageDispatchState
 import com.example.domain.repository.ActivityLogRepository
 import java.util.UUID
@@ -80,31 +81,5 @@ private fun dispatchMetadataJson(
         reason?.let { add("reason" to it) }
         scheduledForMs?.let { add("scheduledForMs" to it.toString()) }
     }
-    return fields.joinToString(prefix = "{", postfix = "}") { (key, value) ->
-        "\"${key.jsonEscaped()}\":\"${value.jsonEscaped()}\""
-    }
-}
-
-private fun String.jsonEscaped(): String {
-    return buildString {
-        for (char in this@jsonEscaped) {
-            when (char) {
-                '\\' -> append("\\\\")
-                '"' -> append("\\\"")
-                '\b' -> append("\\b")
-                '\u000C' -> append("\\f")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                '\t' -> append("\\t")
-                else -> {
-                    if (char.code < 0x20) {
-                        append("\\u")
-                        append(char.code.toString(16).padStart(4, '0'))
-                    } else {
-                        append(char)
-                    }
-                }
-            }
-        }
-    }
+    return JsonTextCodec.encodeObject(fields)
 }

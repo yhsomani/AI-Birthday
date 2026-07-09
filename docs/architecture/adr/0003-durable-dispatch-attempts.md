@@ -13,7 +13,7 @@ RelateAI can send user-visible messages through SMS, WhatsApp automation, and em
 - `MessageDispatchWorker` marks pending messages as `DISPATCHING`, `FAILED`, `EXPIRED`, or leaves them for approval/defer flows.
 - `MessageDispatcher` inserts `sent_messages` rows on successful routes and marks SMS delivery status as pending, failed, or sent.
 - `DeadLetterQueue` is an in-memory list, so failed-send recovery state is not durable across process death.
-- `PLAN.md` Sections 9, 10, 13, and 19 require a `DispatchAttempt` aggregate and `dispatch_attempts` target table.
+- `SSOT.md` records the `DispatchAttempt` aggregate and `dispatch_attempts` table direction; detailed Room migration shape belongs with the migration implementation.
 
 The current model cannot fully answer: what route was tried, why it was eligible, what provider result occurred, how many retries happened, and what is recoverable after restart.
 

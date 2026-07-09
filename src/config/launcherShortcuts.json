@@ -1,0 +1,20 @@
+[
+  {
+    "id": "review-messages",
+    "shortLabel": "Review",
+    "longLabel": "Review messages",
+    "disabledMessage": "Open RelateAI to review messages.",
+    "url": "relateai://messages",
+    "rank": 0,
+    "effect": "navigate"
+  },
+  {
+    "id": "add-event",
+    "shortLabel": "Add event",
+    "longLabel": "Add relationship event",
+    "disabledMessage": "Open RelateAI to add a relationship event.",
+    "url": "relateai://event/new",
+    "rank": 1,
+    "effect": "navigate"
+  }
+]

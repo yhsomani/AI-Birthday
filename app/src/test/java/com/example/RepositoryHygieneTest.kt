@@ -1,5 +1,6 @@
 package com.example
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,6 +17,7 @@ class RepositoryHygieneTest {
             .toSet()
 
         listOf(
+            ".vscode/",
             ".codepulse/",
             ".intelligence/",
             ".gradle-user-home/",
@@ -90,19 +92,65 @@ class RepositoryHygieneTest {
     }
 
     @Test
-    fun startupIdeaDocs_areExplicitlyArchivedWhenPresent() {
+    fun activeDocs_areLimitedToReviewedSourceOfTruthAndSupportingReferences() {
+        val docsRoot = rootFile("docs", mustBeFile = false)
+        val repoRoot = requireNotNull(docsRoot.parentFile)
+        val approvedDocs = setOf(
+            "docs/README.md",
+            "docs/feature-fssot.md",
+            "docs/architecture/adr/0001-domain-purity-and-module-boundaries.md",
+            "docs/architecture/adr/0002-occasion-model.md",
+            "docs/architecture/adr/0003-durable-dispatch-attempts.md",
+            "docs/architecture/adr/0004-database-keying-and-backup-recovery.md",
+            "docs/design/design-system.md",
+            "docs/operations/release-checklist.md",
+            "docs/security/privacy-and-permissions.md",
+        )
+        val actualDocs = docsRoot.walkTopDown()
+            .filter { it.isFile && it.extension == "md" }
+            .map { file -> file.relativeTo(repoRoot).path.replace(File.separatorChar, '/') }
+            .toSet()
+
+        assertEquals(
+            "Active docs should stay limited to the reviewed SSOT support set",
+            approvedDocs,
+            actualDocs,
+        )
+    }
+
+    @Test
+    fun startupIdeaDocs_areNotKeptInTheActiveProductRepository() {
         val startupIdeaDir = rootFile("docs/startup-idea", mustBeFile = false)
-        if (!startupIdeaDir.exists()) return
 
-        val markdownFiles = startupIdeaDir.listFiles { file -> file.extension == "md" }.orEmpty()
-        assertFalse("startup-idea docs should be removed or explicitly marked archived", markdownFiles.isEmpty())
+        assertFalse(
+            "Separate startup-idea docs should not live in the active RelateAI Android repository",
+            startupIdeaDir.exists(),
+        )
+    }
 
-        markdownFiles.forEach { file ->
-            val text = file.readText()
-            assertTrue(
-                "${file.name} must not look like an active implementation contract",
-                text.contains("Archived reference note") &&
-                    text.contains("not the implemented RelateAI Android product"),
+    @Test
+    fun supersededHistoricalDocs_areNotKeptInTheActiveProductRepository() {
+        listOf(
+            "PRODUCT_UX_WORKFLOW_TECHNICAL_ANALYSIS.md",
+            "CODEBASE_AUDIT_REPORT_2026-07-01.md",
+            "CODEBASE_AUDIT_REPORT_2026-07-03.md",
+            "IMPLEMENTATION_PROGRESS.md",
+            "PLAN.md",
+            "PRODUCT_BLUEPRINT.md",
+            "IMPLEMENTATION_TASKS.md",
+            "docs/user/complete-user-guide.md",
+            "docs/security/dependency-review.md",
+            "docs/testing/test-strategy.md",
+            "docs/testing/screenshot-strategy.md",
+            "docs/user/backup-restore.md",
+            "docs/design/ux-audit-checklist.md",
+            "docs/architecture/target-room-schema.md",
+        ).forEach { relativePath ->
+            val historicalDoc = rootFile(relativePath, mustBeFile = false)
+
+            assertFalse(
+                "$relativePath is historical and should stay outside the active product repository",
+                historicalDoc.exists(),
             )
         }
     }
@@ -173,6 +221,7 @@ class RepositoryHygieneTest {
     fun appBuild_doesNotExportRoomSchemasWithoutOwningRoomEntities() {
         val appBuild = rootFile("app/build.gradle.kts").readText()
         val dataBuild = rootFile("core/data/build.gradle.kts").readText()
+        val legacyAppSchemas = rootFile("app/schemas", mustBeFile = false)
 
         assertFalse(
             "app/build.gradle.kts should not configure Room schema export without Room entities",
@@ -185,6 +234,10 @@ class RepositoryHygieneTest {
         assertTrue(
             "core:data should continue to export Room schemas for the database it owns",
             dataBuild.contains("room.schemaLocation"),
+        )
+        assertFalse(
+            "app/schemas should not exist because core:data owns active Room schema exports",
+            legacyAppSchemas.exists(),
         )
     }
 
@@ -210,6 +263,9 @@ class RepositoryHygieneTest {
             ?: error("Could not locate repository root from $start")
         val target = File(root, relativePath)
 
+        if (!mustBeFile && !target.exists()) {
+            return target
+        }
         if (if (mustBeFile) target.isFile else target.exists()) {
             return target
         }

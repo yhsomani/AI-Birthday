@@ -22,7 +22,7 @@ class ContactAutomationReadinessProfileTest {
             profile(
                 nickname = " ",
                 notesText = " ",
-                interestsJson = " [] ",
+                interestsJson = " [ ] ",
                 sharedHistoryJson = "",
             ).hasPersonalizationData,
         )
