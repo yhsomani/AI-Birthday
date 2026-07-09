@@ -24,6 +24,12 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE isActive = 1 AND nextOccurrenceMs >= :nowMs AND CAST((nextOccurrenceMs - :nowMs) / 86400000 AS INTEGER) <= :days ORDER BY nextOccurrenceMs ASC")
     suspend fun getUpcoming(days: Int, nowMs: Long): List<EventEntity>
 
+    @Query("SELECT * FROM events WHERE isActive = 1 ORDER BY nextOccurrenceMs ASC LIMIT :limit")
+    suspend fun getNextActive(limit: Int): List<EventEntity>
+
+    @Query("SELECT * FROM events WHERE isActive = 1 AND type = 'BIRTHDAY' AND dayOfMonth = :dayOfMonth AND month = :month ORDER BY nextOccurrenceMs ASC")
+    suspend fun getActiveBirthdaysOnDate(dayOfMonth: Int, month: Int): List<EventEntity>
+
     @Query("SELECT * FROM events WHERE isActive = 1 AND contactId = :contactId AND nextOccurrenceMs >= :nowMs AND CAST((nextOccurrenceMs - :nowMs) / 86400000 AS INTEGER) <= :days ORDER BY nextOccurrenceMs ASC LIMIT 1")
     suspend fun getNextUpcomingForContact(contactId: String, days: Int, nowMs: Long): EventEntity?
 

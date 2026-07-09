@@ -139,7 +139,12 @@ class DesignSystemTokensTest {
 
     @Test
     fun appShell_usesThemeBackedColorRolesAndTokens() {
-        val source = sourceFile("app/src/main/java/com/example/MainActivity.kt").readText()
+        val source = listOf(
+            "app/src/main/java/com/example/MainActivity.kt",
+            "app/src/main/java/com/example/RelateAppScaffold.kt",
+        ).joinToString(separator = "\n") { path ->
+            sourceFile(path).readText()
+        }
 
         assertTrue(
             "App shell should resolve colors through MaterialTheme.colorScheme.",
@@ -158,7 +163,7 @@ class DesignSystemTokensTest {
             "RelateSurfaceVariant",
         ).forEach { rawColor ->
             assertTrue(
-                "MainActivity should not import or reference $rawColor directly.",
+                "App shell should not import or reference $rawColor directly.",
                 !Regex("""\b$rawColor\b""").containsMatchIn(source),
             )
         }
@@ -205,8 +210,10 @@ class DesignSystemTokensTest {
 
     @Test
     fun relateComponents_useThemeBackedColorRoles() {
-        val source = sourceFile("core/ui/src/main/kotlin/com/example/core/ui/components/RelateComponents.kt")
-            .readText()
+        val source = sourceDirectory("core/ui/src/main/kotlin/com/example/core/ui/components")
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "kt" && it.name.startsWith("Relate") }
+            .joinToString(separator = "\n") { it.readText() }
 
         assertTrue(
             "Shared Relate components should use MaterialTheme.relateSemanticColors for non-Material card/status roles.",
@@ -456,15 +463,17 @@ class DesignSystemTokensTest {
 
     @Test
     fun memoryVaultScreen_usesThemeBackedColorRoles() {
-        val source = sourceFile("app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt")
-            .readText()
+        val source = sourceDirectory("app/src/main/java/com/example/ui/screens/memoryvault")
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .joinToString(separator = "\n") { it.readText() }
 
         assertTrue(
-            "MemoryVaultScreen should resolve Material colors through MaterialTheme.colorScheme.",
+            "Memory Vault presentation should resolve Material colors through MaterialTheme.colorScheme.",
             source.contains("MaterialTheme.colorScheme"),
         )
         assertTrue(
-            "MemoryVaultScreen should resolve note card colors through MaterialTheme.relateSemanticColors.",
+            "Memory Vault presentation should resolve note card colors through MaterialTheme.relateSemanticColors.",
             source.contains("MaterialTheme.relateSemanticColors"),
         )
         listOf(
@@ -475,7 +484,7 @@ class DesignSystemTokensTest {
             "RelateSurfaceVariant",
         ).forEach { rawColor ->
             assertTrue(
-                "MemoryVaultScreen should not import or reference $rawColor directly.",
+                "Memory Vault presentation should not import or reference $rawColor directly.",
                 !Regex("""\b$rawColor\b""").containsMatchIn(source),
             )
         }
@@ -607,6 +616,8 @@ class DesignSystemTokensTest {
     fun settingsScreen_usesThemeBackedColorRoles() {
         val source = listOf(
             "app/src/main/java/com/example/ui/screens/settings/SettingsScreen.kt",
+            "app/src/main/java/com/example/ui/screens/settings/SettingsCommonComponents.kt",
+            "app/src/main/java/com/example/ui/screens/settings/SettingsAccountPreferenceComponents.kt",
             "app/src/main/java/com/example/ui/screens/settings/SettingsConfigurationComponents.kt",
             "app/src/main/java/com/example/ui/screens/settings/SettingsAutomationComponents.kt",
             "app/src/main/java/com/example/ui/screens/settings/SettingsDataComponents.kt",

@@ -3,57 +3,23 @@ package com.example.ui.viewmodel
 import android.app.AlarmManager
 import android.content.Context
 import android.os.Build
-import androidx.annotation.StringRes
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.example.R
-import com.example.core.resilience.CircuitState
 import com.example.core.resilience.HealthMonitor
-import com.example.core.resilience.HealthSnapshot
-import com.example.core.resilience.LogEntry
-import com.example.core.resilience.SensitiveLogRedactor
 import com.example.core.resilience.StructuredLogger
 import com.example.domain.automation.SetupAccountProviderReadinessPolicy
 import com.example.domain.automation.SetupAutomationReadinessPolicy
 import com.example.domain.automation.SetupChannelReadinessPolicy
 import com.example.domain.automation.SetupEmailReadinessPolicy
-import com.example.domain.automation.SetupProviderCircuitState
 import com.example.domain.automation.SetupQualityReadinessPolicy
 import com.example.domain.automation.SetupSystemReadinessPolicy
 import com.example.domain.model.ApprovalMode
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.contact.ContactAutomationReadinessProfile
-import com.example.domain.model.diagnostic.DiagnosticSnapshot
-import com.example.domain.model.dispatch.DispatchAttempt
-import com.example.domain.model.style.StyleProfileRecord
-import com.example.domain.readiness.RelationshipActionReadiness
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.StyleProfileRepository
 import com.example.domain.service.PreferencesRepository
-import kotlinx.coroutines.flow.first
-import org.json.JSONArray
-
-internal data class AiDoctorReport(
-    val summary: AiDoctorSummary,
-    val checks: List<ReadinessCheck>,
-    val recommendedFix: AiDoctorRecommendedFix?,
-    val setupProgress: SetupProgressSummary,
-    val setupActionReadiness: RelationshipActionReadiness,
-)
-
-internal data class AutomationSetupReadinessInputs(
-    val contacts: List<ContactAutomationReadinessProfile>,
-    val styleProfile: StyleProfileRecord?,
-    val persistedRecoveryCount: Int,
-    val persistedDeadLetterCount: Int,
-)
-
-private data class DispatchRecoverySnapshot(
-    val persistedRecoveryCount: Int,
-    val persistedDeadLetterCount: Int,
-    val latestPersistedAttempt: DispatchAttempt?,
-)
 
 internal class AutomationSetupReadinessReportBuilder(
     private val context: Context,
@@ -110,7 +76,6 @@ internal class AutomationSetupReadinessReportBuilder(
         }.getOrDefault(false)
         val dispatchRecovery = loadDispatchRecoverySnapshot(
             persistedRecoveryCount = inputs?.persistedRecoveryCount,
-            persistedDeadLetterCount = inputs?.persistedDeadLetterCount,
         )
         val persistedHealthSnapshot = diagnosticSnapshotStore.loadRecentPersistedHealthSnapshot()
         val senderEmail = preferencesRepository.getSenderEmail().trim()
@@ -119,14 +84,14 @@ internal class AutomationSetupReadinessReportBuilder(
             senderEmail = senderEmail,
             senderEmailPassword = senderEmailPassword,
         )
-        val blockedChannels = preferencesRepository.getChannelBlackout().toChannelSet()
+        val blockedChannels = preferencesRepository.getChannelBlackout().toAutomationChannelSet()
         val selectedChannelCounts = SetupAutomationReadinessPolicy.selectedAutomaticChannelCounts(
             contacts = contacts,
             senderEmailReady = senderEmailReady,
             blockedChannels = blockedChannels,
         )
         val selectedChannels = selectedChannelCounts.filterValues { it > 0 }.keys
-        val channelVerificationSinceMs = System.currentTimeMillis() - CHANNEL_VERIFICATION_WINDOW_MS
+        val channelVerificationSinceMs = System.currentTimeMillis() - AUTOMATION_CHANNEL_VERIFICATION_WINDOW_MS
         val emailSelfTestVerified = senderEmailReady &&
             preferencesRepository.getLastSuccessfulEmailTestMs() >= channelVerificationSinceMs &&
             preferencesRepository.getLastSuccessfulEmailTestSender().equals(senderEmail, ignoreCase = true)
@@ -224,16 +189,17 @@ internal class AutomationSetupReadinessReportBuilder(
                     hasRecentHealthEvidence = hasRecentHealthEvidence,
                 ),
                 recentErrorDetail = recentErrors.toRecentErrorDetail(
+                    context = context,
                     health = health,
                     persistedHealthSnapshot = persistedHealthSnapshot,
+                    aiFailureDiagnoser = aiFailureDiagnoser,
                 ),
             ),
             systemRecoveryCheckPresenter.dispatchRecovery(
                 readiness = SetupSystemReadinessPolicy.evaluateDispatchRecovery(
                     persistedRecoveryCount = dispatchRecovery.persistedRecoveryCount,
-                    persistedDeadLetterCount = dispatchRecovery.persistedDeadLetterCount,
                 ),
-                recoveryDetail = dispatchRecovery.toReadinessDetail(),
+                recoveryDetail = dispatchRecovery.toReadinessDetail(context),
             ),
         )
         return AiDoctorReport(
@@ -247,70 +213,9 @@ internal class AutomationSetupReadinessReportBuilder(
         }
     }
 
-    private fun List<LogEntry>.toRecentErrorDetail(
-        health: HealthSnapshot,
-        persistedHealthSnapshot: DiagnosticSnapshot?,
-    ): String {
-        val liveError = lastOrNull()?.message ?: health.recentErrors.lastOrNull()
-        return when {
-            liveError != null -> aiFailureDiagnoser.diagnose(liveError)
-            persistedHealthSnapshot != null -> text(
-                R.string.automation_setup_ai_error_recent,
-                SensitiveLogRedactor.redact(persistedHealthSnapshot.summary).take(160),
-            )
-            else -> text(R.string.automation_setup_recent_errors_none)
-        }
-    }
-
-    private fun CircuitState?.toSetupProviderCircuitState(): SetupProviderCircuitState {
-        return when (this) {
-            null -> SetupProviderCircuitState.NONE
-            CircuitState.CLOSED -> SetupProviderCircuitState.CLOSED
-            CircuitState.HALF_OPEN -> SetupProviderCircuitState.HALF_OPEN
-            CircuitState.OPEN -> SetupProviderCircuitState.OPEN
-        }
-    }
-
     private suspend fun loadDispatchRecoverySnapshot(
         persistedRecoveryCount: Int? = null,
-        persistedDeadLetterCount: Int? = null,
-    ): DispatchRecoverySnapshot {
-        val resolvedPersistedRecoveryCount = persistedRecoveryCount ?: runCatching {
-            dispatchAttemptRepository.countFailureRecoveryQueue().first()
-        }.getOrDefault(0)
-        val resolvedPersistedDeadLetterCount = persistedDeadLetterCount ?: runCatching {
-            dispatchAttemptRepository.countDeadLettered().first()
-        }.getOrDefault(0)
-        val latestPersistedAttempt = runCatching {
-            dispatchAttemptRepository.getFailureRecoveryQueue(limit = 1).firstOrNull()
-        }.getOrNull()
-        return DispatchRecoverySnapshot(
-            persistedRecoveryCount = resolvedPersistedRecoveryCount,
-            persistedDeadLetterCount = resolvedPersistedDeadLetterCount,
-            latestPersistedAttempt = latestPersistedAttempt,
-        )
-    }
-
-    private val DispatchRecoverySnapshot.totalRecoveryCount: Int
-        get() = persistedRecoveryCount
-
-    private fun DispatchRecoverySnapshot.toReadinessDetail(): String {
-        val summary = when {
-            totalRecoveryCount == 0 -> text(R.string.automation_setup_dead_letter_none)
-            else -> text(
-                R.string.automation_setup_dead_letter_count,
-                persistedRecoveryCount,
-                persistedDeadLetterCount,
-            )
-        }
-        val latest = latestPersistedAttempt ?: return summary
-        return "$summary " + text(
-            R.string.automation_setup_dead_letter_latest,
-            latest.channel.raw,
-            latest.result.raw,
-            latest.messageDraftId.value,
-        )
-    }
+    ): DispatchRecoverySnapshot = dispatchAttemptRepository.loadDispatchRecoverySnapshot(persistedRecoveryCount)
 
     private fun fullAutomationModeCheck(
         globalAutomationMode: ApprovalMode,
@@ -400,28 +305,4 @@ internal class AutomationSetupReadinessReportBuilder(
         )
     }
 
-    private fun countJsonArrayItems(raw: String?): Int {
-        if (raw.isNullOrBlank()) return 0
-        return try {
-            JSONArray(raw).length()
-        } catch (_: Exception) {
-            0
-        }
-    }
-
-    private fun text(@StringRes resId: Int, vararg args: Any): String {
-        return context.getString(resId, *args)
-    }
-
-    private fun String.toChannelSet(): Set<MessageChannel> {
-        return CHANNEL_TOKEN_PATTERN.findAll(this)
-            .map { MessageChannel.fromRaw(it.groupValues[1]) }
-            .filter { it != MessageChannel.UNKNOWN }
-            .toSet()
-    }
-
-    private companion object {
-        const val CHANNEL_VERIFICATION_WINDOW_MS = 30L * 24 * 60 * 60 * 1000
-        val CHANNEL_TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")
-    }
 }

@@ -53,17 +53,16 @@ class AutomationSetupSystemRecoveryCheckPresenterTest {
 
     @Test
     fun `dispatchRecovery maps queued failures to activity action`() {
-        val detail = context.getString(R.string.automation_setup_dead_letter_count, 2, 1)
+        val detail = context.getString(R.string.automation_setup_dispatch_recovery_count, 2)
 
         val check = presenter.dispatchRecovery(
             readiness = SetupSystemReadinessPolicy.evaluateDispatchRecovery(
                 persistedRecoveryCount = 2,
-                persistedDeadLetterCount = 1,
             ),
             recoveryDetail = detail,
         )
 
-        assertEquals(context.getString(R.string.automation_setup_check_dead_letter), check.title)
+        assertEquals(context.getString(R.string.automation_setup_check_dispatch_recovery), check.title)
         assertEquals(ReadinessStatus.WARNING, check.status)
         assertEquals(context.getString(R.string.automation_setup_action_view_activity), check.actionLabel)
         assertEquals(AiDoctorAction.OPEN_ACTIVITY_HISTORY, check.action)

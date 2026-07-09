@@ -5,7 +5,6 @@ import com.example.core.db.dao.DispatchAttemptDao
 import com.example.core.db.dao.PendingMessageDao
 import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.SentMessageEntity
-import com.example.core.resilience.DeadLetterQueue
 import com.example.core.resilience.HealthMonitor
 import com.example.core.resilience.LogLevel
 import com.example.core.resilience.StructuredLogger
@@ -45,13 +44,13 @@ class MessageDispatcherFinalizationAdaptersTest {
 
     @Before
     fun setUp() {
-        DeadLetterQueue.clear()
+        HealthMonitor.clearForTests()
         StructuredLogger.clearForTests()
     }
 
     @After
     fun tearDown() {
-        DeadLetterQueue.clear()
+        HealthMonitor.clearForTests()
         StructuredLogger.clearForTests()
     }
 
@@ -154,7 +153,6 @@ class MessageDispatcherFinalizationAdaptersTest {
         }
         coVerify(exactly = 0) { sentMessageDao.insert(any()) }
         coVerify(exactly = 0) { contactDao.updateLastWished(any(), any()) }
-        assertEquals(0, DeadLetterQueue.count())
         assertTrue(
             HealthMonitor.snapshot().recentErrors.any {
                 it.contains(
@@ -328,12 +326,6 @@ class MessageDispatcherFinalizationAdaptersTest {
             logEntry.message,
         )
 
-        val deadLetter = DeadLetterQueue.getAll().single()
-        assertEquals("pending_no_route", deadLetter.id)
-        assertEquals("Selected", deadLetter.payload)
-        assertEquals("All automatic delivery routes failed.", deadLetter.errorMessage)
-        assertEquals(DispatchProviderRetryPolicy.ERROR_NO_DELIVERY_ROUTE, deadLetter.errorType)
-        assertEquals(0, deadLetter.retryCount)
         assertTrue(
             HealthMonitor.snapshot().recentErrors.any {
                 it.contains("[MessageDispatcher.dispatch] Failed to send pending_no_route via SMS: NO_DELIVERY_ROUTE")
@@ -394,7 +386,6 @@ class MessageDispatcherFinalizationAdaptersTest {
                 deadLetteredAtMs = null,
             )
         }
-        assertEquals(0, DeadLetterQueue.count())
         assertTrue(
             HealthMonitor.snapshot().recentErrors.any {
                 it.contains(
@@ -454,10 +445,14 @@ class MessageDispatcherFinalizationAdaptersTest {
                 deadLetteredAtMs = 1_800_000_000_000L,
             )
         }
-        val deadLetter = DeadLetterQueue.getAll().single()
-        assertEquals("pending_retry_limit", deadLetter.id)
-        assertEquals(DispatchProviderRetryPolicy.MAX_AUTOMATIC_RETRY_FAILURES, deadLetter.retryCount)
-        assertTrue(deadLetter.errorMessage.contains("Automatic retry limit reached"))
+        assertTrue(
+            HealthMonitor.snapshot().recentErrors.any {
+                it.contains(
+                    "[MessageDispatcher.dispatch] Failed to send pending_retry_limit via SMS: " +
+                        "SMS_TRANSIENT_PROVIDER_FAILURE"
+                )
+            }
+        )
     }
 
     private fun dispatchOccasion(): MessageDispatchOccasion {

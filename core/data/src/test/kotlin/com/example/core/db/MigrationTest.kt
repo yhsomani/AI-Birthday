@@ -21,7 +21,8 @@ class MigrationTest {
     @get:Rule
     val helper: MigrationTestHelper = MigrationTestHelper(
         InstrumentationRegistry.getInstrumentation(),
-        AppDatabase::class.java.name,
+        AppDatabase::class.java,
+        emptyList(),
         FrameworkSQLiteOpenHelperFactory(),
     )
 

@@ -106,10 +106,6 @@ android {
         compose = true
     }
 
-    ksp {
-        arg("room.schemaLocation", "$projectDir/schemas")
-    }
-
     packaging {
         resources {
             excludes += setOf(
@@ -163,7 +159,6 @@ dependencies {
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
-    implementation(libs.firebase.vertexai)
 
     // RelateAI app/data dependencies used by the active app UI and application shell.
     implementation(libs.androidx.work.runtime.ktx)
@@ -177,9 +172,6 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-
-    // Room
-    implementation(libs.androidx.room.runtime)
 
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
@@ -203,6 +195,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.junit)
+    testImplementation(libs.androidx.room.runtime)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.androidx.compose.ui.test.manifest)

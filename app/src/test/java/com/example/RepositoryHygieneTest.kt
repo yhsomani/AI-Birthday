@@ -122,6 +122,9 @@ class RepositoryHygieneTest {
             "logging.interceptor",
             "androidx.paging",
             "room.paging",
+            "secrets-gradle-plugin",
+            "libs.plugins.secrets",
+            "secretsGradlePlugin",
         )
 
         checkedFiles.forEach { relativePath ->
@@ -149,6 +152,8 @@ class RepositoryHygieneTest {
             "implementation(libs.okhttp)",
             "implementation(libs.google.material)",
             "implementation(libs.firebase.analytics)",
+            "implementation(libs.firebase.vertexai)",
+            "implementation(libs.androidx.room.runtime)",
         )
 
         dataOwnedRuntimeDependencies.forEach { dependency ->
@@ -162,6 +167,40 @@ class RepositoryHygieneTest {
             "JavaMail remains test-only because app unit tests verify provider exception handling",
             appBuild.contains("testImplementation(libs.sun.mail.android)"),
         )
+    }
+
+    @Test
+    fun appBuild_doesNotExportRoomSchemasWithoutOwningRoomEntities() {
+        val appBuild = rootFile("app/build.gradle.kts").readText()
+        val dataBuild = rootFile("core/data/build.gradle.kts").readText()
+
+        assertFalse(
+            "app/build.gradle.kts should not configure Room schema export without Room entities",
+            appBuild.contains("room.schemaLocation"),
+        )
+        assertFalse(
+            "app/build.gradle.kts should not apply the Room compiler; core:data owns Room",
+            appBuild.contains("ksp(libs.androidx.room.compiler)"),
+        )
+        assertTrue(
+            "core:data should continue to export Room schemas for the database it owns",
+            dataBuild.contains("room.schemaLocation"),
+        )
+    }
+
+    @Test
+    fun manifest_doesNotRequestForegroundServicePermissionsWithoutForegroundService() {
+        val manifest = rootFile("app/src/main/AndroidManifest.xml").readText()
+
+        listOf(
+            "android.permission.FOREGROUND_SERVICE",
+            "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        ).forEach { permission ->
+            assertFalse(
+                "AndroidManifest.xml should not request $permission without a foreground service",
+                manifest.contains(permission),
+            )
+        }
     }
 
     private fun rootFile(relativePath: String, mustBeFile: Boolean = true): File {

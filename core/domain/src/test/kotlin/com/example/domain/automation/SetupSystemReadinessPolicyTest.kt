@@ -93,21 +93,18 @@ class SetupSystemReadinessPolicyTest {
     fun `evaluateDispatchRecovery warns when recovery queue has failures`() {
         val readiness = SetupSystemReadinessPolicy.evaluateDispatchRecovery(
             persistedRecoveryCount = 3,
-            persistedDeadLetterCount = 2,
         )
 
         assertEquals(SetupDispatchRecoveryReadinessReason.RECOVERY_QUEUE_PRESENT, readiness.reason)
         assertEquals(SetupReadinessStatus.WARNING, readiness.status)
         assertEquals(SetupReadinessGroup.RECOVERY, readiness.group)
         assertEquals(3, readiness.persistedRecoveryCount)
-        assertEquals(2, readiness.persistedDeadLetterCount)
     }
 
     @Test
     fun `evaluateDispatchRecovery passes when recovery queue is empty`() {
         val readiness = SetupSystemReadinessPolicy.evaluateDispatchRecovery(
             persistedRecoveryCount = 0,
-            persistedDeadLetterCount = 0,
         )
 
         assertEquals(SetupDispatchRecoveryReadinessReason.CLEAR, readiness.reason)

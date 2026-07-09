@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.gemini.GeminiClient
-import com.example.domain.readiness.RelationshipActionReadiness
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.DiagnosticSnapshotRepository
 import com.example.domain.repository.DispatchAttemptRepository
@@ -106,13 +105,11 @@ class AutomationSetupViewModel @Inject constructor(
                 styleProfileRepository.getProfile(),
                 preferencesRepository.observeChanges().onStart { emit(Unit) },
                 dispatchAttemptRepository.countFailureRecoveryQueue(),
-                dispatchAttemptRepository.countDeadLettered(),
-            ) { contacts, styleProfile, _, persistedRecoveryCount, persistedDeadLetterCount ->
+            ) { contacts, styleProfile, _, persistedRecoveryCount ->
                 AutomationSetupReadinessInputs(
                     contacts = contacts,
                     styleProfile = styleProfile,
                     persistedRecoveryCount = persistedRecoveryCount,
-                    persistedDeadLetterCount = persistedDeadLetterCount,
                 )
             }.collectLatest { inputs ->
                 val report = withContext(Dispatchers.IO) { buildReport(inputs) }
@@ -195,20 +192,4 @@ class AutomationSetupViewModel @Inject constructor(
 
     private suspend fun buildReport(inputs: AutomationSetupReadinessInputs? = null): AiDoctorReport =
         reportBuilder.build(inputs)
-
-    internal fun diagnoseAiFailureForTesting(raw: String): String = aiFailureDiagnoser.diagnose(raw)
-
-    internal fun summarizeForTesting(checks: List<ReadinessCheck>): AiDoctorSummary =
-        readinessPresenter.summarize(checks)
-
-    internal fun setupProgressForTesting(checks: List<ReadinessCheck>): SetupProgressSummary =
-        readinessPresenter.setupProgress(checks)
-
-    internal fun recommendedFixForTesting(checks: List<ReadinessCheck>): AiDoctorRecommendedFix? =
-        readinessPresenter.recommendedFix(checks)
-
-    internal suspend fun buildChecksForTesting(): List<ReadinessCheck> = buildReport().checks
-
-    internal suspend fun buildSetupActionReadinessForTesting(): RelationshipActionReadiness =
-        buildReport().setupActionReadiness
 }

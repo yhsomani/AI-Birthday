@@ -20,10 +20,6 @@ class DispatchAttemptRepositoryImpl @Inject constructor(
         dispatchAttemptDao.upsert(attempt.toEntity())
     }
 
-    override fun countDeadLettered(): Flow<Int> {
-        return dispatchAttemptDao.countDeadLettered()
-    }
-
     override fun countFailureRecoveryQueue(): Flow<Int> {
         return dispatchAttemptDao.countFailureRecoveryQueue()
     }

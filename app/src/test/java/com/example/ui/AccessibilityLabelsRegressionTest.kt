@@ -8,8 +8,7 @@ class AccessibilityLabelsRegressionTest {
 
     @Test
     fun iconOnlyActionsInCleanedScreens_haveScreenReaderLabels() {
-        val offenders = CLEANED_ACTION_SOURCES.flatMap { path ->
-            val file = sourceFile(path)
+        val offenders = actionSources().flatMap { file ->
             val text = file.readText()
             listOf("IconButton", "FloatingActionButton").flatMap { callName ->
                 findActionBlocks(text, callName).filter { block ->
@@ -92,13 +91,24 @@ class AccessibilityLabelsRegressionTest {
         return -1
     }
 
-    private fun sourceFile(rootRelativePath: String): File {
+    private fun sourceDirectory(rootRelativePath: String): File {
         return listOf(
             File(rootRelativePath),
             File("../$rootRelativePath"),
             File(rootRelativePath.removePrefix("app/")),
-        ).firstOrNull { it.exists() }
-            ?: error("Could not locate source file $rootRelativePath from ${File(".").absolutePath}")
+        ).firstOrNull { it.isDirectory }
+            ?: error("Could not locate source directory $rootRelativePath from ${File(".").absolutePath}")
+    }
+
+    private fun actionSources(): List<File> {
+        return listOf(
+            sourceDirectory("app/src/main/java/com/example/ui/components"),
+            sourceDirectory("app/src/main/java/com/example/ui/screens"),
+        ).flatMap { directory ->
+            directory.walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .toList()
+        }.sortedBy { it.path }
     }
 
     private fun lineNumber(text: String, offset: Int): Int {
@@ -109,44 +119,4 @@ class AccessibilityLabelsRegressionTest {
         val offset: Int,
         val body: String,
     )
-
-    private companion object {
-        val CLEANED_ACTION_SOURCES = listOf(
-            "app/src/main/java/com/example/ui/components/SyncErrorCard.kt",
-            "app/src/main/java/com/example/ui/screens/activity/ActivityHistoryScreen.kt",
-            "app/src/main/java/com/example/ui/screens/activity/ActivityHistoryLogComponents.kt",
-            "app/src/main/java/com/example/ui/screens/analytics/AnalyticsScreen.kt",
-            "app/src/main/java/com/example/ui/screens/analytics/AnalyticsReportComponents.kt",
-            "app/src/main/java/com/example/ui/screens/analytics/AnalyticsChartComponents.kt",
-            "app/src/main/java/com/example/ui/screens/backup/BackupRestoreScreen.kt",
-            "app/src/main/java/com/example/ui/screens/contacts/ContactDetailScreen.kt",
-            "app/src/main/java/com/example/ui/screens/contacts/ContactDetailPreferencesComponents.kt",
-            "app/src/main/java/com/example/ui/screens/contacts/ContactDetailPreferenceFormComponents.kt",
-            "app/src/main/java/com/example/ui/screens/contacts/ContactListScreen.kt",
-            "app/src/main/java/com/example/ui/screens/contacts/ContactListRowComponents.kt",
-            "app/src/main/java/com/example/ui/screens/events/EventsScreen.kt",
-            "app/src/main/java/com/example/ui/screens/events/EventsEventCardComponents.kt",
-            "app/src/main/java/com/example/ui/screens/events/EventsManualEventDialogComponents.kt",
-            "app/src/main/java/com/example/ui/screens/events/EventsManualEventContactComponents.kt",
-            "app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorScreen.kt",
-            "app/src/main/java/com/example/ui/screens/giftadvisor/GiftAdvisorHistoryComponents.kt",
-            "app/src/main/java/com/example/ui/screens/home/HomeScreen.kt",
-            "app/src/main/java/com/example/ui/screens/home/HomeActionComponents.kt",
-            "app/src/main/java/com/example/ui/screens/home/HomeQuickActionComponents.kt",
-            "app/src/main/java/com/example/ui/screens/memoryvault/MemoryVaultScreen.kt",
-            "app/src/main/java/com/example/ui/screens/messages/MessagesScreen.kt",
-            "app/src/main/java/com/example/ui/screens/settings/SettingsAutomationComponents.kt",
-            "app/src/main/java/com/example/ui/screens/settings/SettingsDataComponents.kt",
-            "app/src/main/java/com/example/ui/screens/setup/AutomationSetupReadinessComponents.kt",
-            "app/src/main/java/com/example/ui/screens/setup/AutomationSetupActionComponents.kt",
-            "app/src/main/java/com/example/ui/screens/setup/AutomationSetupSupportCards.kt",
-            "app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachScreen.kt",
-            "app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachTrainingComponents.kt",
-            "app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachDisplayComponents.kt",
-            "app/src/main/java/com/example/ui/screens/stylecoach/StyleCoachHistoryComponents.kt",
-            "app/src/main/java/com/example/ui/screens/wish/WishPreviewScreen.kt",
-            "app/src/main/java/com/example/ui/screens/wish/WishPreviewEditorComponents.kt",
-            "app/src/main/java/com/example/ui/screens/wish/WishPreviewActionComponents.kt",
-        )
-    }
 }

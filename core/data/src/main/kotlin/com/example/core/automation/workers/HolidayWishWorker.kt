@@ -15,7 +15,6 @@ import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.gemini.GeminiClient
-import com.example.core.gemini.MessageVariants
 import com.example.core.gemini.PromptBuilder
 import com.example.core.gemini.RateLimiter
 import com.example.core.prefs.SecurePrefs
@@ -102,7 +101,10 @@ class HolidayWishWorker @AssistedInject constructor(
                             holidayName = holiday.name,
                             holidayTone = holiday.tone,
                         )
-                        val suggestion = sanitizeSuggestion(gemini.generate(prompt), holiday, contact.name)
+                        val suggestion = sanitizeGeneratedSuggestion(
+                            raw = gemini.generate(prompt),
+                            fallbackText = fallbackSuggestion(holiday, contact.name),
+                        )
                         val requestedApprovalMode = ApprovalModeResolver.resolve(
                             relationship = contact.relationshipType,
                             contactOverride = ApprovalMode.fromRaw(contact.automationMode),
@@ -190,24 +192,6 @@ class HolidayWishWorker @AssistedInject constructor(
         }
     }
 
-    private fun sanitizeSuggestion(raw: String, holiday: HolidayOccurrence, contactName: String): HolidaySuggestion {
-        val trimmed = raw.trim()
-        if (trimmed.isBlank()) {
-            return HolidaySuggestion(fallbackSuggestion(holiday, contactName), isFallback = true)
-        }
-        if (trimmed.startsWith("{") && trimmed.contains("\"error\"", ignoreCase = true)) {
-            return HolidaySuggestion(fallbackSuggestion(holiday, contactName), isFallback = true)
-        }
-        val text = trimmed
-            .removeSurrounding("\"")
-            .take(500)
-        return if (text.isBlank()) {
-            HolidaySuggestion(fallbackSuggestion(holiday, contactName), isFallback = true)
-        } else {
-            HolidaySuggestion(text, isFallback = false)
-        }
-    }
-
     private fun fallbackSuggestion(holiday: HolidayOccurrence, contactName: String): String {
         val firstName = contactName.trim().substringBefore(' ').ifBlank { "there" }
         return "Happy ${holiday.name}, $firstName. Hope the day brings warmth and good moments your way."
@@ -238,74 +222,10 @@ class HolidayWishWorker @AssistedInject constructor(
         )
     }
 
-    private fun HolidaySuggestion.toVariants(): MessageVariants {
-        return MessageVariants(text, text, text, text, text, text, "standard", isFallback)
-    }
-
-    private data class HolidaySuggestion(
-        val text: String,
-        val isFallback: Boolean,
-    )
-
     companion object {
         const val KEY_NOW_MS = "holiday_now_ms"
         const val LOOKAHEAD_DAYS = 7
         const val MAX_CONTACTS_PER_RUN = 50
         private const val TAG = "HolidayWishWorker"
-    }
-}
-
-private data class FixedHoliday(
-    val id: String,
-    val name: String,
-    val month: Int,
-    val dayOfMonth: Int,
-    val tone: String,
-)
-
-private data class HolidayOccurrence(
-    val id: String,
-    val name: String,
-    val tone: String,
-    val year: Int,
-    val occurrenceMs: Long,
-)
-
-private object FixedHolidayCatalog {
-    private val fixedHolidays = listOf(
-        FixedHoliday("NEW_YEAR", "New Year", Calendar.JANUARY, 1, "hopeful, warm, fresh-start"),
-        FixedHoliday("INDIA_REPUBLIC_DAY", "Republic Day", Calendar.JANUARY, 26, "respectful, proud, inclusive"),
-        FixedHoliday("WOMENS_DAY", "International Women's Day", Calendar.MARCH, 8, "respectful, appreciative, empowering"),
-        FixedHoliday("INDIA_INDEPENDENCE_DAY", "Independence Day", Calendar.AUGUST, 15, "respectful, proud, inclusive"),
-        FixedHoliday("GANDHI_JAYANTI", "Gandhi Jayanti", Calendar.OCTOBER, 2, "peaceful, reflective, respectful"),
-        FixedHoliday("CHRISTMAS", "Christmas", Calendar.DECEMBER, 25, "warm, festive, kind"),
-    )
-
-    fun upcoming(nowMs: Long, lookaheadDays: Int): List<HolidayOccurrence> {
-        val now = Calendar.getInstance().apply { timeInMillis = nowMs }
-        val endMs = nowMs + lookaheadDays.coerceAtLeast(0) * 24L * 60L * 60L * 1000L
-        val currentYear = now.get(Calendar.YEAR)
-        return listOf(currentYear, currentYear + 1)
-            .flatMap { year ->
-                fixedHolidays.map { holiday ->
-                    val occurrenceMs = Calendar.getInstance().apply {
-                        clear()
-                        set(Calendar.YEAR, year)
-                        set(Calendar.MONTH, holiday.month)
-                        set(Calendar.DAY_OF_MONTH, holiday.dayOfMonth)
-                        set(Calendar.HOUR_OF_DAY, 9)
-                        set(Calendar.MINUTE, 0)
-                    }.timeInMillis
-                    HolidayOccurrence(
-                        id = holiday.id,
-                        name = holiday.name,
-                        tone = holiday.tone,
-                        year = year,
-                        occurrenceMs = occurrenceMs,
-                    )
-                }
-            }
-            .filter { it.occurrenceMs in nowMs..endMs }
-            .sortedBy { it.occurrenceMs }
     }
 }

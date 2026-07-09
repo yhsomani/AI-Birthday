@@ -209,8 +209,8 @@ class AutomationSetupScreenshotTest {
                 group = ReadinessGroup.RELIABILITY,
             ),
             check(
-                title = "Failed-send recovery",
-                detail = "2 persisted dispatch recovery records need review; 1 is dead-lettered.",
+                title = "Dispatch Recovery",
+                detail = "2 persisted dispatch recovery records need review.",
                 status = ReadinessStatus.WARNING,
                 actionLabel = "View activity",
                 action = AiDoctorAction.OPEN_ACTIVITY_HISTORY,
@@ -272,8 +272,8 @@ class AutomationSetupScreenshotTest {
                 group = ReadinessGroup.RELIABILITY,
             ),
             check(
-                title = "Failed-send recovery",
-                detail = "No failed or dead-lettered sends need recovery.",
+                title = "Dispatch Recovery",
+                detail = "No persisted dispatch recovery records.",
                 status = ReadinessStatus.OK,
                 group = ReadinessGroup.RECOVERY,
             ),

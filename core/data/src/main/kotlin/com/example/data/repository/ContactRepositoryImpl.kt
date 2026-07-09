@@ -208,7 +208,7 @@ class ContactRepositoryImpl @Inject constructor(
         year: Int?,
         updatedAt: Long,
     ) {
-        updateContactEventDate(
+        contactDao.updateContactEventDate(
             id = id.value,
             eventType = eventType,
             day = day,
@@ -297,81 +297,5 @@ class ContactRepositoryImpl @Inject constructor(
                 .take(limit)
                 .map { it.toAnalyticsSummary() }
             }
-    }
-
-    private suspend fun updateContactEventDate(
-        id: String,
-        eventType: OccasionType,
-        day: Int,
-        month: Int,
-        year: Int?,
-        updatedAt: Long,
-    ) {
-        when (eventType) {
-            OccasionType.BIRTHDAY -> contactDao.updateBirthdayDate(id, day, month, year, updatedAt)
-            OccasionType.ANNIVERSARY -> contactDao.updateAnniversaryDate(id, day, month, year, updatedAt)
-            OccasionType.WORK_ANNIVERSARY -> contactDao.updateWorkStartDate(id, day, month, year, updatedAt)
-            else -> Unit
-        }
-    }
-
-    private fun ContactEntity.withEventDate(
-        eventType: OccasionType,
-        day: Int,
-        month: Int,
-        year: Int?,
-        updatedAt: Long,
-    ): ContactEntity {
-        return when (eventType) {
-            OccasionType.BIRTHDAY -> copy(
-                birthdayDay = day,
-                birthdayMonth = month,
-                birthdayYear = year,
-                updatedAt = updatedAt,
-            )
-            OccasionType.ANNIVERSARY -> copy(
-                anniversaryDay = day,
-                anniversaryMonth = month,
-                anniversaryYear = year,
-                updatedAt = updatedAt,
-            )
-            OccasionType.WORK_ANNIVERSARY -> copy(
-                workStartDay = day,
-                workStartMonth = month,
-                workStartYear = year,
-                updatedAt = updatedAt,
-            )
-            else -> copy(updatedAt = updatedAt)
-        }
-    }
-
-    private fun ContactSyncRecord.toEntity(): ContactEntity {
-        return ContactEntity(
-            id = id,
-            googleContactId = googleContactId,
-            name = displayName,
-            nickname = nickname,
-            birthdayDay = birthdayDay,
-            birthdayMonth = birthdayMonth,
-            birthdayYear = birthdayYear,
-            anniversaryDay = anniversaryDay,
-            anniversaryMonth = anniversaryMonth,
-            anniversaryYear = anniversaryYear,
-            workStartDay = workStartDay,
-            workStartMonth = workStartMonth,
-            workStartYear = workStartYear,
-            primaryPhone = primaryPhone,
-            secondaryPhone = secondaryPhone,
-            primaryEmail = primaryEmail,
-            company = company,
-            jobTitle = jobTitle,
-            address = address,
-            profilePhotoUri = profilePhotoUri,
-            contactGroup = contactGroup,
-            relationshipType = relationshipType,
-            relationsJson = relationsJson,
-            notesText = notesText,
-            isDeleted = isDeleted,
-        )
     }
 }

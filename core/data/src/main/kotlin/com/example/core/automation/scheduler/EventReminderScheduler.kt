@@ -111,7 +111,7 @@ object EventReminderScheduler {
 
 @Singleton
 class EventReminderSchedulerServiceImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) : EventReminderSchedulerService {
     override fun scheduleReminder(request: EventReminderScheduleRequest) {
         EventReminderScheduler.schedule(context, request)

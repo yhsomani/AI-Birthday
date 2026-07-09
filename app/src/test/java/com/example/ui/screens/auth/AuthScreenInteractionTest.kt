@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.R
@@ -48,21 +49,32 @@ class AuthScreenInteractionTest {
 
         composeRule.onNodeWithText(context.getString(R.string.app_name))
             .assertIsDisplayed()
+        composeRule.onNodeWithTag(AuthScreenTestTags.TRUST_PANEL)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.auth_google_sync_title))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.auth_local_mode_title))
+            .assertIsDisplayed()
         composeRule.onNodeWithTag(AuthScreenTestTags.SIGN_IN_BUTTON)
+            .performScrollTo()
             .assertIsDisplayed()
             .performClick()
         composeRule.onNodeWithTag(AuthScreenTestTags.LOCAL_MODE_BUTTON)
+            .performScrollTo()
             .assertIsDisplayed()
             .performClick()
         composeRule.onNodeWithText(context.getString(R.string.auth_local_only_note))
+            .performScrollTo()
             .assertIsDisplayed()
 
         state = AuthUiState(isLoading = true)
         composeRule.onNodeWithTag(AuthScreenTestTags.LOADING)
+            .performScrollTo()
             .assertIsDisplayed()
 
         state = AuthUiState(error = "Unable to sign in.")
         composeRule.onNodeWithTag(AuthScreenTestTags.ERROR)
+            .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithText("Unable to sign in.")
             .assertIsDisplayed()

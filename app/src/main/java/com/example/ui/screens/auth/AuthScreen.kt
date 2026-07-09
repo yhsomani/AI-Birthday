@@ -4,19 +4,26 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -26,12 +33,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.R
+import com.example.core.ui.components.RelateGlassCard
 import com.example.core.ui.theme.RelateRadius
 import com.example.core.ui.theme.RelateSize
 import com.example.core.ui.theme.RelateSpacing
@@ -39,6 +48,7 @@ import com.example.ui.viewmodel.AuthUiState
 import com.example.ui.viewmodel.AuthViewModel
 
 internal object AuthScreenTestTags {
+    const val TRUST_PANEL = "auth_trust_panel"
     const val SIGN_IN_BUTTON = "auth_sign_in_button"
     const val LOCAL_MODE_BUTTON = "auth_local_mode_button"
     const val LOADING = "auth_loading"
@@ -100,7 +110,9 @@ internal fun AuthContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(RelateSize.heroIcon))
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
+        AuthTrustPanel()
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
         if (state.isLoading) {
             CircularProgressIndicator(
                 color = MaterialTheme.colorScheme.primary,
@@ -121,7 +133,7 @@ internal fun AuthContent(
                 Text(
                     text = stringResource(R.string.auth_sign_in_google),
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             Spacer(modifier = Modifier.height(RelateSpacing.sm))
@@ -164,5 +176,70 @@ internal fun AuthContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+private fun AuthTrustPanel() {
+    RelateGlassCard(modifier = Modifier.testTag(AuthScreenTestTags.TRUST_PANEL)) {
+        Column(
+            modifier = Modifier.padding(RelateSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        ) {
+            Text(
+                text = stringResource(R.string.auth_save_choice_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+            AuthTrustLine(
+                icon = Icons.Filled.CloudSync,
+                title = stringResource(R.string.auth_google_sync_title),
+                body = stringResource(R.string.auth_google_sync_body),
+            )
+            AuthTrustLine(
+                icon = Icons.Filled.PhoneAndroid,
+                title = stringResource(R.string.auth_local_mode_title),
+                body = stringResource(R.string.auth_local_mode_body),
+            )
+            AuthTrustLine(
+                icon = Icons.Filled.CheckCircle,
+                title = stringResource(R.string.auth_later_choice_title),
+                body = stringResource(R.string.auth_later_choice_body),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AuthTrustLine(
+    icon: ImageVector,
+    title: String,
+    body: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(RelateSize.iconMd),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

@@ -6,13 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.core.resilience.StructuredLogger
-import com.example.domain.event.EventConflictKind
-import com.example.domain.event.EventResolutionPolicy
-import com.example.domain.event.toOccasion
 import com.example.domain.model.ActivityLogType
 import com.example.domain.model.activity.ActivityLogRecord
-import com.example.domain.model.contact.ContactPickerItem
-import com.example.domain.model.occasion.EventListItem
 import com.example.domain.model.occasion.OccasionType
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
@@ -29,81 +24,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
-
-enum class EventTypeFilter {
-    ALL,
-    BIRTHDAY,
-    ANNIVERSARY,
-    WORK,
-    GRADUATION,
-    HOLIDAY,
-    REVIVAL,
-    FOLLOW_UP,
-    CUSTOM,
-}
-
-enum class EventHorizonFilter {
-    ALL,
-    NEXT_7_DAYS,
-    NEXT_30_DAYS,
-    NEXT_90_DAYS,
-}
-
-enum class ManualEventWarningKind {
-    DUPLICATE,
-    DATE_CONFLICT,
-}
-
-enum class EventVerificationState {
-    VERIFIED,
-    NEEDS_REVIEW,
-    CONFLICT,
-}
-
-enum class EventTrustConflictState {
-    NONE,
-    DUPLICATE,
-    DATE_CONFLICT,
-}
-
-enum class EventResolutionAction {
-    MERGE_KEEP_SELECTED,
-    KEEP_SEPARATE,
-}
-
-data class EventTrustState(
-    val source: String,
-    val verification: EventVerificationState,
-    val confidenceScore: Int,
-    val conflict: EventTrustConflictState = EventTrustConflictState.NONE,
-)
-
-data class ManualEventDuplicateWarning(
-    val contactName: String,
-    val eventType: String,
-    val month: Int,
-    val dayOfMonth: Int,
-    val kind: ManualEventWarningKind = ManualEventWarningKind.DUPLICATE,
-    val requestedMonth: Int? = null,
-    val requestedDayOfMonth: Int? = null,
-)
-
-data class EventsUiState(
-    val allEvents: List<EventListItem> = emptyList(),
-    val events: List<EventListItem> = emptyList(),
-    val contacts: List<ContactPickerItem> = emptyList(),
-    val searchQuery: String = "",
-    val selectedTypeFilter: EventTypeFilter = EventTypeFilter.ALL,
-    val selectedHorizonFilter: EventHorizonFilter = EventHorizonFilter.ALL,
-    val eventTrust: Map<String, EventTrustState> = emptyMap(),
-    val resolvingEventId: String? = null,
-    val isLoading: Boolean = true,
-    val isRefreshing: Boolean = false,
-    val isSavingManualEvent: Boolean = false,
-    val saveMessage: String? = null,
-    val duplicateWarning: ManualEventDuplicateWarning? = null,
-    val error: String? = null,
-)
 
 @HiltViewModel
 class EventsViewModel @Inject constructor(
@@ -323,65 +243,6 @@ class EventsViewModel @Inject constructor(
         }
     }
 
-    private fun EventsUiState.withEvents(
-        allEvents: List<EventListItem>,
-        contacts: List<ContactPickerItem>,
-        isLoading: Boolean = this.isLoading,
-        isRefreshing: Boolean = this.isRefreshing,
-    ): EventsUiState {
-        return copy(
-            allEvents = allEvents,
-            contacts = contacts.sortedBy { it.displayName.lowercase() },
-            eventTrust = buildEventTrustStates(allEvents),
-            isLoading = isLoading,
-            isRefreshing = isRefreshing,
-        ).withFilteredEvents()
-    }
-
-    private fun EventsUiState.withFilteredEvents(): EventsUiState {
-        val contactMap = contacts.associateBy { it.id.value }
-        val normalizedQuery = searchQuery.trim()
-        val nowMs = System.currentTimeMillis()
-        val horizonEndMs = selectedHorizonFilter.endMs(nowMs)
-        val filtered = allEvents
-            .asSequence()
-            .filter { event ->
-                normalizedQuery.isBlank() ||
-                    event.type.raw.contains(normalizedQuery, ignoreCase = true) ||
-                    event.label?.contains(normalizedQuery, ignoreCase = true) == true ||
-                    contactMap[event.contactId.value]?.displayName?.contains(normalizedQuery, ignoreCase = true) == true
-            }
-            .filter { event -> event.matchesTypeFilter(selectedTypeFilter) }
-            .filter { event -> horizonEndMs == null || event.nextOccurrenceMs <= horizonEndMs }
-            .sortedBy { it.nextOccurrenceMs }
-            .toList()
-        return copy(events = filtered)
-    }
-
-    private fun EventListItem.matchesTypeFilter(filter: EventTypeFilter): Boolean {
-        return when (filter) {
-            EventTypeFilter.ALL -> true
-            EventTypeFilter.BIRTHDAY -> type == OccasionType.BIRTHDAY
-            EventTypeFilter.ANNIVERSARY -> type == OccasionType.ANNIVERSARY
-            EventTypeFilter.WORK -> type == OccasionType.WORK_ANNIVERSARY
-            EventTypeFilter.GRADUATION -> type == OccasionType.GRADUATION
-            EventTypeFilter.HOLIDAY -> type == OccasionType.HOLIDAY
-            EventTypeFilter.REVIVAL -> type == OccasionType.REVIVAL
-            EventTypeFilter.FOLLOW_UP -> type == OccasionType.FOLLOW_UP
-            EventTypeFilter.CUSTOM -> type == OccasionType.CUSTOM
-        }
-    }
-
-    private fun EventHorizonFilter.endMs(nowMs: Long): Long? {
-        val days = when (this) {
-            EventHorizonFilter.ALL -> return null
-            EventHorizonFilter.NEXT_7_DAYS -> 7
-            EventHorizonFilter.NEXT_30_DAYS -> 30
-            EventHorizonFilter.NEXT_90_DAYS -> 90
-        }
-        return nowMs + days * 86_400_000L
-    }
-
     private suspend fun recordActivity(entry: ActivityLogRecord) {
         try {
             activityLogRepository.record(entry)
@@ -436,38 +297,6 @@ class EventsViewModel @Inject constructor(
 
     private fun string(@StringRes resId: Int, vararg args: Any): String {
         return appContext.getString(resId, *args)
-    }
-}
-
-internal fun buildEventTrustStates(events: List<EventListItem>): Map<String, EventTrustState> {
-    val conflicts = EventResolutionPolicy.conflictStates(events.map { it.toOccasion() })
-    return events.associate { event ->
-        val eventId = event.id.value
-        val conflict = (conflicts[eventId] ?: if (EventResolutionPolicy.isSourceConflict(event.toOccasion())) {
-            EventConflictKind.DATE_CONFLICT
-        } else {
-            EventConflictKind.NONE
-        }).toTrustConflictState()
-        val verification = when {
-            conflict != EventTrustConflictState.NONE -> EventVerificationState.CONFLICT
-            event.isVerified -> EventVerificationState.VERIFIED
-            else -> EventVerificationState.NEEDS_REVIEW
-        }
-
-        eventId to EventTrustState(
-            source = event.source,
-            verification = verification,
-            confidenceScore = event.confidenceScore.coerceIn(0, 100),
-            conflict = conflict,
-        )
-    }
-}
-
-private fun EventConflictKind.toTrustConflictState(): EventTrustConflictState {
-    return when (this) {
-        EventConflictKind.NONE -> EventTrustConflictState.NONE
-        EventConflictKind.DUPLICATE -> EventTrustConflictState.DUPLICATE
-        EventConflictKind.DATE_CONFLICT -> EventTrustConflictState.DATE_CONFLICT
     }
 }
 

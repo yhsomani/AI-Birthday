@@ -4,22 +4,15 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.navigation.NamedNavArgument
-import androidx.navigation.NavBackStackEntry
-import androidx.navigation.NavDeepLink
-import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import com.example.domain.navigation.RelateDeepLinks
 import com.google.firebase.auth.FirebaseAuth
@@ -27,21 +20,13 @@ import com.example.ui.screens.splash.SplashScreen
 import com.example.ui.screens.onboarding.OnboardingScreen
 import com.example.ui.screens.auth.AuthScreen
 import com.example.ui.screens.home.HomeScreen
-import com.example.ui.screens.contacts.ContactListScreen
-import com.example.ui.screens.contacts.ContactDetailScreen
-import com.example.ui.screens.chat.ChatHistoryScreen
 import com.example.ui.screens.events.EventsScreen
-import com.example.ui.screens.messages.MessagesScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.analytics.AnalyticsScreen
 import com.example.ui.screens.activity.ActivityHistoryScreen
-import com.example.ui.screens.wish.WishPreviewScreen
 import com.example.ui.screens.stylecoach.StyleCoachScreen
 import com.example.ui.screens.backup.BackupRestoreScreen
-import com.example.ui.screens.memoryvault.MemoryVaultScreen
-import com.example.ui.screens.giftadvisor.GiftAdvisorScreen
 import com.example.ui.screens.setup.AutomationSetupScreen
-import com.example.ui.viewmodel.MessageChannelFilter
 
 private const val ANIM_DURATION = 300
 
@@ -182,92 +167,10 @@ fun RelateNavGraph(
                 },
             )
         }
-        authenticatedComposable(
-            route = Screen.ContactList.route,
+        relationshipDestinations(
             navController = navController,
             isSignedIn = isSignedIn,
-            deepLinks = listOf(
-                navDeepLink {
-                    uriPattern = RelateDeepLinks.Contacts.pattern
-                }
-            )
-        ) {
-            ContactListScreen(
-                onContactClick = { contactId ->
-                    navController.navigate(Screen.ContactDetail.createRoute(contactId))
-                }
-            )
-        }
-        authenticatedComposable(
-            route = Screen.ContactDetail.route,
-            navController = navController,
-            isSignedIn = isSignedIn,
-            arguments = listOf(
-                navArgument("contactId") { type = NavType.StringType },
-                navArgument(Screen.ContactDetail.openPreferencesArg) {
-                    type = NavType.BoolType
-                    defaultValue = false
-                },
-            ),
-            deepLinks = listOf(
-                navDeepLink {
-                    uriPattern = RelateDeepLinks.Contact.pattern
-                }
-            )
-        ) { backStackEntry ->
-            val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
-            val openPreferences = backStackEntry.arguments
-                ?.getBoolean(Screen.ContactDetail.openPreferencesArg)
-                ?: false
-            ContactDetailScreen(
-                contactId = contactId,
-                openPreferencesOnStart = openPreferences,
-                onBack = { navController.popBackStack() },
-                onNavigateToWish = { pendingMessageId ->
-                    navController.navigate(Screen.WishPreview.createRoute(contactId, pendingMessageId))
-                },
-                onNavigateToMemoryVault = { cid ->
-                    navController.navigate(Screen.MemoryVault.createRoute(cid))
-                },
-                onNavigateToGiftAdvisor = { cid ->
-                    navController.navigate(Screen.GiftAdvisor.createRoute(cid))
-                },
-                onNavigateToChatHistory = { cid ->
-                    navController.navigate(Screen.ChatHistory.createRoute(cid))
-                }
-            )
-        }
-        authenticatedComposable(
-            route = Screen.WishPreview.route,
-            navController = navController,
-            isSignedIn = isSignedIn,
-            arguments = listOf(
-                navArgument("contactId") { type = NavType.StringType },
-                navArgument("messageRef") { type = NavType.StringType },
-            ),
-            deepLinks = listOf(
-                navDeepLink {
-                    uriPattern = RelateDeepLinks.Wish.pattern
-                }
-            )
-        ) { backStackEntry ->
-            val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
-            val messageRef = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("messageRef"))
-            WishPreviewScreen(
-                contactId = contactId,
-                messageRef = messageRef,
-                onBack = { navController.popBackStack() },
-                onSent = {
-                    navController.popBackStack()
-                },
-                onReviewNext = { nextContactId, nextMessageRef ->
-                    navController.navigate(Screen.WishPreview.createRoute(nextContactId, nextMessageRef)) {
-                        popUpTo(Screen.WishPreview.route) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                },
-            )
-        }
+        )
         authenticatedComposable(
             route = Screen.Events.route,
             navController = navController,
@@ -275,54 +178,10 @@ fun RelateNavGraph(
         ) {
             EventsScreen()
         }
-        authenticatedComposable(
-            route = Screen.Messages.route,
+        messagesDestinations(
             navController = navController,
             isSignedIn = isSignedIn,
-            deepLinks = listOf(
-                navDeepLink {
-                    uriPattern = RelateDeepLinks.Messages.pattern
-                }
-            )
-        ) {
-            MessagesScreen(
-                onNavigateToWish = { contactId, messageRef ->
-                    navController.navigate(Screen.WishPreview.createRoute(contactId, messageRef))
-                },
-                onNavigateToContact = { contactId ->
-                    navController.navigate(
-                        Screen.ContactDetail.createRoute(contactId, openPreferences = true)
-                    )
-                },
-                onNavigateToAutomationSetup = {
-                    navController.navigate(Screen.AutomationSetup.route)
-                },
-            )
-        }
-        authenticatedComposable(
-            route = Screen.Messages.filteredRoute,
-            navController = navController,
-            isSignedIn = isSignedIn,
-            arguments = listOf(navArgument(Screen.Messages.channelArg) { type = NavType.StringType }),
-        ) { backStackEntry ->
-            val channel = RouteArgumentCodec.decode(backStackEntry.arguments?.getString(Screen.Messages.channelArg))
-            val channelFilter = channel.toMessageChannelFilter()
-            MessagesScreen(
-                initialChannelFilter = channelFilter,
-                verificationChannelFilter = channelFilter,
-                onNavigateToWish = { contactId, messageRef ->
-                    navController.navigate(Screen.WishPreview.createRoute(contactId, messageRef))
-                },
-                onNavigateToContact = { contactId ->
-                    navController.navigate(
-                        Screen.ContactDetail.createRoute(contactId, openPreferences = true)
-                    )
-                },
-                onNavigateToAutomationSetup = {
-                    navController.navigate(Screen.AutomationSetup.route)
-                },
-            )
-        }
+        )
         authenticatedComposable(
             route = Screen.Settings.route,
             navController = navController,
@@ -433,91 +292,6 @@ fun RelateNavGraph(
                     navController.navigate(Screen.ActivityHistory.route)
                 },
             )
-        }
-        authenticatedComposable(
-            route = Screen.ChatHistory.route,
-            navController = navController,
-            isSignedIn = isSignedIn,
-            arguments = listOf(navArgument("contactId") { type = NavType.StringType })
-        ) {
-            ChatHistoryScreen(
-                onBack = { navController.popBackStack() }
-            )
-        }
-        authenticatedComposable(
-            route = Screen.MemoryVault.route,
-            navController = navController,
-            isSignedIn = isSignedIn,
-            arguments = listOf(navArgument("contactId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
-            MemoryVaultScreen(
-                contactId = contactId,
-                onBack = { navController.popBackStack() }
-            )
-        }
-        authenticatedComposable(
-            route = Screen.GiftAdvisor.route,
-            navController = navController,
-            isSignedIn = isSignedIn,
-            arguments = listOf(navArgument("contactId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val contactId = RouteArgumentCodec.decode(backStackEntry.arguments?.getString("contactId"))
-            GiftAdvisorScreen(
-                contactId = contactId,
-                onBack = { navController.popBackStack() },
-                onAdjustBudget = {
-                    navController.navigate(
-                        Screen.ContactDetail.createRoute(
-                            contactId = contactId,
-                            openPreferences = true,
-                        ),
-                    )
-                },
-            )
-        }
-    }
-}
-
-private fun String.toMessageChannelFilter(): MessageChannelFilter? {
-    return MessageChannelFilter.entries.firstOrNull { it.name.equals(this, ignoreCase = true) }
-}
-
-private fun NavGraphBuilder.authenticatedComposable(
-    route: String,
-    navController: NavHostController,
-    isSignedIn: () -> Boolean,
-    arguments: List<NamedNavArgument> = emptyList(),
-    deepLinks: List<NavDeepLink> = emptyList(),
-    content: @Composable (NavBackStackEntry) -> Unit,
-) {
-    composable(
-        route = route,
-        arguments = arguments,
-        deepLinks = deepLinks,
-    ) { backStackEntry ->
-        RequireSignedIn(
-            navController = navController,
-            isSignedIn = isSignedIn,
-        ) {
-            content(backStackEntry)
-        }
-    }
-}
-
-@Composable
-private fun RequireSignedIn(
-    navController: NavHostController,
-    isSignedIn: () -> Boolean,
-    content: @Composable () -> Unit,
-) {
-    if (isSignedIn()) {
-        content()
-    } else {
-        LaunchedEffect(Unit) {
-            navController.navigate(Screen.Auth.route) {
-                popUpTo(0) { inclusive = true }
-            }
         }
     }
 }

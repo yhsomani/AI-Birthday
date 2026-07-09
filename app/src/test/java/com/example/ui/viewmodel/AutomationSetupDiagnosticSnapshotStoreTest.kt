@@ -8,6 +8,7 @@ import com.example.domain.model.diagnostic.DiagnosticSnapshotStatus
 import com.example.domain.readiness.RelationshipActionReadinessPolicy
 import com.example.domain.repository.DiagnosticSnapshotRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit4.MockKRule
 import kotlinx.coroutines.test.runTest
@@ -85,10 +86,35 @@ class AutomationSetupDiagnosticSnapshotStoreTest {
         assertNotNull(snapshot.id)
     }
 
-    private fun aiDoctorReport(): AiDoctorReport {
+    @Test
+    fun `recordAiDoctorSnapshot skips duplicate report payloads`() = runTest {
+        coEvery { diagnosticSnapshotRepository.record(any()) } returns Unit
+        val store = AutomationSetupDiagnosticSnapshotStore(diagnosticSnapshotRepository)
+        val report = aiDoctorReport()
+
+        store.recordAiDoctorSnapshot(report)
+        store.recordAiDoctorSnapshot(report)
+
+        coVerify(exactly = 1) { diagnosticSnapshotRepository.record(any()) }
+    }
+
+    @Test
+    fun `recordAiDoctorSnapshot records changed report payloads`() = runTest {
+        coEvery { diagnosticSnapshotRepository.record(any()) } returns Unit
+        val store = AutomationSetupDiagnosticSnapshotStore(diagnosticSnapshotRepository)
+
+        store.recordAiDoctorSnapshot(aiDoctorReport())
+        store.recordAiDoctorSnapshot(aiDoctorReport(summaryTitle = "AI issue changed"))
+
+        coVerify(exactly = 2) { diagnosticSnapshotRepository.record(any()) }
+    }
+
+    private fun aiDoctorReport(
+        summaryTitle: String = "AI issue for aarav@example.com",
+    ): AiDoctorReport {
         return AiDoctorReport(
             summary = AiDoctorSummary(
-                title = "AI issue for aarav@example.com",
+                title = summaryTitle,
                 detail = "Authorization=Bearer ya29.secret-token",
                 status = ReadinessStatus.ACTION_REQUIRED,
             ),

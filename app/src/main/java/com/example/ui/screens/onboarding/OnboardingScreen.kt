@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -46,10 +47,13 @@ import com.example.core.ui.theme.RelateSpacing
 import com.example.ui.viewmodel.OnboardingViewModel
 
 internal object OnboardingTestTags {
+    const val MOMENTUM_CARD = "onboarding_momentum_card"
     const val CONTINUE_BUTTON = "onboarding_continue_button"
     const val SETUP_CHECKLIST_BUTTON = "onboarding_setup_checklist_button"
     const val LOCAL_MODE_BUTTON = "onboarding_local_mode_button"
 }
+
+private const val ONBOARDING_START_PROGRESS = 0.2f
 
 data class OnboardingStep(
     val icon: ImageVector,
@@ -152,6 +156,10 @@ internal fun OnboardingContent(
         )
         Spacer(modifier = Modifier.height(RelateSpacing.xl))
 
+        OnboardingMomentumCard()
+
+        Spacer(modifier = Modifier.height(RelateSpacing.xl))
+
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
@@ -177,7 +185,7 @@ internal fun OnboardingContent(
         ) {
             Text(
                 text = stringResource(R.string.onboarding_continue_to_sign_in),
-                color = MaterialTheme.colorScheme.background,
+                color = MaterialTheme.colorScheme.onPrimary,
             )
         }
         Spacer(modifier = Modifier.height(RelateSpacing.sm))
@@ -214,6 +222,101 @@ internal fun OnboardingContent(
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(RelateSpacing.lg))
+    }
+}
+
+@Composable
+private fun OnboardingMomentumCard() {
+    RelateGlassCard(modifier = Modifier.testTag(OnboardingTestTags.MOMENTUM_CARD)) {
+        Column(
+            modifier = Modifier.padding(RelateSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.onboarding_progress_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(R.string.onboarding_progress_label),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            LinearProgressIndicator(
+                progress = { ONBOARDING_START_PROGRESS },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(RelateSize.progressTrack),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+            Text(
+                text = stringResource(R.string.onboarding_progress_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OnboardingValueLine(
+                icon = Icons.Filled.CheckCircle,
+                title = stringResource(R.string.onboarding_value_defaults_title),
+                body = stringResource(R.string.onboarding_value_defaults_body),
+            )
+            OnboardingValueLine(
+                icon = Icons.Filled.SmartToy,
+                title = stringResource(R.string.onboarding_value_preview_title),
+                body = stringResource(R.string.onboarding_value_preview_body),
+            )
+            OnboardingValueLine(
+                icon = Icons.Filled.Favorite,
+                title = stringResource(R.string.onboarding_value_voice_title),
+                body = stringResource(R.string.onboarding_value_voice_body),
+            )
+            Text(
+                text = stringResource(R.string.onboarding_loss_contrast_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun OnboardingValueLine(
+    icon: ImageVector,
+    title: String,
+    body: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(RelateSpacing.sm),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(RelateSize.iconMd),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

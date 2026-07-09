@@ -38,7 +38,7 @@ data class SignInResult(
 
 @Singleton
 open class AuthManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val database: AppDatabase,
     private val securePrefs: SecurePrefs
 ) {

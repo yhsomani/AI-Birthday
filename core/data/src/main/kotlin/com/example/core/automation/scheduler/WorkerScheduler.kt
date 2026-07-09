@@ -8,7 +8,6 @@ import com.example.core.automation.workers.EventDiscoveryWorker
 import com.example.core.automation.workers.HolidayWishWorker
 import com.example.core.automation.workers.MessageGenerationWorker
 import com.example.core.automation.workers.PostEventFollowUpWorker
-import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 object WorkerScheduler {
@@ -78,22 +77,5 @@ object WorkerScheduler {
          .then(holidayWishRequest)
          .then(followUpRequest)
          .enqueue()
-    }
-
-    private fun calculateDelayUntilMidnight(): Long {
-        return calculateDelayUntil(0, 0)
-    }
-
-    private fun calculateDelayUntil(hour: Int, minute: Int): Long {
-        val now = Calendar.getInstance()
-        val target = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-        }
-        if (target.timeInMillis <= now.timeInMillis) {
-            target.add(Calendar.DAY_OF_YEAR, 1)
-        }
-        return target.timeInMillis - now.timeInMillis
     }
 }

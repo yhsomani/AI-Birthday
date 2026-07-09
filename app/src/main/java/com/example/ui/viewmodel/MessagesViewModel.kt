@@ -6,26 +6,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.R
 import com.example.core.resilience.StructuredLogger
-import com.example.domain.automation.MessageOperationalReadiness
-import com.example.domain.automation.MessageOperationalReadinessPolicy
 import com.example.domain.model.ActivityLogType
-import com.example.domain.model.ApprovalMode
-import com.example.domain.model.MessageChannel
-import com.example.domain.model.MessageStatus
 import com.example.domain.model.activity.ActivityLogRecord
-import com.example.domain.model.contact.ContactMessageContext
-import com.example.domain.model.message.PendingMessageListItem
-import com.example.domain.model.message.SentMessageListItem
-import com.example.domain.model.occasion.OccasionType
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.repository.ContactRepository
 import com.example.domain.repository.EventRepository
 import com.example.domain.repository.MessageRepository
-import com.example.domain.readiness.RelationshipActionReadiness
-import com.example.domain.readiness.RelationshipActionReadinessPolicy
-import com.example.domain.readiness.RelationshipReadinessAction
-import com.example.domain.readiness.RelationshipReadinessReason
-import com.example.domain.readiness.RelationshipReadinessState
 import com.example.domain.service.PreferencesRepository
 import com.example.domain.usecase.ApprovePendingMessageUseCase
 import com.example.domain.usecase.RejectPendingMessageUseCase
@@ -41,168 +27,6 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
-
-typealias MessageReadiness = MessageOperationalReadiness
-
-enum class MessageChannelFilter {
-    ALL,
-    SMS,
-    WHATSAPP,
-    EMAIL,
-}
-
-enum class MessageSort {
-    SCHEDULED_ASC,
-    SCHEDULED_DESC,
-    CONTACT_ASC,
-}
-
-enum class MessageActionRoute {
-    NONE,
-    WISH,
-    CONTACT,
-    AUTOMATION_SETUP,
-}
-
-data class PendingMessageItem(
-    val message: PendingMessageListItem,
-    val contactName: String,
-    val contactAvatarUrl: String? = null,
-    val eventType: String = OccasionType.BIRTHDAY.raw,
-    val readiness: MessageReadiness = MessageReadiness.READY_FOR_REVIEW,
-    val actionReadiness: RelationshipActionReadiness = RelationshipActionReadinessPolicy.fromMessageOperationalReadiness(
-        readiness = readiness,
-        relatedMessageId = message.id.value,
-        relatedContactId = message.contactId.value,
-        relatedEventId = message.occasionId.value,
-    ),
-) {
-    val id: String
-        get() = message.id.value
-
-    val contactId: String
-        get() = message.contactId.value
-
-    val scheduledForMs: Long
-        get() = message.scheduledForMs
-
-    val channel: MessageChannel
-        get() = message.channel
-
-    val approvalMode: ApprovalMode
-        get() = message.approvalMode
-
-    val selectedVariantText: String
-        get() = message.selectedVariantText
-
-    val standardVariant: String
-        get() = message.standardVariant
-
-    val reviewPreviewText: String
-        get() = if (message.editedByUser) {
-            message.userEditedText ?: message.selectedVariantText
-        } else {
-            message.selectedVariantText
-        }
-
-    val messageText: String
-        get() = message.selectedVariantText.ifBlank { message.standardVariant }
-
-    val qualityScore: Int
-        get() = message.qualityScore
-
-    val isUsingFallback: Boolean
-        get() = message.isUsingFallback
-
-    val blocksTaskFlow: Boolean
-        get() = actionReadiness.state == RelationshipReadinessState.ACTION_REQUIRED
-
-    val requiresContactOrChannelFix: Boolean
-        get() = actionReadiness.blockers.any { blocker ->
-            blocker.action in setOf(
-                RelationshipReadinessAction.OPEN_CONTACT,
-                RelationshipReadinessAction.CONFIGURE_CHANNEL,
-                RelationshipReadinessAction.CONFIGURE_EMAIL,
-            )
-        }
-
-    val primaryActionRoute: MessageActionRoute
-        get() = actionReadiness.toMessageActionRoute()
-}
-
-private fun RelationshipActionReadiness.toMessageActionRoute(): MessageActionRoute {
-    return when (primaryAction) {
-        RelationshipReadinessAction.REVIEW_MESSAGE,
-        RelationshipReadinessAction.EDIT_DRAFT -> MessageActionRoute.WISH
-        RelationshipReadinessAction.OPEN_CONTACT -> MessageActionRoute.CONTACT
-        RelationshipReadinessAction.CONFIGURE_CHANNEL -> when (primaryReason) {
-            RelationshipReadinessReason.CONTACT_MISSING,
-            RelationshipReadinessReason.MISSING_PHONE,
-            RelationshipReadinessReason.MISSING_EMAIL -> MessageActionRoute.CONTACT
-            else -> MessageActionRoute.AUTOMATION_SETUP
-        }
-        RelationshipReadinessAction.CONFIGURE_EMAIL,
-        RelationshipReadinessAction.OPEN_SETUP,
-        RelationshipReadinessAction.CHECK_SETUP,
-        RelationshipReadinessAction.CONNECT_AI,
-        RelationshipReadinessAction.ENABLE_AI_GENERATION,
-        RelationshipReadinessAction.FIX_CONTACT_SYNC,
-        RelationshipReadinessAction.SYNC_CONTACTS -> MessageActionRoute.AUTOMATION_SETUP
-        RelationshipReadinessAction.NONE,
-        RelationshipReadinessAction.WAIT,
-        RelationshipReadinessAction.REVIEW_MESSAGES,
-        RelationshipReadinessAction.CREATE_BACKUP,
-        RelationshipReadinessAction.REFRESH_BACKUP -> MessageActionRoute.NONE
-    }
-}
-
-data class SentMessageItem(
-    val message: SentMessageListItem,
-    val contactName: String,
-    val contactAvatarUrl: String? = null,
-) {
-    val id: String
-        get() = message.id.value
-
-    val channel: MessageChannel
-        get() = message.channel
-
-    val sentAtMs: Long
-        get() = message.sentAtMs
-
-    val messageText: String
-        get() = message.messageText
-}
-
-data class MessagesUiState(
-    val allNeedsReviewMessages: List<PendingMessageItem> = emptyList(),
-    val needsReviewMessages: List<PendingMessageItem> = emptyList(),
-    val allScheduledMessages: List<PendingMessageItem> = emptyList(),
-    val scheduledMessages: List<PendingMessageItem> = emptyList(),
-    val allBlockedMessages: List<PendingMessageItem> = emptyList(),
-    val blockedMessages: List<PendingMessageItem> = emptyList(),
-    val allTodayMessages: List<PendingMessageItem> = emptyList(),
-    val todayMessages: List<PendingMessageItem> = emptyList(),
-    val allPendingMessages: List<PendingMessageItem> = emptyList(),
-    val pendingMessages: List<PendingMessageItem> = emptyList(),
-    val allApprovedMessages: List<PendingMessageItem> = emptyList(),
-    val approvedMessages: List<PendingMessageItem> = emptyList(),
-    val allSentMessages: List<SentMessageItem> = emptyList(),
-    val sentMessages: List<SentMessageItem> = emptyList(),
-    val allFailedMessages: List<PendingMessageItem> = emptyList(),
-    val failedMessages: List<PendingMessageItem> = emptyList(),
-    val searchQuery: String = "",
-    val selectedChannelFilter: MessageChannelFilter = MessageChannelFilter.ALL,
-    val selectedSort: MessageSort = MessageSort.SCHEDULED_ASC,
-    val isLoading: Boolean = true,
-    val isRefreshing: Boolean = false,
-    val approvingMessageId: String? = null,
-    val rejectingMessageId: String? = null,
-    val revokingMessageId: String? = null,
-    val retryingMessageId: String? = null,
-    val selectedMessageIds: Set<String> = emptySet(),
-    val error: String? = null,
-)
 
 @HiltViewModel
 class MessagesViewModel @Inject constructor(
@@ -241,77 +65,20 @@ class MessagesViewModel @Inject constructor(
                     eventRepository.getEventListItems(),
                     preferencesRepository.observeChanges().onStart { emit(Unit) },
                 ) { pending, sent, contacts, events, _ ->
-                    val contactMap = contacts.associateBy { it.id.value }
-                    val eventMap = events.associateBy { it.id.value }
-
-                    val needsReviewItems = mutableListOf<PendingMessageItem>()
-                    val scheduledItems = mutableListOf<PendingMessageItem>()
-                    val blockedItems = mutableListOf<PendingMessageItem>()
-                    val failedItems = mutableListOf<PendingMessageItem>()
-
-                    pending.forEach { msg ->
-                        val contact = contactMap[msg.contactId.value]
-                        val event = eventMap[msg.occasionId.value]
-                        val readiness = msg.readinessFor(
-                            contact = contact,
-                        )
-                        val item = PendingMessageItem(
-                            message = msg,
-                            contactName = contact?.displayName ?: msg.contactId.value,
-                            contactAvatarUrl = contact?.avatarUrl,
-                            eventType = event?.type?.raw ?: OccasionType.BIRTHDAY.raw,
-                            readiness = readiness,
-                            actionReadiness = RelationshipActionReadinessPolicy.fromMessageOperationalReadiness(
-                                readiness = readiness,
-                                relatedMessageId = msg.id.value,
-                                relatedContactId = msg.contactId.value,
-                                relatedEventId = msg.occasionId.value,
-                            ),
-                        )
-
-                        when (msg.status) {
-                            MessageStatus.FAILED -> failedItems.add(item)
-                            MessageStatus.APPROVED,
-                            MessageStatus.DISPATCHING -> {
-                                if (item.blocksTaskFlow) {
-                                    blockedItems.add(item)
-                                } else {
-                                    scheduledItems.add(item)
-                                }
-                            }
-                            MessageStatus.SENT,
-                            MessageStatus.REJECTED,
-                            MessageStatus.EXPIRED -> {
-                                // Do not show these in task-state pending lists.
-                            }
-                            MessageStatus.PENDING,
-                            MessageStatus.UNKNOWN -> {
-                                if (item.blocksTaskFlow) {
-                                    blockedItems.add(item)
-                                } else {
-                                    needsReviewItems.add(item)
-                                }
-                            }
-                        }
-                    }
-
-                    val sentItems = sent.map { s ->
-                        val contact = s.contactId?.value?.let { contactMap[it] }
-                        SentMessageItem(
-                            message = s,
-                            contactName = contact?.displayName
-                                ?: s.contactId?.value
-                                ?: string(R.string.messages_deleted_contact),
-                            contactAvatarUrl = contact?.avatarUrl,
-                        )
-                    }
-
-                    _uiState.value.withMessages(
-                        needsReviewMessages = needsReviewItems,
-                        scheduledMessages = scheduledItems,
-                        blockedMessages = blockedItems,
-                        sentMessages = sentItems,
-                        failedMessages = failedItems,
+                    _uiState.value.withMessageLists(
+                        pendingMessages = pending,
+                        sentMessages = sent,
+                        contactContexts = contacts,
+                        eventItems = events,
+                        deletedContactName = string(R.string.messages_deleted_contact),
+                        readinessConfig = MessagesReadinessConfig(
+                            channelBlackoutJson = preferencesRepository.getChannelBlackout(),
+                            senderEmail = preferencesRepository.getSenderEmail(),
+                            senderEmailPassword = preferencesRepository.getSenderEmailPassword(),
+                            quietHoursStart = preferencesRepository.getQuietHoursStart(),
+                            quietHoursEnd = preferencesRepository.getQuietHoursEnd(),
+                            blackoutDatesJson = preferencesRepository.getBlackoutDates(),
+                        ),
                         isLoading = false,
                         isRefreshing = false,
                     )
@@ -514,120 +281,6 @@ class MessagesViewModel @Inject constructor(
     fun selectSort(sort: MessageSort) {
         _uiState.value = _uiState.value.copy(selectedSort = sort).withFilteredMessages()
     }
-
-    private fun MessagesUiState.withMessages(
-        needsReviewMessages: List<PendingMessageItem>,
-        scheduledMessages: List<PendingMessageItem>,
-        blockedMessages: List<PendingMessageItem>,
-        sentMessages: List<SentMessageItem>,
-        failedMessages: List<PendingMessageItem>,
-        isLoading: Boolean,
-        isRefreshing: Boolean,
-    ): MessagesUiState {
-        return copy(
-            allNeedsReviewMessages = needsReviewMessages,
-            allScheduledMessages = scheduledMessages,
-            allBlockedMessages = blockedMessages,
-            allTodayMessages = needsReviewMessages,
-            allPendingMessages = needsReviewMessages,
-            allApprovedMessages = scheduledMessages,
-            allSentMessages = sentMessages,
-            allFailedMessages = failedMessages,
-            isLoading = isLoading,
-            isRefreshing = isRefreshing,
-        ).withFilteredMessages()
-    }
-
-    private fun MessagesUiState.withFilteredMessages(): MessagesUiState {
-        val query = searchQuery.trim()
-        val filteredNeedsReview = allNeedsReviewMessages.filterPending(query, selectedChannelFilter).sortPending(selectedSort)
-        val filteredScheduled = allScheduledMessages.filterPending(query, selectedChannelFilter).sortPending(selectedSort)
-        val filteredBlocked = allBlockedMessages.filterPending(query, selectedChannelFilter).sortPending(selectedSort)
-        return copy(
-            needsReviewMessages = filteredNeedsReview,
-            scheduledMessages = filteredScheduled,
-            blockedMessages = filteredBlocked,
-            todayMessages = filteredNeedsReview,
-            pendingMessages = filteredNeedsReview,
-            approvedMessages = filteredScheduled,
-            sentMessages = allSentMessages.filterSent(query, selectedChannelFilter).sortSent(selectedSort),
-            failedMessages = allFailedMessages.filterPending(query, selectedChannelFilter).sortPending(selectedSort),
-        )
-    }
-
-    private fun List<PendingMessageItem>.filterPending(
-        query: String,
-        channelFilter: MessageChannelFilter,
-    ): List<PendingMessageItem> {
-        return filter { item ->
-            channelFilter.matches(item.channel) &&
-                (query.isBlank() ||
-                    item.contactName.contains(query, ignoreCase = true) ||
-                    item.eventType.contains(query, ignoreCase = true) ||
-                    item.channel.raw.contains(query, ignoreCase = true) ||
-                    item.selectedVariantText.contains(query, ignoreCase = true) ||
-                    item.standardVariant.contains(query, ignoreCase = true))
-        }
-    }
-
-    private fun List<SentMessageItem>.filterSent(
-        query: String,
-        channelFilter: MessageChannelFilter,
-    ): List<SentMessageItem> {
-        return filter { item ->
-            channelFilter.matches(item.channel) &&
-                (query.isBlank() ||
-                    item.contactName.contains(query, ignoreCase = true) ||
-                    item.message.occasionType.contains(query, ignoreCase = true) ||
-                    item.channel.raw.contains(query, ignoreCase = true) ||
-                    item.message.deliveryStatus.raw.contains(query, ignoreCase = true) ||
-                    item.messageText.contains(query, ignoreCase = true))
-        }
-    }
-
-    private fun List<PendingMessageItem>.sortPending(sort: MessageSort): List<PendingMessageItem> {
-        return when (sort) {
-            MessageSort.SCHEDULED_ASC -> sortedBy { it.scheduledForMs }
-            MessageSort.SCHEDULED_DESC -> sortedByDescending { it.scheduledForMs }
-            MessageSort.CONTACT_ASC -> sortedWith(compareBy<PendingMessageItem> { it.contactName.lowercase() }
-                .thenBy { it.scheduledForMs })
-        }
-    }
-
-    private fun List<SentMessageItem>.sortSent(sort: MessageSort): List<SentMessageItem> {
-        return when (sort) {
-            MessageSort.SCHEDULED_ASC -> sortedBy { it.sentAtMs }
-            MessageSort.SCHEDULED_DESC -> sortedByDescending { it.sentAtMs }
-            MessageSort.CONTACT_ASC -> sortedWith(compareBy<SentMessageItem> { it.contactName.lowercase() }
-                .thenByDescending { it.sentAtMs })
-        }
-    }
-
-    private fun MessageChannelFilter.matches(channel: String): Boolean {
-        return matches(MessageChannel.fromRaw(channel))
-    }
-
-    private fun MessageChannelFilter.matches(channel: MessageChannel): Boolean {
-        return when (this) {
-            MessageChannelFilter.ALL -> true
-            MessageChannelFilter.SMS -> channel == MessageChannel.SMS
-            MessageChannelFilter.WHATSAPP -> channel == MessageChannel.WHATSAPP
-            MessageChannelFilter.EMAIL -> channel == MessageChannel.EMAIL
-        }
-    }
-
-    private fun PendingMessageListItem.readinessFor(
-        contact: ContactMessageContext?,
-    ): MessageReadiness = MessageOperationalReadinessPolicy.evaluate(
-        message = this,
-        contact = contact,
-        channelBlackoutJson = preferencesRepository.getChannelBlackout(),
-        senderEmail = preferencesRepository.getSenderEmail(),
-        senderEmailPassword = preferencesRepository.getSenderEmailPassword(),
-        quietHoursStart = preferencesRepository.getQuietHoursStart(),
-        quietHoursEnd = preferencesRepository.getQuietHoursEnd(),
-        blackoutDatesJson = preferencesRepository.getBlackoutDates(),
-    )
 
     private suspend fun recordMessageActivity(
         title: String,

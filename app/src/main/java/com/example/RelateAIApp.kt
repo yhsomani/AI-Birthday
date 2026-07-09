@@ -42,7 +42,4 @@ class RelateAIApp : Application(), androidx.work.Configuration.Provider {
         }
     }
 
-    companion object {
-        private const val TAG = "RelateAIApp"
-    }
 }

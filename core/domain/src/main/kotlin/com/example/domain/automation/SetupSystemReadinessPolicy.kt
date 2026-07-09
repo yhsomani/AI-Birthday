@@ -54,7 +54,6 @@ data class SetupDispatchRecoveryReadiness(
     val status: SetupReadinessStatus,
     val group: SetupReadinessGroup = SetupReadinessGroup.RECOVERY,
     val persistedRecoveryCount: Int = 0,
-    val persistedDeadLetterCount: Int = 0,
 )
 
 object SetupSystemReadinessPolicy {
@@ -124,21 +123,18 @@ object SetupSystemReadinessPolicy {
 
     fun evaluateDispatchRecovery(
         persistedRecoveryCount: Int,
-        persistedDeadLetterCount: Int,
     ): SetupDispatchRecoveryReadiness {
         return if (persistedRecoveryCount == 0) {
             SetupDispatchRecoveryReadiness(
                 reason = SetupDispatchRecoveryReadinessReason.CLEAR,
                 status = SetupReadinessStatus.OK,
                 persistedRecoveryCount = persistedRecoveryCount,
-                persistedDeadLetterCount = persistedDeadLetterCount,
             )
         } else {
             SetupDispatchRecoveryReadiness(
                 reason = SetupDispatchRecoveryReadinessReason.RECOVERY_QUEUE_PRESENT,
                 status = SetupReadinessStatus.WARNING,
                 persistedRecoveryCount = persistedRecoveryCount,
-                persistedDeadLetterCount = persistedDeadLetterCount,
             )
         }
     }

@@ -44,7 +44,14 @@ class OnboardingScreenInteractionTest {
 
         composeRule.onNodeWithText(context.getString(R.string.onboarding_setup_title))
             .assertIsDisplayed()
+        composeRule.onNodeWithTag(OnboardingTestTags.MOMENTUM_CARD)
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.onboarding_progress_label))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.onboarding_value_preview_title))
+            .assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.onboarding_setup_google_title))
+            .performScrollTo()
             .assertIsDisplayed()
 
         composeRule.onNodeWithTag(OnboardingTestTags.SETUP_CHECKLIST_BUTTON)

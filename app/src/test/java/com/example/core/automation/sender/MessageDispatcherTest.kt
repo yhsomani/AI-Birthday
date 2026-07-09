@@ -14,7 +14,6 @@ import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.EventEntity
 import com.example.core.db.entities.SentMessageEntity
 import com.example.core.prefs.SecurePrefs
-import com.example.core.resilience.DeadLetterQueue
 import com.example.domain.model.MessageChannel
 import com.example.domain.model.MessageDeliveryStatus
 import com.example.domain.model.common.ContactId
@@ -40,7 +39,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,7 +61,6 @@ class MessageDispatcherTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         mockkObject(DailyScheduler)
-        DeadLetterQueue.clear()
         mockkObject(NotificationHelper)
         mockkConstructor(SecurePrefs::class)
         mockkConstructor(EmailSender::class)
@@ -87,7 +84,6 @@ class MessageDispatcherTest {
 
     @After
     fun tearDown() {
-        DeadLetterQueue.clear()
         unmockkAll()
     }
 
@@ -167,12 +163,6 @@ class MessageDispatcherTest {
                 deadLetteredAtMs = any(),
             )
         }
-        val deadLetter = DeadLetterQueue.getAll().single()
-        assertEquals("pending_1", deadLetter.id)
-        assertEquals("Selected", deadLetter.payload)
-        assertEquals("All automatic delivery routes failed.", deadLetter.errorMessage)
-        assertEquals("NO_DELIVERY_ROUTE", deadLetter.errorType)
-        assertEquals(0, deadLetter.retryCount)
     }
 
     @Test
@@ -210,7 +200,6 @@ class MessageDispatcherTest {
                 deadLetteredAtMs = null,
             )
         }
-        assertEquals(0, DeadLetterQueue.count())
     }
 
     @Test
@@ -252,12 +241,6 @@ class MessageDispatcherTest {
             )
         }
 
-        val deadLetter = DeadLetterQueue.getAll().single()
-        assertEquals("pending_1", deadLetter.id)
-        assertEquals("Selected", deadLetter.payload)
-        assertEquals(DispatchProviderRetryPolicy.ERROR_SMS_TRANSIENT_PROVIDER_FAILURE, deadLetter.errorType)
-        assertEquals(DispatchProviderRetryPolicy.MAX_AUTOMATIC_RETRY_FAILURES, deadLetter.retryCount)
-        assertTrue(deadLetter.errorMessage.contains("Automatic retry limit reached"))
     }
 
     @Test
@@ -332,7 +315,6 @@ class MessageDispatcherTest {
                 deadLetteredAtMs = null,
             )
         }
-        assertEquals(0, DeadLetterQueue.count())
     }
 
     @Test
@@ -369,7 +351,6 @@ class MessageDispatcherTest {
             )
         }
         coVerify { pendingMessageDao.markSmsHandoffSentIfAwaitingCallback("pending_1") }
-        assertEquals(0, DeadLetterQueue.count())
     }
 
     @Test
@@ -406,7 +387,6 @@ class MessageDispatcherTest {
             )
         }
         coVerify { pendingMessageDao.markSmsHandoffSentIfAwaitingCallback("pending_1") }
-        assertEquals(0, DeadLetterQueue.count())
     }
 
     @Test
@@ -443,7 +423,6 @@ class MessageDispatcherTest {
             )
         }
         coVerify { pendingMessageDao.updateStatus("pending_1", "SENT") }
-        assertEquals(0, DeadLetterQueue.count())
     }
 
     @Test
@@ -506,7 +485,6 @@ class MessageDispatcherTest {
                 deadLetteredAtMs = null,
             )
         }
-        assertEquals(0, DeadLetterQueue.count())
     }
 
     private fun dispatcher(): MessageDispatcher {

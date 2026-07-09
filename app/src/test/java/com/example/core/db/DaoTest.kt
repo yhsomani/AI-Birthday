@@ -168,6 +168,17 @@ class DaoTest {
     }
 
     @Test
+    fun contactDao_getByIdsReturnsOnlyActiveRequestedContacts() = runTest {
+        contactDao.upsert(testContact("c2", "Bob"))
+        contactDao.upsert(testContact("archived", "Archived").copy(isArchived = true))
+        contactDao.upsert(testContact("deleted", "Deleted").copy(isDeleted = true))
+
+        val contacts = contactDao.getByIds(listOf("c1", "c2", "archived", "deleted", "missing"))
+
+        assertEquals(setOf("c1", "c2"), contacts.map { it.id }.toSet())
+    }
+
+    @Test
     fun contactDao_delete() = runTest {
         contactDao.upsert(testContact("c1", "Alice"))
         contactDao.delete(testContact("c1", "Alice"))
@@ -208,6 +219,39 @@ class DaoTest {
         eventDao.upsert(testEvent("inactive", "c1").copy(nextOccurrenceMs = now + 1L * 86_400_000L, isActive = false))
 
         assertEquals(1, eventDao.countUpcoming(days = 30, nowMs = now))
+    }
+
+    @Test
+    fun eventDao_getNextActiveReturnsEarliestActiveEvents() = runTest {
+        val now = 1_700_000_000_000L
+        eventDao.deleteAll()
+        eventDao.upsert(testEvent("later", "c1").copy(nextOccurrenceMs = now + 3L * 86_400_000L))
+        eventDao.upsert(testEvent("soonest", "c1").copy(nextOccurrenceMs = now + 1L * 86_400_000L))
+        eventDao.upsert(testEvent("second", "c1").copy(nextOccurrenceMs = now + 2L * 86_400_000L))
+        eventDao.upsert(testEvent("inactive", "c1").copy(nextOccurrenceMs = now, isActive = false))
+
+        val events = eventDao.getNextActive(limit = 2)
+
+        assertEquals(listOf("soonest", "second"), events.map { it.id })
+    }
+
+    @Test
+    fun eventDao_getActiveBirthdaysOnDateReturnsOnlyMatchingActiveBirthdays() = runTest {
+        eventDao.deleteAll()
+        eventDao.upsert(testEvent("birthday_today", "c1").copy(dayOfMonth = 27, month = 6))
+        eventDao.upsert(testEvent("birthday_other_day", "c1").copy(dayOfMonth = 28, month = 6))
+        eventDao.upsert(
+            testEvent("anniversary_today", "c1").copy(
+                type = "ANNIVERSARY",
+                dayOfMonth = 27,
+                month = 6,
+            ),
+        )
+        eventDao.upsert(testEvent("inactive_today", "c1").copy(dayOfMonth = 27, month = 6, isActive = false))
+
+        val events = eventDao.getActiveBirthdaysOnDate(dayOfMonth = 27, month = 6)
+
+        assertEquals(listOf("birthday_today"), events.map { it.id })
     }
 
     @Test
@@ -281,6 +325,15 @@ class DaoTest {
         pendingMessageDao.insert(testPending("p2", "e2"))
         val count = pendingMessageDao.countPending().first()
         assertEquals(2, count)
+    }
+
+    @Test
+    fun pendingMessageDao_countPendingSyncCountsOnlyPendingRows() = runTest {
+        pendingMessageDao.insert(testPending("pending", "event_pending").copy(status = "PENDING"))
+        pendingMessageDao.insert(testPending("approved", "event_approved").copy(status = "APPROVED"))
+        pendingMessageDao.insert(testPending("failed", "event_failed").copy(status = "FAILED"))
+
+        assertEquals(1, pendingMessageDao.countPendingSync())
     }
 
     @Test
@@ -539,7 +592,6 @@ class DaoTest {
             listOf("da1"),
             dispatchAttemptDao.getByMessageDraft("p1").first().map { it.id },
         )
-        assertEquals(0, dispatchAttemptDao.countDeadLettered().first())
         assertEquals(0, dispatchAttemptDao.countFailureRecoveryQueue().first())
 
         dispatchAttemptDao.updateOutcome(
@@ -563,7 +615,6 @@ class DaoTest {
         assertEquals(MessageChannel.EMAIL.raw, updated?.channel)
         assertEquals(MessageDeliveryStatus.FAILED.raw, updated?.deliveryStatus)
         assertEquals("NETWORK", updated?.errorType)
-        assertEquals(1, dispatchAttemptDao.countDeadLettered().first())
         assertEquals(1, dispatchAttemptDao.countFailureRecoveryQueue().first())
         assertEquals(listOf("da1"), dispatchAttemptDao.getFailureRecoveryQueue().map { it.id })
         assertEquals("da1", dispatchAttemptDao.getLatestFailureForMessageDraft("p1")?.id)
@@ -585,7 +636,6 @@ class DaoTest {
             deadLetteredAtMs = null,
         )
 
-        assertEquals(0, dispatchAttemptDao.countDeadLettered().first())
         assertEquals(0, dispatchAttemptDao.countFailureRecoveryQueue().first())
         assertEquals(null, dispatchAttemptDao.getLatestFailureForMessageDraft("p1"))
         assertEquals(2, dispatchAttemptDao.getMaxRetryCountForMessageDraft("p1"))

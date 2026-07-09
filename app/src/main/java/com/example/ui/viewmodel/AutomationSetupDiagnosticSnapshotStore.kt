@@ -13,6 +13,8 @@ import org.json.JSONObject
 internal class AutomationSetupDiagnosticSnapshotStore(
     private val diagnosticSnapshotRepository: DiagnosticSnapshotRepository,
 ) {
+    private var lastAiDoctorSnapshotSignature: String? = null
+
     suspend fun loadRecentPersistedHealthSnapshot(
         nowMs: Long = System.currentTimeMillis(),
     ): DiagnosticSnapshot? {
@@ -25,7 +27,11 @@ internal class AutomationSetupDiagnosticSnapshotStore(
 
     suspend fun recordAiDoctorSnapshot(report: AiDoctorReport) {
         runCatching {
-            diagnosticSnapshotRepository.record(report.toDiagnosticSnapshot())
+            val snapshot = report.toDiagnosticSnapshot()
+            val signature = snapshot.stableSignature()
+            if (signature == lastAiDoctorSnapshotSignature) return@runCatching
+            diagnosticSnapshotRepository.record(snapshot)
+            lastAiDoctorSnapshotSignature = signature
         }
     }
 
@@ -64,6 +70,10 @@ internal class AutomationSetupDiagnosticSnapshotStore(
         ReadinessStatus.OK -> DiagnosticSnapshotStatus.OK
         ReadinessStatus.WARNING -> DiagnosticSnapshotStatus.WARNING
         ReadinessStatus.ACTION_REQUIRED -> DiagnosticSnapshotStatus.ACTION_REQUIRED
+    }
+
+    private fun DiagnosticSnapshot.stableSignature(): String {
+        return listOf(source.raw, status.raw, summary, checksJson).joinToString(separator = "\n")
     }
 
     private companion object {

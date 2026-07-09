@@ -422,7 +422,6 @@ class MessageLifecycleJourneyTest {
             attempts += attempt
         }
 
-        override fun countDeadLettered(): Flow<Int> = flowOf(attempts.count { it.deadLetteredAtMs != null })
         override fun countFailureRecoveryQueue(): Flow<Int> = flowOf(
             attempts.count {
                 it.result == DispatchAttemptResult.FAILED_RETRYABLE || it.deadLetteredAtMs != null

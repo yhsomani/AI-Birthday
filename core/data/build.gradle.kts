@@ -43,7 +43,7 @@ android {
 
     sourceSets {
         getByName("test") {
-            assets.srcDir("$projectDir/schemas")
+            assets.directories.add("$projectDir/schemas")
         }
     }
 }
@@ -56,7 +56,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     // Room
-    implementation(libs.androidx.room.runtime)
+    api(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 

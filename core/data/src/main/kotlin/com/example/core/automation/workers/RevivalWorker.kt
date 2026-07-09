@@ -108,7 +108,10 @@ class RevivalWorker @AssistedInject constructor(
 
                 RateLimiter.waitIfNeeded()
                 val prompt = prompter.buildReconnectPrompt(contact.toRelationshipPromptContext(), days)
-                val suggestion = sanitizeSuggestion(gemini.generate(prompt), contact.name)
+                val suggestion = sanitizeGeneratedSuggestion(
+                    raw = gemini.generate(prompt),
+                    fallbackText = fallbackSuggestion(contact.name),
+                )
 
                 val scheduledMs = AutomationSchedulePolicy.nextAllowedSendMs(
                     candidateMs = now + 1000 * 60 * 60,
@@ -201,24 +204,6 @@ class RevivalWorker @AssistedInject constructor(
         const val TAG = "RevivalWorker"
     }
 
-    private fun sanitizeSuggestion(raw: String, contactName: String): RevivalSuggestion {
-        val trimmed = raw.trim()
-        if (trimmed.isBlank()) {
-            return RevivalSuggestion(fallbackSuggestion(contactName), isFallback = true)
-        }
-        if (trimmed.startsWith("{") && trimmed.contains("\"error\"", ignoreCase = true)) {
-            return RevivalSuggestion(fallbackSuggestion(contactName), isFallback = true)
-        }
-        val text = trimmed
-            .removeSurrounding("\"")
-            .take(500)
-        return if (text.isBlank()) {
-            RevivalSuggestion(fallbackSuggestion(contactName), isFallback = true)
-        } else {
-            RevivalSuggestion(text, isFallback = false)
-        }
-    }
-
     private fun fallbackSuggestion(contactName: String): String {
         val firstName = contactName.trim().substringBefore(' ').ifBlank { "there" }
         return "Hey $firstName, it has been a while. Hope you are doing well. Want to catch up soon?"
@@ -244,9 +229,4 @@ class RevivalWorker @AssistedInject constructor(
             isVerified = true,
         )
     }
-
-    private data class RevivalSuggestion(
-        val text: String,
-        val isFallback: Boolean,
-    )
 }

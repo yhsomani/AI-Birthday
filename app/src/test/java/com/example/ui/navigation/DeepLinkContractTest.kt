@@ -39,7 +39,7 @@ class DeepLinkContractTest {
 
     @Test
     fun navGraphRegistersEveryExternalDeepLinkPatternThroughSharedContract() {
-        val source = rootFile("app/src/main/java/com/example/ui/navigation/NavGraph.kt").readText()
+        val source = navigationSourceText()
 
         listOf(
             "RelateDeepLinks.Contact.pattern",
@@ -57,7 +57,7 @@ class DeepLinkContractTest {
 
     @Test
     fun navGraphProtectsEverySignedInDestinationWithAuthGate() {
-        val source = rootFile("app/src/main/java/com/example/ui/navigation/NavGraph.kt").readText()
+        val source = navigationSourceText()
 
         listOf(
             "Screen.Home.route",
@@ -178,7 +178,10 @@ class DeepLinkContractTest {
 
     @Test
     fun messagesRoutesWireRecoverySetupActionsToAutomationSetup() {
-        val source = rootFile("app/src/main/java/com/example/ui/navigation/NavGraph.kt").readText()
+        val source = navigationSourceText()
+        val messagesDestinationBlock = source
+            .substringAfter("private fun MessagesDestination(")
+            .substringBefore("private fun String.toMessageChannelFilter")
 
         listOf(
             "Screen.Messages.route",
@@ -187,18 +190,23 @@ class DeepLinkContractTest {
             val routeBlock = source.authenticatedRouteBlock(routeReference)
 
             assertTrue(
-                "$routeReference must render MessagesScreen",
-                routeBlock.contains("MessagesScreen("),
-            )
-            assertTrue(
-                "$routeReference must expose the Messages recovery setup callback",
-                routeBlock.contains("onNavigateToAutomationSetup = {"),
-            )
-            assertTrue(
-                "$routeReference must route failed-send recovery setup actions to Automation Setup",
-                routeBlock.contains("navController.navigate(Screen.AutomationSetup.route)"),
+                "$routeReference must render the shared messages destination",
+                routeBlock.contains("MessagesDestination("),
             )
         }
+
+        assertTrue(
+            "Messages destination must render MessagesScreen",
+            messagesDestinationBlock.contains("MessagesScreen("),
+        )
+        assertTrue(
+            "Messages destination must expose the Messages recovery setup callback",
+            messagesDestinationBlock.contains("onNavigateToAutomationSetup = {"),
+        )
+        assertTrue(
+            "Messages destination must route failed-send recovery setup actions to Automation Setup",
+            messagesDestinationBlock.contains("navController.navigate(Screen.AutomationSetup.route)"),
+        )
     }
 
     @Test
@@ -239,6 +247,17 @@ class DeepLinkContractTest {
 
         return candidates.firstOrNull { it.isFile }
             ?: error("Could not find source file: $relativePath from $start")
+    }
+
+    private fun navigationSourceText(): String {
+        val navigationDir = requireNotNull(
+            rootFile("app/src/main/java/com/example/ui/navigation/NavGraph.kt").parentFile
+        )
+        return navigationDir
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .sortedBy { it.name }
+            .joinToString(separator = "\n") { it.readText() }
     }
 
     private fun String.authenticatedRouteBlock(routeReference: String): String {

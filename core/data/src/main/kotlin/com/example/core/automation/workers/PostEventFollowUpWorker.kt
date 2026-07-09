@@ -15,7 +15,6 @@ import com.example.core.db.dao.SentMessageDao
 import com.example.core.db.entities.ContactEntity
 import com.example.core.db.entities.PendingMessageEntity
 import com.example.core.gemini.GeminiClient
-import com.example.core.gemini.MessageVariants
 import com.example.core.gemini.PromptBuilder
 import com.example.core.gemini.RateLimiter
 import com.example.core.prefs.SecurePrefs
@@ -105,7 +104,10 @@ class PostEventFollowUpWorker @AssistedInject constructor(
                         eventType = originalOccasion?.type?.raw ?: sent.occasionType,
                         eventLabel = originalOccasion?.label ?: sent.occasionLabel,
                     )
-                    val suggestion = sanitizeSuggestion(gemini.generate(prompt), contact.name)
+                    val suggestion = sanitizeGeneratedSuggestion(
+                        raw = gemini.generate(prompt),
+                        fallbackText = fallbackSuggestion(contact.name),
+                    )
                     val requestedApprovalMode = ApprovalModeResolver.resolve(
                         relationship = contact.relationshipType,
                         contactOverride = ApprovalMode.fromRaw(contact.automationMode),
@@ -190,24 +192,6 @@ class PostEventFollowUpWorker @AssistedInject constructor(
         }
     }
 
-    private fun sanitizeSuggestion(raw: String, contactName: String): FollowUpSuggestion {
-        val trimmed = raw.trim()
-        if (trimmed.isBlank()) {
-            return FollowUpSuggestion(fallbackSuggestion(contactName), isFallback = true)
-        }
-        if (trimmed.startsWith("{") && trimmed.contains("\"error\"", ignoreCase = true)) {
-            return FollowUpSuggestion(fallbackSuggestion(contactName), isFallback = true)
-        }
-        val text = trimmed
-            .removeSurrounding("\"")
-            .take(500)
-        return if (text.isBlank()) {
-            FollowUpSuggestion(fallbackSuggestion(contactName), isFallback = true)
-        } else {
-            FollowUpSuggestion(text, isFallback = false)
-        }
-    }
-
     private fun fallbackSuggestion(contactName: String): String {
         val firstName = contactName.trim().substringBefore(' ').ifBlank { "there" }
         return "Hey $firstName, hope your day went nicely. How did you celebrate?"
@@ -235,15 +219,6 @@ class PostEventFollowUpWorker @AssistedInject constructor(
             isVerified = true,
         )
     }
-
-    private fun FollowUpSuggestion.toVariants(): MessageVariants {
-        return MessageVariants(text, text, text, text, text, text, "standard", isFallback)
-    }
-
-    private data class FollowUpSuggestion(
-        val text: String,
-        val isFallback: Boolean,
-    )
 
     private companion object {
         const val TAG = "PostEventFollowUpWorker"

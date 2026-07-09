@@ -111,7 +111,7 @@ internal class AutomationSetupSystemRecoveryCheckPresenter(
         recoveryDetail: String,
     ): ReadinessCheck {
         return ReadinessCheck(
-            title = text(R.string.automation_setup_check_dead_letter),
+            title = text(R.string.automation_setup_check_dispatch_recovery),
             detail = recoveryDetail,
             status = readiness.status,
             actionLabel = when (readiness.reason) {

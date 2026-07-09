@@ -12,13 +12,11 @@ import com.example.core.db.AppDatabase
 import com.example.core.db.toHeader
 import com.example.core.db.toOccasions
 import com.example.core.resilience.StructuredLogger
-import com.example.domain.model.MessageStatus
 import com.example.domain.model.contact.ContactHeader
 import com.example.domain.model.occasion.Occasion
 import com.example.domain.model.occasion.OccasionType
 import com.example.domain.navigation.RelateDeepLinks
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -34,14 +32,25 @@ class BirthdayWidgetProvider : AppWidgetProvider() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val db = AppDatabase.getInstance(context)
-                val occasions = db.eventDao().getAll().first().toOccasions()
-                val contacts = db.contactDao().getAll().first().map { it.toHeader() }
-                val pendingApprovals = db.pendingMessageDao().getAllSync()
-                    .count { MessageStatus.fromRaw(it.status) == MessageStatus.PENDING }
-
                 val today = Calendar.getInstance()
+                val birthdayEvents = db.eventDao().getActiveBirthdaysOnDate(
+                    dayOfMonth = today.get(Calendar.DAY_OF_MONTH),
+                    month = today.get(Calendar.MONTH) + 1,
+                )
+                val nextEvents = db.eventDao().getNextActive(limit = NEXT_EVENT_LIMIT)
+                val widgetOccasions = (birthdayEvents + nextEvents)
+                    .distinctBy { it.id }
+                    .toOccasions()
+                val contactIds = widgetOccasions.map { it.contactId.value }.distinct()
+                val contacts = if (contactIds.isEmpty()) {
+                    emptyList()
+                } else {
+                    db.contactDao().getByIds(contactIds).map { it.toHeader() }
+                }
+                val pendingApprovals = db.pendingMessageDao().countPendingSync()
+
                 val summary = buildBirthdayWidgetSummary(
-                    occasions = occasions,
+                    occasions = widgetOccasions,
                     contacts = contacts,
                     pendingApprovals = pendingApprovals,
                     todayDay = today.get(Calendar.DAY_OF_MONTH),
@@ -92,6 +101,7 @@ class BirthdayWidgetProvider : AppWidgetProvider() {
 
     private companion object {
         const val TAG = "BirthdayWidgetProvider"
+        const val NEXT_EVENT_LIMIT = 3
     }
 }
 

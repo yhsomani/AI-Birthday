@@ -8,7 +8,7 @@ import javax.inject.Singleton
 
 @Singleton
 class SchedulerServiceImpl @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : SchedulerService {
 
     override fun scheduleExactSend(pendingMessageId: String) {

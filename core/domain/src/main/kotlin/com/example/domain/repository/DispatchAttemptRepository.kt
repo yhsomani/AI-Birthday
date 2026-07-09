@@ -11,8 +11,6 @@ import kotlinx.coroutines.flow.Flow
 interface DispatchAttemptRepository {
     suspend fun upsert(attempt: DispatchAttempt)
 
-    fun countDeadLettered(): Flow<Int>
-
     fun countFailureRecoveryQueue(): Flow<Int>
 
     suspend fun getFailureRecoveryQueue(limit: Int = 100): List<DispatchAttempt>

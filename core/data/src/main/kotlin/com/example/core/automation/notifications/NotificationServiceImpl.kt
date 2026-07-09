@@ -13,7 +13,7 @@ import javax.inject.Singleton
 
 @Singleton
 class NotificationServiceImpl @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : NotificationService {
 
     override fun showApprovalNotification(

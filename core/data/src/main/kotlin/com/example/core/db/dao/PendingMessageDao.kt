@@ -128,4 +128,7 @@ interface PendingMessageDao {
 
     @Query("SELECT COUNT(*) FROM pending_messages WHERE status = 'PENDING'")
     fun countPending(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM pending_messages WHERE status = 'PENDING'")
+    suspend fun countPendingSync(): Int
 }

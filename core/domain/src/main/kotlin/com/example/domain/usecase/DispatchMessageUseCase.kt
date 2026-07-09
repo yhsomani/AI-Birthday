@@ -1,6 +1,5 @@
 package com.example.domain.usecase
 
-import com.example.domain.automation.DispatchBlockReason
 import com.example.domain.automation.DispatchDecision
 import com.example.domain.automation.DispatchEligibilityPolicy
 import com.example.domain.dispatch.DispatchExceptionFailurePolicy
@@ -9,10 +8,8 @@ import com.example.domain.dispatch.newDispatchAttempt
 import com.example.domain.repository.ActivityLogRepository
 import com.example.domain.model.ActivityLogSeverity
 import com.example.domain.model.ActivityLogStatus
-import com.example.domain.model.ActivityLogType
 import com.example.domain.model.DispatchActivityDecision
 import com.example.domain.model.MessageStatus
-import com.example.domain.model.activity.ActivityLogRecord
 import com.example.domain.model.common.DispatchAttemptId
 import com.example.domain.model.dispatch.DispatchAttemptCreator
 import com.example.domain.model.dispatch.DispatchAttemptResult
@@ -23,7 +20,6 @@ import com.example.domain.repository.DispatchAttemptRepository
 import com.example.domain.repository.MessageRepository
 import com.example.domain.service.MessageDispatcherService
 import com.example.domain.service.PreferencesRepository
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -63,7 +59,7 @@ class DispatchMessageUseCase @Inject constructor(
                     reason = decision.reason.name,
                     resolvedAtMs = System.currentTimeMillis(),
                 )
-                recordDispatchActivity(
+                activityLogRepository.recordDispatchActivity(
                     pending = pending,
                     title = "Dispatch deferred",
                     detail = "Message is scheduled for later.",
@@ -83,7 +79,7 @@ class DispatchMessageUseCase @Inject constructor(
                     reason = decision.approvalMode.raw,
                     resolvedAtMs = System.currentTimeMillis(),
                 )
-                recordDispatchActivity(
+                activityLogRepository.recordDispatchActivity(
                     pending = pending,
                     title = "Dispatch waiting for approval",
                     detail = "Message still needs approval before it can be sent.",
@@ -104,7 +100,7 @@ class DispatchMessageUseCase @Inject constructor(
                     reason = decision.reason.name,
                     resolvedAtMs = System.currentTimeMillis(),
                 )
-                recordDispatchActivity(
+                activityLogRepository.recordDispatchActivity(
                     pending = expired,
                     title = "Dispatch expired",
                     detail = "Message approval window expired before sending.",
@@ -123,11 +119,11 @@ class DispatchMessageUseCase @Inject constructor(
                     reason = decision.reason.name,
                     resolvedAtMs = System.currentTimeMillis(),
                 )
-                recordDispatchActivity(
+                activityLogRepository.recordDispatchActivity(
                     pending = pending,
                     title = "Dispatch blocked",
-                    detail = blockedDetail(decision.reason),
-                    severity = blockedSeverity(decision.reason),
+                    detail = blockedDispatchDetail(decision.reason),
+                    severity = blockedDispatchSeverity(decision.reason),
                     status = ActivityLogStatus.OPEN,
                     decision = DispatchActivityDecision.BLOCKED,
                     reason = decision.reason.name,
@@ -144,7 +140,7 @@ class DispatchMessageUseCase @Inject constructor(
                 reason = "CONTACT_NOT_FOUND",
                 resolvedAtMs = System.currentTimeMillis(),
             )
-            recordDispatchActivity(
+            activityLogRepository.recordDispatchActivity(
                 pending = pending,
                 title = "Dispatch blocked",
                 detail = "Message contact could not be found.",
@@ -194,7 +190,7 @@ class DispatchMessageUseCase @Inject constructor(
             }
             throw e
         }
-        recordDispatchActivity(
+        activityLogRepository.recordDispatchActivity(
             pending = pending,
             title = "Dispatch sent",
             detail = "Message dispatched through ${pending.channel.raw}.",
@@ -235,102 +231,4 @@ class DispatchMessageUseCase @Inject constructor(
         data class Sent(val pendingId: String, val channel: String) : DispatchOutcome()
     }
 
-    private suspend fun recordDispatchActivity(
-        pending: MessageDispatchState,
-        title: String,
-        detail: String,
-        severity: ActivityLogSeverity,
-        status: ActivityLogStatus,
-        decision: DispatchActivityDecision,
-        reason: String? = null,
-        scheduledForMs: Long? = null,
-    ) {
-        runCatching {
-            activityLogRepository.record(
-                ActivityLogRecord(
-                    id = UUID.randomUUID().toString(),
-                    type = ActivityLogType.MESSAGE.raw,
-                    title = title,
-                    detail = detail,
-                    contactId = pending.contactId.value,
-                    eventId = pending.occasionId.value,
-                    messageId = pending.id.value,
-                    severity = severity.raw,
-                    status = status.raw,
-                    metadataJson = dispatchMetadataJson(
-                        pending = pending,
-                        decision = decision,
-                        reason = reason,
-                        scheduledForMs = scheduledForMs,
-                    ),
-                )
-            )
-        }
-    }
-
-    private fun dispatchMetadataJson(
-        pending: MessageDispatchState,
-        decision: DispatchActivityDecision,
-        reason: String?,
-        scheduledForMs: Long?,
-    ): String {
-        val fields = buildList {
-            add("decision" to decision.raw)
-            add("messageId" to pending.id.value)
-            add("eventId" to pending.occasionId.value)
-            add("contactId" to pending.contactId.value)
-            add("channel" to pending.channel.raw)
-            add("approvalMode" to pending.draft.approvalMode.raw)
-            add("status" to pending.status.raw)
-            reason?.let { add("reason" to it) }
-            scheduledForMs?.let { add("scheduledForMs" to it.toString()) }
-        }
-        return fields.joinToString(prefix = "{", postfix = "}") { (key, value) ->
-            "\"${key.jsonEscaped()}\":\"${value.jsonEscaped()}\""
-        }
-    }
-
-    private fun blockedDetail(reason: DispatchBlockReason): String {
-        return when (reason) {
-            DispatchBlockReason.ALREADY_HANDLED -> "Message was already handled."
-            DispatchBlockReason.REJECTED -> "Message was rejected before dispatch."
-            DispatchBlockReason.EXPIRED -> "Message already expired."
-            DispatchBlockReason.FAILED -> "Message is marked failed and needs recovery."
-            DispatchBlockReason.UNSUPPORTED_STATE -> "Message is in an unsupported dispatch state."
-        }
-    }
-
-    private fun blockedSeverity(reason: DispatchBlockReason): ActivityLogSeverity {
-        return when (reason) {
-            DispatchBlockReason.ALREADY_HANDLED -> ActivityLogSeverity.INFO
-            DispatchBlockReason.REJECTED,
-            DispatchBlockReason.EXPIRED -> ActivityLogSeverity.WARNING
-            DispatchBlockReason.FAILED,
-            DispatchBlockReason.UNSUPPORTED_STATE -> ActivityLogSeverity.ERROR
-        }
-    }
-
-    private fun String.jsonEscaped(): String {
-        return buildString {
-            for (char in this@jsonEscaped) {
-                when (char) {
-                    '\\' -> append("\\\\")
-                    '"' -> append("\\\"")
-                    '\b' -> append("\\b")
-                    '\u000C' -> append("\\f")
-                    '\n' -> append("\\n")
-                    '\r' -> append("\\r")
-                    '\t' -> append("\\t")
-                    else -> {
-                        if (char.code < 0x20) {
-                            append("\\u")
-                            append(char.code.toString(16).padStart(4, '0'))
-                        } else {
-                            append(char)
-                        }
-                    }
-                }
-            }
-        }
-    }
 }

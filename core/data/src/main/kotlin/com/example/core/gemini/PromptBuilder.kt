@@ -6,25 +6,11 @@ import com.example.domain.model.contact.ContactRelationshipPromptContext
 import com.example.domain.model.gift.GiftHistoryRecord
 import com.example.domain.model.message.MessagePromptContext
 import com.example.domain.service.ContactClassificationContract
-import org.json.JSONArray
 
 class PromptBuilder {
-    private fun getFirstName(fullName: String): String {
-        val trimmed = fullName.trim()
-        val spaceIdx = trimmed.indexOf(' ')
-        return if (spaceIdx == -1) trimmed else trimmed.substring(0, spaceIdx)
-    }
-
-    private fun sanitizeNotes(notes: String): String {
-        var sanitized = notes
-        sanitized = sanitized.replace(Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"), "[EMAIL]")
-        sanitized = sanitized.replace(Regex("\\+?\\d{1,4}?[-.\\s]?\\(?\\d{1,3}?\\)?[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,4}[-.\\s]?\\d{1,9}"), "[PHONE]")
-        return sanitized
-    }
-
     fun buildClassificationPrompt(contact: ContactClassificationPromptContext): String {
-        val firstName = getFirstName(contact.displayName)
-        val sanitizedNotes = sanitizeNotes(contact.notesText)
+        val firstName = promptFirstName(contact.displayName)
+        val sanitizedNotes = sanitizePromptNotes(contact.notesText)
         return buildString {
             appendLine("You are a contact classification engine. Based on the contact data below, ")
             appendLine("determine their relationship to the phone owner.")
@@ -123,55 +109,7 @@ class PromptBuilder {
     }
 
     fun buildReconnectPrompt(contact: ContactRelationshipPromptContext, daysSince: Int): String {
-        val firstName = getFirstName(contact.displayName)
-        val interestsList = try {
-            val arr = JSONArray(contact.interestsJson); List(arr.length()) { arr.getString(it) }
-        } catch(e: Exception) { emptyList() }
-        val hobbiesList = try {
-            val arr = JSONArray(contact.hobbiesJson); List(arr.length()) { arr.getString(it) }
-        } catch(e: Exception) { emptyList() }
-        val sharedHistoryList = try {
-            val arr = JSONArray(contact.sharedHistoryJson); List(arr.length()) { arr.getString(it) }
-        } catch(e: Exception) { emptyList() }
-        val sensitiveTopics = try {
-            val arr = JSONArray(contact.sensitiveTopicsJson); List(arr.length()) { arr.getString(it) }
-        } catch(e: Exception) { emptyList() }
-        val sanitizedNotes = sanitizeNotes(contact.notesText).take(180)
-        
-        return buildString {
-            appendLine("Write a short, casual reconnect message from the user to ${contact.nickname ?: firstName}.")
-            appendLine()
-            appendLine("Facts:")
-            appendLine("- Relationship: ${contact.relationshipType}")
-            contact.relationshipSubtype?.takeIf { it.isNotBlank() }?.let {
-                appendLine("- Relationship detail: $it")
-            }
-            appendLine("- Last spoke: $daysSince days ago")
-            appendLine("- Relationship health score: ${contact.healthScore}/100")
-            appendLine("- Interaction frequency: ${contact.interactionFrequencyPerMonth} times/month")
-            appendLine("- Interests: ${interestsList.joinToString(", ")}")
-            appendLine("- Hobbies: ${hobbiesList.joinToString(", ")}")
-            appendLine("- Shared history: ${sharedHistoryList.take(4).joinToString(", ")}")
-            if (sanitizedNotes.isNotBlank()) {
-                appendLine("- Safe notes: $sanitizedNotes")
-            }
-            if (sensitiveTopics.isNotEmpty()) {
-                appendLine("- Avoid these topics: ${sensitiveTopics.joinToString(", ")}")
-            }
-            appendLine("- User style: casual, ${if (contact.formalityLevel == "CASUAL") "uses bro/yaar type language" else "professional"}")
-            appendLine()
-            appendLine("Requirements:")
-            appendLine("- Sound spontaneous, like they just thought of them")
-            appendLine("- DO NOT mention the gap in contact explicitly")
-            appendLine("- Use only facts listed above; do not invent memories, problems, or life events")
-            appendLine("- End with a question to start a conversation")
-            appendLine("- Under 100 words")
-            if (contact.preferredLanguage != "en" && contact.preferredLanguage.isNotBlank()) {
-                appendLine("- Write in ${contact.preferredLanguage}")
-            }
-            appendLine()
-            append("Return plain text only. No JSON. No quotes.")
-        }
+        return buildReconnectPromptText(contact, daysSince)
     }
 
     fun buildPostEventFollowUpPrompt(
@@ -180,33 +118,7 @@ class PromptBuilder {
         eventType: String?,
         eventLabel: String?,
     ): String {
-        val firstName = getFirstName(contact.displayName)
-        val interestsList = try {
-            val arr = JSONArray(contact.interestsJson)
-            List(arr.length()) { arr.getString(it) }
-        } catch(e: Exception) { emptyList() }
-        val eventName = eventLabel?.takeIf { it.isNotBlank() } ?: eventType ?: "recent occasion"
-
-        return buildString {
-            appendLine("Write a short follow-up message from the user to ${contact.nickname ?: firstName}.")
-            appendLine()
-            appendLine("Context:")
-            appendLine("- Relationship: ${contact.relationshipType}")
-            appendLine("- Event: $eventName")
-            appendLine("- Preferred language: ${contact.preferredLanguage}")
-            appendLine("- Formality: ${contact.formalityLevel}")
-            appendLine("- Interests: ${interestsList.joinToString(", ")}")
-            appendLine("- Original message already sent: ${sanitizeNotes(originalMessage).take(240)}")
-            appendLine()
-            appendLine("Requirements:")
-            appendLine("- Sound natural, low-pressure, and personal")
-            appendLine("- Do not repeat the original message")
-            appendLine("- Do not ask why they did not reply")
-            appendLine("- Ask one light question or share one warm check-in")
-            appendLine("- Under 70 words")
-            appendLine()
-            append("Return plain text only. No JSON. No quotes.")
-        }
+        return buildPostEventFollowUpPromptText(contact, originalMessage, eventType, eventLabel)
     }
 
     fun buildHolidayWishPrompt(
@@ -214,37 +126,7 @@ class PromptBuilder {
         holidayName: String,
         holidayTone: String,
     ): String {
-        val firstName = getFirstName(contact.displayName)
-        val interestsList = try {
-            val arr = JSONArray(contact.interestsJson)
-            List(arr.length()) { arr.getString(it) }
-        } catch(e: Exception) { emptyList() }
-        val sharedHistoryList = try {
-            val arr = JSONArray(contact.sharedHistoryJson)
-            List(arr.length()) { arr.getString(it) }
-        } catch(e: Exception) { emptyList() }
-
-        return buildString {
-            appendLine("Write a short ${holidayName} message from the user to ${contact.nickname ?: firstName}.")
-            appendLine()
-            appendLine("Recipient facts:")
-            appendLine("- Relationship: ${contact.relationshipType}")
-            appendLine("- Preferred language: ${contact.preferredLanguage}")
-            appendLine("- Formality: ${contact.formalityLevel}")
-            appendLine("- Communication style: ${contact.communicationStyle}")
-            appendLine("- Interests: ${interestsList.joinToString(", ")}")
-            appendLine("- Shared memories: ${sharedHistoryList.joinToString("; ")}")
-            appendLine("- Holiday tone: $holidayTone")
-            appendLine()
-            appendLine("Requirements:")
-            appendLine("- Sound personal and natural, not like a broadcast")
-            appendLine("- Match the relationship and formality")
-            appendLine("- Reference a real interest or shared memory only if one is listed")
-            appendLine("- Do not invent private details")
-            appendLine("- Under 80 words")
-            appendLine()
-            append("Return plain text only. No JSON. No quotes.")
-        }
+        return buildHolidayWishPromptText(contact, holidayName, holidayTone)
     }
 
     fun buildRegenerationPrompt(
@@ -269,40 +151,6 @@ class PromptBuilder {
     }
 
     fun buildGiftSuggestionsPrompt(contact: ContactGiftAdvisorProfile, history: List<GiftHistoryRecord>): String {
-        val firstName = getFirstName(contact.displayName)
-        val interestsList = try { 
-            val arr = JSONArray(contact.interestsJson); List(arr.length()) { arr.getString(it) } 
-        } catch(e: Exception) { emptyList() }
-        
-        val historyStr = history.joinToString("\n") { 
-            "  - ${it.giftName} (Category: ${it.giftCategory}, Cost: \u20b9${it.approxCostInr}, Liked: ${it.receivedWell ?: "Unknown"})"
-        }
-        
-        return buildString {
-            appendLine("You are a personalized gift advisor. Recommend 3 unique gift ideas for ${contact.nickname ?: firstName}.")
-            appendLine()
-            appendLine("Recipient Facts:")
-            appendLine("- Relationship: ${contact.relationshipType}")
-            appendLine("- Interests: ${interestsList.joinToString(", ")}")
-            appendLine("- Annual Gift Budget: \u20b9${contact.giftBudgetInr}")
-            appendLine()
-            appendLine("Previous Gift History:")
-            appendLine(if (historyStr.isBlank()) "None recorded" else historyStr)
-            appendLine()
-            appendLine("Requirements:")
-            appendLine("- Provide exactly 3 diverse recommendations.")
-            appendLine("- Ensure ideas fit within the annual budget (\u20b9${contact.giftBudgetInr}) and align with the interests.")
-            appendLine("- Avoid repeat/similar items to their previous gifts.")
-            appendLine("- Give a specific, compelling reason for each.")
-            appendLine()
-            appendLine("Return ONLY a valid JSON array, no explanation, no markdown:")
-            appendLine("[")
-            appendLine("  {")
-            appendLine("    \"name\": \"Gift Name\",")
-            appendLine("    \"reason\": \"Specific reason why they will love it based on their interests\",")
-            appendLine("    \"estimatedCostInr\": 500")
-            appendLine("  }")
-            append("]")
-        }
+        return buildGiftSuggestionsPromptText(contact, history)
     }
 }

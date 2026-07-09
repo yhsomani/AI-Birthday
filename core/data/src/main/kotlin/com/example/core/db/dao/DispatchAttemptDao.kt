@@ -46,9 +46,6 @@ interface DispatchAttemptDao {
     @Query("SELECT MAX(retryCount) FROM dispatch_attempts WHERE messageDraftId = :messageDraftId")
     suspend fun getMaxRetryCountForMessageDraft(messageDraftId: String): Int?
 
-    @Query("SELECT COUNT(*) FROM dispatch_attempts WHERE deadLetteredAtMs IS NOT NULL")
-    fun countDeadLettered(): Flow<Int>
-
     @Query(
         """
         SELECT COUNT(*) FROM dispatch_attempts

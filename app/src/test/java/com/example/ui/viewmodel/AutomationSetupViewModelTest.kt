@@ -5,8 +5,6 @@ import android.content.Context
 import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import com.example.R
-import com.example.core.resilience.DeadLetterEntry
-import com.example.core.resilience.DeadLetterQueue
 import com.example.core.resilience.HealthMonitor
 import com.example.core.resilience.StructuredLogger
 import com.example.core.gemini.GeminiClient
@@ -41,6 +39,7 @@ import io.mockk.every
 import io.mockk.impl.annotations.RelaxedMockK
 import io.mockk.junit4.MockKRule
 import io.mockk.verify
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -102,13 +101,11 @@ class AutomationSetupViewModelTest {
     private lateinit var styleProfile: MutableStateFlow<StyleProfileRecord?>
     private lateinit var preferenceChanges: MutableSharedFlow<Unit>
     private lateinit var failureRecoveryCount: MutableStateFlow<Int>
-    private lateinit var deadLetterCount: MutableStateFlow<Int>
     private val createdViewModels = mutableListOf<AutomationSetupViewModel>()
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        DeadLetterQueue.clear()
         HealthMonitor.clearForTests()
         StructuredLogger.clearForTests()
         context = ApplicationProvider.getApplicationContext()
@@ -116,7 +113,6 @@ class AutomationSetupViewModelTest {
         styleProfile = MutableStateFlow(null)
         preferenceChanges = MutableSharedFlow(extraBufferCapacity = 1)
         failureRecoveryCount = MutableStateFlow(0)
-        deadLetterCount = MutableStateFlow(0)
         every { preferencesRepository.getGoogleOAuthToken() } returns ""
         every { preferencesRepository.getGeminiApiKey() } returns ""
         every { preferencesRepository.getSenderEmail() } returns ""
@@ -134,7 +130,6 @@ class AutomationSetupViewModelTest {
         every { styleProfileRepository.getProfile() } returns styleProfile
         coEvery { testSendUseCase(any()) } returns TestSendUseCase.Outcome.MissingEmailSetup
         every { dispatchAttemptRepository.countFailureRecoveryQueue() } returns failureRecoveryCount
-        every { dispatchAttemptRepository.countDeadLettered() } returns deadLetterCount
         coEvery { dispatchAttemptRepository.getFailureRecoveryQueue(any()) } returns emptyList()
         coEvery { dispatchAttemptRepository.getSuccessfulChannelsSince(any()) } returns emptySet()
         coEvery { diagnosticSnapshotRepository.getLatestBySource(any()) } returns null
@@ -148,18 +143,16 @@ class AutomationSetupViewModelTest {
         }
         createdViewModels.clear()
         advanceUntilIdle()
-        DeadLetterQueue.clear()
         HealthMonitor.clearForTests()
         StructuredLogger.clearForTests()
         Dispatchers.resetMain()
     }
 
     @Test
-    fun `summarizeForTesting returns required summary for blockers`() = runTest(testDispatcher) {
-        val viewModel = newViewModel()
-        advanceUntilIdle()
+    fun `summarize returns required summary for blockers`() {
+        val presenter = AutomationSetupReadinessPresenter(context)
 
-        val summary = viewModel.summarizeForTesting(
+        val summary = presenter.summarize(
             listOf(
                 ReadinessCheck(
                     title = context.getString(R.string.automation_setup_check_gemini),
@@ -175,11 +168,10 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `summarizeForTesting returns healthy summary when all checks pass`() = runTest(testDispatcher) {
-        val viewModel = newViewModel()
-        advanceUntilIdle()
+    fun `summarize returns healthy summary when all checks pass`() {
+        val presenter = AutomationSetupReadinessPresenter(context)
 
-        val summary = viewModel.summarizeForTesting(
+        val summary = presenter.summarize(
             listOf(
                 ReadinessCheck(
                     title = context.getString(R.string.automation_setup_check_gemini),
@@ -198,7 +190,7 @@ class AutomationSetupViewModelTest {
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val groupsByTitle = viewModel.buildChecksForTesting().associate {
+        val groupsByTitle = currentChecks(viewModel).associate {
             it.title to it.group
         }
 
@@ -229,12 +221,12 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `buildChecksForTesting requires fully auto for unattended message sending`() = runTest(testDispatcher) {
+    fun `report requires fully auto for unattended message sending`() = runTest(testDispatcher) {
         every { preferencesRepository.getGlobalAutomationMode() } returns ApprovalMode.ALWAYS_ASK
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val fullAutomationCheck = viewModel.buildChecksForTesting()
+        val fullAutomationCheck = currentChecks(viewModel)
             .first { it.title == context.getString(R.string.automation_setup_check_full_automation) }
 
         assertEquals(ReadinessStatus.ACTION_REQUIRED, fullAutomationCheck.status)
@@ -250,9 +242,9 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `buildChecksForTesting warns when contacts keep review first overrides under full automation`() =
+    fun `report warns when contacts keep review first overrides under full automation`() =
         runTest(testDispatcher) {
-            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            seedReadinessProfiles(
                 readinessProfile(
                     id = "manual",
                     automationMode = ApprovalMode.ALWAYS_ASK,
@@ -269,7 +261,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val fullAutomationCheck = viewModel.buildChecksForTesting()
+            val fullAutomationCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_full_automation) }
 
             assertEquals(ReadinessStatus.WARNING, fullAutomationCheck.status)
@@ -281,8 +273,8 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting surfaces contacts without automatable events`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+    fun `report surfaces contacts without automatable events`() = runTest(testDispatcher) {
+        seedReadinessProfiles(
             readinessProfile(
                 id = "birthday",
                 hasAutomatableOccasion = true,
@@ -295,7 +287,7 @@ class AutomationSetupViewModelTest {
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val eventsCheck = viewModel.buildChecksForTesting()
+        val eventsCheck = currentChecks(viewModel)
             .first { it.title == context.getString(R.string.automation_setup_check_automatable_events) }
 
         assertEquals(ReadinessStatus.WARNING, eventsCheck.status)
@@ -307,11 +299,11 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `buildChecksForTesting requires real Google Contacts token or scope`() = runTest(testDispatcher) {
+    fun `report requires real Google Contacts token or scope`() = runTest(testDispatcher) {
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val googleContactsCheck = viewModel.buildChecksForTesting()
+        val googleContactsCheck = currentChecks(viewModel)
             .first { it.title == context.getString(R.string.automation_setup_check_google_contacts) }
 
         assertEquals(ReadinessStatus.ACTION_REQUIRED, googleContactsCheck.status)
@@ -326,8 +318,9 @@ class AutomationSetupViewModelTest {
     fun `report exposes canonical setup readiness summary`() = runTest(testDispatcher) {
         val viewModel = newViewModel()
         advanceUntilIdle()
+        currentChecks(viewModel)
 
-        val readiness = viewModel.buildSetupActionReadinessForTesting()
+        val readiness = viewModel.uiState.value.setupActionReadiness
 
         assertEquals(RelationshipReadinessState.ACTION_REQUIRED, readiness.state)
         assertEquals(RelationshipReadinessReason.SETUP_ACTION_REQUIRED, readiness.primaryReason)
@@ -335,12 +328,12 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `buildChecksForTesting accepts cached People API token for Google Contacts readiness`() = runTest(testDispatcher) {
+    fun `report accepts cached People API token for Google Contacts readiness`() = runTest(testDispatcher) {
         every { preferencesRepository.getGoogleOAuthToken() } returns "cached-token"
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val googleContactsCheck = viewModel.buildChecksForTesting()
+        val googleContactsCheck = currentChecks(viewModel)
             .first { it.title == context.getString(R.string.automation_setup_check_google_contacts) }
 
         assertEquals(ReadinessStatus.OK, googleContactsCheck.status)
@@ -349,9 +342,9 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `buildChecksForTesting blocks full automation when event contacts lack delivery routes`() =
+    fun `report blocks full automation when event contacts lack delivery routes`() =
         runTest(testDispatcher) {
-            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            seedReadinessProfiles(
                 readinessProfile(
                     id = "routable_sms",
                     hasAutomatableOccasion = true,
@@ -371,7 +364,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val deliveryRoutesCheck = viewModel.buildChecksForTesting()
+            val deliveryRoutesCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_delivery_routes) }
 
             assertEquals(ReadinessStatus.ACTION_REQUIRED, deliveryRoutesCheck.status)
@@ -383,9 +376,9 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting warns when selected channels have no recent successful dispatch evidence`() =
+    fun `report warns when selected channels have no recent successful dispatch evidence`() =
         runTest(testDispatcher) {
-            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            seedReadinessProfiles(
                 readinessProfile(
                     id = "sms",
                     preferredChannel = MessageChannel.SMS,
@@ -405,7 +398,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val verificationCheck = viewModel.buildChecksForTesting()
+            val verificationCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
 
             assertEquals(ReadinessStatus.WARNING, verificationCheck.status)
@@ -418,9 +411,9 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting passes channel verification when selected channels have recent success`() =
+    fun `report passes channel verification when selected channels have recent success`() =
         runTest(testDispatcher) {
-            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            seedReadinessProfiles(
                 readinessProfile(
                     id = "email",
                     preferredChannel = MessageChannel.EMAIL,
@@ -434,7 +427,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val verificationCheck = viewModel.buildChecksForTesting()
+            val verificationCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
 
             assertEquals(ReadinessStatus.OK, verificationCheck.status)
@@ -446,9 +439,9 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting counts recent matching email self-test as email channel verification`() =
+    fun `report counts recent matching email self-test as email channel verification`() =
         runTest(testDispatcher) {
-            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            seedReadinessProfiles(
                 readinessProfile(
                     id = "email",
                     preferredChannel = MessageChannel.EMAIL,
@@ -464,7 +457,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val verificationCheck = viewModel.buildChecksForTesting()
+            val verificationCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
 
             assertEquals(ReadinessStatus.OK, verificationCheck.status)
@@ -476,9 +469,9 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting ignores email self-test after sender changes`() =
+    fun `report ignores email self-test after sender changes`() =
         runTest(testDispatcher) {
-            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            seedReadinessProfiles(
                 readinessProfile(
                     id = "email",
                     preferredChannel = MessageChannel.EMAIL,
@@ -494,7 +487,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val verificationCheck = viewModel.buildChecksForTesting()
+            val verificationCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
 
             assertEquals(ReadinessStatus.WARNING, verificationCheck.status)
@@ -507,9 +500,9 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting routes SMS or WhatsApp channel verification to messages`() =
+    fun `report routes SMS or WhatsApp channel verification to messages`() =
         runTest(testDispatcher) {
-            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            seedReadinessProfiles(
                 readinessProfile(
                     id = "sms",
                     preferredChannel = MessageChannel.SMS,
@@ -529,7 +522,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val verificationCheck = viewModel.buildChecksForTesting()
+            val verificationCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
 
             assertEquals(ReadinessStatus.WARNING, verificationCheck.status)
@@ -545,9 +538,9 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting routes WhatsApp channel verification to filtered messages`() =
+    fun `report routes WhatsApp channel verification to filtered messages`() =
         runTest(testDispatcher) {
-            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            seedReadinessProfiles(
                 readinessProfile(
                     id = "whatsapp",
                     preferredChannel = MessageChannel.WHATSAPP,
@@ -560,7 +553,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val verificationCheck = viewModel.buildChecksForTesting()
+            val verificationCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_channel_verification) }
 
             assertEquals(ReadinessStatus.WARNING, verificationCheck.status)
@@ -576,8 +569,8 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting adds generic message risk diagnostic from personalization context`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+    fun `report adds generic message risk diagnostic from personalization context`() = runTest(testDispatcher) {
+        seedReadinessProfiles(
             readinessProfile(
                 id = "ready",
                 notesText = "College friend",
@@ -589,7 +582,7 @@ class AutomationSetupViewModelTest {
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val genericRisk = viewModel.buildChecksForTesting()
+        val genericRisk = currentChecks(viewModel)
             .first { it.title == context.getString(R.string.automation_setup_check_generic_messages) }
 
         assertEquals(ReadinessStatus.WARNING, genericRisk.status)
@@ -602,8 +595,8 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `buildChecksForTesting counts email preferred contacts from readiness profiles`() = runTest(testDispatcher) {
-        coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+    fun `report counts email preferred contacts from readiness profiles`() = runTest(testDispatcher) {
+        seedReadinessProfiles(
             readinessProfile(
                 id = "email",
                 preferredChannel = MessageChannel.EMAIL,
@@ -620,7 +613,7 @@ class AutomationSetupViewModelTest {
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val emailCheck = viewModel.buildChecksForTesting()
+        val emailCheck = currentChecks(viewModel)
             .first { it.title == context.getString(R.string.automation_setup_check_email) }
 
         assertEquals(ReadinessStatus.ACTION_REQUIRED, emailCheck.status)
@@ -632,13 +625,13 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `buildChecksForTesting warns when Gmail sender is configured but unverified`() = runTest(testDispatcher) {
+    fun `report warns when Gmail sender is configured but unverified`() = runTest(testDispatcher) {
         every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
         every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val emailCheck = viewModel.buildChecksForTesting()
+        val emailCheck = currentChecks(viewModel)
             .first { it.title == context.getString(R.string.automation_setup_check_email) }
 
         assertEquals(ReadinessStatus.WARNING, emailCheck.status)
@@ -647,7 +640,7 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `buildChecksForTesting passes email readiness after matching recent self test`() = runTest(testDispatcher) {
+    fun `report passes email readiness after matching recent self test`() = runTest(testDispatcher) {
         every { preferencesRepository.getSenderEmail() } returns "sender@example.com"
         every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
         every { preferencesRepository.getLastSuccessfulEmailTestSender() } returns "sender@example.com"
@@ -655,7 +648,7 @@ class AutomationSetupViewModelTest {
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val emailCheck = viewModel.buildChecksForTesting()
+        val emailCheck = currentChecks(viewModel)
             .first { it.title == context.getString(R.string.automation_setup_check_email) }
 
         assertEquals(ReadinessStatus.OK, emailCheck.status)
@@ -664,13 +657,13 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `buildChecksForTesting blocks invalid saved Gmail sender address`() = runTest(testDispatcher) {
+    fun `report blocks invalid saved Gmail sender address`() = runTest(testDispatcher) {
         every { preferencesRepository.getSenderEmail() } returns "not-an-email"
         every { preferencesRepository.getSenderEmailPassword() } returns "app-password"
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val emailCheck = viewModel.buildChecksForTesting()
+        val emailCheck = currentChecks(viewModel)
             .first { it.title == context.getString(R.string.automation_setup_check_email) }
 
         assertEquals(ReadinessStatus.ACTION_REQUIRED, emailCheck.status)
@@ -679,9 +672,9 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `buildChecksForTesting treats SMS as optional when no event-ready contact selects SMS`() =
+    fun `report treats SMS as optional when no event-ready contact selects SMS`() =
         runTest(testDispatcher) {
-            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            seedReadinessProfiles(
                 readinessProfile(
                     id = "email",
                     preferredChannel = MessageChannel.EMAIL,
@@ -694,7 +687,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val smsCheck = viewModel.buildChecksForTesting()
+            val smsCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_sms) }
 
             assertEquals(ReadinessStatus.OK, smsCheck.status)
@@ -703,9 +696,9 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting requires SMS permission when SMS is selected for event contacts`() =
+    fun `report requires SMS permission when SMS is selected for event contacts`() =
         runTest(testDispatcher) {
-            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            seedReadinessProfiles(
                 readinessProfile(
                     id = "sms",
                     preferredChannel = MessageChannel.SMS,
@@ -716,7 +709,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val smsCheck = viewModel.buildChecksForTesting()
+            val smsCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_sms) }
 
             assertEquals(ReadinessStatus.ACTION_REQUIRED, smsCheck.status)
@@ -728,10 +721,10 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting treats disabled SMS as intentionally unused`() =
+    fun `report treats disabled SMS as intentionally unused`() =
         runTest(testDispatcher) {
             every { preferencesRepository.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
-            coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+            seedReadinessProfiles(
                 readinessProfile(
                     id = "sms",
                     preferredChannel = MessageChannel.SMS,
@@ -742,7 +735,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val smsCheck = viewModel.buildChecksForTesting()
+            val smsCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_sms) }
 
             assertEquals(ReadinessStatus.OK, smsCheck.status)
@@ -751,10 +744,10 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting requires WhatsApp consent before automation channel is ready`() = runTest(testDispatcher) {
+    fun `report requires WhatsApp consent before automation channel is ready`() = runTest(testDispatcher) {
         every { preferencesRepository.isWhatsAppAutomationConsentGranted() } returns false
         every { preferencesRepository.getChannelBlackout() } returns """["${MessageChannel.SMS.raw}"]"""
-        coEvery { contactRepository.getAutomationReadinessProfiles() } returns listOf(
+        seedReadinessProfiles(
             readinessProfile(
                 id = "whatsapp",
                 preferredChannel = MessageChannel.WHATSAPP,
@@ -765,7 +758,7 @@ class AutomationSetupViewModelTest {
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val whatsAppCheck = viewModel.buildChecksForTesting()
+        val whatsAppCheck = currentChecks(viewModel)
             .first { it.title == context.getString(R.string.automation_setup_check_whatsapp) }
 
         assertEquals(ReadinessStatus.ACTION_REQUIRED, whatsAppCheck.status)
@@ -847,9 +840,8 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting surfaces persisted dispatch recovery rows`() = runTest(testDispatcher) {
+    fun `report surfaces persisted dispatch recovery rows`() = runTest(testDispatcher) {
         every { dispatchAttemptRepository.countFailureRecoveryQueue() } returns flowOf(2)
-        every { dispatchAttemptRepository.countDeadLettered() } returns flowOf(1)
         coEvery { dispatchAttemptRepository.getFailureRecoveryQueue(1) } returns listOf(
             DispatchAttempt(
                 id = DispatchAttemptId("attempt_1"),
@@ -878,43 +870,32 @@ class AutomationSetupViewModelTest {
         val viewModel = newViewModel()
         advanceUntilIdle()
 
-        val recoveryCheck = viewModel.buildChecksForTesting()
-            .first { it.title == context.getString(R.string.automation_setup_check_dead_letter) }
+        val recoveryCheck = currentChecks(viewModel)
+            .first { it.title == context.getString(R.string.automation_setup_check_dispatch_recovery) }
 
         assertEquals(ReadinessStatus.WARNING, recoveryCheck.status)
         assertEquals(AiDoctorAction.OPEN_ACTIVITY_HISTORY, recoveryCheck.action)
         assertEquals(context.getString(R.string.automation_setup_action_view_activity), recoveryCheck.actionLabel)
         assertTrue(recoveryCheck.detail.contains("2 persisted dispatch recovery records"))
-        assertTrue(recoveryCheck.detail.contains("1 are dead-lettered"))
         assertTrue(recoveryCheck.detail.contains("SMS FAILED_FINAL"))
         assertTrue(recoveryCheck.detail.contains("draft_1"))
     }
 
     @Test
-    fun `buildChecksForTesting ignores legacy in-memory dead letters when persisted recovery is empty`() =
+    fun `report reports healthy recovery when persisted recovery is empty`() =
         runTest(testDispatcher) {
-            DeadLetterQueue.enqueue(
-                DeadLetterEntry(
-                    id = "draft_memory_only",
-                    payload = "Message text",
-                    errorMessage = "Legacy failure",
-                    errorType = "LEGACY",
-                    retryCount = 0,
-                ),
-            )
-
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val recoveryCheck = viewModel.buildChecksForTesting()
-                .first { it.title == context.getString(R.string.automation_setup_check_dead_letter) }
+            val recoveryCheck = currentChecks(viewModel)
+                .first { it.title == context.getString(R.string.automation_setup_check_dispatch_recovery) }
 
             assertEquals(ReadinessStatus.OK, recoveryCheck.status)
-            assertEquals(context.getString(R.string.automation_setup_dead_letter_none), recoveryCheck.detail)
+            assertEquals(context.getString(R.string.automation_setup_dispatch_recovery_none), recoveryCheck.detail)
         }
 
     @Test
-    fun `buildChecksForTesting surfaces recent persisted HealthMonitor warning after process restart`() =
+    fun `report surfaces recent persisted HealthMonitor warning after process restart`() =
         runTest(testDispatcher) {
             coEvery {
                 diagnosticSnapshotRepository.getLatestBySource(DiagnosticSnapshotSource.HEALTH_MONITOR)
@@ -929,7 +910,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            val recentErrorsCheck = viewModel.buildChecksForTesting()
+            val recentErrorsCheck = currentChecks(viewModel)
                 .first { it.title == context.getString(R.string.automation_setup_check_recent_errors) }
 
             assertEquals(ReadinessStatus.WARNING, recentErrorsCheck.status)
@@ -939,9 +920,9 @@ class AutomationSetupViewModelTest {
         }
 
     @Test
-    fun `buildChecksForTesting persists redacted AI Doctor diagnostic snapshot`() =
+    fun `report persists redacted AI Doctor diagnostic snapshot`() =
         runTest(testDispatcher) {
-            val recorded = mutableListOf<DiagnosticSnapshot>()
+            val recorded = CopyOnWriteArrayList<DiagnosticSnapshot>()
             coEvery {
                 diagnosticSnapshotRepository.getLatestBySource(DiagnosticSnapshotSource.HEALTH_MONITOR)
             } returns DiagnosticSnapshot(
@@ -956,7 +937,7 @@ class AutomationSetupViewModelTest {
             val viewModel = newViewModel()
             advanceUntilIdle()
 
-            viewModel.buildChecksForTesting()
+            currentChecks(viewModel)
             val aiDoctorSnapshot = recorded.last { it.source == DiagnosticSnapshotSource.AI_DOCTOR }
 
             assertEquals(DiagnosticSnapshotSource.AI_DOCTOR, aiDoctorSnapshot.source)
@@ -967,14 +948,13 @@ class AutomationSetupViewModelTest {
             assertTrue(aiDoctorSnapshot.checksJson.contains(context.getString(R.string.automation_setup_check_recent_errors)))
             assertTrue(aiDoctorSnapshot.checksJson.contains("[REDACTED_EMAIL]"))
             assertTrue(aiDoctorSnapshot.checksJson.contains("Bearer [REDACTED]"))
-        }
+    }
 
     @Test
-    fun `recommendedFixForTesting ranks required blockers before earlier warnings and quality fixes`() = runTest(testDispatcher) {
-        val viewModel = newViewModel()
-        advanceUntilIdle()
+    fun `recommendedFix ranks required blockers before earlier warnings and quality fixes`() {
+        val presenter = AutomationSetupReadinessPresenter(context)
 
-        val recommendedFix = viewModel.recommendedFixForTesting(
+        val recommendedFix = presenter.recommendedFix(
             listOf(
                 ReadinessCheck(
                     title = "Style Coach",
@@ -1012,11 +992,10 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `setupProgressForTesting counts ok warnings and blockers`() = runTest(testDispatcher) {
-        val viewModel = newViewModel()
-        advanceUntilIdle()
+    fun `setupProgress counts ok warnings and blockers`() {
+        val presenter = AutomationSetupReadinessPresenter(context)
 
-        val progress = viewModel.setupProgressForTesting(
+        val progress = presenter.setupProgress(
             listOf(
                 ReadinessCheck(
                     title = "Ready",
@@ -1043,11 +1022,10 @@ class AutomationSetupViewModelTest {
     }
 
     @Test
-    fun `diagnoseAiFailureForTesting redacts sensitive fallback text`() = runTest(testDispatcher) {
-        val viewModel = newViewModel()
-        advanceUntilIdle()
+    fun `diagnose redacts sensitive fallback text`() {
+        val diagnoser = AutomationSetupAiFailureDiagnoser(context)
 
-        val message = viewModel.diagnoseAiFailureForTesting(
+        val message = diagnoser.diagnose(
             "Unexpected user=aarav@example.com Authorization=Bearer ya29.secret-token phone=+91 98765 43210",
         )
 
@@ -1081,6 +1059,26 @@ class AutomationSetupViewModelTest {
             dispatchAttemptRepository = dispatchAttemptRepository,
             diagnosticSnapshotRepository = diagnosticSnapshotRepository,
         ).also { createdViewModels += it }
+    }
+
+    private fun currentChecks(viewModel: AutomationSetupViewModel): List<ReadinessCheck> {
+        val deadline = System.currentTimeMillis() + 3_000
+        var latest = emptyList<ReadinessCheck>()
+        while (System.currentTimeMillis() < deadline) {
+            testDispatcher.scheduler.advanceUntilIdle()
+            latest = viewModel.uiState.value.checks
+            if (latest.isNotEmpty()) {
+                return latest
+            }
+            Thread.sleep(10)
+        }
+        return latest
+    }
+
+    private fun seedReadinessProfiles(vararg profiles: ContactAutomationReadinessProfile) {
+        val profileList = profiles.toList()
+        readinessProfiles.value = profileList
+        coEvery { contactRepository.getAutomationReadinessProfiles() } returns profileList
     }
 
     private fun awaitCheck(

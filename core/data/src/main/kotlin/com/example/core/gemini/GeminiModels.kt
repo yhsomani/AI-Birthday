@@ -23,7 +23,7 @@ data class GeminiPart(
 data class GenerationConfig(
     val temperature: Double = 0.85,
     val maxOutputTokens: Int = 512,
-    @Json(name = "responseMimeType") val responseMimeType: String = "application/json"
+    @param:Json(name = "responseMimeType") val responseMimeType: String = "application/json"
 )
 
 @JsonClass(generateAdapter = true)

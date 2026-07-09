@@ -7,8 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import kotlinx.coroutines.test.runTest
-import org.robolectric.shadows.ShadowLog
 
 @RunWith(AndroidJUnit4::class)
 @org.robolectric.annotation.Config(sdk = [34])
@@ -137,35 +135,5 @@ class SensitiveLogRedactorTest {
         assertFalse(entry.extras.values.joinToString(" ").contains("Happy birthday Aarav"))
         assertFalse(entry.extras.values.joinToString(" ").contains("private family note"))
         assertFalse(entry.extras.values.joinToString(" ").contains("private memory"))
-    }
-
-    @Test
-    fun fallbackOrchestrator_redactsProviderFailureLogs() = runTest {
-        ShadowLog.clear()
-        val sensitiveMessage = "user=aarav@example.com apiKey=AIzaSyFakeFakeFakeFakeFakeFake token=secret-token"
-        val orchestrator = FallbackOrchestrator(
-            providers = listOf(
-                object : FallbackProvider<String> {
-                    override suspend fun primary(): String {
-                        throw IllegalStateException(sensitiveMessage)
-                    }
-
-                    override suspend fun fallback(): String {
-                        throw IllegalStateException(sensitiveMessage)
-                    }
-                },
-            ),
-            name = "apiKey=AIzaSyFakeFakeFakeFakeFakeFake",
-        )
-
-        runCatching { orchestrator.execute() }
-
-        val logs = ShadowLog.getLogs().joinToString("\n") { "${it.tag}: ${it.msg}" }
-        assertFalse(logs.contains("aarav@example.com"))
-        assertFalse(logs.contains("AIzaSyFakeFakeFakeFakeFakeFake"))
-        assertFalse(logs.contains("secret-token"))
-        assertTrue(logs.contains("[REDACTED_EMAIL]"))
-        assertTrue(logs.contains("apiKey=[REDACTED]"))
-        assertTrue(logs.contains("token=[REDACTED]"))
     }
 }

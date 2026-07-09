@@ -13,7 +13,7 @@ import javax.inject.Singleton
 
 @Singleton
 class MessageDispatcherServiceImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val pendingMessageDao: PendingMessageDao,
     private val sentMessageDao: SentMessageDao,
     private val contactDao: com.example.core.db.dao.ContactDao,

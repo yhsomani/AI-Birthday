@@ -190,9 +190,7 @@ internal suspend fun saveFailedMessageDispatchFinalization(
         messageDispatchFailureSideEffects(
             messageId = messageId,
             preferredChannel = preferredChannel,
-            messageText = messageText,
             failure = failure,
-            retryCount = retryCount,
         )
     )
     return MessageDispatchFinalizationResult(

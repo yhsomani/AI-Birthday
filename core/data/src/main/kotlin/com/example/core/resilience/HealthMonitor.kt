@@ -2,7 +2,6 @@ package com.example.core.resilience
 
 data class HealthSnapshot(
     val circuitBreakerStates: Map<String, CircuitState> = emptyMap(),
-    val deadLetterCount: Int = 0,
     val recentErrors: List<String> = emptyList(),
     val isHealthy: Boolean = true,
 )
@@ -37,14 +36,12 @@ object HealthMonitor {
         val breakerStates = synchronized(circuitBreakers) {
             circuitBreakers.mapValues { it.value.currentState() }
         }
-        val dlqCount = DeadLetterQueue.count()
         val errors = synchronized(recentErrors) { recentErrors.toList().takeLast(10) }
         val hasOpenBreakers = breakerStates.any { it.value != CircuitState.CLOSED }
         return HealthSnapshot(
             circuitBreakerStates = breakerStates,
-            deadLetterCount = dlqCount,
             recentErrors = errors,
-            isHealthy = !hasOpenBreakers && dlqCount < 10,
+            isHealthy = !hasOpenBreakers,
         )
     }
 

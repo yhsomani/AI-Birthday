@@ -20,37 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
-
-data class SettingsUiState(
-    val userName: String = "User",
-    val userEmail: String = "",
-    val userPhotoUrl: String? = null,
-    val birthdayReminders: Boolean = true,
-    val aiWishGeneration: Boolean = true,
-    val contactSyncEnabled: Boolean = true,
-    val isSyncing: Boolean = false,
-    val lastSyncTimestamp: String = "Never",
-    val lastBackupTimestamp: String = "Never",
-    // AI configuration
-    val geminiApiKey: String = "",
-    val geminiApiKeySaved: Boolean = false,
-    val senderEmail: String = "",
-    val senderEmailPassword: String = "",
-    val senderEmailSaved: Boolean = false,
-    val automationMode: ApprovalMode = ApprovalMode.ALWAYS_ASK,
-    val quietHoursStart: String = "22",
-    val quietHoursEnd: String = "8",
-    val biometricLockEnabled: Boolean = false,
-    val channelBlackoutSms: Boolean = false,
-    val channelBlackoutWhatsApp: Boolean = false,
-    val channelBlackoutEmail: Boolean = false,
-    val syncError: String? = null,
-    val feedbackEvent: FeedbackEvent? = null,
-    val showLegacyDbNotice: Boolean = false,
-    val showSecurePrefsRecoveryNotice: Boolean = false,
-)
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
@@ -84,27 +54,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun refreshPersistedSettings() {
-        _uiState.value = _uiState.value.copy(
-            geminiApiKey = preferencesRepository.getGeminiApiKey(),
-            senderEmail = preferencesRepository.getSenderEmail(),
-            senderEmailPassword = preferencesRepository.getSenderEmailPassword(),
-            automationMode = preferencesRepository.getGlobalAutomationMode(),
-            lastSyncTimestamp = if (initializedSettings) {
-                _uiState.value.lastSyncTimestamp
-            } else {
-                appContext.getString(R.string.settings_last_sync_never)
-            },
-            lastBackupTimestamp = formatLastBackupTimestamp(preferencesRepository.getLastBackupMs()),
-            quietHoursStart = preferencesRepository.getQuietHoursStart().toString(),
-            quietHoursEnd = preferencesRepository.getQuietHoursEnd().toString(),
-            biometricLockEnabled = preferencesRepository.isBiometricLockEnabled(),
-            birthdayReminders = preferencesRepository.isBirthdayRemindersEnabled(),
-            aiWishGeneration = preferencesRepository.isAiWishGenerationEnabled(),
-            channelBlackoutSms = preferencesRepository.isChannelBlacklisted(MessageChannel.SMS),
-            channelBlackoutWhatsApp = preferencesRepository.isChannelBlacklisted(MessageChannel.WHATSAPP),
-            channelBlackoutEmail = preferencesRepository.isChannelBlacklisted(MessageChannel.EMAIL),
-            showLegacyDbNotice = preferencesRepository.wasLegacyUnencryptedDbQuarantined(),
-            showSecurePrefsRecoveryNotice = preferencesRepository.isSecurePrefsRebuiltNoticePending(),
+        _uiState.value = _uiState.value.withPersistedSettings(
+            preferencesRepository = preferencesRepository,
+            appContext = appContext,
+            preserveLastSyncTimestamp = initializedSettings,
         )
         initializedSettings = true
     }
@@ -186,7 +139,7 @@ class SettingsViewModel @Inject constructor(
                         _uiState.value = _uiState.value.copy(
                             automationMode = ApprovalMode.FULLY_AUTO,
                             feedbackEvent = FeedbackEvent(
-                                message = fullAutomationMessage(outcome),
+                                message = settingsFullAutomationMessage(outcome),
                                 type = if (outcome.skippedWithoutRoute == 0 && outcome.skippedNeedsReview == 0) {
                                     FeedbackType.SUCCESS
                                 } else {
@@ -199,7 +152,7 @@ class SettingsViewModel @Inject constructor(
                         _uiState.value = _uiState.value.copy(
                             automationMode = previousMode,
                             feedbackEvent = FeedbackEvent(
-                                message = fullAutomationFailureMessage(error),
+                                message = settingsFullAutomationFailureMessage(error),
                                 type = FeedbackType.ERROR,
                             ),
                         )
@@ -324,83 +277,5 @@ class SettingsViewModel @Inject constructor(
 
     fun signOut() {
         authManager.signOut()
-    }
-
-    private fun PreferencesRepository.isChannelBlacklisted(channel: MessageChannel): Boolean {
-        return channel in getChannelBlackout().toMutableChannelSet()
-    }
-
-    private fun String.toMutableChannelSet(): MutableSet<MessageChannel> {
-        return CHANNEL_TOKEN_PATTERN.findAll(this)
-            .map { match -> MessageChannel.fromRaw(match.groupValues[1]) }
-            .filter { it != MessageChannel.UNKNOWN }
-            .toMutableSet()
-    }
-
-    private fun Set<MessageChannel>.toJsonArray(): String {
-        return map { it.raw }
-            .sorted()
-            .joinToString(separator = ",", prefix = "[", postfix = "]") { channel -> "\"$channel\"" }
-    }
-
-    private fun formatLastBackupTimestamp(timestampMs: Long): String {
-        if (timestampMs <= 0L) {
-            return appContext.getString(R.string.settings_last_sync_never)
-        }
-
-        val ageMs = (System.currentTimeMillis() - timestampMs).coerceAtLeast(0L)
-        val ageDays = TimeUnit.MILLISECONDS.toDays(ageMs)
-        return when {
-            ageDays == 0L -> appContext.getString(R.string.settings_last_backup_today)
-            ageDays == 1L -> appContext.getString(R.string.settings_last_backup_yesterday)
-            else -> appContext.getString(R.string.settings_last_backup_days_ago, ageDays)
-        }
-    }
-
-    private fun fullAutomationMessage(outcome: EnableFullAutomationUseCase.Outcome): UiText {
-        return when {
-            outcome.skippedWithoutRoute > 0 && outcome.skippedNeedsReview > 0 -> UiText.Resource(
-                R.string.settings_full_automation_enabled_route_and_review_blockers,
-                listOf(
-                    outcome.updatedContacts,
-                    outcome.promotedMessages,
-                    outcome.skippedWithoutRoute,
-                    outcome.skippedNeedsReview,
-                ),
-            )
-            outcome.skippedWithoutRoute > 0 -> UiText.Resource(
-                R.string.settings_full_automation_enabled_route_blockers,
-                listOf(
-                    outcome.updatedContacts,
-                    outcome.promotedMessages,
-                    outcome.skippedWithoutRoute,
-                ),
-            )
-            outcome.skippedNeedsReview > 0 -> UiText.Resource(
-                R.string.settings_full_automation_enabled_review_blockers,
-                listOf(
-                    outcome.updatedContacts,
-                    outcome.promotedMessages,
-                    outcome.skippedNeedsReview,
-                ),
-            )
-            else -> UiText.Resource(
-                R.string.settings_full_automation_enabled,
-                listOf(outcome.updatedContacts, outcome.promotedMessages),
-            )
-        }
-    }
-
-    private fun fullAutomationFailureMessage(error: Throwable): UiText {
-        val reason = error.message?.takeUnless(String::isBlank)
-        return if (reason == null) {
-            UiText.Resource(R.string.settings_full_automation_failed)
-        } else {
-            UiText.Resource(R.string.settings_full_automation_failed_with_reason, listOf(reason))
-        }
-    }
-
-    private companion object {
-        val CHANNEL_TOKEN_PATTERN = Regex("\"([A-Za-z_]+)\"")
     }
 }

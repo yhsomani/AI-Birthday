@@ -43,12 +43,11 @@ class HealthMonitorDiagnosticRecorder @Inject constructor(
             val breakerSummary = circuitBreakerStates.entries.joinToString(", ") { (name, state) ->
                 "$name=${state.name}"
             }.ifBlank { "none" }
-            val summary = "HealthMonitor: healthy=$isHealthy; deadLetterCount=$deadLetterCount; " +
+            val summary = "HealthMonitor: healthy=$isHealthy; " +
                 "circuitBreakers=$breakerSummary; recentErrors=${recentErrors.size}"
             val checksJson = JSONObject()
                 .put("source", DiagnosticSnapshotSource.HEALTH_MONITOR.raw)
                 .put("isHealthy", isHealthy)
-                .put("deadLetterCount", deadLetterCount)
                 .put("circuitBreakers", JSONObject().also { json ->
                     circuitBreakerStates.forEach { (name, state) ->
                         json.put(name, state.name)
