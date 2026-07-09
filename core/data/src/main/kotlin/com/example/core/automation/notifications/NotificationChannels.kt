@@ -64,6 +64,7 @@ private data class RelateNotificationChannelDefinition(
     val vibrates: Boolean = false,
     val soundEnabled: Boolean = true,
 ) {
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
     fun toChannel(): NotificationChannel {
         return NotificationChannel(id, name, importance).apply {
             description = this@RelateNotificationChannelDefinition.description

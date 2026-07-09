@@ -210,7 +210,7 @@ class SmsStatusReceiverTest {
         }
 
         assertNotNull(updated)
-        assertEquals(MessageDeliveryStatus.DELIVERED.raw, updated!!.deliveryStatus)
+        assertEquals(MessageDeliveryStatus.DELIVERED.raw, updated?.deliveryStatus)
         coVerify {
             dispatchAttemptDao.updateSmsCallbackOutcome(
                 id = "attempt_delivered",
