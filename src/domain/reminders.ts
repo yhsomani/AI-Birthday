@@ -1,4 +1,11 @@
 import type { AppState, ReminderPlan, RelationshipEvent } from './types';
+import { eventOccurrenceIso } from './occasionDates';
+import {
+  adjustTriggerForSchedulingPolicy,
+  buildSchedulingPolicySummary,
+  type ReminderPlanningResult,
+  type SchedulingPolicyIssue
+} from './schedulingPolicy';
 
 const startOfDayAtNine = (iso: string) => {
   const date = new Date(iso);
@@ -12,28 +19,77 @@ const daysBefore = (iso: string, days: number) => {
   return date;
 };
 
-const buildPlan = (state: AppState, event: RelationshipEvent, days: number): ReminderPlan | undefined => {
+const buildPlan = (
+  state: AppState,
+  event: RelationshipEvent,
+  days: number,
+  now: Date,
+  issues: SchedulingPolicyIssue[]
+): { plan?: ReminderPlan; adjusted: boolean; skipped: boolean } => {
   const contact = state.contacts.find(item => item.id === event.contactId);
   if (!contact) {
-    return undefined;
+    return { skipped: true, adjusted: false };
   }
-  const triggerAt = daysBefore(event.date, days);
-  if (triggerAt.getTime() <= Date.now()) {
-    return undefined;
+  const occurrence = eventOccurrenceIso(event, now);
+  if (!occurrence) {
+    return { skipped: true, adjusted: false };
   }
-  const prefix = days === 0 ? 'Today' : `${days} day${days === 1 ? '' : 's'} left`;
+  const originalTriggerAt = daysBefore(occurrence, days);
+  const adjustedTrigger = adjustTriggerForSchedulingPolicy(originalTriggerAt, state.settings);
+  const triggerAt = adjustedTrigger.triggerAt;
+  if (triggerAt.getTime() <= now.getTime()) {
+    return { skipped: true, adjusted: adjustedTrigger.adjustments.length > 0 };
+  }
+  if (adjustedTrigger.adjustments.length > 0) {
+    issues.push({
+      id: `adjusted-${event.id}-${days}`,
+      severity: 'Info',
+      title: 'Reminder moved',
+      detail: `${event.label} was ${adjustedTrigger.adjustments.join(' ')}`
+    });
+  }
   return {
-    id: `reminder-${event.id}-${days}`,
-    eventId: event.id,
-    contactId: event.contactId,
-    title: `${prefix}: ${event.type} for ${contact.name}`,
-    body: 'Review the checklist, add context, and prepare a message before sending.',
-    triggerAt: triggerAt.toISOString()
+    plan: {
+      id: `reminder-${event.id}-${days}`,
+      eventId: event.id,
+      contactId: event.contactId,
+      title: 'RelateAI reminder',
+      body: 'Open RelateAI to review the event checklist before preparing any message.',
+      triggerAt: triggerAt.toISOString()
+    },
+    adjusted: adjustedTrigger.adjustments.length > 0,
+    skipped: false
+  };
+};
+
+export const buildReminderPlanningResult = (
+  state: AppState,
+  daysBeforeEvent = [7, 1, 0],
+  now = new Date()
+): ReminderPlanningResult => {
+  const policy = buildSchedulingPolicySummary(state);
+  if (!policy.canScheduleNotifications) {
+    return {
+      plans: [],
+      issues: policy.issues,
+      adjustedCount: 0,
+      skippedCount: state.events.length * daysBeforeEvent.length
+    };
+  }
+
+  const issues = [...policy.issues];
+  const planned = state.events.flatMap(event => daysBeforeEvent.map(days => buildPlan(state, event, days, now, issues)));
+  const plans = planned
+    .flatMap(result => (result.plan ? [result.plan] : []))
+    .sort((a, b) => new Date(a.triggerAt).getTime() - new Date(b.triggerAt).getTime());
+
+  return {
+    plans,
+    issues,
+    adjustedCount: planned.filter(result => result.adjusted).length,
+    skippedCount: planned.filter(result => result.skipped).length
   };
 };
 
 export const buildReminderPlans = (state: AppState, daysBeforeEvent = [7, 1, 0]): ReminderPlan[] =>
-  state.events
-    .flatMap(event => daysBeforeEvent.map(days => buildPlan(state, event, days)))
-    .filter((plan): plan is ReminderPlan => Boolean(plan))
-    .sort((a, b) => new Date(a.triggerAt).getTime() - new Date(b.triggerAt).getTime());
+  buildReminderPlanningResult(state, daysBeforeEvent).plans;

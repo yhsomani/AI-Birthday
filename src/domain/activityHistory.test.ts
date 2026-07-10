@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { ActivityItem } from './types';
 import { buildActivityHistory } from './activityHistory';
+import { relateReducer } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 
 const activities: ActivityItem[] = [
   {
@@ -54,6 +56,49 @@ describe('activity history contract', () => {
     assert.equal(targets['a-message'], 'messages');
     assert.equal(targets['a-ai-error'], 'more');
     assert.equal(targets['a-backup-old'], 'more');
+  });
+
+  it('uses explicit recovery targets when linked records still exist', () => {
+    const state = relateReducer(createTestState(), {
+      type: 'approveMessage',
+      messageId: 'msg-mira-checkin'
+    });
+    const result = buildActivityHistory(state.activity, { state });
+    const row = result.rows[0];
+
+    assert.equal(row.item.title, 'Message approved');
+    assert.equal(row.targetScreen, 'wishPreview');
+    assert.equal(row.messageId, 'msg-mira-checkin');
+    assert.equal(row.contactId, 'c-mira');
+    assert.equal(row.recoveryState, 'ready');
+    assert.match(row.recoveryDetail, /available/i);
+  });
+
+  it('falls back safely when an explicit activity target is stale', () => {
+    const activity: ActivityItem[] = [
+      {
+        id: 'a-stale-message',
+        type: 'Message',
+        title: 'Message retry prepared',
+        detail: 'Review the message before retrying.',
+        severity: 'Warning',
+        createdAt: '2026-07-09T08:00:00.000Z',
+        targetScreen: 'wishPreview',
+        messageId: 'missing-message',
+        actionLabel: 'Review retry'
+      }
+    ];
+    const state = {
+      ...createTestState(),
+      messages: []
+    };
+    const result = buildActivityHistory(activity, { state });
+    const row = result.rows[0];
+
+    assert.equal(row.targetScreen, 'messages');
+    assert.equal(row.messageId, undefined);
+    assert.equal(row.recoveryState, 'fallback');
+    assert.match(row.recoveryDetail, /linked message is no longer available/i);
   });
 
   it('distinguishes empty history from no matching activity', () => {

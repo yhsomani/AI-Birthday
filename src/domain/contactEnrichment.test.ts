@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createInitialState, relateReducer } from '../state/relateReducer';
+import { relateReducer } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 import { buildContactEnrichmentPlan, validateEnrichmentAnswer } from './contactEnrichment';
 
 const createSparseContactState = () => {
-  const state = createInitialState();
+  const state = createTestState();
   const base = state.contacts.find(contact => contact.id === 'c-mira')!;
   return {
     ...state,
@@ -39,8 +40,16 @@ describe('guided contact enrichment contract', () => {
     assert.equal(plan.label, 'Needs details');
     assert.deepEqual(
       plan.prompts.map(prompt => prompt.id),
-      ['relationship-context', 'message-mention', 'message-avoid']
+      ['relationship-context', 'message-mention', 'message-avoid', 'language-style']
     );
+    assert.deepEqual(plan.missingSignals, [
+      'relationship context',
+      'mention preferences',
+      'avoid guidance',
+      'language guidance'
+    ]);
+    assert.match(plan.summary, /relationship context/i);
+    assert.equal(plan.prompts[0].improvesSignal, 'relationship context');
   });
 
   it('validates enrichment answers before saving', () => {
@@ -55,7 +64,7 @@ describe('guided contact enrichment contract', () => {
   });
 
   it('saves a guided answer as memory context and improves profile quality without logging the answer', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const before = state.contacts.find(contact => contact.id === 'c-mira')?.healthScore ?? 0;
     const next = relateReducer(state, {
       type: 'answerEnrichmentPrompt',
@@ -64,10 +73,14 @@ describe('guided contact enrichment contract', () => {
       body: 'Jokes about moving cities when she is stressed'
     });
     const after = next.contacts.find(contact => contact.id === 'c-mira')?.healthScore ?? 0;
+    const planAfter = buildContactEnrichmentPlan(next, 'c-mira');
 
     assert.equal(next.memories[0].category, 'Preference');
     assert.match(next.memories[0].body, /^Avoid in messages:/);
     assert.ok(after > before);
+    assert.ok(planAfter);
+    assert.equal(planAfter?.missingSignals.includes('avoid guidance'), false);
+    assert.ok(planAfter?.completedSignals.includes('avoid guidance'));
     assert.match(next.activity[0].detail, /Preference context saved/);
     assert.doesNotMatch(next.activity[0].detail, /moving cities|stressed/);
   });

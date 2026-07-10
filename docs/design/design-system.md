@@ -1,24 +1,22 @@
 # RelateAI Design System
 
-Last reviewed: 2026-06-29
+Last reviewed: 2026-07-10
 
 RelateAI is an operational relationship assistant. The UI should feel calm, direct, and efficient: dense enough for repeated work, clear enough for new users, and careful around automation, permissions, and personal data.
 
 ## Code Source
 
-- Theme: `core/ui/src/main/kotlin/com/example/core/ui/theme`
-- Shared components: `core/ui/src/main/kotlin/com/example/core/ui/components`
-- App shell navigation: `app/src/main/java/com/example/MainActivity.kt`
-- Screen routes: `app/src/main/java/com/example/ui/navigation/Screen.kt`
+- Theme tokens: `src/ui/theme.ts`
+- App shell navigation and screen composition: `src/App.tsx`
+- Localization contracts: `src/i18n/i18n.ts` and `src/ui/localizationContract.test.ts`
+- Accessibility and primary interaction contracts: `src/ui/accessibilityContract.test.ts` and `src/ui/primaryInteractionContract.test.ts`
 
 ## Theme Mode Policy
 
-- Supported production mode: dark theme only.
-- `RelateAITheme` intentionally installs the validated dark color scheme by default, and `RelateThemeContractTest` guards that contract.
-- `RelateAITheme` also provides `MaterialTheme.relateSemanticColors` for card surfaces, card outlines, status accents, and status containers. Shared components and screen-local status accents should read card, success, warning, and info colors from this semantic layer instead of importing dark-specific color exports directly.
-- Splash, Auth, Onboarding, AI Doctor, Home, Contact List, Contact Detail, Messages, Settings, Wish Preview, Analytics, Activity History, Backup/Restore, Events, Chat History, Memory Vault, Gift Advisor, Style Coach, and the app shell production color roles now read from `MaterialTheme.colorScheme` or `MaterialTheme.relateSemanticColors`; keep that pattern for new or reworked screen-local color reads.
-- Screenshot fixtures that frame extracted dialog/form bodies now use `MaterialTheme.colorScheme` or `MaterialTheme.relateSemanticColors`; `DesignSystemTokensTest` guards screenshot fixtures against direct dark-specific color exports and raw color literals.
-- Future light/dynamic support must first implement alternate theme schemes, run contrast review, and add compact-phone, typical-phone, large-font, and Hindi Roborazzi baselines before release.
+- Supported production mode: light neutral theme with semantic status colors.
+- `src/ui/theme.ts` owns the current RN color and spacing tokens. New RN UI should reuse those tokens before adding screen-local values.
+- App-shell, card, input, status, warning, danger, success, and muted text colors should come from the RN token layer so future theme modes can replace values centrally.
+- Future dark/dynamic support must first implement alternate RN token schemes, run contrast review, and add compact-phone, typical-phone, large-font, Hindi, and Hinglish release-device evidence before release.
 
 ## Tokens
 
@@ -115,14 +113,14 @@ Color:
 
 - Neutral surfaces should carry most of the UI. Accent color should identify status, route, or priority, not decorate every section.
 - Purple remains the current primary accent, but redesign work should reduce one-note purple/slate dominance by using semantic green, amber, red, cyan, and rose only where they clarify state.
-- Use `MaterialTheme.relateSemanticColors.cardContainer` and `.cardOutline` for reusable card primitives that need the RelateAI card treatment rather than Material's default surface.
-- Use `MaterialTheme.relateSemanticColors.success`, `.warning`, and `.info` plus their `on*` and `*Container` companions for reusable status and feedback UI. Error colors come from `MaterialTheme.colorScheme.error` unless a component explicitly needs an error container.
+- Use RN token colors for reusable card primitives that need the RelateAI card treatment.
+- Use semantic success, warning, danger, info, muted, and border colors only where they clarify state. Error colors must not be decorative.
 - Provider, channel, and status colors must be tokenized before broad reuse.
 - Error/success/warning colors must not be used as decorative accents.
 
 Typography:
 
-- Use Material typography from `RelateTypography`.
+- Use the RN app typography styles from `src/App.tsx` until reusable text tokens are extracted.
 - Do not scale font size with viewport width.
 - Letter spacing remains 0 unless Material defaults require otherwise.
 - Use hero-scale type only for true top-level screens; cards and panels use `titleMedium`, `titleSmall`, `bodyMedium`, and `bodySmall`.
@@ -132,9 +130,9 @@ Typography:
 App shell:
 
 - Owns routed content, primary bottom navigation, the core permission rationale dialog, and the biometric lock gate.
-- Use `MaterialTheme.colorScheme.background` for shell surfaces and `RelateElevation.flat` for the primary bottom navigation bar unless a future reviewed shell elevation is introduced.
-- Bottom navigation remains limited to Home, Contacts, Events, Messages, and Analytics; secondary routes stay contextual.
-- Biometric-lock loading uses `RelateSize.progressIndicator`, and biometric-lock layout spacing uses `RelateSpacing` tokens. Authentication state and prompt behavior remain owned by `MainActivity` and `BiometricLockPolicy`.
+- Use the RN background/surface tokens for shell surfaces.
+- Bottom navigation remains limited to Home, Events, Messages, Contacts, and More; secondary tools such as Analytics, Backup/Restore, Setup Check, Style Coach, Activity History, and Settings stay under More or contextual actions.
+- Biometric-lock loading uses stable reserved space and tokenized spacing. Authentication prompt behavior remains owned by the RN native bridge and app shell.
 
 `RelateScreen`:
 
@@ -153,7 +151,7 @@ App shell:
 - Use for repeated items, grouped settings, status panels, and compact summaries.
 - Do not nest cards.
 - Keep card radius at `RelateRadius.card`.
-- Card container and border colors come from `MaterialTheme.relateSemanticColors` so future theme modes can replace those values centrally.
+- Card container and border colors come from RN theme tokens so future theme modes can replace those values centrally.
 
 `RelatePrimaryButton`:
 
@@ -167,7 +165,7 @@ App shell:
 - Use for setup blockers, warnings, success, and transient feedback.
 - Messages must be redacted and actionable.
 - Live region feedback should stay concise.
-- Shared warning/error/success/info surfaces use `MaterialTheme.relateSemanticColors` or `MaterialTheme.colorScheme.error` so future theme modes can replace palette values centrally.
+- Shared warning/error/success/info surfaces use RN semantic tokens so future theme modes can replace palette values centrally.
 
 `StatCard`:
 
@@ -178,7 +176,7 @@ App shell:
 `FilterChip`:
 
 - Use for low-risk filtering and segmented modes.
-- Filter chips must not own business logic; they call existing ViewModel filter state.
+- Filter chips must not own business logic; they call existing reducer or screen-state filter handlers.
 
 `ShimmerItem`:
 
@@ -190,9 +188,9 @@ Pager-backed queue/list content:
 
 - Populated list pages should fill the pager page and top-align rows directly below their filters.
 - Centered content is reserved for intentional loading or empty states.
-- Keep pager alignment presentation-only; tabs, filters, selection, and ViewModel state remain owned by the screen.
+- Keep pager alignment presentation-only; tabs, filters, selection, and reducer/screen state remain owned by the screen.
 - Repeated queue/list presentation such as pager shells, list shells, list/card composition, tab rows, avatars, selection controls, search/filter/sort controls, selectable card headers, sent-card headers/bodies, pending-card metadata/bodies, review-card bodies/status icons, metadata badges, card text/date labels, action clusters and card action rows, bulk-selection action bars, reject-dialog presentation, recovery/support panels, readiness badges, and approval-status copy should be extracted into screen-local helpers first.
-- Repeated detail-screen presentation such as blocking loading states, profile headers, relationship metadata, health indicators, section shells, contextual action clusters, and preference-form controls should also start as screen-local helpers. Promote to shared `core/ui` components only after multiple screens need the same API and behavior.
+- Repeated detail-screen presentation such as blocking loading states, profile headers, relationship metadata, health indicators, section shells, contextual action clusters, and preference-form controls should also start as screen-local helpers. Promote to shared `src/ui` components only after multiple screens need the same API and behavior.
 
 `RelateAvatar` and `HealthIndicatorDot`:
 
@@ -201,7 +199,7 @@ Pager-backed queue/list content:
 
 ## Navigation Patterns
 
-- Bottom navigation: Home, Contacts, Events, Messages, Analytics.
+- Bottom navigation: Home, Events, Messages, Contacts, More.
 - Secondary screens are launched from contextual actions and should provide an obvious back path.
 - Dashboard summaries link to feature owners; they do not duplicate full feature controls.
 - Settings links to AI Doctor, Backup/Restore, and Activity History instead of embedding those workflows.
@@ -229,8 +227,8 @@ Pager-backed queue/list content:
 
 ## Implementation Rules
 
-- UI state comes from ViewModels; shared components must not own business decisions.
-- New reusable UI belongs in `core/ui` only after at least two screens need it or it removes meaningful duplication.
-- Screen-local helper Composables are acceptable while behavior is still changing.
+- UI state comes from the React reducer/domain selectors; shared components must not own business decisions.
+- New reusable RN UI belongs in `src/ui` only after at least two screens need it or it removes meaningful duplication.
+- Screen-local helper components are acceptable while behavior is still changing.
 - Convert hard-coded screen dimensions to tokens incrementally with focused compile/test validation.
-- Do not change route names, ViewModel method contracts, dispatch policies, or persistence behavior during visual-only redesign work.
+- Do not change route names, reducer action contracts, dispatch policies, or persistence behavior during visual-only redesign work.

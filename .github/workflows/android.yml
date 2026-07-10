@@ -1,107 +1,80 @@
-name: Android CI
+name: React Native CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+
+concurrency:
+  group: react-native-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
-  build:
+  dependency-review:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
-
       - name: Review dependency changes
-        if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: moderate
           deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, LGPL-2.1, LGPL-3.0
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pinned Node and npm cache
+        uses: actions/setup-node@v4
         with:
-          java-version: "21"
-          distribution: "temurin"
-          cache: gradle
+          node-version-file: .nvmrc
+          cache: npm
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Install exact dependencies
+        run: npm ci
 
-      - name: Run verification
-        run: ./gradlew :core:domain:test testDebugUnitTest lintDebug assembleDebug --no-configuration-cache
+      - name: Prove clean checkout has no generated release report
+        run: test ! -e reports/react-native-release-evidence.json
 
-      - name: Verify screenshot baselines
-        run: ./gradlew :app:verifyRoborazziDebug -Pscreenshot --tests 'com.example.ui.screenshots.*' --no-configuration-cache
+      - name: Type-check before evidence generation
+        run: npm run typecheck
 
-      - name: Verify release readiness guardrails
-        run: ./gradlew :app:testDebugUnitTest --tests com.example.ProductionReadinessConfigTest --no-configuration-cache
+      - name: Lint active source
+        run: npm run lint
 
-      - name: Generate coverage report
-        run: ./gradlew jacocoDebugUnitTestReport --no-configuration-cache
+      - name: Verify formatting
+        run: npm run format:check
 
-      - name: Verify release signing guard
-        run: |
-          set +e
-          ./gradlew assembleRelease --no-configuration-cache > release-signing.log 2>&1
-          status=$?
-          set -e
-          cat release-signing.log
-          if [ "$status" -eq 0 ]; then
-            echo "assembleRelease succeeded without release signing environment variables."
-            exit 1
-          fi
-          grep -q "Release signing is not configured" release-signing.log
-          grep -q "KEYSTORE_PATH" release-signing.log
-          grep -q "STORE_PASSWORD" release-signing.log
-          grep -q "KEY_ALIAS" release-signing.log
-          grep -q "KEY_PASSWORD" release-signing.log
+      - name: Test before evidence generation
+        run: npm test
 
-      - name: Upload lint reports
-        if: always()
+      - name: Generate command-derived release evidence
+        run: npm run release:evidence -- --fail-on-blockers
+
+      - name: Upload release evidence
         uses: actions/upload-artifact@v4
         with:
-          name: lint-reports
-          path: |
-            **/build/reports/lint-results-debug.*
+          name: react-native-release-evidence-${{ github.sha }}
+          path: reports/react-native-release-evidence.json
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: Upload unit test reports
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Attest release evidence provenance
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@v2
         with:
-          name: unit-test-reports
-          path: |
-            **/build/reports/tests/test/**
-            **/build/reports/tests/testDebugUnitTest/**
-            **/build/test-results/test/**
-            **/build/test-results/testDebugUnitTest/**
-
-      - name: Upload Roborazzi reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: roborazzi-reports
-          path: |
-            app/build/reports/roborazzi/**
-            app/build/outputs/roborazzi/**
-            app/build/test-results/roborazzi/**
-
-      - name: Upload coverage reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-reports
-          path: |
-            build/reports/jacoco/jacocoDebugUnitTestReport/**
-
-      - name: Upload debug APK
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          subject-path: reports/react-native-release-evidence.json

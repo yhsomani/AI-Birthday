@@ -1,11 +1,24 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createInitialState, relateReducer } from '../state/relateReducer';
-import { validateManualEventInput } from './events';
+import { relateReducer } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
+import { advancedManualEventTypes, manualEventTypes, primaryManualEventTypes, validateManualEventInput } from './events';
 
 describe('manual event contract', () => {
+  it('keeps birthday, anniversary, and custom as primary manual event choices', () => {
+    assert.deepEqual(primaryManualEventTypes, ['Birthday', 'Anniversary', 'Custom']);
+    assert.deepEqual(advancedManualEventTypes, [
+      'Work anniversary',
+      'Graduation',
+      'Holiday',
+      'Revival',
+      'Follow-up'
+    ]);
+    assert.deepEqual(manualEventTypes, [...primaryManualEventTypes, ...advancedManualEventTypes]);
+  });
+
   it('validates real calendar dates before saving', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const result = validateManualEventInput(
       {
         contactId: 'c-asha',
@@ -24,7 +37,7 @@ describe('manual event contract', () => {
   });
 
   it('catches duplicate same-contact same-day events before save', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const existingDate = state.events.find(event => event.id === 'e-asha-bday')?.date.slice(0, 10) ?? '';
     const blocked = relateReducer(state, {
       type: 'addManualEvent',
@@ -49,7 +62,7 @@ describe('manual event contract', () => {
   });
 
   it('creates a new local contact when an event is added for a new person', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const next = relateReducer(state, {
       type: 'addManualEvent',
       newContactName: 'Nikhil Rao',

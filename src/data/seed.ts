@@ -1,3 +1,4 @@
+import { defaultRelationshipGroupDefaults } from '../domain/contactPreferences';
 import type { AppState } from '../domain/types';
 
 const today = new Date();
@@ -9,7 +10,7 @@ const isoFromNow = (days: number) => {
 };
 
 export const initialState: AppState = {
-  activeScreen: 'home',
+  activeScreen: 'onboarding',
   selectedContactId: undefined,
   selectedMessageId: undefined,
   searchQuery: '',
@@ -141,6 +142,7 @@ export const initialState: AppState = {
       id: 'g-asha-1',
       contactId: 'c-asha',
       name: 'Ceramic tea set',
+      category: 'Personal',
       occasion: 'Birthday',
       cost: 2200,
       year: 2025,
@@ -233,10 +235,35 @@ export const initialState: AppState = {
     emailEnabled: false,
     biometricLockEnabled: false,
     automationMode: 'Always ask',
+    groupDefaults: defaultRelationshipGroupDefaults,
     quietHours: {
       start: '22:00',
       end: '08:00'
-    }
+    },
+    blackouts: []
+  },
+  onboarding: {
+    completed: false,
+    currentStepId: 'intro',
+    selectedGoal: 'Reminders first',
+    completedStepIds: [],
+    skippedStepIds: [],
+    lastUpdatedAt: undefined
+  },
+  privacy: {
+    permissionDecisions: {
+      Contacts: 'Not requested',
+      Notifications: 'Not requested',
+      SMS: 'Not requested',
+      Calendar: 'Not requested',
+      'Biometric lock': 'Not requested',
+      'AI provider': 'Not requested',
+      'Email provider': 'Not requested',
+      'WhatsApp handoff': 'Not requested',
+      'Backup export': 'Not requested'
+    },
+    whatsappHandoffConsent: false,
+    localDataClearConfirmedAt: undefined
   },
   aiProvider: {
     status: 'Not configured'
@@ -268,9 +295,9 @@ export const initialState: AppState = {
     },
     {
       id: 'setup-whatsapp',
-      title: 'WhatsApp automation',
+      title: 'Manual WhatsApp handoff',
       status: 'Optional',
-      detail: 'Use manual WhatsApp handoff before considering unattended automation.',
+      detail: 'Open approved WhatsApp text manually and keep the final send in the destination app.',
       action: 'Keep manual'
     }
   ],

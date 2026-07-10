@@ -2,11 +2,22 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { buildEmailDeliveryRequest } from '../domain/emailDelivery';
 import type { AppState } from '../domain/types';
-import { createInitialState } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 import { sendEmailMessage } from './emailSenderClient';
+import { staticJsonResponse } from './providerTransport';
+
+const authenticatedSession = {
+  sessionAccessToken: 'test-session-token-1234567890',
+  sessionExpiresAt: '2999-01-01T00:00:00.000Z'
+};
+
+const validApproval = {
+  approvedAt: '2026-07-09T09:00:00.000Z',
+  approvalExpiresAt: '2999-07-16T09:00:00.000Z'
+};
 
 const emailReadyState = (): AppState => {
-  const state = createInitialState();
+  const state = createTestState();
   return {
     ...state,
     settings: {
@@ -26,6 +37,7 @@ const emailReadyState = (): AppState => {
         reason: 'Congratulations',
         channel: 'Email',
         status: 'Scheduled',
+        ...validApproval,
         body: 'Congratulations Rajesh, wishing you continued success and a meaningful year ahead.'
       },
       ...state.messages
@@ -42,29 +54,55 @@ describe('emailSenderClient', () => {
     }
 
     let body = '';
+    let idempotencyHeader = '';
+    let authorizationHeader = '';
     const result = await sendEmailMessage(
       request.request,
       {
         endpoint: 'https://email.example.test/send',
-        timeoutMs: 1000
+        timeoutMs: 1000,
+        ...authenticatedSession
       },
       async (_input, init) => {
         body = init.body;
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ deliveryId: 'delivery-1' })
-        };
+        idempotencyHeader = init.headers['idempotency-key'];
+        authorizationHeader = init.headers.authorization;
+        return staticJsonResponse({ deliveryId: 'delivery-1', status: 'sent' });
       }
     );
 
     assert.equal(result.ok, true);
     if (result.ok) {
       assert.equal(result.deliveryId, 'delivery-1');
+      assert.equal(result.status, 'sent');
     }
+    assert.equal(idempotencyHeader, request.request.idempotencyKey);
+    assert.equal(authorizationHeader, `Bearer ${authenticatedSession.sessionAccessToken}`);
     assert.match(body, /rajesh@example\.com/);
     assert.doesNotMatch(body, /Private note excluded/i);
     assert.doesNotMatch(body, /\+91/);
+  });
+
+  it('returns an unknown outcome with the same idempotency key when the response is lost', async () => {
+    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh');
+    assert.equal(request.ok, true);
+    if (!request.ok) return;
+
+    const result = await sendEmailMessage(
+      request.request,
+      { endpoint: 'https://email.example.test/send', timeoutMs: 1000, ...authenticatedSession },
+      async () => {
+        throw new TypeError('connection reset after accept');
+      }
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.outcome, 'unknown');
+      assert.equal(result.error.kind, 'delivery-unknown');
+      assert.equal(result.idempotencyKey, request.request.idempotencyKey);
+      assert.match(result.error.message, /do not retry/i);
+    }
   });
 
   it('returns not-configured before attempting network access', async () => {
@@ -79,6 +117,71 @@ describe('emailSenderClient', () => {
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.equal(result.error.kind, 'not-configured');
+    }
+  });
+
+  it('rejects unsafe configured endpoints before attempting network access', async () => {
+    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh');
+    assert.equal(request.ok, true);
+    if (!request.ok) {
+      return;
+    }
+
+    let calls = 0;
+    const result = await sendEmailMessage(
+      request.request,
+      {
+        endpoint: 'https://token:secret@email.example.test/send',
+        timeoutMs: 1000
+      },
+      async () => {
+        calls += 1;
+        return staticJsonResponse({ deliveryId: 'delivery-unsafe', status: 'sent' });
+      }
+    );
+
+    assert.equal(result.ok, false);
+    assert.equal(calls, 0);
+    if (!result.ok) {
+      assert.equal(result.error.kind, 'not-configured');
+      assert.match(result.error.message, /not safe to use/i);
+      assert.doesNotMatch(result.error.message, /secret|email\.example|send/);
+    }
+  });
+
+  it('requires an authenticated short-lived session for public provider endpoints', async () => {
+    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh');
+    assert.equal(request.ok, true);
+    if (!request.ok) return;
+
+    let calls = 0;
+    const result = await sendEmailMessage(
+      request.request,
+      { endpoint: 'https://email.example.test/send', timeoutMs: 1000 },
+      async () => {
+        calls += 1;
+        return staticJsonResponse({});
+      }
+    );
+    assert.equal(result.ok, false);
+    assert.equal(calls, 0);
+    if (!result.ok) assert.equal(result.error.kind, 'auth');
+  });
+
+  it('treats non-JSON success bodies as delivery unknown', async () => {
+    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh');
+    assert.equal(request.ok, true);
+    if (!request.ok) return;
+
+    const result = await sendEmailMessage(
+      request.request,
+      { endpoint: 'https://email.example.test/send', timeoutMs: 1000, ...authenticatedSession },
+      async () => staticJsonResponse({ status: 'sent' }, { contentType: 'text/html' })
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.outcome, 'unknown');
+      assert.equal(result.error.kind, 'invalid-response');
     }
   });
 });

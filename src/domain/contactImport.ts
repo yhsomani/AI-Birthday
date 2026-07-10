@@ -1,10 +1,9 @@
 import type { AppState, Contact, ImportedContactRecord, RelationshipEvent } from './types';
+import { recurrenceFromDate } from './occasionDates';
 
 const normalizePhone = (phone?: string) => phone?.replace(/[^\d+]/g, '').replace(/^00/, '+');
 
 const normalizeEmail = (email?: string) => email?.trim().toLowerCase();
-
-const normalizeName = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
 
 const makeContactId = (record: ImportedContactRecord) =>
   `import-${record.sourceId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
@@ -18,7 +17,7 @@ const canMerge = (contact: Contact, record: ImportedContactRecord) => {
   if (email && normalizeEmail(contact.email) === email) {
     return true;
   }
-  return normalizeName(contact.name) === normalizeName(record.name);
+  return false;
 };
 
 const buildEvent = (contactId: string, record: ImportedContactRecord): RelationshipEvent | undefined => {
@@ -31,6 +30,7 @@ const buildEvent = (contactId: string, record: ImportedContactRecord): Relations
     type: 'Birthday',
     label: `${record.name.trim()} birthday`,
     date: record.birthday,
+    recurrence: recurrenceFromDate('Birthday', record.birthday),
     verified: false,
     source: 'Imported',
     checklist: [

@@ -1,3 +1,5 @@
+import { resolveContactPreferencesForContact } from './contactPreferences';
+import { MIN_MESSAGE_BODY_LENGTH } from './messageBodyPolicy';
 import type { AppState, ComposerReason, Contact, MessageDraft, Tone } from './types';
 
 export type MessageTemplate = {
@@ -23,6 +25,47 @@ export type TemplateDraftResult =
   | {
       ok: false;
       reason: string;
+    };
+
+export type MessageTemplateLibraryInput = {
+  contactId?: string;
+  reason: ComposerReason;
+  tone?: Tone;
+  selectedTemplateId?: string;
+  draftBody?: string;
+};
+
+export type MessageTemplateLibraryState =
+  | {
+      ok: true;
+      contact: Contact;
+      reason: ComposerReason;
+      selectedTone?: Tone;
+      toneOptions: Tone[];
+      templates: MessageTemplate[];
+      selectedTemplate: MessageTemplate;
+      renderedBody: string;
+      characterCount: number;
+      contextDetail: string;
+      action: {
+        enabled: boolean;
+        detail: string;
+      };
+    }
+  | {
+      ok: false;
+      reason: ComposerReason;
+      selectedTone?: Tone;
+      toneOptions: Tone[];
+      templates: MessageTemplate[];
+      renderedBody: string;
+      characterCount: number;
+      contextDetail: string;
+      action: {
+        enabled: false;
+        detail: string;
+      };
+      error: string;
     };
 
 export const messageTemplates: MessageTemplate[] = [
@@ -92,6 +135,22 @@ const contextForContact = (state: AppState, contactId: string) =>
     .map(memory => memory.body)
     .find(Boolean);
 
+const contextReportForContact = (state: AppState, contact: Contact) => {
+  const memories = state.memories.filter(memory => memory.contactId === contact.id);
+  const publicMemories = memories.filter(memory => memory.category !== 'Private');
+  const privateCount = memories.length - publicMemories.length;
+  const context = publicMemories.map(memory => memory.body).find(Boolean) ?? contact.notesSummary;
+  return {
+    context,
+    detail:
+      publicMemories.length > 0
+        ? `${publicMemories.length} non-private memory item(s) available; ${privateCount} private note(s) excluded.`
+        : contact.notesSummary.trim().length > 0
+          ? `Using contact notes; ${privateCount} private note(s) excluded.`
+          : `No extra context available; ${privateCount} private note(s) excluded.`
+  };
+};
+
 export const findMessageTemplates = (
   reason: ComposerReason,
   tones: Tone[] = []
@@ -126,10 +185,11 @@ export const buildTemplateDraft = (
   }
 
   const body = normalize(input.body);
-  if (body.length < 12) {
+  if (body.length < MIN_MESSAGE_BODY_LENGTH) {
     return { ok: false, reason: 'Write a longer template message before creating a draft.' };
   }
 
+  const preferences = resolveContactPreferencesForContact(state.settings, contact);
   const duplicate = state.messages.find(
     message => message.contactId === contact.id && message.eventId === undefined && message.status !== 'Rejected'
   );
@@ -143,7 +203,7 @@ export const buildTemplateDraft = (
       contactId: contact.id,
       reason: input.reason,
       status: 'Needs review',
-      channel: contact.preferredChannel,
+      channel: preferences.preferredChannel,
       body,
       variants: {
         short,
@@ -161,6 +221,83 @@ export const buildTemplateDraft = (
   };
 };
 
+export const buildMessageTemplateLibrary = (
+  state: AppState,
+  input: MessageTemplateLibraryInput
+): MessageTemplateLibraryState => {
+  const reasonTemplates = messageTemplates.filter(template => template.reason === input.reason);
+  const toneOptions = [...new Set(reasonTemplates.map(template => template.tone))];
+  const contact = input.contactId ? state.contacts.find(item => item.id === input.contactId) : state.contacts[0];
+  const selectedTone = input.tone ?? (contact ? resolveContactPreferencesForContact(state.settings, contact).tone[0] : undefined);
+
+  if (!contact) {
+    return {
+      ok: false,
+      reason: input.reason,
+      selectedTone,
+      toneOptions,
+      templates: reasonTemplates,
+      renderedBody: '',
+      characterCount: 0,
+      contextDetail: 'Choose a contact before personalizing a template.',
+      action: {
+        enabled: false,
+        detail: 'Choose a contact before creating a review draft.'
+      },
+      error: 'No contact is selected.'
+    };
+  }
+
+  const templates = selectedTone ? findMessageTemplates(input.reason, [selectedTone]) : findMessageTemplates(input.reason);
+  const selectedTemplate =
+    templates.find(template => template.id === input.selectedTemplateId) ??
+    reasonTemplates.find(template => template.id === input.selectedTemplateId) ??
+    templates[0];
+  if (!selectedTemplate) {
+    return {
+      ok: false,
+      reason: input.reason,
+      selectedTone,
+      toneOptions,
+      templates: [],
+      renderedBody: '',
+      characterCount: 0,
+      contextDetail: 'No local templates are available for this occasion yet.',
+      action: {
+        enabled: false,
+        detail: 'Choose another occasion or write from Manual Composer.'
+      },
+      error: 'No template is available for the selected occasion.'
+    };
+  }
+  const context = contextReportForContact(state, contact);
+  const renderedBody = selectedTemplate ? renderMessageTemplate(selectedTemplate, contact, context.context) : '';
+  const body = normalize(input.draftBody ?? renderedBody);
+  const exactToneAvailable = selectedTone ? reasonTemplates.some(template => template.tone === selectedTone) : true;
+  const actionEnabled = body.length >= MIN_MESSAGE_BODY_LENGTH;
+
+  return {
+    ok: true,
+    contact,
+    reason: input.reason,
+    selectedTone,
+    toneOptions,
+    templates,
+    selectedTemplate,
+    renderedBody,
+    characterCount: body.length,
+    contextDetail: exactToneAvailable
+      ? context.detail
+      : `${context.detail} No exact ${selectedTone} template exists for ${input.reason}; showing available templates.`,
+    action: {
+      enabled: actionEnabled,
+      detail: actionEnabled
+        ? 'Creates a review-first draft from the edited template.'
+        : `Write at least ${MIN_MESSAGE_BODY_LENGTH} characters before creating a draft.`
+    }
+  };
+};
+
 export const firstRenderedTemplateForContact = (
   state: AppState,
   contactId: string,
@@ -170,6 +307,7 @@ export const firstRenderedTemplateForContact = (
   if (!contact) {
     return undefined;
   }
-  const template = findMessageTemplates(reason, contact.tone)[0];
+  const preferences = resolveContactPreferencesForContact(state.settings, contact);
+  const template = findMessageTemplates(reason, preferences.tone)[0];
   return template ? renderMessageTemplate(template, contact, contextForContact(state, contactId)) : undefined;
 };

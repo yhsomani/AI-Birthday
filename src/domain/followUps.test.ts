@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createInitialState, relateReducer } from '../state/relateReducer';
+import { relateReducer } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 import { buildMessageFollowUpPlan } from './followUps';
 
 describe('post-send follow-up contract', () => {
   it('creates a reviewable follow-up event and reminder after a sent message', () => {
-    const sentState = relateReducer(createInitialState(), {
+    const approved = relateReducer(createTestState(), {
+      type: 'approveMessage',
+      messageId: 'msg-mira-checkin'
+    });
+    const sentState = relateReducer(approved, {
       type: 'manualHandoff',
       messageId: 'msg-mira-checkin'
     });
@@ -22,7 +27,7 @@ describe('post-send follow-up contract', () => {
   });
 
   it('blocks follow-up scheduling before the user has sent the message', () => {
-    const result = buildMessageFollowUpPlan(createInitialState(), 'msg-asha-bday', 7, '2026-07-09T12:00:00.000Z');
+    const result = buildMessageFollowUpPlan(createTestState(), 'msg-asha-bday', 7, '2026-07-09T12:00:00.000Z');
 
     assert.equal(result.ok, false);
     if (!result.ok) {
@@ -31,7 +36,11 @@ describe('post-send follow-up contract', () => {
   });
 
   it('adds one follow-up through the reducer and prevents duplicate same-day reminders', () => {
-    const sentState = relateReducer(createInitialState(), {
+    const approved = relateReducer(createTestState(), {
+      type: 'approveMessage',
+      messageId: 'msg-mira-checkin'
+    });
+    const sentState = relateReducer(approved, {
       type: 'manualHandoff',
       messageId: 'msg-mira-checkin'
     });

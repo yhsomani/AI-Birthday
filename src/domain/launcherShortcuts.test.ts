@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createInitialState } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 import { launcherShortcuts, resolveLauncherShortcut, validateLauncherShortcutContract } from './launcherShortcuts';
 
 describe('launcher shortcut contract', () => {
   it('keeps every retained launcher shortcut navigation-only and safe', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const validation = validateLauncherShortcutContract(state);
 
     assert.equal(validation.ok, true, validation.errors.join('\n'));
@@ -17,7 +17,7 @@ describe('launcher shortcut contract', () => {
   });
 
   it('routes shortcuts to review-first RN workflows', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const review = resolveLauncherShortcut(state, 'review-messages');
     const addEvent = resolveLauncherShortcut(state, 'add-event');
 
@@ -32,7 +32,7 @@ describe('launcher shortcut contract', () => {
   });
 
   it('recovers removed shortcut ids to the home dashboard', () => {
-    const result = resolveLauncherShortcut(createInitialState(), 'send-now');
+    const result = resolveLauncherShortcut(createTestState(), 'send-now');
 
     assert.equal(result.ok, false);
     assert.equal(result.destination.screen, 'home');

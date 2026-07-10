@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createInitialState, relateReducer } from '../state/relateReducer';
+import { relateReducer } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 import { detectDuplicateMessageRisk } from './duplicateGuard';
 
 describe('duplicate send guardrail', () => {
   it('detects already scheduled messages for the same contact and event', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const draft = relateReducer(state, {
       type: 'generateMessage',
       contactId: 'c-asha',
@@ -22,7 +23,7 @@ describe('duplicate send guardrail', () => {
   });
 
   it('blocks approval until duplicate risk is explicitly acknowledged', () => {
-    const generated = relateReducer(createInitialState(), {
+    const generated = relateReducer(createTestState(), {
       type: 'generateMessage',
       contactId: 'c-asha',
       eventId: 'e-asha-bday',
@@ -49,7 +50,11 @@ describe('duplicate send guardrail', () => {
   });
 
   it('detects similar sent messages for the same manual occasion', () => {
-    const sent = relateReducer(createInitialState(), {
+    const approved = relateReducer(createTestState(), {
+      type: 'approveMessage',
+      messageId: 'msg-mira-checkin'
+    });
+    const sent = relateReducer(approved, {
       type: 'manualHandoff',
       messageId: 'msg-mira-checkin',
       nowIso: '2026-07-09T10:00:00.000Z'

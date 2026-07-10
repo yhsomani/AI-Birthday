@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createInitialState, relateReducer } from '../state/relateReducer';
+import { relateReducer } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 import { buildContactTimeline } from './contactTimeline';
 
 describe('contact timeline contract', () => {
   it('combines events, memories, gifts, and sent messages for a contact', () => {
-    const state = relateReducer(createInitialState(), {
+    const approved = relateReducer(createTestState(), {
+      type: 'approveMessage',
+      messageId: 'msg-asha-bday'
+    });
+    const state = relateReducer(approved, {
       type: 'manualHandoff',
       messageId: 'msg-asha-bday',
       nowIso: '2026-07-09T10:00:00.000Z'
@@ -21,7 +26,11 @@ describe('contact timeline contract', () => {
   });
 
   it('filters sent message history without exposing unsent drafts', () => {
-    const state = relateReducer(createInitialState(), {
+    const approved = relateReducer(createTestState(), {
+      type: 'approveMessage',
+      messageId: 'msg-mira-checkin'
+    });
+    const state = relateReducer(approved, {
       type: 'manualHandoff',
       messageId: 'msg-mira-checkin',
       nowIso: '2026-07-09T10:00:00.000Z'
@@ -34,7 +43,7 @@ describe('contact timeline contract', () => {
   });
 
   it('returns a useful empty state for missing contacts and empty filters', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const missing = buildContactTimeline(state, 'missing-contact');
     const gifts = buildContactTimeline(state, 'c-mira', 'Gifts');
 

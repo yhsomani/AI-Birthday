@@ -1,4 +1,4 @@
-import type { ActivityItem, Screen } from './types';
+import type { ActivityItem, AppState, Screen } from './types';
 
 export type ActivityTypeFilter = 'All' | ActivityItem['type'];
 export type ActivitySeverityFilter = 'All' | ActivityItem['severity'];
@@ -10,13 +10,18 @@ export type ActivityHistoryFilters = {
   severity?: ActivitySeverityFilter;
   date?: ActivityDateFilter;
   nowIso?: string;
+  state?: AppState;
 };
 
 export type ActivityHistoryRow = {
   item: ActivityItem;
   actionLabel: string;
   targetScreen: Screen;
+  contactId?: string;
+  messageId?: string;
   isOpenIssue: boolean;
+  recoveryState: 'ready' | 'fallback';
+  recoveryDetail: string;
 };
 
 export type ActivityHistoryResult = {
@@ -33,7 +38,8 @@ export const activityTypeFilters: ActivityTypeFilter[] = [
   'Setup',
   'AI',
   'Gift',
-  'Memory'
+  'Memory',
+  'Analytics'
 ];
 
 export const activitySeverityFilters: ActivitySeverityFilter[] = ['All', 'Info', 'Warning', 'Error'];
@@ -52,8 +58,55 @@ const targetForActivity = (type: ActivityItem['type']): Pick<ActivityHistoryRow,
     case 'Backup':
     case 'Setup':
     case 'AI':
+    case 'Analytics':
       return { actionLabel: 'Open setup', targetScreen: 'more' };
   }
+};
+
+const validateExplicitTarget = (
+  item: ActivityItem,
+  state: AppState | undefined
+): Pick<ActivityHistoryRow, 'actionLabel' | 'targetScreen' | 'contactId' | 'messageId' | 'recoveryState' | 'recoveryDetail'> | undefined => {
+  if (!item.targetScreen) {
+    return undefined;
+  }
+
+  const fallback = targetForActivity(item.type);
+  if (!state) {
+    return {
+      actionLabel: item.actionLabel ?? fallback.actionLabel,
+      targetScreen: item.targetScreen,
+      contactId: item.contactId,
+      messageId: item.messageId,
+      recoveryState: 'ready',
+      recoveryDetail: 'Recovery target is attached to this activity.'
+    };
+  }
+
+  if (item.messageId && !state.messages.some(message => message.id === item.messageId)) {
+    return {
+      ...fallback,
+      recoveryState: 'fallback',
+      recoveryDetail: 'The linked message is no longer available, so this action opens the nearest safe recovery screen.'
+    };
+  }
+
+  if (item.contactId && !state.contacts.some(contact => contact.id === item.contactId)) {
+    return {
+      ...fallback,
+      recoveryState: 'fallback',
+      recoveryDetail: 'The linked contact is no longer available, so this action opens the nearest safe recovery screen.'
+    };
+  }
+
+  return {
+    actionLabel: item.actionLabel ?? fallback.actionLabel,
+    targetScreen: item.targetScreen,
+    contactId: item.contactId,
+    messageId: item.messageId,
+    recoveryState: 'ready',
+    recoveryDetail: 'Recovery target is available.'
+  };
 };
 
 const dayKey = (iso: string) => iso.slice(0, 10);
@@ -82,6 +135,7 @@ export const buildActivityHistory = (
   const severity = filters.severity ?? 'All';
   const date = filters.date ?? 'All';
   const nowIso = filters.nowIso ?? new Date().toISOString();
+  const state = filters.state;
 
   const rows = [...activity]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -94,7 +148,12 @@ export const buildActivityHistory = (
       return queryMatches && typeMatches && severityMatches && withinDateFilter(item, date, nowIso);
     })
     .map(item => {
-      const action = targetForActivity(item.type);
+      const explicitTarget = validateExplicitTarget(item, state);
+      const action = explicitTarget ?? {
+        ...targetForActivity(item.type),
+        recoveryState: 'ready' as const,
+        recoveryDetail: 'General recovery action for this activity type.'
+      };
       return {
         item,
         ...action,

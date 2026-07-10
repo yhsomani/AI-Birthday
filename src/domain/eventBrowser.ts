@@ -1,4 +1,8 @@
 import type { EventType, RelationshipEvent } from './types';
+import {
+  eventOccurrenceInYear,
+  materializeEventOccurrence
+} from './occasionDates';
 
 export type EventTypeFilter = 'All' | EventType;
 export type EventTimeFilter = 'All' | 'Upcoming' | 'Past' | 'This month';
@@ -35,8 +39,8 @@ const parseIso = (iso: string) => {
   return Number.isNaN(date.getTime()) ? undefined : date;
 };
 
-export const sortEventsByDate = (events: RelationshipEvent[]) =>
-  [...events].sort((a, b) => {
+export const sortEventsByDate = (events: RelationshipEvent[], reference: Date = new Date()) =>
+  events.map(event => materializeEventOccurrence(event, reference)).sort((a, b) => {
     const byDate = a.date.localeCompare(b.date);
     return byDate === 0 ? a.label.localeCompare(b.label) : byDate;
   });
@@ -51,7 +55,7 @@ export const filterRelationshipEvents = (
   const activeMonthKey = activeMonth ? monthKey(activeMonth) : monthKey(nowDate);
 
   return sortEventsByDate(
-    events.filter(event => {
+    events.map(event => materializeEventOccurrence(event, nowDate)).filter(event => {
       const eventKey = dateKey(event.date);
       const typeMatches = filters.type === 'All' || event.type === filters.type;
       const timeMatches =
@@ -61,7 +65,8 @@ export const filterRelationshipEvents = (
         (filters.time === 'This month' && eventKey.startsWith(activeMonthKey));
 
       return typeMatches && timeMatches;
-    })
+    }),
+    nowDate
   );
 };
 
@@ -76,7 +81,16 @@ export const buildEventMonthView = (
   const firstWeekday = firstOfMonth.getUTCDay();
   const gridStart = new Date(firstOfMonth);
   gridStart.setUTCDate(firstOfMonth.getUTCDate() - firstWeekday);
-  const eventsByDate = events.reduce<Record<string, RelationshipEvent[]>>((acc, event) => {
+  const gridEnd = new Date(gridStart);
+  gridEnd.setUTCDate(gridStart.getUTCDate() + 41);
+  const years = [...new Set([gridStart.getUTCFullYear(), gridEnd.getUTCFullYear()])];
+  const occurrences = events.flatMap(event =>
+    years.flatMap(year => {
+      const occurrence = eventOccurrenceInYear(event, year);
+      return occurrence ? [occurrence] : [];
+    })
+  );
+  const eventsByDate = occurrences.reduce<Record<string, RelationshipEvent[]>>((acc, event) => {
     const key = dateKey(event.date);
     acc[key] = [...(acc[key] ?? []), event];
     return acc;
@@ -90,7 +104,7 @@ export const buildEventMonthView = (
       dateKey: key,
       dayOfMonth: current.getUTCDate(),
       inMonth: current.getUTCMonth() === monthIndex,
-      events: sortEventsByDate(eventsByDate[key] ?? [])
+      events: sortEventsByDate(eventsByDate[key] ?? [], current)
     };
   });
 

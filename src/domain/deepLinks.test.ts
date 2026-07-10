@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createInitialState } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 import { parseRelateDeepLink, resolveDeepLinkDestination } from './deepLinks';
 
 describe('deep link routing contract', () => {
@@ -21,7 +21,7 @@ describe('deep link routing contract', () => {
   });
 
   it('recovers unsupported and stale links to useful screens', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const unsupported = parseRelateDeepLink('relateai://unknown/place');
     const stale = resolveDeepLinkDestination(state, {
       screen: 'wishPreview',
@@ -34,5 +34,22 @@ describe('deep link routing contract', () => {
     }
     assert.equal(stale.ok, false);
     assert.equal(stale.destination.screen, 'messages');
+  });
+
+  it('recovers message links when the referenced contact was deleted', () => {
+    const state = createTestState();
+    const missingContactState = {
+      ...state,
+      contacts: state.contacts.filter(contact => contact.id !== 'c-asha')
+    };
+
+    const resolution = resolveDeepLinkDestination(missingContactState, {
+      screen: 'wishPreview',
+      messageId: 'msg-asha-bday'
+    });
+
+    assert.equal(resolution.ok, false);
+    assert.equal(resolution.destination.screen, 'messages');
+    assert.match(resolution.message, /contact is no longer available/i);
   });
 });

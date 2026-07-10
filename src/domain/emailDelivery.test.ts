@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createInitialState } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 import { buildEmailDeliveryRequest, classifyEmailProviderStatus, isValidEmailAddress } from './emailDelivery';
+import { MESSAGE_BODY_LIMITS } from './messageBodyPolicy';
 import type { AppState } from './types';
 
+const validApproval = {
+  approvedAt: '2026-07-09T09:00:00.000Z',
+  approvalExpiresAt: '2999-07-16T09:00:00.000Z'
+};
+
 const emailReadyState = (): AppState => {
-  const state = createInitialState();
+  const state = createTestState();
   return {
     ...state,
     settings: {
@@ -25,6 +31,7 @@ const emailReadyState = (): AppState => {
         reason: 'Congratulations',
         channel: 'Email',
         status: 'Scheduled',
+        ...validApproval,
         body: 'Congratulations Rajesh, wishing you continued success and a meaningful year ahead.'
       },
       ...state.messages
@@ -51,6 +58,7 @@ describe('email delivery contract', () => {
     const serialized = JSON.stringify(result.request);
     assert.equal(result.request.senderEmail, 'me@example.com');
     assert.equal(result.request.recipientEmail, 'rajesh@example.com');
+    assert.match(result.request.idempotencyKey, /^relateai-email-v1:msg-email-rajesh:/);
     assert.match(result.request.subject, /congratulations/i);
     assert.doesNotMatch(serialized, /Private note excluded/i);
     assert.doesNotMatch(serialized, /\+91/);
@@ -103,6 +111,53 @@ describe('email delivery contract', () => {
     if (!unapproved.ok) assert.equal(unapproved.error.kind, 'not-approved');
     if (!invalidSender.ok) assert.equal(invalidSender.error.kind, 'invalid-sender');
     if (!missingRecipient.ok) assert.equal(missingRecipient.error.kind, 'missing-recipient');
+  });
+
+  it('rejects expired approval windows before provider delivery', () => {
+    const ready = emailReadyState();
+    const expired = buildEmailDeliveryRequest(
+      {
+        ...ready,
+        messages: [
+          {
+            ...ready.messages[0],
+            approvedAt: '2026-07-01T09:00:00.000Z',
+            approvalExpiresAt: '2026-07-02T09:00:00.000Z'
+          },
+          ...ready.messages.slice(1)
+        ]
+      },
+      'msg-email-rajesh'
+    );
+
+    assert.equal(expired.ok, false);
+    if (!expired.ok) {
+      assert.equal(expired.error.kind, 'not-approved');
+      assert.match(expired.error.message, /expired/i);
+    }
+  });
+
+  it('rejects email bodies that exceed the channel length cap', () => {
+    const ready = emailReadyState();
+    const result = buildEmailDeliveryRequest(
+      {
+        ...ready,
+        messages: [
+          {
+            ...ready.messages[0],
+            body: 'A'.repeat(MESSAGE_BODY_LIMITS.Email + 1)
+          },
+          ...ready.messages.slice(1)
+        ]
+      },
+      'msg-email-rajesh'
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.error.kind, 'invalid-body');
+      assert.match(result.error.message, /Shorten the message or switch channel/i);
+    }
   });
 
   it('classifies provider failures into actionable categories', () => {

@@ -1,15 +1,21 @@
+import { buildDefaultEventPreparationChecklist } from './eventPreparation';
 import type { Contact, EventType, RelationshipEvent } from './types';
 
-export const manualEventTypes: EventType[] = [
+export const primaryManualEventTypes: EventType[] = [
   'Birthday',
   'Anniversary',
+  'Custom'
+];
+
+export const advancedManualEventTypes: EventType[] = [
   'Work anniversary',
-  'Custom',
   'Graduation',
   'Holiday',
   'Revival',
   'Follow-up'
 ];
+
+export const manualEventTypes: EventType[] = [...primaryManualEventTypes, ...advancedManualEventTypes];
 
 export type ManualEventInput = {
   contactId?: string;
@@ -142,17 +148,5 @@ export const validateManualEventInput = (
 };
 
 export const buildDefaultEventChecklist = (eventType: EventType) => {
-  const writeLabel =
-    eventType === 'Follow-up'
-      ? 'Write check-in'
-      : eventType === 'Work anniversary'
-        ? 'Prepare concise note'
-        : 'Write or review wish';
-
-  return [
-    { id: 'confirm-date', label: 'Confirm date', done: true },
-    { id: 'improve-context', label: 'Add one personal memory', done: false },
-    { id: 'write-message', label: writeLabel, done: false },
-    { id: 'choose-channel', label: 'Choose send channel', done: false }
-  ];
+  return buildDefaultEventPreparationChecklist(eventType);
 };

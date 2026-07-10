@@ -1,6 +1,20 @@
-import type { AppState, ComposerReason, MessageDraft } from './types';
+import type {
+  AiProviderObservation,
+  AppState,
+  ComposerReason,
+  MessageDraft,
+  MessageRegenerationFeedback
+} from './types';
+import { resolveContactPreferencesForContact } from './contactPreferences';
+import { eventOccurrenceIso } from './occasionDates';
 
 export type AiDraftVariants = MessageDraft['variants'];
+
+export type AiDraftContextOptions = {
+  excludedMemoryIds?: string[];
+  includePriorMessages?: boolean;
+  feedback?: MessageRegenerationFeedback;
+};
 
 export type AiDraftErrorKind =
   | 'disabled'
@@ -12,6 +26,8 @@ export type AiDraftErrorKind =
   | 'network'
   | 'timeout'
   | 'invalid-response'
+  | 'content-safety'
+  | 'wrong-language'
   | 'server';
 
 export type AiDraftError = {
@@ -48,9 +64,12 @@ export type AiDraftRequest = {
     body: string;
   }>;
   priorApprovedMessages: string[];
+  regenerationFeedback?: MessageRegenerationFeedback;
   privacy: {
     includedMemoryCount: number;
+    excludedOptionalMemoryCount: number;
     excludedPrivateMemoryCount: number;
+    includedPriorMessageCount: number;
     excludedFields: string[];
   };
   outputContract: {
@@ -76,11 +95,18 @@ export type AiDraftResponseResult =
   | {
       ok: true;
       variants: AiDraftVariants;
+      observation?: AiProviderObservation;
     }
   | {
       ok: false;
       error: AiDraftError;
+      observation?: AiProviderObservation;
     };
+
+export type AiDraftResponseValidationOptions = {
+  expectedLanguage?: AppState['contacts'][number]['language'];
+  previousMessages?: string[];
+};
 
 const MAX_CONTEXT_ITEMS = 5;
 const MAX_PRIOR_MESSAGES = 3;
@@ -92,6 +118,76 @@ const cleanText = (value: unknown, maxLength = MAX_VARIANT_LENGTH) => {
     return '';
   }
   return value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
+};
+
+const routeLeakPattern = /(?:\+?\d[\d\s().-]{7,}\d|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|https?:\/\/|www\.)/i;
+const secretLeakPattern = /\b(?:api key|app password|credential|otp|passcode|password|secret token)\b/i;
+const hindiScriptPattern = /[\u0900-\u097F]/;
+const latinScriptPattern = /[A-Za-z]/;
+
+const normalizeForSimilarity = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0900-\u097f ]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const wordSet = (value: string) => new Set(normalizeForSimilarity(value).split(' ').filter(word => word.length > 2));
+
+const similarity = (left: string, right: string) => {
+  const leftWords = wordSet(left);
+  const rightWords = wordSet(right);
+  if (leftWords.size === 0 || rightWords.size === 0) {
+    return 0;
+  }
+  const overlap = [...leftWords].filter(word => rightWords.has(word)).length;
+  return overlap / Math.max(leftWords.size, rightWords.size);
+};
+
+const validateDraftSafety = (
+  variants: AiDraftVariants,
+  options: AiDraftResponseValidationOptions
+): AiDraftError | undefined => {
+  const values = Object.values(variants);
+  if (values.some(value => routeLeakPattern.test(value) || secretLeakPattern.test(value))) {
+    return {
+      kind: 'content-safety',
+      message: 'The AI provider returned sensitive routing or credential-like content. Use a local template or retry.'
+    };
+  }
+
+  if (
+    options.previousMessages?.some(previous =>
+      values.some(value => normalizeForSimilarity(previous) === normalizeForSimilarity(value) || similarity(previous, value) >= 0.82)
+    )
+  ) {
+    return {
+      kind: 'content-safety',
+      message: 'The AI provider repeated an earlier message too closely. Regenerate with different context.'
+    };
+  }
+
+  const combined = values.join(' ');
+  if (options.expectedLanguage === 'Hindi' && !hindiScriptPattern.test(combined)) {
+    return {
+      kind: 'wrong-language',
+      message: 'The AI provider returned the draft in the wrong language. Regenerate or use a local template.'
+    };
+  }
+  if (options.expectedLanguage === 'English' && hindiScriptPattern.test(combined)) {
+    return {
+      kind: 'wrong-language',
+      message: 'The AI provider returned the draft in the wrong language. Regenerate or use a local template.'
+    };
+  }
+  if (options.expectedLanguage === 'Hinglish' && !latinScriptPattern.test(combined)) {
+    return {
+      kind: 'wrong-language',
+      message: 'The AI provider returned the draft in the wrong language. Regenerate or use a local template.'
+    };
+  }
+
+  return undefined;
 };
 
 const failure = (kind: AiDraftErrorKind, message: string): AiDraftRequestResult => ({
@@ -106,7 +202,8 @@ export const buildAiDraftRequest = (
   state: AppState,
   contactId: string,
   eventId: string | undefined,
-  reason: ComposerReason
+  reason: ComposerReason,
+  options: AiDraftContextOptions = {}
 ): AiDraftRequestResult => {
   if (!state.settings.aiEnabled) {
     return failure('disabled', 'AI drafting is disabled. A local template can still be used.');
@@ -122,9 +219,11 @@ export const buildAiDraftRequest = (
     return failure('missing-event', 'The selected event could not be found.');
   }
 
+  const preferences = resolveContactPreferencesForContact(state.settings, contact);
   const contactMemories = state.memories.filter(memory => memory.contactId === contactId);
+  const excludedMemoryIds = new Set(options.excludedMemoryIds ?? []);
   const includedMemories = contactMemories
-    .filter(memory => memory.category !== 'Private')
+    .filter(memory => memory.category !== 'Private' && !excludedMemoryIds.has(memory.id))
     .slice(0, MAX_CONTEXT_ITEMS)
     .map(memory => ({
       category: memory.category,
@@ -132,11 +231,24 @@ export const buildAiDraftRequest = (
     }))
     .filter(memory => memory.body.length > 0);
   const excludedPrivateMemoryCount = contactMemories.filter(memory => memory.category === 'Private').length;
-  const priorApprovedMessages = state.messages
-    .filter(message => message.contactId === contactId && message.status === 'Sent')
-    .slice(0, MAX_PRIOR_MESSAGES)
-    .map(message => cleanText(message.body, 220))
-    .filter(Boolean);
+  const excludedOptionalMemoryCount = contactMemories.filter(
+    memory => memory.category !== 'Private' && excludedMemoryIds.has(memory.id)
+  ).length;
+  const includePriorMessages = options.includePriorMessages ?? true;
+  const priorApprovedMessages = includePriorMessages
+    ? state.messages
+        .filter(message => message.contactId === contactId && message.status === 'Sent')
+        .slice(0, MAX_PRIOR_MESSAGES)
+        .map(message => cleanText(message.body, 220))
+        .filter(Boolean)
+    : [];
+  const feedback = options.feedback
+    ? {
+        instructions: options.feedback.instructions.map(item => cleanText(item, 180)).filter(Boolean),
+        customInstruction: cleanText(options.feedback.customInstruction, 240) || undefined,
+        previousDraftExcerpt: cleanText(options.feedback.previousDraftExcerpt, 220) || undefined
+      }
+    : undefined;
 
   return {
     ok: true,
@@ -147,15 +259,15 @@ export const buildAiDraftRequest = (
         relationship: contact.relationship,
         group: contact.group,
         language: contact.language,
-        tone: contact.tone,
-        preferredChannel: contact.preferredChannel,
+        tone: preferences.tone,
+        preferredChannel: preferences.preferredChannel,
         notesSummary: cleanText(contact.notesSummary, 220)
       },
       event: event
         ? {
             type: event.type,
             label: event.label,
-            date: event.date,
+            date: eventOccurrenceIso(event) ?? event.date,
             verified: event.verified
           }
         : undefined,
@@ -168,9 +280,15 @@ export const buildAiDraftRequest = (
       },
       memories: includedMemories,
       priorApprovedMessages,
+      regenerationFeedback:
+        feedback && (feedback.instructions.length > 0 || feedback.customInstruction)
+          ? feedback
+          : undefined,
       privacy: {
         includedMemoryCount: includedMemories.length,
+        excludedOptionalMemoryCount,
         excludedPrivateMemoryCount,
+        includedPriorMessageCount: priorApprovedMessages.length,
         excludedFields: ['phone', 'email', 'private memories', 'credentials', 'raw contact provider ids']
       },
       outputContract: {
@@ -180,11 +298,14 @@ export const buildAiDraftRequest = (
         mustRequireUserReview: true
       }
     },
-    privacySummary: `${includedMemories.length} memory item(s) included; ${excludedPrivateMemoryCount} private item(s) excluded.`
+    privacySummary: `${includedMemories.length} memory item(s) included; ${excludedOptionalMemoryCount} optional memory item(s) excluded; ${excludedPrivateMemoryCount} private item(s) excluded; ${priorApprovedMessages.length} prior sent message(s) included.`
   };
 };
 
-export const normalizeAiDraftResponse = (payload: unknown): AiDraftResponseResult => {
+export const normalizeAiDraftResponse = (
+  payload: unknown,
+  options: AiDraftResponseValidationOptions = {}
+): AiDraftResponseResult => {
   if (!payload || typeof payload !== 'object') {
     return {
       ok: false,
@@ -222,15 +343,45 @@ export const normalizeAiDraftResponse = (payload: unknown): AiDraftResponseResul
     };
   }
 
-  return {
-    ok: true,
-    variants: {
-      short,
-      standard,
-      warm
-    }
+  const variants = {
+    short,
+    standard,
+    warm
   };
+  const safetyError = validateDraftSafety(variants, options);
+  return safetyError
+    ? {
+        ok: false,
+        error: safetyError
+      }
+    : {
+        ok: true,
+        variants
+      };
 };
+
+export const buildAiProviderObservation = (
+  request: AiDraftRequest,
+  result: AiDraftResponseResult,
+  durationMs: number
+): AiProviderObservation => ({
+  redacted: true,
+  ok: result.ok,
+  durationMs,
+  reason: request.reason,
+  contactLanguage: request.contact.language as AiProviderObservation['contactLanguage'],
+  includedMemoryCount: request.privacy.includedMemoryCount,
+  excludedPrivateMemoryCount: request.privacy.excludedPrivateMemoryCount,
+  includedPriorMessageCount: request.privacy.includedPriorMessageCount,
+  errorKind: result.ok ? undefined : result.error.kind,
+  variantLengths: result.ok
+    ? {
+        short: result.variants.short.length,
+        standard: result.variants.standard.length,
+        warm: result.variants.warm.length
+      }
+    : undefined
+});
 
 export const classifyAiProviderStatus = (status: number): AiDraftError => {
   if (status === 401 || status === 403) {

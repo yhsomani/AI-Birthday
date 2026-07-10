@@ -1,3 +1,5 @@
+import { messageApprovalWindowIssue } from './messageApproval';
+import { validateMessageBodyForChannel } from './messageBodyPolicy';
 import type { AppState, MessageDraft } from './types';
 
 export type EmailDeliveryErrorKind =
@@ -13,6 +15,7 @@ export type EmailDeliveryErrorKind =
   | 'not-configured'
   | 'auth'
   | 'network'
+  | 'delivery-unknown'
   | 'quota'
   | 'server'
   | 'invalid-response';
@@ -23,6 +26,8 @@ export type EmailDeliveryError = {
 };
 
 export type EmailDeliveryRequest = {
+  /** Stable for one approved message version; the backend must enforce uniqueness. */
+  idempotencyKey: string;
   messageId: string;
   contactId: string;
   senderEmail: string;
@@ -67,6 +72,9 @@ const buildSubject = (message: MessageDraft) =>
         ? 'Thank you'
         : 'A note for you';
 
+export const emailDeliveryIdempotencyKey = (message: MessageDraft) =>
+  `relateai-email-v1:${message.id}:${message.approvedAt ?? 'unapproved'}`;
+
 export const buildEmailDeliveryRequest = (
   state: AppState,
   messageId: string
@@ -93,8 +101,13 @@ export const buildEmailDeliveryRequest = (
   if (message.status !== 'Scheduled') {
     return fail('not-approved', 'Approve the email message before sending.');
   }
-  if (message.body.trim().length < 12) {
-    return fail('invalid-body', 'Write a longer email before sending.');
+  const approvalIssue = messageApprovalWindowIssue(message);
+  if (approvalIssue) {
+    return fail('not-approved', approvalIssue);
+  }
+  const bodyPolicy = validateMessageBodyForChannel(message);
+  if (!bodyPolicy.ok) {
+    return fail('invalid-body', bodyPolicy.message);
   }
 
   const contact = state.contacts.find(item => item.id === message.contactId);
@@ -112,6 +125,7 @@ export const buildEmailDeliveryRequest = (
   return {
     ok: true,
     request: {
+      idempotencyKey: emailDeliveryIdempotencyKey(message),
       messageId: message.id,
       contactId: contact.id,
       senderEmail,

@@ -2,7 +2,7 @@
 
 Date: 2026-06-27
 
-Status: Accepted
+Status: Superseded for active React Native app by ADR 0005. Historical Android/Kotlin decision remains archived.
 
 Implementation update 2026-07-03: this ADR is implemented for the current module boundary. Room entities, DAO projections, and persistence-backed mappers live in `:core:data`; `:core:domain` is a Kotlin/JVM module and no longer depends on Room/Paging or imports Android, AndroidX, Room entity, or DAO types.
 

@@ -1,3 +1,4 @@
+import { resolveContactPreferencesForContact } from './contactPreferences';
 import type { AppState, Contact, MemoryCategory, MemoryNote } from './types';
 
 export type ContactEnrichmentPromptId =
@@ -13,6 +14,7 @@ export interface ContactEnrichmentPrompt {
   category: MemoryCategory;
   memoryPrefix: string;
   priority: number;
+  improvesSignal: string;
 }
 
 export interface ContactEnrichmentPlan {
@@ -21,6 +23,8 @@ export interface ContactEnrichmentPlan {
   label: 'Needs details' | 'Growing' | 'Strong';
   prompts: ContactEnrichmentPrompt[];
   completedSignals: string[];
+  missingSignals: string[];
+  summary: string;
 }
 
 export type EnrichmentAnswerValidation =
@@ -43,8 +47,8 @@ const hasMentionPreference = (contact: Contact, memories: MemoryNote[]) =>
   includesAny(contactContextText(contact, memories), /\b(likes|loves|prefers|favorite|favourite|mention|enjoys)\b/i) ||
   memories.some(memory => memory.category === 'Preference');
 
-const hasAvoidGuidance = (contact: Contact, memories: MemoryNote[]) =>
-  contact.tone.includes('No emoji') ||
+const hasAvoidGuidance = (contact: Contact, memories: MemoryNote[], tone: Contact['tone']) =>
+  tone.includes('No emoji') ||
   includesAny(contactContextText(contact, memories), /\b(avoid|do not|don't|never mention|no emoji|should not)\b/i);
 
 const hasLanguageGuidance = (contact: Contact, memories: MemoryNote[]) =>
@@ -59,7 +63,8 @@ const promptFor = (id: ContactEnrichmentPromptId, contact: Contact): ContactEnri
         reason: 'Relationship context helps future messages sound specific.',
         category: 'General',
         memoryPrefix: 'Relationship context: ',
-        priority: 1
+        priority: 1,
+        improvesSignal: 'relationship context'
       };
     case 'message-mention':
       return {
@@ -68,7 +73,8 @@ const promptFor = (id: ContactEnrichmentPromptId, contact: Contact): ContactEnri
         reason: 'Mention preferences reduce generic drafts.',
         category: 'Preference',
         memoryPrefix: 'Message should mention: ',
-        priority: 2
+        priority: 2,
+        improvesSignal: 'mention preferences'
       };
     case 'message-avoid':
       return {
@@ -77,7 +83,8 @@ const promptFor = (id: ContactEnrichmentPromptId, contact: Contact): ContactEnri
         reason: 'Avoid guidance prevents awkward or repetitive drafts.',
         category: 'Preference',
         memoryPrefix: 'Avoid in messages: ',
-        priority: 3
+        priority: 3,
+        improvesSignal: 'avoid guidance'
       };
     case 'language-style':
       return {
@@ -86,9 +93,29 @@ const promptFor = (id: ContactEnrichmentPromptId, contact: Contact): ContactEnri
         reason: 'Language guidance keeps drafts aligned with the relationship.',
         category: 'Preference',
         memoryPrefix: 'Preferred language/style: ',
-        priority: 4
+        priority: 4,
+        improvesSignal: 'language guidance'
       };
   }
+};
+
+const labelForScore = (score: number): ContactEnrichmentPlan['label'] =>
+  score >= 75 ? 'Strong' : score >= 50 ? 'Growing' : 'Needs details';
+
+const summaryFor = (
+  score: number,
+  completedSignals: string[],
+  missingSignals: string[]
+) => {
+  if (missingSignals.length === 0) {
+    return `Personalization is strong at ${score}%. Future drafts have the core relationship context they need.`;
+  }
+
+  if (completedSignals.length === 0) {
+    return `Personalization is ${score}%. Add ${missingSignals[0]} first to make future drafts less generic.`;
+  }
+
+  return `Personalization is ${score}%. Next missing detail: ${missingSignals[0]}.`;
 };
 
 export const buildContactEnrichmentPlan = (state: AppState, contactId: string): ContactEnrichmentPlan | undefined => {
@@ -98,13 +125,14 @@ export const buildContactEnrichmentPlan = (state: AppState, contactId: string): 
   }
 
   const memories = nonPrivateMemories(state, contactId);
+  const preferences = resolveContactPreferencesForContact(state.settings, contact);
   const gifts = state.gifts.filter(gift => gift.contactId === contactId);
   const events = state.events.filter(event => event.contactId === contactId);
   const sentMessages = state.messages.filter(message => message.contactId === contactId && message.status === 'Sent');
   const completedSignals: string[] = [];
   let score = 0;
 
-  if (contact.preferredChannel) {
+  if (preferences.preferredChannel) {
     score += 15;
     completedSignals.push('delivery channel');
   }
@@ -116,7 +144,7 @@ export const buildContactEnrichmentPlan = (state: AppState, contactId: string): 
     score += 20;
     completedSignals.push('mention preferences');
   }
-  if (hasAvoidGuidance(contact, memories)) {
+  if (hasAvoidGuidance(contact, memories, preferences.tone)) {
     score += 15;
     completedSignals.push('avoid guidance');
   }
@@ -134,28 +162,36 @@ export const buildContactEnrichmentPlan = (state: AppState, contactId: string): 
   }
 
   const promptIds: ContactEnrichmentPromptId[] = [];
+  const missingSignals: string[] = [];
   if (!hasPersonalContext(contact, memories)) {
     promptIds.push('relationship-context');
+    missingSignals.push('relationship context');
   }
   if (!hasMentionPreference(contact, memories)) {
     promptIds.push('message-mention');
+    missingSignals.push('mention preferences');
   }
-  if (!hasAvoidGuidance(contact, memories)) {
+  if (!hasAvoidGuidance(contact, memories, preferences.tone)) {
     promptIds.push('message-avoid');
+    missingSignals.push('avoid guidance');
   }
   if (!hasLanguageGuidance(contact, memories)) {
     promptIds.push('language-style');
+    missingSignals.push('language guidance');
   }
+
+  const finalScore = Math.min(100, score);
 
   return {
     contactId,
-    score: Math.min(100, score),
-    label: score >= 75 ? 'Strong' : score >= 50 ? 'Growing' : 'Needs details',
+    score: finalScore,
+    label: labelForScore(finalScore),
     prompts: promptIds
       .map(id => promptFor(id, contact))
-      .sort((a, b) => a.priority - b.priority)
-      .slice(0, 3),
-    completedSignals
+      .sort((a, b) => a.priority - b.priority),
+    completedSignals,
+    missingSignals,
+    summary: summaryFor(finalScore, completedSignals, missingSignals)
   };
 };
 

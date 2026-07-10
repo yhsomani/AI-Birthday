@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { buildAiDraftRequest, classifyAiProviderStatus, normalizeAiDraftResponse } from './aiDrafting';
-import { createInitialState } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 
 describe('aiDrafting contract', () => {
   it('builds provider requests from approved context and excludes private/contact routing data', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const result = buildAiDraftRequest(state, 'c-rajesh', 'e-rajesh-work', 'Congratulations');
 
     assert.equal(result.ok, true);
@@ -23,6 +23,28 @@ describe('aiDrafting contract', () => {
     assert.doesNotMatch(serialized, /\+91/);
   });
 
+  it('includes bounded regeneration feedback in provider requests', () => {
+    const state = createTestState();
+    const result = buildAiDraftRequest(state, 'c-asha', 'e-asha-bday', 'Birthday', {
+      feedback: {
+        instructions: ['Make the draft shorter and easier to send.'],
+        customInstruction: 'Mention mango lassi, but keep it natural.',
+        previousDraftExcerpt: 'Happy birthday Asha! This older draft should guide the rewrite.'
+      }
+    });
+
+    assert.equal(result.ok, true);
+    if (!result.ok) {
+      return;
+    }
+
+    assert.deepEqual(result.request.regenerationFeedback?.instructions, [
+      'Make the draft shorter and easier to send.'
+    ]);
+    assert.equal(result.request.regenerationFeedback?.customInstruction, 'Mention mango lassi, but keep it natural.');
+    assert.match(result.request.regenerationFeedback?.previousDraftExcerpt ?? '', /older draft/i);
+  });
+
   it('normalizes provider JSON variants and rejects unusable responses', () => {
     const valid = normalizeAiDraftResponse({
       variants: {
@@ -37,6 +59,53 @@ describe('aiDrafting contract', () => {
     assert.equal(invalid.ok, false);
     if (!invalid.ok) {
       assert.equal(invalid.error.kind, 'invalid-response');
+    }
+  });
+
+  it('rejects unsafe, repeated, or wrong-language provider output before draft creation', () => {
+    const unsafe = normalizeAiDraftResponse({
+      variants: {
+        short: 'Happy birthday! Call me at +91 98765 43210 today.',
+        standard: 'Happy birthday! Call me at +91 98765 43210 today.',
+        warm: 'Happy birthday! Call me at +91 98765 43210 today.'
+      }
+    });
+    const repeated = normalizeAiDraftResponse(
+      {
+        variants: {
+          short: 'Happy birthday Asha! Wishing you a warm day and a year full of good moments.',
+          standard: 'Happy birthday Asha! Wishing you a warm day and a year full of good moments.',
+          warm: 'Happy birthday Asha! Wishing you a warm day and a year full of good moments.'
+        }
+      },
+      {
+        previousMessages: ['Happy birthday Asha! Wishing you a warm day and a year full of good moments.']
+      }
+    );
+    const wrongLanguage = normalizeAiDraftResponse(
+      {
+        variants: {
+          short: 'Happy birthday Asha! Hope your day is special.',
+          standard: 'Happy birthday Asha! Wishing you a joyful day and a thoughtful year ahead.',
+          warm: 'Happy birthday Asha! Hope today feels personal, warm, and full of love.'
+        }
+      },
+      {
+        expectedLanguage: 'Hindi'
+      }
+    );
+
+    assert.equal(unsafe.ok, false);
+    assert.equal(repeated.ok, false);
+    assert.equal(wrongLanguage.ok, false);
+    if (!unsafe.ok) {
+      assert.equal(unsafe.error.kind, 'content-safety');
+    }
+    if (!repeated.ok) {
+      assert.equal(repeated.error.kind, 'content-safety');
+    }
+    if (!wrongLanguage.ok) {
+      assert.equal(wrongLanguage.error.kind, 'wrong-language');
     }
   });
 

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createInitialState } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 import { buildEventMonthView, filterRelationshipEvents, shiftMonth } from './eventBrowser';
 
 describe('event browser contract', () => {
   it('filters events by type and upcoming time range', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const birthdayDate = state.events.find(event => event.id === 'e-asha-bday')?.date ?? '';
     const filtered = filterRelationshipEvents(state.events, {
       type: 'Birthday',
@@ -21,13 +21,15 @@ describe('event browser contract', () => {
   });
 
   it('sorts events by date and supports past event recovery views', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const pastState = {
       ...state,
       events: [
         {
           ...state.events[0],
           id: 'e-past',
+          type: 'Custom' as const,
+          recurrence: undefined,
           label: 'Past birthday',
           date: '2026-01-01T12:00:00.000Z'
         },
@@ -46,7 +48,7 @@ describe('event browser contract', () => {
   });
 
   it('builds a six-week month grid with events grouped by day', () => {
-    const state = createInitialState();
+    const state = createTestState();
     const event = {
       ...state.events[0],
       id: 'e-month',

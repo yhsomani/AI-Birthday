@@ -1,6 +1,6 @@
 # RelateAI Feature Single Source of Truth
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 This document defines the ideal final-product behavior for RelateAI features from a functional and user-experience perspective. It is the feature single source of truth for product, design, development, QA, support, and AI coding agents.
 
@@ -29,6 +29,8 @@ This document intentionally describes expected behavior only. It keeps the focus
 9. Contact Classification and Relationship Health
 10. Events, Reminders, and Conflict Resolution
 11. AI Message Generation and Regeneration
+11A. Manual Message Composer
+11B. Message Template Library
 12. Wish Preview, Editing, Testing, and Review
 13. Messages Inbox, Approval Lifecycle, Bulk Actions, and Recovery
 14. Scheduling, Automation Modes, Quiet Hours, and Blackouts
@@ -40,7 +42,7 @@ This document intentionally describes expected behavior only. It keeps the focus
 20. Memory Vault
 21. Gift Advisor
 22. Chat History
-23. AI Doctor and Setup Diagnostics
+23. Setup Check and Setup Diagnostics
 24. Settings and Configuration
 25. Backup and Restore
 26. Localization, Accessibility, and Inclusive UX
@@ -59,8 +61,8 @@ Users need to quickly reach the right relationship task without losing context, 
 
 1. The user opens RelateAI from the launcher, a notification, a widget, a shortcut, or a deep link.
 2. The app routes the user to the correct destination based on setup, authentication, security lock, and requested task.
-3. Primary destinations remain available through bottom navigation: Home, Contacts, Events, Messages, and Analytics.
-4. Secondary destinations open from contextual actions and preserve a clear path back to the originating screen.
+3. Primary destinations remain available through bottom navigation: Home, Events, Messages, Contacts, and More.
+4. Secondary destinations such as Analytics, Settings, Backup and Restore, Style Coach, Activity History, and Setup Check open from More or contextual actions and preserve a clear path back to the originating screen.
 5. If the requested destination requires setup, permission, authentication, or unlock, the app explains the blocker and resumes the requested destination after resolution.
 
 ### Expected Interactions and System Responses
@@ -131,7 +133,7 @@ Users need to understand what the app can do, what data it may use, and which se
 1. A first-time user sees a concise introduction to relationship reminders, contact import, AI wishes, style personalization, and automation safety.
 2. The user can move step by step, skip nonessential education, or continue directly to account/local mode choice.
 3. The app presents setup actions in a progressive order: account/local mode, contacts, notifications, AI access, style training, delivery channels, and backup.
-4. The user can stop after the minimum useful setup and return later from Home, Settings, or AI Doctor.
+4. The user can stop after the minimum useful setup and return later from Home, Settings, or Setup Check.
 5. On completion, the app lands on Home with a clear next best action.
 
 ### Expected Interactions and System Responses
@@ -151,11 +153,11 @@ Users need to understand what the app can do, what data it may use, and which se
 
 ### Edge Cases and Exception Scenarios
 
-- The user denies contacts, SMS, notifications, or exact alarms.
+- The user denies contacts, notifications, calendar, or biometric permissions.
 - The user starts setup offline.
 - The user chooses local mode but later wants Google sync.
 - The app is closed mid-onboarding.
-- Accessibility settings or delivery provider setup cannot be completed immediately.
+- Manual handoff setup or delivery provider setup cannot be completed immediately.
 
 ### Automation Opportunities
 
@@ -171,7 +173,7 @@ Users need to understand what the app can do, what data it may use, and which se
 - AI provider configuration.
 - Style Coach.
 - Backup and restore.
-- AI Doctor readiness checks.
+- Setup Check readiness checks.
 
 ### Performance, Usability, Accessibility, and Security Expectations
 
@@ -185,7 +187,7 @@ Users need to understand what the app can do, what data it may use, and which se
 - A new user can reach a useful Home state without completing every optional setup item.
 - Progress is preserved after interruption.
 - Every permission or provider request has clear purpose and denial fallback.
-- Users can later revisit setup gaps from Home, Settings, and AI Doctor.
+- Users can later revisit setup gaps from Home, Settings, and Setup Check.
 
 ## 3. Account Access, Local Mode, Authentication, and Sign-Out
 
@@ -241,7 +243,7 @@ Users have different privacy and convenience needs. Some want Google Contacts an
 - Secure preferences.
 - Contact sync.
 - Backup and restore.
-- Settings and AI Doctor.
+- Settings and Setup Check.
 
 ### Performance, Usability, Accessibility, and Security Expectations
 
@@ -280,15 +282,16 @@ RelateAI handles contacts, messages, private notes, credentials, delivery channe
 - Permission prompts are tied to user actions such as sync, sending, reminders, or automation setup.
 - Denied permissions create recoverable, feature-specific disabled states.
 - Biometric lock protects private screens while allowing safe recovery if biometrics are unavailable.
-- WhatsApp automation requires prominent disclosure and affirmative consent before use.
+- Biometric lock is offered as a contextual privacy recommendation after private notes or provider setup exist, while remaining optional and non-blocking for core manual workflows.
+- WhatsApp manual handoff requires prominent disclosure and affirmative consent before use.
 - Backup passphrases are user-held and not silently stored.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
-- Inputs: permission decisions, biometric preference, automation consent, secure credentials, passphrases.
+- Inputs: permission decisions, biometric preference, handoff consent, secure credentials, passphrases.
 - Outputs: enabled or disabled capabilities, privacy warnings, secure storage state, redacted diagnostics.
 - Validations: permissions are present before sensitive actions, credentials are syntactically valid where possible, passphrases meet minimum strength, consent is explicit.
-- Errors: denied permission, unavailable biometrics, secure storage recovery, invalid credentials, wrong backup passphrase, or policy-blocked automation should provide clear next steps.
+- Errors: denied permission, unavailable biometrics, secure storage recovery, invalid credentials, wrong backup passphrase, or policy-blocked channel behavior should provide clear next steps.
 
 ### Edge Cases and Exception Scenarios
 
@@ -302,11 +305,11 @@ RelateAI handles contacts, messages, private notes, credentials, delivery channe
 
 - The app may detect missing permissions before a scheduled workflow fails.
 - The app may recommend safer defaults such as approval-first automation or backup reminders.
-- The user remains in control because permissions, biometrics, credentials, passphrases, and automation consent are opt-in and revocable.
+- The user remains in control because permissions, biometrics, credentials, passphrases, handoff consent, and automation settings are opt-in and revocable.
 
 ### Dependencies and Integrations
 
-- Android permissions for contacts, SMS, notifications, exact alarms, and accessibility.
+- Platform permissions for contacts, calendar, notifications, biometrics, and any future high-risk channel APIs explicitly approved for release.
 - Device biometrics.
 - Secure local storage.
 - Backup and restore.
@@ -341,7 +344,7 @@ Users need one place to understand what matters today and what action will most 
 
 1. The user opens Home and sees a greeting, key stats, upcoming events, pending approvals, setup readiness, and backup status.
 2. The app highlights one next best action and secondary actions.
-3. The user taps an action to sync contacts, review messages, improve a contact, create a backup, open AI Doctor, or generate/review a wish.
+3. The user taps an action to sync contacts, review messages, improve a contact, create a backup, open Setup Check, write a relationship check-in, snooze a check-in reminder, mark a contact as contacted elsewhere, or generate/review a wish.
 4. Completed actions update Home metrics and recommendations.
 5. Empty states guide the user toward the first meaningful setup step.
 
@@ -351,11 +354,12 @@ Users need one place to understand what matters today and what action will most 
 - Setup warnings explain the impact and route to the fix.
 - Backup warnings route to backup export.
 - Low-health relationship prompts route to the contact profile.
+- Relationship check-in prompts distinguish due, snoozed, and current states without changing last-contact history unless the user explicitly marks the relationship contacted.
 - Pending approval prompts route to Messages or the next Wish Preview.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
-- Inputs: contacts, events, pending messages, sent messages, setup state, backup timestamps, health scores, sync state.
+- Inputs: contacts, events, pending messages, sent messages, setup state, backup timestamps, health scores, sync state, check-in cadence, last-contact date, check-in snooze state.
 - Outputs: stats, upcoming previews, action ranking, readiness banners, warnings.
 - Validations: counts reflect the active user/local dataset; stale or missing data is labeled honestly.
 - Errors: failed metric loading, sync errors, deleted linked records, or permission blockers must show retry and alternate actions.
@@ -370,7 +374,7 @@ Users need one place to understand what matters today and what action will most 
 
 ### Automation Opportunities
 
-- The app may rank actions by urgency, risk, and relationship value.
+- The app may rank actions by urgency, risk, relationship value, overdue check-in cadence, VIP status, and health score.
 - The app may surface setup gaps before they cause missed sends.
 - The user remains in control because Home recommendations only navigate or prepare actions; they do not send, approve, reject, delete, import, or export without confirmation.
 
@@ -379,7 +383,7 @@ Users need one place to understand what matters today and what action will most 
 - Contact sync and contact list.
 - Events and reminders.
 - Messages inbox.
-- AI Doctor.
+- Setup Check.
 - Backup and restore.
 - Analytics and health scoring.
 
@@ -409,7 +413,7 @@ Users need a faster way to populate people, phone numbers, emails, birthdays, an
 
 ### Ideal End-to-End User Workflow
 
-1. The user starts sync from Onboarding, Home, Contacts, Settings, or AI Doctor.
+1. The user starts sync from Onboarding, Home, Contacts, Settings, or Setup Check.
 2. The app explains required account scopes or device permissions.
 3. The user grants access or chooses manual entry instead.
 4. Contacts are imported, deduplicated, enriched, and summarized.
@@ -451,7 +455,7 @@ Users need a faster way to populate people, phone numbers, emails, birthdays, an
 - Android Contacts permission.
 - Events and reminders.
 - Contact classification.
-- AI Doctor readiness.
+- Setup Check readiness.
 
 ### Performance, Usability, Accessibility, and Security Expectations
 
@@ -520,7 +524,7 @@ Users need to find the right person quickly and identify contacts that need even
 - Contact detail.
 - Health scoring.
 - Events and delivery readiness.
-- Home and AI Doctor.
+- Home and Setup Check.
 
 ### Performance, Usability, Accessibility, and Security Expectations
 
@@ -550,7 +554,7 @@ Thoughtful automation depends on accurate relationship context, usable delivery 
 
 1. The user opens a contact from Home, Contacts, Events, Analytics, or Messages.
 2. The profile shows identity, relationship, next event, health, delivery readiness, and personalization quality.
-3. The user edits essentials such as name, relationship, job title, dates, preferred channel, language, formality, VIP status, and budget.
+3. The user edits essentials such as name, relationship, job title, dates, preferred channel, language, formality, and VIP status.
 4. The user opens Memory Vault, Gift Advisor, Chat History, or Wish generation from contextual actions.
 5. Saved changes update related workflows and recommendations.
 
@@ -558,15 +562,23 @@ Thoughtful automation depends on accurate relationship context, usable delivery 
 
 - Edit actions open focused forms with clear save/cancel behavior.
 - Preferences show immediate validation and plain-language consequences.
-- Automation options explain review-first, full-auto, skip-auto, DND, custom send time, quiet hour behavior, and channel preference.
+- Automation options explain review-first, full-auto, skip-auto, DND, check-in cadence, check-in snooze, custom send time, quiet hour behavior, and channel preference.
+- Check-in actions let the user write a check-in, snooze a reminder, or mark the relationship contacted elsewhere without creating or sending a message.
 - Quick enrichment actions add memory, gift, VIP marker, or preferred channel with confirmation feedback.
+- Guided enrichment shows personalization score, completed signals, missing signals, and all core prompts for relationship context, mention preferences, avoid guidance, and language/style guidance.
+- Recipient tone controls let the user choose supported tone preferences such as warm, respectful, playful, concise, formal, Hinglish, and no emoji for this contact.
+- Tone preference controls explain whether the effective tone comes from the contact profile, relationship group defaults, or global defaults.
+- Changing a contact's tone affects that contact's future drafts without retraining the user's global style profile.
+- Gift budget actions are available through Gift Advisor, not the primary essentials form.
 - Generate wish is available only when the contact and event context are sufficient.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
-- Inputs: name, relationship, relationship subtype, job title, phone, email, birthday/anniversary/custom event data, language, formality, preferred channel, DND, send time, automation mode, VIP flag, notes, interests, budget.
-- Outputs: saved contact profile, updated readiness labels, downstream event/message/analytics updates.
-- Validations: required name, valid dates, valid phone/email when used for delivery, valid send time, supported channel, budget range, text length limits.
+- Inputs: name, relationship, relationship subtype, job title, phone, email, birthday/anniversary/custom event data, language, formality, preferred channel, DND, check-in cadence, check-in snooze, send time, automation mode, VIP flag, notes, and interests.
+- Outputs: saved contact profile, updated check-in state, updated readiness labels, downstream event/message/analytics updates.
+- Outputs also include immediate personalization-quality updates, saved non-private memory context, and redacted activity entries that do not log the user's answer text.
+- Validations: required name, valid dates, valid phone/email when used for delivery, valid send time, supported channel, and text length limits.
+- Guided enrichment answers must be meaningful, length-limited, and saved only after explicit user action.
 - Errors: missing contact, save failure, conflicting event dates, invalid channel details, unavailable AI, or duplicate generation should show recovery guidance.
 
 ### Edge Cases and Exception Scenarios
@@ -576,10 +588,13 @@ Thoughtful automation depends on accurate relationship context, usable delivery 
 - Preferred channel becomes unavailable.
 - User enables DND for a contact with scheduled messages.
 - User edits a contact after drafts already exist.
+- User changes tone preferences after drafts already exist.
+- User snoozes a check-in and later marks the relationship contacted outside the app.
 
 ### Automation Opportunities
 
 - The app may suggest missing fields and inferred relationship metadata.
+- The app may recommend the next missing enrichment signal, but the user decides what to answer and can leave prompts incomplete.
 - The app may warn when preferences will block scheduled automation.
 - The user remains in control because edits, automation overrides, VIP status, DND, and generated wishes require explicit action.
 
@@ -604,6 +619,9 @@ Thoughtful automation depends on accurate relationship context, usable delivery 
 
 - Users can view and edit all relationship-critical fields for a contact.
 - Saving preferences updates message generation, dispatch readiness, reminders, analytics, and Home actions.
+- Recipient tone changes are understandable, reversible, and recheck any affected unsent drafts before approval.
+- Guided enrichment prompts cover relationship context, what to mention, what to avoid, and preferred language/style for sparse profiles.
+- Saved enrichment answers improve personalization quality immediately without exposing answer text in activity logs.
 - Invalid inputs are blocked with clear inline feedback.
 - Related tools are reachable from the profile without losing context.
 
@@ -695,20 +713,24 @@ Users need a reliable calendar of relationship moments and a way to detect dupli
 4. The app validates the date and identifies duplicates or conflicts.
 5. The user merges, keeps separate, or edits conflicting events.
 6. Reminder schedules and message opportunities update after event changes.
+7. Upcoming event cards show a preparation checklist for confirming the date, improving context, writing the message, deciding gifts when relevant, choosing the channel, and scheduling reminders.
 
 ### Expected Interactions and System Responses
 
 - Event cards show contact, occasion type, date, source, verification status, and available actions.
-- Filters support all events and major event types.
+- Event preparation cards show checklist progress, the next recommended step, per-step status, and clear actions for message writing, contact context, gift prep, channel readiness, and reminder planning.
+- Filters support all events and major event types, while birthday, anniversary, and custom reminders appear first and broader categories are revealed as advanced choices.
 - Manual event forms support existing contacts and new local contacts.
 - Duplicate and conflict dialogs explain the difference between "same reminder" and "separate reminder."
 - Send Message or Generate Wish actions route to the appropriate message workflow.
+- Device-calendar export is safe to repeat: existing RelateAI calendar entries are updated when event details change, stale RelateAI entries are removed, and unrelated user calendar entries are never deleted.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
 - Inputs: contact, event type, label, day, month, optional year, source, verification decision.
 - Outputs: event record, reminder schedule, conflict state, activity entry, message generation opportunity.
-- Validations: valid month/day/year combination, supported event type, contact exists or new contact name is present, duplicate/conflict detection.
+- Outputs also include event-preparation progress, derived completion from existing drafts/memories/reminders/channel readiness, and the next recommended prep step.
+- Validations: valid month/day/year combination, supported event type, contact exists or new contact name is present, duplicate/conflict detection, and checklist steps limited to relevant event needs.
 - Errors: invalid date, missing contact, unsupported event type, save failure, conflict resolution failure, or reminder scheduling failure should offer retry or edit.
 
 ### Edge Cases and Exception Scenarios
@@ -718,11 +740,15 @@ Users need a reliable calendar of relationship moments and a way to detect dupli
 - Same date from multiple sources with different labels.
 - User changes time zone before event day.
 - Event is deleted or merged while a draft exists.
+- Device-calendar export is repeated after an event changes, is deleted, or was previously exported by an older app version.
+- Older saved checklist items use legacy labels or ids.
+- Gift prep is not relevant for every event type.
 
 ### Automation Opportunities
 
 - The app may auto-discover events from contacts.
 - The app may schedule reminders and suggest message generation windows.
+- The app may mark preparation steps complete when equivalent user-controlled work already exists, such as a non-private memory, review draft, reminder plan, or ready channel.
 - The user remains in control because conflicts, custom events, and message creation decisions are reviewable.
 
 ### Dependencies and Integrations
@@ -743,9 +769,12 @@ Users need a reliable calendar of relationship moments and a way to detect dupli
 ### Success and Acceptance Criteria
 
 - Users can add, find, filter, and resolve events.
+- Birthday, anniversary, and custom event types are the default visible choices; advanced event categories remain available after explicit reveal.
 - Invalid dates and duplicates are caught before save.
 - Reminder schedules update after event changes.
+- Repeated device-calendar export does not create duplicate RelateAI calendar events.
 - Event actions route to message generation or review with correct context.
+- Preparation checklists include only relevant steps, explain the next action, and accept either explicit user completion or equivalent completed work.
 
 ## 11. AI Message Generation and Regeneration
 
@@ -770,21 +799,23 @@ Users often want thoughtful, specific messages but may not have time or confiden
 
 - Generate actions show progress and prevent duplicate requests for the same event occurrence.
 - Drafts indicate whether they are AI-generated or fallback/template-generated.
+- Drafts use the effective recipient tone, language, and global style profile according to the user's explicit contact and group preferences.
 - Low-confidence or fallback drafts require review.
 - Regeneration uses user feedback and explains what will be improved.
 - AI errors are classified into actionable categories such as setup, auth, quota, network, invalid response, or temporary pause.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
-- Inputs: contact profile, event, relationship type, memories except private notes, gift history, previous wishes, style profile, language/formality preferences, feedback, provider credentials.
+- Inputs: contact profile, event, relationship type, memories except private notes, gift history, previous wishes, style profile, language/formality preferences, feedback, AI setting, and provider readiness state.
 - Outputs: draft variants, quality signals, pending message, review notification or schedule decision.
-- Validations: AI enabled, provider available, contact/event exists, message text is nonblank and long enough, content is appropriate, duplicate draft is not created, required channel data exists for automation.
-- Errors: provider unavailable, quota/rate limit, network failure, invalid response, missing context, disabled AI, duplicate generation, or blocked channel should route to review, fallback, or AI Doctor.
+- Validations: AI enabled, provider endpoint is release-ready or clearly marked development-only, contact/event exists, message text is nonblank and long enough, content is appropriate, duplicate draft is not created, required channel data exists for automation.
+- Errors: provider unavailable, quota/rate limit, network failure, invalid response, missing context, disabled AI, duplicate generation, or blocked channel should route to review, fallback, or Setup Check.
 
 ### Edge Cases and Exception Scenarios
 
 - AI returns empty or malformed content.
 - AI repeats a previous wish too closely.
+- Provider endpoint is missing, unsafe for production, local-development only, or temporarily unavailable.
 - Contact context is sparse or contradictory.
 - User changes style or language after a draft is generated.
 - Event occurs today and schedule window is tight.
@@ -797,7 +828,7 @@ Users often want thoughtful, specific messages but may not have time or confiden
 
 ### Dependencies and Integrations
 
-- AI provider configuration.
+- AI provider configuration and readiness.
 - Contact detail and classification.
 - Events.
 - Style Coach.
@@ -812,13 +843,166 @@ Users often want thoughtful, specific messages but may not have time or confiden
 - AI progress and errors must be understandable.
 - Draft text must be editable and accessible.
 - Prompt context must exclude private notes, secrets, credentials, and data outside the user's enabled AI scope.
+- Provider credentials must remain outside the user-facing app experience; readiness and errors must be shown without exposing endpoint hosts, paths, credentials, or query strings.
 
 ### Success and Acceptance Criteria
 
 - Drafts are personalized, editable, and tied to the correct contact/event.
+- Drafts reflect recipient-specific tone preferences without changing the user's global style profile.
 - Duplicate generation for the same occurrence is prevented or clearly resolved.
 - Provider failures produce actionable recovery states.
 - Low-quality or fallback drafts require user review before sending.
+
+## 11A. Manual Message Composer
+
+### Feature Name and Purpose
+
+Manual Message Composer lets users write a thoughtful message to any contact without requiring an event trigger and without requiring AI availability.
+
+### Problem It Solves
+
+Users often need to check in, apologize, congratulate, thank, follow up, or reconnect at moments that are not tied to birthdays, anniversaries, or imported events. They also need a dependable writing path when AI is disabled, unavailable, or not desired.
+
+### Ideal End-to-End User Workflow
+
+1. The user opens a contact and chooses to write a message.
+2. The app shows supported writing reasons: birthday, check-in, thanks, congratulations, apology, follow-up, and custom.
+3. The user selects a reason and reviews suggested local templates matched to the contact's preferred tone.
+4. The app renders an editable draft using the contact name, relationship context, non-private memories, and contact notes where appropriate.
+5. The app clearly explains what context is included and confirms that private notes are excluded.
+6. The user edits the message body until it is ready.
+7. The user either creates a local template draft for review or requests AI variants when AI is ready.
+8. The resulting message always enters review before scheduling, handoff, or sending.
+
+### Expected Interactions and System Responses
+
+- Reason choices must be visible, selectable, and reversible without losing control of the final text.
+- Template choices must update the editable message body while keeping the user free to modify every word.
+- The app must show whether the local template action is ready or blocked and explain the exact validation issue.
+- The app must show whether the AI action will use the AI provider or create a local review-first fallback.
+- If AI is disabled or the provider is unavailable, the composer must keep local template drafting available.
+- The composer must never silently include private memories or sensitive contact routes in generated text or AI context.
+- Creating a draft must navigate into the same review lifecycle used by event-generated messages.
+
+### Inputs, Outputs, Validations, and Error Handling
+
+- Inputs: selected contact, writing reason, contact tone preferences, relationship context, non-private memory notes, contact notes, selected template, edited message body, AI setting, AI provider readiness.
+- Outputs: an editable message body, template readiness state, AI readiness/fallback state, context privacy summary, and a review-first message draft.
+- Validations: contact exists, reason is supported, template body meets minimum message length, private notes are excluded, duplicate manual-message risk is surfaced in review, and no send action occurs from the composer.
+- Errors: missing contact blocks drafting; too-short body blocks template draft creation; disabled AI or provider unavailability produces an understandable fallback state; provider failure creates a review-first local fallback or actionable recovery path.
+
+### Edge Cases and Exception Scenarios
+
+- Contact has no notes or memories.
+- Contact has only private memories.
+- Contact tone has no exact template match.
+- User switches reasons after editing a template.
+- User edits a template into an empty or too-short body.
+- AI is enabled but not configured, temporarily failing, or rate limited.
+- A similar manual message already exists for the same contact.
+
+### Automation Opportunities
+
+- The app may suggest the most relevant reason from relationship signals, recent events, or check-in cadence.
+- The app may preselect the best local template based on tone and relationship group.
+- The app may warn about sparse context and suggest adding a memory before drafting.
+- The user must retain full control over reason, template, edited body, AI use, approval, scheduling, and handoff.
+
+### Dependencies and Integrations
+
+- Contact Detail for contact selection and profile context.
+- Relationship preferences for tone and channel defaults.
+- Memory Vault for non-private context and private-note exclusion.
+- Message Template Library for local drafts.
+- AI Message Generation for optional AI variants and fallback handling.
+- Duplicate guardrails, Messages Inbox, and Wish Preview for review-first lifecycle.
+- Delivery channel readiness for later approval and handoff checks.
+
+### Performance, Usability, Accessibility, and Security Expectations
+
+- Reason and template selection must respond immediately.
+- Template rendering must be local-first and available offline.
+- The editable text field must support screen readers, multiline editing, and clear focus behavior.
+- Readiness, validation, and privacy summaries must be plain-language and visible before action buttons.
+- Private notes, secrets, credentials, phone numbers, email addresses, and raw provider identifiers must not be sent to AI or exposed in fallback summaries.
+
+### Success and Acceptance Criteria
+
+- A user can create a review-first message for a contact without an event.
+- Local template drafting works when AI is disabled or unavailable.
+- AI readiness or fallback behavior is visible before the user taps the AI action.
+- Private memories are excluded and the exclusion is communicated.
+- Too-short messages are blocked with actionable guidance.
+- Created drafts enter the standard review flow and cannot be sent directly from the composer.
+
+## 11B. Message Template Library
+
+### Feature Name and Purpose
+
+Message Template Library provides local, offline, non-AI message templates for common relationship moments.
+
+### Problem It Solves
+
+Users should be able to create useful messages when AI is disabled, unavailable, not configured, or not desired.
+
+### Ideal End-to-End User Workflow
+
+1. The user opens the template library from a secondary tools area.
+2. The user chooses a contact, occasion, and tone.
+3. The app shows matching templates and falls back to available templates when no exact tone match exists.
+4. The app renders the chosen template with contact name and non-private context.
+5. The user edits the text.
+6. The user creates a review-first draft.
+
+### Expected Interactions and System Responses
+
+- Contact, occasion, tone, and template choices update the editable text without sending anything.
+- The library explains which non-private context is used and that private notes are excluded.
+- The app clearly explains when a requested tone has no exact template.
+- The draft action is disabled until the edited body meets the minimum message length.
+- Created drafts enter Wish Preview and follow the standard approval, duplicate, route, and manual handoff guardrails.
+
+### Inputs, Outputs, Validations, and Error Handling
+
+- Inputs: contact, occasion, tone, selected template, edited body, non-private contact notes and memories.
+- Outputs: editable local message text, context privacy summary, template fallback notice when needed, and a review-first draft.
+- Validations: contact exists, template exists, body is long enough, private notes are excluded, duplicate risk is surfaced in review.
+- Errors: missing contact, missing template, too-short body, or unavailable route should produce actionable review-safe guidance.
+
+### Edge Cases and Exception Scenarios
+
+- Contact has no non-private context.
+- The requested tone has no exact template for the selected occasion.
+- AI is disabled or unavailable.
+- A similar manual draft already exists.
+
+### Automation Opportunities
+
+- The app may preselect the contact's effective tone and the most relevant template.
+- The app may suggest adding context when the rendered template is generic.
+- The user remains in control because template choice, edits, draft creation, approval, and sending all require explicit action.
+
+### Dependencies and Integrations
+
+- Contacts and contact preferences.
+- Memory Vault and private-note exclusion.
+- Manual Composer.
+- Wish Preview and Messages Inbox.
+- Duplicate guardrails and delivery channel readiness.
+
+### Performance, Usability, Accessibility, and Security Expectations
+
+- Template browsing and rendering must work offline and respond immediately.
+- Editable text fields and selector controls must be accessible.
+- Private notes, phone numbers, email addresses, credentials, and raw provider identifiers must not appear in template context summaries.
+
+### Success and Acceptance Criteria
+
+- Users can create a review-first draft from local templates without AI.
+- Occasion, tone, contact, and template selections are visible and reversible.
+- Tone fallback behavior is understandable.
+- Private memories remain excluded.
+- No template action sends or schedules a message directly.
 
 ## 12. Wish Preview, Editing, Testing, and Review
 
@@ -842,23 +1026,32 @@ Users need final control over message wording, tone, channel readiness, and appr
 
 - Tone and length choices update the preview without losing user edits unless confirmed.
 - Edited text is preserved during navigation and saved on approval.
+- Regeneration feedback chips and optional custom feedback let the user ask for changes such as warmer, shorter, more formal, less generic, more personal, or no emoji.
+- Regeneration feedback explains what will change before the user starts another draft.
 - Test send clearly indicates destination and never sends to the recipient unless that is the explicit test target.
+- Channel body rules are visible before approval: too-short text, unsupported channel length, or SMS multipart warnings appear next to the edited message.
+- The preview explains the effective recipient tone, language target, preference source, draft quality, and how those choices affected the current AI or template draft.
+- Users can open the contact's tone controls directly from the preview, adjust tone, and return to review without retraining global style.
 - Approval requires confirmation when the action schedules delivery.
 - Rejection explains that the draft will not send and may be regenerated later.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
 - Inputs: selected variant, edited message text, feedback reason, custom feedback, approval/rejection confirmation, test-send action.
-- Outputs: approved scheduled message, rejected message, regenerated draft, saved feedback, test result, next-review route.
-- Validations: message is nonblank, meets minimum length, contact/event exists, route and device setup are ready or review-safe, schedule is valid.
+- Outputs: approved scheduled message, rejected message, regenerated draft, saved regeneration feedback, test result, next-review route.
+- Validations: message is nonblank, meets minimum length, fits the selected channel's supported body length, contact/event exists, route and device setup are ready or review-safe, schedule is valid.
+- Custom regeneration feedback must be bounded, user-editable, optional, and never logged in activity or diagnostics.
 - Errors: missing draft, deleted contact/event, disabled AI, failed regeneration, failed approval, failed rejection, failed test send, or blocked route must present retry or setup actions.
 
 ### Edge Cases and Exception Scenarios
 
 - User edits message to blank text.
 - Message becomes too long for the selected channel.
+- SMS text crosses one-message length and may be sent as multiple billable/readable parts.
 - Draft approval window expires while preview is open.
 - Preferred channel becomes unavailable after preview loads.
+- Recipient tone preferences change while preview is open.
+- The draft is available but the related contact or event has been removed.
 - Multiple pending drafts remain after one is handled.
 
 ### Automation Opportunities
@@ -887,7 +1080,10 @@ Users need final control over message wording, tone, channel readiness, and appr
 
 - Users can safely review, edit, regenerate, approve, reject, and test drafts.
 - Approval never proceeds with blank or invalid text.
+- SMS multipart warnings are explicit and non-blocking when the text remains inside the safe channel cap.
 - The preview explains route, schedule, approval, and blocker state.
+- The preview explains recipient-specific tone impact and provides a direct path to adjust contact tone preferences.
+- Regeneration feedback is visible before regeneration, carried into the next draft request, saved on the regenerated draft, and kept out of logs.
 - Review-next behavior handles remaining queue items correctly.
 
 ## 13. Messages Inbox, Approval Lifecycle, Bulk Actions, and Recovery
@@ -904,21 +1100,24 @@ Users need a single operational queue for drafts and sends, with clear status, s
 
 1. The user opens Messages and selects a tab or channel filter.
 2. The app shows message cards with contact, event, channel, scheduled time, readiness, draft quality, and actions.
-3. The user searches, sorts, reviews individual messages, selects multiple messages, approves, rejects, retries, or revokes approval.
-4. Failed messages show recovery guidance and setup links.
-5. Sent messages remain searchable from the inbox and contact chat history.
+3. The user searches, sorts, reviews individual messages, approves, rejects, retries, or revokes approval.
+4. Advanced bulk tools remain hidden until the user explicitly opens them; then the user may select multiple messages and run eligible bulk actions with confirmation.
+5. Failed messages show recovery guidance and setup links.
+6. Sent messages remain searchable from the inbox and contact chat history.
 
 ### Expected Interactions and System Responses
 
 - Tabs show counts and update as messages move through lifecycle states.
 - Approve, reject, retry, revoke, and bulk actions confirm when risk is meaningful.
+- Bulk selection controls are not shown by default and appear only after the user opens bulk tools.
 - Bulk actions apply only to eligible selected messages and report partial success.
+- Bulk approval skips drafts whose text is too short or too long for their selected channel, while reporting the exact skip reason.
 - Failed recovery surfaces distinguish setup blockers from retryable provider failures.
 - Verification guidance encourages one low-risk send before bulk automation on a channel.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
-- Inputs: selected tab, search query, sort option, channel filter, selected messages, action command.
+- Inputs: selected tab, search query, sort option, channel filter, bulk-tools visibility, selected messages, action command.
 - Outputs: updated message statuses, activity entries, scheduled sends, sent history, recovery recommendations.
 - Validations: message status allows the requested action, route is ready for send/retry, approval has not expired, text is valid, contact and event references are usable.
 - Errors: load failure, action failure, missing contact/channel, disabled channel, missing Gmail setup, missing phone/email, failed retry, partial bulk failure, or stale selection must produce clear feedback.
@@ -926,6 +1125,7 @@ Users need a single operational queue for drafts and sends, with clear status, s
 ### Edge Cases and Exception Scenarios
 
 - Selected messages change status while bulk action is pending.
+- A selected draft has channel-invalid text while other selected drafts remain eligible.
 - Contact was deleted after draft generation.
 - Approval is revoked shortly before send time.
 - A failed message has multiple possible fallback routes.
@@ -934,7 +1134,7 @@ Users need a single operational queue for drafts and sends, with clear status, s
 ### Automation Opportunities
 
 - The app may group failed messages by fix needed.
-- The app may prefilter messages when opened from AI Doctor or notifications.
+- The app may prefilter messages when opened from Setup Check or notifications.
 - The user remains in control because approvals, rejections, retries, revocations, and bulk operations require explicit action.
 
 ### Dependencies and Integrations
@@ -944,19 +1144,19 @@ Users need a single operational queue for drafts and sends, with clear status, s
 - Delivery channels.
 - Contact and event data.
 - Activity history.
-- AI Doctor.
+- Setup Check.
 
 ### Performance, Usability, Accessibility, and Security Expectations
 
 - Inbox tabs, search, and selection must remain responsive for large queues.
 - Bulk selection must be accessible and clearly reversible before action.
 - Message previews should avoid exposing sensitive content unnecessarily on shared screens.
-- Status and blocker labels must be deterministic and consistent across Messages, Wish Preview, Home, and AI Doctor.
+- Status and blocker labels must be deterministic and consistent across Messages, Wish Preview, Home, and Setup Check.
 
 ### Success and Acceptance Criteria
 
 - Every message status has clear user-visible meaning and allowed actions.
-- Bulk actions handle eligibility and partial failures safely.
+- Bulk actions handle eligibility, partial failures, and pre-bulk channel verification guidance safely.
 - Failed messages provide actionable recovery.
 - Queue counts and tabs update after every lifecycle transition.
 
@@ -981,10 +1181,11 @@ Users want timely wishes and reminders without losing control over personal comm
 ### Expected Interactions and System Responses
 
 - Automation modes are explained in terms of control: fully auto, smart approve, VIP approve, always ask, skip auto, and contact overrides.
+- Fully auto is presented as an advanced mode behind an explicit advanced automation reveal, with review-first as the recommended baseline and explicit confirmation before global full automation is enabled.
 - Quiet hours defer nonurgent sends to the next allowed window.
 - Blackouts block or defer sends according to user preference.
 - DND contacts are never auto-sent.
-- The app reports how many contacts/messages changed when enabling full automation.
+- The app reports how many contacts and queued messages are affected when automation mode changes, including when enabling full automation.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
@@ -1014,7 +1215,7 @@ Users want timely wishes and reminders without losing control over personal comm
 - Delivery channels.
 - Notifications.
 - Settings.
-- AI Doctor.
+- Setup Check.
 
 ### Performance, Usability, Accessibility, and Security Expectations
 
@@ -1027,14 +1228,15 @@ Users want timely wishes and reminders without losing control over personal comm
 
 - Messages send only inside eligible windows and according to user-defined approval mode.
 - Deferred and blocked states are visible and actionable.
-- Automation changes update queued messages predictably.
+- Automation changes report contact/message impact counts and update queued messages predictably.
+- Full automation cannot become the global mode without an explicit advanced-mode confirmation.
 - Recovery after device restart or time change preserves user intent and avoids duplicate sends.
 
 ## 15. Delivery Channels: SMS, WhatsApp, and Email
 
 ### Feature Name and Purpose
 
-Delivery Channels send approved or automation-eligible messages through SMS, WhatsApp, or Gmail email according to user and contact preferences.
+Delivery Channels route approved messages through user-controlled SMS or WhatsApp handoff, or through configured email delivery, according to user and contact preferences.
 
 ### Problem It Solves
 
@@ -1042,61 +1244,75 @@ Users communicate with different people through different channels and need safe
 
 ### Ideal End-to-End User Workflow
 
-1. The user configures available channels in Settings or AI Doctor.
+1. The user configures available channels in Settings or Setup Check, with SMS and manual handoff remaining the primary routes and provider-backed email opened only when needed.
 2. A contact has a preferred channel and valid recipient details.
 3. The app verifies route readiness before approval, scheduling, and dispatch.
-4. At send time, the app attempts the preferred eligible route or an allowed fallback route.
-5. The app records the result, updates history, and guides recovery when sending fails.
+4. For manual handoff, the app offers the preferred eligible route and a copy/share fallback while explaining that the destination app performs the final send.
+5. After the user sends manually, they return and explicitly mark the message sent in RelateAI.
+6. The app records the result, updates history, and guides recovery when sending fails.
 
 ### Expected Interactions and System Responses
 
 - Channel settings clearly show enabled, disabled, missing setup, and verified states.
-- SMS requires phone number and SMS permission.
-- WhatsApp requires phone number, app availability, prominent consent, and accessibility enablement.
-- Email requires sender setup, valid sender email, app password or equivalent credential, recipient email, and network access.
+- SMS handoff requires a phone number and an available SMS-capable destination app; direct background SMS sending is not part of the React Native release path unless a future release decision explicitly adds it with policy review.
+- WhatsApp handoff requires a phone number, app availability, and prominent manual handoff consent; AccessibilityService or unattended WhatsApp sending is not part of the React Native release path unless a future release decision explicitly adds it with policy review.
+- Email mail-app handoff remains available when the recipient has an email address and the device can open a mail destination.
+- Provider-backed email is secondary: sender setup, provider status, endpoint readiness, and provider error details appear only after the user explicitly opens email provider setup.
+- Provider-backed email requires a valid sender email, a configured delivery provider endpoint, recipient email, and network access.
+- Channel length rules are enforced before dispatch; SMS over one segment is allowed only with visible multipart guidance, while over-limit bodies are blocked until edited or moved to another channel.
 - Fallbacks are explained and respect user blackouts and contact preferences.
+- If the preferred handoff target cannot open, the fallback share sheet contains only the approved message text; setup reasons and diagnostics stay inside RelateAI.
+- Manual handoff opening, link routing, or share-sheet completion must not mark a message sent until the user confirms they actually sent it.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
-- Inputs: message body, channel preference, recipient phone/email, sender credentials, permissions, consent, app availability, network state.
-- Outputs: sent status, failed status, provider result summary, retry eligibility, activity log, chat history item.
+- Inputs: message body, channel preference, recipient phone/email, sender email for provider delivery, permissions, consent, app availability, network state, share-sheet result.
+- Outputs: handoff destination, copy/share fallback, dismissed fallback state, sent status after explicit confirmation, failed status, provider result summary, retry eligibility, activity log, chat history item.
 - Validations: recipient details are present and valid, channel enabled, permission granted, credential valid, message body supported by channel, consent present.
-- Errors: missing phone/email, denied SMS, missing WhatsApp/app/accessibility/consent, invalid email settings, network failure, provider timeout, delivery unknown, and fallback exhaustion must be recoverable.
+- Errors: missing phone/email, unavailable SMS app, missing WhatsApp app, missing handoff consent, invalid email settings, network failure, provider timeout, delivery unknown, and fallback exhaustion must be recoverable.
 
 ### Edge Cases and Exception Scenarios
 
 - SMS splits into multiple parts.
-- WhatsApp UI changes or device is locked.
+- Message body is valid for one channel but too long for another.
+- Destination app opens but the user cancels, the device blocks interaction, or the user returns without sending.
 - Email credentials expire.
 - Preferred channel is disabled after scheduling.
 - Provider reports success but delivery remains unknown.
+- User opens a handoff target but decides not to send.
+- User dismisses the share sheet without sharing.
 
 ### Automation Opportunities
 
 - The app may rank fallback routes by contact preference and historical success.
-- The app may recommend channel verification before unattended automation.
+- The app may recommend channel verification before scheduled or provider-backed delivery.
 - The user remains in control because channel use depends on explicit preferences, permissions, consent, and approval rules.
+- The app may prompt users to confirm completion after handoff returns, but confirmation remains optional and user-controlled.
 
 ### Dependencies and Integrations
 
-- Android SMS.
-- WhatsApp or WhatsApp Business.
-- Android Accessibility settings for WhatsApp automation.
-- Gmail SMTP or configured email sender.
-- Contacts, messages, scheduling, AI Doctor, and activity history.
+- SMS destination apps and platform deep-link/share APIs.
+- WhatsApp or WhatsApp Business through manual handoff.
+- Optional configured email sender endpoint and mail app handoff.
+- Contacts, messages, scheduling, Setup Check, and activity history.
 
 ### Performance, Usability, Accessibility, and Security Expectations
 
 - Dispatch should not block the UI.
 - Channel setup explanations must be concise and actionable.
+- Provider email setup must not compete with SMS/manual handoff in the main settings flow and must make clear that email delivery is optional.
 - Provider errors must redact message bodies, credentials, tokens, and screen contents.
-- WhatsApp automation must be narrow, disclosed, consented, revocable, and policy-reviewed before distribution.
+- Share fallbacks must not append route errors, setup diagnostics, credentials, phone numbers, or email addresses to recipient-visible message text.
+- Any future unattended channel automation must be narrow, disclosed, consented, revocable, and policy-reviewed before distribution; the React Native release path uses manual handoff for SMS and WhatsApp.
 
 ### Success and Acceptance Criteria
 
 - Each channel blocks sends until required setup is complete.
 - Send results update message status, activity, analytics, and chat history.
 - Fallbacks only occur when allowed and clearly recorded.
+- Manual handoff records sent status only after explicit user confirmation.
+- Opening a destination app, using the share sheet, or dismissing the share sheet never records a send by itself.
+- Email provider setup is hidden behind an explicit user reveal and remains optional when mail-app handoff is sufficient.
 - Failed sends provide the exact user action needed for recovery.
 
 ## 16. Notifications, Event Alerts, Launcher Shortcuts, and Home Widget
@@ -1114,27 +1330,31 @@ Users may miss important events or approval windows if the app only communicates
 1. The user grants notification permission after seeing why reminders and approvals matter.
 2. The app sends notifications for event reminders, pending approvals, setup blockers, fallback alerts, recovery issues, and revival suggestions.
 3. The user taps a notification action to open the relevant screen or perform a safe review action where supported.
-4. The widget shows today's birthdays, next events, and pending approvals.
-5. Launcher shortcuts open common tasks such as composing/reviewing messages or viewing contacts.
+4. The widget stays minimal and shows only today's birthdays/events and pending approvals.
+5. Retained launcher shortcuts open only Review messages and Add event.
 
 ### Expected Interactions and System Responses
 
 - Notification content is concise and avoids unnecessary sensitive detail.
 - Notification actions never surprise the user with an irreversible send.
+- Before native scheduling, the app verifies permission state, route references, safe open-review actions, trigger times, and payload privacy.
+- Reminder scheduling is reconciliation-based: unchanged reminders remain scheduled, changed reminders are replaced, obsolete RelateAI reminders are removed, and unrelated scheduled notifications are preserved.
 - Denied notification permission results in in-app banners and queue states.
 - Widget refreshes periodically and after meaningful app changes.
 - Shortcuts and widget taps respect lock, account, and route requirements.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
-- Inputs: reminder schedule, approval state, setup issue, dispatch failure, backup freshness, widget refresh request.
+- Inputs: reminder schedule, existing scheduled reminder state, approval state, setup issue, dispatch failure, backup freshness, widget refresh request.
 - Outputs: notification, in-app alert, widget summary, shortcut navigation.
-- Validations: permission granted, notification route valid, referenced item still exists, action is safe and eligible.
-- Errors: denied notifications, deleted message/contact/event, stale widget data, unsupported launcher, or blocked action should route to a safe recovery screen.
+- Validations: permission granted, notification route valid, referenced item still exists, action is safe and eligible, stale reminders identified before the user relies on them.
+- Errors: denied notifications, deleted message/contact/event, reminder reconciliation failure, stale widget data, unsupported launcher, or blocked action should route to a safe recovery screen.
 
 ### Edge Cases and Exception Scenarios
 
 - User taps approval notification after message was already handled.
+- A scheduled notification references an event or contact that no longer exists.
+- A previously scheduled reminder no longer matches the current event time, copy, or route.
 - Device is locked and notification privacy is restricted.
 - Notification permission is revoked after scheduling.
 - Widget data refresh fails.
@@ -1143,6 +1363,7 @@ Users may miss important events or approval windows if the app only communicates
 ### Automation Opportunities
 
 - The app may group notifications and prioritize urgent approval windows.
+- The app may reconcile scheduled reminders after event, contact, permission, or quiet-hour changes while showing the user what will be reminded and keeping notification control explicit.
 - The app may update widget counts after dispatch and review events.
 - The user remains in control because external surfaces navigate, remind, or request review rather than silently sending or deleting.
 
@@ -1152,7 +1373,7 @@ Users may miss important events or approval windows if the app only communicates
 - App widget framework.
 - Launcher shortcuts.
 - Deep links and navigation.
-- Messages, events, AI Doctor, and backup.
+- Messages, events, Setup Check, and backup.
 
 ### Performance, Usability, Accessibility, and Security Expectations
 
@@ -1160,13 +1381,16 @@ Users may miss important events or approval windows if the app only communicates
 - Notification and widget labels must be accessible.
 - Sensitive content must be minimized on lock screens.
 - Notification actions must be idempotent and safe against repeated taps.
+- Reminder reconciliation should avoid duplicate alerts and complete quickly enough that saving event or reminder changes feels immediate.
 
 ### Success and Acceptance Criteria
 
 - Users receive useful reminders and approval prompts when permission is enabled.
 - Denied notification permission has in-app fallback visibility.
 - Widget counts route to useful destinations.
+- Stale notification routes and sensitive notification payloads are blocked or surfaced before native scheduling.
 - Stale notification actions do not corrupt message state or trigger duplicate sends.
+- Repeated reminder scheduling does not create duplicate alerts, leaves unchanged reminders alone, removes obsolete RelateAI reminders, updates changed reminders, and does not disturb unrelated notifications.
 
 ## 17. Analytics, Insights, and Report Export
 
@@ -1180,25 +1404,27 @@ Users need feedback on whether they are staying connected and whether automation
 
 ### Ideal End-to-End User Workflow
 
-1. The user opens Analytics and sees high-level health and communication metrics.
+1. The user opens Analytics from More, Settings, Home insights, or another contextual entry point and sees high-level health and communication metrics.
 2. The user reviews monthly wishes, relationship distribution, health buckets, growth metrics, and neglected contacts.
 3. The user taps insights to open contacts, messages, or setup fixes.
-4. The user exports a CSV report when they want portable analysis.
-5. The app records export activity and provides share options.
+4. The user shares a concise redacted relationship summary for quick reflection or explicitly confirms a secondary CSV export when they want portable analysis.
+5. The app records summary/report sharing activity and provides share options.
 
 ### Expected Interactions and System Responses
 
 - Charts and metrics explain denominators and time windows.
 - Empty analytics states guide the user to sync contacts, add events, or send messages.
 - Neglected contacts are presented as helpful suggestions, not judgments.
-- Export requires explicit user action and shows failure/success feedback.
+- Sharing and export require explicit user action and show failure/success feedback.
+- The shareable summary is concise, human-readable, and focused on metrics, health buckets, relationship distribution, overdue check-in counts, and next actions.
+- CSV export is treated as a power-user action: it is hidden behind an explicit export reveal, visually secondary to summary sharing, and requires confirmation that reminds the user to review the destination before sharing.
 - Shared reports avoid secrets and credentials.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
 - Inputs: contacts, events, sent messages, delivery statuses, reply markers, health scores, personalization data, date range.
-- Outputs: analytics dashboard, insights, CSV report, share intent, activity log.
-- Validations: denominators are nonzero before percentages, report data belongs to active user/local profile, export destination is writable.
+- Outputs: analytics dashboard, insights, redacted text summary, CSV report, share intent, activity log.
+- Validations: denominators are nonzero before percentages, report data belongs to active user/local profile, export destination is writable, CSV export is confirmed before opening the share destination.
 - Errors: load failure, export failure, share unavailable, empty data, or deleted contact from insight route should show recovery.
 
 ### Edge Cases and Exception Scenarios
@@ -1220,7 +1446,7 @@ Users need feedback on whether they are staying connected and whether automation
 - Contacts, events, messages, delivery history.
 - Activity history.
 - File sharing.
-- Home and AI Doctor recommendations.
+- Home and Setup Check recommendations.
 
 ### Performance, Usability, Accessibility, and Security Expectations
 
@@ -1233,7 +1459,7 @@ Users need feedback on whether they are staying connected and whether automation
 
 - Users can understand relationship health and delivery outcomes.
 - Empty and sparse data states are useful.
-- Report export succeeds or fails with clear feedback.
+- Summary sharing and confirmed report export succeed or fail with clear feedback.
 - Insight actions open the relevant contact or workflow.
 
 ## 18. Activity History
@@ -1248,7 +1474,7 @@ Users need to understand what the app did, what failed, what needs follow-up, an
 
 ### Ideal End-to-End User Workflow
 
-1. The user opens Activity History from Settings, AI Doctor, Home, or a recovery prompt.
+1. The user opens Activity History from Settings, Setup Check, Home, or a recovery prompt.
 2. The app shows recent activities with type, severity, status, timestamp, summary, and optional action.
 3. The user searches or filters by type, date, and status.
 4. The user taps an action to open the related contact, message, setup, backup, or analytics screen.
@@ -1259,6 +1485,8 @@ Users need to understand what the app did, what failed, what needs follow-up, an
 - Activity rows use plain-language summaries.
 - Filters and search work together and can be cleared.
 - Error activities show the recovery path where possible.
+- Activity actions use the most specific safe recovery target available, such as Wish Preview, Chat History, Messages, Contact Detail, Setup, Backup, or Analytics.
+- If a linked contact or message is no longer available, the action falls back to the nearest safe broad screen and explains the fallback.
 - Empty history explains that no app activity has been recorded yet.
 - Activity details avoid exposing raw secrets or full message bodies unnecessarily.
 
@@ -1280,7 +1508,7 @@ Users need to understand what the app did, what failed, what needs follow-up, an
 ### Automation Opportunities
 
 - The app may create activity records for important automated decisions and failures.
-- The app may link errors to AI Doctor recommendations.
+- The app may link errors to Setup Check recommendations.
 - The user remains in control because activity history records and routes actions; it does not perform destructive recovery automatically.
 
 ### Dependencies and Integrations
@@ -1289,7 +1517,7 @@ Users need to understand what the app did, what failed, what needs follow-up, an
 - Sync.
 - Backup and restore.
 - Analytics export.
-- AI Doctor and setup checks.
+- Setup Check.
 - Navigation/deep links.
 
 ### Performance, Usability, Accessibility, and Security Expectations
@@ -1303,6 +1531,7 @@ Users need to understand what the app did, what failed, what needs follow-up, an
 
 - Users can search and filter recent app actions.
 - Errors have useful recovery routes.
+- Stale recovery targets are detected and routed to a safe fallback without crashing or sending/deleting anything.
 - Activity records are understandable without internal jargon.
 - Sensitive data is not exposed in activity summaries.
 
@@ -1318,10 +1547,10 @@ Generic AI messages can feel unlike the user. Style Coach helps drafts match the
 
 ### Ideal End-to-End User Workflow
 
-1. The user opens Style Coach from Settings, Home, or AI Doctor.
+1. The user opens Style Coach from Settings, Home, or Setup Check.
 2. The user pastes representative writing samples or chooses to analyze recent sent messages.
 3. The app validates the sample amount and analyzes writing style.
-4. The user reviews the learned profile, preview, confidence, and history.
+4. The user reviews the learned profile, preview, and confidence, then uses the "Improve my style" action when they want to retrain from pasted samples.
 5. Future AI drafts use the profile unless the user retrains or disables style use.
 
 ### Expected Interactions and System Responses
@@ -1329,13 +1558,13 @@ Generic AI messages can feel unlike the user. Style Coach helps drafts match the
 - Manual training accepts multiple samples separated clearly.
 - Auto analysis explains which recent sent messages are eligible without exposing unnecessary text.
 - The learned profile shows formality, language/accent, emoji use, common greetings, average length, confidence, and sample count.
-- Profile history shows prior snapshots.
+- Profile history and raw snapshots stay out of the main Style Coach UI; users see the current style quality and improvement actions instead.
 - Failed analysis provides retry and sample-improvement guidance.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
 - Inputs: pasted samples, recent sent messages, user language/style preferences.
-- Outputs: style profile, confidence level, preview, history snapshot.
+- Outputs: current style profile, confidence level, preview, sample count, and retraining result.
 - Validations: samples are nonblank, sufficient length/quantity, safe text size, eligible messages belong to the user.
 - Errors: empty samples, insufficient recent messages, AI/local analysis failure, save failure, or disabled AI should preserve input and explain next steps.
 
@@ -1358,7 +1587,7 @@ Generic AI messages can feel unlike the user. Style Coach helps drafts match the
 - Sent message history.
 - AI message generation.
 - Settings.
-- AI Doctor quality checks.
+- Setup Check quality checks.
 - Privacy settings.
 
 ### Performance, Usability, Accessibility, and Security Expectations
@@ -1374,6 +1603,7 @@ Generic AI messages can feel unlike the user. Style Coach helps drafts match the
 - Future drafts reflect the profile in tone, length, and language.
 - Low-confidence states ask for more samples.
 - Analysis failures do not lose pasted input.
+- Main Style Coach UI focuses on current confidence and improvement actions without profile history snapshots.
 
 ## 20. Memory Vault
 
@@ -1460,21 +1690,21 @@ Users want to avoid repeated or unsuitable gifts and choose ideas that fit the r
 2. The app shows annual budget, spent amount, remaining amount, and gift history.
 3. The user records past or planned gifts with category, occasion, cost, notes, and recipient feedback.
 4. The user asks AI for gift ideas based on relationship context, preferences, memories, and gift history.
-5. The user dismisses suggestions, records a suggestion as a gift, or adjusts the contact budget.
+5. The user dismisses suggestions, records a suggestion as a gift, or adjusts the optional contact gift budget inside Gift Advisor.
 
 ### Expected Interactions and System Responses
 
 - Gift history clearly shows occasion, year, cost, notes, and feedback.
 - Suggestions include confidence, budget fit, duplicate warnings, and rationale-level context.
 - Recording a suggestion pre-fills a gift record for confirmation.
-- Adjust budget routes to contact preferences and returns with updated budget context.
+- Budget editing expands inside Gift Advisor, validates the entered amount, and returns to the suggestion/history context after save or cancel.
 - Errors preserve form input where possible.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
-- Inputs: gift name, category, occasion, cost, notes, feedback, budget, AI suggestion request.
+- Inputs: gift name, category, occasion, cost, notes, feedback, optional annual gift budget, and AI suggestion request.
 - Outputs: saved gift record, budget summary, suggestions, duplicate warning, activity where appropriate.
-- Validations: required gift name/category/occasion, valid cost range, text length limits, contact exists, AI enabled for suggestions.
+- Validations: required gift name/category/occasion, valid cost range, valid optional budget range, text length limits, contact exists, AI enabled for suggestions.
 - Errors: load failure, save/delete failure, invalid cost, missing required fields, suggestion failure, or missing contact should show clear retry/edit paths.
 
 ### Edge Cases and Exception Scenarios
@@ -1581,11 +1811,11 @@ Users need context on what they have already sent so new wishes do not feel repe
 - Empty, no-result, long-message, and error states are handled.
 - History informs future draft quality and repetition avoidance.
 
-## 23. AI Doctor and Setup Diagnostics
+## 23. Setup Check and Setup Diagnostics
 
 ### Feature Name and Purpose
 
-AI Doctor diagnoses why AI wishes feel generic, why automation is blocked, or why delivery fails, then recommends the next fix.
+Setup Check diagnoses why AI wishes feel generic, why automation is blocked, or why delivery fails, then recommends the next fix.
 
 ### Problem It Solves
 
@@ -1593,7 +1823,7 @@ AI and automation involve several dependencies. Users need one understandable pl
 
 ### Ideal End-to-End User Workflow
 
-1. The user opens AI Doctor from Settings, Home, Messages, or an error prompt.
+1. The user opens Setup Check from Settings, Home, Messages, or an error prompt.
 2. The app runs grouped checks for required setup, quality, reliability, and recovery.
 3. The user sees a summary, progress count, recommended fix, and detailed check cards.
 4. The user taps actions to sync contacts, test AI, open settings, train Style Coach, review contacts, review messages, open accessibility, open battery settings, or view activity.
@@ -1603,20 +1833,24 @@ AI and automation involve several dependencies. Users need one understandable pl
 
 - Checks are grouped into Required, Quality, Reliability, and Recovery.
 - Each check states status, impact, and action.
+- AI and email provider checks must distinguish missing, release-ready, development-only, blocked, and temporarily failing states without exposing provider endpoint details.
+- Missing email provider setup is not a required blocker while manual email handoff remains available; it becomes actionable only when provider-backed email has been chosen or a configured endpoint is unsafe, development-only, or failing.
 - Dry run must never create, approve, schedule, or send real messages.
+- Dry run produces a redacted snapshot with readiness counts, blocker/warning counts, and the recommended fix, and records that snapshot without raw message bodies, credentials, phone numbers, emails, private notes, or screen contents.
 - AI test reports success or actionable failure category.
 - Recommended fix changes as the user completes setup.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
-- Inputs: account state, contact sync state, AI settings, automation mode, style profile, personalization coverage, channel setup, permissions, recent errors, dispatch recovery records, scheduler state.
-- Outputs: diagnostic summary, readiness checks, recommended action, dry-run result, AI test result, diagnostic snapshot.
+- Inputs: account state, contact sync state, AI settings, provider readiness, email delivery readiness, automation mode, style profile, personalization coverage, channel setup, permissions, recent errors, dispatch recovery records, scheduler state.
+- Outputs: diagnostic summary, readiness checks, recommended action, redacted dry-run snapshot, AI test result, diagnostic snapshot.
 - Validations: checks are based on latest permission/provider state, actions route to valid destinations, dry run remains side-effect safe.
 - Errors: check load failure, permission state unavailable, provider test failure, sync failure, or stale diagnostic data should offer refresh and manual actions.
 
 ### Edge Cases and Exception Scenarios
 
 - AI provider is healthy but personalization is poor.
+- Provider endpoint is configured but unsafe for production.
 - Channel is configured but unverified.
 - Notifications are denied but messages can still be reviewed in-app.
 - Battery optimization delays scheduled work.
@@ -1632,7 +1866,7 @@ AI and automation involve several dependencies. Users need one understandable pl
 
 - Settings.
 - Contact sync.
-- AI provider.
+- AI provider readiness and optional email provider readiness.
 - Style Coach.
 - Messages.
 - Delivery channels.
@@ -1645,11 +1879,13 @@ AI and automation involve several dependencies. Users need one understandable pl
 - Technical failures must be translated into plain user actions.
 - Cards must be accessible and not rely only on color.
 - Diagnostic snapshots must be redacted and exclude secrets, raw message bodies, and screen contents.
+- Provider diagnostics must be redacted and must not reveal endpoint hosts, paths, credentials, query strings, raw provider responses, or message bodies.
 
 ### Success and Acceptance Criteria
 
 - Users can identify the highest-priority blocker or quality gap.
 - Dry run is side-effect safe.
+- Dry-run snapshots are redacted, auditable, and safe to store as activity history.
 - AI and channel setup failures produce specific recovery actions.
 - Completing a recommended fix updates readiness status.
 
@@ -1669,19 +1905,20 @@ Users need predictable control over how RelateAI stores data, generates drafts, 
 2. The app shows account state, preferences, AI configuration, automation mode, delivery channel setup, sync controls, backup status, privacy/security, activity history, and app info.
 3. The user updates a setting and receives immediate validation or saved feedback.
 4. Settings that affect queued work show consequences.
-5. The user can open AI Doctor, Style Coach, Backup/Restore, Activity History, or sign-out confirmation from Settings.
+5. The user can open Setup Check, Style Coach, Backup/Restore, Activity History, or sign-out confirmation from Settings.
 
 ### Expected Interactions and System Responses
 
 - Toggles and forms explain what changes without lengthy technical text.
-- Gemini/API key, Gmail sender, app password, quiet hours, backup passphrase, automation mode, blackouts, biometric lock, reminders, AI generation, and channel settings validate before save.
+- AI provider credentials, optional email sender setup, quiet hours, backup passphrase, automation mode, blackouts, biometric lock, reminders, AI generation, and channel settings validate before save.
+- Optional email provider setup is discoverable from Settings but does not appear as a primary setup requirement unless the user chooses provider-backed email.
 - Sync shows progress and last synced state.
 - Secure settings recovery notices guide re-entry of sensitive configuration.
 - Sign-out requires explicit confirmation.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
-- Inputs: API key, sender email, app password, quiet hours, default send time, automation mode, channel toggles, biometric lock, reminder/AI toggles, consent, sync action, sign-out action.
+- Inputs: AI provider credentials, sender email, quiet hours, default send time, automation mode, channel toggles, biometric lock, reminder/AI toggles, consent, sync action, sign-out action.
 - Outputs: saved settings, updated readiness, scheduled-work changes, sync result, recovery notices.
 - Validations: email syntax, credential presence, time ranges, supported automation mode, permission availability, nonblank required fields, safe sign-out confirmation.
 - Errors: save failure, invalid inputs, sync failure, credential failure, secure storage recovery, permission denial, or sign-out failure should show targeted guidance.
@@ -1697,21 +1934,22 @@ Users need predictable control over how RelateAI stores data, generates drafts, 
 ### Automation Opportunities
 
 - The app may warn about settings that block queued work.
-- The app may route users to AI Doctor after risky setting changes.
+- The app may route users to Setup Check after risky setting changes.
 - The user remains in control because setting changes are explicit and high-impact actions show consequences.
 
 ### Dependencies and Integrations
 
 - AI provider.
-- Gmail/email provider.
-- SMS, WhatsApp, notifications, exact alarms, biometrics.
+- Optional email provider.
+- SMS and WhatsApp handoff, notifications, calendar sync, biometrics.
 - Sync.
 - Backup and restore.
-- AI Doctor and Activity History.
+- Setup Check and Activity History.
 
 ### Performance, Usability, Accessibility, and Security Expectations
 
 - Settings should be organized into clear sections with stable controls.
+- Biometric lock stays in Settings/Privacy and appears as a contextual recommendation after private notes or provider setup exist, not as an upfront setup requirement.
 - Secret fields must support visibility toggles where appropriate and never expose stored values unnecessarily.
 - Forms must be accessible with labels, hints, and inline errors.
 - Changing settings must not leak credentials into logs, diagnostics, or exports.
@@ -1748,13 +1986,15 @@ Local relationship data is valuable and private. Users need portable recovery wi
 - Export refuses blank or weak passphrases.
 - Import preview happens before restore confirmation.
 - Restore warnings explain whether data will be replaced or merged according to selected mode.
+- Local storage health is visible in Settings/Setup Check with format, entry, chunk, and payload-size metadata, while raw relationship data remains hidden.
+- Storage integrity problems, unsupported versions, missing entries, or corrupt local data route to recovery instead of silently continuing.
 - Secrets such as provider tokens, app passwords, API keys, and live app encryption keys are not exported as restorable settings.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
 - Inputs: export passphrase, restore passphrase, destination URI, backup file, restore confirmation.
-- Outputs: encrypted backup file, import preview, restored dataset, backup timestamp, activity log.
-- Validations: passphrase strength, readable/writable destination, valid backup format, supported version, checksum/integrity, correct passphrase, record count sanity, sufficient storage.
+- Outputs: encrypted backup file, import preview, restored dataset, backup timestamp, local storage health summary, activity log.
+- Validations: passphrase strength, readable/writable destination, valid backup format, supported version, checksum/integrity, normalized local storage integrity, correct passphrase, record count sanity, sufficient storage.
 - Errors: blank/weak passphrase, write/read failure, invalid file, wrong passphrase, unsupported newer version, integrity failure, restore failure, cancellation, or partial provider failure must leave existing data safe.
 
 ### Edge Cases and Exception Scenarios
@@ -1762,6 +2002,7 @@ Local relationship data is valuable and private. Users need portable recovery wi
 - User forgets passphrase.
 - Backup was created by a newer app version.
 - File is truncated or modified.
+- Local storage metadata points to a missing, stale, or corrupt saved entry.
 - User restores over existing local data.
 - Device loses power during restore.
 
@@ -1817,13 +2058,14 @@ Relationship management is personal and daily-use. Users must be able to underst
 - Text does not overlap, clip, or become unreadable at large font sizes.
 - All interactive elements have meaningful labels and minimum touch targets.
 - Loading, empty, error, and success states are announced where appropriate.
+- Native dialogs, share-sheet prompts, import/export summaries, permission-denied fallbacks, and handoff confirmations use the same localized language system as screen content.
 - Color is never the only way to communicate status.
 - Hindi/Hinglish and English content preferences are respected when configured.
 
 ### Inputs, Outputs, Validations, and Error Handling
 
 - Inputs: device locale, font scale, display size, screen-reader state, language preference, contact language, currency context.
-- Outputs: localized UI copy, accessible labels, correctly formatted dates/times/currency, language-aware drafts.
+- Outputs: localized UI copy, localized native feedback, accessible labels, correctly formatted dates/times/currency, language-aware drafts.
 - Validations: all user-visible strings are localizable, layout works at supported scales, AI language choices are supported, right content appears in the selected language.
 - Errors: missing translation, unsupported locale, layout overflow, screen-reader ambiguity, or AI wrong-language output should fall back gracefully and be testable.
 
@@ -1834,6 +2076,7 @@ Relationship management is personal and daily-use. Users must be able to underst
 - Compact screen with large font.
 - Low-vision user reviewing message text.
 - Locale-specific date ambiguity for manual events.
+- Native platform feedback is triggered outside the visible screen flow.
 
 ### Automation Opportunities
 
@@ -1861,6 +2104,7 @@ Relationship management is personal and daily-use. Users must be able to underst
 
 - Primary workflows pass large-font, compact-screen, and screen-reader review.
 - Supported languages have complete, natural copy.
+- Native feedback for handoff, import, export, scheduling, permission, backup, and recovery workflows is localized and test-covered.
 - Dates, times, plurals, and currency display correctly.
 - Wrong-language or inaccessible states are caught before release.
 
@@ -1874,6 +2118,7 @@ Every feature in this document is release-ready only when all applicable criteri
 - Loading, empty, success, error, permission-denied, offline, and stale-data states are handled.
 - Automation is explainable and bounded by user preferences.
 - Sensitive data is minimized, protected, and redacted outside explicit user exports.
+- Local persistence is verified for integrity and recovery without exposing raw relationship records.
 - The feature works with large fonts, screen readers, compact screens, and interrupted sessions.
 - Related screens show consistent status, readiness, and recovery language.
 - Acceptance criteria can be verified manually and through automated tests where practical.

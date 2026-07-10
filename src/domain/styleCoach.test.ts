@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createInitialState, relateReducer } from '../state/relateReducer';
+import { relateReducer } from '../state/relateReducer';
+import { createTestState } from '../test/testState';
 import { analyzeManualStyleSamples, analyzeSentMessageStyle, eligibleSentStyleMessages } from './styleCoach';
 
 describe('style coach contract', () => {
@@ -32,7 +33,11 @@ describe('style coach contract', () => {
   });
 
   it('uses only eligible recent sent messages for opt-in training', () => {
-    const first = relateReducer(createInitialState(), {
+    const approved = relateReducer(createTestState(), {
+      type: 'approveMessage',
+      messageId: 'msg-mira-checkin'
+    });
+    const first = relateReducer(approved, {
       type: 'manualHandoff',
       messageId: 'msg-mira-checkin',
       nowIso: '2026-07-09T10:00:00.000Z'
@@ -67,7 +72,7 @@ describe('style coach contract', () => {
       'Hi Asha, I hope your day feels warm and easy. Thinking of you and sending lots of good wishes.',
       'Hey Mira, just checking in. Hope the new city is becoming friendlier and the role is going well.'
     ].join('\n\n');
-    const next = relateReducer(createInitialState(), {
+    const next = relateReducer(createTestState(), {
       type: 'trainStyleFromSamples',
       samples: sample
     });

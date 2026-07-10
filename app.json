@@ -3,6 +3,9 @@
     "name": "RelateAI",
     "slug": "relateai",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "relateai",
@@ -11,6 +14,7 @@
     ],
     "ios": {
       "supportsTablet": true,
+      "buildNumber": "1",
       "bundleIdentifier": "com.relateai.app",
       "infoPlist": {
         "NSContactsUsageDescription": "RelateAI imports contacts only when you ask, so it can find relationship events and help you prepare messages.",
@@ -20,17 +24,28 @@
     },
     "android": {
       "package": "com.relateai.app",
+      "versionCode": 1,
       "permissions": [
         "READ_CONTACTS",
         "READ_CALENDAR",
         "WRITE_CALENDAR",
         "POST_NOTIFICATIONS",
-        "SEND_SMS",
         "USE_BIOMETRIC"
+      ],
+      "blockedPermissions": [
+        "android.permission.SEND_SMS",
+        "android.permission.READ_SMS",
+        "android.permission.RECEIVE_SMS",
+        "android.permission.READ_CALL_LOG",
+        "android.permission.READ_PHONE_NUMBERS",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.BIND_ACCESSIBILITY_SERVICE"
       ]
     },
     "plugins": [
-      "./plugins/with-relateai-shortcuts"
+      "./plugins/with-relateai-shortcuts",
+      "./plugins/with-relateai-home-widget"
     ],
     "web": {
       "bundler": "metro"

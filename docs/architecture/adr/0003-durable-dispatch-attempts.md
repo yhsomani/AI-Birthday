@@ -2,11 +2,11 @@
 
 Date: 2026-06-27
 
-Status: Accepted
+Status: Superseded for active React Native app by ADR 0005. Historical Android/Kotlin decision remains archived.
 
 ## Context
 
-RelateAI can send user-visible messages through SMS, WhatsApp automation, and email. Current code has important safety checks but dispatch history is split across multiple concerns:
+RelateAI can send user-visible messages through SMS handoff, manual WhatsApp handoff, and email. The archived Kotlin implementation had important safety checks, but dispatch history was split across multiple concerns:
 
 - `DispatchEligibilityPolicy` decides send, defer, approval-needed, expiry, and blocked states.
 - `DispatchMessageUseCase` records activity logs for dispatch decisions.

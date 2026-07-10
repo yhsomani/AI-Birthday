@@ -2,7 +2,7 @@
 
 Date: 2026-06-27
 
-Status: Accepted
+Status: Superseded for active React Native app by ADR 0005. Historical Android/Kotlin decision remains archived.
 
 ## Context
 

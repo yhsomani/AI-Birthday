@@ -1,6 +1,6 @@
 # RelateAI Feature Roadmap Analysis
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 This document uses `docs/feature-fssot.md` as the feature scope baseline and identifies:
 
@@ -53,7 +53,7 @@ Recommended secondary destinations:
 - Gift Advisor
 - Analytics
 - Activity History
-- AI Doctor
+- Setup Check
 
 Analytics should not be a primary bottom-navigation item for the average user. It is useful, but it is not more important than acting on upcoming events or reviewing messages.
 
@@ -128,8 +128,17 @@ Ideal workflow:
 
 1. User opens a contact and taps "Write message."
 2. User chooses a reason: birthday, check-in, thanks, congratulations, apology, follow-up, or custom.
-3. App drafts or templates a message using contact context.
-4. User edits and sends manually or schedules review.
+3. App presents local templates matched to contact tone and explains what non-private context is included.
+4. App shows whether AI is ready, unavailable, disabled, or falling back to a local review-first draft.
+5. User edits the message, creates a local template draft, or requests AI variants.
+6. Draft always enters review before scheduling, handoff, or sending.
+
+Acceptance expectations:
+
+- Local templates remain usable when AI is disabled or unavailable.
+- Private notes are excluded and the exclusion is visible.
+- Too-short edited messages are blocked with actionable guidance.
+- AI readiness or fallback behavior is visible before the user acts.
 
 Priority: Highest.
 
@@ -159,6 +168,13 @@ Ideal workflow:
 2. App shows checklist items: confirm date, improve context, write wish, decide gift, choose channel, schedule reminder.
 3. User completes only the relevant items.
 
+Acceptance expectations:
+
+- Gift preparation appears only for event types where it is useful.
+- The checklist explains the next recommended action and whether each step is done or needs action.
+- Existing memories, drafts, reminder plans, and ready channels can satisfy matching steps without duplicate work.
+- Older saved checklist item ids remain compatible with the canonical preparation steps.
+
 Priority: High.
 
 ### 4. Guided Contact Enrichment
@@ -172,6 +188,13 @@ Ideal workflow:
 1. App identifies missing relationship details.
 2. User answers lightweight prompts such as "How do you know them?", "What should the message mention?", "What should it avoid?", and "What language feels right?"
 3. The profile quality improves immediately.
+
+Acceptance expectations:
+
+- Sparse contacts show all four core enrichment prompts.
+- The profile explains completed and missing personalization signals.
+- Saved answers become reusable non-private context unless the user chooses a private note path.
+- Activity and diagnostics mention that context was saved without logging the user's answer text.
 
 Priority: High.
 
@@ -187,6 +210,13 @@ Ideal workflow:
 2. App offers "Open in SMS," "Open in WhatsApp," or "Copy message."
 3. User sends from the destination app manually.
 4. User can mark as sent in RelateAI.
+
+Acceptance expectations:
+
+- Opening a destination app or share sheet never marks the message sent by itself.
+- The app always offers a copy/share fallback.
+- RelateAI records sent status only after the user explicitly confirms the message was sent.
+- Manual handoff rechecks approval window, route readiness, and message body policy before recording sent status.
 
 Priority: High.
 
@@ -231,6 +261,13 @@ Ideal workflow:
 2. App shows editable templates.
 3. User personalizes, saves, schedules, or sends manually.
 
+Acceptance expectations:
+
+- The library is reachable outside the Manual Composer.
+- Users can choose contact, occasion, tone, and template before editing.
+- Missing exact tone matches fall back to available templates with clear explanation.
+- Template drafts are created as review-first messages and never sent directly.
+
 Priority: Medium.
 
 ### 9. Relationship Timeline
@@ -273,6 +310,15 @@ Ideal workflow:
 2. Wish Preview shows how the preference affected the draft.
 3. User can adjust tone without retraining global style.
 
+Success criteria:
+
+- Contact profile lets users add, remove, inherit, or override supported tone preferences.
+- Wish Preview shows effective tones, language target, preference source, draft quality, and a plain-language explanation of tone impact.
+- Wish Preview provides a direct adjustment path to the contact profile.
+- Tone changes affect future drafts for that contact and require unsent affected drafts to be reviewed again.
+- Template and fallback drafts still show the intended tone target and remain review-first.
+- Global style training is never required to change a single recipient's tone.
+
 Priority: Medium.
 
 ### 12. Safe Duplicate-Send Guardrail
@@ -299,7 +345,7 @@ Ideal workflow:
 
 1. User opens setup.
 2. App asks what they want: reminders only, AI drafts, manual sends, or automation.
-3. App shows only the required steps for that choice.
+3. App shows only the required steps for that choice, including release-ready AI provider readiness for AI drafts and email provider readiness only when provider-backed email has been chosen or configured.
 
 Priority: Medium.
 

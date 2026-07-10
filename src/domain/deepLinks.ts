@@ -60,6 +60,9 @@ export const parseRelateDeepLink = (rawUrl: string): DeepLinkParseResult => {
       case undefined:
       case 'home':
         return { ok: true, destination: { screen: 'home' } };
+      case 'onboarding':
+      case 'help':
+        return { ok: true, destination: { screen: 'onboarding' } };
       case 'events':
       case 'calendar':
         if (id === 'new' || id === 'add') {
@@ -144,6 +147,14 @@ export const resolveDeepLinkDestination = (
         ok: false,
         destination: { screen: 'messages' },
         message: 'That message is no longer available. Showing the message queue instead.'
+      };
+    }
+    const contactExists = state.contacts.some(contact => contact.id === message.contactId);
+    if (!contactExists) {
+      return {
+        ok: false,
+        destination: { screen: 'messages' },
+        message: "That message's contact is no longer available. Showing the message queue instead."
       };
     }
     if (message.status !== 'Needs review' && destination.screen === 'wishPreview') {
