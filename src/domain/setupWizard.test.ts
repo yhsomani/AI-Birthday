@@ -29,7 +29,7 @@ describe('setup wizard contract', () => {
     };
     const plan = buildSetupWizardPlan(
       state,
-      { aiEndpointConfigured: true, emailEndpointConfigured: false },
+      { aiEndpointConfigured: true, emailEndpointConfigured: false, aiProviderSessionReady: true },
       'AI drafts'
     );
 
@@ -54,6 +54,52 @@ describe('setup wizard contract', () => {
     assert.equal(providerStep?.status, 'Needs action');
     assert.equal(providerStep?.command, 'testAiProvider');
     assert.match(providerStep?.detail ?? '', /development only/i);
+  });
+
+  it('requires a live authenticated session and a successful provider test before AI is ready', () => {
+    const state = createTestState();
+    state.aiProvider = { status: 'Not configured' };
+    const endpoint = evaluateProviderEndpointReadiness('https://ai.example.test/draft');
+
+    const missingSession = buildSetupWizardPlan(
+      state,
+      { aiEndpointReadiness: endpoint, aiProviderSessionReady: false },
+      'AI drafts'
+    );
+    const untested = buildSetupWizardPlan(
+      state,
+      { aiEndpointReadiness: endpoint, aiProviderSessionReady: true },
+      'AI drafts'
+    );
+    state.aiProvider = { status: 'Ready', lastCheckedAt: '2026-07-10T10:00:00.000Z' };
+    const tested = buildSetupWizardPlan(
+      state,
+      { aiEndpointReadiness: endpoint, aiProviderSessionReady: true },
+      'AI drafts'
+    );
+
+    const missingSessionStep = missingSession.steps.find(step => step.id === 'ai-provider');
+    const untestedStep = untested.steps.find(step => step.id === 'ai-provider');
+    const testedStep = tested.steps.find(step => step.id === 'ai-provider');
+    assert.equal(missingSessionStep?.status, 'Needs action');
+    assert.equal(missingSessionStep?.command, undefined);
+    assert.match(missingSessionStep?.detail ?? '', /authenticated provider session/i);
+    assert.equal(untestedStep?.status, 'Needs action');
+    assert.equal(untestedStep?.command, 'testAiProvider');
+    assert.equal(testedStep?.status, 'Ready');
+  });
+
+  it('does not offer reminder planning until its event and notification prerequisites are ready', () => {
+    const state = createTestState();
+    state.events = [];
+    state.reminderPlans = [];
+
+    const plan = buildSetupWizardPlan(state, {}, 'Reminders only');
+    const reminderStep = plan.steps.find(step => step.id === 'reminder-plans');
+
+    assert.equal(plan.recommendedStep?.id, 'events');
+    assert.equal(reminderStep?.command, undefined);
+    assert.equal(reminderStep?.targetScreen, 'setupCheck');
   });
 
   it('omits provider email setup from manual sends until email is chosen or configured', () => {
@@ -119,6 +165,28 @@ describe('setup wizard contract', () => {
     assert.equal(emailStep?.status, 'Needs action');
     assert.match(emailStep?.detail ?? '', /not safe for production/i);
     assert.doesNotMatch(emailStep?.detail ?? '', /secret|email\.example/);
+  });
+
+  it('keeps provider email actionable until its authenticated session is live', () => {
+    const state = createTestState();
+    state.settings.emailEnabled = true;
+    const endpoint = evaluateProviderEndpointReadiness('https://email.example.test/send');
+    const missingSession = buildSetupWizardPlan(
+      state,
+      { emailEndpointReadiness: endpoint, emailProviderSessionReady: false },
+      'Manual sends'
+    );
+    const readySession = buildSetupWizardPlan(
+      state,
+      { emailEndpointReadiness: endpoint, emailProviderSessionReady: true },
+      'Manual sends'
+    );
+
+    const missingStep = missingSession.steps.find(step => step.id === 'email-route');
+    const readyStep = readySession.steps.find(step => step.id === 'email-route');
+    assert.equal(missingStep?.status, 'Needs action');
+    assert.match(missingStep?.detail ?? '', /authenticated session/i);
+    assert.equal(readyStep?.status, 'Ready');
   });
 
   it('surfaces configured unsafe email endpoints even when email delivery is off', () => {

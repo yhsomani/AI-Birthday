@@ -1,5 +1,5 @@
 import type { AppState, ReminderPlan, RelationshipEvent } from './types';
-import { eventOccurrenceIso } from './occasionDates';
+import { eventOccurrenceLocalDateKey } from './occasionDates';
 import {
   adjustTriggerForSchedulingPolicy,
   buildSchedulingPolicySummary,
@@ -7,14 +7,12 @@ import {
   type SchedulingPolicyIssue
 } from './schedulingPolicy';
 
-const startOfDayAtNine = (iso: string) => {
-  const date = new Date(iso);
-  date.setHours(9, 0, 0, 0);
-  return date;
-};
-
-const daysBefore = (iso: string, days: number) => {
-  const date = startOfDayAtNine(iso);
+const daysBefore = (dateKey: string, days: number) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(year, month - 1, day, 9, 0, 0, 0);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return undefined;
+  }
   date.setDate(date.getDate() - days);
   return date;
 };
@@ -27,15 +25,25 @@ const buildPlan = (
   issues: SchedulingPolicyIssue[]
 ): { plan?: ReminderPlan; adjusted: boolean; skipped: boolean } => {
   const contact = state.contacts.find(item => item.id === event.contactId);
-  if (!contact) {
+  if (!contact || contact.archivedAt) {
     return { skipped: true, adjusted: false };
   }
-  const occurrence = eventOccurrenceIso(event, now);
-  if (!occurrence) {
+  const occurrenceDate = eventOccurrenceLocalDateKey(event, now);
+  if (!occurrenceDate) {
     return { skipped: true, adjusted: false };
   }
-  const originalTriggerAt = daysBefore(occurrence, days);
+  const originalTriggerAt = daysBefore(occurrenceDate, days);
+  if (!originalTriggerAt) return { skipped: true, adjusted: false };
   const adjustedTrigger = adjustTriggerForSchedulingPolicy(originalTriggerAt, state.settings);
+  if (adjustedTrigger.blockedBy) {
+    issues.push({
+      id: `blocked-${event.id}-${days}`,
+      severity: 'Warning',
+      title: 'Reminder blocked',
+      detail: `${event.label} is blocked by blackout: ${adjustedTrigger.blockedBy}.`
+    });
+    return { skipped: true, adjusted: adjustedTrigger.adjustments.length > 0 };
+  }
   const triggerAt = adjustedTrigger.triggerAt;
   if (triggerAt.getTime() <= now.getTime()) {
     return { skipped: true, adjusted: adjustedTrigger.adjustments.length > 0 };
@@ -78,7 +86,9 @@ export const buildReminderPlanningResult = (
   }
 
   const issues = [...policy.issues];
-  const planned = state.events.flatMap(event => daysBeforeEvent.map(days => buildPlan(state, event, days, now, issues)));
+  const planned = state.events.flatMap(event =>
+    daysBeforeEvent.map(days => buildPlan(state, event, days, now, issues))
+  );
   const plans = planned
     .flatMap(result => (result.plan ? [result.plan] : []))
     .sort((a, b) => new Date(a.triggerAt).getTime() - new Date(b.triggerAt).getTime());

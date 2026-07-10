@@ -8,6 +8,12 @@ export const NAVIGATION_SCREENS = [
   'messages',
   'contacts',
   'more',
+  'analytics',
+  'settings',
+  'backup',
+  'styleCoach',
+  'activityHistory',
+  'setupCheck',
   'contactDetail',
   'chatHistory',
   'wishPreview',
@@ -15,23 +21,27 @@ export const NAVIGATION_SCREENS = [
 ] as const satisfies readonly Screen[];
 
 type AssertNoMissingScreen<T extends never> = T;
-type _AllScreenRoutesCovered = AssertNoMissingScreen<
-  Exclude<Screen, (typeof NAVIGATION_SCREENS)[number]>
->;
+type _AllScreenRoutesCovered = AssertNoMissingScreen<Exclude<Screen, (typeof NAVIGATION_SCREENS)[number]>>;
 
 type StaticScreen =
   | 'onboarding'
   | 'home'
-  | 'events'
   | 'eventForm'
   | 'messages'
   | 'contacts'
-  | 'more';
+  | 'more'
+  | 'analytics'
+  | 'settings'
+  | 'backup'
+  | 'styleCoach'
+  | 'activityHistory'
+  | 'setupCheck';
 
 type ContactBoundScreen = 'contactDetail' | 'chatHistory' | 'manualComposer';
 
 export type NavigationRoute =
   | { screen: StaticScreen }
+  | { screen: 'events'; eventId?: string; contactId?: string }
   | { screen: ContactBoundScreen; contactId: string }
   | {
       screen: 'wishPreview';
@@ -43,12 +53,17 @@ export type NavigationRoute =
 export interface NavigationDestination {
   screen: Screen;
   contactId?: string;
+  eventId?: string;
   messageId?: string;
 }
 
 export interface NavigationEntities {
   contactIds: readonly string[];
   messages: readonly {
+    id: string;
+    contactId: string;
+  }[];
+  events: readonly {
     id: string;
     contactId: string;
   }[];
@@ -60,7 +75,10 @@ export type NavigationRecoveryReason =
   | 'missing-message-reference'
   | 'stale-message'
   | 'stale-message-contact'
-  | 'message-contact-corrected';
+  | 'message-contact-corrected'
+  | 'stale-event'
+  | 'stale-event-contact'
+  | 'event-contact-mismatch';
 
 export interface NavigationRouteResolution {
   route: NavigationRoute;
@@ -74,11 +92,7 @@ export interface NavigationState {
 }
 
 export type NavigationBackSource = 'ui' | 'android-hardware' | 'browser-history';
-export type NavigationBackDisposition =
-  | 'consumed'
-  | 'exit-app'
-  | 'delegate-to-browser'
-  | 'unhandled';
+export type NavigationBackDisposition = 'consumed' | 'exit-app' | 'delegate-to-browser' | 'unhandled';
 
 export type NavigationAction =
   | { type: 'push'; destination: NavigationDestination }
@@ -103,11 +117,10 @@ export interface NavigationTransition {
   outcome: NavigationTransitionOutcome;
 }
 
-const hasContact = (entities: NavigationEntities, contactId: string) =>
-  entities.contactIds.includes(contactId);
+const hasContact = (entities: NavigationEntities, contactId: string) => entities.contactIds.includes(contactId);
 
 const recovered = (
-  screen: 'contacts' | 'messages' | 'home',
+  screen: 'contacts' | 'events' | 'messages' | 'home',
   reason: NavigationRecoveryReason
 ): NavigationRouteResolution => ({
   route: { screen },
@@ -125,6 +138,22 @@ export const resolveNavigationDestination = (
   entities: NavigationEntities
 ): NavigationRouteResolution => {
   switch (destination.screen) {
+    case 'events': {
+      if (!destination.eventId) {
+        return { route: { screen: 'events' }, recovered: false };
+      }
+      const event = entities.events.find(item => item.id === destination.eventId);
+      if (!event) return recovered('events', 'stale-event');
+      if (!hasContact(entities, event.contactId)) return recovered('events', 'stale-event-contact');
+      if (destination.contactId && destination.contactId !== event.contactId) {
+        return recovered('events', 'event-contact-mismatch');
+      }
+      return {
+        route: { screen: 'events', eventId: event.id, contactId: event.contactId },
+        recovered: false
+      };
+    }
+
     case 'contactDetail':
     case 'chatHistory':
     case 'manualComposer': {
@@ -160,23 +189,24 @@ export const resolveNavigationDestination = (
           messageId: message.id,
           contactId: message.contactId
         },
-        recovered: Boolean(
-          destination.contactId && destination.contactId !== message.contactId
-        ),
+        recovered: Boolean(destination.contactId && destination.contactId !== message.contactId),
         reason:
-          destination.contactId && destination.contactId !== message.contactId
-            ? 'message-contact-corrected'
-            : undefined
+          destination.contactId && destination.contactId !== message.contactId ? 'message-contact-corrected' : undefined
       };
     }
 
     case 'onboarding':
     case 'home':
-    case 'events':
     case 'eventForm':
     case 'messages':
     case 'contacts':
     case 'more':
+    case 'analytics':
+    case 'settings':
+    case 'backup':
+    case 'styleCoach':
+    case 'activityHistory':
+    case 'setupCheck':
       return {
         route: { screen: destination.screen },
         recovered: false
@@ -184,15 +214,11 @@ export const resolveNavigationDestination = (
   }
 };
 
-export const navigationRouteEquals = (
-  left: NavigationRoute,
-  right: NavigationRoute
-) =>
+export const navigationRouteEquals = (left: NavigationRoute, right: NavigationRoute) =>
   left.screen === right.screen &&
-  ('contactId' in left ? left.contactId : undefined) ===
-    ('contactId' in right ? right.contactId : undefined) &&
-  ('messageId' in left ? left.messageId : undefined) ===
-    ('messageId' in right ? right.messageId : undefined);
+  ('contactId' in left ? left.contactId : undefined) === ('contactId' in right ? right.contactId : undefined) &&
+  ('messageId' in left ? left.messageId : undefined) === ('messageId' in right ? right.messageId : undefined) &&
+  ('eventId' in left ? left.eventId : undefined) === ('eventId' in right ? right.eventId : undefined);
 
 const compactAdjacentRoutes = (routes: readonly NavigationRoute[]) => {
   const compacted: NavigationRoute[] = [];
@@ -207,6 +233,8 @@ const compactAdjacentRoutes = (routes: readonly NavigationRoute[]) => {
 
 const canonicalParentFor = (route: NavigationRoute): NavigationDestination | undefined => {
   switch (route.screen) {
+    case 'events':
+      return route.eventId ? { screen: 'events' } : undefined;
     case 'wishPreview':
       return { screen: 'messages' };
     case 'manualComposer':
@@ -216,9 +244,15 @@ const canonicalParentFor = (route: NavigationRoute): NavigationDestination | und
       return { screen: 'contactDetail', contactId: route.contactId };
     case 'eventForm':
       return { screen: 'events' };
+    case 'analytics':
+    case 'settings':
+    case 'backup':
+    case 'styleCoach':
+    case 'activityHistory':
+    case 'setupCheck':
+      return { screen: 'more' };
     case 'onboarding':
     case 'home':
-    case 'events':
     case 'messages':
     case 'contacts':
     case 'more':
@@ -297,10 +331,7 @@ export const reduceNavigation = (
       return {
         state: {
           schemaVersion: 1,
-          stack: compactAdjacentRoutes([
-            ...state.stack.slice(0, -1),
-            resolution.route
-          ])
+          stack: compactAdjacentRoutes([...state.stack.slice(0, -1), resolution.route])
         },
         outcome: {
           action: 'replace',
@@ -315,10 +346,7 @@ export const reduceNavigation = (
         const popped = state.stack.slice(0, -1);
         const exposed = popped.at(-1) ?? { screen: 'home' as const };
         const resolution = resolveNavigationDestination(exposed, entities);
-        const stack = compactAdjacentRoutes([
-          ...popped.slice(0, -1),
-          resolution.route
-        ]);
+        const stack = compactAdjacentRoutes([...popped.slice(0, -1), resolution.route]);
         return {
           state: { schemaVersion: 1, stack },
           outcome: {
@@ -368,9 +396,7 @@ export const reduceNavigation = (
     }
 
     case 'reconcile': {
-      const resolutions = state.stack.map(route =>
-        resolveNavigationDestination(route, entities)
-      );
+      const resolutions = state.stack.map(route => resolveNavigationDestination(route, entities));
       const stack = compactAdjacentRoutes(resolutions.map(item => item.route));
       const nextStack = stack.length ? stack : [{ screen: 'home' as const }];
       const recoveredResolutions = resolutions.filter(item => item.recovered);
@@ -403,15 +429,13 @@ const destinationFromUnknown = (value: unknown): NavigationDestination | undefin
   return {
     screen: candidate.screen as Screen,
     contactId: typeof candidate.contactId === 'string' ? candidate.contactId : undefined,
+    eventId: typeof candidate.eventId === 'string' ? candidate.eventId : undefined,
     messageId: typeof candidate.messageId === 'string' ? candidate.messageId : undefined
   };
 };
 
 /** Validates and reconciles JSON-decoded navigation state without trusting stored references. */
-export const restoreNavigationState = (
-  value: unknown,
-  entities: NavigationEntities
-): NavigationState => {
+export const restoreNavigationState = (value: unknown, entities: NavigationEntities): NavigationState => {
   if (!value || typeof value !== 'object') {
     return createNavigationState({ screen: 'home' }, entities);
   }

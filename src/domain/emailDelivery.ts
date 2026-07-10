@@ -1,5 +1,7 @@
 import { messageApprovalWindowIssue } from './messageApproval';
 import { validateMessageBodyForChannel } from './messageBodyPolicy';
+import { assessDuplicateMessageRisk } from './duplicateGuard';
+import { messageDispatchTimingIssue } from './schedulingPolicy';
 import type { AppState, MessageDraft } from './types';
 
 export type EmailDeliveryErrorKind =
@@ -12,6 +14,8 @@ export type EmailDeliveryErrorKind =
   | 'not-approved'
   | 'wrong-channel'
   | 'invalid-body'
+  | 'duplicate-risk'
+  | 'schedule-blocked'
   | 'not-configured'
   | 'auth'
   | 'network'
@@ -77,7 +81,8 @@ export const emailDeliveryIdempotencyKey = (message: MessageDraft) =>
 
 export const buildEmailDeliveryRequest = (
   state: AppState,
-  messageId: string
+  messageId: string,
+  now: Date
 ): EmailDeliveryRequestResult => {
   if (!state.settings.emailEnabled) {
     return fail('disabled', 'Email delivery is disabled in Settings.');
@@ -101,7 +106,7 @@ export const buildEmailDeliveryRequest = (
   if (message.status !== 'Scheduled') {
     return fail('not-approved', 'Approve the email message before sending.');
   }
-  const approvalIssue = messageApprovalWindowIssue(message);
+  const approvalIssue = messageApprovalWindowIssue(message, now.toISOString());
   if (approvalIssue) {
     return fail('not-approved', approvalIssue);
   }
@@ -109,10 +114,27 @@ export const buildEmailDeliveryRequest = (
   if (!bodyPolicy.ok) {
     return fail('invalid-body', bodyPolicy.message);
   }
+  const duplicateRisk = assessDuplicateMessageRisk(state, message);
+  if (duplicateRisk.risk.risk && !duplicateRisk.acknowledged) {
+    return fail(
+      'duplicate-risk',
+      'Duplicate risk changed after approval. Review and explicitly acknowledge the current warning before sending.'
+    );
+  }
+  const timingIssue = messageDispatchTimingIssue(state, message, now);
+  if (timingIssue) {
+    return fail('schedule-blocked', timingIssue);
+  }
 
   const contact = state.contacts.find(item => item.id === message.contactId);
   if (!contact) {
     return fail('missing-contact', 'The email recipient could not be found.');
+  }
+  if (contact.archivedAt) {
+    return fail('missing-contact', 'The email recipient is archived. Restore the contact before sending.');
+  }
+  if (contact.dnd) {
+    return fail('disabled', 'Contact do-not-disturb allows only a deliberate manual handoff.');
   }
   if (!contact.email) {
     return fail('missing-recipient', 'Recipient email address is missing.');

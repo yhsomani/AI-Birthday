@@ -11,9 +11,7 @@ const shareMessage = async (payload: { title: string; message: string }): Promis
   return result.action === Share.dismissedAction ? 'dismissed' : 'shared';
 };
 
-export const openManualHandoffTarget = (
-  input: HandoffExecutionInput
-): Promise<HandoffExecutionResult> =>
+export const openManualHandoffTarget = (input: HandoffExecutionInput): Promise<HandoffExecutionResult> =>
   runHandoffTarget(input, {
     canOpenUrl: Linking.canOpenURL,
     openUrl: Linking.openURL,

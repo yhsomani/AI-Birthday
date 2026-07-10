@@ -1,4 +1,9 @@
 import { buildReminderPlanningResult } from '../domain/reminders';
+import {
+  buildOwnedNotificationPlans,
+  validateOwnedNotificationPlanForState,
+  type OwnedNotificationPlan
+} from '../domain/notificationPlans';
 import type {
   AppState,
   PermissionAuthorizationRecord,
@@ -31,7 +36,16 @@ export type PermissionRefreshReason =
   | 'before-operation'
   | 'permission-change'
   | 'committed-event-change'
+  | 'committed-contact-change'
+  | 'committed-message-change'
+  | 'committed-setup-change'
+  | 'committed-backup-change'
   | 'committed-settings-change';
+
+/** State aggregates whose verified persistence can change the desired native reminder set. */
+export type ReminderAffectingCommittedChange = 'events' | 'contacts' | 'messages' | 'setup' | 'backups' | 'settings';
+
+type ReminderLifecycleRefreshReason = Exclude<PermissionRefreshReason, 'before-operation'>;
 
 export type AppVisibility = 'foreground' | 'background';
 
@@ -47,7 +61,7 @@ export interface PermissionReminderCoordinatorDependencies {
   /** Read-only: implementations must not call any request/authenticate API. */
   readPermissionSnapshot(): Promise<LivePermissionSnapshot>;
   /** Read-only permission check plus diff-based reconciliation of owned notifications. */
-  reconcileReminderNotifications(plans: ReminderPlan[]): Promise<ReminderNativeReconciliationResult>;
+  reconcileReminderNotifications(plans: OwnedNotificationPlan[]): Promise<ReminderNativeReconciliationResult>;
   now?: () => Date;
   onPermissionRecordsChanged?: (
     records: PermissionAuthorizationRecords,
@@ -63,10 +77,12 @@ export interface PermissionReminderCoordinatorDependencies {
 
 export interface ReminderLifecycleResult {
   status: 'reconciled' | 'deferred-background' | 'permission-status-unavailable' | 'reconciliation-failed';
-  reason: Exclude<PermissionRefreshReason, 'before-operation'>;
+  reason: ReminderLifecycleRefreshReason;
   records: PermissionAuthorizationRecords;
   plannedReminders: ReminderPlan[];
-  desiredNativeReminders: ReminderPlan[];
+  plannedNotifications?: OwnedNotificationPlan[];
+  desiredNativeReminders: OwnedNotificationPlan[];
+  blockedNativeNotificationCount?: number;
   nativeResult?: ReminderNativeReconciliationResult;
 }
 
@@ -328,18 +344,21 @@ export class PermissionReminderCoordinator {
 
   private async reconcileLifecycle(
     state: AppState,
-    reason: Exclude<PermissionRefreshReason, 'before-operation'>,
+    reason: ReminderLifecycleRefreshReason,
     visibility: AppVisibility,
     replaceHistory = false
   ): Promise<ReminderLifecycleResult> {
     this.ensureRecords(state, replaceHistory);
     if (visibility === 'background') {
+      const plannedNotifications = buildOwnedNotificationPlans(state, state.reminderPlans, this.now());
       return {
         status: 'deferred-background',
         reason,
         records: cloneRecords(this.records!),
         plannedReminders: state.reminderPlans,
-        desiredNativeReminders: []
+        plannedNotifications,
+        desiredNativeReminders: [],
+        blockedNativeNotificationCount: plannedNotifications.length
       };
     }
 
@@ -349,9 +368,18 @@ export class PermissionReminderCoordinator {
       await this.dependencies.onReminderPlansChanged?.(planning.plans);
     }
 
+    const plannedNotifications = buildOwnedNotificationPlans(state, planning.plans, this.now());
+    const validNotifications = plannedNotifications.filter(
+      plan => validateOwnedNotificationPlanForState(state, plan, this.now()).ok
+    );
+    const blockedNativeNotificationCount = plannedNotifications.length - validNotifications.length;
+
     const notificationAuthorization = refreshed.records.Notifications.systemAuthorization;
+    const schedulingPolicyBlocked = planning.issues.some(issue => issue.severity === 'Error');
     const desiredNativeReminders =
-      state.settings.notificationsEnabled && permissionIsUsable(notificationAuthorization) ? planning.plans : [];
+      state.settings.notificationsEnabled && !schedulingPolicyBlocked && permissionIsUsable(notificationAuthorization)
+        ? validNotifications
+        : [];
 
     if (state.settings.notificationsEnabled && (notificationAuthorization === 'unavailable' || refreshed.queryFailed)) {
       return {
@@ -359,7 +387,9 @@ export class PermissionReminderCoordinator {
         reason,
         records: cloneRecords(refreshed.records),
         plannedReminders: planning.plans,
-        desiredNativeReminders
+        plannedNotifications,
+        desiredNativeReminders,
+        blockedNativeNotificationCount
       };
     }
 
@@ -370,7 +400,9 @@ export class PermissionReminderCoordinator {
         reason,
         records: cloneRecords(refreshed.records),
         plannedReminders: planning.plans,
+        plannedNotifications,
         desiredNativeReminders,
+        blockedNativeNotificationCount,
         nativeResult
       };
     } catch (error) {
@@ -380,7 +412,9 @@ export class PermissionReminderCoordinator {
         reason,
         records: cloneRecords(refreshed.records),
         plannedReminders: planning.plans,
-        desiredNativeReminders
+        plannedNotifications,
+        desiredNativeReminders,
+        blockedNativeNotificationCount
       };
     }
   }
@@ -402,10 +436,18 @@ export class PermissionReminderCoordinator {
 
   afterCommittedChange(
     state: AppState,
-    change: 'events' | 'settings',
+    change: ReminderAffectingCommittedChange,
     visibility: AppVisibility = 'foreground'
   ): Promise<ReminderLifecycleResult> {
-    const reason = change === 'events' ? 'committed-event-change' : 'committed-settings-change';
+    const reasons: Record<ReminderAffectingCommittedChange, ReminderLifecycleRefreshReason> = {
+      events: 'committed-event-change',
+      contacts: 'committed-contact-change',
+      messages: 'committed-message-change',
+      setup: 'committed-setup-change',
+      backups: 'committed-backup-change',
+      settings: 'committed-settings-change'
+    };
+    const reason = reasons[change];
     return this.enqueue(() => this.reconcileLifecycle(state, reason, visibility));
   }
 

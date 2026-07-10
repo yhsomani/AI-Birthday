@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { buildEmailDeliveryRequest } from '../domain/emailDelivery';
 import type { AppState } from '../domain/types';
 import { createTestState } from '../test/testState';
-import { sendEmailMessage } from './emailSenderClient';
+import { reconcileEmailDelivery, sendEmailMessage } from './emailSenderClient';
 import { staticJsonResponse } from './providerTransport';
 
 const authenticatedSession = {
@@ -15,6 +15,7 @@ const validApproval = {
   approvedAt: '2026-07-09T09:00:00.000Z',
   approvalExpiresAt: '2999-07-16T09:00:00.000Z'
 };
+const deliveryNow = new Date('2026-07-10T09:00:00.000Z');
 
 const emailReadyState = (): AppState => {
   const state = createTestState();
@@ -38,6 +39,7 @@ const emailReadyState = (): AppState => {
         channel: 'Email',
         status: 'Scheduled',
         ...validApproval,
+        scheduledFor: '2026-07-10T08:00:00.000Z',
         body: 'Congratulations Rajesh, wishing you continued success and a meaningful year ahead.'
       },
       ...state.messages
@@ -47,7 +49,7 @@ const emailReadyState = (): AppState => {
 
 describe('emailSenderClient', () => {
   it('posts approved email payloads to the configured endpoint', async () => {
-    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh');
+    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh', deliveryNow);
     assert.equal(request.ok, true);
     if (!request.ok) {
       return;
@@ -84,7 +86,7 @@ describe('emailSenderClient', () => {
   });
 
   it('returns an unknown outcome with the same idempotency key when the response is lost', async () => {
-    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh');
+    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh', deliveryNow);
     assert.equal(request.ok, true);
     if (!request.ok) return;
 
@@ -106,7 +108,7 @@ describe('emailSenderClient', () => {
   });
 
   it('returns not-configured before attempting network access', async () => {
-    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh');
+    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh', deliveryNow);
     assert.equal(request.ok, true);
     if (!request.ok) {
       return;
@@ -121,7 +123,7 @@ describe('emailSenderClient', () => {
   });
 
   it('rejects unsafe configured endpoints before attempting network access', async () => {
-    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh');
+    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh', deliveryNow);
     assert.equal(request.ok, true);
     if (!request.ok) {
       return;
@@ -150,7 +152,7 @@ describe('emailSenderClient', () => {
   });
 
   it('requires an authenticated short-lived session for public provider endpoints', async () => {
-    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh');
+    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh', deliveryNow);
     assert.equal(request.ok, true);
     if (!request.ok) return;
 
@@ -169,7 +171,7 @@ describe('emailSenderClient', () => {
   });
 
   it('treats non-JSON success bodies as delivery unknown', async () => {
-    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh');
+    const request = buildEmailDeliveryRequest(emailReadyState(), 'msg-email-rajesh', deliveryNow);
     assert.equal(request.ok, true);
     if (!request.ok) return;
 
@@ -183,5 +185,41 @@ describe('emailSenderClient', () => {
       assert.equal(result.outcome, 'unknown');
       assert.equal(result.error.kind, 'invalid-response');
     }
+  });
+
+  it('reconciles an existing idempotent attempt without resending message content', async () => {
+    let body = '';
+    const result = await reconcileEmailDelivery(
+      { idempotencyKey: 'attempt-key-1', deliveryId: 'delivery-1' },
+      {
+        statusEndpoint: 'https://email.example.test/status',
+        timeoutMs: 1000,
+        ...authenticatedSession
+      },
+      async (_input, init) => {
+        body = init.body;
+        return staticJsonResponse({ status: 'sent', deliveryId: 'delivery-1' });
+      }
+    );
+    assert.deepEqual(result, { ok: true, status: 'sent', deliveryId: 'delivery-1' });
+    assert.deepEqual(JSON.parse(body), {
+      idempotencyKey: 'attempt-key-1',
+      deliveryId: 'delivery-1'
+    });
+    assert.doesNotMatch(body, /recipient|message|body|subject/i);
+  });
+
+  it('keeps ambiguous reconciliation outcomes unknown and non-retryable as sends', async () => {
+    const result = await reconcileEmailDelivery(
+      { idempotencyKey: 'attempt-key-2' },
+      {
+        statusEndpoint: 'https://email.example.test/status',
+        timeoutMs: 1000,
+        ...authenticatedSession
+      },
+      async () => staticJsonResponse({ status: 'processing' })
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.outcome, 'unknown');
   });
 });

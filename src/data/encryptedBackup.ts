@@ -1,5 +1,12 @@
+import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import {
+  AES_GCM_IV_BYTES,
+  type CrossPlatformCryptoProvider,
+  resolveCrossPlatformCryptoProvider
+} from '../crypto/crossPlatformCrypto';
+import type { AppState } from '../domain/types';
 import { deserializeState, PERSISTENCE_VERSION, serializeState } from '../state/persistence';
-import type { AppState } from './types';
 
 export const BACKUP_FORMAT = 'relateai.encrypted-backup';
 export const BACKUP_VERSION = 2;
@@ -17,7 +24,7 @@ export const MAX_BACKUP_TOTAL_RECORDS = 30_000;
 export const MAX_BACKUP_FIELD_LENGTH = 32_768;
 
 const BACKUP_SALT_BYTES = 16;
-const BACKUP_IV_BYTES = 12;
+const BACKUP_IV_BYTES = AES_GCM_IV_BYTES;
 const SHA_256_BYTES = 32;
 const MAX_BACKUP_OBJECT_KEYS = 96;
 const MAX_BACKUP_JSON_DEPTH = 12;
@@ -87,6 +94,11 @@ export type BackupCryptoOptions = {
   createdAt?: string;
   /** Test/migration fixture support only. Production exports default to v2. */
   formatVersion?: 1 | 2;
+  cryptoProvider?: CrossPlatformCryptoProvider;
+};
+
+export type BackupDecryptOptions = {
+  cryptoProvider?: CrossPlatformCryptoProvider;
 };
 
 const textEncoder = new TextEncoder();
@@ -117,13 +129,6 @@ const assertRecord = (value: unknown, label: string): Record<string, unknown> =>
 const assertString = (value: unknown, label: string, maximum = MAX_BACKUP_FIELD_LENGTH): string => {
   if (typeof value !== 'string' || value.length > maximum) {
     throw new Error(`${label} is invalid or too long.`);
-  }
-  return value;
-};
-
-const assertBoolean = (value: unknown, label: string): boolean => {
-  if (typeof value !== 'boolean') {
-    throw new Error(`${label} is invalid.`);
   }
   return value;
 };
@@ -238,46 +243,91 @@ const validateRestoredAppState = (state: AppState): void => {
   });
   assertBoundedJsonTree(root, 'Backup state');
 
-  const collectionSchemas: ReadonlyArray<{
+  const collectionSchemas: readonly {
     key: keyof Pick<AppState, 'contacts' | 'events' | 'memories' | 'gifts' | 'messages' | 'activity'>;
     fields: Readonly<Record<string, 'string' | 'number' | 'boolean' | 'array' | 'record'>>;
-  }> = [
+  }[] = [
     {
       key: 'contacts',
       fields: {
-        id: 'string', name: 'string', relationship: 'string', group: 'string', preferredChannel: 'string',
-        language: 'string', tone: 'array', healthScore: 'number', isVip: 'boolean', dnd: 'boolean',
-        checkInCadenceDays: 'number', notesSummary: 'string', annualGiftBudget: 'number'
+        id: 'string',
+        name: 'string',
+        relationship: 'string',
+        group: 'string',
+        preferredChannel: 'string',
+        language: 'string',
+        tone: 'array',
+        healthScore: 'number',
+        isVip: 'boolean',
+        dnd: 'boolean',
+        checkInCadenceDays: 'number',
+        notesSummary: 'string',
+        annualGiftBudget: 'number'
       }
     },
     {
       key: 'events',
       fields: {
-        id: 'string', contactId: 'string', type: 'string', label: 'string', date: 'string', verified: 'boolean',
-        source: 'string', checklist: 'array'
+        id: 'string',
+        contactId: 'string',
+        type: 'string',
+        label: 'string',
+        date: 'string',
+        verified: 'boolean',
+        source: 'string',
+        checklist: 'array'
       }
     },
     {
       key: 'memories',
-      fields: { id: 'string', contactId: 'string', category: 'string', body: 'string', pinned: 'boolean', createdAt: 'string' }
+      fields: {
+        id: 'string',
+        contactId: 'string',
+        category: 'string',
+        body: 'string',
+        pinned: 'boolean',
+        createdAt: 'string'
+      }
     },
     {
       key: 'gifts',
       fields: {
-        id: 'string', contactId: 'string', name: 'string', category: 'string', occasion: 'string', cost: 'number',
-        year: 'number', feedback: 'string', notes: 'string'
+        id: 'string',
+        contactId: 'string',
+        name: 'string',
+        category: 'string',
+        occasion: 'string',
+        cost: 'number',
+        year: 'number',
+        feedback: 'string',
+        notes: 'string'
       }
     },
     {
       key: 'messages',
       fields: {
-        id: 'string', contactId: 'string', reason: 'string', status: 'string', channel: 'string', body: 'string',
-        variants: 'record', selectedVariant: 'string', quality: 'string', readiness: 'string'
+        id: 'string',
+        contactId: 'string',
+        reason: 'string',
+        status: 'string',
+        channel: 'string',
+        body: 'string',
+        variants: 'record',
+        selectedVariant: 'string',
+        quality: 'string',
+        readiness: 'string'
       }
     },
     {
       key: 'activity',
-      fields: { id: 'string', type: 'string', title: 'string', detail: 'string', severity: 'string', createdAt: 'string' }
+      fields: {
+        id: 'string',
+        type: 'string',
+        title: 'string',
+        detail: 'string',
+        severity: 'string',
+        createdAt: 'string'
+      }
     }
   ];
 
@@ -288,42 +338,97 @@ const validateRestoredAppState = (state: AppState): void => {
 
   assertArray(root.backups, 'Backup state.backups', MAX_BACKUP_RECORDS_PER_COLLECTION).forEach((record, index) =>
     requiredShapeFields(record, `Backup state.backups[${index}]`, {
-      id: 'string', createdAt: 'string', recordCount: 'number', encrypted: 'boolean'
+      id: 'string',
+      createdAt: 'string',
+      recordCount: 'number',
+      encrypted: 'boolean'
     })
   );
-  assertArray(root.setupChecks, 'Backup state.setupChecks', MAX_BACKUP_RECORDS_PER_COLLECTION).forEach((record, index) =>
-    requiredShapeFields(record, `Backup state.setupChecks[${index}]`, {
-      id: 'string', title: 'string', status: 'string', detail: 'string', action: 'string'
-    })
+  assertArray(root.setupChecks, 'Backup state.setupChecks', MAX_BACKUP_RECORDS_PER_COLLECTION).forEach(
+    (record, index) =>
+      requiredShapeFields(record, `Backup state.setupChecks[${index}]`, {
+        id: 'string',
+        title: 'string',
+        status: 'string',
+        detail: 'string',
+        action: 'string'
+      })
   );
-  assertArray(root.reminderPlans, 'Backup state.reminderPlans', MAX_BACKUP_RECORDS_PER_COLLECTION).forEach((record, index) =>
-    requiredShapeFields(record, `Backup state.reminderPlans[${index}]`, {
-      id: 'string', eventId: 'string', contactId: 'string', title: 'string', body: 'string', triggerAt: 'string'
-    })
+  assertArray(root.reminderPlans, 'Backup state.reminderPlans', MAX_BACKUP_RECORDS_PER_COLLECTION).forEach(
+    (record, index) =>
+      requiredShapeFields(record, `Backup state.reminderPlans[${index}]`, {
+        id: 'string',
+        eventId: 'string',
+        contactId: 'string',
+        title: 'string',
+        body: 'string',
+        triggerAt: 'string'
+      })
   );
 
-  requiredShapeFields(root.styleProfile, 'Backup state.styleProfile', {
-    confidence: 'string', formality: 'string', language: 'string', averageLength: 'number', emojiUse: 'string', sampleCount: 'number'
+  const styleProfile = requiredShapeFields(root.styleProfile, 'Backup state.styleProfile', {
+    confidence: 'string',
+    formality: 'string',
+    language: 'string',
+    averageLength: 'number',
+    emojiUse: 'string',
+    sampleCount: 'number'
   });
+  if (styleProfile.enabledForAiDrafts !== undefined && typeof styleProfile.enabledForAiDrafts !== 'boolean') {
+    throw new Error('Backup state.styleProfile.enabledForAiDrafts is invalid.');
+  }
+  if (styleProfile.commonGreetings !== undefined) {
+    assertArray(styleProfile.commonGreetings, 'Backup state.styleProfile.commonGreetings', 5).forEach(
+      (greeting, index) => {
+        const value = assertString(greeting, `Backup state.styleProfile.commonGreetings[${index}]`, 80);
+        if (!value.trim()) throw new Error(`Backup state.styleProfile.commonGreetings[${index}] is invalid.`);
+      }
+    );
+  }
+  if (styleProfile.representativePreview !== undefined) {
+    assertString(styleProfile.representativePreview, 'Backup state.styleProfile.representativePreview', 500);
+  }
   const settings = requiredShapeFields(root.settings, 'Backup state.settings', {
-    accountMode: 'string', locale: 'string', aiEnabled: 'boolean', notificationsEnabled: 'boolean', smsEnabled: 'boolean',
-    whatsappHandoffEnabled: 'boolean', emailEnabled: 'boolean', biometricLockEnabled: 'boolean', automationMode: 'string',
-    groupDefaults: 'record', quietHours: 'record', blackouts: 'array'
+    accountMode: 'string',
+    locale: 'string',
+    aiEnabled: 'boolean',
+    notificationsEnabled: 'boolean',
+    smsEnabled: 'boolean',
+    whatsappHandoffEnabled: 'boolean',
+    emailEnabled: 'boolean',
+    biometricLockEnabled: 'boolean',
+    automationMode: 'string',
+    groupDefaults: 'record',
+    quietHours: 'record',
+    defaultSendTime: 'string',
+    blackouts: 'array'
   });
-  assertArray(settings.blackouts, 'Backup state.settings.blackouts', MAX_BACKUP_RECORDS_PER_COLLECTION).forEach((record, index) =>
-    requiredShapeFields(record, `Backup state.settings.blackouts[${index}]`, {
-      id: 'string', label: 'string', startDate: 'string', endDate: 'string'
-    })
+  assertArray(settings.blackouts, 'Backup state.settings.blackouts', MAX_BACKUP_RECORDS_PER_COLLECTION).forEach(
+    (record, index) =>
+      requiredShapeFields(record, `Backup state.settings.blackouts[${index}]`, {
+        id: 'string',
+        label: 'string',
+        startDate: 'string',
+        endDate: 'string'
+      })
   );
   requiredShapeFields(root.onboarding, 'Backup state.onboarding', {
-    completed: 'boolean', currentStepId: 'string', selectedGoal: 'string', completedStepIds: 'array', skippedStepIds: 'array'
+    completed: 'boolean',
+    currentStepId: 'string',
+    selectedGoal: 'string',
+    completedStepIds: 'array',
+    skippedStepIds: 'array'
   });
   requiredShapeFields(root.privacy, 'Backup state.privacy', {
-    permissionDecisions: 'record', whatsappHandoffConsent: 'boolean'
+    permissionDecisions: 'record',
+    whatsappHandoffConsent: 'boolean'
   });
   requiredShapeFields(root.aiProvider, 'Backup state.aiProvider', { status: 'string' });
   requiredShapeFields(root.emailDelivery, 'Backup state.emailDelivery', { status: 'string' });
-  requiredShapeFields(root.calendarSync, 'Backup state.calendarSync', { exportedCount: 'number', importedCount: 'number' });
+  requiredShapeFields(root.calendarSync, 'Backup state.calendarSync', {
+    exportedCount: 'number',
+    importedCount: 'number'
+  });
   requiredShapeFields(root.persistence, 'Backup state.persistence', { status: 'string' });
 };
 
@@ -357,13 +462,6 @@ const assertRestorePassphraseBound = (passphrase: string) => {
   if (passphrase.length === 0 || passphrase.length > MAX_BACKUP_PASSPHRASE_LENGTH) {
     throw new Error('Backup passphrase length is invalid.');
   }
-};
-
-const requireBackupCrypto = () => {
-  if (!globalThis.crypto?.subtle || typeof globalThis.crypto.getRandomValues !== 'function') {
-    throw new Error('Encrypted backup is not available on this platform.');
-  }
-  return globalThis.crypto;
 };
 
 const bytesToBase64 = (bytes: Uint8Array) => {
@@ -408,14 +506,8 @@ const base64ToBytes = (value: string) => {
   return bytes;
 };
 
-const bytesToArrayBuffer = (bytes: Uint8Array): ArrayBuffer =>
-  bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-
-const digestBase64 = async (bytes: Uint8Array) => {
-  const crypto = requireBackupCrypto();
-  const digest = await crypto.subtle.digest('SHA-256', bytesToArrayBuffer(bytes));
-  return bytesToBase64(new Uint8Array(digest));
-};
+const digestBase64 = async (bytes: Uint8Array, cryptoProvider: CrossPlatformCryptoProvider) =>
+  bytesToBase64(await cryptoProvider.sha256(bytes));
 
 const assertKdfIterations = (value: unknown): number =>
   assertNumber(value, 'Backup KDF iterations', {
@@ -424,27 +516,25 @@ const assertKdfIterations = (value: unknown): number =>
     maximum: MAX_BACKUP_KDF_ITERATIONS
   });
 
-const deriveBackupKey = async (passphrase: string, salt: Uint8Array, iterations: number) => {
-  const crypto = requireBackupCrypto();
-  const baseKey = await crypto.subtle.importKey(
-    'raw',
-    bytesToArrayBuffer(textEncoder.encode(passphrase)),
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  );
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: bytesToArrayBuffer(salt),
-      iterations,
-      hash: 'SHA-256'
-    },
-    baseKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
+const deriveBackupKey = async (passphrase: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> => {
+  const passwordBytes = textEncoder.encode(passphrase);
+  try {
+    return await pbkdf2Async(sha256, passwordBytes, salt, {
+      c: iterations,
+      dkLen: 32,
+      asyncTick: 8
+    });
+  } finally {
+    passwordBytes.fill(0);
+  }
+};
+
+const importBackupKey = async (cryptoProvider: CrossPlatformCryptoProvider, rawKey: Uint8Array) => {
+  try {
+    return await cryptoProvider.importAesGcmKey(rawKey);
+  } finally {
+    rawKey.fill(0);
+  }
 };
 
 export const assertBackupRawInput = (raw: string): void => {
@@ -487,14 +577,29 @@ const parseEnvelope = (raw: string): EncryptedBackupEnvelope => {
   const record = assertRecord(parsed, 'Backup file');
   assertExactKeys(
     record,
-    ['format', 'version', 'app', 'createdAt', 'encrypted', 'persistenceVersion', 'recordCounts', 'kdf', 'cipher', 'checksum'],
+    [
+      'format',
+      'version',
+      'app',
+      'createdAt',
+      'encrypted',
+      'persistenceVersion',
+      'recordCounts',
+      'kdf',
+      'cipher',
+      'checksum'
+    ],
     [],
     'Backup file'
   );
   if (record.format !== BACKUP_FORMAT || record.encrypted !== true || record.app !== 'RelateAI') {
     throw new Error('Backup file is not a RelateAI encrypted backup.');
   }
-  const version = assertNumber(record.version, 'Backup version', { integer: true, minimum: 1, maximum: BACKUP_VERSION });
+  const version = assertNumber(record.version, 'Backup version', {
+    integer: true,
+    minimum: 1,
+    maximum: BACKUP_VERSION
+  });
   const persistenceVersion = assertNumber(record.persistenceVersion, 'Backup data version', {
     integer: true,
     minimum: 1,
@@ -517,11 +622,7 @@ const parseEnvelope = (raw: string): EncryptedBackupEnvelope => {
     throw new Error('Backup cipher algorithm is not supported.');
   }
   const iv = assertBase64(cipher.iv, 'Backup cipher IV', BACKUP_IV_BYTES, BACKUP_IV_BYTES);
-  const ciphertext = assertBase64(
-    cipher.ciphertext,
-    'Backup ciphertext',
-    MAX_BACKUP_CIPHERTEXT_BYTES
-  );
+  const ciphertext = assertBase64(cipher.ciphertext, 'Backup ciphertext', MAX_BACKUP_CIPHERTEXT_BYTES);
 
   const checksum = assertRecord(record.checksum, 'Backup checksum metadata');
   const ciphertextChecksum = assertBase64(
@@ -546,12 +647,7 @@ const parseEnvelope = (raw: string): EncryptedBackupEnvelope => {
   };
   if (version === 1) {
     assertExactKeys(checksum, ['algorithm', 'ciphertext', 'plaintext'], [], 'Backup checksum metadata');
-    const plaintext = assertBase64(
-      checksum.plaintext,
-      'Backup plaintext checksum',
-      SHA_256_BYTES,
-      SHA_256_BYTES
-    );
+    const plaintext = assertBase64(checksum.plaintext, 'Backup plaintext checksum', SHA_256_BYTES, SHA_256_BYTES);
     return {
       ...base,
       version: 1,
@@ -619,14 +715,15 @@ export const createEncryptedBackup = async (
     throw new Error('Backup format version is not supported.');
   }
 
-  const crypto = requireBackupCrypto();
-  const salt = crypto.getRandomValues(new Uint8Array(BACKUP_SALT_BYTES));
-  const iv = crypto.getRandomValues(new Uint8Array(BACKUP_IV_BYTES));
+  const cryptoProvider = options.cryptoProvider ?? resolveCrossPlatformCryptoProvider();
+  const salt = await cryptoProvider.randomBytes(BACKUP_SALT_BYTES);
+  const iv = await cryptoProvider.randomBytes(BACKUP_IV_BYTES);
   const plaintext = textEncoder.encode(serializeState(state));
   if (plaintext.byteLength > MAX_BACKUP_PLAINTEXT_BYTES) {
     throw new Error(`Backup payload must be no larger than ${MAX_BACKUP_PLAINTEXT_BYTES} bytes.`);
   }
-  const key = await deriveBackupKey(passphrase, salt, iterations);
+  const rawKey = await deriveBackupKey(passphrase, salt, iterations);
+  const key = await importBackupKey(cryptoProvider, rawKey);
   const saltBase64 = bytesToBase64(salt);
   const ivBase64 = bytesToBase64(iv);
   const common = {
@@ -644,22 +741,16 @@ export const createEncryptedBackup = async (
     version: 2,
     checksum: { algorithm: 'SHA-256', ciphertext: '' }
   };
-  const ciphertext = new Uint8Array(
-    await crypto.subtle.encrypt(
-      {
-        name: 'AES-GCM',
-        iv: bytesToArrayBuffer(iv),
-        ...(version === 2 ? { additionalData: bytesToArrayBuffer(authenticatedMetadata(metadataEnvelope)) } : {})
-      },
-      key,
-      bytesToArrayBuffer(plaintext)
-    )
+  const ciphertext = await key.encrypt(
+    plaintext,
+    iv,
+    version === 2 ? authenticatedMetadata(metadataEnvelope) : undefined
   );
   if (ciphertext.byteLength > MAX_BACKUP_CIPHERTEXT_BYTES) {
     throw new Error('Encrypted backup exceeds the supported size.');
   }
   const ciphertextBase64 = bytesToBase64(ciphertext);
-  const ciphertextChecksum = await digestBase64(ciphertext);
+  const ciphertextChecksum = await digestBase64(ciphertext, cryptoProvider);
 
   const envelope: EncryptedBackupEnvelope =
     version === 1
@@ -670,7 +761,7 @@ export const createEncryptedBackup = async (
           checksum: {
             algorithm: 'SHA-256',
             ciphertext: ciphertextChecksum,
-            plaintext: await digestBase64(plaintext)
+            plaintext: await digestBase64(plaintext, cryptoProvider)
           }
         }
       : {
@@ -711,41 +802,39 @@ const parseBoundedPersistedState = (plaintext: Uint8Array): AppState => {
   return state;
 };
 
-export const decryptEncryptedBackup = async (raw: string, passphrase: string): Promise<AppState> => {
+export const decryptEncryptedBackup = async (
+  raw: string,
+  passphrase: string,
+  options: BackupDecryptOptions = {}
+): Promise<AppState> => {
   assertRestorePassphraseBound(passphrase);
   const envelope = parseEnvelope(raw);
   if (envelope.persistenceVersion > PERSISTENCE_VERSION) {
     throw new Error('Backup data version is not supported.');
   }
 
+  const cryptoProvider = options.cryptoProvider ?? resolveCrossPlatformCryptoProvider();
   const ciphertext = base64ToBytes(envelope.cipher.ciphertext);
-  const ciphertextDigest = await digestBase64(ciphertext);
+  const ciphertextDigest = await digestBase64(ciphertext, cryptoProvider);
   if (ciphertextDigest !== envelope.checksum.ciphertext) {
     throw new Error('Backup integrity check failed.');
   }
 
-  const key = await deriveBackupKey(passphrase, base64ToBytes(envelope.kdf.salt), envelope.kdf.iterations);
+  const rawKey = await deriveBackupKey(passphrase, base64ToBytes(envelope.kdf.salt), envelope.kdf.iterations);
+  const key = await importBackupKey(cryptoProvider, rawKey);
   let plaintext: Uint8Array;
   try {
-    plaintext = new Uint8Array(
-      await requireBackupCrypto().subtle.decrypt(
-        {
-          name: 'AES-GCM',
-          iv: bytesToArrayBuffer(base64ToBytes(envelope.cipher.iv)),
-          ...(envelope.version === 2
-            ? { additionalData: bytesToArrayBuffer(authenticatedMetadata(envelope)) }
-            : {})
-        },
-        key,
-        bytesToArrayBuffer(ciphertext)
-      )
+    plaintext = await key.decrypt(
+      ciphertext,
+      base64ToBytes(envelope.cipher.iv),
+      envelope.version === 2 ? authenticatedMetadata(envelope) : undefined
     );
   } catch {
     throw new Error('Backup passphrase is incorrect or the file is damaged.');
   }
 
   if (envelope.version === 1) {
-    const plaintextDigest = await digestBase64(plaintext);
+    const plaintextDigest = await digestBase64(plaintext, cryptoProvider);
     if (plaintextDigest !== envelope.checksum.plaintext) {
       throw new Error('Backup payload integrity check failed.');
     }
@@ -754,7 +843,7 @@ export const decryptEncryptedBackup = async (raw: string, passphrase: string): P
   const state = parseBoundedPersistedState(plaintext);
   const actualCounts = countBackupRecords(state);
   if (
-    (Object.keys(actualCounts) as Array<keyof BackupRecordCounts>).some(
+    (Object.keys(actualCounts) as (keyof BackupRecordCounts)[]).some(
       keyName => actualCounts[keyName] !== envelope.recordCounts[keyName]
     )
   ) {

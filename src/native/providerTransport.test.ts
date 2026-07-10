@@ -12,18 +12,12 @@ describe('bounded provider response transport', () => {
   });
 
   it('rejects unexpected content types before parsing', async () => {
-    const result = await readBoundedJsonResponse(
-      staticJsonResponse({ ok: true }, { contentType: 'text/html' }),
-      1024
-    );
+    const result = await readBoundedJsonResponse(staticJsonResponse({ ok: true }, { contentType: 'text/html' }), 1024);
     assert.deepEqual(result, { ok: false, reason: 'content-type' });
   });
 
   it('rejects invalid or oversized declared and actual response bodies', async () => {
-    const declared = await readBoundedJsonResponse(
-      staticJsonResponse({}, { contentLength: '5000' }),
-      100
-    );
+    const declared = await readBoundedJsonResponse(staticJsonResponse({}, { contentLength: '5000' }), 100);
     assert.deepEqual(declared, { ok: false, reason: 'content-length' });
 
     const actual = staticJsonResponse({ payload: 'x'.repeat(100) }, { contentLength: '1' });

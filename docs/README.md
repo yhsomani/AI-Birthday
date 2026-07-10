@@ -4,7 +4,7 @@
 
 Keep supporting docs narrow:
 
-- `architecture/` records ADRs. ADR 0005 is the active React Native replacement architecture decision; earlier Android/Kotlin ADRs are historical migration references.
+- `architecture/` records ADRs. ADR 0005 is the active React Native replacement architecture decision; ADR 0006 is its encrypted repository decision; earlier Android/Kotlin ADRs are historical migration references.
 - `feature-fssot.md` records ideal feature behavior without implementation details.
 - `feature-roadmap-analysis.md` records product-prioritization recommendations based on the feature FSSOT.
 - `react-native-migration-status.md` records current RN replacement progress and remaining parity gaps.

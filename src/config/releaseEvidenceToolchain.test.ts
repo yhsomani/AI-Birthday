@@ -51,12 +51,27 @@ describe('release toolchain and clean-checkout contract', () => {
     assert.match(workflow, /run: npm ci/);
     assert.match(
       workflow,
-      /test ! -e reports\/react-native-release-evidence\.json[\s\S]+npm run typecheck[\s\S]+npm test[\s\S]+npm run release:evidence -- --fail-on-blockers/
+      /test ! -e reports\/react-native-release-evidence\.json[\s\S]+npm run typecheck[\s\S]+npm run test:coverage[\s\S]+npm run test:native-prebuild[\s\S]+npm run release:evidence -- --fail-on-blockers/
     );
+    assert.match(workflow, /actions\/setup-java@v4[\s\S]+java-version: '17'/);
     assert.match(workflow, /actions\/attest-build-provenance@v2/);
     assert.match(evidenceCli, /executeReleaseEvidenceCommands/);
     assert.match(evidenceCli, /collectReleaseEvidenceProvenance/);
     assert.doesNotMatch(evidenceCli, /RELATEAI_RELEASE_[A-Z_]+_STATUS/);
+  });
+
+  it('keeps the native prebuild command temporary and compile-gated', () => {
+    const packageJson = JSON.parse(read('package.json')) as {
+      scripts?: Record<string, string>;
+    };
+    const nativePrebuildScript = read('scripts/verify_native_prebuild.js');
+
+    assert.equal(packageJson.scripts?.['test:native-prebuild'], 'node scripts/verify_native_prebuild.js');
+    assert.match(nativePrebuildScript, /mkdtemp/);
+    assert.match(nativePrebuildScript, /'prebuild', '--clean', '--no-install', '--platform', 'android'/);
+    assert.match(nativePrebuildScript, /':app:assembleDebug'/);
+    assert.match(nativePrebuildScript, /requires JDK 17/);
+    assert.match(nativePrebuildScript, /rm\(fixtureRoot, \{ recursive: true, force: true \}\)/);
   });
 
   it('documents endpoint-only public configuration and no client provider secret', () => {
@@ -65,8 +80,12 @@ describe('release toolchain and clean-checkout contract', () => {
 
     assert.match(environmentTemplate, /EXPO_PUBLIC_RELATE_AI_ENDPOINT=/);
     assert.match(environmentTemplate, /EXPO_PUBLIC_RELATE_EMAIL_ENDPOINT=/);
+    assert.match(environmentTemplate, /EXPO_PUBLIC_RELATE_EMAIL_STATUS_ENDPOINT=/);
     assert.match(environmentTemplate, /Never put API[\s\S]+provider secrets here/i);
     assert.doesNotMatch(environmentTemplate, /GEMINI_API_KEY|AIza[0-9A-Za-z_-]+/);
-    assert.doesNotMatch(releaseChecklist, /ProductionReadinessConfigTest|network_security_config\.xml|AuthManager\.signOut/);
+    assert.doesNotMatch(
+      releaseChecklist,
+      /ProductionReadinessConfigTest|network_security_config\.xml|AuthManager\.signOut/
+    );
   });
 });

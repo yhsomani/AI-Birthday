@@ -80,7 +80,9 @@ export const buildRelationshipHealthInsight = (
     .filter(memory => memory.contactId === contact.id && memory.category !== 'Private')
     .map(memory => memory.body)
     .join(' ');
-  const sentCount = state.messages.filter(message => message.contactId === contact.id && message.status === 'Sent').length;
+  const sentCount = state.messages.filter(
+    message => message.contactId === contact.id && message.status === 'Sent'
+  ).length;
   const todayKey = localDateKey(now) ?? now.toISOString().slice(0, 10);
   const upcomingEventCount = state.events.filter(event => {
     const occurrence = event.contactId === contact.id ? eventOccurrenceIso(event, now) : undefined;
@@ -89,7 +91,9 @@ export const buildRelationshipHealthInsight = (
   const giftCount = state.gifts.filter(gift => gift.contactId === contact.id).length;
   const quietDays = daysSince(contact.lastContactedAt, now);
   const snoozedUntil = contact.checkInSnoozedUntil ? new Date(contact.checkInSnoozedUntil) : undefined;
-  const isSnoozed = Boolean(snoozedUntil && !Number.isNaN(snoozedUntil.getTime()) && snoozedUntil.getTime() > now.getTime());
+  const isSnoozed = Boolean(
+    snoozedUntil && !Number.isNaN(snoozedUntil.getTime()) && snoozedUntil.getTime() > now.getTime()
+  );
   const preferences = resolveContactPreferencesForContact(state.settings, contact);
   const missingChannel =
     (preferences.preferredChannel === 'SMS' || preferences.preferredChannel === 'WhatsApp') && !contact.phone
@@ -109,7 +113,9 @@ export const buildRelationshipHealthInsight = (
     reasons.push('No recent contact date is available.');
   }
   if (isSnoozed) {
-    reasons.push(`Check-in reminder is snoozed until ${contact.checkInSnoozedUntil}; last-contact history is unchanged.`);
+    reasons.push(
+      `Check-in reminder is snoozed until ${contact.checkInSnoozedUntil}; last-contact history is unchanged.`
+    );
   }
   if (upcomingEventCount > 0) {
     reasons.push(`${upcomingEventCount} upcoming relationship event(s) are known.`);
@@ -131,13 +137,24 @@ export const buildRelationshipHealthInsight = (
 
   const inferred = classifyFromText(contact, nonPrivateMemoryText);
   const suggestion = inferred && inferred.group !== contact.group ? inferred : undefined;
-  const label: RelationshipHealthLabel =
-    contact.healthScore >= 70 ? 'Healthy' : contact.healthScore >= 50 ? 'Watch' : 'Needs attention';
-  const reviewNeeded = Boolean(suggestion) || contact.healthScore < 60 || missingChannel || nonPrivateMemoryText.trim().length === 0;
+  let score = 50;
+  if (!Number.isFinite(quietDays)) score -= 20;
+  else if (quietDays <= preferences.checkInCadenceDays) score += 20;
+  else if (quietDays <= Math.ceil(preferences.checkInCadenceDays * 1.5)) score += 5;
+  else if (quietDays > preferences.checkInCadenceDays * 2) score -= 20;
+  else score -= 10;
+  score += upcomingEventCount > 0 ? 10 : -8;
+  score += sentCount > 0 ? Math.min(12, 6 + sentCount * 2) : 0;
+  score += nonPrivateMemoryText.trim().length > 0 ? 8 : 0;
+  score += giftCount > 0 ? 2 : 0;
+  score -= missingChannel ? 15 : 0;
+  score = Math.max(0, Math.min(100, score));
+  const label: RelationshipHealthLabel = score >= 70 ? 'Healthy' : score >= 50 ? 'Watch' : 'Needs attention';
+  const reviewNeeded = Boolean(suggestion) || score < 60 || missingChannel || nonPrivateMemoryText.trim().length === 0;
 
   return {
     contactId: contact.id,
-    score: contact.healthScore,
+    score,
     label,
     summary:
       label === 'Healthy'

@@ -1,7 +1,4 @@
-import {
-  resolveContactPreferencesForContact,
-  type ContactPreferenceSource
-} from './contactPreferences';
+import { resolveContactPreferencesForContact, type ContactPreferenceSource } from './contactPreferences';
 import type { AppState, AutomationMode, Contact, MessageChannel, MessageDraft, Screen, Tone } from './types';
 
 export type TonePreferenceSummaryStatus = 'ready' | 'missing-contact' | 'missing-draft';
@@ -54,7 +51,8 @@ const buildInfluenceSummary = (
   message: MessageDraft | undefined,
   sourceDetail: string,
   tones: Tone[],
-  styleConfidence: AppState['styleProfile']['confidence']
+  styleConfidence: AppState['styleProfile']['confidence'],
+  styleEnabled: boolean
 ) => {
   const effectiveTones = toneList(tones);
 
@@ -70,7 +68,9 @@ const buildInfluenceSummary = (
     return `This draft starts from ${effectiveTones} from ${sourceDetail}, but sparse relationship context means the user should review personalization before approval.`;
   }
 
-  return `This AI draft should use ${effectiveTones} from ${sourceDetail}, written in ${contact.language}, with the user's ${styleConfidence.toLowerCase()} global style profile.`;
+  return styleEnabled
+    ? `This AI draft should use ${effectiveTones} from ${sourceDetail}, written in ${contact.language}, with the user's ${styleConfidence.toLowerCase()} global style profile.`
+    : `This AI draft should use ${effectiveTones} from ${sourceDetail}, written in ${contact.language}, without applying the disabled global Style Coach profile.`;
 };
 
 export const buildTonePreferenceSummary = (
@@ -140,7 +140,8 @@ export const buildTonePreferenceSummary = (
       message,
       sourceDetail,
       preferences.tone,
-      state.styleProfile.confidence
+      state.styleProfile.confidence,
+      state.styleProfile.enabledForAiDrafts
     ),
     controlSummary:
       "Adjusting these tones changes this contact's future drafts without retraining the global style profile. Existing unsent drafts should be reviewed again after any change.",
@@ -150,7 +151,9 @@ export const buildTonePreferenceSummary = (
       `Language target: ${contact.language}`,
       `Preferred channel: ${preferences.preferredChannel}`,
       `Automation review: ${preferences.automationMode}`,
-      `Global style profile: ${state.styleProfile.confidence}, ${state.styleProfile.formality}`,
+      state.styleProfile.enabledForAiDrafts
+        ? `Global style profile: enabled, ${state.styleProfile.confidence}, ${state.styleProfile.formality}`
+        : 'Global style profile: disabled for future AI drafts',
       ...(message ? [`Draft quality: ${message.quality}`] : [])
     ],
     warnings,

@@ -62,6 +62,10 @@ describe('privacy-safe operational issue queue', () => {
 
   it('returns immutable snapshots instead of exposing queue mutation', () => {
     const queue = queueFixture();
+    let revisions = 0;
+    const unsubscribe = queue.subscribe(() => {
+      revisions += 1;
+    });
     queue.report({
       code: 'persistence-failed',
       severity: 'blocking',
@@ -71,5 +75,7 @@ describe('privacy-safe operational issue queue', () => {
     const snapshot = queue.snapshot();
     assert.equal(Object.isFrozen(snapshot[0]), true);
     assert.notEqual(snapshot, queue.snapshot());
+    assert.equal(revisions, 1);
+    unsubscribe();
   });
 });

@@ -1,5 +1,6 @@
 import { buildContactEnrichmentPlan } from './contactEnrichment';
 import { resolveContactPreferencesForContact } from './contactPreferences';
+import { buildRelationshipHealthInsight } from './relationshipHealth';
 import type { AppState, Contact, RelationshipEvent, Screen } from './types';
 import { localDateKey, materializeEventOccurrence } from './occasionDates';
 
@@ -102,8 +103,7 @@ const nextEventsByContact = (events: RelationshipEvent[], now: Date) => {
 };
 
 const hasPersonalization = (memoryContactIds: Set<string>, contact: Contact) =>
-  contact.notesSummary.trim().length >= 24 ||
-  memoryContactIds.has(contact.id);
+  contact.notesSummary.trim().length >= 24 || memoryContactIds.has(contact.id);
 
 const bucketCount = <T extends string>(labels: T[], values: T[]): AnalyticsBucket[] =>
   labels.map(label => ({
@@ -117,46 +117,61 @@ export const buildAnalyticsDashboard = (
   now: Date = new Date()
 ): AnalyticsDashboard => {
   const start = rangeStart(range, now);
-  const eventContactIds = new Set(state.events.map(event => event.contactId));
+  const activeContacts = state.contacts.filter(contact => !contact.archivedAt);
+  const activeContactIds = new Set(activeContacts.map(contact => contact.id));
+  const healthByContact = new Map(
+    activeContacts.map(contact => [contact.id, buildRelationshipHealthInsight(state, contact.id, now)] as const)
+  );
+  const healthScoreFor = (contact: Contact) => healthByContact.get(contact.id)?.score ?? 0;
+  const eventContactIds = new Set(
+    state.events.filter(event => activeContactIds.has(event.contactId)).map(event => event.contactId)
+  );
   const memoryContactIds = new Set(
-    state.memories.filter(memory => memory.category !== 'Private').map(memory => memory.contactId)
+    state.memories
+      .filter(memory => activeContactIds.has(memory.contactId) && memory.category !== 'Private')
+      .map(memory => memory.contactId)
   );
-  const sentMessages = state.messages.filter(message => message.status === 'Sent' && inRange(message.sentAt, start, now));
-  const failedMessages = state.messages.filter(message =>
-    ['Failed', 'Blocked', 'Delivery unknown'].includes(message.status) &&
-    inRange(message.sentAt ?? message.scheduledFor, start, now)
+  const sentMessages = state.messages.filter(
+    message =>
+      activeContactIds.has(message.contactId) && message.status === 'Sent' && inRange(message.sentAt, start, now)
   );
-  const pendingMessages = state.messages.filter(message => message.status === 'Needs review' || message.status === 'Draft');
-  const scheduledMessages = state.messages.filter(message => message.status === 'Scheduled');
-  const contactsWithEvents = state.contacts.filter(contact => eventContactIds.has(contact.id));
-  const personalizedContacts = state.contacts.filter(contact => hasPersonalization(memoryContactIds, contact));
-  const healthyContacts = state.contacts.filter(contact => contact.healthScore >= 70);
-  const needsAttention = state.contacts.filter(contact => contact.healthScore < 60);
+  const failedMessages = state.messages.filter(
+    message =>
+      activeContactIds.has(message.contactId) &&
+      ['Failed', 'Blocked', 'Delivery unknown'].includes(message.status) &&
+      inRange(message.sentAt ?? message.scheduledFor, start, now)
+  );
+  const pendingMessages = state.messages.filter(
+    message =>
+      activeContactIds.has(message.contactId) && (message.status === 'Needs review' || message.status === 'Draft')
+  );
+  const scheduledMessages = state.messages.filter(
+    message => activeContactIds.has(message.contactId) && message.status === 'Scheduled'
+  );
+  const contactsWithEvents = activeContacts.filter(contact => eventContactIds.has(contact.id));
+  const personalizedContacts = activeContacts.filter(contact => hasPersonalization(memoryContactIds, contact));
+  const healthyContacts = activeContacts.filter(contact => healthScoreFor(contact) >= 70);
+  const needsAttention = activeContacts.filter(contact => healthScoreFor(contact) < 60);
   const deliveryDenominator = sentMessages.length + failedMessages.length;
-  const neglectedContacts = state.contacts
+  const neglectedContacts = activeContacts
     .map(contact => ({
       contact,
       preferences: resolveContactPreferencesForContact(state.settings, contact),
       days: daysSince(contact.lastContactedAt, now)
     }))
     .filter(({ days, preferences }) => days > preferences.checkInCadenceDays)
-    .sort(
-      (a, b) =>
-        b.days - b.preferences.checkInCadenceDays - (a.days - a.preferences.checkInCadenceDays)
-    )
+    .sort((a, b) => b.days - b.preferences.checkInCadenceDays - (a.days - a.preferences.checkInCadenceDays))
     .slice(0, 5)
     .map(({ contact, days, preferences }) => ({
       contactId: contact.id,
       name: contact.name,
       overdueDays: Number.isFinite(days) ? days - preferences.checkInCadenceDays : preferences.checkInCadenceDays,
       cadenceDays: preferences.checkInCadenceDays,
-      healthScore: contact.healthScore
+      healthScore: healthScoreFor(contact)
     }));
 
-  const groupValues = state.contacts.map(contact => contact.group);
-  const healthValues = state.contacts.map(contact =>
-    contact.healthScore >= 70 ? 'Healthy' : contact.healthScore >= 50 ? 'Watch' : 'Needs attention'
-  );
+  const groupValues = activeContacts.map(contact => contact.group);
+  const healthValues = activeContacts.map(contact => healthByContact.get(contact.id)?.label ?? 'Needs attention');
   const insights: AnalyticsInsight[] = [];
   if (pendingMessages.length > 0) {
     insights.push({
@@ -176,12 +191,12 @@ export const buildAnalyticsDashboard = (
       targetScreen: 'contacts'
     });
   }
-  const weakestPlan = state.contacts
+  const weakestPlan = activeContacts
     .map(contact => buildContactEnrichmentPlan(state, contact.id))
     .filter((plan): plan is NonNullable<typeof plan> => Boolean(plan))
     .sort((a, b) => a.score - b.score)[0];
   if (weakestPlan && weakestPlan.score < 50) {
-    const contact = state.contacts.find(item => item.id === weakestPlan.contactId);
+    const contact = activeContacts.find(item => item.id === weakestPlan.contactId);
     insights.push({
       id: 'personalization-gap',
       title: 'Improve personalization',
@@ -204,22 +219,22 @@ export const buildAnalyticsDashboard = (
 
   return {
     range,
-    contactCount: state.contacts.length,
+    contactCount: activeContacts.length,
     metrics: [
       {
         label: 'Relationship health',
-        value: pct(healthyContacts.length, state.contacts.length),
-        detail: `${healthyContacts.length}/${state.contacts.length} contacts are 70+ health.`
+        value: pct(healthyContacts.length, activeContacts.length),
+        detail: `${healthyContacts.length}/${activeContacts.length} contacts are 70+ health.`
       },
       {
         label: 'Event coverage',
-        value: pct(contactsWithEvents.length, state.contacts.length),
-        detail: `${contactsWithEvents.length}/${state.contacts.length} contacts have at least one event.`
+        value: pct(contactsWithEvents.length, activeContacts.length),
+        detail: `${contactsWithEvents.length}/${activeContacts.length} contacts have at least one event.`
       },
       {
         label: 'Personalization coverage',
-        value: pct(personalizedContacts.length, state.contacts.length),
-        detail: `${personalizedContacts.length}/${state.contacts.length} contacts have usable context.`
+        value: pct(personalizedContacts.length, activeContacts.length),
+        detail: `${personalizedContacts.length}/${activeContacts.length} contacts have usable context.`
       },
       {
         label: 'Delivery success',
@@ -240,7 +255,7 @@ export const buildAnalyticsDashboard = (
     neglectedContacts,
     insights,
     emptyState:
-      state.contacts.length === 0
+      activeContacts.length === 0
         ? 'Add or import contacts to see relationship analytics.'
         : sentMessages.length === 0
           ? `No sent messages in ${range.toLowerCase()}; analytics will improve after you send from RelateAI.`
@@ -255,13 +270,19 @@ const csvCell = (value: string | number | undefined) => {
 
 export const buildAnalyticsCsvReport = (
   state: AppState,
-  dashboard: AnalyticsDashboard = buildAnalyticsDashboard(state)
+  dashboard: AnalyticsDashboard = buildAnalyticsDashboard(state),
+  now: Date = new Date()
 ) => {
-  const nextEventByContact = nextEventsByContact(state.events, new Date());
-  const rows: Array<Array<string | number | undefined>> = [
+  const nextEventByContact = nextEventsByContact(state.events, now);
+  const rows: (string | number | undefined)[][] = [
     ['Section', 'Name', 'Value', 'Detail'],
     ...dashboard.metrics.map(metric => ['Metric', metric.label, metric.value, metric.detail]),
-    ...dashboard.relationshipDistribution.map(bucket => ['Relationship distribution', bucket.label, bucket.count, 'contacts']),
+    ...dashboard.relationshipDistribution.map(bucket => [
+      'Relationship distribution',
+      bucket.label,
+      bucket.count,
+      'contacts'
+    ]),
     ...dashboard.healthBuckets.map(bucket => ['Health bucket', bucket.label, bucket.count, 'contacts']),
     ...dashboard.neglectedContacts.map(contact => [
       'Neglected contact',
@@ -269,15 +290,17 @@ export const buildAnalyticsCsvReport = (
       contact.overdueDays,
       `cadence ${contact.cadenceDays} days; health ${contact.healthScore}`
     ]),
-    ...state.contacts.map(contact => {
-      const nextEvent = nextEventByContact.get(contact.id);
-      return [
-        'Contact summary',
-        contact.name,
-        contact.healthScore,
-        `${contact.relationship}; ${contact.group}; next event ${nextEvent?.label ?? 'none'}`
-      ];
-    })
+    ...state.contacts
+      .filter(contact => !contact.archivedAt)
+      .map(contact => {
+        const nextEvent = nextEventByContact.get(contact.id);
+        return [
+          'Contact summary',
+          contact.name,
+          buildRelationshipHealthInsight(state, contact.id, now)?.score ?? 0,
+          `${contact.relationship}; ${contact.group}; next event ${nextEvent?.label ?? 'none'}`
+        ];
+      })
   ];
 
   return rows.map(row => row.map(csvCell).join(',')).join('\n');
@@ -287,10 +310,7 @@ export const buildShareableAnalyticsSummary = (
   dashboard: AnalyticsDashboard,
   generatedAt: Date = new Date()
 ): AnalyticsShareSummary => {
-  const longestOverdue = dashboard.neglectedContacts.reduce(
-    (max, contact) => Math.max(max, contact.overdueDays),
-    0
-  );
+  const longestOverdue = dashboard.neglectedContacts.reduce((max, contact) => Math.max(max, contact.overdueDays), 0);
   const nextActions = dashboard.insights.slice(0, 3).map(insight => `${insight.title}: ${insight.actionLabel}`);
   const lines = [
     'RelateAI relationship summary',
@@ -312,7 +332,9 @@ export const buildShareableAnalyticsSummary = (
       : '- No overdue check-ins in this view.',
     '',
     'Next actions:',
-    ...(nextActions.length > 0 ? nextActions.map(action => `- ${action}`) : ['- No urgent analytics action in this view.']),
+    ...(nextActions.length > 0
+      ? nextActions.map(action => `- ${action}`)
+      : ['- No urgent analytics action in this view.']),
     '',
     'Privacy: This summary excludes message bodies, phone numbers, email addresses, private notes, credentials, and raw provider data.'
   ];

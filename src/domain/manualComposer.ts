@@ -1,6 +1,12 @@
 import { resolveContactPreferencesForContact, type ResolvedContactPreferences } from './contactPreferences';
 import { MIN_MESSAGE_BODY_LENGTH } from './messageBodyPolicy';
-import { findMessageTemplates, renderMessageTemplate, type MessageTemplate } from './messageTemplates';
+import {
+  renderMessageTemplate,
+  selectLocalMessageTemplate,
+  type LocalTemplateSelection,
+  type MessageTemplate
+} from './messageTemplates';
+import { buildMemoryPersonalizationContext } from './personalizationContextPolicy';
 import type { AppState, ComposerReason, Contact } from './types';
 
 export const manualComposerReasons: ComposerReason[] = [
@@ -26,7 +32,9 @@ export interface ManualComposerContextSummary {
   contextText?: string;
   contextSource: 'memory' | 'notes' | 'none';
   includedMemoryCount: number;
+  excludedGuidanceMemoryCount: number;
   excludedPrivateMemoryCount: number;
+  excludedSensitiveMemoryCount: number;
   detail: string;
 }
 
@@ -39,6 +47,7 @@ export type ManualComposerState =
       templates: MessageTemplate[];
       selectedTemplate?: MessageTemplate;
       selectedTemplateId?: string;
+      templateSelection: LocalTemplateSelection;
       renderedTemplateBody: string;
       characterCount: number;
       context: ManualComposerContextSummary;
@@ -59,43 +68,35 @@ export type ManualComposerState =
 
 const normalize = (value: string) => value.trim().replace(/\s+/g, ' ');
 
-const countLabel = (value: number, singular: string, plural: string) =>
-  `${value} ${value === 1 ? singular : plural}`;
+const countLabel = (value: number, singular: string, plural: string) => `${value} ${value === 1 ? singular : plural}`;
 
-export const buildManualComposerContext = (
-  state: AppState,
-  contact: Contact
-): ManualComposerContextSummary => {
-  const contactMemories = state.memories.filter(memory => memory.contactId === contact.id);
-  const publicMemories = contactMemories
-    .filter(memory => memory.category !== 'Private')
-    .map(memory => normalize(memory.body))
-    .filter(Boolean);
-  const privateCount = contactMemories.filter(memory => memory.category === 'Private').length;
-  const noteContext = normalize(contact.notesSummary);
-  const contextText = publicMemories[0] ?? noteContext;
-  const contextSource: ManualComposerContextSummary['contextSource'] = publicMemories[0]
-    ? 'memory'
-    : noteContext
-      ? 'notes'
-      : 'none';
-  const contextDetail =
-    contextSource === 'memory'
-      ? `Using ${countLabel(publicMemories.length, 'non-private memory', 'non-private memories')}; ${countLabel(privateCount, 'private note', 'private notes')} excluded.`
-      : contextSource === 'notes'
-        ? `Using contact notes; ${countLabel(privateCount, 'private note', 'private notes')} excluded.`
-        : `No extra context included; ${countLabel(privateCount, 'private note', 'private notes')} excluded.`;
+export const buildManualComposerContext = (state: AppState, contact: Contact): ManualComposerContextSummary => {
+  const context = buildMemoryPersonalizationContext(state.memories, {
+    contactId: contact.id
+  });
+  const contextText = context.mentionableFacts[0]?.text;
+  const contextSource: ManualComposerContextSummary['contextSource'] = contextText ? 'memory' : 'none';
+  const mentionableDetail = contextText
+    ? `Using ${countLabel(context.includedMentionableMemoryCount, 'mentionable non-private memory', 'mentionable non-private memories')}`
+    : 'No mentionable memory context included';
+  const guidanceDetail = `${countLabel(context.includedGuidanceMemoryCount, 'instruction/guidance memory', 'instruction/guidance memories')} excluded from recipient-visible template text`;
+  const privateDetail = `${countLabel(context.excludedPrivateMemoryCount, 'private note', 'private notes')} excluded`;
+  const sensitiveDetail = context.excludedSensitiveMemoryCount
+    ? `; ${countLabel(context.excludedSensitiveMemoryCount, 'sensitive memory', 'sensitive memories')} excluded`
+    : '';
 
   return {
     contextText,
     contextSource,
-    includedMemoryCount: publicMemories.length,
-    excludedPrivateMemoryCount: privateCount,
-    detail: contextDetail
+    includedMemoryCount: context.includedMentionableMemoryCount,
+    excludedGuidanceMemoryCount: context.includedGuidanceMemoryCount,
+    excludedPrivateMemoryCount: context.excludedPrivateMemoryCount,
+    excludedSensitiveMemoryCount: context.excludedSensitiveMemoryCount,
+    detail: `${mentionableDetail}; ${guidanceDetail}; ${privateDetail}${sensitiveDetail}.`
   };
 };
 
-const templateActionForBody = (body: string): ManualComposerAction => {
+const templateActionForBody = (body: string, language: Contact['language']): ManualComposerAction => {
   const characterCount = normalize(body).length;
   if (characterCount < MIN_MESSAGE_BODY_LENGTH) {
     return {
@@ -110,17 +111,17 @@ const templateActionForBody = (body: string): ManualComposerAction => {
     status: 'Ready',
     enabled: true,
     label: 'Use template',
-    detail: 'Creates a review-first draft from the edited template.'
+    detail: `Creates a review-first draft from the edited ${language} template.`
   };
 };
 
-const aiActionForState = (state: AppState): ManualComposerAction => {
+const aiActionForState = (state: AppState, language: Contact['language']): ManualComposerAction => {
   if (!state.settings.aiEnabled) {
     return {
       status: 'Warning',
       enabled: true,
       label: 'Create fallback',
-      detail: 'AI drafting is disabled. This creates a local review-first fallback instead.'
+      detail: `AI drafting is disabled. This creates a local ${language} review-first fallback instead.`
     };
   }
 
@@ -129,7 +130,7 @@ const aiActionForState = (state: AppState): ManualComposerAction => {
       status: 'Warning',
       enabled: true,
       label: 'Create fallback',
-      detail: `AI provider is ${state.aiProvider.status.toLowerCase()}. This creates a local review-first fallback instead.`
+      detail: `AI provider is ${state.aiProvider.status.toLowerCase()}. This creates a local ${language} review-first fallback instead.`
     };
   }
 
@@ -137,7 +138,7 @@ const aiActionForState = (state: AppState): ManualComposerAction => {
     status: 'Ready',
     enabled: true,
     label: 'Ask AI',
-    detail: 'Requests AI variants with private notes excluded and review required before sending.'
+    detail: `Requests ${language} AI variants with private notes excluded and review required before sending.`
   };
 };
 
@@ -165,7 +166,9 @@ export const buildManualComposerState = (
       context: {
         contextSource: 'none',
         includedMemoryCount: 0,
+        excludedGuidanceMemoryCount: 0,
         excludedPrivateMemoryCount: 0,
+        excludedSensitiveMemoryCount: 0,
         detail: 'No contact is selected.'
       },
       templateAction: blockedAction,
@@ -175,8 +178,9 @@ export const buildManualComposerState = (
   }
 
   const preferences = resolveContactPreferencesForContact(state.settings, contact);
-  const templates = findMessageTemplates(reason, preferences.tone);
-  const selectedTemplate = templates.find(template => template.id === selectedTemplateId) ?? templates[0];
+  const selection = selectLocalMessageTemplate(reason, contact.language, preferences.tone, selectedTemplateId);
+  const templates = selection.templates;
+  const selectedTemplate = selection.selectedTemplate;
   const context = buildManualComposerContext(state, contact);
   const renderedTemplateBody = selectedTemplate
     ? renderMessageTemplate(selectedTemplate, contact, context.contextText)
@@ -191,10 +195,11 @@ export const buildManualComposerState = (
     templates,
     selectedTemplate,
     selectedTemplateId: selectedTemplate?.id,
+    templateSelection: selection.summary,
     renderedTemplateBody,
     characterCount: normalize(body).length,
     context,
-    templateAction: templateActionForBody(body),
-    aiAction: aiActionForState(state)
+    templateAction: templateActionForBody(body, contact.language),
+    aiAction: aiActionForState(state, contact.language)
   };
 };

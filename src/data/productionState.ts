@@ -1,5 +1,6 @@
 import { defaultRelationshipGroupDefaults } from '../domain/contactPreferences';
 import type { AppState } from '../domain/types';
+import { resolveLocale } from '../i18n/i18n';
 
 /**
  * The only state used for a fresh production install and persistence recovery.
@@ -9,6 +10,7 @@ import type { AppState } from '../domain/types';
 export const productionInitialState: AppState = {
   activeScreen: 'onboarding',
   selectedContactId: undefined,
+  selectedEventId: undefined,
   selectedMessageId: undefined,
   searchQuery: '',
   contacts: [],
@@ -23,7 +25,10 @@ export const productionInitialState: AppState = {
     language: 'Not trained',
     averageLength: 0,
     emojiUse: 'Unknown',
-    sampleCount: 0
+    sampleCount: 0,
+    enabledForAiDrafts: true,
+    commonGreetings: [],
+    representativePreview: ''
   },
   backups: [],
   settings: {
@@ -41,6 +46,7 @@ export const productionInitialState: AppState = {
       start: '22:00',
       end: '08:00'
     },
+    defaultSendTime: '09:00',
     blackouts: []
   },
   onboarding: {
@@ -83,4 +89,16 @@ export const productionInitialState: AppState = {
   }
 };
 
-export const createProductionInitialState = (): AppState => structuredClone(productionInitialState);
+const deviceLocale = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().locale;
+  } catch {
+    return undefined;
+  }
+};
+
+export const createProductionInitialState = (locale: string | undefined = deviceLocale()): AppState => {
+  const state = structuredClone(productionInitialState);
+  state.settings.locale = resolveLocale(locale);
+  return state;
+};

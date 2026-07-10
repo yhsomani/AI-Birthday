@@ -7,14 +7,17 @@ import type {
   RelationshipEvent,
   Screen
 } from './types';
+import { messageTargetsEventOccurrence } from './duplicateGuard';
+import {
+  eventOccurrenceLocalDateKey,
+  localDateKey,
+  recurrenceForEvent,
+  utcDateKey,
+  yearlyOccurrenceDateKey
+} from './occasionDates';
 
 export type EventPreparationStepId =
-  | 'confirm-date'
-  | 'improve-context'
-  | 'write-message'
-  | 'decide-gift'
-  | 'choose-channel'
-  | 'schedule-reminder';
+  'confirm-date' | 'improve-context' | 'write-message' | 'decide-gift' | 'choose-channel' | 'schedule-reminder';
 
 export type EventPreparationStatus = 'Done' | 'Needs action';
 
@@ -69,7 +72,75 @@ const checklistAliases: Record<EventPreparationStepId, string[]> = {
   'schedule-reminder': ['schedule-reminder', 'plan-reminder']
 };
 
-const knownChecklistIds = new Set(Object.values(checklistAliases).flat());
+const checklistLabelAliases: Record<EventPreparationStepId, string[]> = {
+  'confirm-date': ['confirm date', 'confirm imported date'],
+  'improve-context': ['add one personal memory', 'add memory', 'improve context'],
+  'write-message': ['write or review wish', 'write wish', 'write check-in', 'prepare concise note'],
+  'decide-gift': ['decide gift idea', 'choose gift', 'prepare gift'],
+  'choose-channel': ['choose send channel', 'choose channel', 'confirm email route', 'use manual send handoff'],
+  'schedule-reminder': ['schedule reminder', 'plan reminder']
+};
+
+const normalizedChecklistLabel = (value: string) => value.trim().toLocaleLowerCase('en-US');
+
+const checklistItemMatchesStep = (item: EventChecklistItem, stepId: EventPreparationStepId) =>
+  checklistAliases[stepId].includes(item.id) ||
+  checklistLabelAliases[stepId].includes(normalizedChecklistLabel(item.label));
+
+const isKnownChecklistItem = (item: EventChecklistItem) =>
+  (Object.keys(checklistAliases) as EventPreparationStepId[]).some(stepId => checklistItemMatchesStep(item, stepId));
+
+const localDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+const isValidLocalDateKey = (value: string | undefined): value is string => {
+  if (!value || !localDatePattern.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+};
+
+/** Resolves the one local-calendar occurrence whose preparation is currently actionable. */
+export const eventPreparationOccurrenceKey = (
+  event: RelationshipEvent,
+  reference: Date | string = new Date()
+): string | undefined => {
+  if (reference instanceof Date) return eventOccurrenceLocalDateKey(event, reference);
+  if (!isValidLocalDateKey(reference)) return undefined;
+  const recurrence = recurrenceForEvent(event);
+  if (!recurrence) return utcDateKey(event.date);
+  const year = Number(reference.slice(0, 4));
+  const currentYear = yearlyOccurrenceDateKey(recurrence, year);
+  if (currentYear && currentYear >= reference) return currentYear;
+  return yearlyOccurrenceDateKey(recurrence, year + 1);
+};
+
+const explicitChecklistItemDoneForOccurrence = (
+  event: RelationshipEvent,
+  item: EventChecklistItem,
+  occurrenceKey: string | undefined
+) => {
+  if (!item.done || !occurrenceKey) return false;
+  if (item.completedForOccurrence !== undefined) {
+    return item.completedForOccurrence === occurrenceKey;
+  }
+  // Legacy checklist records did not carry an occurrence key. For recurring
+  // events, their explicit completion belongs only to the saved reference
+  // occurrence instead of silently carrying into every future year.
+  return recurrenceForEvent(event) ? utcDateKey(event.date) === occurrenceKey : true;
+};
+
+const withExplicitCompletion = (
+  item: EventChecklistItem,
+  done: boolean,
+  occurrenceKey?: string
+): EventChecklistItem => {
+  const { completedForOccurrence: _previousOccurrence, ...base } = item;
+  return {
+    ...base,
+    done,
+    ...(done && occurrenceKey ? { completedForOccurrence: occurrenceKey } : {})
+  };
+};
 
 export const eventPreparationStepDefinitions = (eventType: EventType): EventChecklistItem[] => {
   const steps: EventChecklistItem[] = [
@@ -101,24 +172,46 @@ export const normalizeEventPreparationChecklist = (
   checklist: EventChecklistItem[]
 ): EventChecklistItem[] =>
   eventPreparationStepDefinitions(eventType).map(definition => {
-    const aliasIds = checklistAliases[definition.id as EventPreparationStepId];
-    const existing = checklist.find(item => aliasIds.includes(item.id));
+    const existing = checklist.find(item => checklistItemMatchesStep(item, definition.id as EventPreparationStepId));
     return {
       ...definition,
-      done: existing?.done ?? false
+      done: existing?.done ?? false,
+      ...(existing?.completedForOccurrence ? { completedForOccurrence: existing.completedForOccurrence } : {})
     };
   });
 
 export const toggleEventPreparationChecklistStep = (
   eventType: EventType,
   checklist: EventChecklistItem[],
-  stepId: EventPreparationStepId
+  stepId: EventPreparationStepId,
+  occurrenceKey?: string,
+  legacyOccurrenceKey?: string
 ): EventChecklistItem[] => {
-  const normalized = normalizeEventPreparationChecklist(eventType, checklist).map(item =>
-    item.id === stepId ? { ...item, done: !item.done } : item
-  );
-  const customItems = checklist.filter(item => !knownChecklistIds.has(item.id));
+  const normalized = normalizeEventPreparationChecklist(eventType, checklist).map(item => {
+    if (item.id !== stepId) return item;
+    const doneForOccurrence = occurrenceKey
+      ? item.done &&
+        (item.completedForOccurrence === occurrenceKey ||
+          (item.completedForOccurrence === undefined && legacyOccurrenceKey === occurrenceKey))
+      : item.done;
+    return withExplicitCompletion(item, !doneForOccurrence, occurrenceKey);
+  });
+  const customItems = checklist.filter(item => !isKnownChecklistItem(item));
   return [...normalized, ...customItems];
+};
+
+/** Compatibility toggle for callers that still address a legacy checklist id directly. */
+export const toggleEventChecklistItemForOccurrence = (
+  event: RelationshipEvent,
+  itemId: string,
+  referenceLocalDate: string
+): EventChecklistItem[] => {
+  const occurrenceKey = eventPreparationOccurrenceKey(event, referenceLocalDate);
+  return event.checklist.map(item => {
+    if (item.id !== itemId) return item;
+    const doneForOccurrence = explicitChecklistItemDoneForOccurrence(event, item, occurrenceKey);
+    return withExplicitCompletion(item, !doneForOccurrence, occurrenceKey);
+  });
 };
 
 const channelDetail = (
@@ -147,22 +240,53 @@ const channelDetail = (
     if (!state.settings.whatsappHandoffEnabled) {
       return { ready: false, detail: 'WhatsApp handoff is disabled in Settings.' };
     }
+    if (!state.privacy.whatsappHandoffConsent) {
+      return { ready: false, detail: 'Grant explicit WhatsApp handoff consent first.' };
+    }
     return contact.phone
       ? { ready: true, detail: 'WhatsApp handoff has a phone number.' }
       : { ready: false, detail: 'Add a phone number or choose another channel.' };
   }
 
-  if (!state.settings.emailEnabled) {
-    return { ready: false, detail: 'Email is disabled in Settings.' };
-  }
   return contact.email
-    ? { ready: true, detail: 'Email route has an email address.' }
+    ? {
+        ready: true,
+        detail: state.settings.emailEnabled
+          ? 'Email route can use configured delivery or manual mail handoff.'
+          : 'Manual mail handoff is available; provider delivery remains optional.'
+      }
     : { ready: false, detail: 'Add an email address or choose another channel.' };
 };
 
 const statusFor = (done: boolean): EventPreparationStatus => (done ? 'Done' : 'Needs action');
 
-export const buildEventPreparationPlan = (state: AppState, eventId: string): EventPreparationPlan => {
+const dayNumber = (dateKey: string) => Date.parse(`${dateKey}T12:00:00.000Z`) / 86_400_000;
+
+const reminderTargetsOccurrence = (
+  plan: AppState['reminderPlans'][number],
+  event: RelationshipEvent,
+  occurrenceKey: string | undefined
+) => {
+  if (!occurrenceKey || plan.eventId !== event.id) return false;
+  const trigger = new Date(plan.triggerAt);
+  const triggerKey = Number.isNaN(trigger.getTime()) ? undefined : localDateKey(trigger);
+  if (!triggerKey) return false;
+  const configuredDays = Number(plan.id.slice(`reminder-${event.id}-`.length));
+  const maximumLeadDays =
+    plan.id.startsWith(`reminder-${event.id}-`) && Number.isInteger(configuredDays) && configuredDays >= 0
+      ? configuredDays
+      : 31;
+  const daysUntilOccurrence = dayNumber(occurrenceKey) - dayNumber(triggerKey);
+  // Reminder policy may defer a trigger through quiet hours or blackouts, but
+  // a stale plan from a prior annual occurrence must not complete this step.
+  return daysUntilOccurrence <= maximumLeadDays && daysUntilOccurrence >= -31;
+};
+
+export const buildEventPreparationPlan = (
+  state: AppState,
+  eventId: string,
+  reference: Date = new Date()
+): EventPreparationPlan => {
   const event = state.events.find(item => item.id === eventId);
   if (!event) {
     return {
@@ -177,21 +301,28 @@ export const buildEventPreparationPlan = (state: AppState, eventId: string): Eve
   }
 
   const contact = state.contacts.find(item => item.id === event.contactId);
+  const occurrenceKey = eventPreparationOccurrenceKey(event, reference);
   const checklist = normalizeEventPreparationChecklist(event.type, event.checklist);
   const checklistDone = (stepId: EventPreparationStepId) =>
-    checklist.find(item => item.id === stepId)?.done ?? false;
+    explicitChecklistItemDoneForOccurrence(
+      event,
+      checklist.find(item => item.id === stepId) ?? { id: stepId, label: stepId, done: false },
+      occurrenceKey
+    );
   const publicMemoryCount = state.memories.filter(
     memory => memory.contactId === event.contactId && memory.category !== 'Private'
   ).length;
-  const messageReady = state.messages.some(message => message.eventId === event.id && message.status !== 'Rejected');
+  const messageReady = state.messages.some(
+    message => message.status !== 'Rejected' && messageTargetsEventOccurrence(state, message, event.id, reference)
+  );
   const giftHistoryCount = state.gifts.filter(gift => gift.contactId === event.contactId).length;
-  const reminderReady = state.reminderPlans.some(plan => plan.eventId === event.id);
+  const reminderReady = state.reminderPlans.some(plan => reminderTargetsOccurrence(plan, event, occurrenceKey));
   const route = channelDetail(state, contact, contact?.preferredChannel ?? 'Manual');
 
   const steps: EventPreparationStep[] = checklist.map(item => {
     const id = item.id as EventPreparationStepId;
     if (id === 'confirm-date') {
-      const done = item.done || event.verified;
+      const done = checklistDone(id) || event.verified;
       return {
         id,
         label: item.label,
@@ -205,7 +336,7 @@ export const buildEventPreparationPlan = (state: AppState, eventId: string): Eve
     }
 
     if (id === 'improve-context') {
-      const done = item.done || publicMemoryCount > 0;
+      const done = checklistDone(id) || publicMemoryCount > 0;
       return {
         id,
         label: item.label,
@@ -221,13 +352,15 @@ export const buildEventPreparationPlan = (state: AppState, eventId: string): Eve
     }
 
     if (id === 'write-message') {
-      const done = item.done || messageReady;
+      const done = checklistDone(id) || messageReady;
       return {
         id,
         label: item.label,
         done,
         status: statusFor(done),
-        detail: done ? 'A draft or checklist mark exists for this event.' : 'Create a review-first draft for this event.',
+        detail: done
+          ? 'A draft or checklist mark exists for this occurrence.'
+          : 'Create a review-first draft for this occurrence.',
         actionLabel: 'Write message',
         targetScreen: 'wishPreview',
         canToggle: true
@@ -235,7 +368,7 @@ export const buildEventPreparationPlan = (state: AppState, eventId: string): Eve
     }
 
     if (id === 'decide-gift') {
-      const done = item.done;
+      const done = checklistDone(id);
       return {
         id,
         label: item.label,
@@ -252,7 +385,7 @@ export const buildEventPreparationPlan = (state: AppState, eventId: string): Eve
     }
 
     if (id === 'choose-channel') {
-      const done = item.done || route.ready;
+      const done = checklistDone(id) || route.ready;
       return {
         id,
         label: item.label,
@@ -271,9 +404,11 @@ export const buildEventPreparationPlan = (state: AppState, eventId: string): Eve
       label: item.label,
       done,
       status: statusFor(done),
-      detail: done ? 'A reminder plan exists or the reminder step is complete.' : 'Plan reminders before the event day.',
+      detail: done
+        ? 'A reminder plan exists or the reminder step is complete.'
+        : 'Plan reminders before the event day.',
       actionLabel: 'Plan reminders',
-      targetScreen: 'more',
+      targetScreen: 'setupCheck',
       canToggle: true
     };
   });

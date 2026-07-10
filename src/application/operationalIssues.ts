@@ -22,10 +22,7 @@ export type OperationalIssue = Readonly<{
   resolvedAt?: string;
 }>;
 
-export type OperationalIssueInput = Pick<
-  OperationalIssue,
-  'code' | 'severity' | 'summary' | 'recovery'
->;
+export type OperationalIssueInput = Pick<OperationalIssue, 'code' | 'severity' | 'summary' | 'recovery'>;
 
 export type OperationalIssueDependencies = {
   now(): string;
@@ -46,6 +43,7 @@ const safeSummary = (summary: string) => {
 
 export class OperationalIssueQueue {
   private issues: OperationalIssue[] = [];
+  private listeners = new Set<() => void>();
 
   constructor(private readonly dependencies: OperationalIssueDependencies) {}
 
@@ -61,6 +59,7 @@ export class OperationalIssueQueue {
         attempts: existing.attempts + 1
       });
       this.issues = [updated, ...this.issues.filter(issue => issue.id !== existing.id)];
+      this.emit();
       return updated;
     }
 
@@ -75,7 +74,12 @@ export class OperationalIssueQueue {
       recovery: input.recovery,
       attempts: 1
     });
-    this.issues = [issue, ...this.issues.filter(item => !item.resolvedAt).slice(0, MAX_ACTIVE_ISSUES - 1), ...this.issues.filter(item => item.resolvedAt).slice(0, MAX_RESOLVED_ISSUES)];
+    this.issues = [
+      issue,
+      ...this.issues.filter(item => !item.resolvedAt).slice(0, MAX_ACTIVE_ISSUES - 1),
+      ...this.issues.filter(item => item.resolvedAt).slice(0, MAX_RESOLVED_ISSUES)
+    ];
+    this.emit();
     return issue;
   }
 
@@ -84,6 +88,7 @@ export class OperationalIssueQueue {
     if (!current) return undefined;
     const resolved = Object.freeze({ ...current, resolvedAt: this.dependencies.now() });
     this.issues = this.issues.map(issue => (issue.id === id ? resolved : issue));
+    this.emit();
     return resolved;
   }
 
@@ -99,12 +104,19 @@ export class OperationalIssueQueue {
   snapshot(): readonly OperationalIssue[] {
     return this.issues.map(issue => Object.freeze({ ...issue }));
   }
+
+  subscribe(listener: () => void) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private emit() {
+    for (const listener of [...this.listeners]) listener();
+  }
 }
 
 let fallbackIssueSequence = 0;
 export const appOperationalIssues = new OperationalIssueQueue({
   now: () => new Date().toISOString(),
-  createId: () =>
-    globalThis.crypto?.randomUUID?.() ??
-    `issue-${Date.now()}-${++fallbackIssueSequence}`
+  createId: () => globalThis.crypto?.randomUUID?.() ?? `issue-${Date.now()}-${++fallbackIssueSequence}`
 });

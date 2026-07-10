@@ -96,29 +96,38 @@ const withObservation = (
 export const requestAiDraft = async (
   request: AiDraftRequest,
   config: AiProviderConfig = readAiProviderConfig(),
-  fetcher: AiFetch = globalThis.fetch as AiFetch
+  fetcher: AiFetch = globalThis.fetch as AiFetch,
+  externalSignal?: AbortSignal
 ): Promise<AiDraftResponseResult> => {
   const startedAt = Date.now();
   if (!config.endpoint) {
-    return withObservation(request, {
-      ok: false,
-      error: {
-        kind: 'not-configured',
-        message: 'No secure AI endpoint is configured for drafting.'
-      }
-    }, startedAt);
+    return withObservation(
+      request,
+      {
+        ok: false,
+        error: {
+          kind: 'not-configured',
+          message: 'No secure AI endpoint is configured for drafting.'
+        }
+      },
+      startedAt
+    );
   }
   const endpointReadiness = evaluateProviderEndpointReadiness(config.endpoint, {
     allowLocalDevelopment: config.allowLocalProviderEndpoint
   });
   if (!endpointReadiness.canUseProviderEndpoint) {
-    return withObservation(request, {
-      ok: false,
-      error: {
-        kind: 'not-configured',
-        message: `AI provider endpoint is not safe to use. ${endpointReadiness.summary}`
-      }
-    }, startedAt);
+    return withObservation(
+      request,
+      {
+        ok: false,
+        error: {
+          kind: 'not-configured',
+          message: `AI provider endpoint is not safe to use. ${endpointReadiness.summary}`
+        }
+      },
+      startedAt
+    );
   }
   if (endpointReadiness.productionReady && !validSessionToken(config, startedAt)) {
     return withObservation(
@@ -127,7 +136,8 @@ export const requestAiDraft = async (
         ok: false,
         error: {
           kind: 'auth',
-          message: 'An authenticated, short-lived provider session is required before AI drafting can use this endpoint.'
+          message:
+            'An authenticated, short-lived provider session is required before AI drafting can use this endpoint.'
         }
       },
       startedAt
@@ -138,17 +148,24 @@ export const requestAiDraft = async (
   const rateLimit = evaluateAiProviderRateLimit(requestHistory, startedAt, maxRequestsPerMinute);
   if (!rateLimit.allowed) {
     const waitSeconds = Math.max(1, Math.ceil(((rateLimit.nextAllowedAt ?? startedAt) - startedAt) / 1000));
-    return withObservation(request, {
-      ok: false,
-      error: {
-        kind: 'quota',
-        message: `AI drafting is paused by the local rate limit. Try again in about ${waitSeconds} second(s).`
-      }
-    }, startedAt);
+    return withObservation(
+      request,
+      {
+        ok: false,
+        error: {
+          kind: 'quota',
+          message: `AI drafting is paused by the local rate limit. Try again in about ${waitSeconds} second(s).`
+        }
+      },
+      startedAt
+    );
   }
   requestHistory.push(startedAt);
 
   const controller = new AbortController();
+  const abortFromCaller = () => controller.abort();
+  if (externalSignal?.aborted) controller.abort();
+  else externalSignal?.addEventListener('abort', abortFromCaller, { once: true });
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 
   try {
@@ -156,19 +173,21 @@ export const requestAiDraft = async (
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        ...(endpointReadiness.productionReady
-          ? { authorization: `Bearer ${config.sessionAccessToken?.trim()}` }
-          : {})
+        ...(endpointReadiness.productionReady ? { authorization: `Bearer ${config.sessionAccessToken?.trim()}` } : {})
       },
       body: JSON.stringify(request),
       signal: controller.signal
     });
 
     if (!response.ok) {
-      return withObservation(request, {
-        ok: false,
-        error: classifyAiProviderStatus(response.status)
-      }, startedAt);
+      return withObservation(
+        request,
+        {
+          ok: false,
+          error: classifyAiProviderStatus(response.status)
+        },
+        startedAt
+      );
     }
 
     const payload = await readBoundedJsonResponse(response, AI_PROVIDER_RESPONSE_MAX_BYTES);
@@ -195,11 +214,16 @@ export const requestAiDraft = async (
       startedAt
     );
   } catch (error) {
-    return withObservation(request, {
-      ok: false,
-      error: error instanceof Error && error.name === 'AbortError' ? timeoutError : networkError
-    }, startedAt);
+    return withObservation(
+      request,
+      {
+        ok: false,
+        error: error instanceof Error && error.name === 'AbortError' ? timeoutError : networkError
+      },
+      startedAt
+    );
   } finally {
     clearTimeout(timeout);
+    externalSignal?.removeEventListener('abort', abortFromCaller);
   }
 };

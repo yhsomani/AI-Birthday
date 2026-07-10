@@ -70,4 +70,14 @@ describe('relationship check-in reminders', () => {
     assert.equal(marked.messages.length, state.messages.length);
     assert.equal(marked.activity[0].title, 'Contact marked contacted');
   });
+
+  it('does not plan check-ins for archived contacts', () => {
+    const state = createTestState();
+    state.contacts = state.contacts.map(contact => ({
+      ...contact,
+      archivedAt: '2026-07-10T00:00:00.000Z'
+    }));
+    const queue = buildCheckInReminderQueue(state, new Date('2026-07-10T09:00:00.000Z'));
+    assert.equal(queue.due.length + queue.snoozed.length + queue.current.length, 0);
+  });
 });

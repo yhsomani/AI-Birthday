@@ -6,16 +6,22 @@ import {
   decryptEncryptedBackup,
   previewEncryptedBackup,
   type BackupPreview
-} from '../domain/backup';
+} from '../data/encryptedBackup';
 import type { AppState } from '../domain/types';
 
 export type BackupFileExportResult = {
   uri: string;
+  fileName: string;
+  byteCount: number;
   shared: boolean;
   preview: BackupPreview;
   disposition: 'temporary-shared' | 'saved-export';
   temporaryFileRemoved: boolean;
+  /** True only after a user-accessible destination was durably verified. */
+  verifiedPortableCopy: boolean;
 };
+
+export type BackupFilePlatform = 'android' | 'ios' | 'web' | 'macos' | 'windows' | 'other';
 
 export type BackupFilePickResult = {
   name: string;
@@ -51,12 +57,16 @@ export interface BackupFileSystem {
   getInfoAsync(uri: string): Promise<{ exists: boolean; isDirectory?: boolean; size?: number }>;
 }
 
+export type BackupDirectoryPermissionResult = { granted: false } | { granted: true; directoryUri: string };
+
+export interface BackupStorageAccessFramework {
+  requestDirectoryPermissionsAsync(initialFileUrl?: string | null): Promise<BackupDirectoryPermissionResult>;
+  createFileAsync(directoryUri: string, fileName: string, mimeType: string): Promise<string>;
+}
+
 export interface BackupSharing {
   isAvailableAsync(): Promise<boolean>;
-  shareAsync(
-    uri: string,
-    options: { dialogTitle: string; mimeType: string; UTI: string }
-  ): Promise<void>;
+  shareAsync(uri: string, options: { dialogTitle: string; mimeType: string; UTI: string }): Promise<void>;
 }
 
 export interface BackupFileCodec {
@@ -69,6 +79,8 @@ export interface BackupFileDependencies {
   documentPicker: BackupDocumentPicker;
   fileSystem: BackupFileSystem;
   sharing: BackupSharing;
+  platform?: BackupFilePlatform;
+  storageAccessFramework?: BackupStorageAccessFramework;
   codec?: BackupFileCodec;
   now?: () => Date;
 }
@@ -81,12 +93,7 @@ export interface BackupFileService {
   restoreEncryptedBackupFile(raw: string, passphrase: string): Promise<AppState>;
 }
 
-const supportedBackupMimeTypes = new Set([
-  'application/json',
-  'application/octet-stream',
-  'text/json',
-  'text/plain'
-]);
+const supportedBackupMimeTypes = new Set(['application/json', 'application/octet-stream', 'text/json', 'text/plain']);
 const generatedBackupPrefix = 'relateai-backup-';
 const maximumBackupFilenameLength = 255;
 const maximumBackupUriLength = 4096;
@@ -124,10 +131,7 @@ const hasSupportedBackupFilename = (name: string): boolean => {
   return normalized.endsWith(`.${BACKUP_FILE_EXTENSION}`) || normalized.endsWith('.json');
 };
 
-const assertSupportedBackupAsset = async (
-  asset: BackupDocumentAsset,
-  fileSystem: BackupFileSystem
-): Promise<void> => {
+const assertSupportedBackupAsset = async (asset: BackupDocumentAsset, fileSystem: BackupFileSystem): Promise<void> => {
   if (!hasSupportedBackupFilename(asset.name)) {
     throw new Error(`Choose a .${BACKUP_FILE_EXTENSION} or .json RelateAI backup file.`);
   }
@@ -165,6 +169,8 @@ export const createBackupFileService = ({
   documentPicker,
   fileSystem,
   sharing,
+  platform = 'other',
+  storageAccessFramework,
   codec = defaultCodec,
   now = () => new Date()
 }: BackupFileDependencies): BackupFileService => {
@@ -179,13 +185,82 @@ export const createBackupFileService = ({
     state: AppState,
     passphrase: string,
     directory: string
-  ): Promise<{ uri: string; preview: BackupPreview }> => {
+  ): Promise<{ uri: string; fileName: string; byteCount: number; preview: BackupPreview }> => {
     const raw = await codec.create(state, passphrase);
     assertBackupRawInput(raw);
     const preview = codec.preview(raw);
-    const uri = `${directory}${nextBackupFilename()}`;
+    const fileName = nextBackupFilename();
+    const uri = `${directory}${fileName}`;
     await fileSystem.writeAsStringAsync(uri, raw, { encoding: fileSystem.utf8Encoding });
-    return { uri, preview };
+    return {
+      uri,
+      fileName,
+      byteCount: new TextEncoder().encode(raw).byteLength,
+      preview
+    };
+  };
+
+  const createBoundedBackup = async (
+    state: AppState,
+    passphrase: string
+  ): Promise<{ raw: string; preview: BackupPreview; byteCount: number }> => {
+    const raw = await codec.create(state, passphrase);
+    assertBackupRawInput(raw);
+    const preview = codec.preview(raw);
+    return { raw, preview, byteCount: new TextEncoder().encode(raw).byteLength };
+  };
+
+  const assertStorageAccessUri = (uri: string, label: string): void => {
+    if (
+      typeof uri !== 'string' ||
+      uri.length === 0 ||
+      uri.length > maximumBackupUriLength ||
+      !uri.startsWith('content://') ||
+      hasTraversalSegment(uri)
+    ) {
+      throw new Error(`${label} is invalid.`);
+    }
+  };
+
+  const saveAndroidPortableBackup = async (state: AppState, passphrase: string): Promise<BackupFileExportResult> => {
+    if (!storageAccessFramework) {
+      throw new Error('User-selected backup export storage is not available on this Android device.');
+    }
+
+    const permission = await storageAccessFramework.requestDirectoryPermissionsAsync();
+    if (!permission.granted) {
+      throw new Error('Backup export was cancelled before a destination was selected.');
+    }
+    assertStorageAccessUri(permission.directoryUri, 'The selected backup directory');
+
+    const { raw, preview, byteCount } = await createBoundedBackup(state, passphrase);
+    const fileName = nextBackupFilename();
+    const uri = await storageAccessFramework.createFileAsync(permission.directoryUri, fileName, 'application/json');
+    assertStorageAccessUri(uri, 'The created backup file location');
+
+    await fileSystem.writeAsStringAsync(uri, raw, { encoding: fileSystem.utf8Encoding });
+    const info = await fileSystem.getInfoAsync(uri);
+    if (!info.exists || info.isDirectory === true) {
+      throw new Error('The encrypted backup write could not be verified at the selected destination.');
+    }
+
+    const writtenRaw = await fileSystem.readAsStringAsync(uri, { encoding: fileSystem.utf8Encoding });
+    assertBackupRawInput(writtenRaw);
+    if (writtenRaw !== raw) {
+      throw new Error('The encrypted backup read-back did not match the exported file.');
+    }
+    codec.preview(writtenRaw);
+
+    return {
+      uri,
+      fileName,
+      byteCount,
+      shared: false,
+      preview,
+      disposition: 'saved-export',
+      temporaryFileRemoved: false,
+      verifiedPortableCopy: true
+    };
   };
 
   const removeOwnedCacheFile = async (uri: string, generatedOnly: boolean): Promise<boolean> => {
@@ -200,20 +275,24 @@ export const createBackupFileService = ({
     return true;
   };
 
-  const saveEncryptedBackupFile = async (
-    state: AppState,
-    passphrase: string
-  ): Promise<BackupFileExportResult> => {
+  const saveEncryptedBackupFile = async (state: AppState, passphrase: string): Promise<BackupFileExportResult> => {
+    if (platform === 'android') {
+      return saveAndroidPortableBackup(state, passphrase);
+    }
     if (!fileSystem.documentDirectory) {
       throw new Error('Persistent backup export storage is not available on this device.');
     }
-    const { uri, preview } = await writeBackup(state, passphrase, fileSystem.documentDirectory);
+    const { uri, fileName, byteCount, preview } = await writeBackup(state, passphrase, fileSystem.documentDirectory);
     return {
       uri,
+      fileName,
+      byteCount,
       shared: false,
       preview,
       disposition: 'saved-export',
-      temporaryFileRemoved: false
+      temporaryFileRemoved: false,
+      // The app document directory is durable but not a user-held export.
+      verifiedPortableCopy: false
     };
   };
 
@@ -228,7 +307,7 @@ export const createBackupFileService = ({
         throw new Error('Temporary backup sharing storage is not available on this device.');
       }
 
-      const { uri, preview } = await writeBackup(state, passphrase, fileSystem.cacheDirectory);
+      const { uri, fileName, byteCount, preview } = await writeBackup(state, passphrase, fileSystem.cacheDirectory);
       let temporaryFileRemoved = false;
       try {
         await sharing.shareAsync(uri, {
@@ -244,10 +323,14 @@ export const createBackupFileService = ({
 
       return {
         uri,
+        fileName,
+        byteCount,
         shared: true,
         preview,
         disposition: 'temporary-shared',
-        temporaryFileRemoved
+        temporaryFileRemoved,
+        // Expo Sharing cannot distinguish a completed save from dismissal.
+        verifiedPortableCopy: false
       };
     },
 
@@ -255,12 +338,7 @@ export const createBackupFileService = ({
 
     async pickEncryptedBackupFile() {
       const result = await documentPicker.getDocumentAsync({
-        type: [
-          'application/json',
-          'application/octet-stream',
-          'text/json',
-          'text/plain'
-        ],
+        type: ['application/json', 'application/octet-stream', 'text/json', 'text/plain'],
         copyToCacheDirectory: true,
         multiple: false,
         base64: false
@@ -315,10 +393,12 @@ const loadDefaultBackupFileService = (): Promise<BackupFileService> => {
     defaultServicePromise = Promise.all([
       import('expo-document-picker'),
       import('expo-file-system/legacy'),
-      import('expo-sharing')
-    ]).then(([documentPicker, fileSystem, sharing]) =>
+      import('expo-sharing'),
+      import('react-native')
+    ]).then(([documentPicker, fileSystem, sharing, reactNative]) =>
       createBackupFileService({
         documentPicker,
+        platform: reactNative.Platform.OS,
         fileSystem: {
           documentDirectory: fileSystem.documentDirectory,
           cacheDirectory: fileSystem.cacheDirectory,
@@ -328,6 +408,13 @@ const loadDefaultBackupFileService = (): Promise<BackupFileService> => {
           deleteAsync: fileSystem.deleteAsync,
           getInfoAsync: fileSystem.getInfoAsync
         },
+        storageAccessFramework:
+          reactNative.Platform.OS === 'android'
+            ? {
+                requestDirectoryPermissionsAsync: fileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync,
+                createFileAsync: fileSystem.StorageAccessFramework.createFileAsync
+              }
+            : undefined,
         sharing
       })
     );
@@ -335,16 +422,10 @@ const loadDefaultBackupFileService = (): Promise<BackupFileService> => {
   return defaultServicePromise;
 };
 
-export const exportEncryptedBackupFile = async (
-  state: AppState,
-  passphrase: string
-): Promise<BackupFileExportResult> =>
+export const exportEncryptedBackupFile = async (state: AppState, passphrase: string): Promise<BackupFileExportResult> =>
   (await loadDefaultBackupFileService()).exportEncryptedBackupFile(state, passphrase);
 
-export const saveEncryptedBackupFile = async (
-  state: AppState,
-  passphrase: string
-): Promise<BackupFileExportResult> =>
+export const saveEncryptedBackupFile = async (state: AppState, passphrase: string): Promise<BackupFileExportResult> =>
   (await loadDefaultBackupFileService()).saveEncryptedBackupFile(state, passphrase);
 
 export const pickEncryptedBackupFile = async (): Promise<BackupFilePickResult | undefined> =>

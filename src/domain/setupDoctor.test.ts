@@ -68,9 +68,13 @@ describe('setup doctor contract', () => {
         gifts: [],
         messages: [],
         activity: [],
-        backups: []
+        backups: [],
+        aiProvider: {
+          status: 'Ready',
+          lastCheckedAt: '2026-07-09T09:00:00.000Z'
+        }
       },
-      { aiEndpointConfigured: true, emailEndpointConfigured: false },
+      { aiEndpointConfigured: true, emailEndpointConfigured: false, aiProviderSessionReady: true },
       new Date('2026-07-09T10:00:00.000Z')
     );
 
@@ -131,12 +135,89 @@ describe('setup doctor contract', () => {
       },
       new Date('2026-07-09T10:00:00.000Z')
     );
-    const emailProvider = report.checksByGroup.flatMap(group => group.checks).find(check => check.id === 'email-provider');
+    const emailProvider = report.checksByGroup
+      .flatMap(group => group.checks)
+      .find(check => check.id === 'email-provider');
 
     assert.equal(emailProvider?.status, 'Needs action');
-    assert.equal(emailProvider?.targetScreen, 'more');
+    assert.equal(emailProvider?.targetScreen, 'settings');
     assert.match(emailProvider?.impact ?? '', /not safe to use/i);
     assert.doesNotMatch(emailProvider?.impact ?? '', /email\.example|send/);
+  });
+
+  it('does not report public provider endpoints ready without authenticated sessions', () => {
+    const report = buildSetupDoctorReport(
+      createTestState(),
+      {
+        aiEndpointReadiness: evaluateProviderEndpointReadiness('https://ai.example.test/draft'),
+        emailEndpointReadiness: evaluateProviderEndpointReadiness('https://email.example.test/send'),
+        aiProviderSessionReady: false,
+        emailProviderSessionReady: false
+      },
+      new Date('2026-07-09T10:00:00.000Z')
+    );
+    const checks = report.checksByGroup.flatMap(group => group.checks);
+    const ai = checks.find(check => check.id === 'ai-provider');
+    const email = checks.find(check => check.id === 'email-provider');
+    assert.equal(ai?.status, 'Needs action');
+    assert.equal(ai?.command, undefined);
+    assert.match(ai?.impact ?? '', /authenticated provider session/i);
+    assert.equal(email?.status, 'Needs action');
+    assert.equal(email?.group, 'Required');
+    assert.match(email?.impact ?? '', /authenticated provider session/i);
+  });
+
+  it('keeps an authenticated but untested provider actionable after onboarding', () => {
+    const state = createTestState();
+    state.onboarding.completed = true;
+    state.setupChecks = state.setupChecks.map(check => ({ ...check, status: 'Ready' }));
+    state.aiProvider = { status: 'Not configured' };
+    const environment = {
+      aiEndpointReadiness: evaluateProviderEndpointReadiness('https://ai.example.test/draft'),
+      aiProviderSessionReady: true,
+      emailEndpointConfigured: false,
+      emailProviderSessionReady: false
+    };
+
+    const untested = buildSetupDoctorReport(state, environment, new Date('2026-07-09T10:00:00.000Z'));
+    const untestedAi = untested.checksByGroup.flatMap(group => group.checks).find(check => check.id === 'ai-provider');
+    assert.equal(untestedAi?.status, 'Needs action');
+    assert.equal(untestedAi?.command, 'testAiProvider');
+    assert.match(untestedAi?.impact ?? '', /readiness test/i);
+
+    state.aiProvider = { status: 'Ready', lastCheckedAt: '2026-07-09T09:00:00.000Z' };
+    const tested = buildSetupDoctorReport(state, environment, new Date('2026-07-09T10:00:00.000Z'));
+    const testedAi = tested.checksByGroup.flatMap(group => group.checks).find(check => check.id === 'ai-provider');
+    assert.equal(testedAi?.status, 'Ready');
+  });
+
+  it('recommends the highest-priority warning when no required blocker remains', () => {
+    const state = privacyCleanState();
+    state.onboarding.completed = true;
+    state.messages = state.messages.map(message => ({
+      ...message,
+      status: 'Sent',
+      sentAt: '2026-07-09T09:00:00.000Z'
+    }));
+    state.aiProvider = { status: 'Ready', lastCheckedAt: '2026-07-09T09:00:00.000Z' };
+    state.backups = [{ id: 'backup-current', createdAt: '2026-07-09T09:00:00.000Z', recordCount: 1, encrypted: true }];
+    const report = buildSetupDoctorReport(
+      state,
+      {
+        aiEndpointReadiness: evaluateProviderEndpointReadiness('https://ai.example.test/draft'),
+        aiProviderSessionReady: true,
+        emailEndpointConfigured: false,
+        emailProviderSessionReady: false
+      },
+      new Date('2026-07-09T10:00:00.000Z')
+    );
+
+    assert.equal(
+      report.checksByGroup.flatMap(group => group.checks).some(check => check.status === 'Needs action'),
+      false
+    );
+    assert.equal(report.recommendedCheck?.status, 'Warning');
+    assert.match(report.summary, /No required blockers found\. Next review:/i);
   });
 
   it('surfaces unsafe configured email endpoints even when email delivery is disabled', () => {
@@ -148,7 +229,9 @@ describe('setup doctor contract', () => {
       },
       new Date('2026-07-09T10:00:00.000Z')
     );
-    const emailProvider = report.checksByGroup.flatMap(group => group.checks).find(check => check.id === 'email-provider');
+    const emailProvider = report.checksByGroup
+      .flatMap(group => group.checks)
+      .find(check => check.id === 'email-provider');
 
     assert.equal(emailProvider?.status, 'Needs action');
     assert.equal(emailProvider?.group, 'Required');
@@ -173,7 +256,9 @@ describe('setup doctor contract', () => {
       },
       new Date('2026-07-09T10:00:00.000Z')
     );
-    const emailProvider = report.checksByGroup.flatMap(group => group.checks).find(check => check.id === 'email-provider');
+    const emailProvider = report.checksByGroup
+      .flatMap(group => group.checks)
+      .find(check => check.id === 'email-provider');
 
     assert.equal(emailProvider?.status, 'Ready');
     assert.equal(emailProvider?.group, 'Reliability');
@@ -222,7 +307,7 @@ describe('setup doctor contract', () => {
 
     assert.equal(privacy?.status, 'Warning');
     assert.match(privacy?.impact ?? '', /need review|fallback/i);
-    assert.equal(privacy?.targetScreen, 'more');
+    assert.equal(privacy?.targetScreen, 'settings');
   });
 
   it('keeps contextual biometric recommendations non-blocking in setup diagnostics', () => {
@@ -295,8 +380,8 @@ describe('setup doctor contract', () => {
 
     assert.equal(reminders?.status, 'Needs action');
     assert.equal(reminders?.command, undefined);
-    assert.match(reminders?.impact ?? '', /Reminder route is stale/i);
-    assert.match(reminders?.impact ?? '', /missing contact or event/i);
+    assert.match(reminders?.impact ?? '', /Notification route is stale/i);
+    assert.match(reminders?.impact ?? '', /missing, archived, mismatched, or already handled/i);
   });
 
   it('surfaces missing React Native release evidence as a reliability warning', () => {
@@ -309,7 +394,7 @@ describe('setup doctor contract', () => {
     const release = report.checksByGroup.flatMap(group => group.checks).find(check => check.id === 'release-evidence');
 
     assert.equal(release?.status, 'Warning');
-    assert.equal(release?.targetScreen, 'more');
+    assert.equal(release?.targetScreen, 'setupCheck');
     assert.match(release?.impact ?? '', /not been attached/i);
   });
 
@@ -328,7 +413,9 @@ describe('setup doctor contract', () => {
       },
       new Date('2026-07-09T10:00:00.000Z')
     );
-    const warning = warningReport.checksByGroup.flatMap(group => group.checks).find(check => check.id === 'release-evidence');
+    const warning = warningReport.checksByGroup
+      .flatMap(group => group.checks)
+      .find(check => check.id === 'release-evidence');
 
     assert.equal(warning?.status, 'Warning');
     assert.match(warning?.impact ?? '', /2 React Native release evidence warning/);
@@ -344,7 +431,9 @@ describe('setup doctor contract', () => {
       },
       new Date('2026-07-09T10:00:00.000Z')
     );
-    const blocker = blockerReport.checksByGroup.flatMap(group => group.checks).find(check => check.id === 'release-evidence');
+    const blocker = blockerReport.checksByGroup
+      .flatMap(group => group.checks)
+      .find(check => check.id === 'release-evidence');
 
     assert.equal(blocker?.status, 'Needs action');
     assert.match(blocker?.impact ?? '', /1 React Native release blocker/);
@@ -376,9 +465,38 @@ describe('setup doctor contract', () => {
     const storage = report.checksByGroup.flatMap(group => group.checks).find(check => check.id === 'local-storage');
 
     assert.equal(storage?.status, 'Ready');
-    assert.equal(storage?.targetScreen, 'more');
+    assert.equal(storage?.targetScreen, 'settings');
     assert.match(storage?.impact ?? '', /42 normalized storage item\(s\)/);
     assert.doesNotMatch(JSON.stringify(storage), /24000|900|2026-07-09T10/);
+  });
+
+  it('surfaces a verified encrypted entity repository without exposing storage metadata', () => {
+    const state = createTestState();
+    const report = buildSetupDoctorReport(
+      {
+        ...state,
+        persistence: {
+          ...state.persistence,
+          storageHealth: {
+            status: 'Ready',
+            storageFormat: 'Encrypted entity repository',
+            payloadBytes: 48000,
+            entryCount: 73,
+            chunkCount: 0,
+            largestEntryBytes: 1900,
+            envelopeVersion: 1,
+            lastVerifiedAt: '2026-07-09T10:00:00.000Z'
+          }
+        }
+      },
+      { aiEndpointConfigured: true, emailEndpointConfigured: true },
+      new Date('2026-07-09T10:00:00.000Z')
+    );
+    const storage = report.checksByGroup.flatMap(group => group.checks).find(check => check.id === 'local-storage');
+
+    assert.equal(storage?.status, 'Ready');
+    assert.match(storage?.impact ?? '', /73 encrypted repository record\(s\)/);
+    assert.doesNotMatch(JSON.stringify(storage), /48000|1900|2026-07-09T10/);
   });
 
   it('surfaces corrupt local storage as a recovery blocker without exposing payload data', () => {

@@ -6,6 +6,8 @@ export const supportedContactLanguages: Contact['language'][] = ['English', 'Hin
 export interface ContactEssentialsInput {
   name: string;
   relationship: string;
+  relationshipSubtype?: string;
+  jobTitle?: string;
   phone?: string;
   email?: string;
   language: Contact['language'];
@@ -15,11 +17,16 @@ export interface ContactEssentialsInput {
 export type ContactEssentialsValidation =
   | {
       ok: true;
-      value: Pick<Contact, 'name' | 'relationship' | 'phone' | 'email' | 'language' | 'notesSummary'>;
+      value: Pick<
+        Contact,
+        'name' | 'relationship' | 'relationshipSubtype' | 'jobTitle' | 'phone' | 'email' | 'language' | 'notesSummary'
+      >;
     }
   | { ok: false; message: string };
 
 const normalizeText = (value: string) => value.trim().replace(/\s+/g, ' ');
+
+const normalizeOptionalText = (value: string | undefined) => normalizeText(value ?? '') || undefined;
 
 const normalizePhone = (value: string | undefined) => {
   const trimmed = normalizeText(value ?? '');
@@ -45,6 +52,8 @@ export const validateContactEssentials = (
 ): ContactEssentialsValidation => {
   const name = normalizeText(input.name);
   const relationship = normalizeText(input.relationship);
+  const relationshipSubtype = normalizeOptionalText(input.relationshipSubtype);
+  const jobTitle = normalizeOptionalText(input.jobTitle);
   const phone = normalizePhone(input.phone);
   const email = normalizeEmailAddress(input.email) || undefined;
   const notesSummary = input.notesSummary.trim().replace(/\s+/g, ' ');
@@ -60,6 +69,12 @@ export const validateContactEssentials = (
   }
   if (relationship.length > 80) {
     return { ok: false, message: 'Relationship must be 80 characters or fewer.' };
+  }
+  if (relationshipSubtype && relationshipSubtype.length > 80) {
+    return { ok: false, message: 'Relationship subtype must be 80 characters or fewer.' };
+  }
+  if (jobTitle && jobTitle.length > 120) {
+    return { ok: false, message: 'Job title must be 120 characters or fewer.' };
   }
   if (!supportedContactLanguages.includes(input.language)) {
     return { ok: false, message: 'Choose a supported contact language.' };
@@ -85,6 +100,8 @@ export const validateContactEssentials = (
     value: {
       name,
       relationship,
+      relationshipSubtype,
+      jobTitle,
       phone,
       email,
       language: input.language,

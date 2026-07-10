@@ -1,10 +1,7 @@
 import { buildContactEnrichmentPlan } from './contactEnrichment';
 import { buildNotificationReadinessReport } from './notificationReadiness';
 import { buildPrivacyCenterReport } from './privacyCenter';
-import {
-  providerEndpointReadinessFromConfigured,
-  type ProviderEndpointReadiness
-} from './providerEndpointReadiness';
+import { providerEndpointReadinessFromConfigured, type ProviderEndpointReadiness } from './providerEndpointReadiness';
 import { buildSchedulingPolicySummary } from './schedulingPolicy';
 import type { AppState, Screen } from './types';
 
@@ -30,10 +27,10 @@ export interface SetupDoctorReport {
   readyCount: number;
   totalCount: number;
   recommendedCheck?: SetupDoctorCheck;
-  checksByGroup: Array<{
+  checksByGroup: {
     group: SetupDoctorGroup;
     checks: SetupDoctorCheck[];
-  }>;
+  }[];
   dryRun: {
     safe: true;
     message: string;
@@ -56,6 +53,8 @@ export interface SetupDoctorEnvironment {
   emailEndpointConfigured?: boolean;
   aiEndpointReadiness?: ProviderEndpointReadiness;
   emailEndpointReadiness?: ProviderEndpointReadiness;
+  aiProviderSessionReady?: boolean;
+  emailProviderSessionReady?: boolean;
   releaseEvidence?: {
     blockers: string[];
     warnings: string[];
@@ -98,6 +97,9 @@ const storageImpactFor = (state: AppState) => {
   if (health.storageFormat === 'Normalized') {
     return `${health.entryCount} normalized storage item(s) verified across ${health.chunkCount} chunk(s).`;
   }
+  if (health.storageFormat === 'Encrypted entity repository') {
+    return `${health.entryCount} encrypted repository record(s) verified with transactional checkpoints.`;
+  }
   return 'Local data is readable but should be rewritten into normalized storage before release verification.';
 };
 
@@ -106,7 +108,10 @@ const storageStatusFor = (state: AppState): SetupDoctorStatus => {
   if (state.persistence.status === 'Error' || health?.status === 'Corrupt') {
     return 'Needs action';
   }
-  if (health?.status === 'Ready' && health.storageFormat === 'Normalized') {
+  if (
+    health?.status === 'Ready' &&
+    (health.storageFormat === 'Normalized' || health.storageFormat === 'Encrypted entity repository')
+  ) {
     return 'Ready';
   }
   return 'Warning';
@@ -136,8 +141,12 @@ const releaseEvidenceImpactFor = (env: SetupDoctorEnvironment) => {
   if (evidence.warnings.length > 0) {
     const legacyCount = evidence.legacyKotlinGradleArtifactPaths?.length ?? 0;
     return legacyCount > 0
-      ? evidence.warnings.length + ' React Native release evidence warning(s) remain, including ' + legacyCount + ' legacy Android artifact path(s).'
-      : evidence.warnings.length + ' React Native release evidence warning(s) remain for signed builds, device smoke, or store evidence.';
+      ? evidence.warnings.length +
+          ' React Native release evidence warning(s) remain, including ' +
+          legacyCount +
+          ' legacy Android artifact path(s).'
+      : evidence.warnings.length +
+          ' React Native release evidence warning(s) remain for signed builds, device smoke, or store evidence.';
   }
   return 'React Native release evidence has no blockers or warnings.';
 };
@@ -147,12 +156,11 @@ export const buildSetupDoctorReport = (
   env: SetupDoctorEnvironment,
   now: Date = new Date()
 ): SetupDoctorReport => {
-  const pendingMessages = state.messages.filter(message => message.status === 'Needs review' || message.status === 'Draft');
+  const pendingMessages = state.messages.filter(
+    message => message.status === 'Needs review' || message.status === 'Draft'
+  );
   const failedMessages = state.messages.filter(
-    message =>
-      message.status === 'Failed' ||
-      message.status === 'Blocked' ||
-      message.status === 'Delivery unknown'
+    message => message.status === 'Failed' || message.status === 'Blocked' || message.status === 'Delivery unknown'
   );
   const weakContactPlans = state.contacts
     .map(contact => buildContactEnrichmentPlan(state, contact.id))
@@ -168,6 +176,8 @@ export const buildSetupDoctorReport = (
   const aiEndpointReadiness = aiEndpointReadinessFor(env);
   const emailEndpointReadiness = emailEndpointReadinessFor(env);
   const emailProviderConfigured = emailEndpointReadiness.configured;
+  const aiProviderSessionReady = env.aiProviderSessionReady === true;
+  const emailProviderSessionReady = env.emailProviderSessionReady === true;
   const emailProviderChosen =
     state.settings.emailEnabled ||
     emailProviderConfigured ||
@@ -184,27 +194,42 @@ export const buildSetupDoctorReport = (
     notificationReadiness.status !== 'Blocked' &&
     !notificationReadiness.issues.some(issue => notificationSetupIssueIds.has(issue.id));
   const privacyReport = buildPrivacyCenterReport(state);
+  const aiProviderTestable =
+    state.settings.aiEnabled &&
+    aiEndpointReadiness.canUseProviderEndpoint &&
+    (!aiEndpointReadiness.productionReady || aiProviderSessionReady);
   const aiProviderStatus: SetupDoctorStatus =
-    !state.settings.aiEnabled || (aiEndpointReadiness.productionReady && state.aiProvider.status !== 'Error')
+    !state.settings.aiEnabled ||
+    (aiEndpointReadiness.productionReady && aiProviderSessionReady && state.aiProvider.status === 'Ready')
       ? 'Ready'
       : 'Needs action';
   const aiProviderImpact = !state.settings.aiEnabled
     ? 'Local templates remain available while AI is disabled.'
-    : aiEndpointReadiness.productionReady
-      ? 'Provider drafts can be tested before use.'
-      : aiEndpointReadiness.status === 'Development only'
-        ? 'Provider endpoint is local-development only; configure HTTPS before release.'
-        : aiEndpointReadiness.configured
-          ? 'Configured provider endpoint is not safe to use. Use HTTPS without credentials, localhost, or private-network hosts.'
-          : 'AI drafts will fall back to local templates until a secure endpoint is configured.';
+    : aiEndpointReadiness.productionReady && !aiProviderSessionReady
+      ? 'A short-lived authenticated provider session is required before AI drafting is ready.'
+      : aiEndpointReadiness.productionReady
+        ? state.aiProvider.status === 'Ready'
+          ? 'The authenticated provider path passed its latest privacy-safe readiness test.'
+          : state.aiProvider.status === 'Error'
+            ? 'The latest provider readiness test failed. Test again or use local review-first templates.'
+            : 'Run a privacy-safe provider readiness test before relying on AI drafts.'
+        : aiEndpointReadiness.status === 'Development only'
+          ? 'Provider endpoint is local-development only; configure HTTPS before release.'
+          : aiEndpointReadiness.configured
+            ? 'Configured provider endpoint is not safe to use. Use HTTPS without credentials, localhost, or private-network hosts.'
+            : 'AI drafts will fall back to local templates until a secure endpoint is configured.';
   const emailProviderStatus: SetupDoctorStatus =
-    emailProviderConfigured && !emailEndpointReadiness.productionReady
-      ? emailEndpointReadiness.status === 'Development only'
-        ? 'Warning'
-        : 'Needs action'
+    emailProviderConfigured && (!emailEndpointReadiness.productionReady || !emailProviderSessionReady)
+      ? emailEndpointReadiness.productionReady && !emailProviderSessionReady
+        ? 'Needs action'
+        : emailEndpointReadiness.status === 'Development only'
+          ? 'Warning'
+          : 'Needs action'
       : 'Ready';
   const emailProviderImpact = emailProviderConfigured
-    ? emailEndpointReadiness.productionReady
+    ? emailEndpointReadiness.productionReady && !emailProviderSessionReady
+      ? 'Email delivery requires a short-lived authenticated provider session.'
+      : emailEndpointReadiness.productionReady
         ? 'Email provider delivery uses a release-ready HTTPS endpoint.'
         : emailEndpointReadiness.status === 'Development only'
           ? 'Email provider endpoint is local-development only; configure HTTPS before release.'
@@ -219,14 +244,17 @@ export const buildSetupDoctorReport = (
       status: aiProviderStatus,
       title: state.settings.aiEnabled ? 'AI provider endpoint' : 'AI drafts disabled',
       impact: aiProviderImpact,
-      actionLabel: aiEndpointReadiness.canUseProviderEndpoint ? 'Test AI provider' : 'Open setup',
-      targetScreen: 'more',
-      command: aiEndpointReadiness.canUseProviderEndpoint ? 'testAiProvider' : undefined,
+      actionLabel: aiProviderTestable ? 'Test AI provider' : 'Open setup',
+      targetScreen: 'settings',
+      command: aiProviderTestable ? 'testAiProvider' : undefined,
       priority: 10
     }),
     check({
       id: 'email-provider',
-      group: emailProviderConfigured && !emailEndpointReadiness.productionReady ? 'Required' : 'Reliability',
+      group:
+        emailProviderConfigured && (!emailEndpointReadiness.productionReady || !emailProviderSessionReady)
+          ? 'Required'
+          : 'Reliability',
       status: emailProviderStatus,
       title: emailProviderConfigured
         ? 'Email provider endpoint'
@@ -235,7 +263,7 @@ export const buildSetupDoctorReport = (
           : 'Email provider disabled',
       impact: emailProviderImpact,
       actionLabel: 'Review email settings',
-      targetScreen: 'more',
+      targetScreen: 'settings',
       priority: 18
     }),
     check({
@@ -259,10 +287,14 @@ export const buildSetupDoctorReport = (
       title: 'Style Coach confidence',
       impact:
         state.styleProfile.confidence === 'Strong' || state.styleProfile.confidence === 'Growing'
-          ? `${state.styleProfile.confidence} confidence profile is available.`
+          ? `${state.styleProfile.confidence} confidence profile is available${
+              state.styleProfile.enabledForAiDrafts
+                ? ' and enabled for future AI drafts.'
+                : ' but disabled for future AI drafts.'
+            }`
           : 'Train Style Coach with writing samples before relying on tone matching.',
       actionLabel: 'Open Style Coach',
-      targetScreen: 'more',
+      targetScreen: 'styleCoach',
       priority: 30
     }),
     check({
@@ -285,7 +317,7 @@ export const buildSetupDoctorReport = (
       title: 'Privacy and permissions',
       impact: privacyReport.summary,
       actionLabel: 'Open privacy settings',
-      targetScreen: 'more',
+      targetScreen: 'settings',
       priority: 35
     }),
     check({
@@ -302,12 +334,10 @@ export const buildSetupDoctorReport = (
         schedulingBlockers.length > 0
           ? schedulingBlockers.map(issue => `${issue.title}: ${issue.detail}`).join(' ')
           : `${notificationReadiness.summary}${
-              primaryNotificationIssue
-                ? ` ${primaryNotificationIssue.title}: ${primaryNotificationIssue.detail}`
-                : ''
+              primaryNotificationIssue ? ` ${primaryNotificationIssue.title}: ${primaryNotificationIssue.detail}` : ''
             } ${notificationReadiness.privacyNote}`,
       actionLabel: notificationReadiness.issues[0]?.actionLabel ?? 'Review reminders',
-      targetScreen: 'more',
+      targetScreen: 'settings',
       command: canRunReminderPlanCommand ? 'planReminders' : undefined,
       priority: 40
     }),
@@ -321,7 +351,7 @@ export const buildSetupDoctorReport = (
           ? `Last encrypted backup is ${backupAgeDays} day(s) old.`
           : 'Create an encrypted backup before relying on this as your only relationship record.',
       actionLabel: 'Open backup',
-      targetScreen: 'more',
+      targetScreen: 'backup',
       priority: 50
     }),
     check({
@@ -331,7 +361,7 @@ export const buildSetupDoctorReport = (
       title: 'Local data storage',
       impact: storageImpactFor(state),
       actionLabel: 'Open persistence',
-      targetScreen: 'more',
+      targetScreen: 'settings',
       priority: 45
     }),
     check({
@@ -341,7 +371,7 @@ export const buildSetupDoctorReport = (
       title: 'React Native release evidence',
       impact: releaseEvidenceImpactFor(env),
       actionLabel: 'Review release evidence',
-      targetScreen: 'more',
+      targetScreen: 'setupCheck',
       priority: 48
     }),
     check({
@@ -367,21 +397,23 @@ export const buildSetupDoctorReport = (
           ? `${recentWarnings.length} recent warning(s) are available in Activity History.`
           : 'No recent warnings require attention.',
       actionLabel: 'View activity',
-      targetScreen: 'more',
+      targetScreen: 'activityHistory',
       priority: 60
     })
   ];
 
   const readyCount = checks.filter(item => item.status === 'Ready').length;
-  const recommendedCheck = checks
-    .filter(item => item.status === 'Needs action')
-    .sort((a, b) => a.priority - b.priority)[0];
+  const recommendedCheck =
+    checks.filter(item => item.status === 'Needs action').sort((a, b) => a.priority - b.priority)[0] ??
+    checks.filter(item => item.status === 'Warning').sort((a, b) => a.priority - b.priority)[0];
+  const requiredBlockerCount = checks.filter(item => item.status === 'Needs action').length;
 
   return {
-    summary:
-      recommendedCheck
+    summary: recommendedCheck
+      ? requiredBlockerCount > 0
         ? `${readyCount}/${checks.length} checks ready. Next fix: ${recommendedCheck.title}.`
-        : `${readyCount}/${checks.length} checks ready. No required blockers found.`,
+        : `${readyCount}/${checks.length} checks ready. No required blockers found. Next review: ${recommendedCheck.title}.`
+      : `${readyCount}/${checks.length} checks ready. No required blockers or warnings found.`,
     readyCount,
     totalCount: checks.length,
     recommendedCheck,
@@ -391,7 +423,8 @@ export const buildSetupDoctorReport = (
     })),
     dryRun: {
       safe: true,
-      message: 'Readiness dry run only checks setup, quality, and recovery state; it does not create, approve, schedule, or send messages.'
+      message:
+        'Readiness dry run only checks setup, quality, and recovery state; it does not create, approve, schedule, or send messages.'
     }
   };
 };

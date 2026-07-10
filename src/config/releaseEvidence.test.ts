@@ -152,7 +152,12 @@ describe('React Native release evidence contract', () => {
     });
 
     assert.equal(evidence.activeReleaseSurface.legacyKotlinGradleStatus, 'Reference only');
-    assert.deepEqual(evidence.activeReleaseSurface.legacyKotlinGradleArtifactPaths, ['app', 'core', 'gradle', 'gradlew']);
+    assert.deepEqual(evidence.activeReleaseSurface.legacyKotlinGradleArtifactPaths, [
+      'app',
+      'core',
+      'gradle',
+      'gradlew'
+    ]);
     assert.ok(evidence.warnings.some(warning => /app, core, gradle, gradlew/.test(warning)));
   });
 
@@ -173,7 +178,10 @@ describe('React Native release evidence contract', () => {
     setupEvidence.legacyKotlinGradleArtifactPaths?.push('mutated path');
 
     assert.deepEqual(evidence.blockers, []);
-    assert.equal(evidence.warnings.some(warning => warning === 'mutated warning'), false);
+    assert.equal(
+      evidence.warnings.some(warning => warning === 'mutated warning'),
+      false
+    );
     assert.deepEqual(evidence.activeReleaseSurface.legacyKotlinGradleArtifactPaths, ['app', 'core']);
   });
 
@@ -306,7 +314,9 @@ describe('React Native release evidence contract', () => {
     assert.ok(brokenEvidence.blockers.some(blocker => /directly requests a forbidden/i.test(blocker)));
     assert.ok(brokenEvidence.blockers.some(blocker => /exact-alarm/i.test(blocker)));
     assert.ok(brokenEvidence.blockers.some(blocker => /AccessibilityService permission/i.test(blocker)));
-    assert.ok(brokenEvidence.blockers.some(blocker => /does not block all forbidden Android permissions/i.test(blocker)));
+    assert.ok(
+      brokenEvidence.blockers.some(blocker => /does not block all forbidden Android permissions/i.test(blocker))
+    );
     assert.ok(brokenEvidence.blockers.some(blocker => /npm run typecheck evidence is failing/i.test(blocker)));
   });
 
@@ -330,9 +340,7 @@ describe('React Native release evidence contract', () => {
       easConfig,
       generatedAt: '2026-07-10T00:00:00.000Z',
       provenance: { ...provenance, dirty: true },
-      commands: passedCommands.map(command =>
-        command.id === 'audit' ? { ...command, command: 'true' } : command
-      ),
+      commands: passedCommands.map(command => (command.id === 'audit' ? { ...command, command: 'true' } : command)),
       deviceEvidence: defaultDeviceEvidence.map(item => ({ ...item, status: 'Attached' }))
     });
 

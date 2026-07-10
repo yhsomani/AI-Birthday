@@ -139,6 +139,7 @@ const seedLegacyChunkedPayload = async (store: MemoryStore, state: AppState) => 
 describe('state persistence contract', () => {
   it('round-trips app state with a versioned envelope', () => {
     const state = createTestState();
+    state.selectedEventId = state.events[0].id;
     const raw = serializeState(state);
     const restored = deserializeState(raw);
     const envelope = JSON.parse(raw) as { version: number };
@@ -146,6 +147,7 @@ describe('state persistence contract', () => {
     assert.equal(envelope.version, PERSISTENCE_VERSION);
     assert.equal(restored.contacts.length, state.contacts.length);
     assert.equal(restored.messages.length, state.messages.length);
+    assert.equal(restored.selectedEventId, state.events[0].id);
   });
 
   it('saves, loads, and clears state through a key-value store', async () => {
@@ -292,7 +294,10 @@ describe('state persistence contract', () => {
     const nextManifest = requireNormalizedManifest(store);
 
     assert.notEqual(nextManifest.entryPrefix, firstManifest.entryPrefix);
-    assert.equal(firstPayloadKeys.every(key => store.peek(key) === undefined), true);
+    assert.equal(
+      firstPayloadKeys.every(key => store.peek(key) === undefined),
+      true
+    );
   });
 
   it('selectively recovers from missing normalized entries without deleting valid payloads', async () => {
@@ -322,18 +327,22 @@ describe('state persistence contract', () => {
     assert.equal(recovery.raw, undefined);
     assert.equal(recovery.checksum, undefined);
     assert.notEqual(store.peek(RELATE_STATE_KEY), undefined);
-    assert.equal(payloadKeys.some(key => store.peek(key) !== undefined), true);
+    assert.equal(
+      payloadKeys.some(key => store.peek(key) !== undefined),
+      true
+    );
   });
 
   it('records an unrecoverable redacted manifest without private payload fragments', async () => {
     const store = new MemoryStore();
-    await store.setItem(RELATE_STATE_KEY, '{not-json');
+    const corruptPayload = '{not-json';
+    await store.setItem(RELATE_STATE_KEY, corruptPayload);
 
     const result = await loadStateWithRecovery(store);
     const quarantine = store.peek(RELATE_CORRUPT_STATE_KEY);
 
     assert.equal(result.status, 'recovered');
-    assert.equal(store.peek(RELATE_STATE_KEY), undefined);
+    assert.equal(store.peek(RELATE_STATE_KEY), corruptPayload);
     const manifest = JSON.parse(quarantine ?? '{}') as Record<string, unknown>;
     assert.equal(manifest.redacted, true);
     assert.equal(manifest.outcome, 'unrecoverable');
@@ -342,16 +351,34 @@ describe('state persistence contract', () => {
     assert.doesNotMatch(quarantine ?? '', /not-json/);
   });
 
+  it('preserves a newer-version payload for rollback instead of deleting it during load', async () => {
+    const store = new MemoryStore();
+    const newerPayload = JSON.stringify({
+      version: PERSISTENCE_VERSION + 1,
+      savedAt: '2026-07-10T00:00:00.000Z',
+      state: createTestState()
+    });
+    await store.setItem(RELATE_STATE_KEY, newerPayload);
+
+    const result = await loadStateWithRecovery(store);
+    const recovery = store.peek(RELATE_CORRUPT_STATE_KEY);
+
+    assert.equal(result.status, 'recovered');
+    if (result.status === 'recovered') {
+      assert.match(result.reason, /newer app version/i);
+    }
+    assert.equal(store.peek(RELATE_STATE_KEY), newerPayload);
+    assert.match(recovery ?? '', /unrecoverable/);
+    assert.doesNotMatch(recovery ?? '', /Asha|notesSummary|message/i);
+  });
+
   it('recovers valid direct-envelope records and emits only redacted issue metadata', async () => {
     const store = new MemoryStore();
     const state = createTestState();
     const privateMarker = 'DO-NOT-PERSIST-PRIVATE-MARKER';
     const malformedState = {
       ...state,
-      contacts: [
-        ...state.contacts,
-        { id: 'broken-contact', name: privateMarker, phone: '+911234567890' }
-      ],
+      contacts: [...state.contacts, { id: 'broken-contact', name: privateMarker, phone: '+911234567890' }],
       events: [
         ...state.events,
         { ...state.events[0], id: 'orphan-event', contactId: 'broken-contact', label: privateMarker }
@@ -378,11 +405,15 @@ describe('state persistence contract', () => {
     assert.equal(result.status, 'loaded');
     if (result.status !== 'loaded') return;
     assert.equal(result.state.contacts.length, state.contacts.length);
-    assert.equal(result.state.events.some(event => event.id === 'orphan-event'), false);
+    assert.equal(
+      result.state.events.some(event => event.id === 'orphan-event'),
+      false
+    );
     const recoveredActivity = result.state.activity.find(item => item.id === 'stale-activity');
     assert.ok(recoveredActivity);
     assert.equal(recoveredActivity.contactId, undefined);
     assert.equal(recoveredActivity.messageId, undefined);
+    assert.equal(recoveredActivity.status, 'Obsolete');
     assert.ok(result.recovery);
     assert.ok((result.recovery?.excludedRecordCount ?? 0) >= 2);
 
@@ -438,11 +469,14 @@ describe('state persistence contract', () => {
       return originalGet(key);
     };
 
-    await assert.rejects(() => loadStateWithRecovery(store), error => {
-      assert.ok(error instanceof Error);
-      assert.equal(error.name, 'ProtectedStorageError');
-      return true;
-    });
+    await assert.rejects(
+      () => loadStateWithRecovery(store),
+      error => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.name, 'ProtectedStorageError');
+        return true;
+      }
+    );
     assert.notEqual(store.peek(RELATE_STATE_KEY), undefined);
     assert.equal(store.peek(RELATE_CORRUPT_STATE_KEY), undefined);
   });

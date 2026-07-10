@@ -78,11 +78,13 @@ Sensitive data handling requirements:
 
 - Platform auto backup must not expose unencrypted relationship data; sensitive stores should be excluded unless encrypted by the app.
 - User backup/export must be explicit, encrypted where implemented, and documented with restore limitations.
-- React Native app-state persistence must keep collection records and singleton state in normalized entries, bound oversized entries into chunks, preserve versioned migration, clean stale payloads after replacement/clear, and recover safely from missing or corrupt entries.
+- The production repository path uses independently AES-GCM-encrypted entity files with encrypted indexes/manifests and alternating rollback checkpoints. Its random master key must remain only in verified platform-protected storage. Production startup uses a verified dual-read/single-write migration facade: current normalized SecureStore is read-only during migration, the encrypted repository is authoritative after the protected commit checkpoint, and automatic migration does not delete the rollback source. A user-confirmed local-data clear removes that legacy payload only after the empty repository replacement verifies.
+- Expo SQLite must not store private relationship data unless a future adapter proves SQLCipher-equivalent encryption for database pages, journals/WAL files, migrations, and key lifecycle on both platforms.
 - Live app state encryption and backup passphrases must remain separate. Backup passphrases only protect exported backup files and must not be stored.
 - Local-only mode does not send contacts to account sync providers. Manual contacts, device-imported contacts, events, drafts, and activity remain local unless the user explicitly uses an external provider feature such as AI drafting, provider email delivery, SMS/WhatsApp handoff, calendar export, or encrypted backup export.
 - Sign-out or local-data clearing must clear local app state through one explicit user-confirmed path.
 - Logs, analytics exports, backup manifests, and provider failure metadata must redact tokens, credentials, raw AI responses, raw screen contents, and message bodies where not explicitly user-exported.
+- The default analytics share action contains aggregate metrics only. The secondary CSV report may contain contact names and relationship metrics, so it requires a fresh preview/confirmation, opens only a user-controlled share destination, and deletes its app-owned temporary file after the share flow succeeds or fails.
 - Diagnostic snapshots are local troubleshooting evidence. They must stay redacted, must not contain raw message bodies or secrets, and are excluded from user backup export/import.
 
 ## Open Release Blockers

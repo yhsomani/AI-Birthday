@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 import { buildCalendarExportEntries } from '../domain/calendarSync';
 import type { AppState, CalendarExportEntry } from '../domain/types';
 import { createProductionInitialState } from '../data/productionState';
@@ -7,8 +7,15 @@ import {
   exportEventsToDeviceCalendarWithApi,
   importEventsFromDeviceCalendarWithApi,
   mapCalendarEntryToNativeDetails,
+  normalizeDeviceCalendarImportStartDate,
   type CalendarBridgeApi
 } from './calendarBridge';
+
+const originalTimeZone = process.env.TZ;
+
+afterEach(() => {
+  process.env.TZ = originalTimeZone;
+});
 
 const exportState = (): AppState => ({
   ...createProductionInitialState(),
@@ -148,6 +155,121 @@ describe('Expo 57 calendar adapter', () => {
     assert.deepEqual(deleted, ['device-stale']);
   });
 
+  it('partially reconciles only selected entries and leaves unselected owned and user events untouched', async () => {
+    const state = exportState();
+    const [selectedEntry, unselectedEntry] = buildCalendarExportEntries(state);
+    const updated: string[] = [];
+    const deleted: string[] = [];
+    const created: unknown[] = [];
+    const mustStay = (id: string) => ({
+      update: async () => {
+        throw new Error(`${id} must not be updated by a selected export.`);
+      },
+      delete: async () => {
+        throw new Error(`${id} must not be deleted by a selected export.`);
+      }
+    });
+    const existingEvents = [
+      {
+        id: 'device-selected',
+        title: 'Outdated selected title',
+        startDate: selectedEntry.startDate,
+        endDate: selectedEntry.endDate,
+        notes: selectedEntry.notes,
+        update: async () => {
+          updated.push('device-selected');
+        },
+        delete: async () => {
+          deleted.push('device-selected');
+        }
+      },
+      {
+        id: 'device-selected-duplicate',
+        title: selectedEntry.title,
+        startDate: selectedEntry.startDate,
+        endDate: selectedEntry.endDate,
+        notes: 'RelateAI reminder. Review in RelateAI before sending any message.',
+        update: async () => undefined,
+        delete: async () => {
+          deleted.push('device-selected-duplicate');
+        }
+      },
+      {
+        id: 'device-unselected',
+        title: unselectedEntry.title,
+        startDate: unselectedEntry.startDate,
+        endDate: unselectedEntry.endDate,
+        notes: unselectedEntry.notes,
+        ...mustStay('device-unselected')
+      },
+      {
+        id: 'device-stale-unselected',
+        title: 'Old RelateAI event',
+        startDate: selectedEntry.startDate,
+        endDate: selectedEntry.endDate,
+        notes: 'RelateAI reminder.\nRelateAI export: calendar-export-old-unselected',
+        ...mustStay('device-stale-unselected')
+      },
+      {
+        id: 'device-user-event',
+        title: selectedEntry.title,
+        startDate: selectedEntry.startDate,
+        endDate: selectedEntry.endDate,
+        notes: 'Personal calendar event',
+        ...mustStay('device-user-event')
+      }
+    ];
+    const calendar = {
+      id: 'relate-calendar',
+      title: 'RelateAI Relationship Events',
+      allowsModifications: true,
+      source: { id: 'local', name: 'Local', type: 'local', isLocalAccount: true },
+      listEvents: async () => existingEvents,
+      createEvent: async (details: unknown) => {
+        created.push(details);
+        return {};
+      }
+    };
+    const api = {
+      ...calendarConstants,
+      requestCalendarPermissions: async () => ({ status: 'granted' }),
+      getCalendars: async () => [calendar],
+      createCalendar: async () => calendar,
+      listEvents: async () => []
+    } as unknown as CalendarBridgeApi;
+
+    const changed = await exportEventsToDeviceCalendarWithApi(state, api, {
+      eventIds: ['event-update']
+    });
+
+    assert.equal(changed, 1);
+    assert.deepEqual(updated, ['device-selected']);
+    assert.deepEqual(deleted, ['device-selected-duplicate']);
+    assert.equal(created.length, 0);
+  });
+
+  it('rejects a stale selected event before requesting device-calendar permission', async () => {
+    let permissionRequests = 0;
+    const api = {
+      ...calendarConstants,
+      requestCalendarPermissions: async () => {
+        permissionRequests += 1;
+        return { status: 'granted' };
+      },
+      getCalendars: async () => [],
+      createCalendar: async () => {
+        throw new Error('A stale selection must not create a calendar.');
+      },
+      listEvents: async () => []
+    } as unknown as CalendarBridgeApi;
+
+    await assert.rejects(
+      () => exportEventsToDeviceCalendarWithApi(exportState(), api, { eventIds: ['missing-event'] }),
+      /selection is invalid/i
+    );
+    assert.equal(permissionRequests, 0);
+  });
+
   it('maps all-day annual recurrence to Expo recurrence fields', () => {
     const entry: CalendarExportEntry = {
       id: 'calendar-export-birthday',
@@ -160,10 +282,7 @@ describe('Expo 57 calendar adapter', () => {
       recurrenceRule: { frequency: 'yearly' }
     };
 
-    const details = mapCalendarEntryToNativeDetails(
-      entry,
-      calendarConstants as unknown as CalendarBridgeApi
-    );
+    const details = mapCalendarEntryToNativeDetails(entry, calendarConstants as unknown as CalendarBridgeApi);
 
     assert.equal(details.allDay, true);
     assert.deepEqual(details.recurrenceRule, { frequency: 'yearly', interval: 1 });
@@ -313,7 +432,7 @@ describe('Expo 57 calendar adapter', () => {
   });
 
   it('imports matching events through the supported listEvents API and preserves DTO shape', async () => {
-    const listCalls: Array<{ calendars: unknown[]; startDate: Date; endDate: Date }> = [];
+    const listCalls: { calendars: unknown[]; startDate: Date; endDate: Date }[] = [];
     const calendars = [{ id: 'personal-calendar', title: 'Personal' }];
     const api = {
       ...calendarConstants,
@@ -358,6 +477,106 @@ describe('Expo 57 calendar adapter', () => {
     ]);
   });
 
+  it('keeps all-day calendar dates at UTC noon without a time-zone day shift', () => {
+    const startDate = '2030-01-01T00:00:00.000+14:00';
+    process.env.TZ = 'Pacific/Kiritimati';
+    const ahead = normalizeDeviceCalendarImportStartDate(startDate, true);
+    process.env.TZ = 'America/Adak';
+    const behind = normalizeDeviceCalendarImportStartDate(startDate, true);
+
+    assert.equal(ahead, '2030-01-01T12:00:00.000Z');
+    assert.equal(behind, ahead);
+    assert.equal(
+      normalizeDeviceCalendarImportStartDate(startDate, false),
+      '2029-12-31T10:00:00.000Z',
+      'timed events preserve their instant instead of all-day calendar semantics'
+    );
+  });
+
+  it('uses all-day normalization in the device calendar import adapter', async () => {
+    const calendars = [{ id: 'calendar-personal', title: 'Personal' }];
+    const api = {
+      ...calendarConstants,
+      requestCalendarPermissions: async () => ({ status: 'granted' }),
+      getCalendars: async () => calendars,
+      createCalendar: async () => {
+        throw new Error('Not used by import.');
+      },
+      listEvents: async () => [
+        {
+          id: 'all-day-birthday',
+          title: 'Birthday: New Year Person',
+          startDate: '2030-01-01T00:00:00.000+14:00',
+          allDay: true,
+          notes: null
+        }
+      ]
+    } as unknown as CalendarBridgeApi;
+
+    process.env.TZ = 'America/Adak';
+    const candidates = await importEventsFromDeviceCalendarWithApi(api);
+
+    assert.equal(candidates[0].startDate, '2030-01-01T12:00:00.000Z');
+  });
+
+  it('cancels calendar import before the next native list operation', async () => {
+    const controller = new AbortController();
+    let listCalls = 0;
+    const api = {
+      ...calendarConstants,
+      requestCalendarPermissions: async () => ({ status: 'granted' }),
+      getCalendars: async () => {
+        controller.abort(new Error('calendar import cancelled'));
+        return [{ id: 'calendar-personal', title: 'Personal' }];
+      },
+      createCalendar: async () => {
+        throw new Error('Not used by import.');
+      },
+      listEvents: async () => {
+        listCalls += 1;
+        return [];
+      }
+    } as unknown as CalendarBridgeApi;
+
+    await assert.rejects(
+      importEventsFromDeviceCalendarWithApi(api, { signal: controller.signal }),
+      /calendar import cancelled/
+    );
+    assert.equal(listCalls, 0);
+  });
+
+  it('finishes an export commit after its first native mutation even if cancellation arrives', async () => {
+    const controller = new AbortController();
+    const state = exportState();
+    let creates = 0;
+    const ownedCalendar = {
+      id: 'relate-calendar',
+      title: 'RelateAI Relationship Events',
+      allowsModifications: true,
+      source: { id: 'local', name: 'Local', type: 'local', isLocalAccount: true },
+      listEvents: async () => [],
+      createEvent: async () => {
+        creates += 1;
+        if (creates === 1) controller.abort(new Error('too late to cancel native commit'));
+        return {};
+      }
+    };
+    const api = {
+      ...calendarConstants,
+      requestCalendarPermissions: async () => ({ status: 'granted' }),
+      getCalendars: async () => [ownedCalendar],
+      createCalendar: async () => ownedCalendar,
+      listEvents: async () => []
+    } as unknown as CalendarBridgeApi;
+
+    const changed = await exportEventsToDeviceCalendarWithApi(state, api, {
+      signal: controller.signal
+    });
+
+    assert.equal(changed, 2);
+    assert.equal(creates, 2);
+  });
+
   it('does not read calendars after permission denial', async () => {
     let calendarReads = 0;
     const api = {
@@ -373,10 +592,7 @@ describe('Expo 57 calendar adapter', () => {
       listEvents: async () => []
     } as unknown as CalendarBridgeApi;
 
-    await assert.rejects(
-      importEventsFromDeviceCalendarWithApi(api),
-      /Calendar permission was not granted/
-    );
+    await assert.rejects(importEventsFromDeviceCalendarWithApi(api), /Calendar permission was not granted/);
     assert.equal(calendarReads, 0);
   });
 });

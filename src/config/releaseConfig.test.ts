@@ -99,14 +99,20 @@ describe('react native release configuration contract', () => {
     const roadmap = readDoc('docs/feature-roadmap-analysis.md');
     const privacyPolicy = readDoc('docs/security/privacy-and-permissions.md');
 
-    assert.match(fssot, /WhatsApp handoff requires a phone number, app availability, and prominent manual handoff consent/i);
+    assert.match(
+      fssot,
+      /WhatsApp handoff requires a phone number, app availability, and prominent manual handoff consent/i
+    );
     assert.match(fssot, /SMS handoff requires a phone number and an available SMS-capable destination app/i);
     assert.doesNotMatch(fssot, /accessibility enablement/i);
     assert.doesNotMatch(fssot, /Android Accessibility settings for WhatsApp automation/i);
     assert.doesNotMatch(fssot, /WhatsApp automation must be narrow/i);
 
     assert.match(roadmap, /Prefer manual "Open in WhatsApp with approved text" or review-first handoff/i);
-    assert.match(privacyPolicy, /The React Native release path uses manual WhatsApp handoff, not AccessibilityService automation/i);
+    assert.match(
+      privacyPolicy,
+      /The React Native release path uses manual WhatsApp handoff, not AccessibilityService automation/i
+    );
     assert.match(privacyPolicy, /current contract excludes AccessibilityService automation/i);
   });
 

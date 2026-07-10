@@ -2,18 +2,17 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { relateReducer } from '../state/relateReducer';
 import { createTestState } from '../test/testState';
-import { advancedManualEventTypes, manualEventTypes, primaryManualEventTypes, validateManualEventInput } from './events';
+import {
+  advancedManualEventTypes,
+  manualEventTypes,
+  primaryManualEventTypes,
+  validateManualEventInput
+} from './events';
 
 describe('manual event contract', () => {
   it('keeps birthday, anniversary, and custom as primary manual event choices', () => {
     assert.deepEqual(primaryManualEventTypes, ['Birthday', 'Anniversary', 'Custom']);
-    assert.deepEqual(advancedManualEventTypes, [
-      'Work anniversary',
-      'Graduation',
-      'Holiday',
-      'Revival',
-      'Follow-up'
-    ]);
+    assert.deepEqual(advancedManualEventTypes, ['Work anniversary', 'Graduation', 'Holiday', 'Revival', 'Follow-up']);
     assert.deepEqual(manualEventTypes, [...primaryManualEventTypes, ...advancedManualEventTypes]);
   });
 
@@ -59,6 +58,70 @@ describe('manual event contract', () => {
     assert.match(blocked.activity[0].title, /review event conflict/i);
     assert.equal(confirmed.events.length, state.events.length + 1);
     assert.equal(confirmed.activeScreen, 'events');
+  });
+
+  it('detects yearly occasion conflicts by recurrence day across different original years and returns ids', () => {
+    const state = createTestState();
+    state.events = [
+      {
+        id: 'birthday-original-year-1990',
+        contactId: 'c-asha',
+        type: 'Birthday',
+        label: 'Asha birthday',
+        date: '1990-07-09T12:00:00.000Z',
+        recurrence: {
+          frequency: 'Yearly',
+          month: 7,
+          day: 9,
+          originalYear: 1990,
+          leapDayPolicy: 'February 28'
+        },
+        verified: true,
+        source: 'Manual',
+        checklist: []
+      }
+    ];
+
+    const result = validateManualEventInput(
+      {
+        contactId: 'c-asha',
+        eventType: 'Birthday',
+        label: 'Asha birthday confirmation',
+        date: '2027-07-09'
+      },
+      state.contacts,
+      state.events
+    );
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.conflictingEventIds, ['birthday-original-year-1990']);
+    assert.match(result.warnings.join(' '), /possible duplicate/i);
+  });
+
+  it('does not report a yearly conflict when the recurrence month or day differs', () => {
+    const state = createTestState();
+    state.events = [
+      {
+        ...state.events[0],
+        id: 'birthday-other-day',
+        contactId: 'c-asha',
+        type: 'Birthday',
+        date: '1990-07-10T12:00:00.000Z'
+      }
+    ];
+    const result = validateManualEventInput(
+      {
+        contactId: 'c-asha',
+        eventType: 'Birthday',
+        label: 'Asha birthday',
+        date: '2027-07-09'
+      },
+      state.contacts,
+      state.events
+    );
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.conflictingEventIds, []);
   });
 
   it('creates a new local contact when an event is added for a new person', () => {

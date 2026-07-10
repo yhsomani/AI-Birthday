@@ -23,7 +23,11 @@ describe('analytics contract', () => {
     assert.ok(dashboard.metrics.some(metric => metric.label === 'Delivery success'));
     assert.ok(dashboard.relationshipDistribution.some(bucket => bucket.label === 'Family' && bucket.count === 1));
     assert.ok(dashboard.neglectedContacts.some(contact => contact.contactId === 'c-rajesh'));
-    assert.ok(dashboard.insights.some(insight => insight.targetScreen === 'messages' || insight.targetScreen === 'contactDetail'));
+    assert.ok(
+      dashboard.insights.some(
+        insight => insight.targetScreen === 'messages' || insight.targetScreen === 'contactDetail'
+      )
+    );
   });
 
   it('provides useful sparse states without divide-by-zero percentages', () => {
@@ -42,6 +46,40 @@ describe('analytics contract', () => {
 
     assert.match(empty.emptyState ?? '', /Add or import contacts/);
     assert.ok(empty.metrics.every(metric => metric.value !== 'NaN%'));
+  });
+
+  it('excludes archived contacts and their activity from active analytics', () => {
+    const state = createTestState();
+    const archivedId = state.contacts[0].id;
+    state.contacts[0] = { ...state.contacts[0], archivedAt: '2026-07-10T00:00:00.000Z' };
+    const dashboard = buildAnalyticsDashboard(state, 'All time', new Date('2026-07-10T12:00:00.000Z'));
+    assert.equal(dashboard.contactCount, state.contacts.length - 1);
+    assert.equal(
+      dashboard.neglectedContacts.some(contact => contact.contactId === archivedId),
+      false
+    );
+  });
+
+  it('derives current relationship health instead of trusting stale stored scores', () => {
+    const state = createTestState();
+    state.contacts = state.contacts.map(contact => ({
+      ...contact,
+      healthScore: 99,
+      lastContactedAt: undefined,
+      checkInCadenceDays: 14
+    }));
+    state.events = [];
+    state.memories = [];
+    state.messages = [];
+    state.gifts = [];
+
+    const now = new Date('2026-07-09T12:00:00.000Z');
+    const dashboard = buildAnalyticsDashboard(state, 'All time', now);
+    const csv = buildAnalyticsCsvReport(state, dashboard, now);
+
+    assert.equal(dashboard.metrics.find(metric => metric.label === 'Relationship health')?.value, '0%');
+    assert.ok(dashboard.neglectedContacts.every(contact => contact.healthScore < 70));
+    assert.doesNotMatch(csv, /Contact summary,[^\n]*,99,/);
   });
 
   it('exports a redacted CSV report without private notes, contact routes, or raw message bodies', () => {
@@ -116,6 +154,9 @@ describe('analytics contract', () => {
     assert.match(summary.body, /Metrics:/);
     assert.match(summary.body, /Privacy:/);
     assert.ok(summary.lineCount > dashboard.metrics.length);
-    assert.doesNotMatch(summary.body, /Asha|Mira|Rajesh|\+911111111111|secret@example\.com|Private family issue|Raw message body/);
+    assert.doesNotMatch(
+      summary.body,
+      /Asha|Mira|Rajesh|\+911111111111|secret@example\.com|Private family issue|Raw message body/
+    );
   });
 });

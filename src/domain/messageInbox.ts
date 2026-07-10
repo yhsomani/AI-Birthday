@@ -1,5 +1,9 @@
 import type { AppState, MessageChannel, MessageDraft, Screen } from './types';
+import { resolveContactPreferencesForContact } from './contactPreferences';
+import { assessDuplicateMessageRisk } from './duplicateGuard';
 import { validateMessageBodyForChannel } from './messageBodyPolicy';
+import { eventOccurrenceLocalDateKey } from './occasionDates';
+import { scheduleMessageForEvent } from './schedulingPolicy';
 
 export type MessageInboxTab = 'All' | 'Review' | 'Today' | 'Scheduled' | 'Blocked' | 'Failed' | 'Sent' | 'Rejected';
 export type MessageInboxChannelFilter = 'All' | MessageChannel;
@@ -11,6 +15,8 @@ export interface MessageInboxRecovery {
   detail: string;
   actionLabel: string;
   targetScreen: Screen;
+  /** Strict console action that performs the advertised recovery step. */
+  command: Record<string, unknown>;
 }
 
 export interface MessageInboxRow {
@@ -52,7 +58,16 @@ export interface MessageInboxOptions {
   nowIso?: string;
 }
 
-export const messageInboxTabs: MessageInboxTab[] = ['All', 'Review', 'Today', 'Scheduled', 'Blocked', 'Failed', 'Sent', 'Rejected'];
+export const messageInboxTabs: MessageInboxTab[] = [
+  'All',
+  'Review',
+  'Today',
+  'Scheduled',
+  'Blocked',
+  'Failed',
+  'Sent',
+  'Rejected'
+];
 export const messageInboxChannelFilters: MessageInboxChannelFilter[] = ['All', 'SMS', 'WhatsApp', 'Email', 'Manual'];
 export const messageInboxSorts: MessageInboxSort[] = ['Newest', 'Scheduled', 'Contact', 'Status'];
 export const messageBulkActions: MessageBulkAction[] = ['Approve', 'Reject', 'Retry', 'Revoke approval'];
@@ -68,9 +83,9 @@ const tabForMessage = (message: MessageDraft): MessageInboxTab =>
           ? 'Failed'
           : message.status === 'Delivery pending' || message.status === 'Delivery unknown'
             ? 'Failed'
-          : message.status === 'Sent'
-            ? 'Sent'
-            : 'Rejected';
+            : message.status === 'Sent'
+              ? 'Sent'
+              : 'Rejected';
 
 const searchTextFor = (row: MessageInboxRow) =>
   [
@@ -88,28 +103,45 @@ const searchTextFor = (row: MessageInboxRow) =>
     .join(' ')
     .toLowerCase();
 
-const messageTime = (message: MessageDraft) =>
-  message.sentAt ?? message.scheduledFor ?? '';
+const messageTime = (message: MessageDraft) => message.sentAt ?? message.scheduledFor ?? '';
 
 const isReviewQueueMessage = (message: MessageDraft) => message.status === 'Needs review' || message.status === 'Draft';
-const datePart = (iso?: string) => (iso?.includes('T') ? iso.slice(0, 10) : undefined);
+const localDatePart = (iso?: string) => {
+  if (!iso) return undefined;
+  const value = new Date(iso);
+  if (Number.isNaN(value.getTime())) return undefined;
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+};
 const isScheduledForDate = (message: MessageDraft, iso: string) =>
-  message.status === 'Scheduled' && datePart(message.scheduledFor) === datePart(iso);
+  message.status === 'Scheduled' && localDatePart(message.scheduledFor) === localDatePart(iso);
 const messageMatchesTab = (message: MessageDraft, tab: MessageInboxTab, nowIso: string) =>
   tab === 'All' || (tab === 'Today' ? isScheduledForDate(message, nowIso) : tabForMessage(message) === tab);
 
 export const findNextReviewMessageId = (state: AppState, currentMessageId?: string) =>
   state.messages.find(message => message.id !== currentMessageId && isReviewQueueMessage(message))?.id;
 
-export const messageApprovalRouteIssue = (state: AppState, message: MessageDraft) => {
+export const messageApprovalRouteIssue = (
+  state: AppState,
+  message: MessageDraft,
+  options: { allowDndManualControl?: boolean; allowShareFallback?: boolean } = {}
+) => {
   const contact = state.contacts.find(item => item.id === message.contactId);
   if (!contact) {
     return 'The contact is no longer available.';
   }
 
-  if (contact.dnd) {
+  if (contact.archivedAt) {
+    return 'The contact is archived. Restore it before scheduling or sending.';
+  }
+
+  if (contact.dnd && !options.allowDndManualControl) {
     return 'Contact is in do-not-disturb.';
   }
+
+  // A deliberate post-approval copy/share fallback needs no recipient route.
+  // Contact existence/archive, approval, timing, body and duplicate checks are
+  // still enforced by the surrounding handoff boundary.
+  if (options.allowShareFallback) return undefined;
 
   if (message.channel === 'SMS') {
     if (!state.settings.smsEnabled) {
@@ -127,25 +159,43 @@ export const messageApprovalRouteIssue = (state: AppState, message: MessageDraft
     if (!contact.phone) {
       return 'WhatsApp handoff requires a phone number.';
     }
+    if (!state.privacy.whatsappHandoffConsent) {
+      return 'WhatsApp handoff requires explicit consent before the destination app can be opened.';
+    }
   }
 
   if (message.channel === 'Email') {
-    if (!state.settings.emailEnabled) {
-      return 'Email delivery is disabled in Settings.';
-    }
     if (!contact.email) {
-      return 'Email delivery requires a recipient address.';
+      return 'Email handoff requires a recipient address.';
     }
   }
 
   return undefined;
 };
 
-const bulkEligibilityIssue = (
-  state: AppState,
-  message: MessageDraft,
-  action: MessageBulkAction
-) => {
+const bulkApprovalScheduleIssue = (state: AppState, message: MessageDraft, now: Date) => {
+  if (!message.eventId) {
+    return message.scheduledFor
+      ? 'This draft has a scheduled time without event context. Clear the stale time or link an event before approval.'
+      : undefined;
+  }
+  const event = state.events.find(item => item.id === message.eventId && item.contactId === message.contactId);
+  if (!event) {
+    return 'The linked event is no longer valid for this recipient. Return the message to review.';
+  }
+  const currentOccurrence = eventOccurrenceLocalDateKey(event, now);
+  if (message.occurrenceDate && message.occurrenceDate !== currentOccurrence) {
+    return 'This draft targets an event occurrence that has passed. Regenerate it for the current occurrence before approval.';
+  }
+  const contact = state.contacts.find(item => item.id === message.contactId);
+  const preferences = contact ? resolveContactPreferencesForContact(state.settings, contact) : undefined;
+  return scheduleMessageForEvent(event, state.settings, message.channel, now, {
+    customSendTime: preferences?.customSendTime,
+    quietHoursBehavior: preferences?.quietHoursBehavior
+  }).issue;
+};
+
+const bulkEligibilityIssue = (state: AppState, message: MessageDraft, action: MessageBulkAction, now: Date) => {
   if (action === 'Approve') {
     if (message.status !== 'Needs review' && message.status !== 'Draft') {
       return 'Only review or draft messages can be approved.';
@@ -154,14 +204,19 @@ const bulkEligibilityIssue = (
     if (!bodyPolicy.ok) {
       return bodyPolicy.message;
     }
-    if (message.duplicateWarning && !message.duplicateAcknowledged) {
+    const duplicateRisk = assessDuplicateMessageRisk(state, message);
+    if (duplicateRisk.risk.risk && !duplicateRisk.acknowledged) {
       return 'Duplicate risk must be acknowledged from preview first.';
     }
-    return messageApprovalRouteIssue(state, message);
+    return messageApprovalRouteIssue(state, message) ?? bulkApprovalScheduleIssue(state, message, now);
   }
 
   if (action === 'Reject') {
-    if (message.status === 'Scheduled' || message.status === 'Delivery pending' || message.status === 'Delivery unknown') {
+    if (
+      message.status === 'Scheduled' ||
+      message.status === 'Delivery pending' ||
+      message.status === 'Delivery unknown'
+    ) {
       return 'Scheduled or in-flight deliveries cannot be rejected.';
     }
     if (message.status === 'Sent' || message.status === 'Rejected') {
@@ -207,9 +262,7 @@ const buildBulkVerificationGuidance = (
   }
 
   const previouslySentChannels = new Set(
-    state.messages
-      .filter(message => message.status === 'Sent')
-      .map(message => message.channel)
+    state.messages.filter(message => message.status === 'Sent').map(message => message.channel)
   );
   const unverifiedChannels = Array.from(
     new Set(
@@ -231,7 +284,8 @@ const buildBulkVerificationGuidance = (
 export const buildMessageBulkActionReport = (
   state: AppState,
   messageIds: string[],
-  action: MessageBulkAction
+  action: MessageBulkAction,
+  now: Date = new Date()
 ): MessageBulkActionReport => {
   const uniqueIds = Array.from(new Set(messageIds));
   const messagesById = new Map(state.messages.map(message => [message.id, message]));
@@ -251,7 +305,7 @@ export const buildMessageBulkActionReport = (
     }
 
     const contactName = state.contacts.find(contact => contact.id === message.contactId)?.name ?? 'Unknown contact';
-    const issue = bulkEligibilityIssue(state, message, action);
+    const issue = bulkEligibilityIssue(state, message, action, now);
     if (issue) {
       skipped.push({
         messageId,
@@ -309,7 +363,8 @@ const buildRecovery = (
       title: 'Delivery confirmation pending',
       detail: 'The provider accepted this attempt. Wait for status reconciliation; do not send it again.',
       actionLabel: 'Review delivery',
-      targetScreen: 'wishPreview'
+      targetScreen: 'wishPreview',
+      command: { type: 'email.reconcile', messageId: message.id }
     };
   }
   if (message.status === 'Delivery unknown') {
@@ -317,7 +372,8 @@ const buildRecovery = (
       title: 'Delivery status unknown',
       detail: 'The provider result was lost. Reconcile the existing idempotent attempt before any retry.',
       actionLabel: 'Review delivery',
-      targetScreen: 'wishPreview'
+      targetScreen: 'wishPreview',
+      command: { type: 'email.reconcile', messageId: message.id }
     };
   }
   if (message.status !== 'Failed' && message.status !== 'Blocked') {
@@ -330,7 +386,8 @@ const buildRecovery = (
       title: 'Contact unavailable',
       detail: 'The contact attached to this message is missing. Review contacts before retrying.',
       actionLabel: 'Open contacts',
-      targetScreen: 'contacts'
+      targetScreen: 'contacts',
+      command: { type: 'contacts.query', sort: 'Name' }
     };
   }
 
@@ -339,17 +396,20 @@ const buildRecovery = (
     return {
       title: 'Message needs editing',
       detail: bodyPolicy.message,
-      actionLabel: 'Edit preview',
-      targetScreen: 'wishPreview'
+      actionLabel: 'Prepare retry for editing',
+      targetScreen: 'wishPreview',
+      command: { type: 'messages.retry', messageId: message.id }
     };
   }
 
-  if (message.duplicateWarning && !message.duplicateAcknowledged) {
+  const duplicateRisk = assessDuplicateMessageRisk(state, message);
+  if (duplicateRisk.risk.risk && !duplicateRisk.acknowledged) {
     return {
       title: 'Duplicate risk needs review',
       detail: 'A similar message exists. Edit, reject, or explicitly continue after review.',
-      actionLabel: 'Review duplicate',
-      targetScreen: 'wishPreview'
+      actionLabel: 'Prepare retry for review',
+      targetScreen: 'wishPreview',
+      command: { type: 'messages.retry', messageId: message.id }
     };
   }
 
@@ -358,7 +418,8 @@ const buildRecovery = (
       title: 'Missing phone number',
       detail: `${message.channel} handoff needs a phone number or a manual fallback.`,
       actionLabel: 'Open contact',
-      targetScreen: 'contactDetail'
+      targetScreen: 'contactDetail',
+      command: { type: 'contacts.inspect', contactId: contact.id }
     };
   }
 
@@ -367,7 +428,8 @@ const buildRecovery = (
       title: 'Missing email address',
       detail: 'Email delivery needs a recipient address or manual fallback.',
       actionLabel: 'Open contact',
-      targetScreen: 'contactDetail'
+      targetScreen: 'contactDetail',
+      command: { type: 'contacts.inspect', contactId: contact.id }
     };
   }
 
@@ -376,7 +438,8 @@ const buildRecovery = (
       title: 'Email provider not configured',
       detail: 'Configure provider delivery or use email handoff.',
       actionLabel: 'Open setup',
-      targetScreen: 'more'
+      targetScreen: 'setupCheck',
+      command: { type: 'setup.inspect' }
     };
   }
 
@@ -384,14 +447,12 @@ const buildRecovery = (
     title: 'Ready to retry',
     detail: message.lastError ?? 'Retry after reviewing the message and route.',
     actionLabel: 'Retry message',
-    targetScreen: 'messages'
+    targetScreen: 'messages',
+    command: { type: 'messages.retry', messageId: message.id }
   };
 };
 
-export const buildMessageInbox = (
-  state: AppState,
-  options: MessageInboxOptions
-): MessageInboxResult => {
+export const buildMessageInbox = (state: AppState, options: MessageInboxOptions): MessageInboxResult => {
   const nowIso = options.nowIso ?? new Date().toISOString();
   const rows = state.messages.map(message => {
     const contact = state.contacts.find(item => item.id === message.contactId);
@@ -419,10 +480,15 @@ export const buildMessageInbox = (
     .filter(row => query.length === 0 || searchTextFor(row).includes(query))
     .sort((a, b) => {
       if (options.sort === 'Contact') {
-        return a.contactName.localeCompare(b.contactName) || messageTime(b.message).localeCompare(messageTime(a.message));
+        return (
+          a.contactName.localeCompare(b.contactName) || messageTime(b.message).localeCompare(messageTime(a.message))
+        );
       }
       if (options.sort === 'Status') {
-        return a.message.status.localeCompare(b.message.status) || messageTime(b.message).localeCompare(messageTime(a.message));
+        return (
+          a.message.status.localeCompare(b.message.status) ||
+          messageTime(b.message).localeCompare(messageTime(a.message))
+        );
       }
       if (options.sort === 'Scheduled') {
         return (a.message.scheduledFor ?? '9999').localeCompare(b.message.scheduledFor ?? '9999');

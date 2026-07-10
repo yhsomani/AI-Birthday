@@ -1,19 +1,14 @@
 import type { MessageDraft, MessageRegenerationFeedback } from './types';
 
 export type WishFeedbackOptionId =
-  | 'more-personal'
-  | 'warmer'
-  | 'shorter'
-  | 'more-formal'
-  | 'less-generic'
-  | 'avoid-emoji';
+  'more-personal' | 'warmer' | 'shorter' | 'more-formal' | 'less-generic' | 'avoid-emoji';
 
 export type WishFeedbackOption = {
   id: WishFeedbackOptionId;
   label: string;
   instruction: string;
   detail: string;
-  recommendedFor: Array<MessageDraft['quality']>;
+  recommendedFor: MessageDraft['quality'][];
 };
 
 export type WishFeedbackInput = {
@@ -86,17 +81,12 @@ const normalize = (value: string, maxLength: number) => value.trim().replace(/\s
 
 const previousDraftExcerpt = (message: MessageDraft) => normalize(message.body, 220);
 
-export const buildWishFeedbackPlan = (
-  message: MessageDraft,
-  input: WishFeedbackInput = {}
-): WishFeedbackPlan => {
+export const buildWishFeedbackPlan = (message: MessageDraft, input: WishFeedbackInput = {}): WishFeedbackPlan => {
   const selectedIds = new Set(input.selectedOptionIds ?? []);
   const selectedOptions = wishFeedbackOptions.filter(option => selectedIds.has(option.id));
   const customText = normalize(input.customText ?? '', WISH_CUSTOM_FEEDBACK_MAX_LENGTH + 1);
   const customTooLong = customText.length > WISH_CUSTOM_FEEDBACK_MAX_LENGTH;
-  const warnings = customTooLong
-    ? [`Feedback must be ${WISH_CUSTOM_FEEDBACK_MAX_LENGTH} characters or less.`]
-    : [];
+  const warnings = customTooLong ? [`Feedback must be ${WISH_CUSTOM_FEEDBACK_MAX_LENGTH} characters or less.`] : [];
   const hasGuidance = selectedOptions.length > 0 || customText.length > 0;
   const recommendedOptions = wishFeedbackOptions.filter(option => option.recommendedFor.includes(message.quality));
   const requestFeedback =
@@ -108,16 +98,10 @@ export const buildWishFeedbackPlan = (
         }
       : undefined;
   const selectedLabels = selectedOptions.map(option => option.label.toLowerCase());
-  const summaryParts = [
-    ...selectedLabels,
-    ...(customText && !customTooLong ? ['custom guidance'] : [])
-  ];
+  const summaryParts = [...selectedLabels, ...(customText && !customTooLong ? ['custom guidance'] : [])];
 
   return {
-    options: [
-      ...recommendedOptions,
-      ...wishFeedbackOptions.filter(option => !recommendedOptions.includes(option))
-    ],
+    options: [...recommendedOptions, ...wishFeedbackOptions.filter(option => !recommendedOptions.includes(option))],
     selectedOptions,
     customText,
     characterCount: customText.length,

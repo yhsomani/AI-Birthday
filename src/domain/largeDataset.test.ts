@@ -148,4 +148,3 @@ describe('large dataset workflow contract', () => {
     assert.ok(elapsedMs < 5000, `large dataset builders took ${Math.round(elapsedMs)}ms`);
   });
 });
-

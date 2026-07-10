@@ -75,6 +75,7 @@ const stateWithUpcomingEvent = (): AppState => {
   ];
   state.settings.notificationsEnabled = true;
   state.reminderPlans = [];
+  state.messages = state.messages.map(message => ({ ...message, eventId: undefined }));
   return state;
 };
 
@@ -190,9 +191,15 @@ describe('permission and reminder lifecycle coordinator', () => {
     assert.ok(result.plannedReminders.length > 0);
     assert.deepEqual(
       reconciledPlans,
+      result.desiredNativeReminders.map(plan => plan.id)
+    );
+    assert.ok(reconciledPlans.some(id => id.includes('pending-approval')));
+    assert.ok(reconciledPlans.some(id => id.includes('setup-blocker')));
+    assert.ok(reconciledPlans.some(id => id.includes('check-in-suggestion')));
+    assert.deepEqual(
+      publishedPlans,
       result.plannedReminders.map(plan => plan.id)
     );
-    assert.deepEqual(publishedPlans, reconciledPlans);
     assert.equal(publishedRecords?.Notifications.systemAuthorization, 'granted');
   });
 
@@ -227,6 +234,8 @@ describe('permission and reminder lifecycle coordinator', () => {
     assert.deepEqual(calls, [0, 0]);
     assert.equal(restricted.records.Notifications.systemAuthorization, 'restricted');
     assert.ok(restricted.plannedReminders.length > 0, 'in-app plans remain available');
+    assert.ok((restricted.plannedNotifications?.length ?? 0) > restricted.plannedReminders.length);
+    assert.equal(restricted.desiredNativeReminders.length, 0);
   });
 
   it('does not mutate native schedules when authorization cannot be queried', async () => {
@@ -287,6 +296,40 @@ describe('permission and reminder lifecycle coordinator', () => {
     assert.equal(reads, 1);
     assert.equal(reconciles, 1);
     assert.equal(foreground.status, 'reconciled');
+  });
+
+  it('accepts source aggregates after commit without treating derived plans as another source', async () => {
+    const state = stateWithUpcomingEvent();
+    const reasons: string[] = [];
+    let reconciles = 0;
+    const coordinator = new PermissionReminderCoordinator({
+      now: () => new Date(nowIso),
+      readPermissionSnapshot: async () => snapshot(),
+      reconcileReminderNotifications: async plans => {
+        reconciles += 1;
+        return { scheduled: plans.length, skipped: 0, cancelled: 0, unchanged: 0 };
+      },
+      onPermissionRecordsChanged: (_records, reason) => {
+        reasons.push(reason);
+      }
+    });
+
+    await coordinator.afterCommittedChange(state, 'events');
+    await coordinator.afterCommittedChange(state, 'contacts');
+    await coordinator.afterCommittedChange(state, 'messages');
+    await coordinator.afterCommittedChange(state, 'setup');
+    await coordinator.afterCommittedChange(state, 'backups');
+    await coordinator.afterCommittedChange(state, 'settings');
+
+    assert.equal(reconciles, 6);
+    assert.deepEqual(reasons, [
+      'committed-event-change',
+      'committed-contact-change',
+      'committed-message-change',
+      'committed-setup-change',
+      'committed-backup-change',
+      'committed-settings-change'
+    ]);
   });
 
   it('refreshes immediately before each protected operation and maps limited/restricted accurately', async () => {

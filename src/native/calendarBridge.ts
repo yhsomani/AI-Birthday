@@ -1,9 +1,11 @@
 import {
   buildCalendarExportEntries,
   buildCalendarExportPlan,
+  resolveCalendarExportSelection,
   type MirroredCalendarEvent
 } from '../domain/calendarSync';
 import type { AppState, CalendarExportEntry, CalendarImportCandidate } from '../domain/types';
+import { throwIfAborted } from './abort';
 
 const RELATEAI_CALENDAR_TITLE = 'RelateAI Relationship Events';
 
@@ -28,10 +30,33 @@ type CalendarEntryWithNativeSemantics = CalendarExportEntry & {
   };
 };
 
+export interface CalendarBridgeOperationOptions {
+  signal?: AbortSignal;
+  eventIds?: readonly string[];
+}
+
+const cancellationGate = (signal: AbortSignal | undefined) => {
+  let nativeCommitStarted = false;
+  return {
+    checkpoint: () => {
+      if (!nativeCommitStarted) throwIfAborted(signal);
+    },
+    beginNativeCommit: () => {
+      if (!nativeCommitStarted) {
+        throwIfAborted(signal);
+        nativeCommitStarted = true;
+      }
+    }
+  };
+};
+
 const getOrCreateRelateCalendar = async (
-  Calendar: CalendarBridgeApi
+  Calendar: CalendarBridgeApi,
+  gate: ReturnType<typeof cancellationGate>
 ): Promise<DeviceCalendar> => {
+  gate.checkpoint();
   const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
+  gate.checkpoint();
   const existing = calendars.find(calendar => calendar.title === RELATEAI_CALENDAR_TITLE);
   if (existing) {
     return existing;
@@ -45,6 +70,7 @@ const getOrCreateRelateCalendar = async (
     isLocalAccount: true
   };
 
+  gate.beginNativeCommit();
   return Calendar.createCalendar({
     title: RELATEAI_CALENDAR_TITLE,
     color: '#176b5b',
@@ -98,20 +124,14 @@ export const mapCalendarEntryToNativeDetails = (
   ...(!entry.allDay && { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
 });
 
-const toMirroredCalendarEvent = (
-  event: DeviceCalendarEvent,
-  Calendar: CalendarBridgeApi
-): MirroredCalendarEvent => ({
+const toMirroredCalendarEvent = (event: DeviceCalendarEvent, Calendar: CalendarBridgeApi): MirroredCalendarEvent => ({
   id: event.id,
   title: event.title,
   startDate: event.startDate,
   endDate: event.endDate,
   notes: event.notes,
   allDay: event.allDay,
-  recurrenceRule:
-    event.recurrenceRule?.frequency === Calendar.Frequency.YEARLY
-      ? { frequency: 'yearly' }
-      : undefined
+  recurrenceRule: event.recurrenceRule?.frequency === Calendar.Frequency.YEARLY ? { frequency: 'yearly' } : undefined
 });
 
 const exportTokenFromNotes = (notes: string | null | undefined) =>
@@ -122,10 +142,7 @@ const exportTokenFromNotes = (notes: string | null | undefined) =>
     ?.replace('RelateAI export:', '')
     .trim();
 
-const collapseCalendarOccurrences = (
-  events: DeviceCalendarEvent[],
-  entries: CalendarEntryWithNativeSemantics[]
-) => {
+const collapseCalendarOccurrences = (events: DeviceCalendarEvent[], entries: CalendarEntryWithNativeSemantics[]) => {
   const entryById = new Map(entries.map(entry => [entry.id, entry]));
   const selectedBySeriesId = new Map<string, DeviceCalendarEvent>();
 
@@ -141,9 +158,7 @@ const collapseCalendarOccurrences = (
     const eventTime = new Date(event.startDate).getTime();
     const currentTime = new Date(current.startDate).getTime();
     const eventScore = Number.isNaN(targetTime) ? eventTime : Math.abs(eventTime - targetTime);
-    const currentScore = Number.isNaN(targetTime)
-      ? currentTime
-      : Math.abs(currentTime - targetTime);
+    const currentScore = Number.isNaN(targetTime) ? currentTime : Math.abs(currentTime - targetTime);
 
     if (eventScore < currentScore) {
       selectedBySeriesId.set(event.id, event);
@@ -168,20 +183,30 @@ const lifecycleTargetFor = (event: DeviceCalendarEvent) =>
  */
 export const exportEventsToDeviceCalendarWithApi = async (
   state: AppState,
-  Calendar: CalendarBridgeApi
+  Calendar: CalendarBridgeApi,
+  options: CalendarBridgeOperationOptions = {}
 ): Promise<number> => {
+  const gate = cancellationGate(options.signal);
+  gate.checkpoint();
+  const selection = resolveCalendarExportSelection(state, options.eventIds);
+  if (!selection.ok) {
+    throw new Error('Calendar export selection is invalid or no longer exportable.');
+  }
   const permission = await Calendar.requestCalendarPermissions();
+  gate.checkpoint();
   if (permission.status !== 'granted') {
     throw new Error('Calendar permission was not granted.');
   }
 
-  const calendar = await getOrCreateRelateCalendar(Calendar);
-  const entries = buildCalendarExportEntries(state);
+  const calendar = await getOrCreateRelateCalendar(Calendar, gate);
+  const entries = selection.entries;
   const { startDate, endDate } = exportRangeFor(entries);
+  gate.checkpoint();
   const listedEvents = await calendar.listEvents(startDate, endDate);
+  gate.checkpoint();
   const existingEvents = collapseCalendarOccurrences(listedEvents, entries);
   const mirroredEvents = existingEvents.map(event => toMirroredCalendarEvent(event, Calendar));
-  const exportPlan = buildCalendarExportPlan(entries, mirroredEvents);
+  const exportPlan = buildCalendarExportPlan(entries, mirroredEvents, { mode: selection.mode });
   const eventsById = new Map(existingEvents.map(event => [event.id, event]));
 
   for (const staleDeviceEventId of exportPlan.staleDeviceEventIds) {
@@ -189,6 +214,7 @@ export const exportEventsToDeviceCalendarWithApi = async (
     if (!staleEvent) {
       throw new Error(`Calendar event ${staleDeviceEventId} disappeared during reconciliation.`);
     }
+    gate.beginNativeCommit();
     await lifecycleTargetFor(staleEvent).delete();
   }
   for (const update of exportPlan.toUpdate) {
@@ -196,49 +222,93 @@ export const exportEventsToDeviceCalendarWithApi = async (
     if (!deviceEvent) {
       throw new Error(`Calendar event ${update.deviceEventId} disappeared during reconciliation.`);
     }
-    await lifecycleTargetFor(deviceEvent).update(
-      mapCalendarEntryToNativeDetails(update.entry, Calendar)
-    );
+    gate.beginNativeCommit();
+    await lifecycleTargetFor(deviceEvent).update(mapCalendarEntryToNativeDetails(update.entry, Calendar));
   }
   for (const entry of exportPlan.toCreate) {
+    gate.beginNativeCommit();
     await calendar.createEvent(mapCalendarEntryToNativeDetails(entry, Calendar));
   }
 
   return exportPlan.toCreate.length + exportPlan.toUpdate.length;
 };
 
-export const exportEventsToDeviceCalendar = async (state: AppState): Promise<number> => {
+export const exportEventsToDeviceCalendar = async (
+  state: AppState,
+  options: CalendarBridgeOperationOptions = {}
+): Promise<number> => {
   const Calendar = await import('expo-calendar');
-  return exportEventsToDeviceCalendarWithApi(state, Calendar);
+  return exportEventsToDeviceCalendarWithApi(state, Calendar, options);
+};
+
+const allDayCalendarDate = (value: string | Date): string | undefined => {
+  if (typeof value === 'string') {
+    const calendarPrefix = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/.exec(value.trim());
+    if (calendarPrefix) {
+      const year = Number(calendarPrefix[1]);
+      const month = Number(calendarPrefix[2]);
+      const day = Number(calendarPrefix[3]);
+      const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+      if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day) {
+        return date.toISOString();
+      }
+      return undefined;
+    }
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12, 0, 0, 0)).toISOString();
+};
+
+export const normalizeDeviceCalendarImportStartDate = (
+  value: string | Date,
+  allDay: boolean | undefined
+): string | undefined => {
+  if (allDay) return allDayCalendarDate(value);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 };
 
 export const importEventsFromDeviceCalendarWithApi = async (
-  Calendar: CalendarBridgeApi
+  Calendar: CalendarBridgeApi,
+  options: CalendarBridgeOperationOptions = {}
 ): Promise<CalendarImportCandidate[]> => {
+  throwIfAborted(options.signal);
   const permission = await Calendar.requestCalendarPermissions();
+  throwIfAborted(options.signal);
   if (permission.status !== 'granted') {
     throw new Error('Calendar permission was not granted.');
   }
 
+  throwIfAborted(options.signal);
   const calendars = await Calendar.getCalendars(Calendar.EntityTypes.EVENT);
+  throwIfAborted(options.signal);
   const startDate = new Date();
   const endDate = new Date();
   endDate.setFullYear(startDate.getFullYear() + 1);
-  const events = calendars.length
-    ? await Calendar.listEvents(calendars, startDate, endDate)
-    : [];
+  throwIfAborted(options.signal);
+  const events = calendars.length ? await Calendar.listEvents(calendars, startDate, endDate) : [];
+  throwIfAborted(options.signal);
 
-  return events
-    .filter(event => /birthday|anniversary|graduation|follow[- ]?up/i.test(event.title ?? ''))
-    .map(event => ({
+  const candidates: CalendarImportCandidate[] = [];
+  for (const event of events) {
+    throwIfAborted(options.signal);
+    if (!/birthday|anniversary|graduation|follow[- ]?up/i.test(event.title ?? '')) continue;
+    const normalizedStartDate = normalizeDeviceCalendarImportStartDate(event.startDate, event.allDay);
+    if (!normalizedStartDate) continue;
+    candidates.push({
       sourceId: event.id,
       title: event.title ?? 'Calendar event',
-      startDate: new Date(event.startDate).toISOString(),
+      startDate: normalizedStartDate,
       notes: event.notes ?? undefined
-    }));
+    });
+  }
+  return candidates;
 };
 
-export const importEventsFromDeviceCalendar = async (): Promise<CalendarImportCandidate[]> => {
+export const importEventsFromDeviceCalendar = async (
+  options: CalendarBridgeOperationOptions = {}
+): Promise<CalendarImportCandidate[]> => {
   const Calendar = await import('expo-calendar');
-  return importEventsFromDeviceCalendarWithApi(Calendar);
+  return importEventsFromDeviceCalendarWithApi(Calendar, options);
 };

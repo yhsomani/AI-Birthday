@@ -178,9 +178,7 @@ export const createProtectedStateStore = ({
         await protectedBackend.deleteItemAsync(key);
       } catch (error) {
         protectedStorageError =
-          error instanceof ProtectedStorageError
-            ? error
-            : new ProtectedStorageError('remove-failed', 'remove', error);
+          error instanceof ProtectedStorageError ? error : new ProtectedStorageError('remove-failed', 'remove', error);
       }
 
       // Always attempt to purge an obsolete fallback during a user-requested

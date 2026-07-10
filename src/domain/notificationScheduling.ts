@@ -1,5 +1,9 @@
-import { buildReminderNotificationData } from './notificationRoutes';
-import type { ReminderPlan } from './types';
+import {
+  privacyMinimizedNotificationContent,
+  validateOwnedNotificationPlanStructure,
+  type OwnedNotificationPlan
+} from './notificationPlans';
+import { buildReminderNotificationData, isOwnedRelateAiNotificationData } from './notificationRoutes';
 
 export interface ScheduledReminderNotification {
   identifier: string;
@@ -12,23 +16,24 @@ export interface ScheduledReminderNotification {
 }
 
 export interface ReminderNotificationSchedulePlan {
-  toSchedule: ReminderPlan[];
+  toSchedule: OwnedNotificationPlan[];
   toCancel: string[];
   unchangedCount: number;
   skippedPastCount: number;
+  skippedUnsafeCount: number;
+  identifierCollisionCount: number;
 }
 
 const notificationDataMatches = (
   scheduledData: Record<string, unknown> | null | undefined,
-  plan: ReminderPlan
+  plan: OwnedNotificationPlan
 ) => {
   const desiredData = buildReminderNotificationData(plan);
+  if (!scheduledData) return false;
+  const desiredEntries = Object.entries(desiredData);
   return (
-    scheduledData?.route === desiredData.route &&
-    scheduledData.safeAction === desiredData.safeAction &&
-    scheduledData.eventId === desiredData.eventId &&
-    scheduledData.contactId === desiredData.contactId &&
-    scheduledData.url === desiredData.url
+    Object.keys(scheduledData).length === desiredEntries.length &&
+    desiredEntries.every(([key, value]) => scheduledData[key] === value)
   );
 };
 
@@ -53,32 +58,38 @@ const triggerTimeFor = (trigger: unknown): number => {
 };
 
 const isRelateAiReminderNotification = (notification: ScheduledReminderNotification) =>
-  notification.content?.data?.route === 'event-reminder' &&
-  notification.content.data.safeAction === 'open-review';
+  isOwnedRelateAiNotificationData(notification.content?.data, notification.identifier);
 
-const reminderNotificationMatchesPlan = (
-  notification: ScheduledReminderNotification,
-  plan: ReminderPlan
-) =>
-  notification.content?.title === plan.title &&
-  notification.content?.body === plan.body &&
-  notificationDataMatches(notification.content?.data, plan) &&
-  triggerTimeFor(notification.trigger) === new Date(plan.triggerAt).getTime();
+const reminderNotificationMatchesPlan = (notification: ScheduledReminderNotification, plan: OwnedNotificationPlan) => {
+  const content = privacyMinimizedNotificationContent(plan);
+  return (
+    notification.content?.title === content.title &&
+    notification.content?.body === content.body &&
+    notificationDataMatches(notification.content?.data, plan) &&
+    triggerTimeFor(notification.trigger) === new Date(plan.triggerAt).getTime()
+  );
+};
 
 export const buildReminderNotificationSchedulePlan = (
-  plans: ReminderPlan[],
+  plans: OwnedNotificationPlan[],
   scheduledNotifications: ScheduledReminderNotification[],
   now: Date = new Date()
 ): ReminderNotificationSchedulePlan => {
-  const toSchedule: ReminderPlan[] = [];
+  const toSchedule: OwnedNotificationPlan[] = [];
   const toCancel = new Set<string>();
   let unchangedCount = 0;
   let skippedPastCount = 0;
+  let skippedUnsafeCount = 0;
+  let identifierCollisionCount = 0;
 
   const futurePlans = plans.filter(plan => {
     const triggerAt = new Date(plan.triggerAt).getTime();
     if (Number.isNaN(triggerAt) || triggerAt <= now.getTime()) {
       skippedPastCount += 1;
+      return false;
+    }
+    if (!validateOwnedNotificationPlanStructure(plan).ok) {
+      skippedUnsafeCount += 1;
       return false;
     }
     return true;
@@ -87,22 +98,26 @@ export const buildReminderNotificationSchedulePlan = (
 
   for (const plan of futurePlans) {
     const matches = scheduledNotifications.filter(notification => notification.identifier === plan.id);
-    const [primary, ...duplicates] = matches;
-    duplicates.forEach(duplicate => {
-      if (isRelateAiReminderNotification(duplicate)) {
-        toCancel.add(duplicate.identifier);
-      }
-    });
+    const [primary] = matches;
 
     if (!primary) {
       toSchedule.push(plan);
       continue;
     }
 
+    if (matches.some(notification => !isRelateAiReminderNotification(notification))) {
+      identifierCollisionCount += 1;
+      continue;
+    }
+
+    if (matches.length > 1) {
+      toCancel.add(plan.id);
+      toSchedule.push(plan);
+      continue;
+    }
+
     if (!reminderNotificationMatchesPlan(primary, plan)) {
-      if (isRelateAiReminderNotification(primary)) {
-        toCancel.add(primary.identifier);
-      }
+      toCancel.add(primary.identifier);
       toSchedule.push(plan);
     } else {
       unchangedCount += 1;
@@ -122,6 +137,8 @@ export const buildReminderNotificationSchedulePlan = (
     toSchedule,
     toCancel: [...toCancel],
     unchangedCount,
-    skippedPastCount
+    skippedPastCount,
+    skippedUnsafeCount,
+    identifierCollisionCount
   };
 };

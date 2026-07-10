@@ -7,6 +7,7 @@ import type {
   PartialContactDetails
 } from 'expo-contacts';
 import type { ImportedContactRecord } from '../domain/types';
+import { throwIfAborted } from './abort';
 
 const CONTACT_IMPORT_PAGE_SIZE = 250;
 
@@ -32,12 +33,29 @@ export interface ContactsImportApi {
   };
 }
 
-const buildBirthday = (birthday: ContactDate | null | undefined): string | undefined => {
-  if (!birthday?.day || !birthday.month) {
-    return undefined;
+export interface DeviceContactImportOptions {
+  fallbackBirthdayYear?: number;
+  signal?: AbortSignal;
+}
+
+const INVALID_IMPORTED_BIRTHDAY = 'invalid-imported-birthday';
+
+const buildBirthday = (birthday: ContactDate | null | undefined, fallbackBirthdayYear: number): string | undefined => {
+  if (!birthday) return undefined;
+  if (!birthday.day || !birthday.month) return INVALID_IMPORTED_BIRTHDAY;
+  const year = birthday.year ?? fallbackBirthdayYear;
+  if (!Number.isInteger(year) || year < 1 || year > 9999) {
+    return INVALID_IMPORTED_BIRTHDAY;
   }
-  const year = birthday.year ?? new Date().getFullYear();
-  return new Date(year, birthday.month - 1, birthday.day).toISOString();
+  const date = new Date(Date.UTC(year, birthday.month - 1, birthday.day, 12, 0, 0, 0));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== birthday.month - 1 ||
+    date.getUTCDate() !== birthday.day
+  ) {
+    return INVALID_IMPORTED_BIRTHDAY;
+  }
+  return date.toISOString();
 };
 
 const birthdayFrom = (contact: ContactImportDetails) => {
@@ -45,27 +63,31 @@ const birthdayFrom = (contact: ContactImportDetails) => {
     return contact.birthday;
   }
 
-  return contact.dates?.find(
-    (date: ExistingDate) => date.label?.trim().toLowerCase() === 'birthday'
-  )?.date;
+  return contact.dates?.find((date: ExistingDate) => date.label?.trim().toLowerCase() === 'birthday')?.date;
 };
 
-const firstPhone = (phones: ExistingPhone[] | undefined) =>
-  phones?.find(phone => Boolean(phone.number?.trim()))?.number;
+const allPhones = (phones: ExistingPhone[] | undefined) => [
+  ...new Set(phones?.map(phone => phone.number?.trim()).filter((value): value is string => Boolean(value)) ?? [])
+];
 
-const firstEmail = (emails: ExistingEmail[] | undefined) =>
-  emails?.find(email => Boolean(email.address?.trim()))?.address;
+const allEmails = (emails: ExistingEmail[] | undefined) => [
+  ...new Set(emails?.map(email => email.address?.trim()).filter((value): value is string => Boolean(value)) ?? [])
+];
 
-const toImportedRecord = (contact: ContactImportDetails): ImportedContactRecord => {
+const toImportedRecord = (contact: ContactImportDetails, fallbackBirthdayYear: number): ImportedContactRecord => {
   const composedName = [contact.givenName, contact.familyName].filter(Boolean).join(' ').trim();
   const name = contact.fullName?.trim() || composedName;
 
+  const phones = allPhones(contact.phones);
+  const emails = allEmails(contact.emails);
   return {
     sourceId: contact.id || `${name || 'contact'}-device`,
     name,
-    phone: firstPhone(contact.phones),
-    email: firstEmail(contact.emails),
-    birthday: buildBirthday(birthdayFrom(contact)),
+    phone: phones[0],
+    email: emails[0],
+    phones,
+    emails,
+    birthday: buildBirthday(birthdayFrom(contact), fallbackBirthdayYear),
     relationship: undefined
   };
 };
@@ -76,22 +98,28 @@ const toImportedRecord = (contact: ContactImportDetails): ImportedContactRecord 
  * `importDeviceContacts`, which supplies the installed native module.
  */
 export const importDeviceContactsWithApi = async (
-  Contacts: ContactsImportApi
+  Contacts: ContactsImportApi,
+  options: DeviceContactImportOptions = {}
 ): Promise<ImportedContactRecord[]> => {
+  throwIfAborted(options.signal);
   const permission = await Contacts.requestPermissionsAsync();
+  throwIfAborted(options.signal);
   if (permission.status !== 'granted') {
     throw new Error('Contacts permission was not granted.');
   }
 
   const imported: ImportedContactRecord[] = [];
   const seenContactIds = new Set<string>();
+  const fallbackBirthdayYear = options.fallbackBirthdayYear ?? new Date().getUTCFullYear();
   let offset = 0;
 
   while (true) {
+    throwIfAborted(options.signal);
     const page = await Contacts.Contact.getAllDetails(CONTACT_IMPORT_FIELDS, {
       limit: CONTACT_IMPORT_PAGE_SIZE,
       offset
     });
+    throwIfAborted(options.signal);
 
     if (page.length === 0) {
       break;
@@ -99,11 +127,12 @@ export const importDeviceContactsWithApi = async (
 
     let newRecords = 0;
     for (const contact of page) {
+      throwIfAborted(options.signal);
       if (seenContactIds.has(contact.id)) {
         continue;
       }
       seenContactIds.add(contact.id);
-      imported.push(toImportedRecord(contact));
+      imported.push(toImportedRecord(contact, fallbackBirthdayYear));
       newRecords += 1;
     }
 
@@ -120,25 +149,9 @@ export const importDeviceContactsWithApi = async (
   return imported;
 };
 
-export const importDeviceContacts = async (): Promise<ImportedContactRecord[]> => {
+export const importDeviceContacts = async (
+  options: DeviceContactImportOptions = {}
+): Promise<ImportedContactRecord[]> => {
   const Contacts = await import('expo-contacts');
-  return importDeviceContactsWithApi(Contacts);
+  return importDeviceContactsWithApi(Contacts, options);
 };
-
-export const sampleImportRecords = (): ImportedContactRecord[] => [
-  {
-    sourceId: 'sample-asha-duplicate',
-    name: 'Asha Mehra',
-    phone: '+91 98765 43210',
-    birthday: new Date(new Date().getFullYear(), 7, 4).toISOString(),
-    relationship: 'Sister'
-  },
-  {
-    sourceId: 'sample-dev',
-    name: 'Dev Kapoor',
-    phone: '+91 90000 12345',
-    email: 'dev@example.com',
-    birthday: new Date(new Date().getFullYear(), 10, 14).toISOString(),
-    relationship: 'Friend'
-  }
-];

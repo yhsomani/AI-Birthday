@@ -164,8 +164,7 @@ export const initialState: AppState = {
         short: 'Happy birthday Asha! Hope your day is full of laughter, mango lassi, and a lot of love.',
         standard:
           'Happy birthday Asha! Hope your day is full of mango lassi, laughter, and all the family chaos you secretly enjoy. Wishing you a beautiful year ahead.',
-        warm:
-          'Happy birthday Asha. You make family life warmer, funnier, and lighter. Hope this year brings you joy, rest, and many mango-lassi-level good moments.'
+        warm: 'Happy birthday Asha. You make family life warmer, funnier, and lighter. Hope this year brings you joy, rest, and many mango-lassi-level good moments.'
       },
       scheduledFor: isoFromNow(5),
       quality: 'AI draft',
@@ -184,8 +183,7 @@ export const initialState: AppState = {
         short: 'Hey Mira, how is Pune treating you? Hope the new role is starting well.',
         standard:
           'Hey Mira, how is Pune treating you so far? I was thinking of you and hope the new design role is starting well.',
-        warm:
-          'Hey Mira, just wanted to check in. Moving cities is a lot, and I hope Pune and the new design role are slowly starting to feel like home.'
+        warm: 'Hey Mira, just wanted to check in. Moving cities is a lot, and I hope Pune and the new design role are slowly starting to feel like home.'
       },
       quality: 'AI draft',
       readiness: 'Use manual handoff'
@@ -215,7 +213,10 @@ export const initialState: AppState = {
     language: 'English with Hinglish allowed per contact',
     averageLength: 142,
     emojiUse: 'Light',
-    sampleCount: 8
+    sampleCount: 8,
+    enabledForAiDrafts: true,
+    commonGreetings: ['Hi', 'Hey'],
+    representativePreview: 'Hey! Thinking of you and sending warm wishes.'
   },
   backups: [
     {
@@ -240,6 +241,7 @@ export const initialState: AppState = {
       start: '22:00',
       end: '08:00'
     },
+    defaultSendTime: '09:00',
     blackouts: []
   },
   onboarding: {

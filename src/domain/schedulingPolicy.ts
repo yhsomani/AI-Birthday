@@ -1,5 +1,16 @@
 import { availableAutomationModes, productAvailability } from '../config/productAvailability';
-import type { AppState, AutomationMode, ReminderPlan, ScheduleBlackout, SettingsState } from './types';
+import { eventOccurrenceLocalDateKey } from './occasionDates';
+import type {
+  AppState,
+  AutomationMode,
+  ContactQuietHoursBehavior,
+  MessageChannel,
+  MessageDraft,
+  RelationshipEvent,
+  ReminderPlan,
+  ScheduleBlackout,
+  SettingsState
+} from './types';
 
 /** Modes that are genuinely selectable in this release. */
 export const automationModes: AutomationMode[] = [...availableAutomationModes];
@@ -27,10 +38,46 @@ export interface BlackoutInput {
   label: string;
   startDate: string;
   endDate: string;
+  behavior?: 'Block' | 'Defer';
+  channels?: MessageChannel[];
+}
+
+export interface ContactSchedulingPreferences {
+  customSendTime?: string;
+  quietHoursBehavior?: ContactQuietHoursBehavior;
 }
 
 const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+const messageChannels = new Set<MessageChannel>(['SMS', 'WhatsApp', 'Email', 'Manual']);
+const MAX_SCHEDULE_TIME_ZONE_LENGTH = 128;
+
+/** Returns a canonical IANA time-zone identity when the runtime supports it. */
+export const normalizeScheduleTimeZone = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const candidate = value.trim();
+  if (candidate.length === 0 || candidate.length > MAX_SCHEDULE_TIME_ZONE_LENGTH) return undefined;
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: candidate }).resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+};
+
+/** The current device zone, with UTC as a fail-closed, deterministic platform fallback. */
+export const currentScheduleTimeZone = (): string => {
+  try {
+    return normalizeScheduleTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone) ?? 'UTC';
+  } catch {
+    return 'UTC';
+  }
+};
+
+export const scheduleTimeZonesMatch = (left: unknown, right: unknown): boolean => {
+  const normalizedLeft = normalizeScheduleTimeZone(left);
+  const normalizedRight = normalizeScheduleTimeZone(right);
+  return normalizedLeft !== undefined && normalizedLeft === normalizedRight;
+};
 
 const parseTime = (value: string) => {
   const match = timePattern.exec(value.trim());
@@ -82,6 +129,9 @@ export const validateQuietHours = (quietHours: SettingsState['quietHours']) => {
   return undefined;
 };
 
+export const validateDefaultSendTime = (value: string) =>
+  parseTime(value) === undefined ? 'Default send time must use a 24-hour HH:mm time.' : undefined;
+
 export const validateBlackoutInput = (input: BlackoutInput) => {
   const label = input.label.trim().replace(/\s+/g, ' ');
   const startDate = normalizeDateKey(input.startDate);
@@ -98,12 +148,27 @@ export const validateBlackoutInput = (input: BlackoutInput) => {
   if (label.length > 80) {
     return { ok: false as const, message: 'Blackout label is too long.' };
   }
+  const behavior = input.behavior ?? 'Defer';
+  if (behavior !== 'Block' && behavior !== 'Defer') {
+    return { ok: false as const, message: 'Blackout behavior must block or defer.' };
+  }
+  const channels = input.channels ? [...new Set(input.channels)] : undefined;
+  if (
+    channels &&
+    (channels.length === 0 ||
+      channels.length !== input.channels?.length ||
+      channels.some(channel => !messageChannels.has(channel)))
+  ) {
+    return { ok: false as const, message: 'Blackout channels contain an unsupported or duplicate value.' };
+  }
   return {
     ok: true as const,
     value: {
       label,
       startDate,
-      endDate
+      endDate,
+      behavior,
+      ...(channels ? { channels } : {})
     }
   };
 };
@@ -132,9 +197,14 @@ const quietHoursEndFor = (date: Date, quietHours: SettingsState['quietHours']) =
   return endDate;
 };
 
-const blackoutFor = (date: Date, blackouts: ScheduleBlackout[]) => {
+const blackoutFor = (date: Date, blackouts: ScheduleBlackout[], channel?: MessageChannel) => {
   const key = localDateKey(date);
-  return blackouts.find(blackout => blackout.startDate <= key && key <= blackout.endDate);
+  return blackouts.find(
+    blackout =>
+      blackout.startDate <= key &&
+      key <= blackout.endDate &&
+      (!blackout.channels || (channel !== undefined && blackout.channels.includes(channel)))
+  );
 };
 
 const moveAfterBlackout = (date: Date, blackout: ScheduleBlackout) => {
@@ -147,25 +217,120 @@ const moveAfterBlackout = (date: Date, blackout: ScheduleBlackout) => {
 
 export const adjustTriggerForSchedulingPolicy = (
   triggerAt: Date,
-  settings: SettingsState
-): { triggerAt: Date; adjustments: string[] } => {
+  settings: SettingsState,
+  channel?: MessageChannel
+): { triggerAt: Date; adjustments: string[]; blockedBy?: string } => {
   let candidate = new Date(triggerAt);
   const adjustments: string[] = [];
-  for (let attempt = 0; attempt < 10; attempt += 1) {
+  // Every defer advances beyond at least one blackout or quiet-hours window.
+  // The bound scales with persisted policy size so long, valid chains cannot
+  // silently fall through into a prohibited window.
+  const maximumAdjustments = settings.blackouts.length * 2 + 4;
+  for (let attempt = 0; attempt < maximumAdjustments; attempt += 1) {
     if (isWithinQuietHours(candidate, settings.quietHours)) {
       candidate = quietHoursEndFor(candidate, settings.quietHours);
       adjustments.push(`Moved outside quiet hours to ${settings.quietHours.end}.`);
       continue;
     }
-    const blackout = blackoutFor(candidate, settings.blackouts);
+    const blackout = blackoutFor(candidate, settings.blackouts, channel);
     if (blackout) {
+      if ((blackout.behavior ?? 'Defer') === 'Block') {
+        return { triggerAt: candidate, adjustments, blockedBy: blackout.label };
+      }
       candidate = moveAfterBlackout(candidate, blackout);
       adjustments.push(`Moved after blackout: ${blackout.label}.`);
       continue;
     }
-    break;
+    return { triggerAt: candidate, adjustments };
   }
-  return { triggerAt: candidate, adjustments };
+  const unresolvedBlackout = blackoutFor(candidate, settings.blackouts, channel);
+  return {
+    triggerAt: candidate,
+    adjustments,
+    blockedBy: unresolvedBlackout?.label ?? 'the scheduling policy could not find an allowed window'
+  };
+};
+
+const localDateAtTime = (dateKey: string, time: string): Date | undefined => {
+  if (!isRealDateKey(dateKey)) return undefined;
+  const minutes = parseTime(time);
+  if (minutes === undefined) return undefined;
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const value = new Date(year, month - 1, day, Math.floor(minutes / 60), minutes % 60, 0, 0);
+  return value.getFullYear() === year && value.getMonth() === month - 1 && value.getDate() === day ? value : undefined;
+};
+
+export const scheduleMessageForEvent = (
+  event: RelationshipEvent,
+  settings: SettingsState,
+  channel: MessageChannel,
+  reference: Date = new Date(),
+  contactPreferences: ContactSchedulingPreferences = {}
+): { scheduledFor?: string; scheduledTimeZone?: string; adjustments: string[]; issue?: string } => {
+  const scheduledTimeZone = currentScheduleTimeZone();
+  const dateKey = eventOccurrenceLocalDateKey(event, reference);
+  const sendTime = contactPreferences.customSendTime ?? settings.defaultSendTime;
+  const candidate = dateKey ? localDateAtTime(dateKey, sendTime) : undefined;
+  if (!candidate) {
+    return {
+      adjustments: [],
+      issue: contactPreferences.customSendTime
+        ? 'The event date or contact custom send time is invalid.'
+        : 'The event date or default send time is invalid.'
+    };
+  }
+  if (contactPreferences.quietHoursBehavior === 'Block' && isWithinQuietHours(candidate, settings.quietHours)) {
+    return {
+      scheduledFor: candidate.toISOString(),
+      scheduledTimeZone,
+      adjustments: [],
+      issue:
+        'The contact quiet-hours preference blocks this intended send time. Choose a time outside global quiet hours.'
+    };
+  }
+  const adjusted = adjustTriggerForSchedulingPolicy(candidate, settings, channel);
+  if (adjusted.blockedBy) {
+    return {
+      scheduledFor: candidate.toISOString(),
+      scheduledTimeZone,
+      adjustments: adjusted.adjustments,
+      issue: `Sending is blocked by blackout: ${adjusted.blockedBy}.`
+    };
+  }
+  return {
+    scheduledFor: adjusted.triggerAt.toISOString(),
+    scheduledTimeZone,
+    adjustments: adjusted.adjustments
+  };
+};
+
+/** Rechecks the actual dispatch moment; opening a destination is a dispatch attempt. */
+export const messageDispatchTimingIssue = (
+  state: AppState,
+  message: MessageDraft,
+  now: Date = new Date()
+): string | undefined => {
+  if (message.scheduledFor) {
+    const currentTimeZone = currentScheduleTimeZone();
+    if (message.scheduledTimeZone && !scheduleTimeZonesMatch(message.scheduledTimeZone, currentTimeZone)) {
+      return `The device time zone changed from ${message.scheduledTimeZone} to ${currentTimeZone}. Return the message to review before sending.`;
+    }
+    const scheduled = new Date(message.scheduledFor);
+    if (Number.isNaN(scheduled.getTime()))
+      return 'The approved send schedule is invalid. Return the message to review.';
+    if (scheduled.getTime() > now.getTime()) return 'This message is not due yet. Wait for its approved send time.';
+  }
+  const contact = state.contacts.find(item => item.id === message.contactId);
+  if (contact?.quietHoursBehavior === 'Block' && isWithinQuietHours(now, state.settings.quietHours)) {
+    return 'The contact quiet-hours preference blocks dispatch during global quiet hours.';
+  }
+  const currentWindow = adjustTriggerForSchedulingPolicy(now, state.settings, message.channel);
+  if (currentWindow.blockedBy)
+    return `Sending is blocked by the current scheduling policy: ${currentWindow.blockedBy}.`;
+  if (currentWindow.triggerAt.getTime() !== now.getTime()) {
+    return `Sending is deferred until ${currentWindow.triggerAt.toISOString()} by the current schedule policy.`;
+  }
+  return undefined;
 };
 
 export const buildSchedulingPolicySummary = (state: AppState): SchedulingPolicySummary => {
@@ -186,6 +351,16 @@ export const buildSchedulingPolicySummary = (state: AppState): SchedulingPolicyS
       severity: 'Error',
       title: 'Quiet hours need review',
       detail: quietHoursProblem
+    });
+  }
+
+  const sendTimeProblem = validateDefaultSendTime(state.settings.defaultSendTime);
+  if (sendTimeProblem) {
+    issues.push({
+      id: 'default-send-time-invalid',
+      severity: 'Error',
+      title: 'Default send time needs review',
+      detail: sendTimeProblem
     });
   }
 

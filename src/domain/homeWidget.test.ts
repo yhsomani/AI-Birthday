@@ -54,10 +54,7 @@ describe('home widget summary contract', () => {
     const joined = JSON.stringify(summary);
     assert.ok(summary.tiles.some(tile => tile.id === 'today-events'));
     assert.ok(summary.tiles.some(tile => tile.id === 'pending-approvals'));
-    assert.deepEqual(
-      summary.tiles.map(tile => tile.id).sort(),
-      ['pending-approvals', 'today-events']
-    );
+    assert.deepEqual(summary.tiles.map(tile => tile.id).sort(), ['pending-approvals', 'today-events']);
     assert.doesNotMatch(joined, /raw message body|Private memory text|9999999999|secret@example/i);
     assert.doesNotMatch(joined, /private birthday plan|Confidential manager/i);
     assert.ok(summary.tiles.every(tile => !tile.route.messageId && !tile.route.contactId));

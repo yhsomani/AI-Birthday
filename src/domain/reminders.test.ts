@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createTestState } from '../test/testState';
-import { buildReminderPlans } from './reminders';
+import { buildReminderPlanningResult, buildReminderPlans } from './reminders';
 
 describe('reminder planning', () => {
   it('creates upcoming reminder plans for known events', () => {
@@ -24,5 +24,35 @@ describe('reminder planning', () => {
     const plans = buildReminderPlans(state, [365]);
 
     assert.equal(plans.length, 0);
+  });
+
+  it('constructs yearly reminder dates in the device calendar zone without UTC-day drift', () => {
+    const originalTimeZone = process.env.TZ;
+    process.env.TZ = 'Pacific/Kiritimati';
+    try {
+      const state = createTestState();
+      state.events = [
+        {
+          ...state.events[0],
+          date: '1990-07-20T12:00:00.000Z',
+          recurrence: {
+            frequency: 'Yearly',
+            month: 7,
+            day: 20,
+            originalYear: 1990,
+            leapDayPolicy: 'February 28'
+          }
+        }
+      ];
+      const result = buildReminderPlanningResult(state, [0], new Date(2026, 6, 10, 12));
+      const trigger = new Date(result.plans[0].triggerAt);
+      assert.equal(trigger.getFullYear(), 2026);
+      assert.equal(trigger.getMonth(), 6);
+      assert.equal(trigger.getDate(), 20);
+      assert.equal(trigger.getHours(), 9);
+    } finally {
+      if (originalTimeZone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimeZone;
+    }
   });
 });

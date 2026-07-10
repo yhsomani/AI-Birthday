@@ -1,12 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { MAX_BACKUP_RAW_BYTES, type BackupPreview } from '../domain/backup';
+import { MAX_BACKUP_RAW_BYTES, type BackupPreview } from '../data/encryptedBackup';
 import { createTestState } from '../test/testState';
-import {
-  createBackupFileService,
-  type BackupDocumentAsset,
-  type BackupFileDependencies
-} from './backupFiles';
+import { createBackupFileService, type BackupDocumentAsset, type BackupFileDependencies } from './backupFiles';
 
 const preview: BackupPreview = {
   format: 'relateai.encrypted-backup',
@@ -86,12 +82,18 @@ describe('backup file lifecycle', () => {
     assert.equal(result.shared, true);
     assert.equal(result.disposition, 'temporary-shared');
     assert.equal(result.temporaryFileRemoved, true);
+    assert.equal(result.verifiedPortableCopy, false);
+    assert.match(result.fileName, /^relateai-backup-.*\.relateai-backup$/);
+    assert.equal(result.byteCount, new TextEncoder().encode('{"encrypted":true}').byteLength);
     assert.match(result.uri, /^file:\/\/\/cache\/relateai-backup-/);
     const shareIndex = harness.calls.findIndex(call => call.startsWith('share:file:'));
     const deleteIndex = harness.calls.findIndex(call => call.startsWith('delete:file:'));
     assert.ok(shareIndex >= 0);
     assert.ok(deleteIndex > shareIndex);
-    assert.equal(harness.calls.some(call => call.includes('file:///documents/')), false);
+    assert.equal(
+      harness.calls.some(call => call.includes('file:///documents/')),
+      false
+    );
   });
 
   it('cleans temporary exports even when the share target rejects', async () => {
@@ -106,7 +108,10 @@ describe('backup file lifecycle', () => {
       () => service.exportEncryptedBackupFile(createTestState(), 'CorrectHorse123'),
       /share target failed/i
     );
-    assert.equal(harness.calls.some(call => call.startsWith('delete:file:///cache/')), true);
+    assert.equal(
+      harness.calls.some(call => call.startsWith('delete:file:///cache/')),
+      true
+    );
   });
 
   it('retains an intentional document export when platform sharing is unavailable', async () => {
@@ -119,8 +124,232 @@ describe('backup file lifecycle', () => {
     assert.equal(result.shared, false);
     assert.equal(result.disposition, 'saved-export');
     assert.equal(result.temporaryFileRemoved, false);
+    assert.equal(result.verifiedPortableCopy, false);
+    assert.match(result.fileName, /^relateai-backup-.*\.relateai-backup$/);
+    assert.equal(result.byteCount, new TextEncoder().encode('{"encrypted":true}').byteLength);
     assert.match(result.uri, /^file:\/\/\/documents\/relateai-backup-/);
-    assert.equal(harness.calls.some(call => call.startsWith('delete:')), false);
+    assert.equal(
+      harness.calls.some(call => call.startsWith('delete:')),
+      false
+    );
+  });
+
+  it('writes an Android export to an explicitly selected SAF directory and verifies the exact read-back', async () => {
+    const harness = createHarness();
+    const directoryUri = 'content://provider/tree/primary%3ADocuments';
+    const destinationUri = 'content://provider/document/primary%3ADocuments%2Frelateai-backup';
+    let written = '';
+    let requestedFileName = '';
+    harness.dependencies.platform = 'android';
+    harness.dependencies.storageAccessFramework = {
+      async requestDirectoryPermissionsAsync() {
+        harness.calls.push('saf:select-directory');
+        return { granted: true, directoryUri };
+      },
+      async createFileAsync(selectedDirectoryUri, name, mimeType) {
+        requestedFileName = name;
+        harness.calls.push(`saf:create:${selectedDirectoryUri}:${name}:${mimeType}`);
+        return destinationUri;
+      }
+    };
+    harness.dependencies.fileSystem.writeAsStringAsync = async (uri, value) => {
+      harness.calls.push(`write:${uri}`);
+      written = value;
+    };
+    harness.dependencies.fileSystem.getInfoAsync = async uri => {
+      harness.calls.push(`info:${uri}`);
+      return { exists: true, isDirectory: false, size: new TextEncoder().encode(written).byteLength };
+    };
+    harness.dependencies.fileSystem.readAsStringAsync = async uri => {
+      harness.calls.push(`read:${uri}`);
+      return written;
+    };
+    const service = createBackupFileService(harness.dependencies);
+
+    const result = await service.saveEncryptedBackupFile(createTestState(), 'CorrectHorse123');
+
+    assert.equal(result.uri, destinationUri);
+    assert.equal(result.shared, false);
+    assert.equal(result.disposition, 'saved-export');
+    assert.equal(result.verifiedPortableCopy, true);
+    assert.equal(result.temporaryFileRemoved, false);
+    assert.equal(result.fileName, requestedFileName);
+    assert.equal(result.byteCount, new TextEncoder().encode(written).byteLength);
+    assert.ok(harness.calls[0] === 'saf:select-directory');
+    assert.ok(harness.calls.some(call => call.includes(`saf:create:${directoryUri}:relateai-backup-`)));
+    const writeIndex = harness.calls.indexOf(`write:${destinationUri}`);
+    const infoIndex = harness.calls.indexOf(`info:${destinationUri}`);
+    const readIndex = harness.calls.indexOf(`read:${destinationUri}`);
+    assert.ok(writeIndex >= 0 && infoIndex > writeIndex && readIndex > infoIndex);
+    assert.equal(
+      harness.calls.some(call => call.startsWith('delete:')),
+      false
+    );
+    assert.equal(
+      harness.calls.some(call => call.includes('file:///documents/')),
+      false
+    );
+  });
+
+  it('treats Android SAF directory-picker cancellation as a cancelled export without creating data', async () => {
+    const harness = createHarness();
+    harness.dependencies.platform = 'android';
+    harness.dependencies.storageAccessFramework = {
+      async requestDirectoryPermissionsAsync() {
+        harness.calls.push('saf:select-directory');
+        return { granted: false };
+      },
+      async createFileAsync() {
+        harness.calls.push('saf:create');
+        return 'content://provider/document/unexpected';
+      }
+    };
+    const service = createBackupFileService(harness.dependencies);
+
+    await assert.rejects(
+      () => service.saveEncryptedBackupFile(createTestState(), 'CorrectHorse123'),
+      /cancelled.*destination/i
+    );
+    assert.deepEqual(harness.calls, ['saf:select-directory']);
+  });
+
+  it('rejects an oversized encrypted Android export before creating or writing a destination file', async () => {
+    const harness = createHarness();
+    harness.dependencies.platform = 'android';
+    harness.dependencies.storageAccessFramework = {
+      async requestDirectoryPermissionsAsync() {
+        harness.calls.push('saf:select-directory');
+        return { granted: true, directoryUri: 'content://provider/tree/primary%3ADocuments' };
+      },
+      async createFileAsync() {
+        harness.calls.push('saf:create');
+        return 'content://provider/document/unexpected';
+      }
+    };
+    harness.dependencies.codec = {
+      ...harness.dependencies.codec!,
+      async create() {
+        harness.calls.push('codec:create:oversized');
+        return 'x'.repeat(MAX_BACKUP_RAW_BYTES + 1);
+      }
+    };
+    const service = createBackupFileService(harness.dependencies);
+
+    await assert.rejects(() => service.saveEncryptedBackupFile(createTestState(), 'CorrectHorse123'), /no larger/i);
+    assert.deepEqual(harness.calls, ['saf:select-directory', 'codec:create:oversized']);
+  });
+
+  it('does not report or delete an Android user-owned file after a write failure', async () => {
+    const harness = createHarness();
+    const destinationUri = 'content://provider/document/primary%3ADocuments%2Fpartial-backup';
+    harness.dependencies.platform = 'android';
+    harness.dependencies.storageAccessFramework = {
+      async requestDirectoryPermissionsAsync() {
+        return { granted: true, directoryUri: 'content://provider/tree/primary%3ADocuments' };
+      },
+      async createFileAsync() {
+        harness.calls.push(`saf:create:${destinationUri}`);
+        return destinationUri;
+      }
+    };
+    harness.dependencies.fileSystem.writeAsStringAsync = async uri => {
+      harness.calls.push(`write:${uri}`);
+      throw new Error('provider write failed');
+    };
+    const service = createBackupFileService(harness.dependencies);
+
+    await assert.rejects(
+      () => service.saveEncryptedBackupFile(createTestState(), 'CorrectHorse123'),
+      /provider write failed/i
+    );
+    assert.equal(harness.calls.includes(`read:${destinationUri}`), false);
+    assert.equal(
+      harness.calls.some(call => call.startsWith('delete:')),
+      false
+    );
+  });
+
+  it('rejects a mismatched Android read-back and never deletes the user-owned destination', async () => {
+    const harness = createHarness();
+    const destinationUri = 'content://provider/document/primary%3ADocuments%2Fchanged-backup';
+    harness.dependencies.platform = 'android';
+    harness.dependencies.storageAccessFramework = {
+      async requestDirectoryPermissionsAsync() {
+        return { granted: true, directoryUri: 'content://provider/tree/primary%3ADocuments' };
+      },
+      async createFileAsync() {
+        return destinationUri;
+      }
+    };
+    harness.dependencies.fileSystem.getInfoAsync = async uri => {
+      harness.calls.push(`info:${uri}`);
+      return { exists: true, isDirectory: false };
+    };
+    harness.dependencies.fileSystem.readAsStringAsync = async uri => {
+      harness.calls.push(`read:${uri}`);
+      return '{"encrypted":false}';
+    };
+    const service = createBackupFileService(harness.dependencies);
+
+    await assert.rejects(
+      () => service.saveEncryptedBackupFile(createTestState(), 'CorrectHorse123'),
+      /read-back did not match/i
+    );
+    assert.equal(
+      harness.calls.some(call => call.startsWith('delete:')),
+      false
+    );
+  });
+
+  it('does not report or delete an Android user-owned destination when read-back fails', async () => {
+    const harness = createHarness();
+    const destinationUri = 'content://provider/document/primary%3ADocuments%2Funreadable-backup';
+    harness.dependencies.platform = 'android';
+    harness.dependencies.storageAccessFramework = {
+      async requestDirectoryPermissionsAsync() {
+        return { granted: true, directoryUri: 'content://provider/tree/primary%3ADocuments' };
+      },
+      async createFileAsync() {
+        return destinationUri;
+      }
+    };
+    harness.dependencies.fileSystem.getInfoAsync = async () => ({
+      exists: true,
+      isDirectory: false
+    });
+    harness.dependencies.fileSystem.readAsStringAsync = async uri => {
+      harness.calls.push(`read:${uri}`);
+      throw new Error('provider read failed');
+    };
+    const service = createBackupFileService(harness.dependencies);
+
+    await assert.rejects(
+      () => service.saveEncryptedBackupFile(createTestState(), 'CorrectHorse123'),
+      /provider read failed/i
+    );
+    assert.equal(harness.calls.includes(`read:${destinationUri}`), true);
+    assert.equal(
+      harness.calls.some(call => call.startsWith('delete:')),
+      false
+    );
+  });
+
+  it('fails closed when Android SAF is unavailable and keeps non-Android document saves unverified', async () => {
+    const androidHarness = createHarness();
+    androidHarness.dependencies.platform = 'android';
+    const androidService = createBackupFileService(androidHarness.dependencies);
+    await assert.rejects(
+      () => androidService.saveEncryptedBackupFile(createTestState(), 'CorrectHorse123'),
+      /user-selected.*not available/i
+    );
+    assert.equal(androidHarness.calls.length, 0);
+
+    const webHarness = createHarness();
+    webHarness.dependencies.platform = 'web';
+    const webService = createBackupFileService(webHarness.dependencies);
+    const webResult = await webService.saveEncryptedBackupFile(createTestState(), 'CorrectHorse123');
+    assert.equal(webResult.verifiedPortableCopy, false);
+    assert.match(webResult.uri, /^file:\/\/\/documents\//);
   });
 
   it('deletes a validated picker cache copy after reading it into bounded memory', async () => {
@@ -198,16 +427,25 @@ describe('backup file lifecycle', () => {
     const result = await service.pickEncryptedBackupFile();
 
     assert.equal(result?.temporaryFileRemoved, false);
-    assert.equal(harness.calls.some(call => call.startsWith('delete:')), false);
+    assert.equal(
+      harness.calls.some(call => call.startsWith('delete:')),
+      false
+    );
   });
 
   it('cleanup API is restricted to generated RelateAI cache files', async () => {
     const harness = createHarness();
     const service = createBackupFileService(harness.dependencies);
 
-    assert.equal(await service.cleanupTemporaryBackupFile('file:///documents/relateai-backup-a.relateai-backup'), false);
+    assert.equal(
+      await service.cleanupTemporaryBackupFile('file:///documents/relateai-backup-a.relateai-backup'),
+      false
+    );
     assert.equal(await service.cleanupTemporaryBackupFile('file:///cache/unrelated.json'), false);
-    assert.equal(await service.cleanupTemporaryBackupFile('file:///cache/../documents/relateai-backup-a.relateai-backup'), false);
+    assert.equal(
+      await service.cleanupTemporaryBackupFile('file:///cache/../documents/relateai-backup-a.relateai-backup'),
+      false
+    );
     assert.equal(await service.cleanupTemporaryBackupFile('file:///cache/relateai-backup-a.relateai-backup'), true);
     assert.deepEqual(
       harness.calls.filter(call => call.startsWith('delete:')),

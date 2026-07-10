@@ -12,10 +12,10 @@ describe('app error boundary component contract', () => {
     assert.doesNotMatch(source, /error\.message|info\.componentStack/);
   });
 
-  it('renders an accessible recovery surface with a platform-sized retry action', () => {
+  it('renders a minimal accessible recovery surface without visual styling', () => {
     assert.match(source, /accessibilityRole="alert"/);
     assert.match(source, /accessibilityRole="header"/);
     assert.match(source, /accessibilityRole="button"/);
-    assert.match(source, /minHeight: 48/);
+    assert.doesNotMatch(source, /StyleSheet|style=|ui\/theme/);
   });
 });

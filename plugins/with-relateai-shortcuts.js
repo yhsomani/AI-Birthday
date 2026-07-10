@@ -8,11 +8,7 @@ const {
   withFinalizedMod,
   withStringsXml
 } = require('expo/config-plugins');
-const {
-  assertCondition,
-  resolveAndroidPackage,
-  writeGeneratedFileAsync
-} = require('./android-generation');
+const { assertCondition, resolveAndroidPackage, writeGeneratedFileAsync } = require('./android-generation');
 
 const shortcutDefinitions = require('../src/config/launcherShortcuts.json');
 
@@ -23,11 +19,7 @@ const resourceNameFor = (shortcut, suffix) =>
   `relateai_shortcut_${shortcut.id.replace(/[^a-zA-Z0-9_]/g, '_')}_${suffix}`;
 
 const escapeXml = value =>
-  String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const renderShortcutXml = (shortcuts, androidPackage) => {
   const items = shortcuts
@@ -122,7 +114,10 @@ const validateShortcutGenerationAsync = async (projectRoot, androidPackage) => {
   const metadataItems = (mainActivity['meta-data'] ?? []).filter(
     item => item.$?.['android:name'] === SHORTCUT_METADATA_NAME
   );
-  assertCondition(metadataItems.length === 1, 'RelateAI launcher shortcuts expected exactly one manifest metadata item.');
+  assertCondition(
+    metadataItems.length === 1,
+    'RelateAI launcher shortcuts expected exactly one manifest metadata item.'
+  );
   assertCondition(
     metadataItems[0].$?.['android:resource'] === `@xml/${RESOURCE_NAME}`,
     'RelateAI launcher shortcuts manifest metadata references an invalid resource.'
@@ -139,7 +134,10 @@ const validateShortcutGenerationAsync = async (projectRoot, androidPackage) => {
 
   for (const definition of shortcutDefinitions) {
     const matches = generatedShortcuts.filter(item => item.$?.['android:shortcutId'] === definition.id);
-    assertCondition(matches.length === 1, `RelateAI launcher shortcut ${definition.id} must be generated exactly once.`);
+    assertCondition(
+      matches.length === 1,
+      `RelateAI launcher shortcut ${definition.id} must be generated exactly once.`
+    );
     const intents = matches[0].intent ?? [];
     assertCondition(intents.length === 1, `RelateAI launcher shortcut ${definition.id} must have exactly one intent.`);
     assertCondition(

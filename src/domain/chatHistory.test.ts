@@ -1,20 +1,19 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { relateReducer } from '../state/relateReducer';
 import { createTestState } from '../test/testState';
 import { buildChatHistory } from './chatHistory';
 
 describe('chat history contract', () => {
   it('shows only sent messages for a contact in newest-first order', () => {
-    const approved = relateReducer(createTestState(), {
-      type: 'approveMessage',
-      messageId: 'msg-mira-checkin'
-    });
-    const firstSent = relateReducer(approved, {
-      type: 'manualHandoff',
-      messageId: 'msg-mira-checkin',
-      nowIso: '2026-07-09T10:00:00.000Z'
-    });
+    const initial = createTestState();
+    const firstSent = {
+      ...initial,
+      messages: initial.messages.map(message =>
+        message.id === 'msg-mira-checkin'
+          ? { ...message, status: 'Sent' as const, sentAt: '2026-07-09T10:00:00.000Z' }
+          : message
+      )
+    };
     const withSecond = {
       ...firstSent,
       messages: [
@@ -38,15 +37,15 @@ describe('chat history contract', () => {
   });
 
   it('searches sent history by body, reason, and channel without changing messages', () => {
-    const approved = relateReducer(createTestState(), {
-      type: 'approveMessage',
-      messageId: 'msg-mira-checkin'
-    });
-    const sent = relateReducer(approved, {
-      type: 'manualHandoff',
-      messageId: 'msg-mira-checkin',
-      nowIso: '2026-07-09T10:00:00.000Z'
-    });
+    const initial = createTestState();
+    const sent = {
+      ...initial,
+      messages: initial.messages.map(message =>
+        message.id === 'msg-mira-checkin'
+          ? { ...message, status: 'Sent' as const, sentAt: '2026-07-09T10:00:00.000Z' }
+          : message
+      )
+    };
     const byText = buildChatHistory(sent, { contactId: 'c-mira', searchQuery: 'pune' });
     const byChannel = buildChatHistory(sent, { contactId: 'c-mira', searchQuery: 'manual' });
     const filteredOut = buildChatHistory(sent, { contactId: 'c-mira', channel: 'Email' });

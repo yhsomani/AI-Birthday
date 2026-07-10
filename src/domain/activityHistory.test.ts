@@ -47,6 +47,65 @@ describe('activity history contract', () => {
       ['a-ai-error']
     );
     assert.equal(result.rows[0].isOpenIssue, true);
+    assert.equal(result.rows[0].status, 'Open');
+  });
+
+  it('derives and filters all four activity statuses deterministically', () => {
+    const state = createTestState();
+    const statusActivities: ActivityItem[] = [
+      {
+        id: 'a-open',
+        type: 'AI',
+        title: 'Open warning',
+        detail: 'Needs user attention.',
+        severity: 'Warning',
+        createdAt: '2026-07-09T08:00:00.000Z'
+      },
+      {
+        id: 'a-completed',
+        type: 'Backup',
+        title: 'Completed backup',
+        detail: 'Backup completed.',
+        severity: 'Info',
+        createdAt: '2026-07-09T07:00:00.000Z'
+      },
+      {
+        id: 'a-resolved',
+        type: 'Setup',
+        title: 'Resolved setup issue',
+        detail: 'The issue was resolved.',
+        severity: 'Error',
+        status: 'Resolved',
+        resolvedAt: '2026-07-09T09:00:00.000Z',
+        createdAt: '2026-07-09T06:00:00.000Z'
+      },
+      {
+        id: 'a-obsolete',
+        type: 'Message',
+        title: 'Stale message target',
+        detail: 'The linked draft no longer exists.',
+        severity: 'Error',
+        status: 'Resolved',
+        targetScreen: 'wishPreview',
+        messageId: 'missing-message',
+        createdAt: '2026-07-09T05:00:00.000Z'
+      }
+    ];
+
+    const all = buildActivityHistory(statusActivities, { state });
+    assert.deepEqual(Object.fromEntries(all.rows.map(row => [row.item.id, row.status])), {
+      'a-open': 'Open',
+      'a-completed': 'Completed',
+      'a-resolved': 'Resolved',
+      'a-obsolete': 'Obsolete'
+    });
+    for (const status of ['Open', 'Resolved', 'Obsolete', 'Completed'] as const) {
+      const filtered = buildActivityHistory(statusActivities, { state, status });
+      assert.deepEqual(
+        filtered.rows.map(row => row.status),
+        [status]
+      );
+    }
   });
 
   it('routes activity actions to safe recovery surfaces', () => {
@@ -54,8 +113,8 @@ describe('activity history contract', () => {
     const targets = Object.fromEntries(result.rows.map(row => [row.item.id, row.targetScreen]));
 
     assert.equal(targets['a-message'], 'messages');
-    assert.equal(targets['a-ai-error'], 'more');
-    assert.equal(targets['a-backup-old'], 'more');
+    assert.equal(targets['a-ai-error'], 'setupCheck');
+    assert.equal(targets['a-backup-old'], 'backup');
   });
 
   it('uses explicit recovery targets when linked records still exist', () => {
@@ -98,7 +157,34 @@ describe('activity history contract', () => {
     assert.equal(row.targetScreen, 'messages');
     assert.equal(row.messageId, undefined);
     assert.equal(row.recoveryState, 'fallback');
+    assert.equal(row.status, 'Obsolete');
+    assert.equal(row.isOpenIssue, false);
     assert.match(row.recoveryDetail, /linked message is no longer available/i);
+  });
+
+  it('resolves only an open issue and prepends a content-free completed audit record', () => {
+    const state = createTestState();
+    state.activity = [
+      {
+        id: 'a-open-private-title',
+        type: 'AI',
+        title: 'Private provider context must not be copied',
+        detail: 'Private diagnostic detail must not be copied',
+        severity: 'Error',
+        createdAt: '2026-07-09T08:00:00.000Z'
+      }
+    ];
+
+    const resolved = relateReducer(state, { type: 'resolveActivity', activityId: 'a-open-private-title' });
+    const target = resolved.activity.find(item => item.id === 'a-open-private-title');
+    assert.equal(target?.status, 'Resolved');
+    assert.ok(target?.resolvedAt && Number.isFinite(Date.parse(target.resolvedAt)));
+    assert.equal(resolved.activity[0].status, 'Completed');
+    assert.match(resolved.activity[0].title, /activity issue resolved/i);
+    assert.doesNotMatch(JSON.stringify(resolved.activity[0]), /Private provider|Private diagnostic/);
+
+    const repeated = relateReducer(resolved, { type: 'resolveActivity', activityId: 'a-open-private-title' });
+    assert.equal(repeated, resolved);
   });
 
   it('distinguishes empty history from no matching activity', () => {
@@ -119,5 +205,22 @@ describe('activity history contract', () => {
       result.rows.map(row => row.item.id),
       ['a-message', 'a-ai-error', 'a-backup-old']
     );
+  });
+
+  it('evaluates Today using the device calendar day rather than a UTC string prefix', () => {
+    const previousTimeZone = process.env.TZ;
+    process.env.TZ = 'America/Los_Angeles';
+    try {
+      const result = buildActivityHistory(
+        [{ ...activities[0], id: 'a-local-day', createdAt: '2026-07-10T01:00:00.000Z' }],
+        { date: 'Today', nowIso: '2026-07-09T23:00:00.000Z' }
+      );
+      assert.deepEqual(
+        result.rows.map(row => row.item.id),
+        ['a-local-day']
+      );
+    } finally {
+      process.env.TZ = previousTimeZone;
+    }
   });
 });

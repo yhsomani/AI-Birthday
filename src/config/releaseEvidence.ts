@@ -1,12 +1,7 @@
 export type CommandEvidenceStatus = 'Passed' | 'Failed' | 'Not recorded';
 
 export type ReleaseEvidenceCommandId =
-  | 'typecheck'
-  | 'test'
-  | 'audit'
-  | 'expo-dependencies'
-  | 'web-export'
-  | 'diff-check';
+  'typecheck' | 'test' | 'native-prebuild' | 'audit' | 'expo-dependencies' | 'web-export' | 'diff-check';
 
 export interface ReleaseEvidenceCommand {
   id: ReleaseEvidenceCommandId;
@@ -167,6 +162,7 @@ export const forbiddenDirectAndroidPermissions = [
 export const defaultReleaseEvidenceCommands: ReleaseEvidenceCommand[] = [
   { id: 'typecheck', command: 'npm run typecheck', status: 'Not recorded' },
   { id: 'test', command: 'npm test', status: 'Not recorded' },
+  { id: 'native-prebuild', command: 'npm run test:native-prebuild', status: 'Not recorded' },
   { id: 'audit', command: 'npm audit --audit-level=moderate', status: 'Not recorded' },
   { id: 'expo-dependencies', command: 'npx expo install --check', status: 'Not recorded' },
   {
@@ -191,12 +187,14 @@ export const defaultDeviceEvidence: ReleaseEvidenceDeviceItem[] = [
   {
     id: 'android-device-smoke',
     status: 'Pending',
-    detail: 'Attach Android device smoke evidence for notifications, calendar, handoff, widget, shortcuts, and core review flows.'
+    detail:
+      'Attach Android device smoke evidence for notifications, calendar, handoff, widget, shortcuts, and core review flows.'
   },
   {
     id: 'ios-device-smoke',
     status: 'Pending',
-    detail: 'Attach iOS device smoke evidence for notifications, calendar, handoff, backup, lock, and core review flows.'
+    detail:
+      'Attach iOS device smoke evidence for notifications, calendar, handoff, backup, lock, and core review flows.'
   },
   {
     id: 'store-submission',
@@ -396,7 +394,8 @@ export const buildReactNativeReleaseEvidence = (input: ReleaseEvidenceInput): Re
       androidVersionCode: android.versionCode ?? null,
       iosBundleIdentifier: ios.bundleIdentifier ?? '',
       iosBuildNumber: ios.buildNumber ?? '',
-      runtimeVersionPolicy: typeof expo.runtimeVersion === 'string' ? expo.runtimeVersion : (expo.runtimeVersion?.policy ?? '')
+      runtimeVersionPolicy:
+        typeof expo.runtimeVersion === 'string' ? expo.runtimeVersion : (expo.runtimeVersion?.policy ?? '')
     },
     activeReleaseSurface: {
       platform: 'React Native / Expo',

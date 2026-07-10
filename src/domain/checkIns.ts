@@ -47,7 +47,8 @@ const buildReminder = (state: AppState, contact: Contact, now: Date): CheckInRem
   const snoozedUntil = parseDate(contact.checkInSnoozedUntil);
   const isSnoozed = Boolean(snoozedUntil && snoozedUntil.getTime() > now.getTime());
   const days = daysSince(contact.lastContactedAt, now);
-  const overdueDays = days === undefined ? preferences.checkInCadenceDays : Math.max(0, days - preferences.checkInCadenceDays);
+  const overdueDays =
+    days === undefined ? preferences.checkInCadenceDays : Math.max(0, days - preferences.checkInCadenceDays);
 
   if (isSnoozed) {
     return {
@@ -94,7 +95,9 @@ const contactPriority = (state: AppState, reminder: CheckInReminder) => {
 };
 
 export const buildCheckInReminderQueue = (state: AppState, now = new Date()): CheckInReminderQueue => {
-  const reminders = state.contacts.map(contact => buildReminder(state, contact, now));
+  const reminders = state.contacts
+    .filter(contact => !contact.archivedAt)
+    .map(contact => buildReminder(state, contact, now));
   const due = reminders
     .filter(reminder => reminder.status === 'Due')
     .sort((left, right) => {

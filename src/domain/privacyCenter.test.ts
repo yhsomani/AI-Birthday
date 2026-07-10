@@ -86,6 +86,10 @@ describe('privacy center contract', () => {
     assert.equal(revoked.privacy.whatsappHandoffConsent, false);
     assert.match(granted.activity[0].detail, /granted/i);
     assert.match(revoked.activity[0].detail, /revoked/i);
+    const beforeConsent = buildPrivacyCenterReport(state).rows.find(row => row.capability === 'WhatsApp handoff');
+    const afterConsent = buildPrivacyCenterReport(granted).rows.find(row => row.capability === 'WhatsApp handoff');
+    assert.notEqual(beforeConsent?.status, 'Enabled');
+    assert.equal(afterConsent?.status, 'Enabled');
   });
 
   it('offers biometric lock after private notes without making it a blocker', () => {

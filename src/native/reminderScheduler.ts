@@ -1,7 +1,11 @@
 import * as Notifications from 'expo-notifications';
+import { privacyMinimizedNotificationContent, type OwnedNotificationPlan } from '../domain/notificationPlans';
 import { buildReminderNotificationSchedulePlan } from '../domain/notificationScheduling';
 import { buildReminderNotificationData } from '../domain/notificationRoutes';
-import type { ReminderPlan } from '../domain/types';
+import {
+  initializeAndroidReminderNotificationChannel,
+  RELATEAI_REMINDER_NOTIFICATION_CHANNEL_ID
+} from './notificationChannel';
 import { reconcileReminderPlansWithAdapter } from './reminderSchedulerCore';
 
 export interface ReminderScheduleResult {
@@ -13,23 +17,25 @@ export interface ReminderScheduleResult {
 }
 
 const applyReminderSchedulePlan = async (
-  plans: ReminderPlan[],
+  plans: OwnedNotificationPlan[],
   authorization: ReminderScheduleResult['authorization']
 ): Promise<ReminderScheduleResult> => {
   const counts = await reconcileReminderPlansWithAdapter(plans, {
     getScheduledNotifications: Notifications.getAllScheduledNotificationsAsync,
     cancelScheduledNotification: Notifications.cancelScheduledNotificationAsync,
     scheduleReminder: async plan => {
+      const content = privacyMinimizedNotificationContent(plan);
       await Notifications.scheduleNotificationAsync({
         identifier: plan.id,
         content: {
-          title: plan.title,
-          body: plan.body,
+          title: content.title,
+          body: content.body,
           data: buildReminderNotificationData(plan)
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: new Date(plan.triggerAt)
+          date: new Date(plan.triggerAt),
+          channelId: RELATEAI_REMINDER_NOTIFICATION_CHANNEL_ID
         }
       });
     }
@@ -43,7 +49,8 @@ const applyReminderSchedulePlan = async (
 const notificationPermissionIsUsable = (permission: { status?: string; granted?: boolean }) =>
   permission.granted === true || permission.status === 'granted' || permission.status === 'limited';
 
-export const scheduleReminderPlans = async (plans: ReminderPlan[]): Promise<ReminderScheduleResult> => {
+export const scheduleReminderPlans = async (plans: OwnedNotificationPlan[]): Promise<ReminderScheduleResult> => {
+  await initializeAndroidReminderNotificationChannel();
   const permission = await Notifications.requestPermissionsAsync();
   if (!notificationPermissionIsUsable(permission)) {
     throw new Error('Notification permission was not granted.');
@@ -56,7 +63,10 @@ export const scheduleReminderPlans = async (plans: ReminderPlan[]): Promise<Remi
  * it never opens a system prompt. When access is denied it removes stale owned
  * reminders while leaving unrelated notifications untouched.
  */
-export const reconcileReminderPlansWithoutPrompt = async (plans: ReminderPlan[]): Promise<ReminderScheduleResult> => {
+export const reconcileReminderPlansWithoutPrompt = async (
+  plans: OwnedNotificationPlan[]
+): Promise<ReminderScheduleResult> => {
+  await initializeAndroidReminderNotificationChannel();
   const permission = await Notifications.getPermissionsAsync();
   const authorized = notificationPermissionIsUsable(permission);
   return applyReminderSchedulePlan(authorized ? plans : [], authorized ? 'authorized' : 'not-authorized');

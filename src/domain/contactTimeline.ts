@@ -87,8 +87,6 @@ export const buildContactTimeline = (
   return {
     entries,
     emptyMessage:
-      filter === 'All'
-        ? 'No relationship timeline entries yet.'
-        : `No ${filter.toLowerCase()} found for this contact.`
+      filter === 'All' ? 'No relationship timeline entries yet.' : `No ${filter.toLowerCase()} found for this contact.`
   };
 };

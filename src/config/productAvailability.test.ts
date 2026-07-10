@@ -23,6 +23,10 @@ describe('truthful release capability availability', () => {
     assert.equal(productAvailability.durableUnattendedAutomation.available, false);
     assert.match(productAvailability.durableUnattendedAutomation.reason, /not available/i);
     assert.match(productAvailability.durableUnattendedAutomation.reason, /review-controlled/i);
+    assert.equal(productAvailability.authenticatedAiProvider.available, false);
+    assert.match(productAvailability.authenticatedAiProvider.reason, /local review-first/i);
+    assert.equal(productAvailability.authenticatedEmailProvider.available, false);
+    assert.match(productAvailability.authenticatedEmailProvider.reason, /mail-app handoff/i);
   });
 
   it('rejects unavailable choices and explains the active release boundary', () => {

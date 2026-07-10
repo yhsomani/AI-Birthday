@@ -13,6 +13,14 @@ export const productAvailability = Object.freeze({
   durableUnattendedAutomation: Object.freeze({
     available: false,
     reason: 'Unattended message generation and sending are not available. Drafts and sends remain review-controlled.'
+  }),
+  authenticatedAiProvider: Object.freeze({
+    available: false,
+    reason: 'No production account session adapter is bundled; local review-first templates remain available.'
+  }),
+  authenticatedEmailProvider: Object.freeze({
+    available: false,
+    reason: 'No production account session adapter is bundled; use the explicit mail-app handoff instead.'
   })
 });
 

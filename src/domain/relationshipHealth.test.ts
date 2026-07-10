@@ -39,6 +39,40 @@ describe('relationship health and classification contract', () => {
     assert.equal(state.contacts[0].group, 'Other');
   });
 
+  it('derives health from current recency and follow-through instead of trusting a stale stored score', () => {
+    const base = createTestState();
+    const now = new Date('2026-07-10T10:00:00.000Z');
+    const stale = {
+      ...base,
+      contacts: base.contacts.map(contact =>
+        contact.id === 'c-mira'
+          ? {
+              ...contact,
+              healthScore: 99,
+              lastContactedAt: '2025-01-01T00:00:00.000Z',
+              checkInCadenceDays: 30
+            }
+          : contact
+      ),
+      events: base.events.filter(event => event.contactId !== 'c-mira'),
+      memories: base.memories.filter(memory => memory.contactId !== 'c-mira'),
+      messages: base.messages.filter(message => message.contactId !== 'c-mira'),
+      gifts: base.gifts.filter(gift => gift.contactId !== 'c-mira')
+    };
+    const current = {
+      ...stale,
+      contacts: stale.contacts.map(contact =>
+        contact.id === 'c-mira' ? { ...contact, lastContactedAt: '2026-07-09T10:00:00.000Z' } : contact
+      )
+    };
+
+    const staleInsight = buildRelationshipHealthInsight(stale, 'c-mira', now);
+    const currentInsight = buildRelationshipHealthInsight(current, 'c-mira', now);
+
+    assert.notEqual(staleInsight?.score, 99);
+    assert.ok((currentInsight?.score ?? 0) > (staleInsight?.score ?? 0));
+  });
+
   it('excludes private memories from classification rationale', () => {
     const state = {
       ...createTestState(),

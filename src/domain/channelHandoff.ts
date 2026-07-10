@@ -20,7 +20,8 @@ const baseTarget = () => ({
   fallbackLabel: 'Copy/share message',
   privacyNote: 'RelateAI opens the approved text only. The destination app performs the send after your final review.',
   completionTitle: 'Mark sent?',
-  completionMessage: 'Send the approved text in the destination app first. Mark sent here only after the message has actually left your device.',
+  completionMessage:
+    'Send the approved text in the destination app first. Mark sent here only after the message has actually left your device.',
   markSentLabel: 'I sent it',
   dismissLabel: 'Not yet'
 });

@@ -11,6 +11,8 @@ export type SetupEnvironment = {
   emailEndpointConfigured?: boolean;
   aiEndpointReadiness?: ProviderEndpointReadiness;
   emailEndpointReadiness?: ProviderEndpointReadiness;
+  aiProviderSessionReady?: boolean;
+  emailProviderSessionReady?: boolean;
 };
 
 export type SetupStep = {
@@ -77,6 +79,8 @@ const hasEmailProviderIntent = (state: AppState, endpointReadiness: ProviderEndp
 const buildReminderSteps = (state: AppState): SetupStep[] => {
   const schedulingPolicy = buildSchedulingPolicySummary(state);
   const schedulingBlockers = schedulingPolicy.issues.filter(issue => issue.severity === 'Error');
+  const canPlanReminders =
+    state.settings.notificationsEnabled && schedulingBlockers.length === 0 && state.events.length > 0;
   return [
     step(
       'notifications',
@@ -86,7 +90,7 @@ const buildReminderSteps = (state: AppState): SetupStep[] => {
         : 'Enable notifications so reminders can reach you outside the app.',
       state.settings.notificationsEnabled ? 'Ready' : 'Needs action',
       state.settings.notificationsEnabled ? 'Configured' : 'Enable notifications',
-      { targetScreen: 'more' }
+      { targetScreen: 'settings' }
     ),
     step(
       'scheduling-policy',
@@ -96,7 +100,7 @@ const buildReminderSteps = (state: AppState): SetupStep[] => {
         : `Reminder planning respects ${state.settings.quietHours.start}-${state.settings.quietHours.end} quiet hours and ${state.settings.blackouts.length} blackout window(s).`,
       schedulingBlockers.length > 0 ? 'Needs action' : 'Ready',
       'Review scheduling',
-      { targetScreen: 'more' }
+      { targetScreen: 'settings' }
     ),
     step(
       'events',
@@ -116,21 +120,38 @@ const buildReminderSteps = (state: AppState): SetupStep[] => {
         : 'Plan reminders after events and notification preferences are ready.',
       state.reminderPlans.length > 0 ? 'Ready' : 'Needs action',
       state.reminderPlans.length > 0 ? 'Review reminders' : 'Plan reminders',
-      state.reminderPlans.length > 0 ? { targetScreen: 'more' } : { command: 'planReminders' }
+      state.reminderPlans.length > 0 || !canPlanReminders
+        ? { targetScreen: 'setupCheck' }
+        : { command: 'planReminders' }
     )
   ];
 };
 
 const buildAiSteps = (state: AppState, env: SetupEnvironment): SetupStep[] => {
   const endpointReadiness = aiEndpointReadinessFor(env);
+  const providerSessionReady = !endpointReadiness.productionReady || env.aiProviderSessionReady === true;
   const aiProviderDetail = !endpointReadiness.configured
     ? 'Configure a secure backend endpoint before relying on provider drafts.'
-    : endpointReadiness.productionReady
-      ? `Provider endpoint is configured. Current status: ${state.aiProvider.status}.`
-      : endpointReadiness.status === 'Development only'
-        ? 'Local provider endpoint is allowed for development only. Use HTTPS before release.'
-        : 'Provider endpoint is configured but not safe for production. Use HTTPS without credentials, localhost, or private-network hosts.';
-  const aiProviderReady = endpointReadiness.productionReady && state.aiProvider.status !== 'Error';
+    : endpointReadiness.productionReady && !providerSessionReady
+      ? 'A short-lived authenticated provider session is required before AI drafting can be tested.'
+      : endpointReadiness.productionReady
+        ? state.aiProvider.status === 'Ready'
+          ? 'The authenticated provider path passed its latest privacy-safe readiness test.'
+          : state.aiProvider.status === 'Error'
+            ? 'The latest provider readiness test failed. Test again or use local review-first templates.'
+            : 'The authenticated provider path is configured and must pass a privacy-safe readiness test.'
+        : endpointReadiness.status === 'Development only'
+          ? 'Local provider endpoint is allowed for development only. Use HTTPS before release.'
+          : 'Provider endpoint is configured but not safe for production. Use HTTPS without credentials, localhost, or private-network hosts.';
+  const aiProviderReady =
+    endpointReadiness.productionReady && providerSessionReady && state.aiProvider.status === 'Ready';
+  const aiProviderTestable =
+    state.settings.aiEnabled && endpointReadiness.canUseProviderEndpoint && providerSessionReady;
+  const aiProviderAction = aiProviderTestable
+    ? 'Test AI provider'
+    : endpointReadiness.productionReady && !providerSessionReady
+      ? 'Reconnect provider session'
+      : 'Configure endpoint';
 
   return [
     step(
@@ -141,15 +162,15 @@ const buildAiSteps = (state: AppState, env: SetupEnvironment): SetupStep[] => {
         : 'Turn on AI drafting or use local templates instead.',
       state.settings.aiEnabled ? 'Ready' : 'Needs action',
       state.settings.aiEnabled ? 'Enabled' : 'Enable AI',
-      { targetScreen: 'more' }
+      { targetScreen: 'settings' }
     ),
     step(
       'ai-provider',
       'AI provider endpoint',
       aiProviderDetail,
       aiProviderReady ? 'Ready' : 'Needs action',
-      endpointReadiness.canUseProviderEndpoint ? 'Test AI provider' : 'Configure endpoint',
-      endpointReadiness.canUseProviderEndpoint ? { command: 'testAiProvider' } : { targetScreen: 'more' }
+      aiProviderAction,
+      aiProviderTestable ? { command: 'testAiProvider' } : { targetScreen: 'settings' }
     ),
     step(
       'personalization',
@@ -166,19 +187,24 @@ const buildAiSteps = (state: AppState, env: SetupEnvironment): SetupStep[] => {
 
 const buildManualSendSteps = (state: AppState, env: SetupEnvironment): SetupStep[] => {
   const endpointReadiness = emailEndpointReadinessFor(env);
+  const providerSessionReady = !endpointReadiness.productionReady || env.emailProviderSessionReady === true;
   const emailDetail = !endpointReadiness.configured
     ? 'Email handoff is available; provider delivery stays optional until you configure an endpoint.'
-    : endpointReadiness.productionReady
-      ? 'Email provider endpoint is configured for optional provider delivery.'
-      : endpointReadiness.status === 'Development only'
-        ? 'Configured email endpoint is local-development only. Use HTTPS before release.'
-        : 'Configured email endpoint is not safe for production. Use HTTPS without credentials, localhost, or private-network hosts, or use handoff fallback.';
+    : endpointReadiness.productionReady && !providerSessionReady
+      ? 'Provider email needs a short-lived authenticated session; manual email handoff remains available.'
+      : endpointReadiness.productionReady
+        ? 'Email provider endpoint is configured for optional provider delivery.'
+        : endpointReadiness.status === 'Development only'
+          ? 'Configured email endpoint is local-development only. Use HTTPS before release.'
+          : 'Configured email endpoint is not safe for production. Use HTTPS without credentials, localhost, or private-network hosts, or use handoff fallback.';
   const emailStatus: SetupCheck['status'] =
     endpointReadiness.configured && !endpointReadiness.productionReady
       ? 'Needs action'
-      : endpointReadiness.productionReady
+      : endpointReadiness.productionReady && providerSessionReady
         ? 'Ready'
-        : 'Optional';
+        : endpointReadiness.productionReady
+          ? 'Needs action'
+          : 'Optional';
   const steps = [
     step(
       'contacts',
@@ -198,13 +224,15 @@ const buildManualSendSteps = (state: AppState, env: SetupEnvironment): SetupStep
         : 'Enable manual WhatsApp handoff if you want WhatsApp routing.',
       state.settings.whatsappHandoffEnabled ? 'Ready' : 'Optional',
       'Review channel settings',
-      { targetScreen: 'more' }
+      { targetScreen: 'settings' }
     )
   ];
 
   if (hasEmailProviderIntent(state, endpointReadiness)) {
     steps.push(
-      step('email-route', 'Email route', emailDetail, emailStatus, 'Review email settings', { targetScreen: 'more' })
+      step('email-route', 'Email route', emailDetail, emailStatus, 'Review email settings', {
+        targetScreen: 'settings'
+      })
     );
   }
 
@@ -229,7 +257,7 @@ const buildAutomationSteps = (state: AppState, env: SetupEnvironment): SetupStep
         ? 'Optional'
         : 'Ready',
     state.settings.automationMode === 'Fully auto' ? 'Use a review mode' : 'Review workflow settings',
-    { targetScreen: 'more' }
+    { targetScreen: 'settings' }
   )
 ];
 

@@ -4,6 +4,7 @@ import type {
   AutomationMode,
   Contact,
   ContactGroupDefaults,
+  ContactQuietHoursBehavior,
   MessageChannel,
   RelationshipGroup,
   RelationshipGroupDefaults,
@@ -15,6 +16,9 @@ export type ContactPreferenceSource = 'contact' | 'group' | 'global';
 
 export interface ResolvedContactPreferences extends ContactGroupDefaults {
   group: RelationshipGroup;
+  customSendTime?: string;
+  quietHoursBehavior: ContactQuietHoursBehavior;
+  skipAuto: boolean;
   sources: Record<keyof ContactGroupDefaults, ContactPreferenceSource>;
   inheritedCount: number;
   overrideCount: number;
@@ -58,17 +62,13 @@ export const defaultRelationshipGroupDefaults: RelationshipGroupDefaults = {
   }
 };
 
-const isChannel = (value: unknown): value is MessageChannel =>
-  channels.includes(value as MessageChannel);
+const isChannel = (value: unknown): value is MessageChannel => channels.includes(value as MessageChannel);
 
-const isTone = (value: unknown): value is Tone =>
-  tones.includes(value as Tone);
+const isTone = (value: unknown): value is Tone => tones.includes(value as Tone);
 
-const isCadence = (value: unknown): value is number =>
-  typeof value === 'number' && checkInCadences.includes(value);
+const isCadence = (value: unknown): value is number => typeof value === 'number' && checkInCadences.includes(value);
 
-const isAutomationMode = (value: unknown): value is AutomationMode =>
-  automationModes.includes(value as AutomationMode);
+const isAutomationMode = (value: unknown): value is AutomationMode => automationModes.includes(value as AutomationMode);
 
 const normalizeTones = (value: unknown, fallback: Tone[]) => {
   if (!Array.isArray(value)) {
@@ -84,9 +84,7 @@ const normalizeGroupDefault = (
 ): ContactGroupDefaults => ({
   preferredChannel: isChannel(value?.preferredChannel) ? value.preferredChannel : fallback.preferredChannel,
   tone: normalizeTones(value?.tone, fallback.tone),
-  checkInCadenceDays: isCadence(value?.checkInCadenceDays)
-    ? value.checkInCadenceDays
-    : fallback.checkInCadenceDays,
+  checkInCadenceDays: isCadence(value?.checkInCadenceDays) ? value.checkInCadenceDays : fallback.checkInCadenceDays,
   automationMode: isAutomationMode(value?.automationMode) ? value.automationMode : fallback.automationMode
 });
 
@@ -108,11 +106,12 @@ export const resolveContactPreferencesForContact = (
   const hasOverride = (key: keyof ContactGroupDefaults) =>
     Boolean(overrides && Object.prototype.hasOwnProperty.call(overrides, key));
 
-  const preferredChannel = hasOverride('preferredChannel') && isChannel(overrides?.preferredChannel)
-    ? overrides.preferredChannel
-    : managedByGroup
-      ? groupDefaults.preferredChannel
-      : contact.preferredChannel;
+  const preferredChannel =
+    hasOverride('preferredChannel') && isChannel(overrides?.preferredChannel)
+      ? overrides.preferredChannel
+      : managedByGroup
+        ? groupDefaults.preferredChannel
+        : contact.preferredChannel;
   const tone = hasOverride('tone')
     ? normalizeTones(overrides?.tone, groupDefaults.tone)
     : managedByGroup
@@ -124,11 +123,12 @@ export const resolveContactPreferencesForContact = (
       : managedByGroup
         ? groupDefaults.checkInCadenceDays
         : contact.checkInCadenceDays;
-  const automationMode = hasOverride('automationMode') && isAutomationMode(overrides?.automationMode)
-    ? overrides.automationMode
-    : managedByGroup
-      ? groupDefaults.automationMode
-      : settings.automationMode;
+  const automationMode =
+    hasOverride('automationMode') && isAutomationMode(overrides?.automationMode)
+      ? overrides.automationMode
+      : managedByGroup
+        ? groupDefaults.automationMode
+        : settings.automationMode;
 
   const sources: ResolvedContactPreferences['sources'] = {
     preferredChannel: hasOverride('preferredChannel') ? 'contact' : managedByGroup ? 'group' : 'contact',
@@ -141,6 +141,9 @@ export const resolveContactPreferencesForContact = (
 
   return {
     group: contact.group,
+    customSendTime: contact.customSendTime,
+    quietHoursBehavior: contact.quietHoursBehavior ?? 'Defer',
+    skipAuto: contact.skipAuto ?? false,
     preferredChannel,
     tone,
     checkInCadenceDays,
@@ -150,6 +153,8 @@ export const resolveContactPreferencesForContact = (
     overrideCount
   };
 };
+
+export const contactAllowsAutomaticDraftGeneration = (contact: Contact) => !(contact.skipAuto ?? false);
 
 export const resolveContactPreferences = (
   state: AppState,

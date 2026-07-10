@@ -17,8 +17,7 @@ export type ChatHistoryResult = {
 const searchableText = (message: MessageDraft) =>
   `${message.body} ${message.channel} ${message.reason} ${message.readiness}`.toLowerCase();
 
-const sentTime = (message: MessageDraft) =>
-  new Date(message.sentAt ?? message.scheduledFor ?? 0).getTime();
+const sentTime = (message: MessageDraft) => new Date(message.sentAt ?? message.scheduledFor ?? 0).getTime();
 
 export const buildChatHistory = (state: AppState, query: ChatHistoryQuery): ChatHistoryResult => {
   const search = query.searchQuery?.trim().toLowerCase() ?? '';

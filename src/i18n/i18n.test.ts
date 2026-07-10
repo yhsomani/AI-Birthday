@@ -15,7 +15,8 @@ import {
 
 describe('localization contract', () => {
   const englishKeys = Object.keys(translations['en-IN']) as TranslationKey[];
-  const placeholdersFor = (value: string) => [...value.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)].map(match => match[1]).sort();
+  const placeholdersFor = (value: string) =>
+    [...value.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)].map(match => match[1]).sort();
 
   it('keeps every supported locale complete for user-facing UI keys', () => {
     const englishKeys = Object.keys(translations['en-IN']) as TranslationKey[];
@@ -32,13 +33,19 @@ describe('localization contract', () => {
     for (const key of englishKeys) {
       const expected = placeholdersFor(translations['en-IN'][key]);
       for (const locale of supportedLocales) {
-        assert.deepEqual(placeholdersFor(translations[locale][key]), expected, `${locale} placeholder drift for ${key}`);
+        assert.deepEqual(
+          placeholdersFor(translations[locale][key]),
+          expected,
+          `${locale} placeholder drift for ${key}`
+        );
       }
     }
   });
 
   it('falls back unsupported locales to English India', () => {
     assert.equal(resolveLocale('fr-FR'), 'en-IN');
+    assert.equal(resolveLocale('hi'), 'hi-IN');
+    assert.equal(resolveLocale('hi-Deva-IN'), 'hi-IN');
     assert.equal(t(resolveLocale(undefined), 'nav.home'), 'Home');
   });
 
@@ -67,7 +74,10 @@ describe('localization contract', () => {
       }),
       '2 संदेश समीक्षा के लिए'
     );
-    assert.equal(t('en-Hinglish', 'feature.home.widget.emptyState'), 'Abhi koi event ya approval attention nahi chahta.');
+    assert.equal(
+      t('en-Hinglish', 'feature.home.widget.emptyState'),
+      'Abhi koi event ya approval attention nahi chahta.'
+    );
   });
 
   it('localizes primary screen headings beyond the home dashboard', () => {
@@ -187,11 +197,14 @@ describe('localization contract', () => {
       t('hi-IN', 'feature.contactDetail.status.automationReview', {
         mode: t('hi-IN', 'feature.more.settings.automation.vipApprove')
       }),
-      'VIP स्वीकृति समीक्षा'
+      'VIP प्राथमिक review समीक्षा'
     );
     assert.equal(t('hi-IN', 'label.checkInStatus.snoozed'), 'स्नूज़');
     assert.equal(t('hi-IN', 'feature.contactDetail.action.snoozeCheckIn'), 'चेक-इन स्नूज़ करें');
-    assert.equal(t('en-Hinglish', 'feature.contactDetail.essentials.detail'), 'Saved profile details messages, reminders, gifts, aur analytics update karte hain.');
+    assert.equal(
+      t('en-Hinglish', 'feature.contactDetail.essentials.detail'),
+      'Saved profile details messages, reminders, gifts, aur analytics update karte hain.'
+    );
     assert.equal(t('hi-IN', 'feature.contactDetail.gift.annualBudget'), 'वार्षिक उपहार बजट');
     assert.equal(t('hi-IN', 'label.contactLanguage.hindi'), 'हिंदी');
     assert.equal(t('hi-IN', 'label.relationshipHealth.needsAttention'), 'ध्यान चाहिए');
@@ -209,14 +222,23 @@ describe('localization contract', () => {
       'मध्यम भरोसा. Signals match'
     );
     assert.equal(t('hi-IN', 'feature.contactDetail.relationshipHealth.applySuggestion'), 'सुझाव लागू करें');
-    assert.equal(t('en-Hinglish', 'feature.contactDetail.enrichment.personalization', { score: 85 }), 'Personalization 85%');
-    assert.equal(t('hi-IN', 'feature.contactDetail.enrichment.improves', { signal: 'Favorite food' }), 'सुधारता है: Favorite food');
+    assert.equal(
+      t('en-Hinglish', 'feature.contactDetail.enrichment.personalization', { score: 85 }),
+      'Personalization 85%'
+    );
+    assert.equal(
+      t('hi-IN', 'feature.contactDetail.enrichment.improves', { signal: 'Favorite food' }),
+      'सुधारता है: Favorite food'
+    );
     assert.equal(
       t('en-IN', 'feature.contactDetail.memory.stats', { visible: 2, total: 5, eligible: 1, private: 3, pinned: 1 }),
       '2 of 5 note(s). 1 AI-eligible, 3 private, 1 pinned.'
     );
     assert.equal(t('hi-IN', 'feature.contactDetail.memory.confirmDelete'), 'डिलीट की पुष्टि करें');
-    assert.equal(t('en-Hinglish', 'feature.contactDetail.memory.characterCount', { count: 12, max: 500 }), '12/500 characters');
+    assert.equal(
+      t('en-Hinglish', 'feature.contactDetail.memory.characterCount', { count: 12, max: 500 }),
+      '12/500 characters'
+    );
     assert.equal(t('hi-IN', 'label.memoryCategory.preference'), 'पसंद');
     assert.equal(
       t('hi-IN', 'feature.contactDetail.memory.noteMeta', {
@@ -230,7 +252,11 @@ describe('localization contract', () => {
       'AI-eligible note: AI enabled hone par drafts aur Gift Advisor suggestions improve kar sakta hai.'
     );
     assert.equal(
-      t('en-IN', 'feature.contactDetail.gift.budgetSummary', { annual: '₹5,000.00', spent: '₹2,000.00', remaining: '₹3,000.00' }),
+      t('en-IN', 'feature.contactDetail.gift.budgetSummary', {
+        annual: '₹5,000.00',
+        spent: '₹2,000.00',
+        remaining: '₹3,000.00'
+      }),
       'Annual budget: ₹5,000.00. Spent this year: ₹2,000.00. Remaining: ₹3,000.00.'
     );
     assert.equal(t('hi-IN', 'label.giftCategory.personal'), 'व्यक्तिगत');
@@ -250,7 +276,10 @@ describe('localization contract', () => {
     assert.equal(t('hi-IN', 'feature.contactDetail.gift.record'), 'उपहार रिकॉर्ड करें');
     assert.equal(t('en-Hinglish', 'feature.contactDetail.gift.deleteGift'), 'Gift delete karo');
     assert.equal(t('hi-IN', 'feature.contactDetail.tone.title'), 'प्राप्तकर्ता टोन');
-    assert.equal(t('en-Hinglish', 'feature.contactDetail.channel.detail'), 'Provider setup trusted hone tak manual safest hai.');
+    assert.equal(
+      t('en-Hinglish', 'feature.contactDetail.channel.detail'),
+      'Provider setup trusted hone tak manual safest hai.'
+    );
     assert.equal(
       t('en-IN', 'feature.contactDetail.timeline.summary', { events: 2, memories: 3, gifts: 1, sent: 4 }),
       'Events 2 - Memories 3 - Gifts 1 - Sent 4'
@@ -281,7 +310,10 @@ describe('localization contract', () => {
   });
 
   it('localizes Manual Composer workflow copy with contact placeholders', () => {
-    assert.equal(t('en-IN', 'feature.manualComposer.detail', { name: 'Mira' }), 'Write to Mira without needing an event.');
+    assert.equal(
+      t('en-IN', 'feature.manualComposer.detail', { name: 'Mira' }),
+      'Write to Mira without needing an event.'
+    );
     assert.equal(t('hi-IN', 'label.composerReason.thanks'), 'धन्यवाद');
     assert.equal(t('en-Hinglish', 'label.composerReason.apology'), 'Apology');
     assert.equal(t('hi-IN', 'feature.manualComposer.templates'), 'टेम्पलेट');
@@ -343,10 +375,7 @@ describe('localization contract', () => {
   });
 
   it('localizes More Calendar Sync and file import controls', () => {
-    assert.equal(
-      t('en-IN', 'feature.more.calendar.counts', { exported: 2, imported: 3 }),
-      'Exported: 2. Imported: 3.'
-    );
+    assert.equal(t('en-IN', 'feature.more.calendar.counts', { exported: 2, imported: 3 }), 'Exported: 2. Imported: 3.');
     assert.equal(t('hi-IN', 'feature.more.calendar.autoDetect'), 'स्वतः पहचानें');
     assert.equal(t('en-Hinglish', 'feature.more.calendar.importPasted'), 'Pasted events import karo');
     assert.equal(t('hi-IN', 'feature.more.calendar.selectFile'), 'CSV/vCard फ़ाइल चुनें');
@@ -368,13 +397,19 @@ describe('localization contract', () => {
       t('hi-IN', 'feature.more.reminders.blackoutRange', { start: '2026-07-09', end: '2026-07-12' }),
       '2026-07-09 से 2026-07-12'
     );
-    assert.equal(t('en-Hinglish', 'feature.more.reminders.noBlackouts'), 'Koi blackout window nahi hai. Zarurat par holidays, travel, ya no-reminder periods add karo.');
+    assert.equal(
+      t('en-Hinglish', 'feature.more.reminders.noBlackouts'),
+      'Koi blackout window nahi hai. Zarurat par holidays, travel, ya no-reminder periods add karo.'
+    );
     assert.equal(t('hi-IN', 'feature.more.reminders.planSchedule'), 'रिमाइंडर प्लान और शेड्यूल करें');
     assert.equal(
       t('hi-IN', 'feedback.remindersScheduledMessage', { scheduled: 2, skipped: 1 }),
       '2 शेड्यूल, 1 छोड़े गए.'
     );
-    assert.equal(t('en-Hinglish', 'feedback.reminderSchedulingFailedFallback'), 'Notification reminders schedule nahi ho paye.');
+    assert.equal(
+      t('en-Hinglish', 'feedback.reminderSchedulingFailedFallback'),
+      'Notification reminders schedule nahi ho paye.'
+    );
   });
 
   it('localizes More Contact Import and Template Library controls', () => {
@@ -405,7 +440,10 @@ describe('localization contract', () => {
       'सिर्फ़ रिमाइंडर के लिए 2/4 सेटअप चरण तैयार हैं.'
     );
     assert.equal(t('hi-IN', 'feature.more.setupWizard.step.notifications.title'), 'नोटिफिकेशन');
-    assert.match(t('en-IN', 'feature.more.setupWizard.detail.emailProviderOptional'), /provider delivery stays optional/);
+    assert.match(
+      t('en-IN', 'feature.more.setupWizard.detail.emailProviderOptional'),
+      /provider delivery stays optional/
+    );
     assert.equal(
       t('en-Hinglish', 'feature.more.setupWizard.detail.schedulingReady', {
         start: '22:00',
@@ -456,7 +494,10 @@ describe('localization contract', () => {
       }),
       'Growing: Warm. औसत 82 अक्षर.'
     );
-    assert.equal(t('en-Hinglish', 'feature.more.styleCoach.lowConfidence'), 'Confidence badhane ke liye aur representative samples add karo.');
+    assert.equal(
+      t('en-Hinglish', 'feature.more.styleCoach.lowConfidence'),
+      'Confidence badhane ke liye aur representative samples add karo.'
+    );
     assert.equal(t('hi-IN', 'feature.more.styleCoach.improveStyle'), 'मेरी शैली सुधारें');
     assert.equal(t('en-Hinglish', 'feature.more.styleCoach.improveStyle'), 'Mera style improve karo');
     assert.equal(
@@ -495,7 +536,10 @@ describe('localization contract', () => {
       t('en-Hinglish', 'feature.more.analytics.summaryShareTitle', { range: 'Last 30 days' }),
       'Last 30 days relationship summary'
     );
-    assert.equal(t('hi-IN', 'feature.more.analytics.shareUnavailable'), 'शेयर उपलब्ध नहीं है. इस डिवाइस से फिर कोशिश करें.');
+    assert.equal(
+      t('hi-IN', 'feature.more.analytics.shareUnavailable'),
+      'शेयर उपलब्ध नहीं है. इस डिवाइस से फिर कोशिश करें.'
+    );
   });
 
   it('localizes More Backup and Restore controls and feedback', () => {
@@ -518,7 +562,10 @@ describe('localization contract', () => {
       t('en-Hinglish', 'feedback.backupExportedMessageShared', { count: '12 records' }),
       '12 records encrypted hue. Share sheet se destination choose karo.'
     );
-    assert.equal(t('hi-IN', 'feedback.backupRestoreFailedFallback'), 'बैकअप रिस्टोर नहीं हुआ. मौजूदा डेटा बदला नहीं गया.');
+    assert.equal(
+      t('hi-IN', 'feedback.backupRestoreFailedFallback'),
+      'बैकअप रिस्टोर नहीं हुआ. मौजूदा डेटा बदला नहीं गया.'
+    );
   });
 
   it('localizes More Activity History controls and recovery states', () => {
@@ -572,7 +619,10 @@ describe('localization contract', () => {
 
   it('localizes More Settings controls and defaults', () => {
     assert.equal(t('hi-IN', 'feature.more.settings.title'), 'सेटिंग्स');
-    assert.equal(t('en-Hinglish', 'feature.more.settings.senderEmailPlaceholder'), 'Provider delivery ke liye sender email');
+    assert.equal(
+      t('en-Hinglish', 'feature.more.settings.senderEmailPlaceholder'),
+      'Provider delivery ke liye sender email'
+    );
     assert.equal(
       t('hi-IN', 'feature.more.settings.emailProviderStatus', { status: 'तैयार', error: '' }),
       'ईमेल प्रदाता: तैयार.'
@@ -580,25 +630,22 @@ describe('localization contract', () => {
     assert.equal(t('hi-IN', 'feature.more.settings.showEmailProviderSetup'), 'ईमेल प्रदाता सेटअप दिखाएं');
     assert.equal(t('en-Hinglish', 'feature.more.settings.hideEmailProviderSetup'), 'Email provider setup chhupao');
     assert.match(t('en-IN', 'feature.more.settings.emailProviderSetupDetail'), /Manual mail handoff/);
-    assert.equal(
-      t('en-Hinglish', 'feature.more.settings.toggleStatus', { setting: 'AI', status: 'on' }),
-      'AI on'
-    );
+    assert.equal(t('en-Hinglish', 'feature.more.settings.toggleStatus', { setting: 'AI', status: 'on' }), 'AI on');
     assert.equal(
       t('hi-IN', 'feature.more.settings.automationSummary', {
         mode: 'हमेशा पूछें',
         start: '22:00',
         end: '08:00'
       }),
-      'ऑटोमेशन मोड: हमेशा पूछें. शांत समय: 22:00 से 08:00.'
+      'समीक्षा कार्यप्रवाह: हमेशा पूछें. बिना देखे send नहीं होता. शांत समय: 22:00 से 08:00.'
     );
-    assert.match(t('en-IN', 'feature.more.settings.fullAutoAdvancedNotice'), /Always ask is recommended/);
-    assert.equal(t('hi-IN', 'feature.more.settings.showAdvancedAutomation'), 'Advanced automation दिखाएं');
-    assert.equal(t('en-Hinglish', 'feature.more.settings.hideAdvancedAutomation'), 'Advanced automation chhupao');
-    assert.match(t('hi-IN', 'feature.more.settings.fullAutoConfirmBody'), /queued scheduled messages/);
+    assert.match(t('en-IN', 'feature.more.settings.fullAutoAdvancedNotice'), /review-controlled.*not available/i);
+    assert.equal(t('hi-IN', 'feature.more.settings.showAdvancedAutomation'), 'Automation availability दिखाएं');
+    assert.equal(t('en-Hinglish', 'feature.more.settings.hideAdvancedAutomation'), 'Automation availability chhupao');
+    assert.match(t('hi-IN', 'feature.more.settings.fullAutoConfirmBody'), /user review.*generate.*send/);
     assert.equal(t('hi-IN', 'feature.more.settings.group.closeFriends'), 'करीबी दोस्त');
     assert.equal(t('hi-IN', 'feature.more.settings.cadenceDays', { days: 30 }), '30 दिन');
-    assert.equal(t('en-Hinglish', 'feature.more.settings.automation.vipApprove'), 'VIP approve');
+    assert.equal(t('en-Hinglish', 'feature.more.settings.automation.vipApprove'), 'VIP prioritized review');
     assert.equal(t('hi-IN', 'feature.more.settings.resetDemoData'), 'डेमो डेटा रीसेट करें');
   });
 

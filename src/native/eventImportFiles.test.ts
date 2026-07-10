@@ -58,10 +58,7 @@ describe('bounded event import file transport', () => {
     const result = await unknownSize.service.pickEventImportFile();
     assert.ok(result);
 
-    const invalidUtf8 = fixture(
-      { name: 'events.vcf', uri: 'file:///cache/events.vcf', size: 8 },
-      'BEGIN:\uFFFD'
-    );
+    const invalidUtf8 = fixture({ name: 'events.vcf', uri: 'file:///cache/events.vcf', size: 8 }, 'BEGIN:\uFFFD');
     await assert.rejects(invalidUtf8.service.pickEventImportFile(), /UTF-8/);
   });
 

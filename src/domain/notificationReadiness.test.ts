@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createTestState } from '../test/testState';
+import { buildOwnedNotificationPlans, privacyMinimizedNotificationContent } from './notificationPlans';
 import { buildReminderNotificationData } from './notificationRoutes';
 import { buildNotificationReadinessReport } from './notificationReadiness';
 import { buildReminderPlans } from './reminders';
@@ -28,12 +29,16 @@ describe('notification readiness contract', () => {
       reminderPlans
     };
     const report = buildNotificationReadinessReport(state);
-    const serializedPayloads = reminderPlans
-      .map(plan => `${plan.title} ${plan.body} ${JSON.stringify(buildReminderNotificationData(plan))}`)
+    const notificationPlans = buildOwnedNotificationPlans(state, reminderPlans);
+    const serializedPayloads = notificationPlans
+      .map(plan => {
+        const content = privacyMinimizedNotificationContent(plan);
+        return `${content.title} ${content.body} ${JSON.stringify(buildReminderNotificationData(plan))}`;
+      })
       .join(' ');
 
     assert.equal(report.status, 'Ready');
-    assert.equal(report.safeRouteCount, reminderPlans.length);
+    assert.equal(report.safeRouteCount, notificationPlans.length);
     assert.ok(report.schedulableCount > 0);
     assert.equal(report.issues.length, 0);
     state.contacts.forEach(contact => {
@@ -119,10 +124,10 @@ describe('notification readiness contract', () => {
 
     assert.equal(report.status, 'Blocked');
     assert.equal(report.staleRouteCount, 1);
-    assert.match(report.issues[0]?.detail ?? '', /missing contact or event/i);
+    assert.match(report.issues[0]?.detail ?? '', /missing|archived|mismatched|handled/i);
   });
 
-  it('blocks notification payloads that expose private relationship data', () => {
+  it('replaces unsafe source copy with fixed privacy-minimized native copy', () => {
     const base = notificationGrantedState();
     const privateMemory = base.memories.find(memory => memory.category === 'Private')!;
     const report = buildNotificationReadinessReport({
@@ -139,11 +144,20 @@ describe('notification readiness contract', () => {
       ]
     });
 
-    assert.equal(report.status, 'Blocked');
-    assert.ok(report.issues.some(issue => issue.id === 'sensitive-payload-reminder-sensitive'));
-    assert.match(
-      report.issues.find(issue => issue.id === 'sensitive-payload-reminder-sensitive')?.detail ?? '',
-      /contact names|private notes|message bodies/i
+    assert.equal(report.status, 'Ready');
+    assert.equal(
+      report.issues.some(issue => issue.id === 'sensitive-payload-reminder-sensitive'),
+      false
     );
+    const nativeContent = privacyMinimizedNotificationContent({
+      id: 'reminder-sensitive',
+      eventId: base.events[0].id,
+      contactId: base.contacts[0].id,
+      title: `Reminder for ${base.contacts[0].name}`,
+      body: privateMemory.body,
+      triggerAt: new Date(Date.now() + 60_000).toISOString()
+    });
+    assert.doesNotMatch(JSON.stringify(nativeContent), new RegExp(base.contacts[0].name, 'i'));
+    assert.equal(JSON.stringify(nativeContent).includes(privateMemory.body), false);
   });
 });

@@ -31,12 +31,12 @@ describe('aiProviderClient', () => {
       async (_input, init) => {
         postedBody = init.body;
         return staticJsonResponse({
-            variants: {
-              short: 'Happy birthday Asha! Hope your day is full of warmth.',
-              standard: 'Happy birthday Asha! Wishing you a personal, joyful day and a beautiful year ahead.',
-              warm: 'Happy birthday Asha! I hope today feels easy, loved, and full of the good chaos you enjoy.'
-            }
-          });
+          variants: {
+            short: 'Happy birthday Asha! Aaj ka din warmth aur khushi se bhara rahe.',
+            standard: 'Happy birthday Asha! Umeed hai aaj ka special day joyful ho aur aane wala year bahut lovely ho.',
+            warm: 'Happy birthday Asha! Aap hamare liye bahut special ho; umeed hai aaj love aur good chaos se bhara rahe.'
+          }
+        });
       }
     );
 
@@ -45,9 +45,55 @@ describe('aiProviderClient', () => {
     assert.equal(result.observation?.ok, true);
     assert.equal(result.observation?.includedMemoryCount, request.request.privacy.includedMemoryCount);
     assert.equal(result.observation?.variantLengths?.standard, result.ok ? result.variants.standard.length : undefined);
+    const posted = JSON.parse(postedBody) as typeof request.request;
+    assert.deepEqual(posted.giftHistory, [
+      {
+        name: 'Ceramic tea set',
+        category: 'Personal',
+        occasion: 'Birthday',
+        year: 2025,
+        feedback: 'Liked'
+      }
+    ]);
     assert.doesNotMatch(postedBody, /\+919876543210/);
     assert.doesNotMatch(postedBody, /Private note excluded/i);
-    assert.doesNotMatch(JSON.stringify(result.observation), /Asha|Happy birthday|98765/i);
+    assert.doesNotMatch(postedBody, /Avoid repeating kitchenware|"cost"|annualGiftBudget/i);
+    assert.doesNotMatch(JSON.stringify(result.observation), /Asha|Happy birthday|98765|Ceramic tea set/i);
+  });
+
+  it('rejects unsafe provider output and records only content-free diagnostics', async () => {
+    resetAiProviderRateLimitForTests();
+    const request = buildAiDraftRequest(createTestState(), 'c-asha', 'e-asha-bday', 'Birthday');
+    assert.equal(request.ok, true);
+    if (!request.ok) {
+      return;
+    }
+
+    const unsafeText = 'Happy birthday, and I hope you die before the day is over.';
+    const result = await requestAiDraft(
+      request.request,
+      {
+        endpoint: 'https://ai.example.test/draft',
+        timeoutMs: 1000,
+        ...authenticatedSession
+      },
+      async () =>
+        staticJsonResponse({
+          variants: {
+            short: unsafeText,
+            standard: 'Happy birthday! Wishing you a personal, joyful day and a thoughtful year ahead.',
+            warm: 'Happy birthday! Hope today feels personal, warm, and full of love.'
+          }
+        })
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.error.kind, 'content-safety');
+      assert.equal(result.observation?.errorKind, 'content-safety');
+      assert.doesNotMatch(result.error.message, /hope you die/i);
+      assert.doesNotMatch(JSON.stringify(result.observation), /hope you die|Asha|Ceramic tea set/i);
+    }
   });
 
   it('returns not-configured before attempting network access', async () => {
@@ -119,12 +165,12 @@ describe('aiProviderClient', () => {
       async () => {
         calls += 1;
         return staticJsonResponse({
-            variants: {
-              short: 'Happy birthday Asha! Hope your day is full of warmth.',
-              standard: 'Happy birthday Asha! Wishing you a personal, joyful day and a beautiful year ahead.',
-              warm: 'Happy birthday Asha! I hope today feels easy, loved, and full of the good chaos you enjoy.'
-            }
-          });
+          variants: {
+            short: 'Happy birthday Asha! Aaj ka din warmth aur khushi se bhara rahe.',
+            standard: 'Happy birthday Asha! Umeed hai aaj ka special day joyful ho aur aane wala year bahut lovely ho.',
+            warm: 'Happy birthday Asha! Aap hamare liye bahut special ho; umeed hai aaj love aur good chaos se bhara rahe.'
+          }
+        });
       }
     );
 
@@ -145,12 +191,13 @@ describe('aiProviderClient', () => {
     const fetcher = async () => {
       calls += 1;
       return staticJsonResponse({
-          variants: {
-            short: 'Hope you are doing well Asha. Thinking of you today.',
-            standard: 'Hope you are doing well Asha. Just checking in and sending warm wishes for your week.',
-            warm: 'Hope you are doing well Asha. Thinking of you and hoping today feels calm and kind.'
-          }
-        });
+        variants: {
+          short: 'Hi Asha, bas check in karna tha. Umeed hai sab theek hai.',
+          standard:
+            'Hi Asha, aaj aapki yaad aayi, isliye bas check in karna tha. Umeed hai week achchha chal raha hai.',
+          warm: 'Hi Asha, aapki yaad aayi aur poochna tha ki sab kaisa hai. Umeed hai aaj ka din calm aur kind ho.'
+        }
+      });
     };
 
     const config = {

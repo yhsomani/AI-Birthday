@@ -86,11 +86,7 @@ export const validateMemoryNoteInput = (
   };
 };
 
-export const buildMemoryVaultReport = (
-  state: AppState,
-  contactId: string,
-  query = ''
-): MemoryVaultReport => {
+export const buildMemoryVaultReport = (state: AppState, contactId: string, query = ''): MemoryVaultReport => {
   const contactExists = state.contacts.some(contact => contact.id === contactId);
   const normalizedQuery = query.trim().toLowerCase();
   const allNotes = state.memories.filter(memory => memory.contactId === contactId);

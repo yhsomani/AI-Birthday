@@ -6,6 +6,12 @@ export type Screen =
   | 'messages'
   | 'contacts'
   | 'more'
+  | 'analytics'
+  | 'settings'
+  | 'backup'
+  | 'styleCoach'
+  | 'activityHistory'
+  | 'setupCheck'
   | 'contactDetail'
   | 'chatHistory'
   | 'wishPreview'
@@ -14,14 +20,7 @@ export type Screen =
 export type RelationshipGroup = 'Family' | 'Friends' | 'Work' | 'Close friends' | 'Other';
 
 export type EventType =
-  | 'Birthday'
-  | 'Anniversary'
-  | 'Work anniversary'
-  | 'Custom'
-  | 'Graduation'
-  | 'Holiday'
-  | 'Revival'
-  | 'Follow-up';
+  'Birthday' | 'Anniversary' | 'Work anniversary' | 'Custom' | 'Graduation' | 'Holiday' | 'Revival' | 'Follow-up';
 
 export type MessageChannel = 'SMS' | 'WhatsApp' | 'Email' | 'Manual';
 
@@ -37,17 +36,10 @@ export type MessageStatus =
   | 'Draft';
 
 export type AutomationMode = 'Always ask' | 'Smart approve' | 'VIP approve' | 'Fully auto';
+export type ContactQuietHoursBehavior = 'Defer' | 'Block';
 export type AccountMode = 'Local' | 'Google sync';
 export type OnboardingStepId =
-  | 'intro'
-  | 'account'
-  | 'contacts'
-  | 'notifications'
-  | 'ai'
-  | 'style'
-  | 'channels'
-  | 'backup'
-  | 'finish';
+  'intro' | 'account' | 'contacts' | 'notifications' | 'ai' | 'style' | 'channels' | 'backup' | 'finish';
 export type OnboardingGoal = 'Reminders first' | 'AI wishes' | 'Manual relationship manager' | 'Full setup';
 export type PermissionCapability =
   | 'Contacts'
@@ -60,26 +52,11 @@ export type PermissionCapability =
   | 'WhatsApp handoff'
   | 'Backup export';
 export type PermissionDecision = 'Not requested' | 'Granted' | 'Denied' | 'Unavailable';
-export type SystemPermissionCapability =
-  | 'Contacts'
-  | 'Notifications'
-  | 'Calendar'
-  | 'Biometric lock';
+export type SystemPermissionCapability = 'Contacts' | 'Notifications' | 'Calendar' | 'Biometric lock';
 export type SystemAuthorization =
-  | 'granted'
-  | 'limited'
-  | 'denied'
-  | 'restricted'
-  | 'undetermined'
-  | 'not-enrolled'
-  | 'unavailable';
+  'granted' | 'limited' | 'denied' | 'restricted' | 'undetermined' | 'not-enrolled' | 'unavailable';
 export type PermissionUserIntent = 'not-expressed' | 'allow' | 'decline';
-export type PermissionPromptOutcome =
-  | 'granted'
-  | 'limited'
-  | 'denied'
-  | 'restricted'
-  | 'undetermined';
+export type PermissionPromptOutcome = 'granted' | 'limited' | 'denied' | 'restricted' | 'undetermined';
 
 /**
  * Consent history and live OS authorization are intentionally separate. A live
@@ -104,6 +81,8 @@ export interface ScheduleBlackout {
   label: string;
   startDate: string;
   endDate: string;
+  behavior?: 'Block' | 'Defer';
+  channels?: MessageChannel[];
 }
 
 export interface OnboardingState {
@@ -124,31 +103,20 @@ export interface PrivacyState {
 
 export type SupportedLocale = 'en-IN' | 'hi-IN' | 'en-Hinglish';
 
-export type Tone =
-  | 'Warm'
-  | 'Respectful'
-  | 'Playful'
-  | 'Concise'
-  | 'Formal'
-  | 'Hinglish'
-  | 'No emoji';
+export type Tone = 'Warm' | 'Respectful' | 'Playful' | 'Concise' | 'Formal' | 'Hinglish' | 'No emoji';
 
 export type MemoryCategory = 'General' | 'Private' | 'Preference' | 'Event' | 'Gift' | 'Milestone';
 export type GiftCategory = 'Experience' | 'Food' | 'Books' | 'Wellness' | 'Personal' | 'Other';
 
 export type ComposerReason =
-  | 'Birthday'
-  | 'Check-in'
-  | 'Thanks'
-  | 'Congratulations'
-  | 'Apology'
-  | 'Follow-up'
-  | 'Custom';
+  'Birthday' | 'Check-in' | 'Thanks' | 'Congratulations' | 'Apology' | 'Follow-up' | 'Custom';
 
 export interface Contact {
   id: string;
   name: string;
   relationship: string;
+  relationshipSubtype?: string;
+  jobTitle?: string;
   group: RelationshipGroup;
   phone?: string;
   email?: string;
@@ -159,11 +127,40 @@ export interface Contact {
   isVip: boolean;
   dnd: boolean;
   checkInCadenceDays: number;
+  /** Optional local-clock override for event-linked message scheduling. */
+  customSendTime?: string;
+  /** May preserve global deferral or make it stricter; it can never bypass global quiet hours. */
+  quietHoursBehavior?: ContactQuietHoursBehavior;
+  /** Blocks proactive draft generation only. Explicit user-requested drafts remain available. */
+  skipAuto?: boolean;
   preferenceOverrides?: ContactPreferenceOverrides;
   lastContactedAt?: string;
   checkInSnoozedUntil?: string;
   notesSummary: string;
   annualGiftBudget: number;
+  routes?: ContactRoute[];
+  sourceIdentities?: ContactSourceIdentity[];
+  archivedAt?: string;
+}
+
+export interface ContactRoute {
+  id: string;
+  type: 'Phone' | 'Email';
+  value: string;
+  label?: string;
+  primary: boolean;
+  verified: boolean;
+}
+
+export interface ContactSourceIdentity {
+  provider: 'Device contacts' | 'Calendar' | 'Local';
+  sourceId: string;
+}
+
+/** Stable provider identity for an imported occasion, independent of local ids. */
+export interface EventSourceIdentity {
+  provider: 'Device contacts' | 'Calendar' | 'Local';
+  sourceId: string;
 }
 
 export interface ContactGroupDefaults {
@@ -182,6 +179,8 @@ export interface ImportedContactRecord {
   name: string;
   phone?: string;
   email?: string;
+  phones?: string[];
+  emails?: string[];
   birthday?: string;
   relationship?: string;
 }
@@ -207,6 +206,7 @@ export interface RelationshipEvent {
   recurrence?: YearlyOccasionRecurrence;
   verified: boolean;
   source: 'Imported' | 'Manual' | 'AI suggested';
+  sourceIdentities?: EventSourceIdentity[];
   checklist: EventChecklistItem[];
 }
 
@@ -214,6 +214,8 @@ export interface EventChecklistItem {
   id: string;
   label: string;
   done: boolean;
+  /** Local-calendar occurrence for which an explicit preparation step was completed. */
+  completedForOccurrence?: string;
 }
 
 export interface MemoryNote {
@@ -241,6 +243,8 @@ export interface MessageDraft {
   id: string;
   contactId: string;
   eventId?: string;
+  /** Stable local-calendar occurrence targeted by an event-linked draft. */
+  occurrenceDate?: string;
   reason: ComposerReason;
   status: MessageStatus;
   channel: MessageChannel;
@@ -248,6 +252,8 @@ export interface MessageDraft {
   variants: Record<'short' | 'standard' | 'warm', string>;
   selectedVariant: 'short' | 'standard' | 'warm';
   scheduledFor?: string;
+  /** Canonical device time zone used to calculate an approved scheduled instant. */
+  scheduledTimeZone?: string;
   sentAt?: string;
   approvedAt?: string;
   approvalExpiresAt?: string;
@@ -256,6 +262,7 @@ export interface MessageDraft {
   regenerationFeedback?: MessageRegenerationFeedback;
   duplicateWarning?: string;
   duplicateAcknowledged?: boolean;
+  duplicateAcknowledgementFingerprint?: string;
   lastError?: string;
   emailDeliveryAttempt?: {
     idempotencyKey: string;
@@ -299,12 +306,17 @@ export type EmailDeliveryState = {
   lastError?: string;
 };
 
+export type ActivityStatus = 'Open' | 'Resolved' | 'Obsolete' | 'Completed';
+
 export interface ActivityItem {
   id: string;
   type: 'Message' | 'Event' | 'Contact' | 'Backup' | 'Setup' | 'AI' | 'Gift' | 'Memory' | 'Analytics';
   title: string;
   detail: string;
   severity: 'Info' | 'Warning' | 'Error';
+  /** Optional only for compatibility with backups created before activity statuses were persisted. */
+  status?: ActivityStatus;
+  resolvedAt?: string;
   createdAt: string;
   targetScreen?: Screen;
   contactId?: string;
@@ -319,6 +331,9 @@ export interface StyleProfile {
   averageLength: number;
   emojiUse: string;
   sampleCount: number;
+  enabledForAiDrafts: boolean;
+  commonGreetings: string[];
+  representativePreview: string;
 }
 
 export interface SetupCheck {
@@ -365,7 +380,8 @@ export interface BackupSnapshot {
   encrypted: boolean;
 }
 
-export type PersistenceStorageFormat = 'Missing' | 'Direct envelope' | 'Legacy chunked' | 'Normalized' | 'Corrupt';
+export type PersistenceStorageFormat =
+  'Missing' | 'Direct envelope' | 'Legacy chunked' | 'Normalized' | 'Encrypted entity repository' | 'Corrupt';
 
 export interface PersistenceStorageHealth {
   status: 'Missing' | 'Ready' | 'Corrupt';
@@ -395,12 +411,14 @@ export interface SettingsState {
     start: string;
     end: string;
   };
+  defaultSendTime: string;
   blackouts: ScheduleBlackout[];
 }
 
 export interface AppState {
   activeScreen: Screen;
   selectedContactId?: string;
+  selectedEventId?: string;
   selectedMessageId?: string;
   contacts: Contact[];
   events: RelationshipEvent[];

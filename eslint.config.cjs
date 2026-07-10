@@ -3,20 +3,13 @@ const expoConfig = require('eslint-config-expo/flat');
 
 module.exports = defineConfig([
   {
-    ignores: [
-      'node_modules/**',
-      'reports/**',
-      'dist/**',
-      'android/**',
-      'ios/**',
-      'plugins/**'
-    ]
+    ignores: ['node_modules/**', 'reports/**', 'dist/**', 'android/**', 'ios/**', 'plugins/**']
   },
   expoConfig,
   {
     files: ['src/**/*.{ts,tsx}'],
     rules: {
-      'eqeqeq': ['error', 'always'],
+      eqeqeq: ['error', 'always'],
       'no-console': 'error',
       'no-eval': 'error',
       'no-implied-eval': 'error',
@@ -46,6 +39,14 @@ module.exports = defineConfig([
           ]
         }
       ]
+    }
+  },
+  {
+    files: ['src/domain/**/*.test.{ts,tsx}'],
+    rules: {
+      // Domain tests intentionally exercise reducer-backed integration behavior.
+      // Keep the layer boundary enforced for production domain modules only.
+      'no-restricted-imports': 'off'
     }
   },
   {

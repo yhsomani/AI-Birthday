@@ -10,7 +10,8 @@ import { collectReleaseEvidenceProvenance, executeReleaseEvidenceCommands } from
 
 const rootDir = process.cwd();
 const outputArg = process.argv.find(arg => arg.startsWith('--output='));
-const outputPath = outputArg?.slice('--output='.length) || join(rootDir, 'reports', 'react-native-release-evidence.json');
+const outputPath =
+  outputArg?.slice('--output='.length) || join(rootDir, 'reports', 'react-native-release-evidence.json');
 
 const readJson = <T>(path: string): T => JSON.parse(readFileSync(path, 'utf8')) as T;
 

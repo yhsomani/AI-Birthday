@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createTestState } from '../test/testState';
 import { buildEmailDeliveryRequest, classifyEmailProviderStatus, isValidEmailAddress } from './emailDelivery';
+import { assessDuplicateMessageRisk } from './duplicateGuard';
 import { MESSAGE_BODY_LIMITS } from './messageBodyPolicy';
 import type { AppState } from './types';
 
@@ -9,6 +10,7 @@ const validApproval = {
   approvedAt: '2026-07-09T09:00:00.000Z',
   approvalExpiresAt: '2999-07-16T09:00:00.000Z'
 };
+const deliveryNow = new Date('2026-07-10T09:00:00.000Z');
 
 const emailReadyState = (): AppState => {
   const state = createTestState();
@@ -32,6 +34,7 @@ const emailReadyState = (): AppState => {
         channel: 'Email',
         status: 'Scheduled',
         ...validApproval,
+        scheduledFor: '2026-07-10T08:00:00.000Z',
         body: 'Congratulations Rajesh, wishing you continued success and a meaningful year ahead.'
       },
       ...state.messages
@@ -48,7 +51,7 @@ describe('email delivery contract', () => {
 
   it('builds provider requests only for approved email messages', () => {
     const state = emailReadyState();
-    const result = buildEmailDeliveryRequest(state, 'msg-email-rajesh');
+    const result = buildEmailDeliveryRequest(state, 'msg-email-rajesh', deliveryNow);
 
     assert.equal(result.ok, true);
     if (!result.ok) {
@@ -74,14 +77,16 @@ describe('email delivery contract', () => {
           emailEnabled: false
         }
       },
-      'msg-email-rajesh'
+      'msg-email-rajesh',
+      deliveryNow
     );
     const unapproved = buildEmailDeliveryRequest(
       {
         ...ready,
         messages: [{ ...ready.messages[0], status: 'Needs review' }, ...ready.messages.slice(1)]
       },
-      'msg-email-rajesh'
+      'msg-email-rajesh',
+      deliveryNow
     );
     const invalidSender = buildEmailDeliveryRequest(
       {
@@ -91,7 +96,8 @@ describe('email delivery contract', () => {
           senderEmail: 'bad'
         }
       },
-      'msg-email-rajesh'
+      'msg-email-rajesh',
+      deliveryNow
     );
     const missingRecipient = buildEmailDeliveryRequest(
       {
@@ -100,7 +106,8 @@ describe('email delivery contract', () => {
           contact.id === 'c-rajesh' ? { ...contact, email: undefined } : contact
         )
       },
-      'msg-email-rajesh'
+      'msg-email-rajesh',
+      deliveryNow
     );
 
     assert.equal(disabled.ok, false);
@@ -111,6 +118,21 @@ describe('email delivery contract', () => {
     if (!unapproved.ok) assert.equal(unapproved.error.kind, 'not-approved');
     if (!invalidSender.ok) assert.equal(invalidSender.error.kind, 'invalid-sender');
     if (!missingRecipient.ok) assert.equal(missingRecipient.error.kind, 'missing-recipient');
+  });
+
+  it('keeps provider email blocked for DND while manual handoff remains a separate user-controlled path', () => {
+    const ready = emailReadyState();
+    const result = buildEmailDeliveryRequest(
+      {
+        ...ready,
+        contacts: ready.contacts.map(contact => (contact.id === 'c-rajesh' ? { ...contact, dnd: true } : contact))
+      },
+      'msg-email-rajesh',
+      deliveryNow
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.match(result.error.message, /manual handoff/i);
   });
 
   it('rejects expired approval windows before provider delivery', () => {
@@ -127,7 +149,8 @@ describe('email delivery contract', () => {
           ...ready.messages.slice(1)
         ]
       },
-      'msg-email-rajesh'
+      'msg-email-rajesh',
+      deliveryNow
     );
 
     assert.equal(expired.ok, false);
@@ -150,7 +173,8 @@ describe('email delivery contract', () => {
           ...ready.messages.slice(1)
         ]
       },
-      'msg-email-rajesh'
+      'msg-email-rajesh',
+      deliveryNow
     );
 
     assert.equal(result.ok, false);
@@ -158,6 +182,48 @@ describe('email delivery contract', () => {
       assert.equal(result.error.kind, 'invalid-body');
       assert.match(result.error.message, /Shorten the message or switch channel/i);
     }
+  });
+
+  it('rechecks the current duplicate fingerprint immediately before provider dispatch', () => {
+    const ready = emailReadyState();
+    const target = {
+      ...ready.messages[0],
+      occurrenceDate: '2026-07-20'
+    };
+    const newlySent = {
+      ...target,
+      id: 'newly-sent-same-occurrence',
+      status: 'Sent' as const,
+      sentAt: '2026-07-10T08:30:00.000Z',
+      approvedAt: undefined,
+      approvalExpiresAt: undefined
+    };
+    const changed = { ...ready, messages: [target, newlySent, ...ready.messages.slice(1)] };
+
+    const blocked = buildEmailDeliveryRequest(changed, target.id, deliveryNow);
+    assert.equal(blocked.ok, false);
+    if (!blocked.ok) {
+      assert.equal(blocked.error.kind, 'duplicate-risk');
+      assert.match(blocked.error.message, /changed after approval/i);
+    }
+
+    const assessment = assessDuplicateMessageRisk(changed, target);
+    assert.equal(assessment.risk.risk, true);
+    assert.ok(assessment.fingerprint);
+    const acknowledged = {
+      ...changed,
+      messages: changed.messages.map(message =>
+        message.id === target.id
+          ? {
+              ...message,
+              duplicateWarning: assessment.risk.risk ? assessment.risk.message : undefined,
+              duplicateAcknowledged: true,
+              duplicateAcknowledgementFingerprint: assessment.fingerprint
+            }
+          : message
+      )
+    };
+    assert.equal(buildEmailDeliveryRequest(acknowledged, target.id, deliveryNow).ok, true);
   });
 
   it('classifies provider failures into actionable categories', () => {

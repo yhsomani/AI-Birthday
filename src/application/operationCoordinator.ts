@@ -22,9 +22,7 @@ export type OperationTaskResult<T> =
   | { status: 'unknown'; error: OperationError };
 
 export type OperationRunResult<T> =
-  | OperationTaskResult<T>
-  | { status: 'cancelled' }
-  | { status: 'already-running'; requestId: string };
+  OperationTaskResult<T> | { status: 'cancelled' } | { status: 'already-running'; requestId: string };
 
 export type OperationTask<T> = (signal: AbortSignal) => Promise<OperationTaskResult<T>>;
 
@@ -171,7 +169,10 @@ export class OperationCoordinator {
   retry<T>(scope: string): Promise<OperationRunResult<T>> {
     const registration = this.retries.get(scope);
     if (!registration) {
-      return Promise.resolve({ status: 'failed', error: { code: 'retry-unavailable', retryable: false, summary: 'This operation cannot be retried safely.' } });
+      return Promise.resolve({
+        status: 'failed',
+        error: { code: 'retry-unavailable', retryable: false, summary: 'This operation cannot be retried safely.' }
+      });
     }
     return this.run(scope, registration.task as OperationTask<T>, { requestId: registration.requestId });
   }

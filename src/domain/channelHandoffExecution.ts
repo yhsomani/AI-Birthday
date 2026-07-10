@@ -20,11 +20,7 @@ export interface HandoffExecutionDependencies {
   share: (payload: HandoffSharePayload) => Promise<HandoffShareStatus>;
 }
 
-export type HandoffExecutionOutcome =
-  | 'opened-destination'
-  | 'shared-fallback'
-  | 'dismissed-fallback'
-  | 'failed';
+export type HandoffExecutionOutcome = 'opened-destination' | 'shared-fallback' | 'dismissed-fallback' | 'failed';
 
 export interface HandoffExecutionResult {
   outcome: HandoffExecutionOutcome;
@@ -33,11 +29,8 @@ export interface HandoffExecutionResult {
   errorMessage?: string;
 }
 
-export const buildHandoffSharePayload = (
-  body: string,
-  contactName?: string
-): HandoffSharePayload => ({
-  title: `Message for ${contactName?.trim() || 'contact'}`,
+export const buildHandoffSharePayload = (body: string, _contactName?: string): HandoffSharePayload => ({
+  title: 'Approved message',
   message: body
 });
 

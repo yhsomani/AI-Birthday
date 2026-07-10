@@ -26,10 +26,7 @@ export type LauncherShortcutResolution =
 
 export const launcherShortcuts = shortcutDefinitions as LauncherShortcutDefinition[];
 
-export const resolveLauncherShortcut = (
-  state: AppState,
-  shortcutId: string
-): LauncherShortcutResolution => {
+export const resolveLauncherShortcut = (state: AppState, shortcutId: string): LauncherShortcutResolution => {
   const shortcut = launcherShortcuts.find(item => item.id === shortcutId);
   if (!shortcut) {
     return {

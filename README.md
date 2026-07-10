@@ -50,6 +50,7 @@ The React Native replacement uses `app.json` for native identifiers and permissi
 ```bash
 npm run typecheck
 npm test
+npm run test:native-prebuild
 npm audit --audit-level=moderate
 npx expo install --check
 npx expo export --platform web --output-dir reports/web-export
@@ -58,41 +59,53 @@ npm run release:evidence -- --fail-on-blockers
 ```
 
 `npm test` runs the React Native source-contract suite without per-file process isolation so local and CI validation do not depend on child `node`/`esbuild` process launches.
-`npm run release:evidence` executes the typecheck, test, audit, Expo dependency, web export, and diff checks itself. It writes the ignored external artifact `reports/react-native-release-evidence.json` with command exit codes, timing and output hashes plus the exact commit, dirty-state fingerprint, lockfile hash, and Node/npm versions. Environment variables cannot mark checks passed. `--fail-on-blockers` makes missing/failed proof, dirty source, unsafe release configuration, or other blockers fail the command.
+`npm run test:native-prebuild` requires JDK 17 and an Android SDK. It creates an isolated temporary Expo project, runs a real Android prebuild, compiles the debug APK, and removes the fixture. JDK 21 alone is not sufficient because the React Native Gradle plugin requests a JDK 17 toolchain; relying on Foojay auto-provisioning can also fail on restricted or slow networks, so CI provisions Temurin 17 explicitly.
+`npm run release:evidence` executes the typecheck, test, native prebuild/debug compile, audit, Expo dependency, web export, and diff checks itself. It writes the ignored external artifact `reports/react-native-release-evidence.json` with command exit codes, timing and output hashes plus the exact commit, dirty-state fingerprint, lockfile hash, and Node/npm versions. Environment variables cannot mark checks passed. `--fail-on-blockers` makes missing/failed proof, dirty source, unsafe release configuration, or other blockers fail the command.
 
 The generated report is not imported by the application and is never a prerequisite for typecheck, test, or bundle. Setup Check safely reports release evidence as unattached because operational CI/release evidence does not belong in a user runtime. GitHub CI proves the clean-checkout order, uploads the report, and attests it on protected-branch pushes.
 
 ## Current React Native Scope
 
-The RN app currently includes a local-first implementation shell for the most important product workflows:
+The user interface is intentionally temporary. `src/App.tsx` exposes one unstyled,
+bounded JSON command input plus redacted readiness, operation, issue, and entity-count
+output. It exists only to execute and validate the product behavior while the final UI
+is redesigned separately in Figma. It contains no product layout, theme, animation,
+icon system, or visual polish that the later UI must preserve.
 
-- Home next-best-action dashboard with explicit relationship check-in queue actions.
-- First-run onboarding with setup goals, account/local mode choice, permission rationale, progress preservation, and reopen-from-Home/Settings behavior.
-- Account and Privacy center with local/Google-sync mode state, checklist-backed account disconnect/local data clearing, backup-before-destructive-action guidance, permission decision tracking, denial fallbacks, and revocable manual WhatsApp handoff consent.
-- Native contact import with deduplication rules.
-- Events with canonical preparation checklists, next-step guidance, type/time filters that default to birthday/anniversary/custom and reveal advanced categories explicitly, month view, and manual event creation for existing or new local contacts.
-- Calendar import/export for relationship events, including idempotent RelateAI calendar reconciliation that updates changed mirrored events and removes stale/duplicate RelateAI exports, plus review-first CSV/vCard event import from pasted text or selected files.
-- Contacts with group/quality filters and sorting, contact detail, validated editable essentials, stale-draft review guardrails after profile/preference changes, explainable relationship health, review-only classification suggestions, explicit group/VIP/DND/cadence controls with DND and route-aware approval blocking, check-in snooze and mark-contacted actions that preserve truthful last-contact history, group default inheritance with per-contact overrides, guided enrichment with all core missing-context prompts and personalization summaries, tone controls, preferred channel, searchable/editable Memory Vault with pinning, delete confirmation, note validation, and private-note AI exclusion, Gift Advisor optional budget/suggestions/history with delete confirmation, filterable relationship timeline, and searchable Chat History.
-- Manual message composer with editable local templates, privacy-context summaries, readiness validation, and a separate AI-ready/fallback draft path.
-- AI provider draft generation through release-ready endpoint preflight, local template fallback, variants, local rate limiting, response content-safety/language gates, AI-disable draft review guardrails, and redacted provider observations.
-- Message Template Library under More for offline/non-AI drafts by contact, occasion, and tone, with editable text and review-first draft creation.
-- Wish preview, editing, recipient-specific tone impact explanation with a direct adjust path, regeneration feedback chips/custom guidance, channel body validation with SMS multipart guidance, safe test-send route checks, regeneration with user-controlled AI context exclusions, confirmation-backed time-boxed approval/rejection, duplicate warning, review-next routing, AI context preview, and approval-gated manual send handoff that offers destination-app and copy/share options before explicit mark-sent confirmation.
-- Duplicate-send guardrails that block approval until the user explicitly acknowledges same-event or similar sent/scheduled message risks.
-- Channel-specific SMS, WhatsApp, and email handoff through native Linking/share flows, with approved-text-only copy/share fallback, post-send user confirmation, dispatch-time route, body-length, and approval-window rechecks, plus optional explicitly revealed provider email delivery for approved messages with endpoint preflight and message-level failure recovery.
-- Messages Inbox with status tabs/counts including Today and separate Failed recovery, search, channel filters, sorting, individual review-first actions, advanced opt-in bulk approve/reject/retry/revoke tools, route-aware and channel-body approval eligibility, pre-bulk channel verification guidance, partial-skip summaries, recovery guidance, approval expiry, channel, automation, and schedule-setting review guardrails, and review, scheduled, blocked, failed, and sent states.
-- Post-send follow-up scheduling that creates reviewable follow-up events and reminders from sent messages.
-- Deep-link routing for home, events, add event, contacts, chat history, messages, review/wish preview, settings, setup, and backup entry points, with stale message/contact recovery before opening private preview surfaces.
-- Android static launcher shortcuts for Review messages and Add event through the Expo prebuild config plugin.
-- Privacy-minimized localized home widget summary preview, JS-to-native widget sync, and Android Expo prebuild widget packaging, with safe tiles only for today's events and pending reviews, immutable navigation intents, and no send/delete actions.
-- Event reminder planning with automation mode, quiet hours, blackout windows, notification readiness diagnostics, lock-screen-safe Expo notification payloads, idempotent notification reconciliation that updates changed reminders, clears stale RelateAI reminders, preserves unrelated scheduled notifications, notification-disable reminder-plan clearing, automation-mode queued-message consequences, explicit advanced full-auto reveal plus confirmation, and safe notification tap routing back into review surfaces.
-- Goal-based Setup Wizard with localized readiness steps that omit provider email until it is chosen or configured, privacy-aware Setup Check with localized provider endpoint readiness diagnostics that keep missing email provider setup optional while manual handoff is available and surface unsafe configured endpoints, explicit readiness refresh feedback, redacted dry-run snapshots, Style Coach sample analysis with an "Improve my style" action and no main profile-history UI, Analytics dashboard, default shareable summary, and explicitly revealed confirmed CSV export, encrypted file Backup/Restore, Settings with optional explicitly revealed email provider setup, relationship group defaults, automation-mode impact counts, and queued-work consequences, and searchable/filterable Activity History with localized system activity titles/details and safe recovery navigation under More.
-- SecureStore-backed persisted app state where supported, with normalized entry storage, bounded chunks for oversized entries, verified storage health metadata in Persistence and Setup Check, versioned migration, and corrupt-state recovery.
-- Large-dataset contract coverage for core local RN lists and reports.
-- Biometric lock via Expo Local Authentication, kept in Settings/Privacy and offered as a contextual recommendation after private notes or provider setup exist.
-- Locale files for English, Hindi, and Hinglish with locale-aware navigation, Onboarding/Home dashboard controls and widget summaries/tiles, primary screen headings, Events/Event cards/Add Event, Messages, Contacts/Contact Detail static workflows, Manual Composer, Chat History, Wish Preview, and More Account/Privacy/Calendar/Reminder/Import/Template Library/Persistence/Setup Wizard summaries-details-actions/Setup Check diagnostics/Style Coach/AI Provider endpoint readiness/Analytics/Backup/Activity History workflow/title/detail/Settings controls, shared actions, native feedback for manual handoff/contact import/reminder scheduling/calendar sync/event file import, system feedback, lock/home shell copy, status labels, pluralized counts, dates, currency, and language settings.
-- Source-level accessibility contract coverage for native touch targets, text inputs, tabs, and checkbox state.
-- Source-level primary interaction contract coverage for core tab routing, Home/Events/Messages/Contacts/More workflows, and high-risk confirmations.
-- React Native release evidence generation that executes required checks, binds their hashed results to source/toolchain provenance, records native identifiers/EAS profiles/permission policy, and keeps the artifact outside the runtime app.
+The implementation behind that console remains local-first and includes the behavior
+defined by the feature documents: contacts and conflict-aware imports, relationship
+events and reminders, review-first AI or local-template drafting, message approval and
+delivery recovery, explicit manual channel handoff, memories and enrichment context,
+check-ins and follow-ups, privacy and permission controls, deep-link/navigation state,
+home planning, diagnostics, derived relationship analytics, redacted summary sharing,
+confirmed CSV export, selected idempotent calendar export, encrypted backup/restore,
+and protected persistence. Goal-specific onboarding cannot bypass required choices;
+scheduled work is returned to review after a device time-zone change; and advanced bulk
+message actions use a short-lived preview/confirm boundary with live eligibility checks.
+Risky or de-emphasized roadmap features are kept out of the primary runtime surface;
+commands may expose bounded validation hooks where release testing requires them.
+
+Run `{"type":"system.catalog"}` to inspect the exhaustive command vocabulary and
+review-first workflow examples. Successful non-secret commands clear the command input;
+failed non-secret commands remain editable for retry. Secure input is always cleared and
+is accepted only through the `$SECURE_INPUT` placeholder.
+
+All state-changing commands run through deterministic domain transitions, verified
+durable commits, operation serialization/cancellation, native reconciliation, and
+redacted error reporting. Private state is not shown while biometric locking is active.
+External AI or email requests require a short-lived authenticated provider session;
+provider credentials and session tokens are never persisted, exported, displayed, or
+logged. Native contact, calendar, notification, widget, backup, and handoff bridges are
+invoked only after the corresponding user intent and product guardrails succeed.
+
+The feature documents define behavior; the command console is not a replacement UX
+specification. The future Figma implementation must call the same application services
+without weakening confirmations, permission rationale, review-first rules, privacy
+boundaries, or recovery semantics.
+
+Release evidence generation executes the required checks, binds results to source and
+toolchain provenance, records native identifiers/EAS profiles/permission policy, and
+keeps the artifact outside the runtime application.
 
 Legacy Android/Gradle artifacts are not an active project surface. Any reintroduced legacy path is release drift and must be resolved before signing.
 

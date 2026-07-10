@@ -2,9 +2,52 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { relateReducer } from '../state/relateReducer';
 import { createTestState } from '../test/testState';
-import { buildMessageBulkActionReport, buildMessageInbox, findNextReviewMessageId } from './messageInbox';
+import {
+  buildMessageBulkActionReport,
+  buildMessageInbox,
+  findNextReviewMessageId,
+  messageApprovalRouteIssue
+} from './messageInbox';
 
 describe('message inbox contract', () => {
+  it('enforces WhatsApp consent while keeping manual email handoff independent of provider delivery', () => {
+    const state = createTestState();
+    const whatsapp = {
+      ...state.messages[0],
+      contactId: 'c-asha',
+      channel: 'WhatsApp' as const
+    };
+    state.settings.whatsappHandoffEnabled = true;
+    state.privacy.whatsappHandoffConsent = false;
+    assert.match(messageApprovalRouteIssue(state, whatsapp) ?? '', /explicit consent/i);
+    state.privacy.whatsappHandoffConsent = true;
+    assert.equal(messageApprovalRouteIssue(state, whatsapp), undefined);
+
+    const email = {
+      ...state.messages[0],
+      contactId: 'c-rajesh',
+      channel: 'Email' as const
+    };
+    state.settings.emailEnabled = false;
+    assert.equal(messageApprovalRouteIssue(state, email), undefined);
+
+    const missingRoute = { ...whatsapp, channel: 'SMS' as const };
+    const withoutRoute = {
+      ...state,
+      contacts: state.contacts.map(contact =>
+        contact.id === missingRoute.contactId ? { ...contact, phone: undefined, routes: [] } : contact
+      )
+    };
+    assert.match(messageApprovalRouteIssue(withoutRoute, missingRoute) ?? '', /phone number/i);
+    assert.equal(
+      messageApprovalRouteIssue(withoutRoute, missingRoute, {
+        allowDndManualControl: true,
+        allowShareFallback: true
+      }),
+      undefined
+    );
+  });
+
   it('builds status tab counts and filters review messages', () => {
     const state = createTestState();
     const inbox = buildMessageInbox(state, {
@@ -20,15 +63,15 @@ describe('message inbox contract', () => {
   });
 
   it('searches message body/contact context and applies channel filters', () => {
-    const approved = relateReducer(createTestState(), {
-      type: 'approveMessage',
-      messageId: 'msg-mira-checkin'
-    });
-    const state = relateReducer(approved, {
-      type: 'manualHandoff',
-      messageId: 'msg-mira-checkin',
-      nowIso: '2026-07-09T10:00:00.000Z'
-    });
+    const initial = createTestState();
+    const state = {
+      ...initial,
+      messages: initial.messages.map(message =>
+        message.id === 'msg-mira-checkin'
+          ? { ...message, status: 'Sent' as const, sentAt: '2026-07-09T10:00:00.000Z' }
+          : message
+      )
+    };
     const inbox = buildMessageInbox(state, {
       tab: 'Sent',
       channel: 'Manual',
@@ -115,8 +158,48 @@ describe('message inbox contract', () => {
     assert.equal(today.counts.Scheduled, 2);
     assert.equal(today.counts.Blocked, 1);
     assert.equal(today.counts.Failed, 1);
-    assert.deepEqual(today.rows.map(row => row.message.id), ['today']);
-    assert.deepEqual(failed.rows.map(row => row.message.id), ['failed']);
+    assert.deepEqual(
+      today.rows.map(row => row.message.id),
+      ['today']
+    );
+    assert.deepEqual(
+      failed.rows.map(row => row.message.id),
+      ['failed']
+    );
+  });
+
+  it('matches Today by the device calendar date across a UTC boundary', () => {
+    const previousTimeZone = process.env.TZ;
+    process.env.TZ = 'America/Los_Angeles';
+    try {
+      const state = createTestState();
+      const result = buildMessageInbox(
+        {
+          ...state,
+          messages: [
+            {
+              ...state.messages[0],
+              id: 'local-today',
+              status: 'Scheduled' as const,
+              scheduledFor: '2026-07-10T01:00:00.000Z'
+            }
+          ]
+        },
+        {
+          tab: 'Today',
+          channel: 'All',
+          query: '',
+          sort: 'Scheduled',
+          nowIso: '2026-07-09T23:00:00.000Z'
+        }
+      );
+      assert.deepEqual(
+        result.rows.map(row => row.message.id),
+        ['local-today']
+      );
+    } finally {
+      process.env.TZ = previousTimeZone;
+    }
   });
 
   it('provides specific recovery guidance for blocked and failed messages', () => {
@@ -161,10 +244,20 @@ describe('message inbox contract', () => {
     const blockedRecoveryById = Object.fromEntries(blockedInbox.rows.map(row => [row.message.id, row.recovery?.title]));
     const failedRecoveryById = Object.fromEntries(failedInbox.rows.map(row => [row.message.id, row.recovery?.title]));
 
-    assert.deepEqual(blockedInbox.rows.map(row => row.message.status), ['Blocked']);
-    assert.deepEqual(failedInbox.rows.map(row => row.message.status), ['Failed']);
+    assert.deepEqual(
+      blockedInbox.rows.map(row => row.message.status),
+      ['Blocked']
+    );
+    assert.deepEqual(
+      failedInbox.rows.map(row => row.message.status),
+      ['Failed']
+    );
     assert.equal(blockedRecoveryById['msg-asha-bday'], 'Message needs editing');
     assert.equal(failedRecoveryById['email-failed'], 'Email provider not configured');
+    assert.deepEqual(blockedInbox.rows[0].recovery?.command, {
+      type: 'messages.retry',
+      messageId: 'msg-asha-bday'
+    });
   });
 
   it('distinguishes empty inboxes from no-result filters', () => {
@@ -253,11 +346,7 @@ describe('message inbox contract', () => {
       )
     };
 
-    const report = buildMessageBulkActionReport(
-      smsBulkState,
-      ['msg-asha-bday', 'msg-mira-checkin'],
-      'Approve'
-    );
+    const report = buildMessageBulkActionReport(smsBulkState, ['msg-asha-bday', 'msg-mira-checkin'], 'Approve');
 
     assert.deepEqual(report.eligibleIds, ['msg-asha-bday', 'msg-mira-checkin']);
     assert.match(report.verificationGuidance ?? '', /Before bulk approval on SMS/i);
@@ -284,5 +373,41 @@ describe('message inbox contract', () => {
     );
 
     assert.equal(verifiedReport.verificationGuidance, undefined);
+  });
+
+  it('includes event occurrence and scheduling validity in bulk approval eligibility', () => {
+    const base = createTestState();
+    const state = {
+      ...base,
+      messages: [
+        {
+          ...base.messages[0],
+          id: 'stale-occurrence',
+          occurrenceDate: '2025-08-12'
+        },
+        {
+          ...base.messages[1],
+          id: 'missing-event',
+          eventId: 'event-no-longer-present',
+          status: 'Needs review' as const
+        }
+      ]
+    };
+    const report = buildMessageBulkActionReport(
+      state,
+      ['stale-occurrence', 'missing-event'],
+      'Approve',
+      new Date('2026-07-10T10:00:00.000Z')
+    );
+
+    assert.equal(report.eligibleIds.length, 0);
+    assert.match(
+      report.skipped.find(item => item.messageId === 'stale-occurrence')?.reason ?? '',
+      /occurrence.*passed/i
+    );
+    assert.match(
+      report.skipped.find(item => item.messageId === 'missing-event')?.reason ?? '',
+      /event.*no longer valid/i
+    );
   });
 });

@@ -14,6 +14,7 @@ export interface EvidenceCommandSpec {
   command: string;
   executable: string;
   args: string[];
+  timeoutMs?: number;
 }
 
 export type EvidenceCommandRunner = (
@@ -42,6 +43,13 @@ export const executableReleaseEvidenceCommands: EvidenceCommandSpec[] = [
     args: ['run', 'typecheck']
   },
   { id: 'test', command: 'npm test', executable: npmExecutable, args: ['test'] },
+  {
+    id: 'native-prebuild',
+    command: 'npm run test:native-prebuild',
+    executable: npmExecutable,
+    args: ['run', 'test:native-prebuild'],
+    timeoutMs: 20 * 60 * 1000
+  },
   {
     id: 'audit',
     command: 'npm audit --audit-level=moderate',
@@ -79,7 +87,7 @@ export const executeReleaseEvidenceCommands = (options: ExecuteEvidenceOptions):
     const result = runner(spec.executable, [...spec.args], {
       cwd: options.rootDir,
       encoding: 'utf8',
-      timeout: 10 * 60 * 1000,
+      timeout: spec.timeoutMs ?? 10 * 60 * 1000,
       maxBuffer: 32 * 1024 * 1024
     });
     const completed = now();

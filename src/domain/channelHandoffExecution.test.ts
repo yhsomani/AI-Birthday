@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { HandoffTarget } from './channelHandoff';
-import { buildHandoffSharePayload, runHandoffTarget, type HandoffExecutionDependencies } from './channelHandoffExecution';
+import {
+  buildHandoffSharePayload,
+  runHandoffTarget,
+  type HandoffExecutionDependencies
+} from './channelHandoffExecution';
 
 const target = (overrides: Partial<HandoffTarget> = {}): HandoffTarget => ({
   url: 'sms:+919999999999?body=Hello',
@@ -100,11 +104,11 @@ describe('channel handoff execution', () => {
     assert.equal(result.needsSentConfirmation, true);
   });
 
-  it('builds share payloads without route setup reasons or diagnostics', () => {
+  it('builds share payloads with only approved text and a recipient-free generic title', () => {
     const payload = buildHandoffSharePayload('Approved body', ' Asha ');
 
-    assert.equal(payload.title, 'Message for Asha');
+    assert.equal(payload.title, 'Approved message');
     assert.equal(payload.message, 'Approved body');
-    assert.doesNotMatch(JSON.stringify(payload), /missing|diagnostic|reason/i);
+    assert.doesNotMatch(JSON.stringify(payload), /Asha|missing|diagnostic|reason/i);
   });
 });

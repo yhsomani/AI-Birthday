@@ -16,7 +16,11 @@ export const MAX_EVENT_IMPORT_ERRORS = 100;
 
 const inputByteLength = (value: string) => new TextEncoder().encode(value).byteLength;
 
-const normalizeHeader = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+const normalizeHeader = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
 
 const slug = (value: string) =>
   value
@@ -39,9 +43,7 @@ const parsePartialDate = (month: number, day: number, now: Date) => {
   if (!thisYear) {
     return undefined;
   }
-  return new Date(thisYear).getTime() < now.getTime()
-    ? isoAtReviewHour(now.getFullYear() + 1, month, day)
-    : thisYear;
+  return new Date(thisYear).getTime() < now.getTime() ? isoAtReviewHour(now.getFullYear() + 1, month, day) : thisYear;
 };
 
 export const normalizeImportDate = (value: string | undefined, now = new Date()): string | undefined => {
@@ -161,7 +163,11 @@ const valueFor = (row: string[], headers: Map<string, number>, names: string[]) 
 
 export const parseCsvEventImport = (raw: string, now = new Date()): EventImportParseResult => {
   if (inputByteLength(raw) > MAX_EVENT_IMPORT_BYTES) {
-    return { candidates: [], skipped: 0, errors: [`Event import must be no larger than ${MAX_EVENT_IMPORT_BYTES} bytes.`] };
+    return {
+      candidates: [],
+      skipped: 0,
+      errors: [`Event import must be no larger than ${MAX_EVENT_IMPORT_BYTES} bytes.`]
+    };
   }
   const parsedRows = parseCsvRows(raw.replace(/^\uFEFF/, ''));
   if (parsedRows.error) {
@@ -247,7 +253,11 @@ const parseVcardValue = (line: string) => {
 
 export const parseVcardEventImport = (raw: string, now = new Date()): EventImportParseResult => {
   if (inputByteLength(raw) > MAX_EVENT_IMPORT_BYTES) {
-    return { candidates: [], skipped: 0, errors: [`Event import must be no larger than ${MAX_EVENT_IMPORT_BYTES} bytes.`] };
+    return {
+      candidates: [],
+      skipped: 0,
+      errors: [`Event import must be no larger than ${MAX_EVENT_IMPORT_BYTES} bytes.`]
+    };
   }
   const lines = unfoldVcardLines(raw);
   const blocks: string[][] = [];
@@ -284,15 +294,7 @@ export const parseVcardEventImport = (raw: string, now = new Date()): EventImpor
       }
     }
 
-    const name =
-      values.get('FN') ??
-      values
-        .get('N')
-        ?.split(';')
-        .filter(Boolean)
-        .reverse()
-        .join(' ')
-        .trim();
+    const name = values.get('FN') ?? values.get('N')?.split(';').filter(Boolean).reverse().join(' ').trim();
     const birthday = normalizeImportDate(values.get('BDAY'), now);
     const anniversary = normalizeImportDate(values.get('ANNIVERSARY'), now);
     const note = values.get('NOTE');
@@ -351,9 +353,6 @@ export const parseEventImportText = (
     };
   }
 
-  const resolvedFormat =
-    format === 'auto' ? (/\bBEGIN:VCARD\b/i.test(trimmed) ? 'vcard' : 'csv') : format;
-  return resolvedFormat === 'vcard'
-    ? parseVcardEventImport(trimmed, now)
-    : parseCsvEventImport(trimmed, now);
+  const resolvedFormat = format === 'auto' ? (/\bBEGIN:VCARD\b/i.test(trimmed) ? 'vcard' : 'csv') : format;
+  return resolvedFormat === 'vcard' ? parseVcardEventImport(trimmed, now) : parseCsvEventImport(trimmed, now);
 };

@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
 type AndroidManifest = {
   manifest: {
-    application: Array<{
-      receiver?: Array<{
+    application: {
+      $?: Record<string, string>;
+      receiver?: {
         $?: Record<string, string>;
-        'intent-filter'?: Array<{ action?: Array<{ $?: Record<string, string> }> }>;
-        'meta-data'?: Array<{ $?: Record<string, string> }>;
-      }>;
-    }>;
+        'intent-filter'?: { action?: { $?: Record<string, string> }[] }[];
+        'meta-data'?: { $?: Record<string, string> }[];
+      }[];
+    }[];
   };
 };
 
@@ -25,7 +27,8 @@ type HomeWidgetPlugin = {
   renderWidgetProviderJava: (androidPackage: string) => string;
 };
 
-const homeWidgetPlugin = require('../../plugins/with-relateai-home-widget') as HomeWidgetPlugin;
+const loadPlugin = createRequire(import.meta.url);
+const homeWidgetPlugin = loadPlugin('../../plugins/with-relateai-home-widget') as HomeWidgetPlugin;
 const bridgeSource = readFileSync(join(process.cwd(), 'src/native/homeWidgetBridge.ts'), 'utf8');
 const appConfig = JSON.parse(readFileSync(join(process.cwd(), 'app.json'), 'utf8')) as {
   expo: {
@@ -87,6 +90,12 @@ describe('React Native Android home widget plugin contract', () => {
   });
 
   it('registers the generated native module package in Expo MainApplication templates', () => {
+    const currentKotlinMainApplication = `
+      override fun getPackages(): List<ReactPackage> =
+        PackageList(this).packages.apply {
+          // Add packages that cannot be autolinked here.
+        }
+    `;
     const kotlinMainApplication = `
       override fun getPackages(): List<ReactPackage> {
         val packages = PackageList(this).packages
@@ -100,6 +109,16 @@ describe('React Native Android home widget plugin contract', () => {
       }
     `;
 
+    const currentKotlinResult = homeWidgetPlugin.addWidgetPackageToMainApplication(
+      currentKotlinMainApplication,
+      'com.relateai.app'
+    );
+    assert.match(currentKotlinResult, /add\(com\.relateai\.app\.widget\.RelateAiHomeWidgetPackage\(\)\)/);
+    assert.match(currentKotlinResult, /@generated begin relateai-home-widget-package/);
+    assert.equal(
+      homeWidgetPlugin.addWidgetPackageToMainApplication(currentKotlinResult, 'com.relateai.app'),
+      currentKotlinResult
+    );
     assert.match(
       homeWidgetPlugin.addWidgetPackageToMainApplication(kotlinMainApplication, 'com.relateai.app'),
       /packages\.add\(com\.relateai\.app\.widget\.RelateAiHomeWidgetPackage\(\)\)/
@@ -121,7 +140,13 @@ describe('React Native Android home widget plugin contract', () => {
     const manifest = homeWidgetPlugin.addWidgetReceiverToManifest(
       {
         manifest: {
-          application: [{}]
+          application: [
+            {
+              $: {
+                'android:name': '.MainApplication'
+              }
+            }
+          ]
         }
       },
       'com.relateai.app'

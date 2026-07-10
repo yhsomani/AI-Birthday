@@ -67,10 +67,7 @@ const isOwnedCacheUri = (uri: string, cacheDirectory: string | null) =>
 const supportedExtension = (name: string) =>
   supportedExtensions.some(extension => name.toLowerCase().endsWith(extension));
 
-const assertSupportedAsset = async (
-  asset: EventImportDocumentAsset,
-  fileSystem: EventImportFileSystem
-) => {
+const assertSupportedAsset = async (asset: EventImportDocumentAsset, fileSystem: EventImportFileSystem) => {
   if (
     !asset.name ||
     asset.name.length > maximumFilenameLength ||
@@ -145,17 +142,15 @@ let defaultServicePromise: Promise<EventImportFileService> | undefined;
 
 const loadDefaultService = () => {
   if (!defaultServicePromise) {
-    defaultServicePromise = Promise.all([
-      import('expo-document-picker'),
-      import('expo-file-system/legacy')
-    ]).then(([documentPicker, fileSystem]) =>
-      createEventImportFileService(documentPicker, {
-        cacheDirectory: fileSystem.cacheDirectory,
-        utf8Encoding: fileSystem.EncodingType.UTF8,
-        readAsStringAsync: fileSystem.readAsStringAsync,
-        getInfoAsync: fileSystem.getInfoAsync,
-        deleteAsync: fileSystem.deleteAsync
-      })
+    defaultServicePromise = Promise.all([import('expo-document-picker'), import('expo-file-system/legacy')]).then(
+      ([documentPicker, fileSystem]) =>
+        createEventImportFileService(documentPicker, {
+          cacheDirectory: fileSystem.cacheDirectory,
+          utf8Encoding: fileSystem.EncodingType.UTF8,
+          readAsStringAsync: fileSystem.readAsStringAsync,
+          getInfoAsync: fileSystem.getInfoAsync,
+          deleteAsync: fileSystem.deleteAsync
+        })
     );
   }
   return defaultServicePromise;

@@ -16,4 +16,14 @@ describe('reminder scheduler source contract', () => {
   it('has a lifecycle path that reads permission without requesting it', () => {
     assert.match(source, /reconcileReminderPlansWithoutPrompt[\s\S]+Notifications\.getPermissionsAsync\(\)/);
   });
+
+  it('initializes and targets the stable Android reminder channel', () => {
+    assert.match(source, /await initializeAndroidReminderNotificationChannel\(\)/);
+    assert.match(source, /channelId: RELATEAI_REMINDER_NOTIFICATION_CHANNEL_ID/);
+  });
+
+  it('uses fixed privacy-minimized copy instead of persisted event or message text', () => {
+    assert.match(source, /privacyMinimizedNotificationContent\(plan\)/);
+    assert.doesNotMatch(source, /title:\s*plan\.title|body:\s*plan\.body/);
+  });
 });

@@ -9,9 +9,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "relateai",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "buildNumber": "1",
@@ -25,13 +23,7 @@
     "android": {
       "package": "com.relateai.app",
       "versionCode": 1,
-      "permissions": [
-        "READ_CONTACTS",
-        "READ_CALENDAR",
-        "WRITE_CALENDAR",
-        "POST_NOTIFICATIONS",
-        "USE_BIOMETRIC"
-      ],
+      "permissions": ["READ_CONTACTS", "READ_CALENDAR", "WRITE_CALENDAR", "POST_NOTIFICATIONS", "USE_BIOMETRIC"],
       "blockedPermissions": [
         "android.permission.SEND_SMS",
         "android.permission.READ_SMS",
@@ -43,10 +35,7 @@
         "android.permission.BIND_ACCESSIBILITY_SERVICE"
       ]
     },
-    "plugins": [
-      "./plugins/with-relateai-shortcuts",
-      "./plugins/with-relateai-home-widget"
-    ],
+    "plugins": ["./plugins/with-relateai-shortcuts", "./plugins/with-relateai-home-widget"],
     "web": {
       "bundler": "metro"
     }

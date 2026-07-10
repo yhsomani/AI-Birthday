@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { relateReducer } from '../state/relateReducer';
 import { createTestState } from '../test/testState';
-import { buildGiftBudgetSummary, buildGiftSuggestions, validateGiftBudgetInput, validateGiftInput } from './giftAdvisor';
+import {
+  buildGiftBudgetSummary,
+  buildGiftSuggestions,
+  validateGiftBudgetInput,
+  validateGiftInput
+} from './giftAdvisor';
 
 describe('gift advisor contract', () => {
   it('summarizes annual budget and remaining spend for a contact', () => {
@@ -35,18 +40,9 @@ describe('gift advisor contract', () => {
   });
 
   it('validates required gift fields and cost range', () => {
-    assert.equal(
-      validateGiftInput({ name: '', category: 'Books', occasion: 'Birthday', cost: 100 }).ok,
-      false
-    );
-    assert.equal(
-      validateGiftInput({ name: 'Book', category: 'Books', occasion: '', cost: 100 }).ok,
-      false
-    );
-    assert.equal(
-      validateGiftInput({ name: 'Book', category: 'Books', occasion: 'Birthday', cost: -1 }).ok,
-      false
-    );
+    assert.equal(validateGiftInput({ name: '', category: 'Books', occasion: 'Birthday', cost: 100 }).ok, false);
+    assert.equal(validateGiftInput({ name: 'Book', category: 'Books', occasion: '', cost: 100 }).ok, false);
+    assert.equal(validateGiftInput({ name: 'Book', category: 'Books', occasion: 'Birthday', cost: -1 }).ok, false);
 
     const valid = validateGiftInput({
       name: '  Book voucher  ',
@@ -105,7 +101,10 @@ describe('gift advisor contract', () => {
 
     assert.equal(before.recordedGiftCount, 1);
     assert.equal(before.spentThisYear, 2200);
-    assert.equal(deleted.gifts.some(gift => gift.id === 'g-asha-1'), false);
+    assert.equal(
+      deleted.gifts.some(gift => gift.id === 'g-asha-1'),
+      false
+    );
     assert.equal(after.recordedGiftCount, 0);
     assert.equal(after.spentThisYear, 0);
     assert.equal(after.remaining, contact.annualGiftBudget);

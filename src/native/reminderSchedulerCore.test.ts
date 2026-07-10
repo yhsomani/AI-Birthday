@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { buildReminderNotificationData } from '../domain/notificationRoutes';
+import { privacyMinimizedNotificationContent } from '../domain/notificationPlans';
 import type { ReminderPlan } from '../domain/types';
 import { reconcileReminderPlansWithAdapter } from './reminderSchedulerCore';
 
@@ -28,6 +29,8 @@ describe('executable reminder scheduler adapter', () => {
               title: 'RelateAI reminder',
               body: 'Old',
               data: {
+                owner: 'relateai',
+                contractVersion: 1,
                 route: 'event-reminder',
                 safeAction: 'open-review',
                 eventId: 'old-event',
@@ -71,8 +74,7 @@ describe('executable reminder scheduler adapter', () => {
           {
             identifier: desired.id,
             content: {
-              title: desired.title,
-              body: desired.body,
+              ...privacyMinimizedNotificationContent(desired),
               data: buildReminderNotificationData(desired)
             },
             trigger: desired.triggerAt

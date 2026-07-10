@@ -13,7 +13,7 @@ export type PersistenceCommitResult =
     };
 
 export interface PersistenceCommitAdapter {
-  save(state: AppState): Promise<void>;
+  save(state: AppState, previousState?: AppState): Promise<void>;
   inspect(): Promise<PersistenceStorageHealth | undefined>;
   nowIso(): string;
 }
@@ -27,16 +27,15 @@ export class PersistenceCoordinator {
   private latestRequestedSnapshot = '';
   private lastPersistedSnapshot = '';
   private lastFailedSnapshot = '';
+  private lastFailure: unknown;
+  private lastPersistedState?: AppState;
   private pendingCount = 0;
 
   constructor(private readonly adapter: PersistenceCommitAdapter) {}
 
   schedule(state: AppState): Promise<PersistenceCommitResult> {
     const snapshot = JSON.stringify(state);
-    if (
-      this.pendingCount === 0 &&
-      (snapshot === this.lastPersistedSnapshot || snapshot === this.lastFailedSnapshot)
-    ) {
+    if (this.pendingCount === 0 && (snapshot === this.lastPersistedSnapshot || snapshot === this.lastFailedSnapshot)) {
       return Promise.resolve({ status: 'unchanged', snapshot });
     }
 
@@ -49,14 +48,17 @@ export class PersistenceCoordinator {
           return { status: 'superseded', snapshot };
         }
         try {
-          await this.adapter.save(state);
+          await this.adapter.save(state, this.lastPersistedState);
         } catch (error) {
           this.lastFailedSnapshot = snapshot;
+          this.lastFailure = error;
           throw error;
         }
         const storageHealth = await this.adapter.inspect();
         this.lastPersistedSnapshot = snapshot;
+        this.lastPersistedState = state;
         this.lastFailedSnapshot = '';
+        this.lastFailure = undefined;
         return {
           status: 'persisted',
           snapshot,
@@ -68,20 +70,23 @@ export class PersistenceCoordinator {
         this.pendingCount = Math.max(0, this.pendingCount - 1);
       });
 
-    this.tail = operation
-      .then(() => undefined)
-      .catch(() => undefined);
+    this.tail = operation.then(() => undefined).catch(() => undefined);
 
     return operation;
   }
 
   async flush(): Promise<void> {
     await this.tail;
+    if (this.lastFailedSnapshot && this.lastFailedSnapshot === this.latestRequestedSnapshot) {
+      throw this.lastFailure ?? new Error('The latest protected-storage write failed.');
+    }
   }
 
-  reset(snapshot = ''): void {
+  reset(snapshot = '', state?: AppState): void {
     this.latestRequestedSnapshot = snapshot;
     this.lastPersistedSnapshot = snapshot;
     this.lastFailedSnapshot = '';
+    this.lastFailure = undefined;
+    this.lastPersistedState = state;
   }
 }

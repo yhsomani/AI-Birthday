@@ -74,8 +74,13 @@ const isReviewStatus = (status: string) => status === 'Needs review' || status =
 export const buildHomeWidgetSummary = (state: AppState, now = new Date()): HomeWidgetSummary => {
   const today = dateKey(now);
   const generatedAt = now.toISOString();
-  const todayEvents = state.events.filter(event => eventOccurrenceIso(event, now)?.slice(0, 10) === today);
-  const pendingApprovals = state.messages.filter(message => isReviewStatus(message.status));
+  const activeContactIds = new Set(state.contacts.filter(contact => !contact.archivedAt).map(contact => contact.id));
+  const todayEvents = state.events.filter(
+    event => activeContactIds.has(event.contactId) && eventOccurrenceIso(event, now)?.slice(0, 10) === today
+  );
+  const pendingApprovals = state.messages.filter(
+    message => activeContactIds.has(message.contactId) && isReviewStatus(message.status)
+  );
 
   const tiles: HomeWidgetTile[] = [];
 
@@ -115,7 +120,8 @@ export const buildHomeWidgetSummary = (state: AppState, now = new Date()): HomeW
         : 'No relationship actions need attention.',
     tiles: sortedTiles,
     emptyState: sortedTiles.length === 0 ? 'No events or approvals need attention.' : undefined,
-    privacyNote: 'Widget summaries avoid message bodies, phone numbers, email addresses, private notes, and send actions.'
+    privacyNote:
+      'Widget summaries avoid message bodies, phone numbers, email addresses, private notes, and send actions.'
   };
 };
 

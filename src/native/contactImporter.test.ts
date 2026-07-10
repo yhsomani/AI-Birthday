@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
-import {
-  importDeviceContactsWithApi,
-  type ContactsImportApi
-} from './contactImporter';
+import { afterEach, describe, it } from 'node:test';
+import { importDeviceContactsWithApi, type ContactsImportApi } from './contactImporter';
 
 type ContactPage = Awaited<ReturnType<ContactsImportApi['Contact']['getAllDetails']>>;
 type ContactDetails = ContactPage[number];
+
+const originalTimeZone = process.env.TZ;
+
+afterEach(() => {
+  process.env.TZ = originalTimeZone;
+});
 
 const contactDetails = (id: string): ContactDetails => ({
   id,
@@ -19,10 +22,7 @@ const contactDetails = (id: string): ContactDetails => ({
   dates: []
 });
 
-const contactsApi = (
-  pages: Map<number, ContactPage>,
-  status = 'granted'
-) => {
+const contactsApi = (pages: Map<number, ContactPage>, status = 'granted') => {
   const offsets: number[] = [];
   const requestedFields: string[][] = [];
   const limits: number[] = [];
@@ -76,7 +76,7 @@ describe('Expo 57 contacts adapter', () => {
       ])
     );
 
-    const imported = await importDeviceContactsWithApi(api);
+    const imported = await importDeviceContactsWithApi(api, { fallbackBirthdayYear: 2026 });
 
     assert.equal(imported.length, 252);
     assert.deepEqual(offsets, [0, 250]);
@@ -88,14 +88,62 @@ describe('Expo 57 contacts adapter', () => {
       name: 'Asha Mehra',
       phone: '+91 98765 43210',
       email: '250@example.com',
-      birthday: new Date(1992, 7, 4).toISOString(),
+      phones: ['+91 98765 43210'],
+      emails: ['250@example.com'],
+      birthday: '1992-08-04T12:00:00.000Z',
       relationship: undefined
     });
     assert.equal(imported[251].email, 'dev@example.com');
-    assert.equal(
-      imported[251].birthday,
-      new Date(new Date().getFullYear(), 10, 14).toISOString()
+    assert.deepEqual(imported[251].emails, ['dev@example.com']);
+    assert.equal(imported[251].birthday, '2026-11-14T12:00:00.000Z');
+  });
+
+  it('keeps birthday calendar days invariant across time zones and rejects rolled dates', async () => {
+    const validBirthday: ContactDetails = {
+      ...contactDetails('tz-valid'),
+      birthday: { year: 1992, month: 1, day: 1 }
+    };
+    const missingYearBirthday: ContactDetails = {
+      ...contactDetails('tz-fallback'),
+      birthday: { month: 12, day: 31 }
+    };
+    const invalidBirthday: ContactDetails = {
+      ...contactDetails('tz-invalid'),
+      birthday: { year: 2026, month: 2, day: 30 }
+    };
+
+    process.env.TZ = 'Pacific/Kiritimati';
+    const ahead = await importDeviceContactsWithApi(
+      contactsApi(new Map([[0, [validBirthday, missingYearBirthday, invalidBirthday]]])).api,
+      { fallbackBirthdayYear: 2026 }
     );
+    process.env.TZ = 'America/Adak';
+    const behind = await importDeviceContactsWithApi(
+      contactsApi(new Map([[0, [validBirthday, missingYearBirthday, invalidBirthday]]])).api,
+      { fallbackBirthdayYear: 2026 }
+    );
+
+    assert.deepEqual(behind, ahead);
+    assert.equal(ahead[0].birthday, '1992-01-01T12:00:00.000Z');
+    assert.equal(ahead[1].birthday, '2026-12-31T12:00:00.000Z');
+    assert.equal(ahead[2].birthday, 'invalid-imported-birthday');
+  });
+
+  it('retains incomplete birthdays and nameless routable contacts for domain review', async () => {
+    const record: ContactDetails = {
+      ...contactDetails('review-record'),
+      fullName: null,
+      givenName: null,
+      familyName: null,
+      birthday: { month: 12, day: 0 },
+      phones: [{ id: 'review-phone', number: '+91 90000 12345' }]
+    };
+
+    const imported = await importDeviceContactsWithApi(contactsApi(new Map([[0, [record]]])).api);
+
+    assert.equal(imported[0].name, '');
+    assert.equal(imported[0].phone, '+91 90000 12345');
+    assert.equal(imported[0].birthday, 'invalid-imported-birthday');
   });
 
   it('stops safely if a native page repeats instead of silently looping forever', async () => {
@@ -107,19 +155,28 @@ describe('Expo 57 contacts adapter', () => {
       ])
     );
 
-    await assert.rejects(
-      importDeviceContactsWithApi(api),
-      /Contacts pagination did not advance/
-    );
+    await assert.rejects(importDeviceContactsWithApi(api), /Contacts pagination did not advance/);
+  });
+
+  it('checks cancellation before requesting another native contact page', async () => {
+    const controller = new AbortController();
+    const firstPage = Array.from({ length: 250 }, (_, index) => contactDetails(String(index)));
+    const { api, offsets } = contactsApi(new Map([[0, firstPage]]));
+    const originalGetAllDetails = api.Contact.getAllDetails;
+    api.Contact.getAllDetails = async (fields, options) => {
+      const page = await originalGetAllDetails(fields, options);
+      controller.abort(new Error('cancelled by test'));
+      return page;
+    };
+
+    await assert.rejects(importDeviceContactsWithApi(api, { signal: controller.signal }), /cancelled by test/);
+    assert.deepEqual(offsets, [0]);
   });
 
   it('does not query contacts when permission is denied', async () => {
     const { api, offsets } = contactsApi(new Map(), 'denied');
 
-    await assert.rejects(
-      importDeviceContactsWithApi(api),
-      /Contacts permission was not granted/
-    );
+    await assert.rejects(importDeviceContactsWithApi(api), /Contacts permission was not granted/);
     assert.deepEqual(offsets, []);
   });
 });

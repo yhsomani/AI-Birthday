@@ -120,6 +120,11 @@ export type PersistenceLoadResult =
       reason: string;
     };
 
+export type PersistenceLoadOptions = {
+  /** Reads and validates without rewriting, quarantining, or deleting the source store. */
+  readOnly?: boolean;
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -360,7 +365,9 @@ const writeNormalizedEntryPayload = async (
   entryPrefix: string,
   entryNumber: number,
   raw: string
-): Promise<Pick<NormalizedStateEntry, 'key' | 'chunkPrefix' | 'chunkCount' | 'chunkLength' | 'rawLength' | 'checksum'>> => {
+): Promise<
+  Pick<NormalizedStateEntry, 'key' | 'chunkPrefix' | 'chunkCount' | 'chunkLength' | 'rawLength' | 'checksum'>
+> => {
   const rawLength = raw.length;
   const checksum = checksumString(raw);
   const key = `${entryPrefix}${entryNumber}`;
@@ -434,6 +441,7 @@ const parseNormalizedEntryValue = (entry: NormalizedStateEntry, raw: string): un
 const buildShellState = (state: AppState) => ({
   activeScreen: state.activeScreen,
   selectedContactId: state.selectedContactId,
+  selectedEventId: state.selectedEventId,
   selectedMessageId: state.selectedMessageId,
   searchQuery: state.searchQuery
 });
@@ -469,7 +477,12 @@ const saveEnvelope = async (store: KeyValueStore, envelope: PersistedStateEnvelo
       collection.map(async (record, index) => {
         const currentEntryNumber = entryNumber;
         entryNumber += 1;
-        const storage = await writeNormalizedEntryPayload(store, entryPrefix, currentEntryNumber, JSON.stringify(record));
+        const storage = await writeNormalizedEntryPayload(
+          store,
+          entryPrefix,
+          currentEntryNumber,
+          JSON.stringify(record)
+        );
         entries.push({
           name,
           kind: 'collectionItem',
@@ -913,7 +926,10 @@ const safeUnrecoverableReason = (error: unknown): string => {
   return 'Saved state could not be safely decoded.';
 };
 
-export const loadStateWithRecovery = async (store: KeyValueStore): Promise<PersistenceLoadResult> => {
+export const loadStateWithRecovery = async (
+  store: KeyValueStore,
+  options: PersistenceLoadOptions = {}
+): Promise<PersistenceLoadResult> => {
   const activeRaw = await store.getItem(RELATE_STATE_KEY);
   if (!activeRaw) {
     return { status: 'missing' };
@@ -927,12 +943,16 @@ export const loadStateWithRecovery = async (store: KeyValueStore): Promise<Persi
     let recovery: PersistenceRecoveryManifest | undefined;
     if (decoded.issueCount > 0) {
       recovery = createPersistenceRecoveryManifest(decoded, read.envelope.version);
-      await store.setItem(RELATE_CORRUPT_STATE_KEY, JSON.stringify(recovery));
+      if (!options.readOnly) {
+        await store.setItem(RELATE_CORRUPT_STATE_KEY, JSON.stringify(recovery));
+      }
     } else {
-      if (versionMigrated) {
+      if (versionMigrated && !options.readOnly) {
         await saveEnvelope(store, migrated.envelope, activeRaw);
       }
-      await store.removeItem(RELATE_CORRUPT_STATE_KEY);
+      if (!options.readOnly) {
+        await store.removeItem(RELATE_CORRUPT_STATE_KEY);
+      }
     }
     return {
       status: 'loaded',
@@ -946,14 +966,18 @@ export const loadStateWithRecovery = async (store: KeyValueStore): Promise<Persi
       throw error;
     }
     const reason = safeUnrecoverableReason(error);
-    await writeUnrecoverableManifest(store, 0);
-    await removeStoredStatePayload(store, activeRaw);
+    if (!options.readOnly) {
+      await writeUnrecoverableManifest(store, 0);
+    }
     return {
       status: 'recovered',
       reason
     };
   }
 };
+
+export const loadStateForRepositoryMigration = async (store: KeyValueStore): Promise<PersistenceLoadResult> =>
+  loadStateWithRecovery(store, { readOnly: true });
 
 export const loadState = async (store: KeyValueStore): Promise<AppState | undefined> => {
   const result = await loadStateWithRecovery(store);

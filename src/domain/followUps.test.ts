@@ -4,16 +4,21 @@ import { relateReducer } from '../state/relateReducer';
 import { createTestState } from '../test/testState';
 import { buildMessageFollowUpPlan } from './followUps';
 
+const stateWithSentMiraMessage = () => {
+  const state = createTestState();
+  return {
+    ...state,
+    messages: state.messages.map(message =>
+      message.id === 'msg-mira-checkin'
+        ? { ...message, status: 'Sent' as const, sentAt: '2026-07-09T10:00:00.000Z' }
+        : message
+    )
+  };
+};
+
 describe('post-send follow-up contract', () => {
   it('creates a reviewable follow-up event and reminder after a sent message', () => {
-    const approved = relateReducer(createTestState(), {
-      type: 'approveMessage',
-      messageId: 'msg-mira-checkin'
-    });
-    const sentState = relateReducer(approved, {
-      type: 'manualHandoff',
-      messageId: 'msg-mira-checkin'
-    });
+    const sentState = stateWithSentMiraMessage();
     const result = buildMessageFollowUpPlan(sentState, 'msg-mira-checkin', 1, '2026-07-09T12:00:00.000Z');
 
     assert.equal(result.ok, true);
@@ -36,14 +41,7 @@ describe('post-send follow-up contract', () => {
   });
 
   it('adds one follow-up through the reducer and prevents duplicate same-day reminders', () => {
-    const approved = relateReducer(createTestState(), {
-      type: 'approveMessage',
-      messageId: 'msg-mira-checkin'
-    });
-    const sentState = relateReducer(approved, {
-      type: 'manualHandoff',
-      messageId: 'msg-mira-checkin'
-    });
+    const sentState = stateWithSentMiraMessage();
     const scheduled = relateReducer(sentState, {
       type: 'scheduleMessageFollowUp',
       messageId: 'msg-mira-checkin',

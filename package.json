@@ -18,13 +18,18 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"*.{json,js,cjs}\"",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"*.{json,js,cjs}\"",
     "test": "tsx --test --test-isolation=none src/**/*.test.ts",
+    "test:coverage": "tsx --test --test-isolation=none --experimental-test-coverage --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=85 src/**/*.test.ts",
+    "test:native-prebuild": "node scripts/verify_native_prebuild.js",
+    "web:export": "expo export --platform web --output-dir reports/web-export",
     "release:evidence": "tsx src/config/releaseEvidenceCli.ts"
   },
   "dependencies": {
+    "@noble/hashes": "2.0.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "57.0.4",
     "expo-calendar": "^57.0.0",
     "expo-contacts": "^57.0.0",
+    "expo-crypto": "57.0.0",
     "expo-document-picker": "^57.0.0",
     "expo-file-system": "^57.0.0",
     "expo-local-authentication": "^57.0.0",

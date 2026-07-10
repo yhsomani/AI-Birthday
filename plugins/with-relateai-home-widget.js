@@ -41,11 +41,7 @@ const widgetStringItems = [
 const androidPackagePath = androidPackage => androidPackage.split('.').join(path.sep);
 
 const escapeXml = value =>
-  String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const renderWidgetProviderInfoXml = () => `<?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
@@ -622,7 +618,10 @@ const validateWidgetGenerationAsync = async (projectRoot, androidPackage) => {
   const receivers = (application.receiver ?? []).filter(item => item.$?.['android:name'] === receiverName);
 
   assertCondition(receivers.length === 1, `RelateAI home widget expected exactly one ${receiverName} receiver.`);
-  assertCondition(receivers[0].$?.['android:exported'] === 'false', 'RelateAI home widget receiver must not be exported.');
+  assertCondition(
+    receivers[0].$?.['android:exported'] === 'false',
+    'RelateAI home widget receiver must not be exported.'
+  );
   assertCondition(
     receivers[0]['intent-filter']?.[0]?.action?.[0]?.$?.['android:name'] ===
       'android.appwidget.action.APPWIDGET_UPDATE',
@@ -669,7 +668,10 @@ const validateWidgetGenerationAsync = async (projectRoot, androidPackage) => {
   );
 
   for (const match of providerSource.matchAll(/R\.id\.([A-Za-z0-9_]+)/g)) {
-    assertCondition(layoutIds.has(match[1]), `RelateAI home widget generated Java references missing layout id ${match[1]}.`);
+    assertCondition(
+      layoutIds.has(match[1]),
+      `RelateAI home widget generated Java references missing layout id ${match[1]}.`
+    );
   }
 
   const strings = await XML.readXMLAsync({ path: path.join(androidRoot, 'res/values/strings.xml') });
@@ -678,7 +680,10 @@ const validateWidgetGenerationAsync = async (projectRoot, androidPackage) => {
     assertCondition(stringNames.has(name), `RelateAI home widget is missing string resource ${name}.`);
   }
   for (const match of providerSource.matchAll(/R\.string\.([A-Za-z0-9_]+)/g)) {
-    assertCondition(stringNames.has(match[1]), `RelateAI home widget generated Java references missing string ${match[1]}.`);
+    assertCondition(
+      stringNames.has(match[1]),
+      `RelateAI home widget generated Java references missing string ${match[1]}.`
+    );
   }
 
   const mainApplicationPath = AndroidConfig.Paths.getProjectFilePath(projectRoot, 'MainApplication');

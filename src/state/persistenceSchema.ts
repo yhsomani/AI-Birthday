@@ -1,5 +1,6 @@
 import { productionInitialState } from '../data/productionState';
 import { withCanonicalRecurrence } from '../domain/occasionDates';
+import { normalizeScheduleTimeZone } from '../domain/schedulingPolicy';
 import type {
   ActivityItem,
   AiProviderObservation,
@@ -10,6 +11,7 @@ import type {
   ContactPreferenceOverrides,
   GiftRecord,
   MemoryNote,
+  MessageChannel,
   MessageDraft,
   PersistenceStorageHealth,
   RelationshipEvent,
@@ -19,7 +21,7 @@ import type {
   SetupCheck
 } from '../domain/types';
 
-export const PERSISTED_STATE_SCHEMA_VERSION = 3;
+export const PERSISTED_STATE_SCHEMA_VERSION = 6;
 export const MAX_PERSISTED_RECORDS_PER_AGGREGATE = 10_000;
 export const MAX_PERSISTED_TOTAL_RECORDS = 30_000;
 export const MAX_PERSISTED_FIELD_LENGTH = 32_768;
@@ -96,36 +98,94 @@ export class PersistedStateValidationError extends Error {
 }
 
 const screens = new Set([
-  'onboarding', 'home', 'events', 'eventForm', 'messages', 'contacts', 'more', 'contactDetail',
-  'chatHistory', 'wishPreview', 'manualComposer'
+  'onboarding',
+  'home',
+  'events',
+  'eventForm',
+  'messages',
+  'contacts',
+  'more',
+  'analytics',
+  'settings',
+  'backup',
+  'styleCoach',
+  'activityHistory',
+  'setupCheck',
+  'contactDetail',
+  'chatHistory',
+  'wishPreview',
+  'manualComposer'
 ]);
-const relationshipGroups = ['Family', 'Friends', 'Work', 'Close friends', 'Other'] as const;
+const relationshipGroups: readonly RelationshipGroup[] = ['Family', 'Friends', 'Work', 'Close friends', 'Other'];
 const relationshipGroupSet = new Set<string>(relationshipGroups);
 const eventTypes = new Set([
-  'Birthday', 'Anniversary', 'Work anniversary', 'Custom', 'Graduation', 'Holiday', 'Revival', 'Follow-up'
+  'Birthday',
+  'Anniversary',
+  'Work anniversary',
+  'Custom',
+  'Graduation',
+  'Holiday',
+  'Revival',
+  'Follow-up'
 ]);
 const messageChannels = new Set(['SMS', 'WhatsApp', 'Email', 'Manual']);
 const messageStatuses = new Set([
-  'Needs review', 'Scheduled', 'Blocked', 'Sent', 'Failed', 'Delivery pending', 'Delivery unknown', 'Rejected', 'Draft'
+  'Needs review',
+  'Scheduled',
+  'Blocked',
+  'Sent',
+  'Failed',
+  'Delivery pending',
+  'Delivery unknown',
+  'Rejected',
+  'Draft'
 ]);
 const automationModes = new Set(['Always ask', 'Smart approve', 'VIP approve', 'Fully auto']);
 const locales = new Set(['en-IN', 'hi-IN', 'en-Hinglish']);
 const tones = new Set(['Warm', 'Respectful', 'Playful', 'Concise', 'Formal', 'Hinglish', 'No emoji']);
 const contactLanguages = new Set(['English', 'Hinglish', 'Hindi']);
+const contactQuietHoursBehaviors = new Set(['Defer', 'Block']);
+const localTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const eventSources = new Set(['Imported', 'Manual', 'AI suggested']);
 const memoryCategories = new Set(['General', 'Private', 'Preference', 'Event', 'Gift', 'Milestone']);
 const giftCategories = new Set(['Experience', 'Food', 'Books', 'Wellness', 'Personal', 'Other']);
 const giftFeedback = new Set(['Liked', 'Disliked', 'Unknown']);
-const composerReasons = new Set(['Birthday', 'Check-in', 'Thanks', 'Congratulations', 'Apology', 'Follow-up', 'Custom']);
+const composerReasons = new Set([
+  'Birthday',
+  'Check-in',
+  'Thanks',
+  'Congratulations',
+  'Apology',
+  'Follow-up',
+  'Custom'
+]);
 const messageQualities = new Set(['AI draft', 'Template fallback', 'Needs more context']);
 const messageVariants = new Set(['short', 'standard', 'warm']);
 const activityTypes = new Set(['Message', 'Event', 'Contact', 'Backup', 'Setup', 'AI', 'Gift', 'Memory', 'Analytics']);
 const activitySeverities = new Set(['Info', 'Warning', 'Error']);
-const onboardingSteps = new Set(['intro', 'account', 'contacts', 'notifications', 'ai', 'style', 'channels', 'backup', 'finish']);
+const activityStatuses = new Set(['Open', 'Resolved', 'Obsolete', 'Completed']);
+const onboardingSteps = new Set([
+  'intro',
+  'account',
+  'contacts',
+  'notifications',
+  'ai',
+  'style',
+  'channels',
+  'backup',
+  'finish'
+]);
 const onboardingGoals = new Set(['Reminders first', 'AI wishes', 'Manual relationship manager', 'Full setup']);
 const permissionCapabilities = [
-  'Contacts', 'Notifications', 'SMS', 'Calendar', 'Biometric lock', 'AI provider', 'Email provider',
-  'WhatsApp handoff', 'Backup export'
+  'Contacts',
+  'Notifications',
+  'SMS',
+  'Calendar',
+  'Biometric lock',
+  'AI provider',
+  'Email provider',
+  'WhatsApp handoff',
+  'Backup export'
 ] as const;
 const permissionDecisions = new Set(['Not requested', 'Granted', 'Denied', 'Unavailable']);
 
@@ -145,6 +205,13 @@ const finiteNumber = (value: unknown, minimum: number, maximum: number, integer 
 const optionalString = (value: unknown, maximum = MAX_PERSISTED_FIELD_LENGTH): value is string | undefined =>
   value === undefined || boundedString(value, maximum);
 
+const validLocalDateKey = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+};
+
 class DecodeContext {
   readonly issues: PersistenceRecoveryIssue[] = [];
   issueCount = 0;
@@ -152,12 +219,7 @@ class DecodeContext {
   readonly defaultedAggregates = new Set<PersistedAggregateName>();
   remainingRecordBudget = MAX_PERSISTED_TOTAL_RECORDS;
 
-  issue(
-    aggregate: PersistedAggregateName,
-    code: PersistenceRecoveryIssueCode,
-    recordIndex?: number,
-    field?: string
-  ) {
+  issue(aggregate: PersistedAggregateName, code: PersistenceRecoveryIssueCode, recordIndex?: number, field?: string) {
     this.issueCount += 1;
     if (this.issues.length < MAX_PERSISTED_RECOVERY_ISSUES) {
       this.issues.push({
@@ -266,6 +328,59 @@ const decodeGroupPreferences = (value: unknown): ContactPreferenceOverrides | un
   return result;
 };
 
+const decodeContactRoutes = (value: unknown): Contact['routes'] | undefined => {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > 100) return undefined;
+  const identities = new Set<string>();
+  const routes: NonNullable<Contact['routes']> = [];
+  for (const item of value) {
+    if (
+      !isRecord(item) ||
+      !boundedString(item.id, 256, false) ||
+      (item.type !== 'Phone' && item.type !== 'Email') ||
+      !boundedString(item.value, 512, false) ||
+      (item.label !== undefined && !boundedString(item.label, 160)) ||
+      typeof item.primary !== 'boolean' ||
+      typeof item.verified !== 'boolean'
+    ) {
+      return undefined;
+    }
+    const identity = `${item.type}:${item.value}`;
+    if (identities.has(identity)) return undefined;
+    identities.add(identity);
+    routes.push({
+      id: item.id,
+      type: item.type,
+      value: item.value,
+      ...(item.label ? { label: item.label as string } : {}),
+      primary: item.primary,
+      verified: item.verified
+    });
+  }
+  return routes;
+};
+
+const decodeContactSourceIdentities = (value: unknown): Contact['sourceIdentities'] | undefined => {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > 100) return undefined;
+  const identities = new Set<string>();
+  const result: NonNullable<Contact['sourceIdentities']> = [];
+  for (const item of value) {
+    if (
+      !isRecord(item) ||
+      (item.provider !== 'Device contacts' && item.provider !== 'Calendar' && item.provider !== 'Local') ||
+      !boundedString(item.sourceId, 256, false)
+    ) {
+      return undefined;
+    }
+    const identity = `${item.provider}:${item.sourceId}`;
+    if (identities.has(identity)) continue;
+    identities.add(identity);
+    result.push({ provider: item.provider, sourceId: item.sourceId });
+  }
+  return result;
+};
+
 const decodeContact = (value: unknown, index: number, context: DecodeContext): Contact | undefined => {
   const aggregate = 'contacts';
   if (!isRecord(value)) {
@@ -296,10 +411,49 @@ const decodeContact = (value: unknown, index: number, context: DecodeContext): C
   if (value.preferenceOverrides !== undefined && !preferenceOverrides) {
     context.issue(aggregate, 'invalid-field', index, 'preferenceOverrides');
   }
+  const routes = decodeContactRoutes(value.routes);
+  const sourceIdentities = decodeContactSourceIdentities(value.sourceIdentities);
+  if (value.routes !== undefined && !routes) {
+    context.issue(aggregate, 'invalid-field', index, 'routes');
+  }
+  if (value.sourceIdentities !== undefined && !sourceIdentities) {
+    context.issue(aggregate, 'invalid-field', index, 'sourceIdentities');
+  }
+  const relationshipSubtype = decodeOptionalString(context, aggregate, index, value, 'relationshipSubtype', 80);
+  const jobTitle = decodeOptionalString(context, aggregate, index, value, 'jobTitle', 120);
+  let customSendTime: string | undefined;
+  if (value.customSendTime !== undefined) {
+    if (boundedString(value.customSendTime, 5, false) && localTimePattern.test(value.customSendTime)) {
+      customSendTime = value.customSendTime;
+    } else {
+      context.issue(aggregate, 'invalid-field', index, 'customSendTime');
+    }
+  }
+  let quietHoursBehavior: Contact['quietHoursBehavior'] = 'Defer';
+  if (value.quietHoursBehavior !== undefined) {
+    if (
+      boundedString(value.quietHoursBehavior, 10, false) &&
+      contactQuietHoursBehaviors.has(value.quietHoursBehavior)
+    ) {
+      quietHoursBehavior = value.quietHoursBehavior as Contact['quietHoursBehavior'];
+    } else {
+      context.issue(aggregate, 'invalid-field', index, 'quietHoursBehavior');
+    }
+  }
+  let skipAuto = false;
+  if (value.skipAuto !== undefined) {
+    if (typeof value.skipAuto === 'boolean') {
+      skipAuto = value.skipAuto;
+    } else {
+      context.issue(aggregate, 'invalid-field', index, 'skipAuto');
+    }
+  }
   return {
     id: value.id as string,
     name: value.name as string,
     relationship: value.relationship as string,
+    ...(relationshipSubtype?.trim() ? { relationshipSubtype } : {}),
+    ...(jobTitle?.trim() ? { jobTitle } : {}),
     group: value.group as Contact['group'],
     ...(decodeOptionalString(context, aggregate, index, value, 'phone', 512) ? { phone: value.phone as string } : {}),
     ...(decodeOptionalString(context, aggregate, index, value, 'email', 512) ? { email: value.email as string } : {}),
@@ -310,12 +464,20 @@ const decodeContact = (value: unknown, index: number, context: DecodeContext): C
     isVip: value.isVip as boolean,
     dnd: value.dnd as boolean,
     checkInCadenceDays: value.checkInCadenceDays as number,
+    ...(customSendTime ? { customSendTime } : {}),
+    quietHoursBehavior,
+    skipAuto,
     ...(preferenceOverrides ? { preferenceOverrides } : {}),
     ...(decodeOptionalString(context, aggregate, index, value, 'lastContactedAt', 64)
       ? { lastContactedAt: value.lastContactedAt as string }
       : {}),
     ...(decodeOptionalString(context, aggregate, index, value, 'checkInSnoozedUntil', 64)
       ? { checkInSnoozedUntil: value.checkInSnoozedUntil as string }
+      : {}),
+    ...(routes ? { routes } : {}),
+    ...(sourceIdentities ? { sourceIdentities } : {}),
+    ...(decodeOptionalString(context, aggregate, index, value, 'archivedAt', 64)
+      ? { archivedAt: value.archivedAt as string }
       : {}),
     notesSummary: value.notesSummary as string,
     annualGiftBudget: value.annualGiftBudget as number
@@ -334,12 +496,21 @@ const decodeChecklist = (value: unknown): RelationshipEvent['checklist'] | undef
       !boundedString(item.id, 256, false) ||
       ids.has(item.id) ||
       !boundedString(item.label, 500, false) ||
-      typeof item.done !== 'boolean'
+      typeof item.done !== 'boolean' ||
+      (item.completedForOccurrence !== undefined &&
+        (typeof item.completedForOccurrence !== 'string' || !validLocalDateKey(item.completedForOccurrence)))
     ) {
       return undefined;
     }
     ids.add(item.id);
-    result.push({ id: item.id, label: item.label, done: item.done });
+    result.push({
+      id: item.id,
+      label: item.label,
+      done: item.done,
+      ...(item.completedForOccurrence !== undefined
+        ? { completedForOccurrence: item.completedForOccurrence as string }
+        : {})
+    });
   }
   return result;
 };
@@ -367,6 +538,27 @@ const decodeRecurrence = (value: unknown): RelationshipEvent['recurrence'] | und
   };
 };
 
+const decodeEventSourceIdentities = (value: unknown): RelationshipEvent['sourceIdentities'] | undefined => {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > 100) return undefined;
+  const identities = new Set<string>();
+  const result: NonNullable<RelationshipEvent['sourceIdentities']> = [];
+  for (const item of value) {
+    if (
+      !isRecord(item) ||
+      (item.provider !== 'Device contacts' && item.provider !== 'Calendar' && item.provider !== 'Local') ||
+      !boundedString(item.sourceId, 256, false)
+    ) {
+      return undefined;
+    }
+    const identity = `${item.provider}:${item.sourceId}`;
+    if (identities.has(identity)) continue;
+    identities.add(identity);
+    result.push({ provider: item.provider, sourceId: item.sourceId });
+  }
+  return result;
+};
+
 const decodeEvent = (value: unknown, index: number, context: DecodeContext): RelationshipEvent | undefined => {
   const aggregate = 'events';
   if (!isRecord(value)) {
@@ -375,6 +567,7 @@ const decodeEvent = (value: unknown, index: number, context: DecodeContext): Rel
   }
   const checklist = decodeChecklist(value.checklist);
   const recurrence = decodeRecurrence(value.recurrence);
+  const sourceIdentities = decodeEventSourceIdentities(value.sourceIdentities);
   if (
     invalidRequired(context, aggregate, index, value, {
       id: candidate => boundedString(candidate, 256, false),
@@ -385,12 +578,16 @@ const decodeEvent = (value: unknown, index: number, context: DecodeContext): Rel
       verified: candidate => typeof candidate === 'boolean',
       source: candidate => boundedString(candidate, 30) && eventSources.has(candidate),
       checklist: () => checklist !== undefined
-    }) || recurrence === false
+    }) ||
+    recurrence === false
   ) {
     if (recurrence === false) {
       context.exclude(aggregate, 'invalid-field', index, 'recurrence');
     }
     return undefined;
+  }
+  if (value.sourceIdentities !== undefined && !sourceIdentities) {
+    context.issue(aggregate, 'invalid-field', index, 'sourceIdentities');
   }
   const decoded: RelationshipEvent = {
     id: value.id as string,
@@ -401,6 +598,7 @@ const decodeEvent = (value: unknown, index: number, context: DecodeContext): Rel
     ...(recurrence ? { recurrence } : {}),
     verified: value.verified as boolean,
     source: value.source as RelationshipEvent['source'],
+    ...(sourceIdentities ? { sourceIdentities } : {}),
     checklist: checklist as RelationshipEvent['checklist']
   };
   try {
@@ -413,14 +611,17 @@ const decodeEvent = (value: unknown, index: number, context: DecodeContext): Rel
 
 const decodeMemory = (value: unknown, index: number, context: DecodeContext): MemoryNote | undefined => {
   const aggregate = 'memories';
-  if (!isRecord(value) || invalidRequired(context, aggregate, index, value, {
-    id: candidate => boundedString(candidate, 256, false),
-    contactId: candidate => boundedString(candidate, 256, false),
-    category: candidate => boundedString(candidate, 30) && memoryCategories.has(candidate),
-    body: candidate => boundedString(candidate, MAX_PERSISTED_FIELD_LENGTH, false),
-    pinned: candidate => typeof candidate === 'boolean',
-    createdAt: candidate => boundedString(candidate, 64, false) && Number.isFinite(Date.parse(candidate))
-  })) {
+  if (
+    !isRecord(value) ||
+    invalidRequired(context, aggregate, index, value, {
+      id: candidate => boundedString(candidate, 256, false),
+      contactId: candidate => boundedString(candidate, 256, false),
+      category: candidate => boundedString(candidate, 30) && memoryCategories.has(candidate),
+      body: candidate => boundedString(candidate, MAX_PERSISTED_FIELD_LENGTH, false),
+      pinned: candidate => typeof candidate === 'boolean',
+      createdAt: candidate => boundedString(candidate, 64, false) && Number.isFinite(Date.parse(candidate))
+    })
+  ) {
     if (!isRecord(value)) context.exclude(aggregate, 'invalid-record', index);
     return undefined;
   }
@@ -436,17 +637,20 @@ const decodeMemory = (value: unknown, index: number, context: DecodeContext): Me
 
 const decodeGift = (value: unknown, index: number, context: DecodeContext): GiftRecord | undefined => {
   const aggregate = 'gifts';
-  if (!isRecord(value) || invalidRequired(context, aggregate, index, value, {
-    id: candidate => boundedString(candidate, 256, false),
-    contactId: candidate => boundedString(candidate, 256, false),
-    name: candidate => boundedString(candidate, 1000, false),
-    category: candidate => boundedString(candidate, 30) && giftCategories.has(candidate),
-    occasion: candidate => boundedString(candidate, 1000),
-    cost: candidate => finiteNumber(candidate, 0, 1_000_000_000),
-    year: candidate => finiteNumber(candidate, 1, 9999, true),
-    feedback: candidate => boundedString(candidate, 20) && giftFeedback.has(candidate),
-    notes: candidate => boundedString(candidate)
-  })) {
+  if (
+    !isRecord(value) ||
+    invalidRequired(context, aggregate, index, value, {
+      id: candidate => boundedString(candidate, 256, false),
+      contactId: candidate => boundedString(candidate, 256, false),
+      name: candidate => boundedString(candidate, 1000, false),
+      category: candidate => boundedString(candidate, 30) && giftCategories.has(candidate),
+      occasion: candidate => boundedString(candidate, 1000),
+      cost: candidate => finiteNumber(candidate, 0, 1_000_000_000),
+      year: candidate => finiteNumber(candidate, 1, 9999, true),
+      feedback: candidate => boundedString(candidate, 20) && giftFeedback.has(candidate),
+      notes: candidate => boundedString(candidate)
+    })
+  ) {
     if (!isRecord(value)) context.exclude(aggregate, 'invalid-record', index);
     return undefined;
   }
@@ -463,7 +667,12 @@ const decodeGift = (value: unknown, index: number, context: DecodeContext): Gift
   };
 };
 
-const decodeMessage = (value: unknown, index: number, context: DecodeContext): MessageDraft | undefined => {
+const decodeMessage = (
+  value: unknown,
+  index: number,
+  context: DecodeContext,
+  sourceVersion: number
+): MessageDraft | undefined => {
   const aggregate = 'messages';
   if (!isRecord(value)) {
     context.exclude(aggregate, 'invalid-record', index);
@@ -475,24 +684,28 @@ const decodeMessage = (value: unknown, index: number, context: DecodeContext): M
     boundedString(variants.short) &&
     boundedString(variants.standard) &&
     boundedString(variants.warm);
-  if (invalidRequired(context, aggregate, index, value, {
-    id: candidate => boundedString(candidate, 256, false),
-    contactId: candidate => boundedString(candidate, 256, false),
-    reason: candidate => boundedString(candidate, 30) && composerReasons.has(candidate),
-    status: candidate => boundedString(candidate, 30) && messageStatuses.has(candidate),
-    channel: candidate => boundedString(candidate, 20) && messageChannels.has(candidate),
-    body: candidate => boundedString(candidate),
-    variants: () => validVariants,
-    selectedVariant: candidate => boundedString(candidate, 20) && messageVariants.has(candidate),
-    quality: candidate => boundedString(candidate, 30) && messageQualities.has(candidate),
-    readiness: candidate => boundedString(candidate, 2000)
-  })) {
+  if (
+    invalidRequired(context, aggregate, index, value, {
+      id: candidate => boundedString(candidate, 256, false),
+      contactId: candidate => boundedString(candidate, 256, false),
+      reason: candidate => boundedString(candidate, 30) && composerReasons.has(candidate),
+      status: candidate => boundedString(candidate, 30) && messageStatuses.has(candidate),
+      channel: candidate => boundedString(candidate, 20) && messageChannels.has(candidate),
+      body: candidate => boundedString(candidate),
+      variants: () => validVariants,
+      selectedVariant: candidate => boundedString(candidate, 20) && messageVariants.has(candidate),
+      quality: candidate => boundedString(candidate, 30) && messageQualities.has(candidate),
+      readiness: candidate => boundedString(candidate, 2000)
+    })
+  ) {
     return undefined;
   }
   const result: MessageDraft = {
     id: value.id as string,
     contactId: value.contactId as string,
-    ...(decodeOptionalString(context, aggregate, index, value, 'eventId', 256) ? { eventId: value.eventId as string } : {}),
+    ...(decodeOptionalString(context, aggregate, index, value, 'eventId', 256)
+      ? { eventId: value.eventId as string }
+      : {}),
     reason: value.reason as MessageDraft['reason'],
     status: value.status as MessageDraft['status'],
     channel: value.channel as MessageDraft['channel'],
@@ -506,14 +719,46 @@ const decodeMessage = (value: unknown, index: number, context: DecodeContext): M
     quality: value.quality as MessageDraft['quality'],
     readiness: value.readiness as string
   };
-  for (const field of ['scheduledFor', 'sentAt', 'approvedAt', 'approvalExpiresAt', 'duplicateWarning', 'lastError'] as const) {
-    const decoded = decodeOptionalString(context, aggregate, index, value, field, field.includes('At') || field === 'scheduledFor' ? 64 : 2000);
+  const occurrenceDate = decodeOptionalString(context, aggregate, index, value, 'occurrenceDate', 10);
+  if (occurrenceDate !== undefined) {
+    if (validLocalDateKey(occurrenceDate)) {
+      result.occurrenceDate = occurrenceDate;
+    } else {
+      context.issue(aggregate, 'invalid-field', index, 'occurrenceDate');
+    }
+  }
+  for (const field of [
+    'scheduledFor',
+    'sentAt',
+    'approvedAt',
+    'approvalExpiresAt',
+    'duplicateWarning',
+    'duplicateAcknowledgementFingerprint',
+    'lastError'
+  ] as const) {
+    const decoded = decodeOptionalString(
+      context,
+      aggregate,
+      index,
+      value,
+      field,
+      field.includes('At') || field === 'scheduledFor' ? 64 : 2000
+    );
     if (decoded !== undefined) {
       result[field] = decoded;
     }
   }
+  if (value.scheduledTimeZone !== undefined) {
+    const scheduledTimeZone = normalizeScheduleTimeZone(value.scheduledTimeZone);
+    if (scheduledTimeZone) result.scheduledTimeZone = scheduledTimeZone;
+    else context.issue(aggregate, 'invalid-field', index, 'scheduledTimeZone');
+  }
   if (typeof value.duplicateAcknowledged === 'boolean') {
-    result.duplicateAcknowledged = value.duplicateAcknowledged;
+    if (value.duplicateAcknowledged && result.duplicateAcknowledgementFingerprint) {
+      result.duplicateAcknowledged = true;
+    } else if (value.duplicateAcknowledged) {
+      context.issue(aggregate, 'reference-cleared', index, 'duplicateAcknowledged');
+    }
   } else if (value.duplicateAcknowledged !== undefined) {
     context.issue(aggregate, 'invalid-field', index, 'duplicateAcknowledged');
   }
@@ -544,7 +789,10 @@ const decodeMessage = (value: unknown, index: number, context: DecodeContext): M
     if (
       isRecord(attempt) &&
       boundedString(attempt.idempotencyKey, 256, false) &&
-      (attempt.status === 'Accepted' || attempt.status === 'Sent' || attempt.status === 'Failed' || attempt.status === 'Unknown') &&
+      (attempt.status === 'Accepted' ||
+        attempt.status === 'Sent' ||
+        attempt.status === 'Failed' ||
+        attempt.status === 'Unknown') &&
       optionalString(attempt.deliveryId, 256) &&
       boundedString(attempt.updatedAt, 64, false) &&
       Number.isFinite(Date.parse(attempt.updatedAt))
@@ -559,19 +807,41 @@ const decodeMessage = (value: unknown, index: number, context: DecodeContext): M
       context.issue(aggregate, 'invalid-field', index, 'emailDeliveryAttempt');
     }
   }
+  if (result.status === 'Scheduled' && result.scheduledFor && !result.scheduledTimeZone) {
+    if (sourceVersion >= PERSISTED_STATE_SCHEMA_VERSION && value.scheduledTimeZone === undefined) {
+      context.issue(aggregate, 'missing-entry', index, 'scheduledTimeZone');
+    }
+    result.status = 'Needs review';
+    result.readiness = 'Review legacy schedule time zone';
+    result.lastError =
+      'The saved schedule has no trusted time-zone identity. Review and approve again to recalculate the intended local send time.';
+    delete result.scheduledFor;
+    delete result.scheduledTimeZone;
+    delete result.approvedAt;
+    delete result.approvalExpiresAt;
+    delete result.duplicateAcknowledged;
+    delete result.duplicateAcknowledgementFingerprint;
+  }
+  if (result.scheduledTimeZone && !result.scheduledFor) {
+    context.issue(aggregate, 'invalid-field', index, 'scheduledTimeZone');
+    delete result.scheduledTimeZone;
+  }
   return result;
 };
 
 const decodeActivity = (value: unknown, index: number, context: DecodeContext): ActivityItem | undefined => {
   const aggregate = 'activity';
-  if (!isRecord(value) || invalidRequired(context, aggregate, index, value, {
-    id: candidate => boundedString(candidate, 256, false),
-    type: candidate => boundedString(candidate, 30) && activityTypes.has(candidate),
-    title: candidate => boundedString(candidate, 1000, false),
-    detail: candidate => boundedString(candidate),
-    severity: candidate => boundedString(candidate, 20) && activitySeverities.has(candidate),
-    createdAt: candidate => boundedString(candidate, 64, false) && Number.isFinite(Date.parse(candidate))
-  })) {
+  if (
+    !isRecord(value) ||
+    invalidRequired(context, aggregate, index, value, {
+      id: candidate => boundedString(candidate, 256, false),
+      type: candidate => boundedString(candidate, 30) && activityTypes.has(candidate),
+      title: candidate => boundedString(candidate, 1000, false),
+      detail: candidate => boundedString(candidate),
+      severity: candidate => boundedString(candidate, 20) && activitySeverities.has(candidate),
+      createdAt: candidate => boundedString(candidate, 64, false) && Number.isFinite(Date.parse(candidate))
+    })
+  ) {
     if (!isRecord(value)) context.exclude(aggregate, 'invalid-record', index);
     return undefined;
   }
@@ -581,9 +851,29 @@ const decodeActivity = (value: unknown, index: number, context: DecodeContext): 
     title: value.title as string,
     detail: value.detail as string,
     severity: value.severity as ActivityItem['severity'],
+    status:
+      typeof value.status === 'string' && activityStatuses.has(value.status)
+        ? (value.status as ActivityItem['status'])
+        : value.severity === 'Info'
+          ? 'Completed'
+          : 'Open',
     createdAt: value.createdAt as string
   };
-  if (boundedString(value.targetScreen, 30) && screens.has(value.targetScreen)) result.targetScreen = value.targetScreen as ActivityItem['targetScreen'];
+  if (value.status !== undefined && !(typeof value.status === 'string' && activityStatuses.has(value.status))) {
+    context.issue(aggregate, 'invalid-field', index, 'status');
+  }
+  if (
+    value.resolvedAt !== undefined &&
+    boundedString(value.resolvedAt, 64, false) &&
+    Number.isFinite(Date.parse(value.resolvedAt)) &&
+    result.status === 'Resolved'
+  ) {
+    result.resolvedAt = value.resolvedAt;
+  } else if (value.resolvedAt !== undefined) {
+    context.issue(aggregate, 'invalid-field', index, 'resolvedAt');
+  }
+  if (boundedString(value.targetScreen, 30) && screens.has(value.targetScreen))
+    result.targetScreen = value.targetScreen as ActivityItem['targetScreen'];
   else if (value.targetScreen !== undefined) context.issue(aggregate, 'invalid-field', index, 'targetScreen');
   for (const field of ['contactId', 'messageId', 'actionLabel'] as const) {
     const decoded = decodeOptionalString(context, aggregate, index, value, field, field === 'actionLabel' ? 500 : 256);
@@ -594,12 +884,15 @@ const decodeActivity = (value: unknown, index: number, context: DecodeContext): 
 
 const decodeBackup = (value: unknown, index: number, context: DecodeContext): BackupSnapshot | undefined => {
   const aggregate = 'backups';
-  if (!isRecord(value) || invalidRequired(context, aggregate, index, value, {
-    id: candidate => boundedString(candidate, 256, false),
-    createdAt: candidate => boundedString(candidate, 64, false) && Number.isFinite(Date.parse(candidate)),
-    recordCount: candidate => finiteNumber(candidate, 0, MAX_PERSISTED_TOTAL_RECORDS, true),
-    encrypted: candidate => typeof candidate === 'boolean'
-  })) {
+  if (
+    !isRecord(value) ||
+    invalidRequired(context, aggregate, index, value, {
+      id: candidate => boundedString(candidate, 256, false),
+      createdAt: candidate => boundedString(candidate, 64, false) && Number.isFinite(Date.parse(candidate)),
+      recordCount: candidate => finiteNumber(candidate, 0, MAX_PERSISTED_TOTAL_RECORDS, true),
+      encrypted: candidate => typeof candidate === 'boolean'
+    })
+  ) {
     if (!isRecord(value)) context.exclude(aggregate, 'invalid-record', index);
     return undefined;
   }
@@ -613,13 +906,16 @@ const decodeBackup = (value: unknown, index: number, context: DecodeContext): Ba
 
 const decodeSetupCheck = (value: unknown, index: number, context: DecodeContext): SetupCheck | undefined => {
   const aggregate = 'setupChecks';
-  if (!isRecord(value) || invalidRequired(context, aggregate, index, value, {
-    id: candidate => boundedString(candidate, 256, false),
-    title: candidate => boundedString(candidate, 1000, false),
-    status: candidate => candidate === 'Ready' || candidate === 'Needs action' || candidate === 'Optional',
-    detail: candidate => boundedString(candidate, 4000),
-    action: candidate => boundedString(candidate, 1000)
-  })) {
+  if (
+    !isRecord(value) ||
+    invalidRequired(context, aggregate, index, value, {
+      id: candidate => boundedString(candidate, 256, false),
+      title: candidate => boundedString(candidate, 1000, false),
+      status: candidate => candidate === 'Ready' || candidate === 'Needs action' || candidate === 'Optional',
+      detail: candidate => boundedString(candidate, 4000),
+      action: candidate => boundedString(candidate, 1000)
+    })
+  ) {
     if (!isRecord(value)) context.exclude(aggregate, 'invalid-record', index);
     return undefined;
   }
@@ -634,14 +930,17 @@ const decodeSetupCheck = (value: unknown, index: number, context: DecodeContext)
 
 const decodeReminder = (value: unknown, index: number, context: DecodeContext): ReminderPlan | undefined => {
   const aggregate = 'reminderPlans';
-  if (!isRecord(value) || invalidRequired(context, aggregate, index, value, {
-    id: candidate => boundedString(candidate, 256, false),
-    eventId: candidate => boundedString(candidate, 256, false),
-    contactId: candidate => boundedString(candidate, 256, false),
-    title: candidate => boundedString(candidate, 1000, false),
-    body: candidate => boundedString(candidate, 4000),
-    triggerAt: candidate => boundedString(candidate, 64, false) && Number.isFinite(Date.parse(candidate))
-  })) {
+  if (
+    !isRecord(value) ||
+    invalidRequired(context, aggregate, index, value, {
+      id: candidate => boundedString(candidate, 256, false),
+      eventId: candidate => boundedString(candidate, 256, false),
+      contactId: candidate => boundedString(candidate, 256, false),
+      title: candidate => boundedString(candidate, 1000, false),
+      body: candidate => boundedString(candidate, 4000),
+      triggerAt: candidate => boundedString(candidate, 64, false) && Number.isFinite(Date.parse(candidate))
+    })
+  ) {
     if (!isRecord(value)) context.exclude(aggregate, 'invalid-record', index);
     return undefined;
   }
@@ -655,7 +954,8 @@ const decodeReminder = (value: unknown, index: number, context: DecodeContext): 
   };
 };
 
-type CollectionKey = 'contacts' | 'events' | 'memories' | 'gifts' | 'messages' | 'activity' | 'backups' | 'setupChecks' | 'reminderPlans';
+type CollectionKey =
+  'contacts' | 'events' | 'memories' | 'gifts' | 'messages' | 'activity' | 'backups' | 'setupChecks' | 'reminderPlans';
 
 const decodeCollection = <T>(
   source: Record<string, unknown>,
@@ -715,15 +1015,47 @@ const singletonRecord = (
   return undefined;
 };
 
-const decodeStyleProfile = (source: Record<string, unknown>, version: number, context: DecodeContext): AppState['styleProfile'] => {
+const decodeStyleProfile = (
+  source: Record<string, unknown>,
+  version: number,
+  context: DecodeContext
+): AppState['styleProfile'] => {
   const fallback = structuredClone(productionInitialState.styleProfile);
   const value = singletonRecord(source, 'styleProfile', version, context);
   if (!value) return fallback;
+  const enabledForAiDrafts =
+    value.enabledForAiDrafts === undefined
+      ? fallback.enabledForAiDrafts
+      : typeof value.enabledForAiDrafts === 'boolean'
+        ? value.enabledForAiDrafts
+        : undefined;
+  const commonGreetings =
+    value.commonGreetings === undefined
+      ? fallback.commonGreetings
+      : Array.isArray(value.commonGreetings) &&
+          value.commonGreetings.length <= 5 &&
+          value.commonGreetings.every(greeting => boundedString(greeting, 80, false))
+        ? (value.commonGreetings as string[])
+        : undefined;
+  const representativePreview =
+    value.representativePreview === undefined
+      ? fallback.representativePreview
+      : boundedString(value.representativePreview, 500)
+        ? value.representativePreview
+        : undefined;
   if (
-    (value.confidence !== 'Not trained' && value.confidence !== 'Starting' && value.confidence !== 'Growing' && value.confidence !== 'Strong') ||
-    !boundedString(value.formality, 500) || !boundedString(value.language, 500) ||
-    !finiteNumber(value.averageLength, 0, 100_000) || !boundedString(value.emojiUse, 500) ||
-    !finiteNumber(value.sampleCount, 0, 1_000_000, true)
+    (value.confidence !== 'Not trained' &&
+      value.confidence !== 'Starting' &&
+      value.confidence !== 'Growing' &&
+      value.confidence !== 'Strong') ||
+    !boundedString(value.formality, 500) ||
+    !boundedString(value.language, 500) ||
+    !finiteNumber(value.averageLength, 0, 100_000) ||
+    !boundedString(value.emojiUse, 500) ||
+    !finiteNumber(value.sampleCount, 0, 1_000_000, true) ||
+    enabledForAiDrafts === undefined ||
+    commonGreetings === undefined ||
+    representativePreview === undefined
   ) {
     context.defaultAggregate('styleProfile', 'invalid-field');
     return fallback;
@@ -734,7 +1066,10 @@ const decodeStyleProfile = (source: Record<string, unknown>, version: number, co
     language: value.language,
     averageLength: value.averageLength,
     emojiUse: value.emojiUse,
-    sampleCount: value.sampleCount
+    sampleCount: value.sampleCount,
+    enabledForAiDrafts,
+    commonGreetings,
+    representativePreview
   };
 };
 
@@ -744,15 +1079,23 @@ const decodeGroupDefaults = (value: unknown): AppState['settings']['groupDefault
   for (const group of relationshipGroups) {
     const decoded = decodeGroupPreferences(value[group]);
     if (
-      !decoded || decoded.preferredChannel === undefined || decoded.tone === undefined ||
-      decoded.checkInCadenceDays === undefined || decoded.automationMode === undefined
-    ) return undefined;
+      !decoded ||
+      decoded.preferredChannel === undefined ||
+      decoded.tone === undefined ||
+      decoded.checkInCadenceDays === undefined ||
+      decoded.automationMode === undefined
+    )
+      return undefined;
     result[group] = decoded as ContactGroupDefaults;
   }
   return result;
 };
 
-const decodeSettings = (source: Record<string, unknown>, version: number, context: DecodeContext): AppState['settings'] => {
+const decodeSettings = (
+  source: Record<string, unknown>,
+  version: number,
+  context: DecodeContext
+): AppState['settings'] => {
   const fallback = structuredClone(productionInitialState.settings);
   const value = singletonRecord(source, 'settings', version, context);
   if (!value) return fallback;
@@ -761,39 +1104,109 @@ const decodeSettings = (source: Record<string, unknown>, version: number, contex
     const [hour, minute] = candidate.split(':').map(Number);
     return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
   };
-  const useField = <T>(field: string, candidate: unknown, valid: (item: unknown) => boolean, defaultValue: T): T => {
+  const decodeField = <T>(field: string, candidate: unknown, valid: (item: unknown) => boolean, defaultValue: T): T => {
     if (candidate === undefined && version < PERSISTED_STATE_SCHEMA_VERSION) return defaultValue;
     if (valid(candidate)) return candidate as T;
     context.defaultedAggregates.add('settings');
     context.issue('settings', 'invalid-field', undefined, field);
     return defaultValue;
   };
-  const accountMode = useField('accountMode', value.accountMode, candidate => candidate === 'Local' || candidate === 'Google sync', fallback.accountMode);
-  const locale = useField('locale', value.locale, candidate => boundedString(candidate, 30) && locales.has(candidate), fallback.locale);
-  const aiEnabled = useField('aiEnabled', value.aiEnabled, candidate => typeof candidate === 'boolean', fallback.aiEnabled);
-  const notificationsEnabled = useField('notificationsEnabled', value.notificationsEnabled, candidate => typeof candidate === 'boolean', fallback.notificationsEnabled);
-  const smsEnabled = useField('smsEnabled', value.smsEnabled, candidate => typeof candidate === 'boolean', fallback.smsEnabled);
-  const whatsappHandoffEnabled = useField('whatsappHandoffEnabled', value.whatsappHandoffEnabled, candidate => typeof candidate === 'boolean', fallback.whatsappHandoffEnabled);
-  const emailEnabled = useField('emailEnabled', value.emailEnabled, candidate => typeof candidate === 'boolean', fallback.emailEnabled);
-  const biometricLockEnabled = useField('biometricLockEnabled', value.biometricLockEnabled, candidate => typeof candidate === 'boolean', fallback.biometricLockEnabled);
-  const automationMode = useField('automationMode', value.automationMode, candidate => boundedString(candidate, 30) && automationModes.has(candidate), fallback.automationMode);
-  const groupDefaults = useField('groupDefaults', value.groupDefaults, candidate => decodeGroupDefaults(candidate) !== undefined, fallback.groupDefaults);
+  const accountMode = decodeField(
+    'accountMode',
+    value.accountMode,
+    candidate => candidate === 'Local' || candidate === 'Google sync',
+    fallback.accountMode
+  );
+  const locale = decodeField(
+    'locale',
+    value.locale,
+    candidate => boundedString(candidate, 30) && locales.has(candidate),
+    fallback.locale
+  );
+  const aiEnabled = decodeField(
+    'aiEnabled',
+    value.aiEnabled,
+    candidate => typeof candidate === 'boolean',
+    fallback.aiEnabled
+  );
+  const notificationsEnabled = decodeField(
+    'notificationsEnabled',
+    value.notificationsEnabled,
+    candidate => typeof candidate === 'boolean',
+    fallback.notificationsEnabled
+  );
+  const smsEnabled = decodeField(
+    'smsEnabled',
+    value.smsEnabled,
+    candidate => typeof candidate === 'boolean',
+    fallback.smsEnabled
+  );
+  const whatsappHandoffEnabled = decodeField(
+    'whatsappHandoffEnabled',
+    value.whatsappHandoffEnabled,
+    candidate => typeof candidate === 'boolean',
+    fallback.whatsappHandoffEnabled
+  );
+  const emailEnabled = decodeField(
+    'emailEnabled',
+    value.emailEnabled,
+    candidate => typeof candidate === 'boolean',
+    fallback.emailEnabled
+  );
+  const biometricLockEnabled = decodeField(
+    'biometricLockEnabled',
+    value.biometricLockEnabled,
+    candidate => typeof candidate === 'boolean',
+    fallback.biometricLockEnabled
+  );
+  const automationMode = decodeField(
+    'automationMode',
+    value.automationMode,
+    candidate => boundedString(candidate, 30) && automationModes.has(candidate),
+    fallback.automationMode
+  );
+  const groupDefaults = decodeField(
+    'groupDefaults',
+    value.groupDefaults,
+    candidate => decodeGroupDefaults(candidate) !== undefined,
+    fallback.groupDefaults
+  );
   const decodedGroupDefaults = decodeGroupDefaults(groupDefaults) ?? fallback.groupDefaults;
   const quietHours = isRecord(value.quietHours) ? value.quietHours : {};
-  const quietStart = useField('quietHours.start', quietHours.start, validTime, fallback.quietHours.start);
-  const quietEnd = useField('quietHours.end', quietHours.end, validTime, fallback.quietHours.end);
+  const quietStart = decodeField('quietHours.start', quietHours.start, validTime, fallback.quietHours.start);
+  const quietEnd = decodeField('quietHours.end', quietHours.end, validTime, fallback.quietHours.end);
+  const defaultSendTime = decodeField('defaultSendTime', value.defaultSendTime, validTime, fallback.defaultSendTime);
   const blackouts: ScheduleBlackout[] = [];
   if (Array.isArray(value.blackouts)) {
     value.blackouts.slice(0, MAX_PERSISTED_RECORDS_PER_AGGREGATE).forEach((blackout, index) => {
+      const rawChannels = isRecord(blackout) && Array.isArray(blackout.channels) ? blackout.channels : undefined;
+      const channels = rawChannels
+        ? rawChannels.filter(
+            (channel): channel is MessageChannel =>
+              channel === 'SMS' || channel === 'WhatsApp' || channel === 'Email' || channel === 'Manual'
+          )
+        : undefined;
       if (
-        isRecord(blackout) && boundedString(blackout.id, 256, false) && boundedString(blackout.label, 1000, false) &&
-        boundedString(blackout.startDate, 64, false) && boundedString(blackout.endDate, 64, false)
-      ) blackouts.push({
-        id: blackout.id,
-        label: blackout.label,
-        startDate: blackout.startDate,
-        endDate: blackout.endDate
-      });
+        isRecord(blackout) &&
+        boundedString(blackout.id, 256, false) &&
+        boundedString(blackout.label, 1000, false) &&
+        boundedString(blackout.startDate, 64, false) &&
+        boundedString(blackout.endDate, 64, false) &&
+        (blackout.behavior === undefined || blackout.behavior === 'Block' || blackout.behavior === 'Defer') &&
+        (blackout.channels === undefined ||
+          (channels !== undefined &&
+            channels.length > 0 &&
+            channels.length === rawChannels?.length &&
+            new Set(channels).size === channels.length))
+      )
+        blackouts.push({
+          id: blackout.id,
+          label: blackout.label,
+          startDate: blackout.startDate,
+          endDate: blackout.endDate,
+          behavior: blackout.behavior === 'Block' ? 'Block' : 'Defer',
+          ...(channels ? { channels } : {})
+        });
       else {
         context.defaultedAggregates.add('settings');
         context.issue('settings', 'invalid-field', index, 'blackouts');
@@ -815,26 +1228,56 @@ const decodeSettings = (source: Record<string, unknown>, version: number, contex
     automationMode,
     groupDefaults: decodedGroupDefaults,
     quietHours: { start: quietStart, end: quietEnd },
+    defaultSendTime,
     blackouts
   };
 };
 
-const decodeOnboarding = (source: Record<string, unknown>, version: number, context: DecodeContext): AppState['onboarding'] => {
+const decodeOnboarding = (
+  source: Record<string, unknown>,
+  version: number,
+  context: DecodeContext
+): AppState['onboarding'] => {
   const fallback = structuredClone(productionInitialState.onboarding);
   const value = singletonRecord(source, 'onboarding', version, context);
   if (!value) return fallback;
-  const useField = <T>(field: string, candidate: unknown, valid: (item: unknown) => boolean, defaultValue: T): T => {
+  const decodeField = <T>(field: string, candidate: unknown, valid: (item: unknown) => boolean, defaultValue: T): T => {
     if (candidate === undefined && version < PERSISTED_STATE_SCHEMA_VERSION) return defaultValue;
     if (valid(candidate)) return candidate as T;
     context.defaultedAggregates.add('onboarding');
     context.issue('onboarding', 'invalid-field', undefined, field);
     return defaultValue;
   };
-  const completed = useField('completed', value.completed, candidate => typeof candidate === 'boolean', fallback.completed);
-  const currentStepId = useField('currentStepId', value.currentStepId, candidate => boundedString(candidate, 30) && onboardingSteps.has(candidate), fallback.currentStepId);
-  const selectedGoal = useField('selectedGoal', value.selectedGoal, candidate => boundedString(candidate, 100) && onboardingGoals.has(candidate), fallback.selectedGoal);
-  const completedStepIds = useField('completedStepIds', value.completedStepIds, candidate => decodeStringArray(candidate, onboardingSteps, 9) !== undefined, fallback.completedStepIds);
-  const skippedStepIds = useField('skippedStepIds', value.skippedStepIds, candidate => decodeStringArray(candidate, onboardingSteps, 9) !== undefined, fallback.skippedStepIds);
+  const completed = decodeField(
+    'completed',
+    value.completed,
+    candidate => typeof candidate === 'boolean',
+    fallback.completed
+  );
+  const currentStepId = decodeField(
+    'currentStepId',
+    value.currentStepId,
+    candidate => boundedString(candidate, 30) && onboardingSteps.has(candidate),
+    fallback.currentStepId
+  );
+  const selectedGoal = decodeField(
+    'selectedGoal',
+    value.selectedGoal,
+    candidate => boundedString(candidate, 100) && onboardingGoals.has(candidate),
+    fallback.selectedGoal
+  );
+  const completedStepIds = decodeField(
+    'completedStepIds',
+    value.completedStepIds,
+    candidate => decodeStringArray(candidate, onboardingSteps, 9) !== undefined,
+    fallback.completedStepIds
+  );
+  const skippedStepIds = decodeField(
+    'skippedStepIds',
+    value.skippedStepIds,
+    candidate => decodeStringArray(candidate, onboardingSteps, 9) !== undefined,
+    fallback.skippedStepIds
+  );
   if (value.lastUpdatedAt !== undefined && !boundedString(value.lastUpdatedAt, 64)) {
     context.defaultedAggregates.add('onboarding');
     context.issue('onboarding', 'invalid-field', undefined, 'lastUpdatedAt');
@@ -843,13 +1286,19 @@ const decodeOnboarding = (source: Record<string, unknown>, version: number, cont
     completed,
     currentStepId,
     selectedGoal,
-    completedStepIds: (decodeStringArray(completedStepIds, onboardingSteps, 9) ?? fallback.completedStepIds) as AppState['onboarding']['completedStepIds'],
-    skippedStepIds: (decodeStringArray(skippedStepIds, onboardingSteps, 9) ?? fallback.skippedStepIds) as AppState['onboarding']['skippedStepIds'],
+    completedStepIds: (decodeStringArray(completedStepIds, onboardingSteps, 9) ??
+      fallback.completedStepIds) as AppState['onboarding']['completedStepIds'],
+    skippedStepIds: (decodeStringArray(skippedStepIds, onboardingSteps, 9) ??
+      fallback.skippedStepIds) as AppState['onboarding']['skippedStepIds'],
     ...(boundedString(value.lastUpdatedAt, 64) ? { lastUpdatedAt: value.lastUpdatedAt } : {})
   };
 };
 
-const decodePrivacy = (source: Record<string, unknown>, version: number, context: DecodeContext): AppState['privacy'] => {
+const decodePrivacy = (
+  source: Record<string, unknown>,
+  version: number,
+  context: DecodeContext
+): AppState['privacy'] => {
   const fallback = structuredClone(productionInitialState.privacy);
   const value = singletonRecord(source, 'privacy', version, context);
   if (!value) return fallback;
@@ -868,7 +1317,11 @@ const decodePrivacy = (source: Record<string, unknown>, version: number, context
     typeof value.whatsappHandoffConsent === 'boolean'
       ? value.whatsappHandoffConsent
       : value.whatsappAutomationConsent === true;
-  if (typeof value.whatsappHandoffConsent !== 'boolean' && value.whatsappAutomationConsent === undefined && version >= 3) {
+  if (
+    typeof value.whatsappHandoffConsent !== 'boolean' &&
+    value.whatsappAutomationConsent === undefined &&
+    version >= 3
+  ) {
     context.issue('privacy', 'invalid-field', undefined, 'whatsappHandoffConsent');
   }
   if (value.localDataClearConfirmedAt !== undefined && !boundedString(value.localDataClearConfirmedAt, 64)) {
@@ -877,11 +1330,17 @@ const decodePrivacy = (source: Record<string, unknown>, version: number, context
   return {
     permissionDecisions: decisions,
     whatsappHandoffConsent,
-    ...(boundedString(value.localDataClearConfirmedAt, 64) ? { localDataClearConfirmedAt: value.localDataClearConfirmedAt } : {})
+    ...(boundedString(value.localDataClearConfirmedAt, 64)
+      ? { localDataClearConfirmedAt: value.localDataClearConfirmedAt }
+      : {})
   };
 };
 
-const decodeAiProvider = (source: Record<string, unknown>, version: number, context: DecodeContext): AppState['aiProvider'] => {
+const decodeAiProvider = (
+  source: Record<string, unknown>,
+  version: number,
+  context: DecodeContext
+): AppState['aiProvider'] => {
   const fallback = structuredClone(productionInitialState.aiProvider);
   const value = singletonRecord(source, 'aiProvider', version, context);
   if (!value) return fallback;
@@ -904,39 +1363,50 @@ const decodeAiProvider = (source: Record<string, unknown>, version: number, cont
         finiteNumber(variantLengths.standard, 0, MAX_PERSISTED_FIELD_LENGTH, true) &&
         finiteNumber(variantLengths.warm, 0, MAX_PERSISTED_FIELD_LENGTH, true));
     if (
-      isRecord(observation) && observation.redacted === true && typeof observation.ok === 'boolean' &&
-      finiteNumber(observation.durationMs, 0, 86_400_000) && boundedString(observation.reason, 30) && composerReasons.has(observation.reason) &&
-      boundedString(observation.contactLanguage, 20) && contactLanguages.has(observation.contactLanguage) &&
+      isRecord(observation) &&
+      observation.redacted === true &&
+      typeof observation.ok === 'boolean' &&
+      finiteNumber(observation.durationMs, 0, 86_400_000) &&
+      boundedString(observation.reason, 30) &&
+      composerReasons.has(observation.reason) &&
+      boundedString(observation.contactLanguage, 20) &&
+      contactLanguages.has(observation.contactLanguage) &&
       finiteNumber(observation.includedMemoryCount, 0, MAX_PERSISTED_RECORDS_PER_AGGREGATE, true) &&
       finiteNumber(observation.excludedPrivateMemoryCount, 0, MAX_PERSISTED_RECORDS_PER_AGGREGATE, true) &&
       finiteNumber(observation.includedPriorMessageCount, 0, MAX_PERSISTED_RECORDS_PER_AGGREGATE, true) &&
-      optionalString(observation.errorKind, 100) && validVariantLengths
-    ) result.lastObservation = {
-      redacted: true,
-      ok: observation.ok,
-      durationMs: observation.durationMs,
-      reason: observation.reason as AiProviderObservation['reason'],
-      contactLanguage: observation.contactLanguage as AiProviderObservation['contactLanguage'],
-      includedMemoryCount: observation.includedMemoryCount,
-      excludedPrivateMemoryCount: observation.excludedPrivateMemoryCount,
-      includedPriorMessageCount: observation.includedPriorMessageCount,
-      ...(observation.errorKind !== undefined ? { errorKind: observation.errorKind } : {}),
-      ...(isRecord(variantLengths)
-        ? {
-            variantLengths: {
-              short: variantLengths.short as number,
-              standard: variantLengths.standard as number,
-              warm: variantLengths.warm as number
+      optionalString(observation.errorKind, 100) &&
+      validVariantLengths
+    )
+      result.lastObservation = {
+        redacted: true,
+        ok: observation.ok,
+        durationMs: observation.durationMs,
+        reason: observation.reason as AiProviderObservation['reason'],
+        contactLanguage: observation.contactLanguage as AiProviderObservation['contactLanguage'],
+        includedMemoryCount: observation.includedMemoryCount,
+        excludedPrivateMemoryCount: observation.excludedPrivateMemoryCount,
+        includedPriorMessageCount: observation.includedPriorMessageCount,
+        ...(observation.errorKind !== undefined ? { errorKind: observation.errorKind } : {}),
+        ...(isRecord(variantLengths)
+          ? {
+              variantLengths: {
+                short: variantLengths.short as number,
+                standard: variantLengths.standard as number,
+                warm: variantLengths.warm as number
+              }
             }
-          }
-        : {})
-    };
+          : {})
+      };
     else context.issue('aiProvider', 'invalid-field', undefined, 'lastObservation');
   }
   return result;
 };
 
-const decodeEmailDelivery = (source: Record<string, unknown>, version: number, context: DecodeContext): AppState['emailDelivery'] => {
+const decodeEmailDelivery = (
+  source: Record<string, unknown>,
+  version: number,
+  context: DecodeContext
+): AppState['emailDelivery'] => {
   const fallback = structuredClone(productionInitialState.emailDelivery);
   const value = singletonRecord(source, 'emailDelivery', version, context);
   if (!value) return fallback;
@@ -952,15 +1422,26 @@ const decodeEmailDelivery = (source: Record<string, unknown>, version: number, c
   return result;
 };
 
-const decodeCalendarSync = (source: Record<string, unknown>, version: number, context: DecodeContext): AppState['calendarSync'] => {
+const decodeCalendarSync = (
+  source: Record<string, unknown>,
+  version: number,
+  context: DecodeContext
+): AppState['calendarSync'] => {
   const fallback = structuredClone(productionInitialState.calendarSync);
   const value = singletonRecord(source, 'calendarSync', version, context);
   if (!value) return fallback;
-  if (!finiteNumber(value.exportedCount, 0, MAX_PERSISTED_TOTAL_RECORDS, true) || !finiteNumber(value.importedCount, 0, MAX_PERSISTED_TOTAL_RECORDS, true)) {
+  if (
+    !finiteNumber(value.exportedCount, 0, MAX_PERSISTED_TOTAL_RECORDS, true) ||
+    !finiteNumber(value.importedCount, 0, MAX_PERSISTED_TOTAL_RECORDS, true)
+  ) {
     context.defaultAggregate('calendarSync', 'invalid-field');
     return fallback;
   }
-  for (const [field, maximum] of [['lastExportedAt', 64], ['lastImportedAt', 64], ['lastError', 4000]] as const) {
+  for (const [field, maximum] of [
+    ['lastExportedAt', 64],
+    ['lastImportedAt', 64],
+    ['lastError', 4000]
+  ] as const) {
     if (value[field] !== undefined && !boundedString(value[field], maximum)) {
       context.issue('calendarSync', 'invalid-field', undefined, field);
     }
@@ -978,12 +1459,22 @@ const decodeStorageHealth = (value: unknown): PersistenceStorageHealth | undefin
   if (!isRecord(value)) return undefined;
   if (
     (value.status !== 'Missing' && value.status !== 'Ready' && value.status !== 'Corrupt') ||
-    (value.storageFormat !== 'Missing' && value.storageFormat !== 'Direct envelope' && value.storageFormat !== 'Legacy chunked' && value.storageFormat !== 'Normalized' && value.storageFormat !== 'Corrupt') ||
-    !finiteNumber(value.payloadBytes, 0, 100_000_000, true) || !finiteNumber(value.entryCount, 0, 100_000, true) ||
-    !finiteNumber(value.chunkCount, 0, 1_000_000, true) || !finiteNumber(value.largestEntryBytes, 0, 100_000_000, true) ||
-    !optionalString(value.savedAt, 64) || (value.envelopeVersion !== undefined && !finiteNumber(value.envelopeVersion, 1, 1000, true)) ||
-    !optionalString(value.lastVerifiedAt, 64) || !optionalString(value.issue, 4000)
-  ) return undefined;
+    (value.storageFormat !== 'Missing' &&
+      value.storageFormat !== 'Direct envelope' &&
+      value.storageFormat !== 'Legacy chunked' &&
+      value.storageFormat !== 'Normalized' &&
+      value.storageFormat !== 'Encrypted entity repository' &&
+      value.storageFormat !== 'Corrupt') ||
+    !finiteNumber(value.payloadBytes, 0, 100_000_000, true) ||
+    !finiteNumber(value.entryCount, 0, 100_000, true) ||
+    !finiteNumber(value.chunkCount, 0, 1_000_000, true) ||
+    !finiteNumber(value.largestEntryBytes, 0, 100_000_000, true) ||
+    !optionalString(value.savedAt, 64) ||
+    (value.envelopeVersion !== undefined && !finiteNumber(value.envelopeVersion, 1, 1000, true)) ||
+    !optionalString(value.lastVerifiedAt, 64) ||
+    !optionalString(value.issue, 4000)
+  )
+    return undefined;
   return {
     status: value.status,
     storageFormat: value.storageFormat,
@@ -998,7 +1489,11 @@ const decodeStorageHealth = (value: unknown): PersistenceStorageHealth | undefin
   };
 };
 
-const decodePersistence = (source: Record<string, unknown>, version: number, context: DecodeContext): AppState['persistence'] => {
+const decodePersistence = (
+  source: Record<string, unknown>,
+  version: number,
+  context: DecodeContext
+): AppState['persistence'] => {
   const value = singletonRecord(source, 'persistence', version, context);
   if (!value) return { status: 'Ready' };
   if (value.status !== 'Loading' && value.status !== 'Ready' && value.status !== 'Saving' && value.status !== 'Error') {
@@ -1059,13 +1554,13 @@ const clearStaleOptionalReferences = (state: AppState, context: DecodeContext): 
     let result = item;
     if (item.contactId && !contactIds.has(item.contactId)) {
       context.issue('activity', 'reference-cleared', index, 'contactId');
-      const { contactId: _contactId, ...withoutContact } = result;
-      result = withoutContact;
+      const { contactId: _contactId, resolvedAt: _resolvedAt, ...withoutContact } = result;
+      result = { ...withoutContact, status: 'Obsolete' };
     }
     if (result.messageId && !validMessageIds.has(result.messageId)) {
       context.issue('activity', 'reference-cleared', index, 'messageId');
-      const { messageId: _messageId, ...withoutMessage } = result;
-      result = withoutMessage;
+      const { messageId: _messageId, resolvedAt: _resolvedAt, ...withoutMessage } = result;
+      result = { ...withoutMessage, status: 'Obsolete' };
     }
     return result;
   });
@@ -1080,10 +1575,16 @@ const clearStaleOptionalReferences = (state: AppState, context: DecodeContext): 
     context.issue('shell', 'reference-cleared', undefined, 'selectedMessageId');
     selectedMessageId = undefined;
   }
+  let selectedEventId = state.selectedEventId;
+  if (selectedEventId && !validEventIds.has(selectedEventId)) {
+    context.issue('shell', 'reference-cleared', undefined, 'selectedEventId');
+    selectedEventId = undefined;
+  }
 
   return {
     ...state,
     ...(selectedContactId ? { selectedContactId } : { selectedContactId: undefined }),
+    ...(selectedEventId ? { selectedEventId } : { selectedEventId: undefined }),
     ...(selectedMessageId ? { selectedMessageId } : { selectedMessageId: undefined }),
     events,
     memories,
@@ -1108,26 +1609,30 @@ export const decodePersistedState = (state: unknown, sourceVersion: number): Per
   const events = decodeCollection(state, 'events', sourceVersion, context, decodeEvent);
   const memories = decodeCollection(state, 'memories', sourceVersion, context, decodeMemory);
   const gifts = decodeCollection(state, 'gifts', sourceVersion, context, decodeGift);
-  const messages = decodeCollection(state, 'messages', sourceVersion, context, decodeMessage);
+  const messages = decodeCollection(state, 'messages', sourceVersion, context, (value, index, decodeContext) =>
+    decodeMessage(value, index, decodeContext, sourceVersion)
+  );
   const activity = decodeCollection(state, 'activity', sourceVersion, context, decodeActivity);
   const backups = decodeCollection(state, 'backups', sourceVersion, context, decodeBackup);
   const setupChecks = decodeCollection(state, 'setupChecks', sourceVersion, context, decodeSetupCheck);
   const reminderPlans = decodeCollection(state, 'reminderPlans', sourceVersion, context, decodeReminder);
 
-  const activeScreen = boundedString(state.activeScreen, 30) && screens.has(state.activeScreen)
-    ? (state.activeScreen as AppState['activeScreen'])
-    : defaults.activeScreen;
+  const activeScreen =
+    boundedString(state.activeScreen, 30) && screens.has(state.activeScreen)
+      ? (state.activeScreen as AppState['activeScreen'])
+      : defaults.activeScreen;
   if (activeScreen !== state.activeScreen && (state.activeScreen !== undefined || sourceVersion >= 3)) {
     context.issue('shell', 'invalid-field', undefined, 'activeScreen');
   }
-  const searchQuery = boundedString(state.searchQuery, 1000)
-    ? state.searchQuery
-    : defaults.searchQuery;
+  const searchQuery = boundedString(state.searchQuery, 1000) ? state.searchQuery : defaults.searchQuery;
   if (searchQuery !== state.searchQuery && (state.searchQuery !== undefined || sourceVersion >= 3)) {
     context.issue('shell', 'invalid-field', undefined, 'searchQuery');
   }
   if (state.selectedContactId !== undefined && !boundedString(state.selectedContactId, 256, false)) {
     context.issue('shell', 'invalid-field', undefined, 'selectedContactId');
+  }
+  if (state.selectedEventId !== undefined && !boundedString(state.selectedEventId, 256, false)) {
+    context.issue('shell', 'invalid-field', undefined, 'selectedEventId');
   }
   if (state.selectedMessageId !== undefined && !boundedString(state.selectedMessageId, 256, false)) {
     context.issue('shell', 'invalid-field', undefined, 'selectedMessageId');
@@ -1136,6 +1641,7 @@ export const decodePersistedState = (state: unknown, sourceVersion: number): Per
   let decoded: AppState = {
     activeScreen,
     ...(boundedString(state.selectedContactId, 256, false) ? { selectedContactId: state.selectedContactId } : {}),
+    ...(boundedString(state.selectedEventId, 256, false) ? { selectedEventId: state.selectedEventId } : {}),
     ...(boundedString(state.selectedMessageId, 256, false) ? { selectedMessageId: state.selectedMessageId } : {}),
     searchQuery,
     contacts,

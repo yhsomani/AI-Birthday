@@ -2,6 +2,22 @@ import type { SupportedLocale } from '../domain/types';
 
 const englishTranslations = {
   'app.tagline': 'Remember, write, review, send.',
+  'functionalConsole.title': 'RelateAI functional console',
+  'functionalConsole.runtime': 'Runtime: {phase}',
+  'functionalConsole.stateSummary': 'State summary',
+  'functionalConsole.command': 'Command',
+  'functionalConsole.commandJson': 'Functional command JSON',
+  'functionalConsole.secret': 'Sensitive command secret',
+  'functionalConsole.execute': 'Execute',
+  'functionalConsole.running': 'Running',
+  'functionalConsole.examples': 'Command examples',
+  'functionalConsole.loadCommand': 'Load command {id}',
+  'functionalConsole.operations': 'Operations',
+  'functionalConsole.operationsEmpty': 'No operations recorded.',
+  'functionalConsole.issues': 'Operational issues',
+  'functionalConsole.issuesEmpty': 'No active operational issues.',
+  'functionalConsole.result.none': 'No command has run.',
+  'functionalConsole.result.failed': 'Command failed without exposing private content. Review operational issues.',
   'nav.home': 'Home',
   'nav.events': 'Events',
   'nav.messages': 'Messages',
@@ -124,6 +140,18 @@ const englishTranslations = {
   'feedback.remindersScheduledMessage': '{scheduled} scheduled, {skipped} skipped.',
   'feedback.reminderSchedulingFailedTitle': 'Reminder scheduling failed',
   'feedback.reminderSchedulingFailedFallback': 'Notification reminders could not be scheduled.',
+  'notification.event.title': 'RelateAI event reminder',
+  'notification.event.body': 'Open RelateAI to review an upcoming relationship event.',
+  'notification.approval.title': 'Message review reminder',
+  'notification.approval.body': 'A prepared message is waiting for your review.',
+  'notification.fallback.title': 'Fallback draft ready',
+  'notification.fallback.body': 'A local fallback draft needs review before any handoff.',
+  'notification.setup.title': 'RelateAI setup reminder',
+  'notification.setup.body': 'Open RelateAI to review a setup or backup item.',
+  'notification.recovery.title': 'RelateAI recovery reminder',
+  'notification.recovery.body': 'Open RelateAI to review a safe recovery step.',
+  'notification.checkIn.title': 'Relationship check-in',
+  'notification.checkIn.body': 'A relationship check-in is due for review.',
   'feedback.calendarExportCompleteTitle': 'Calendar export complete',
   'feedback.calendarExportCompleteMessage': '{count} event(s) exported to the RelateAI calendar.',
   'feedback.calendarExportFailedTitle': 'Calendar export failed',
@@ -212,8 +240,7 @@ const englishTranslations = {
   'feature.home.widget.tile.pendingApprovals.title.one': '{count} message to review',
   'feature.home.widget.tile.pendingApprovals.title.other': '{count} messages to review',
   'feature.home.widget.tile.pendingApprovals.detail': 'Open Messages to approve, edit, reject, or retry.',
-  'feature.home.widget.tile.pendingApprovals.accessibility.one':
-    '{count} message waiting for review. Open Messages.',
+  'feature.home.widget.tile.pendingApprovals.accessibility.one': '{count} message waiting for review. Open Messages.',
   'feature.home.widget.tile.pendingApprovals.accessibility.other':
     '{count} messages waiting for review. Open Messages.',
   'feature.home.setup.title': 'Finish setup basics',
@@ -669,8 +696,7 @@ const englishTranslations = {
     'Manual WhatsApp handoff is enabled and remains user-controlled.',
   'feature.more.setupWizard.detail.manualWhatsAppDisabled':
     'Enable manual WhatsApp handoff if you want WhatsApp routing.',
-  'feature.more.setupWizard.detail.emailReady':
-    'Email provider endpoint is configured for optional provider delivery.',
+  'feature.more.setupWizard.detail.emailReady': 'Email provider endpoint is configured for optional provider delivery.',
   'feature.more.setupWizard.detail.emailDevelopmentOnly':
     'Configured email endpoint is local-development only. Use HTTPS before release.',
   'feature.more.setupWizard.detail.emailUnsafe':
@@ -737,8 +763,7 @@ const englishTranslations = {
   'feature.more.setupCheck.impact.aiProviderUnsafe':
     'Configured provider endpoint is not safe to use. Use HTTPS without credentials, localhost, or private-network hosts.',
   'feature.more.setupCheck.impact.aiDisabled': 'Local templates remain available while AI is disabled.',
-  'feature.more.setupCheck.impact.emailProviderReady':
-    'Email provider delivery uses a release-ready HTTPS endpoint.',
+  'feature.more.setupCheck.impact.emailProviderReady': 'Email provider delivery uses a release-ready HTTPS endpoint.',
   'feature.more.setupCheck.impact.emailDisabled':
     'Email provider delivery is disabled; manual handoff remains available.',
   'feature.more.setupCheck.impact.emailProviderOptional':
@@ -748,16 +773,13 @@ const englishTranslations = {
   'feature.more.setupCheck.impact.emailProviderUnsafe':
     'Configured email endpoint is not safe to use. Use HTTPS without credentials, localhost, or private-network hosts.',
   'feature.more.setupCheck.impact.personalizationReady': 'Contacts have enough context for useful drafts.',
-  'feature.more.setupCheck.impact.personalizationNeedsContext':
-    '{count} contact(s) need more relationship context.',
+  'feature.more.setupCheck.impact.personalizationNeedsContext': '{count} contact(s) need more relationship context.',
   'feature.more.setupCheck.impact.styleReady': '{confidence} confidence profile is available.',
   'feature.more.setupCheck.impact.styleNeedsTraining':
     'Train Style Coach with writing samples before relying on tone matching.',
-  'feature.more.setupCheck.impact.pendingReview':
-    '{count} message(s) need review before scheduling or sending.',
+  'feature.more.setupCheck.impact.pendingReview': '{count} message(s) need review before scheduling or sending.',
   'feature.more.setupCheck.impact.noPendingReview': 'No messages are waiting for approval.',
-  'feature.more.setupCheck.impact.privacyReady':
-    'Privacy-sensitive capabilities have clear user-controlled states.',
+  'feature.more.setupCheck.impact.privacyReady': 'Privacy-sensitive capabilities have clear user-controlled states.',
   'feature.more.setupCheck.impact.privacyNeedsReview':
     '{count} privacy-sensitive capability/capabilities need review or have a fallback active.',
   'feature.more.setupCheck.impact.privacyRecommendation': '{count} privacy recommendation(s) available.',
@@ -772,20 +794,16 @@ const englishTranslations = {
   'feature.more.setupCheck.impact.localStorageRecoveryDetail': 'Local data storage needs recovery: {reason}',
   'feature.more.setupCheck.impact.localStorageIntegrityFailed':
     'Local data storage integrity failed and needs recovery.',
-  'feature.more.setupCheck.impact.localStorageIntegrityDetail':
-    'Local data storage integrity failed: {reason}',
+  'feature.more.setupCheck.impact.localStorageIntegrityDetail': 'Local data storage integrity failed: {reason}',
   'feature.more.setupCheck.impact.localStorageRewrite':
     'Local data is readable but should be rewritten into normalized storage before release verification.',
-  'feature.more.setupCheck.impact.failedMessages':
-    '{count} message(s) need recovery before they can be sent.',
+  'feature.more.setupCheck.impact.failedMessages': '{count} message(s) need recovery before they can be sent.',
   'feature.more.setupCheck.impact.noFailedMessages': 'No failed message recovery is needed.',
-  'feature.more.setupCheck.impact.recentWarnings':
-    '{count} recent warning(s) are available in Activity History.',
+  'feature.more.setupCheck.impact.recentWarnings': '{count} recent warning(s) are available in Activity History.',
   'feature.more.setupCheck.impact.noRecentWarnings': 'No recent warnings require attention.',
   'feature.more.setupCheck.impact.releaseEvidenceMissing':
     'React Native release evidence has not been attached to this Setup Check run.',
-  'feature.more.setupCheck.impact.releaseEvidenceReady':
-    'React Native release evidence has no blockers or warnings.',
+  'feature.more.setupCheck.impact.releaseEvidenceReady': 'React Native release evidence has no blockers or warnings.',
   'feature.more.setupCheck.impact.releaseEvidenceBlockers':
     '{count} React Native release blocker(s) must be resolved before release.',
   'feature.more.setupCheck.impact.releaseEvidenceLegacyWarnings':
@@ -998,7 +1016,8 @@ const englishTranslations = {
   'feature.more.activityHistory.permission.denied': 'denied',
   'feature.more.activityHistory.permission.unavailable': 'unavailable',
   'feature.more.activityHistory.permission.notRequested': 'not requested',
-  'feature.more.activityHistory.detail.reviewFirstAutomation': 'Messages require approval before scheduling or sending.',
+  'feature.more.activityHistory.detail.reviewFirstAutomation':
+    'Messages require approval before scheduling or sending.',
   'feature.more.activityHistory.detail.localDataCleared':
     'Contacts, events, messages, memories, gifts, and backups were cleared.',
   'feature.more.activityHistory.detail.contactRequired': 'A contact is required.',
@@ -1019,8 +1038,7 @@ const englishTranslations = {
   'feature.more.activityHistory.detail.memoryPinned': 'Pinned notes appear first in Memory Vault.',
   'feature.more.activityHistory.detail.noteRemoved': 'The note was removed from this contact.',
   'feature.more.activityHistory.detail.contactMissing': 'Contact could not be found.',
-  'feature.more.activityHistory.detail.enrichmentPromptUnavailable':
-    'This enrichment prompt is no longer available.',
+  'feature.more.activityHistory.detail.enrichmentPromptUnavailable': 'This enrichment prompt is no longer available.',
   'feature.more.activityHistory.detail.giftUnavailable': 'This gift record is no longer available.',
   'feature.more.activityHistory.detail.contactPriorityChanged': 'Contact priority was changed.',
   'feature.more.activityHistory.detail.contactAutomationChanged': 'Contact automation preference was changed.',
@@ -1049,8 +1067,7 @@ const englishTranslations = {
   'feature.more.activityHistory.detail.templateReady': '{reason} template is ready for review.',
   'feature.more.activityHistory.detail.wishReadyForContact': '{reason} wish for {name} is ready for review.',
   'feature.more.activityHistory.detail.eventAdded': '{label} was added to Events.',
-  'feature.more.activityHistory.detail.eventKeptSeparate':
-    '{label} was kept as a separate event after review.',
+  'feature.more.activityHistory.detail.eventKeptSeparate': '{label} was kept as a separate event after review.',
   'feature.more.activityHistory.detail.followUpReady': '{label} is ready in Events and reminders.',
   'feature.more.activityHistory.detail.giftAdded': '{name} was added to gift history.',
   'feature.more.activityHistory.detail.giftRemoved': '{name} was removed from gift history.',
@@ -1088,7 +1105,8 @@ const englishTranslations = {
   'feature.more.settings.toggle.email': 'Email',
   'feature.more.settings.toggle.manualWhatsApp': 'Manual WhatsApp',
   'feature.more.settings.toggle.biometricLock': 'Biometric lock',
-  'feature.more.settings.automationSummary': 'Review workflow: {mode}. No unattended sends. Quiet hours: {start} to {end}.',
+  'feature.more.settings.automationSummary':
+    'Review workflow: {mode}. No unattended sends. Quiet hours: {start} to {end}.',
   'feature.more.settings.fullAutoAdvancedNotice':
     'Every message remains review-controlled. Unattended generation and sending are not available.',
   'feature.more.settings.showAdvancedAutomation': 'Show automation availability',
@@ -1177,6 +1195,22 @@ export const translations = {
   'en-IN': englishTranslations,
   'hi-IN': {
     'app.tagline': 'याद रखें, लिखें, समीक्षा करें, भेजें.',
+    'functionalConsole.title': 'RelateAI कार्यात्मक कंसोल',
+    'functionalConsole.runtime': 'रनटाइम: {phase}',
+    'functionalConsole.stateSummary': 'स्थिति सारांश',
+    'functionalConsole.command': 'कमांड',
+    'functionalConsole.commandJson': 'कार्यात्मक कमांड JSON',
+    'functionalConsole.secret': 'संवेदनशील कमांड गोपनीय मान',
+    'functionalConsole.execute': 'चलाएँ',
+    'functionalConsole.running': 'चल रहा है',
+    'functionalConsole.examples': 'कमांड उदाहरण',
+    'functionalConsole.loadCommand': 'कमांड {id} लोड करें',
+    'functionalConsole.operations': 'कार्य',
+    'functionalConsole.operationsEmpty': 'कोई कार्य दर्ज नहीं है.',
+    'functionalConsole.issues': 'सक्रिय समस्याएँ',
+    'functionalConsole.issuesEmpty': 'कोई सक्रिय समस्या नहीं है.',
+    'functionalConsole.result.none': 'अभी कोई कमांड नहीं चला है.',
+    'functionalConsole.result.failed': 'निजी सामग्री दिखाए बिना कमांड विफल हुआ. सक्रिय समस्याओं की समीक्षा करें.',
     'nav.home': 'होम',
     'nav.events': 'इवेंट',
     'nav.messages': 'संदेश',
@@ -1299,6 +1333,18 @@ export const translations = {
     'feedback.remindersScheduledMessage': '{scheduled} शेड्यूल, {skipped} छोड़े गए.',
     'feedback.reminderSchedulingFailedTitle': 'रिमाइंडर शेड्यूलिंग विफल',
     'feedback.reminderSchedulingFailedFallback': 'नोटिफिकेशन रिमाइंडर शेड्यूल नहीं हो सके.',
+    'notification.event.title': 'RelateAI इवेंट रिमाइंडर',
+    'notification.event.body': 'आने वाले रिश्ते के इवेंट की समीक्षा के लिए RelateAI खोलें.',
+    'notification.approval.title': 'संदेश समीक्षा रिमाइंडर',
+    'notification.approval.body': 'एक तैयार संदेश आपकी समीक्षा की प्रतीक्षा कर रहा है.',
+    'notification.fallback.title': 'फ़ॉलबैक ड्राफ़्ट तैयार है',
+    'notification.fallback.body': 'किसी भी हैंडऑफ़ से पहले स्थानीय फ़ॉलबैक ड्राफ़्ट की समीक्षा करें.',
+    'notification.setup.title': 'RelateAI सेटअप रिमाइंडर',
+    'notification.setup.body': 'सेटअप या बैकअप आइटम की समीक्षा के लिए RelateAI खोलें.',
+    'notification.recovery.title': 'RelateAI रिकवरी रिमाइंडर',
+    'notification.recovery.body': 'सुरक्षित रिकवरी चरण की समीक्षा के लिए RelateAI खोलें.',
+    'notification.checkIn.title': 'रिश्ते का चेक-इन',
+    'notification.checkIn.body': 'एक रिश्ते का चेक-इन समीक्षा के लिए देय है.',
     'feedback.calendarExportCompleteTitle': 'कैलेंडर निर्यात पूरा',
     'feedback.calendarExportCompleteMessage': '{count} इवेंट RelateAI कैलेंडर में निर्यात हुए.',
     'feedback.calendarExportFailedTitle': 'कैलेंडर निर्यात विफल',
@@ -1386,8 +1432,7 @@ export const translations = {
     'feature.home.widget.tile.todayEvents.accessibility.other': 'आज {count} रिलेशनशिप इवेंट. Events खोलें.',
     'feature.home.widget.tile.pendingApprovals.title.one': '{count} संदेश समीक्षा के लिए',
     'feature.home.widget.tile.pendingApprovals.title.other': '{count} संदेश समीक्षा के लिए',
-    'feature.home.widget.tile.pendingApprovals.detail':
-      'Approve, edit, reject या retry करने के लिए Messages खोलें.',
+    'feature.home.widget.tile.pendingApprovals.detail': 'Approve, edit, reject या retry करने के लिए Messages खोलें.',
     'feature.home.widget.tile.pendingApprovals.accessibility.one':
       '{count} संदेश समीक्षा का इंतजार कर रहा है. Messages खोलें.',
     'feature.home.widget.tile.pendingApprovals.accessibility.other':
@@ -1516,7 +1561,8 @@ export const translations = {
     'feature.contactDetail.action.snoozeCheckIn': 'चेक-इन स्नूज़ करें',
     'feature.contactDetail.action.markContacted': 'संपर्क किया मार्क करें',
     'feature.contactDetail.essentials.title': 'ज़रूरी विवरण',
-    'feature.contactDetail.essentials.detail': 'सेव की गई प्रोफ़ाइल जानकारी संदेश, रिमाइंडर, उपहार और एनालिटिक्स अपडेट करती है.',
+    'feature.contactDetail.essentials.detail':
+      'सेव की गई प्रोफ़ाइल जानकारी संदेश, रिमाइंडर, उपहार और एनालिटिक्स अपडेट करती है.',
     'feature.contactDetail.essentials.contactName': 'संपर्क का नाम',
     'feature.contactDetail.essentials.relationship': 'रिश्ता',
     'feature.contactDetail.essentials.contactPhone': 'संपर्क का फ़ोन',
@@ -1583,8 +1629,7 @@ export const translations = {
     'feature.contactDetail.memory.delete': 'डिलीट करें',
     'feature.contactDetail.gift.title': 'Gift Advisor',
     'feature.contactDetail.gift.detail': 'विचारों और दोहराव से बचने पर ध्यान दें; बजट वैकल्पिक है.',
-    'feature.contactDetail.gift.budgetSummary':
-      'वार्षिक बजट: {annual}. इस साल खर्च: {spent}. बाकी: {remaining}.',
+    'feature.contactDetail.gift.budgetSummary': 'वार्षिक बजट: {annual}. इस साल खर्च: {spent}. बाकी: {remaining}.',
     'feature.contactDetail.gift.overBudget': 'उपहार इतिहास वार्षिक बजट से अधिक है.',
     'feature.contactDetail.gift.adjustBudget': 'बजट बदलें',
     'feature.contactDetail.gift.hideBudget': 'बजट छिपाएं',
@@ -1664,8 +1709,7 @@ export const translations = {
     'feature.wishPreview.variant.standard': 'मानक',
     'feature.wishPreview.variant.warm': 'गर्मजोशी',
     'feature.wishPreview.confirmVariantTitle': 'बदला हुआ टेक्स्ट बदलें?',
-    'feature.wishPreview.confirmVariantBody':
-      '{variant} पर जाने से आपका बदला हुआ संदेश उस सेव वैरिएंट से बदल जाएगा.',
+    'feature.wishPreview.confirmVariantBody': '{variant} पर जाने से आपका बदला हुआ संदेश उस सेव वैरिएंट से बदल जाएगा.',
     'feature.wishPreview.confirmVariantAction': 'टेक्स्ट बदलें',
     'feature.wishPreview.feedbackTitle': 'रीजनरेशन फीडबैक',
     'feature.wishPreview.feedbackDetail': 'अगले ड्राफ्ट के लिए वैकल्पिक मार्गदर्शन.',
@@ -1681,8 +1725,7 @@ export const translations = {
     'feature.wishPreview.confirmApproveBody':
       'यह संदेश चुने हुए रूट के लिए शेड्यूल करता है. हैंडऑफ या प्रदाता डिलीवरी से पहले आप स्वीकृति वापस ले सकते हैं.',
     'feature.wishPreview.confirmRejectTitle': 'ड्राफ्ट अस्वीकार करें?',
-    'feature.wishPreview.confirmRejectBody':
-      'यह ड्राफ्ट नहीं भेजा जाएगा. आप बाद में दूसरा संदेश बना या लिख सकते हैं.',
+    'feature.wishPreview.confirmRejectBody': 'यह ड्राफ्ट नहीं भेजा जाएगा. आप बाद में दूसरा संदेश बना या लिख सकते हैं.',
     'feature.wishPreview.action.testSend': 'टेस्ट भेजें',
     'feature.wishPreview.action.approve': 'स्वीकृत करें',
     'feature.wishPreview.action.continueAnyway': 'फिर भी जारी रखें',
@@ -1822,7 +1865,8 @@ export const translations = {
     'feature.more.setupWizard.detail.schedulingReady':
       'रिमाइंडर प्लानिंग {start}-{end} शांत समय और {count} blackout window(s) का सम्मान करती है.',
     'feature.more.setupWizard.detail.eventsReady': '{count} event(s) रिमाइंडर के लिए उपलब्ध हैं.',
-    'feature.more.setupWizard.detail.eventsMissing': 'कम से कम एक जन्मदिन, वर्षगांठ या custom event जोड़ें या आयात करें.',
+    'feature.more.setupWizard.detail.eventsMissing':
+      'कम से कम एक जन्मदिन, वर्षगांठ या custom event जोड़ें या आयात करें.',
     'feature.more.setupWizard.detail.reminderPlansReady': '{count} reminder plan(s) तैयार हैं.',
     'feature.more.setupWizard.detail.reminderPlansMissing':
       'इवेंट और नोटिफिकेशन preferences तैयार होने के बाद रिमाइंडर प्लान करें.',
@@ -1915,8 +1959,7 @@ export const translations = {
     'feature.more.setupCheck.impact.aiDisabled': 'AI बंद रहने पर local templates उपलब्ध रहते हैं.',
     'feature.more.setupCheck.impact.emailProviderReady':
       'Email provider delivery release-ready HTTPS endpoint उपयोग करती है.',
-    'feature.more.setupCheck.impact.emailDisabled':
-      'Email provider delivery बंद है; manual handoff उपलब्ध रहता है.',
+    'feature.more.setupCheck.impact.emailDisabled': 'Email provider delivery बंद है; manual handoff उपलब्ध रहता है.',
     'feature.more.setupCheck.impact.emailProviderOptional':
       'Email provider delivery वैकल्पिक है; manual email handoff उपलब्ध रहता है.',
     'feature.more.setupCheck.impact.emailProviderDevelopmentOnly':
@@ -1929,11 +1972,9 @@ export const translations = {
     'feature.more.setupCheck.impact.styleReady': '{confidence} confidence profile उपलब्ध है.',
     'feature.more.setupCheck.impact.styleNeedsTraining':
       'Tone matching पर भरोसा करने से पहले Style Coach को writing samples से train करें.',
-    'feature.more.setupCheck.impact.pendingReview':
-      '{count} message(s) को schedule या send होने से पहले review चाहिए.',
+    'feature.more.setupCheck.impact.pendingReview': '{count} message(s) को schedule या send होने से पहले review चाहिए.',
     'feature.more.setupCheck.impact.noPendingReview': 'कोई message approval का इंतजार नहीं कर रहा.',
-    'feature.more.setupCheck.impact.privacyReady':
-      'Privacy-sensitive capabilities में साफ user-controlled states हैं.',
+    'feature.more.setupCheck.impact.privacyReady': 'Privacy-sensitive capabilities में साफ user-controlled states हैं.',
     'feature.more.setupCheck.impact.privacyNeedsReview':
       '{count} privacy-sensitive capability/capabilities को review चाहिए या fallback active है.',
     'feature.more.setupCheck.impact.privacyRecommendation': '{count} privacy recommendation(s) उपलब्ध हैं.',
@@ -1942,21 +1983,17 @@ export const translations = {
       'इसे अपना एकमात्र relationship record मानने से पहले encrypted backup बनाएं.',
     'feature.more.setupCheck.impact.localStorageReady':
       '{entries} normalized storage item(s), {chunks} chunk(s) में verify हुए.',
-    'feature.more.setupCheck.impact.localStorageUnverified':
-      'इस डिवाइस पर local data storage अभी verify नहीं हुआ है.',
+    'feature.more.setupCheck.impact.localStorageUnverified': 'इस डिवाइस पर local data storage अभी verify नहीं हुआ है.',
     'feature.more.setupCheck.impact.localStorageRecovery': 'Release से पहले local data storage recovery चाहिए.',
     'feature.more.setupCheck.impact.localStorageRecoveryDetail': 'Local data storage recovery चाहिए: {reason}',
     'feature.more.setupCheck.impact.localStorageIntegrityFailed':
       'Local data storage integrity fail हुई और recovery चाहिए.',
-    'feature.more.setupCheck.impact.localStorageIntegrityDetail':
-      'Local data storage integrity fail हुई: {reason}',
+    'feature.more.setupCheck.impact.localStorageIntegrityDetail': 'Local data storage integrity fail हुई: {reason}',
     'feature.more.setupCheck.impact.localStorageRewrite':
       'Local data readable है लेकिन release verification से पहले normalized storage में rewrite होना चाहिए.',
-    'feature.more.setupCheck.impact.failedMessages':
-      '{count} message(s) को send होने से पहले recovery चाहिए.',
+    'feature.more.setupCheck.impact.failedMessages': '{count} message(s) को send होने से पहले recovery चाहिए.',
     'feature.more.setupCheck.impact.noFailedMessages': 'किसी failed message recovery की जरूरत नहीं है.',
-    'feature.more.setupCheck.impact.recentWarnings':
-      '{count} recent warning(s) Activity History में उपलब्ध हैं.',
+    'feature.more.setupCheck.impact.recentWarnings': '{count} recent warning(s) Activity History में उपलब्ध हैं.',
     'feature.more.setupCheck.impact.noRecentWarnings': 'कोई recent warning ध्यान नहीं चाहती.',
     'feature.more.setupCheck.impact.releaseEvidenceMissing':
       'इस Setup Check run में React Native release evidence attach नहीं है.',
@@ -2008,8 +2045,7 @@ export const translations = {
     'feature.more.analytics.relationshipDistribution': 'रिश्ता वितरण',
     'feature.more.analytics.healthBuckets': 'हेल्थ बकेट',
     'feature.more.analytics.reconnectSuggestions': 'दोबारा जुड़ने के सुझाव',
-    'feature.more.analytics.reconnectDetail':
-      '{cadenceDays}-दिन कैडेंस से {overdueDays} दिन आगे. हेल्थ {healthScore}.',
+    'feature.more.analytics.reconnectDetail': '{cadenceDays}-दिन कैडेंस से {overdueDays} दिन आगे. हेल्थ {healthScore}.',
     'feature.more.analytics.openContact': 'संपर्क खोलें',
     'feature.more.analytics.insights': 'इनसाइट',
     'feature.more.analytics.shareSummary': 'सारांश शेयर करें',
@@ -2174,7 +2210,8 @@ export const translations = {
     'feature.more.activityHistory.permission.denied': 'denied',
     'feature.more.activityHistory.permission.unavailable': 'unavailable',
     'feature.more.activityHistory.permission.notRequested': 'not requested',
-    'feature.more.activityHistory.detail.reviewFirstAutomation': 'संदेश शेड्यूल या send होने से पहले स्वीकृति चाहते हैं.',
+    'feature.more.activityHistory.detail.reviewFirstAutomation':
+      'संदेश शेड्यूल या send होने से पहले स्वीकृति चाहते हैं.',
     'feature.more.activityHistory.detail.localDataCleared':
       'संपर्क, इवेंट, संदेश, मेमोरी, उपहार और बैकअप साफ कर दिए गए.',
     'feature.more.activityHistory.detail.contactRequired': 'संपर्क जरूरी है.',
@@ -2185,8 +2222,7 @@ export const translations = {
       'यूजर ने डुप्लिकेट चेतावनी की समीक्षा के बाद जारी रखना चुना.',
     'feature.more.activityHistory.detail.messageRejected': 'ड्राफ्ट भेजा नहीं जाएगा.',
     'feature.more.activityHistory.detail.messageApprovalRevoked': 'फिर से शेड्यूल करने से पहले संदेश की समीक्षा करें.',
-    'feature.more.activityHistory.detail.manualHandoffCompleted':
-      'यूजर ने destination app में अंतिम नियंत्रण रखा.',
+    'feature.more.activityHistory.detail.manualHandoffCompleted': 'यूजर ने destination app में अंतिम नियंत्रण रखा.',
     'feature.more.activityHistory.detail.messageRetryPrepared': 'Retry से पहले संदेश की समीक्षा करें.',
     'feature.more.activityHistory.detail.memoryPrivateExcluded': 'निजी मेमोरी AI context से बाहर है.',
     'feature.more.activityHistory.detail.memoryCanImproveDrafts': 'मेमोरी भविष्य के drafts सुधार सकती है.',
@@ -2195,22 +2231,19 @@ export const translations = {
     'feature.more.activityHistory.detail.memoryPinned': 'Pinned notes Memory Vault में पहले दिखते हैं.',
     'feature.more.activityHistory.detail.noteRemoved': 'नोट इस संपर्क से हटा दिया गया.',
     'feature.more.activityHistory.detail.contactMissing': 'संपर्क नहीं मिला.',
-    'feature.more.activityHistory.detail.enrichmentPromptUnavailable':
-      'यह enrichment prompt अब उपलब्ध नहीं है.',
+    'feature.more.activityHistory.detail.enrichmentPromptUnavailable': 'यह enrichment prompt अब उपलब्ध नहीं है.',
     'feature.more.activityHistory.detail.giftUnavailable': 'यह उपहार रिकॉर्ड अब उपलब्ध नहीं है.',
     'feature.more.activityHistory.detail.contactPriorityChanged': 'संपर्क priority बदली गई.',
     'feature.more.activityHistory.detail.contactAutomationChanged': 'संपर्क automation preference बदली गई.',
     'feature.more.activityHistory.detail.unsupportedCadence': 'समर्थित cadence चुनें.',
     'feature.more.activityHistory.detail.groupDefaultsApplied': 'संपर्क अब समूह preferences inherit करता है.',
-    'feature.more.activityHistory.detail.contactMarkedContacted':
-      'संदेश बनाए या भेजे बिना चेक-इन history अपडेट हुई.',
+    'feature.more.activityHistory.detail.contactMarkedContacted': 'संदेश बनाए या भेजे बिना चेक-इन history अपडेट हुई.',
     'feature.more.activityHistory.detail.emailSenderChanged': 'ईमेल sender configuration बदला.',
     'feature.more.activityHistory.detail.emailProviderReady': 'ईमेल delivery endpoint ने संदेश स्वीकार किया.',
     'feature.more.activityHistory.detail.emailSent': 'स्वीकृत ईमेल configured provider से भेजा गया.',
     'feature.more.activityHistory.detail.onboardingCompleted':
       'Home तैयार है; setup gaps Settings और Setup Check से उपलब्ध रहेंगे.',
-    'feature.more.activityHistory.detail.accountDisconnected':
-      'Provider sync disconnect हुआ और local data रखा गया.',
+    'feature.more.activityHistory.detail.accountDisconnected': 'Provider sync disconnect हुआ और local data रखा गया.',
     'feature.more.activityHistory.detail.whatsappConsentRevoked': 'Manual WhatsApp handoff consent revoke हुआ.',
     'feature.more.activityHistory.detail.whatsappConsentGranted':
       'Manual WhatsApp handoff consent केवल approved handoff के लिए granted हुआ.',
@@ -2225,8 +2258,7 @@ export const translations = {
     'feature.more.activityHistory.detail.templateReady': '{reason} template समीक्षा के लिए तैयार है.',
     'feature.more.activityHistory.detail.wishReadyForContact': '{name} के लिए {reason} wish समीक्षा के लिए तैयार है.',
     'feature.more.activityHistory.detail.eventAdded': '{label} Events में जोड़ा गया.',
-    'feature.more.activityHistory.detail.eventKeptSeparate':
-      '{label} समीक्षा के बाद अलग event रखा गया.',
+    'feature.more.activityHistory.detail.eventKeptSeparate': '{label} समीक्षा के बाद अलग event रखा गया.',
     'feature.more.activityHistory.detail.followUpReady': '{label} Events और reminders में तैयार है.',
     'feature.more.activityHistory.detail.giftAdded': '{name} gift history में जोड़ा गया.',
     'feature.more.activityHistory.detail.giftRemoved': '{name} gift history से हटाया गया.',
@@ -2264,7 +2296,8 @@ export const translations = {
     'feature.more.settings.toggle.email': 'ईमेल',
     'feature.more.settings.toggle.manualWhatsApp': 'मैनुअल WhatsApp',
     'feature.more.settings.toggle.biometricLock': 'बायोमेट्रिक लॉक',
-    'feature.more.settings.automationSummary': 'समीक्षा कार्यप्रवाह: {mode}. बिना देखे send नहीं होता. शांत समय: {start} से {end}.',
+    'feature.more.settings.automationSummary':
+      'समीक्षा कार्यप्रवाह: {mode}. बिना देखे send नहीं होता. शांत समय: {start} से {end}.',
     'feature.more.settings.fullAutoAdvancedNotice':
       'हर संदेश review-controlled रहता है. बिना देखे generation और sending उपलब्ध नहीं हैं.',
     'feature.more.settings.showAdvancedAutomation': 'Automation availability दिखाएं',
@@ -2313,6 +2346,22 @@ export const translations = {
   },
   'en-Hinglish': {
     'app.tagline': 'Yaad rakho, likho, review karo, send karo.',
+    'functionalConsole.title': 'RelateAI functional console',
+    'functionalConsole.runtime': 'Runtime: {phase}',
+    'functionalConsole.stateSummary': 'State summary',
+    'functionalConsole.command': 'Command',
+    'functionalConsole.commandJson': 'Functional command JSON',
+    'functionalConsole.secret': 'Sensitive command secret',
+    'functionalConsole.execute': 'Chalao',
+    'functionalConsole.running': 'Chal raha hai',
+    'functionalConsole.examples': 'Command examples',
+    'functionalConsole.loadCommand': 'Command {id} load karo',
+    'functionalConsole.operations': 'Operations',
+    'functionalConsole.operationsEmpty': 'Koi operation record nahi hua.',
+    'functionalConsole.issues': 'Operational issues',
+    'functionalConsole.issuesEmpty': 'Koi active operational issue nahi hai.',
+    'functionalConsole.result.none': 'Abhi koi command run nahi hua.',
+    'functionalConsole.result.failed': 'Private content dikhaye bina command fail hua. Operational issues review karo.',
     'nav.home': 'Home',
     'nav.events': 'Events',
     'nav.messages': 'Messages',
@@ -2435,6 +2484,18 @@ export const translations = {
     'feedback.remindersScheduledMessage': '{scheduled} scheduled, {skipped} skipped.',
     'feedback.reminderSchedulingFailedTitle': 'Reminder scheduling fail hua',
     'feedback.reminderSchedulingFailedFallback': 'Notification reminders schedule nahi ho paye.',
+    'notification.event.title': 'RelateAI event reminder',
+    'notification.event.body': 'Upcoming relationship event review karne ke liye RelateAI kholo.',
+    'notification.approval.title': 'Message review reminder',
+    'notification.approval.body': 'Ek prepared message aapke review ka wait kar raha hai.',
+    'notification.fallback.title': 'Fallback draft ready hai',
+    'notification.fallback.body': 'Kisi handoff se pehle local fallback draft review karo.',
+    'notification.setup.title': 'RelateAI setup reminder',
+    'notification.setup.body': 'Setup ya backup item review karne ke liye RelateAI kholo.',
+    'notification.recovery.title': 'RelateAI recovery reminder',
+    'notification.recovery.body': 'Safe recovery step review karne ke liye RelateAI kholo.',
+    'notification.checkIn.title': 'Relationship check-in',
+    'notification.checkIn.body': 'Ek relationship check-in review ke liye due hai.',
     'feedback.calendarExportCompleteTitle': 'Calendar export complete',
     'feedback.calendarExportCompleteMessage': '{count} event(s) RelateAI calendar mein export hue.',
     'feedback.calendarExportFailedTitle': 'Calendar export fail hua',
@@ -2495,7 +2556,8 @@ export const translations = {
     'feature.checkIn.queue.summaryDue': '{count} relationship check-in(s) review chahiye.',
     'feature.checkIn.queue.summarySnoozed': 'Koi check-in due nahi hai; {count} reminder(s) snoozed hain.',
     'feature.checkIn.queue.summaryNone': 'Koi relationship check-in due nahi hai.',
-    'feature.checkIn.queue.emptyNoContacts': 'Check-in reminders ke liye pehle contacts aur cadence preferences add karo.',
+    'feature.checkIn.queue.emptyNoContacts':
+      'Check-in reminders ke liye pehle contacts aur cadence preferences add karo.',
     'feature.checkIn.queue.emptyNoDue': 'Abhi koi check-in due nahi hai.',
     'feature.checkIn.reminder.title.due': '{name} ko check-in chahiye',
     'feature.checkIn.reminder.title.snoozed': '{name} check-in snoozed hai',
@@ -2528,7 +2590,8 @@ export const translations = {
     'feature.home.widget.tile.pendingApprovals.accessibility.other':
       '{count} messages review ka wait kar rahe hain. Messages kholo.',
     'feature.home.setup.title': 'Setup basics finish karo',
-    'feature.home.setup.detail': 'Onboarding progress saved hai. Setup guidance continue karo ya app manually use karte raho.',
+    'feature.home.setup.detail':
+      'Onboarding progress saved hai. Setup guidance continue karo ya app manually use karte raho.',
     'feature.home.setup.openOnboarding': 'Onboarding kholo',
     'feature.home.upcoming.title': 'Upcoming events',
     'feature.home.upcoming.detail': 'Date se pehle checklist complete karo.',
@@ -2651,7 +2714,8 @@ export const translations = {
     'feature.contactDetail.action.snoozeCheckIn': 'Check-in snooze karo',
     'feature.contactDetail.action.markContacted': 'Contacted mark karo',
     'feature.contactDetail.essentials.title': 'Essentials',
-    'feature.contactDetail.essentials.detail': 'Saved profile details messages, reminders, gifts, aur analytics update karte hain.',
+    'feature.contactDetail.essentials.detail':
+      'Saved profile details messages, reminders, gifts, aur analytics update karte hain.',
     'feature.contactDetail.essentials.contactName': 'Contact name',
     'feature.contactDetail.essentials.relationship': 'Relationship',
     'feature.contactDetail.essentials.contactPhone': 'Contact phone',
@@ -2833,7 +2897,8 @@ export const translations = {
     'feature.more.account.googleSync': 'Google sync (available nahi)',
     'feature.more.account.providerDisconnected':
       'Is release mein Google sync implemented nahi hai. Local data isi device par rehta hai.',
-    'feature.more.account.localModeDetail': 'Local mode account sync avoid karta hai. Provider features opt-in rehte hain.',
+    'feature.more.account.localModeDetail':
+      'Local mode account sync avoid karta hai. Provider features opt-in rehte hain.',
     'feature.more.account.checklistTitle': '{title} checklist',
     'feature.more.account.checklistReady': 'Ready',
     'feature.more.account.checklistReview': 'Review',
@@ -2957,7 +3022,8 @@ export const translations = {
     'feature.more.setupWizard.detail.schedulingReady':
       'Reminder planning {start}-{end} quiet hours aur {count} blackout window(s) respect karti hai.',
     'feature.more.setupWizard.detail.eventsReady': '{count} event(s) reminders ke liye available hain.',
-    'feature.more.setupWizard.detail.eventsMissing': 'Kam se kam ek birthday, anniversary, ya custom event add/import karo.',
+    'feature.more.setupWizard.detail.eventsMissing':
+      'Kam se kam ek birthday, anniversary, ya custom event add/import karo.',
     'feature.more.setupWizard.detail.reminderPlansReady': '{count} reminder plan(s) ready hain.',
     'feature.more.setupWizard.detail.reminderPlansMissing':
       'Events aur notification preferences ready hone ke baad reminders plan karo.',
@@ -2975,7 +3041,8 @@ export const translations = {
     'feature.more.setupWizard.detail.personalizationMissing':
       'Non-private memories ya notes add karo taaki drafts generic na lagen.',
     'feature.more.setupWizard.detail.contactsReady': 'Contacts ke paas at least ek usable manual route hai.',
-    'feature.more.setupWizard.detail.contactsMissing': 'Send karne se pehle phone, email, ya manual route details add karo.',
+    'feature.more.setupWizard.detail.contactsMissing':
+      'Send karne se pehle phone, email, ya manual route details add karo.',
     'feature.more.setupWizard.detail.manualWhatsAppEnabled':
       'Manual WhatsApp handoff enabled hai aur user-controlled rehta hai.',
     'feature.more.setupWizard.detail.manualWhatsAppDisabled':
@@ -3083,15 +3150,12 @@ export const translations = {
     'feature.more.setupCheck.impact.localStorageRecoveryDetail': 'Local data storage recovery chahiye: {reason}',
     'feature.more.setupCheck.impact.localStorageIntegrityFailed':
       'Local data storage integrity fail hui aur recovery chahiye.',
-    'feature.more.setupCheck.impact.localStorageIntegrityDetail':
-      'Local data storage integrity fail hui: {reason}',
+    'feature.more.setupCheck.impact.localStorageIntegrityDetail': 'Local data storage integrity fail hui: {reason}',
     'feature.more.setupCheck.impact.localStorageRewrite':
       'Local data readable hai but release verification se pehle normalized storage mein rewrite hona chahiye.',
-    'feature.more.setupCheck.impact.failedMessages':
-      '{count} message(s) ko send hone se pehle recovery chahiye.',
+    'feature.more.setupCheck.impact.failedMessages': '{count} message(s) ko send hone se pehle recovery chahiye.',
     'feature.more.setupCheck.impact.noFailedMessages': 'Koi failed message recovery needed nahi hai.',
-    'feature.more.setupCheck.impact.recentWarnings':
-      '{count} recent warning(s) Activity History mein available hain.',
+    'feature.more.setupCheck.impact.recentWarnings': '{count} recent warning(s) Activity History mein available hain.',
     'feature.more.setupCheck.impact.noRecentWarnings': 'Koi recent warning attention nahi chahti.',
     'feature.more.setupCheck.impact.releaseEvidenceMissing':
       'Is Setup Check run mein React Native release evidence attached nahi hai.',
@@ -3309,7 +3373,8 @@ export const translations = {
     'feature.more.activityHistory.permission.denied': 'denied',
     'feature.more.activityHistory.permission.unavailable': 'unavailable',
     'feature.more.activityHistory.permission.notRequested': 'not requested',
-    'feature.more.activityHistory.detail.reviewFirstAutomation': 'Messages schedule ya send hone se pehle approval chahiye.',
+    'feature.more.activityHistory.detail.reviewFirstAutomation':
+      'Messages schedule ya send hone se pehle approval chahiye.',
     'feature.more.activityHistory.detail.localDataCleared':
       'Contacts, events, messages, memories, gifts, aur backups clear ho gaye.',
     'feature.more.activityHistory.detail.contactRequired': 'Contact required hai.',
@@ -3330,8 +3395,7 @@ export const translations = {
     'feature.more.activityHistory.detail.memoryPinned': 'Pinned notes Memory Vault mein pehle dikhte hain.',
     'feature.more.activityHistory.detail.noteRemoved': 'Note is contact se remove ho gaya.',
     'feature.more.activityHistory.detail.contactMissing': 'Contact nahi mila.',
-    'feature.more.activityHistory.detail.enrichmentPromptUnavailable':
-      'Yeh enrichment prompt ab available nahi hai.',
+    'feature.more.activityHistory.detail.enrichmentPromptUnavailable': 'Yeh enrichment prompt ab available nahi hai.',
     'feature.more.activityHistory.detail.giftUnavailable': 'Yeh gift record ab available nahi hai.',
     'feature.more.activityHistory.detail.contactPriorityChanged': 'Contact priority change hui.',
     'feature.more.activityHistory.detail.contactAutomationChanged': 'Contact automation preference change hui.',
@@ -3360,8 +3424,7 @@ export const translations = {
     'feature.more.activityHistory.detail.templateReady': '{reason} template review ke liye ready hai.',
     'feature.more.activityHistory.detail.wishReadyForContact': '{name} ke liye {reason} wish review ke liye ready hai.',
     'feature.more.activityHistory.detail.eventAdded': '{label} Events mein add hua.',
-    'feature.more.activityHistory.detail.eventKeptSeparate':
-      '{label} review ke baad separate event rakha gaya.',
+    'feature.more.activityHistory.detail.eventKeptSeparate': '{label} review ke baad separate event rakha gaya.',
     'feature.more.activityHistory.detail.followUpReady': '{label} Events aur reminders mein ready hai.',
     'feature.more.activityHistory.detail.giftAdded': '{name} gift history mein add hua.',
     'feature.more.activityHistory.detail.giftRemoved': '{name} gift history se remove hua.',
@@ -3399,7 +3462,8 @@ export const translations = {
     'feature.more.settings.toggle.email': 'Email',
     'feature.more.settings.toggle.manualWhatsApp': 'Manual WhatsApp',
     'feature.more.settings.toggle.biometricLock': 'Biometric lock',
-    'feature.more.settings.automationSummary': 'Review workflow: {mode}. Unattended send nahi hota. Quiet hours: {start} to {end}.',
+    'feature.more.settings.automationSummary':
+      'Review workflow: {mode}. Unattended send nahi hota. Quiet hours: {start} to {end}.',
     'feature.more.settings.fullAutoAdvancedNotice':
       'Har message review-controlled rehta hai. Unattended generation aur sending available nahi hain.',
     'feature.more.settings.showAdvancedAutomation': 'Automation availability dikhao',
@@ -3448,8 +3512,12 @@ export const translations = {
   }
 } satisfies Record<SupportedLocale, Record<TranslationKey, string>>;
 
-export const resolveLocale = (locale: string | undefined): SupportedLocale =>
-  supportedLocales.includes(locale as SupportedLocale) ? (locale as SupportedLocale) : 'en-IN';
+export const resolveLocale = (locale: string | undefined): SupportedLocale => {
+  if (supportedLocales.includes(locale as SupportedLocale)) return locale as SupportedLocale;
+  const language = locale?.trim().toLowerCase();
+  if (language?.startsWith('hi')) return 'hi-IN';
+  return 'en-IN';
+};
 
 const formatInterpolationValue = (value: TranslationValues[string]) => {
   if (value === undefined || value === null) {

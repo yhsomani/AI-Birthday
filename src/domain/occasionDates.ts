@@ -1,8 +1,4 @@
-import type {
-  EventType,
-  RelationshipEvent,
-  YearlyOccasionRecurrence
-} from './types';
+import type { EventType, RelationshipEvent, YearlyOccasionRecurrence } from './types';
 
 const yearlyEventTypes = new Set<EventType>(['Birthday', 'Anniversary', 'Work anniversary']);
 
@@ -21,15 +17,13 @@ export const localDateKey = (value: Date): string | undefined => {
   if (!parsed) {
     return undefined;
   }
-  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(
-    parsed.getDate()
-  ).padStart(2, '0')}`;
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(
+    2,
+    '0'
+  )}`;
 };
 
-export const recurrenceFromDate = (
-  type: EventType,
-  dateIso: string
-): YearlyOccasionRecurrence | undefined => {
+export const recurrenceFromDate = (type: EventType, dateIso: string): YearlyOccasionRecurrence | undefined => {
   if (!yearlyEventTypes.has(type)) {
     return undefined;
   }
@@ -46,25 +40,19 @@ export const recurrenceFromDate = (
   };
 };
 
-export const recurrenceForEvent = (
-  event: RelationshipEvent
-): YearlyOccasionRecurrence | undefined => event.recurrence ?? recurrenceFromDate(event.type, event.date);
+export const recurrenceForEvent = (event: RelationshipEvent): YearlyOccasionRecurrence | undefined =>
+  event.recurrence ?? recurrenceFromDate(event.type, event.date);
 
 const isLeapYear = (year: number) => year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 
 const occurrenceParts = (recurrence: YearlyOccasionRecurrence, year: number) => {
   if (recurrence.month === 2 && recurrence.day === 29 && !isLeapYear(year)) {
-    return recurrence.leapDayPolicy === 'March 1'
-      ? { month: 3, day: 1 }
-      : { month: 2, day: 28 };
+    return recurrence.leapDayPolicy === 'March 1' ? { month: 3, day: 1 } : { month: 2, day: 28 };
   }
   return { month: recurrence.month, day: recurrence.day };
 };
 
-export const yearlyOccurrenceIso = (
-  recurrence: YearlyOccasionRecurrence,
-  year: number
-): string | undefined => {
+export const yearlyOccurrenceIso = (recurrence: YearlyOccasionRecurrence, year: number): string | undefined => {
   if (
     !Number.isInteger(year) ||
     !Number.isInteger(recurrence.month) ||
@@ -84,25 +72,34 @@ export const yearlyOccurrenceIso = (
   return date.toISOString();
 };
 
-/** Resolves the occurrence on or after the reference local-calendar day. */
-export const eventOccurrenceIso = (
+export const yearlyOccurrenceDateKey = (recurrence: YearlyOccasionRecurrence, year: number): string | undefined => {
+  const iso = yearlyOccurrenceIso(recurrence, year);
+  return iso?.slice(0, 10);
+};
+
+/** Resolves an occasion as calendar parts without converting through a UTC instant. */
+export const eventOccurrenceLocalDateKey = (
   event: RelationshipEvent,
   reference: Date = new Date()
 ): string | undefined => {
   const recurrence = recurrenceForEvent(event);
+  if (!recurrence) return utcDateKey(event.date);
+  const referenceKey = localDateKey(reference);
+  if (!referenceKey) return undefined;
+  const year = reference.getFullYear();
+  const currentYear = yearlyOccurrenceDateKey(recurrence, year);
+  if (currentYear && currentYear >= referenceKey) return currentYear;
+  return yearlyOccurrenceDateKey(recurrence, year + 1);
+};
+
+/** Resolves the occurrence on or after the reference local-calendar day. */
+export const eventOccurrenceIso = (event: RelationshipEvent, reference: Date = new Date()): string | undefined => {
+  const recurrence = recurrenceForEvent(event);
   if (!recurrence) {
     return validDate(event.date)?.toISOString();
   }
-  const referenceKey = localDateKey(reference);
-  if (!referenceKey) {
-    return undefined;
-  }
-  const year = reference.getFullYear();
-  const currentYear = yearlyOccurrenceIso(recurrence, year);
-  if (currentYear && currentYear.slice(0, 10) >= referenceKey) {
-    return currentYear;
-  }
-  return yearlyOccurrenceIso(recurrence, year + 1);
+  const dateKey = eventOccurrenceLocalDateKey(event, reference);
+  return dateKey ? `${dateKey}T12:00:00.000Z` : undefined;
 };
 
 export const materializeEventOccurrence = (
@@ -114,10 +111,7 @@ export const materializeEventOccurrence = (
   recurrence: recurrenceForEvent(event)
 });
 
-export const eventOccurrenceInYear = (
-  event: RelationshipEvent,
-  year: number
-): RelationshipEvent | undefined => {
+export const eventOccurrenceInYear = (event: RelationshipEvent, year: number): RelationshipEvent | undefined => {
   const recurrence = recurrenceForEvent(event);
   if (!recurrence) {
     const date = validDate(event.date);

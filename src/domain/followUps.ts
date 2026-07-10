@@ -29,7 +29,8 @@ export const buildMessageFollowUpPlan = (
   state: AppState,
   messageId: string,
   delayDays: FollowUpDelayDays,
-  nowIso = new Date().toISOString()
+  nowIso: string,
+  identities?: { eventId: string; reminderId: string }
 ): MessageFollowUpPlan => {
   const message = state.messages.find(item => item.id === messageId);
   if (!message) {
@@ -58,11 +59,9 @@ export const buildMessageFollowUpPlan = (
   }
 
   const label =
-    delayDays === 1
-      ? `Follow up with ${contact.name} tomorrow`
-      : `Follow up with ${contact.name} next week`;
+    delayDays === 1 ? `Follow up with ${contact.name} tomorrow` : `Follow up with ${contact.name} next week`;
   const event: RelationshipEvent = {
-    id: `followup-${message.id}-${delayDays}`,
+    id: identities?.eventId ?? `followup-${message.id}-${delayDays}`,
     contactId: contact.id,
     type: 'Follow-up',
     label,
@@ -72,7 +71,7 @@ export const buildMessageFollowUpPlan = (
     checklist: buildDefaultEventChecklist('Follow-up')
   };
   const reminderPlan: ReminderPlan = {
-    id: `reminder-${event.id}`,
+    id: identities?.reminderId ?? `reminder-${event.id}`,
     eventId: event.id,
     contactId: contact.id,
     title: label,

@@ -63,7 +63,10 @@ describe('Memory Vault contract', () => {
     assert.equal(report.aiEligibleCount, 2);
     assert.equal(report.privateCount, 1);
     assert.match(report.notes.find(item => item.note.id === 'memory-private')?.aiUseLabel ?? '', /excluded from AI/i);
-    assert.deepEqual(search.notes.map(item => item.note.id), ['memory-pinned']);
+    assert.deepEqual(
+      search.notes.map(item => item.note.id),
+      ['memory-pinned']
+    );
     assert.match(empty.emptyMessage ?? '', /No memories match/);
   });
 
@@ -101,7 +104,10 @@ describe('Memory Vault contract', () => {
     assert.equal(edited.memories[0].body, 'Updated secret family context.');
     assert.equal(pinned.memories[0].pinned, true);
     assert.doesNotMatch(generated.messages[0].body, /secret family/i);
-    assert.equal(deleted.memories.some(memory => memory.id === memoryId), false);
+    assert.equal(
+      deleted.memories.some(memory => memory.id === memoryId),
+      false
+    );
     assert.equal(deleted.activity[0].title, 'Memory deleted');
   });
 });

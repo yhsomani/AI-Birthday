@@ -17,9 +17,15 @@ describe('operation coordinator', () => {
     let finish!: (result: OperationTaskResult<string>) => void;
     const first = coordinator.run(
       'email:message-1',
-      () => new Promise<OperationTaskResult<string>>(resolve => { finish = resolve; })
+      () =>
+        new Promise<OperationTaskResult<string>>(resolve => {
+          finish = resolve;
+        })
     );
-    const duplicate = await coordinator.run('email:message-1', async () => ({ status: 'succeeded', value: 'duplicate' }));
+    const duplicate = await coordinator.run('email:message-1', async () => ({
+      status: 'succeeded',
+      value: 'duplicate'
+    }));
     const unrelated = await coordinator.run('backup:export', async () => ({ status: 'succeeded', value: 'backup' }));
     assert.deepEqual(duplicate, { status: 'already-running', requestId: 'request-1' });
     assert.deepEqual(unrelated, { status: 'succeeded', value: 'backup' });
@@ -32,13 +38,14 @@ describe('operation coordinator', () => {
     let finish!: (result: OperationTaskResult<string>) => void;
     const obsolete = coordinator.run(
       'ai:contact-1',
-      () => new Promise<OperationTaskResult<string>>(resolve => { finish = resolve; })
+      () =>
+        new Promise<OperationTaskResult<string>>(resolve => {
+          finish = resolve;
+        })
     );
-    const latest = coordinator.run(
-      'ai:contact-1',
-      async () => ({ status: 'succeeded', value: 'latest' }),
-      { cancelPrevious: true }
-    );
+    const latest = coordinator.run('ai:contact-1', async () => ({ status: 'succeeded', value: 'latest' }), {
+      cancelPrevious: true
+    });
     finish({ status: 'succeeded', value: 'obsolete' });
     assert.deepEqual(await obsolete, { status: 'cancelled' });
     assert.deepEqual(await latest, { status: 'succeeded', value: 'latest' });

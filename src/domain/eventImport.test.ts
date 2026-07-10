@@ -54,7 +54,11 @@ describe('event file import contract', () => {
   });
 
   it('reports skipped rows without importing invalid or incomplete content', () => {
-    const result = parseEventImportText('name,type,date\nMissing Date,Birthday,\nBad Date,Birthday,not-a-date', 'csv', now);
+    const result = parseEventImportText(
+      'name,type,date\nMissing Date,Birthday,\nBad Date,Birthday,not-a-date',
+      'csv',
+      now
+    );
 
     assert.equal(result.candidates.length, 0);
     assert.equal(result.skipped, 2);

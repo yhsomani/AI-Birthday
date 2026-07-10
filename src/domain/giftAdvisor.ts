@@ -40,13 +40,9 @@ export interface GiftSuggestion {
   duplicateWarning?: string;
 }
 
-export type GiftValidationResult =
-  | { ok: true; value: GiftAdvisorInput }
-  | { ok: false; message: string };
+export type GiftValidationResult = { ok: true; value: GiftAdvisorInput } | { ok: false; message: string };
 
-export type GiftBudgetValidationResult =
-  | { ok: true; value: number }
-  | { ok: false; message: string };
+export type GiftBudgetValidationResult = { ok: true; value: number } | { ok: false; message: string };
 
 const currentYear = () => new Date().getFullYear();
 
@@ -147,11 +143,7 @@ const suggestionDuplicateWarning = (
     : undefined;
 };
 
-export const buildGiftSuggestions = (
-  state: AppState,
-  contactId: string,
-  occasion = 'Next event'
-): GiftSuggestion[] => {
+export const buildGiftSuggestions = (state: AppState, contactId: string, occasion = 'Next event'): GiftSuggestion[] => {
   const contact = state.contacts.find(item => item.id === contactId);
   if (!contact) {
     return [];
@@ -166,9 +158,10 @@ export const buildGiftSuggestions = (
     .join(' ');
   const context = `${contact.notesSummary} ${nonPrivateMemoryText}`.toLowerCase();
   const hasRichContext = normalize(nonPrivateMemoryText).length > 0 || contact.notesSummary.length > 24;
-  const confidence: GiftSuggestionConfidence = gifts.length > 0 && hasRichContext ? 'High' : hasRichContext ? 'Medium' : 'Low';
+  const confidence: GiftSuggestionConfidence =
+    gifts.length > 0 && hasRichContext ? 'High' : hasRichContext ? 'Medium' : 'Low';
   const baseCost = budget.annualBudget > 0 ? Math.max(500, Math.round(Math.max(1, budget.remaining) / 2)) : 1000;
-  const suggestions: Array<Omit<GiftSuggestion, 'id' | 'budgetFit' | 'confidence' | 'duplicateWarning'>> = [];
+  const suggestions: Omit<GiftSuggestion, 'id' | 'budgetFit' | 'confidence' | 'duplicateWarning'>[] = [];
 
   if (/book|read|novel/.test(context)) {
     suggestions.push({

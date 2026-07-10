@@ -33,10 +33,7 @@ const homeWidgetTileText = (locale: SupportedLocale, tile: HomeWidgetTile): Home
   }
 };
 
-export const localizeHomeWidgetSummary = (
-  summary: HomeWidgetSummary,
-  locale: SupportedLocale
-): HomeWidgetSummary => ({
+export const localizeHomeWidgetSummary = (summary: HomeWidgetSummary, locale: SupportedLocale): HomeWidgetSummary => ({
   ...summary,
   title: t(locale, 'feature.home.widget.summaryTitle'),
   subtitle:

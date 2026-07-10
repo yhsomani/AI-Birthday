@@ -39,16 +39,74 @@ describe('manual composer contract', () => {
 
     assert.equal(model.ok, true);
     if (model.ok) {
-      assert.equal(model.selectedTemplateId, 'custom-warm');
+      assert.equal(model.selectedTemplateId, 'custom-hinglish-warm');
+      assert.equal(model.selectedTemplate?.language, 'Hinglish');
+      assert.equal(model.templateSelection.exactLanguageMatch, true);
       assert.equal(model.context.contextSource, 'memory');
       assert.equal(model.context.includedMemoryCount, 1);
+      assert.equal(model.context.excludedGuidanceMemoryCount, 1);
       assert.equal(model.context.excludedPrivateMemoryCount, 1);
-      assert.match(model.context.detail, /1 non-private memory/i);
+      assert.match(model.context.detail, /1 mentionable non-private memory/i);
+      assert.match(model.context.detail, /1 instruction\/guidance memory/i);
       assert.match(model.context.detail, /1 private note excluded/i);
       assert.match(model.renderedTemplateBody, /Favorite dessert is mango lassi/i);
+      assert.doesNotMatch(model.renderedTemplateBody, /Mention family jokes lightly/i);
       assert.doesNotMatch(model.renderedTemplateBody, /Secret family detail/i);
       assert.equal(model.templateAction.enabled, true);
       assert.equal(model.templateAction.status, 'Ready');
+    }
+  });
+
+  it('never interpolates avoidance, language, or tone guidance into local template text', () => {
+    const base = createTestState();
+    const state: AppState = {
+      ...base,
+      memories: [
+        {
+          id: 'fact',
+          contactId: 'c-asha',
+          category: 'Milestone',
+          body: 'Finished a first marathon in May.',
+          pinned: false,
+          createdAt: '2026-07-10T00:00:00.000Z'
+        },
+        {
+          id: 'avoid',
+          contactId: 'c-asha',
+          category: 'Preference',
+          body: 'Avoid in messages: office gossip.',
+          pinned: false,
+          createdAt: '2026-07-10T00:00:00.000Z'
+        },
+        {
+          id: 'language',
+          contactId: 'c-asha',
+          category: 'Preference',
+          body: 'Preferred language/style: formal Hindi.',
+          pinned: false,
+          createdAt: '2026-07-10T00:00:00.000Z'
+        },
+        {
+          id: 'tone',
+          contactId: 'c-asha',
+          category: 'Preference',
+          body: 'Preferred tone: respectful and no emoji.',
+          pinned: false,
+          createdAt: '2026-07-10T00:00:00.000Z'
+        }
+      ]
+    };
+    const model = buildManualComposerState(state, 'c-asha', 'Custom');
+
+    assert.equal(model.ok, true);
+    if (model.ok) {
+      assert.match(model.renderedTemplateBody, /Finished a first marathon in May/i);
+      assert.doesNotMatch(
+        model.renderedTemplateBody,
+        /Avoid in messages|office gossip|Preferred language|formal Hindi|Preferred tone|no emoji/i
+      );
+      assert.equal(model.context.includedMemoryCount, 1);
+      assert.equal(model.context.excludedGuidanceMemoryCount, 3);
     }
   });
 
@@ -100,6 +158,35 @@ describe('manual composer contract', () => {
       assert.equal(disabled.templateAction.enabled, true);
       assert.equal(notConfigured.aiAction.status, 'Warning');
       assert.match(notConfigured.aiAction.detail, /not configured/i);
+      assert.match(notConfigured.aiAction.detail, /local English review-first fallback/i);
+    }
+  });
+
+  it('reports the language target and refuses a selected template from another language', () => {
+    const base = createTestState();
+    const state: AppState = {
+      ...base,
+      settings: { ...base.settings, aiEnabled: false },
+      contacts: [
+        {
+          ...base.contacts[0],
+          language: 'Hindi',
+          tone: ['Warm']
+        },
+        ...base.contacts.slice(1)
+      ]
+    };
+    const model = buildManualComposerState(state, 'c-asha', 'Birthday', undefined, 'birthday-warm');
+
+    assert.equal(model.ok, true);
+    if (model.ok) {
+      assert.equal(model.selectedTemplate?.language, 'Hindi');
+      assert.equal(model.templateSelection.languageTarget, 'Hindi');
+      assert.equal(model.templateSelection.wrongLanguageTemplateBlocked, true);
+      assert.match(model.templateSelection.detail, /English template was not used/i);
+      assert.match(model.renderedTemplateBody, /[\u0900-\u097f]/);
+      assert.match(model.templateAction.detail, /edited Hindi template/i);
+      assert.match(model.aiAction.detail, /local Hindi review-first fallback/i);
     }
   });
 

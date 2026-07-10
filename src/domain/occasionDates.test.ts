@@ -1,12 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { RelationshipEvent } from './types';
-import {
-  eventOccurrenceIso,
-  eventOccurrenceInYear,
-  recurrenceForEvent,
-  yearlyOccurrenceIso
-} from './occasionDates';
+import { eventOccurrenceIso, eventOccurrenceInYear, recurrenceForEvent, yearlyOccurrenceIso } from './occasionDates';
 
 const birthday = (date = '1990-07-09T12:00:00.000Z'): RelationshipEvent => ({
   id: 'birthday',
@@ -49,7 +44,10 @@ describe('recurring occasion dates', () => {
     };
     assert.equal(yearlyOccurrenceIso(recurrence, 2028), '2028-02-29T12:00:00.000Z');
     assert.equal(yearlyOccurrenceIso(recurrence, 2100), '2100-02-28T12:00:00.000Z');
-    assert.equal(eventOccurrenceInYear({ ...birthday('2000-02-29T12:00:00.000Z'), recurrence }, 2100)?.date, '2100-02-28T12:00:00.000Z');
+    assert.equal(
+      eventOccurrenceInYear({ ...birthday('2000-02-29T12:00:00.000Z'), recurrence }, 2100)?.date,
+      '2100-02-28T12:00:00.000Z'
+    );
   });
 
   it('produces a valid occurrence for every year in a twenty-year horizon', () => {

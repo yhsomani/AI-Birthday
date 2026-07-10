@@ -1,11 +1,11 @@
 import { buildReminderNotificationSchedulePlan } from '../domain/notificationScheduling';
 import type { ScheduledReminderNotification } from '../domain/notificationScheduling';
-import type { ReminderPlan } from '../domain/types';
+import type { OwnedNotificationPlan } from '../domain/notificationPlans';
 
 export interface ReminderSchedulerAdapter {
   getScheduledNotifications(): Promise<ScheduledReminderNotification[]>;
   cancelScheduledNotification(identifier: string): Promise<void>;
-  scheduleReminder(plan: ReminderPlan): Promise<void>;
+  scheduleReminder(plan: OwnedNotificationPlan): Promise<void>;
 }
 
 export interface ReminderScheduleCounts {
@@ -17,7 +17,7 @@ export interface ReminderScheduleCounts {
 
 /** Applies the pure desired-vs-actual diff and never requests permission. */
 export const reconcileReminderPlansWithAdapter = async (
-  plans: ReminderPlan[],
+  plans: OwnedNotificationPlan[],
   adapter: ReminderSchedulerAdapter,
   now: Date = new Date()
 ): Promise<ReminderScheduleCounts> => {
@@ -34,7 +34,7 @@ export const reconcileReminderPlansWithAdapter = async (
 
   return {
     scheduled: schedulePlan.toSchedule.length,
-    skipped: schedulePlan.skippedPastCount,
+    skipped: schedulePlan.skippedPastCount + schedulePlan.skippedUnsafeCount + schedulePlan.identifierCollisionCount,
     cancelled: schedulePlan.toCancel.length,
     unchanged: schedulePlan.unchangedCount
   };

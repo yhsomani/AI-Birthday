@@ -1,11 +1,7 @@
 import { resolveContactPreferencesForContact } from './contactPreferences';
 import type { AppState, Contact, MemoryCategory, MemoryNote } from './types';
 
-export type ContactEnrichmentPromptId =
-  | 'relationship-context'
-  | 'message-mention'
-  | 'message-avoid'
-  | 'language-style';
+export type ContactEnrichmentPromptId = 'relationship-context' | 'message-mention' | 'message-avoid' | 'language-style';
 
 export interface ContactEnrichmentPrompt {
   id: ContactEnrichmentPromptId;
@@ -27,9 +23,7 @@ export interface ContactEnrichmentPlan {
   summary: string;
 }
 
-export type EnrichmentAnswerValidation =
-  | { ok: true; value: string }
-  | { ok: false; message: string };
+export type EnrichmentAnswerValidation = { ok: true; value: string } | { ok: false; message: string };
 
 const nonPrivateMemories = (state: AppState, contactId: string) =>
   state.memories.filter(memory => memory.contactId === contactId && memory.category !== 'Private');
@@ -52,7 +46,8 @@ const hasAvoidGuidance = (contact: Contact, memories: MemoryNote[], tone: Contac
   includesAny(contactContextText(contact, memories), /\b(avoid|do not|don't|never mention|no emoji|should not)\b/i);
 
 const hasLanguageGuidance = (contact: Contact, memories: MemoryNote[]) =>
-  contact.language !== 'English' || includesAny(contactContextText(contact, memories), /\b(language|hindi|hinglish|english)\b/i);
+  contact.language !== 'English' ||
+  includesAny(contactContextText(contact, memories), /\b(language|hindi|hinglish|english)\b/i);
 
 const promptFor = (id: ContactEnrichmentPromptId, contact: Contact): ContactEnrichmentPrompt => {
   switch (id) {
@@ -102,11 +97,7 @@ const promptFor = (id: ContactEnrichmentPromptId, contact: Contact): ContactEnri
 const labelForScore = (score: number): ContactEnrichmentPlan['label'] =>
   score >= 75 ? 'Strong' : score >= 50 ? 'Growing' : 'Needs details';
 
-const summaryFor = (
-  score: number,
-  completedSignals: string[],
-  missingSignals: string[]
-) => {
+const summaryFor = (score: number, completedSignals: string[], missingSignals: string[]) => {
   if (missingSignals.length === 0) {
     return `Personalization is strong at ${score}%. Future drafts have the core relationship context they need.`;
   }
@@ -186,9 +177,7 @@ export const buildContactEnrichmentPlan = (state: AppState, contactId: string): 
     contactId,
     score: finalScore,
     label: labelForScore(finalScore),
-    prompts: promptIds
-      .map(id => promptFor(id, contact))
-      .sort((a, b) => a.priority - b.priority),
+    prompts: promptIds.map(id => promptFor(id, contact)).sort((a, b) => a.priority - b.priority),
     completedSignals,
     missingSignals,
     summary: summaryFor(finalScore, completedSignals, missingSignals)

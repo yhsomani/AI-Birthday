@@ -1,11 +1,8 @@
 import { buildDefaultEventPreparationChecklist } from './eventPreparation';
+import { recurrenceForEvent, recurrenceFromDate } from './occasionDates';
 import type { Contact, EventType, RelationshipEvent } from './types';
 
-export const primaryManualEventTypes: EventType[] = [
-  'Birthday',
-  'Anniversary',
-  'Custom'
-];
+export const primaryManualEventTypes: EventType[] = ['Birthday', 'Anniversary', 'Custom'];
 
 export const advancedManualEventTypes: EventType[] = [
   'Work anniversary',
@@ -39,11 +36,13 @@ export type ManualEventValidation =
       ok: true;
       normalized: NormalizedManualEventInput;
       warnings: string[];
+      conflictingEventIds: string[];
     }
   | {
       ok: false;
       errors: string[];
       warnings: string[];
+      conflictingEventIds: string[];
     };
 
 const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -59,11 +58,7 @@ const parseDate = (value: string) => {
   const month = Number(match[2]);
   const day = Number(match[3]);
   const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
     return undefined;
   }
 
@@ -84,7 +79,9 @@ export const validateManualEventInput = (
   const warnings: string[] = [];
   const label = input.label.trim().replace(/\s+/g, ' ');
   const newContactName = input.newContactName?.trim().replace(/\s+/g, ' ');
-  const selectedContact = input.contactId ? contacts.find(contact => contact.id === input.contactId) : undefined;
+  const selectedContact = input.contactId
+    ? contacts.find(contact => contact.id === input.contactId && !contact.archivedAt)
+    : undefined;
 
   if (!manualEventTypes.includes(input.eventType)) {
     errors.push('Choose a supported event type.');
@@ -111,20 +108,28 @@ export const validateManualEventInput = (
     return {
       ok: false,
       errors,
-      warnings
+      warnings,
+      conflictingEventIds: []
     };
   }
 
   const contactName = selectedContact?.name ?? newContactName ?? '';
   const contactNameKey = normalizeName(contactName);
-  const sameDayEvents = events.filter(event => event.date.slice(0, 10) === parsedDate.dateKey);
-  const conflicts = sameDayEvents.filter(event => {
-    if (selectedContact) {
-      return event.contactId === selectedContact.id;
+  const candidateRecurrence = recurrenceFromDate(input.eventType, parsedDate.dateIso);
+  const conflicts = events.filter(event => {
+    const sameContact = selectedContact
+      ? event.contactId === selectedContact.id
+      : normalizeName(contacts.find(contact => contact.id === event.contactId)?.name ?? '') === contactNameKey;
+    if (!sameContact) return false;
+    const existingRecurrence = recurrenceForEvent(event);
+    if (candidateRecurrence && existingRecurrence) {
+      return (
+        existingRecurrence.month === candidateRecurrence.month && existingRecurrence.day === candidateRecurrence.day
+      );
     }
-    const existingContact = contacts.find(contact => contact.id === event.contactId);
-    return existingContact ? normalizeName(existingContact.name) === contactNameKey : false;
+    return event.date.slice(0, 10) === parsedDate.dateKey;
   });
+  const conflictingEventIds = conflicts.map(event => event.id).sort();
 
   const duplicate = conflicts.find(event => event.type === input.eventType);
   if (duplicate) {
@@ -143,7 +148,8 @@ export const validateManualEventInput = (
       dateIso: parsedDate.dateIso,
       dateKey: parsedDate.dateKey
     },
-    warnings
+    warnings,
+    conflictingEventIds
   };
 };
 

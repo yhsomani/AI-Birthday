@@ -15,6 +15,7 @@ describe('release evidence command runner', () => {
       [
         'npm run typecheck',
         'npm test',
+        'npm run test:native-prebuild',
         'npm audit --audit-level=moderate',
         'npx expo install --check',
         'npx expo export --platform web --output-dir reports/web-export',
@@ -24,7 +25,7 @@ describe('release evidence command runner', () => {
   });
 
   it('derives status, timing, exit code, and output hashes from executed commands', () => {
-    const calls: Array<{ executable: string; args: string[] }> = [];
+    const calls: { executable: string; args: string[] }[] = [];
     const runner: EvidenceCommandRunner = (executable, args) => {
       calls.push({ executable, args });
       return {
@@ -34,8 +35,9 @@ describe('release evidence command runner', () => {
         error: undefined
       };
     };
-    const instants = Array.from({ length: executableReleaseEvidenceCommands.length * 2 }, (_, index) =>
-      new Date(Date.UTC(2026, 6, 10, 0, 0, 0, index * 10))
+    const instants = Array.from(
+      { length: executableReleaseEvidenceCommands.length * 2 },
+      (_, index) => new Date(Date.UTC(2026, 6, 10, 0, 0, 0, index * 10))
     );
     const evidence = executeReleaseEvidenceCommands({
       rootDir: '/workspace',

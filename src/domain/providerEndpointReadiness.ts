@@ -59,10 +59,7 @@ const productionReady = (): ProviderEndpointReadiness => ({
 
 const isNonPublicIpv4 = (host: string) => {
   const octets = host.split('.').map(Number);
-  if (
-    octets.length !== 4 ||
-    octets.some(octet => !Number.isInteger(octet) || octet < 0 || octet > 255)
-  ) {
+  if (octets.length !== 4 || octets.some(octet => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
     return false;
   }
 
@@ -157,8 +154,7 @@ export const evaluateProviderEndpointReadiness = (
   return productionReady();
 };
 
-export const providerEndpointReadinessFromConfigured = (
-  configured: boolean | undefined
-): ProviderEndpointReadiness => (configured ? productionReady() : missingEndpointReadiness);
+export const providerEndpointReadinessFromConfigured = (configured: boolean | undefined): ProviderEndpointReadiness =>
+  configured ? productionReady() : missingEndpointReadiness;
 
 export const providerEndpointReadinessStatusLabel = (readiness: ProviderEndpointReadiness) => readiness.status;

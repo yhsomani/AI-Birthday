@@ -33,14 +33,54 @@ const emojiCount = (text: string) => [...text].filter(char => /\p{Extended_Picto
 const formalSignals = (text: string) =>
   /\b(regards|sincerely|appreciate|congratulations|meaningful|continued success|apologize|properly)\b/i.test(text);
 
-const casualSignals = (text: string) =>
-  /\b(hey|hi|haha|lol|just checking|thinking of you|no rush)\b/i.test(text);
+const casualSignals = (text: string) => /\b(hey|hi|haha|lol|just checking|thinking of you|no rush)\b/i.test(text);
 
-const greetingPreview = (samples: string[]) => {
-  const first = samples
-    .map(sample => sample.split(/[.!?\n]/)[0]?.trim())
-    .find(line => line && line.length <= 80);
-  return first ?? 'Hi, I was thinking of you.';
+const supportedGreetings = [
+  ['good morning', 'Good morning'],
+  ['good afternoon', 'Good afternoon'],
+  ['good evening', 'Good evening'],
+  ['namaste', 'Namaste'],
+  ['hello', 'Hello'],
+  ['dear', 'Dear'],
+  ['hey', 'Hey'],
+  ['hi', 'Hi']
+] as const;
+
+const commonGreetings = (samples: string[]) => {
+  const counts = new Map<string, { count: number; firstIndex: number }>();
+  samples.forEach((sample, index) => {
+    const normalized = sample.trimStart().toLocaleLowerCase('en-IN');
+    const greeting = supportedGreetings.find(
+      ([candidate]) =>
+        normalized === candidate || normalized.startsWith(`${candidate} `) || normalized.startsWith(`${candidate},`)
+    );
+    if (!greeting) return;
+    const current = counts.get(greeting[1]);
+    counts.set(greeting[1], {
+      count: (current?.count ?? 0) + 1,
+      firstIndex: current?.firstIndex ?? index
+    });
+  });
+  return [...counts.entries()]
+    .sort((left, right) => right[1].count - left[1].count || left[1].firstIndex - right[1].firstIndex)
+    .slice(0, 5)
+    .map(([greeting]) => greeting);
+};
+
+const representativePreview = (language: string, formality: string, emojiUse: string, greetings: string[]) => {
+  const greeting =
+    greetings[0] ?? (language.includes('Hindi') ? 'Namaste' : formality.startsWith('Leans formal') ? 'Hello' : 'Hi');
+  const emoji = emojiUse === 'Rare' ? '' : ' ✨';
+  if (language === 'Hindi and English mix') {
+    return `${greeting}! Aaj aapki yaad aayi—bahut saari warm wishes.${emoji}`;
+  }
+  if (language === 'English with Hinglish touches') {
+    return `${greeting}! Aaj tumhari yaad aayi—sending lots of warm wishes.${emoji}`;
+  }
+  if (formality.startsWith('Leans formal')) {
+    return `${greeting}. Thinking of you and sending my warm wishes.${emoji}`;
+  }
+  return `${greeting}! Thinking of you and sending warm wishes.${emoji}`;
 };
 
 const buildProfile = (samples: string[], source: StyleAnalysisSource): StyleAnalysisResult => {
@@ -79,6 +119,8 @@ const buildProfile = (samples: string[], source: StyleAnalysisSource): StyleAnal
   const emojiUse = emojiCount(combined) >= samples.length ? 'Moderate' : emojiCount(combined) > 0 ? 'Light' : 'Rare';
   const confidence: StyleProfile['confidence'] =
     samples.length >= 5 && sampleWords.length >= 80 ? 'Strong' : samples.length >= 3 ? 'Growing' : 'Starting';
+  const greetings = commonGreetings(samples);
+  const preview = representativePreview(language, formality, emojiUse, greetings);
 
   return {
     ok: true,
@@ -89,9 +131,12 @@ const buildProfile = (samples: string[], source: StyleAnalysisSource): StyleAnal
       language,
       averageLength,
       emojiUse,
-      sampleCount: samples.length
+      sampleCount: samples.length,
+      enabledForAiDrafts: true,
+      commonGreetings: greetings,
+      representativePreview: preview
     },
-    preview: `${greetingPreview(samples)} (${source}, ${confidence.toLowerCase()} confidence)`
+    preview: `${preview} (${source}, ${confidence.toLowerCase()} confidence)`
   };
 };
 

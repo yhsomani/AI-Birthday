@@ -111,14 +111,14 @@ export const buildPrivacyCenterReport = (state: AppState): PrivacyCenterReport =
       'Notifications',
       'Notify about event reminders, pending approvals, and recovery issues.',
       'Home, Messages, and Events still show in-app reminder states when notifications are denied.',
-      { enabled: state.settings.notificationsEnabled, targetScreen: 'more' }
+      { enabled: state.settings.notificationsEnabled, targetScreen: 'settings' }
     ),
     row(
       state,
       'SMS',
       'Open approved SMS handoff only after a message is reviewed and the contact has a phone number.',
       'Manual share or another channel can be used when SMS is disabled or denied.',
-      { enabled: state.settings.smsEnabled, targetScreen: 'more' }
+      { enabled: state.settings.smsEnabled, targetScreen: 'settings' }
     ),
     row(
       state,
@@ -134,35 +134,38 @@ export const buildPrivacyCenterReport = (state: AppState): PrivacyCenterReport =
         ? 'Private notes or provider setup are now present. Biometric lock can protect this app on shared devices.'
         : 'Protect private contacts, memories, drafts, backups, and sent history on shared devices.',
       'Biometric lock remains optional; core manual workflows still work without it.',
-      { enabled: state.settings.biometricLockEnabled, recommended: recommendBiometricLock, targetScreen: 'more' }
+      { enabled: state.settings.biometricLockEnabled, recommended: recommendBiometricLock, targetScreen: 'settings' }
     ),
     row(
       state,
       'AI provider',
       'Generate drafts through a secure backend using only approved, privacy-filtered context.',
       'Local templates remain available when AI is disabled, denied, or unavailable.',
-      { enabled: state.settings.aiEnabled && state.aiProvider.status === 'Ready', targetScreen: 'more' }
+      { enabled: state.settings.aiEnabled && state.aiProvider.status === 'Ready', targetScreen: 'settings' }
     ),
     row(
       state,
       'Email provider',
       'Send approved Email messages through a configured backend without storing provider secrets on device.',
       'Manual mailto handoff remains available when provider delivery is off.',
-      { enabled: state.settings.emailEnabled && state.emailDelivery.status === 'Ready', targetScreen: 'more' }
+      { enabled: state.settings.emailEnabled && state.emailDelivery.status === 'Ready', targetScreen: 'settings' }
     ),
     row(
       state,
       'WhatsApp handoff',
       'Open approved text in WhatsApp while keeping the user in control of final send.',
       'Manual share or SMS/email can be used if WhatsApp handoff is disabled.',
-      { enabled: state.settings.whatsappHandoffEnabled, targetScreen: 'more' }
+      {
+        enabled: state.settings.whatsappHandoffEnabled && state.privacy.whatsappHandoffConsent,
+        targetScreen: 'settings'
+      }
     ),
     row(
       state,
       'Backup export',
       'Create explicit encrypted backup files protected by a passphrase the app does not store.',
       'Without export, local data remains on this device and may be lost if the app is removed.',
-      { enabled: state.backups.length > 0, targetScreen: 'more' }
+      { enabled: state.backups.length > 0, targetScreen: 'backup' }
     )
   ];
 

@@ -21,6 +21,25 @@ describe('contact group preference contract', () => {
     assert.equal(preferences.automationMode, 'Always ask');
     assert.equal(preferences.sources.preferredChannel, 'contact');
     assert.equal(preferences.sources.automationMode, 'global');
+    assert.equal(preferences.customSendTime, undefined);
+    assert.equal(preferences.quietHoursBehavior, 'Defer');
+    assert.equal(preferences.skipAuto, false);
+  });
+
+  it('resolves direct scheduling and proactive-generation preferences without weakening global inheritance', () => {
+    const state = createTestState();
+    const contact = {
+      ...state.contacts[0],
+      customSendTime: '07:30',
+      quietHoursBehavior: 'Block' as const,
+      skipAuto: true
+    };
+    const preferences = resolveContactPreferencesForContact(state.settings, contact);
+
+    assert.equal(preferences.customSendTime, '07:30');
+    assert.equal(preferences.quietHoursBehavior, 'Block');
+    assert.equal(preferences.skipAuto, true);
+    assert.equal(preferences.automationMode, state.settings.automationMode);
   });
 
   it('resolves inherited group defaults and validates invalid default values', () => {

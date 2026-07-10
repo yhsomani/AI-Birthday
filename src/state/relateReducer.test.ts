@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { MESSAGE_BODY_LIMITS } from '../domain/messageBodyPolicy';
+import { messageDraftRevision, messageOccurrenceDate } from '../domain/duplicateGuard';
+import { currentScheduleTimeZone } from '../domain/schedulingPolicy';
 import { relateReducer } from './relateReducer';
 import { createTestState } from '../test/testState';
 
@@ -66,6 +68,40 @@ describe('relateReducer feature contract', () => {
     assert.match(message?.lastError ?? '', /Shorten the message or switch channel/i);
   });
 
+  it('blocks an event draft whose pinned yearly occurrence passed before approval', () => {
+    const state = createTestState();
+    state.events = state.events.map(event =>
+      event.id === 'e-asha-bday'
+        ? {
+            ...event,
+            date: '1990-01-01T12:00:00.000Z',
+            recurrence: {
+              frequency: 'Yearly',
+              month: 1,
+              day: 1,
+              originalYear: 1990,
+              leapDayPolicy: 'February 28'
+            }
+          }
+        : event
+    );
+    state.messages = state.messages.map(message =>
+      message.id === 'msg-asha-bday' ? { ...message, occurrenceDate: '2026-01-01' } : message
+    );
+
+    const approved = relateReducer(state, {
+      type: 'approveMessage',
+      messageId: 'msg-asha-bday',
+      nowIso: '2026-01-02T09:00:00.000Z'
+    });
+    const message = approved.messages.find(item => item.id === 'msg-asha-bday');
+
+    assert.equal(message?.status, 'Blocked');
+    assert.equal(message?.occurrenceDate, '2026-01-01');
+    assert.match(message?.lastError ?? '', /occurrence that has passed/i);
+    assert.doesNotMatch(message?.scheduledFor ?? '', /^2027-/);
+  });
+
   it('allows multipart SMS approval while keeping the segment warning visible', () => {
     const state = createTestState();
     const edited = relateReducer(state, {
@@ -128,6 +164,7 @@ describe('relateReducer feature contract', () => {
     assert.match(message?.readiness ?? '', /approved|scheduled/i);
     assert.equal(message?.approvedAt, '2026-07-09T10:00:00.000Z');
     assert.equal(message?.approvalExpiresAt, '2026-07-16T10:00:00.000Z');
+    assert.equal(message?.scheduledTimeZone, currentScheduleTimeZone());
   });
 
   it('moves to the next pending draft after successful approval when requested', () => {
@@ -151,7 +188,7 @@ describe('relateReducer feature contract', () => {
     assert.equal(next.selectedContactId, 'c-mira');
   });
 
-  it('blocks approval for do-not-disturb contacts', () => {
+  it('allows only deliberate manual handoff for do-not-disturb contacts', () => {
     const base = createTestState();
     const state = {
       ...base,
@@ -162,12 +199,17 @@ describe('relateReducer feature contract', () => {
       messageId: 'msg-asha-bday'
     });
     const message = approved.messages.find(item => item.id === 'msg-asha-bday');
+    assert.ok(message?.scheduledFor);
+    const handedOff = relateReducer(approved, {
+      type: 'manualHandoff',
+      messageId: 'msg-asha-bday',
+      nowIso: new Date(Date.parse(message.scheduledFor) + 1_000).toISOString()
+    });
 
-    assert.equal(message?.status, 'Blocked');
+    assert.equal(message?.status, 'Scheduled');
     assert.match(message?.readiness ?? '', /do-not-disturb/i);
-    assert.match(message?.lastError ?? '', /do-not-disturb/i);
-    assert.equal(approved.activity[0].severity, 'Warning');
-    assert.match(approved.activity[0].title, /blocked/i);
+    assert.equal(message?.lastError, undefined);
+    assert.equal(handedOff.messages.find(item => item.id === 'msg-asha-bday')?.status, 'Sent');
   });
 
   it('blocks approval when the delivery route is unavailable', () => {
@@ -316,13 +358,20 @@ describe('relateReducer feature contract', () => {
   });
 
   it('stores regeneration feedback on provider drafts without logging custom feedback', () => {
-    const state = createTestState();
+    const state = relateReducer(createTestState(), {
+      type: 'generateMessage',
+      contactId: 'c-rajesh',
+      eventId: 'e-rajesh-work',
+      reason: 'Congratulations'
+    });
+    const source = state.messages[0];
     const next = relateReducer(state, {
       type: 'createAiDraft',
       contactId: 'c-rajesh',
       eventId: 'e-rajesh-work',
       reason: 'Congratulations',
       privacySummary: '1 memory item(s) included; 0 private item(s) excluded.',
+      regenerationSource: { messageId: source.id, expectedRevision: messageDraftRevision(source) },
       feedback: {
         instructions: ['Make the draft shorter and easier to send.'],
         customInstruction: 'Mention mango lassi softly.',
@@ -341,6 +390,76 @@ describe('relateReducer feature contract', () => {
     assert.match(next.messages[0].regenerationFeedback?.customInstruction ?? '', /mango lassi/i);
     assert.equal(next.activity[0].title, 'AI draft regenerated');
     assert.doesNotMatch(next.activity[0].detail, /mango lassi/i);
+  });
+
+  it('atomically supersedes the source draft when provider regeneration succeeds', () => {
+    const state = createTestState();
+    const source = state.messages[0];
+    const sourceOccurrence = messageOccurrenceDate(state, source);
+    const next = relateReducer(state, {
+      type: 'createAiDraft',
+      contactId: source.contactId,
+      eventId: source.eventId,
+      reason: source.reason,
+      privacySummary: 'Regeneration context was bounded and private notes were excluded.',
+      regenerationSource: {
+        messageId: source.id,
+        expectedRevision: messageDraftRevision(source)
+      },
+      feedback: {
+        instructions: ['Make it shorter.'],
+        customInstruction: 'Mention the private picnic detail.'
+      },
+      variants: {
+        short: 'A shorter regenerated birthday note.',
+        standard: 'A thoughtful regenerated birthday note that is ready for review.',
+        warm: 'A warm regenerated birthday note that remains ready for careful review.'
+      }
+    });
+
+    const regenerated = next.messages.find(message => message.id !== source.id && !state.messages.includes(message));
+    const history = next.messages.find(message => message.id === source.id);
+    assert.equal(next.messages.length, state.messages.length + 1);
+    assert.equal(history?.status, 'Rejected');
+    assert.match(history?.readiness ?? '', /superseded/i);
+    assert.equal(regenerated?.status, 'Needs review');
+    assert.ok(sourceOccurrence);
+    assert.equal(regenerated?.occurrenceDate, sourceOccurrence);
+    assert.equal(regenerated?.duplicateWarning, undefined);
+    assert.equal(regenerated?.duplicateAcknowledged, undefined);
+    assert.deepEqual(regenerated?.regenerationFeedback?.instructions, ['Make it shorter.']);
+    assert.doesNotMatch(next.activity[0].detail, /private picnic/i);
+  });
+
+  it('rejects a stale regeneration result without superseding or creating a draft', () => {
+    const base = createTestState();
+    const source = base.messages[0];
+    const expectedRevision = messageDraftRevision(source);
+    const state = {
+      ...base,
+      messages: base.messages.map(message =>
+        message.id === source.id ? { ...message, body: `${message.body} A concurrent edit.` } : message
+      )
+    };
+    const next = relateReducer(state, {
+      type: 'createAiDraft',
+      contactId: source.contactId,
+      eventId: source.eventId,
+      reason: source.reason,
+      privacySummary: 'Private context stayed excluded.',
+      regenerationSource: { messageId: source.id, expectedRevision },
+      feedback: { instructions: ['Make it warmer.'] },
+      variants: {
+        short: 'A stale regenerated short message.',
+        standard: 'A stale regenerated standard message that must not be saved.',
+        warm: 'A stale regenerated warm message that must never replace the concurrent edit.'
+      }
+    });
+
+    assert.equal(next.messages.length, state.messages.length);
+    assert.match(next.messages.find(message => message.id === source.id)?.body ?? '', /concurrent edit/i);
+    assert.notEqual(next.messages.find(message => message.id === source.id)?.status, 'Rejected');
+    assert.match(next.activity[0].detail, /changed while regeneration/i);
   });
 
   it('stores redacted AI provider failure observations for diagnostics', () => {
@@ -386,16 +505,45 @@ describe('relateReducer feature contract', () => {
     assert.match(next.messages[0].lastError ?? '', /could not be reached/i);
   });
 
-  it('keeps feedback on local regeneration fallbacks', () => {
+  it('keeps provider-failure fallbacks in the contact language', () => {
     const state = createTestState();
+    state.contacts = state.contacts.map(contact =>
+      contact.id === 'c-mira' ? { ...contact, language: 'Hindi' as const, tone: ['Warm'] } : contact
+    );
+    const next = relateReducer(state, {
+      type: 'generateMessage',
+      contactId: 'c-mira',
+      eventId: 'e-mira-checkin',
+      reason: 'Check-in',
+      fallbackReason: 'The AI provider could not be reached.'
+    });
+
+    assert.equal(next.messages[0].quality, 'Template fallback');
+    assert.match(next.messages[0].body, /[\u0900-\u097F]/u);
+    assert.doesNotMatch(next.messages[0].body, /just checking in|no rush to reply/i);
+    assert.match(next.messages[0].variants.warm, /[\u0900-\u097F]/u);
+  });
+
+  it('keeps feedback on local regeneration fallbacks', () => {
+    const state = relateReducer(createTestState(), {
+      type: 'generateMessage',
+      contactId: 'c-rajesh',
+      eventId: 'e-rajesh-work',
+      reason: 'Congratulations'
+    });
+    const source = state.messages[0];
     const next = relateReducer(state, {
       type: 'generateMessage',
       contactId: 'c-rajesh',
       eventId: 'e-rajesh-work',
       reason: 'Congratulations',
       fallbackReason: 'The AI provider could not be reached.',
+      regenerationSource: { messageId: source.id, expectedRevision: messageDraftRevision(source) },
       feedback: {
-        instructions: ['Make the draft shorter and easier to send.', 'Avoid generic wishes and make the message feel less templated.'],
+        instructions: [
+          'Make the draft shorter and easier to send.',
+          'Avoid generic wishes and make the message feel less templated.'
+        ],
         customInstruction: 'Keep it professional in one sentence.',
         previousDraftExcerpt: 'Hey Mira, older draft.'
       }
@@ -431,15 +579,50 @@ describe('relateReducer feature contract', () => {
       messageId: 'msg-mira-checkin'
     });
     const before = state.contacts.find(contact => contact.id === 'c-mira')?.healthScore ?? 0;
+    const scheduledFor = approved.messages.find(item => item.id === 'msg-mira-checkin')?.scheduledFor;
+    assert.ok(scheduledFor);
     const next = relateReducer(approved, {
       type: 'manualHandoff',
-      messageId: 'msg-mira-checkin'
+      messageId: 'msg-mira-checkin',
+      nowIso: new Date(Date.parse(scheduledFor) + 1_000).toISOString()
     });
     const message = next.messages.find(item => item.id === 'msg-mira-checkin');
     const after = next.contacts.find(contact => contact.id === 'c-mira')?.healthScore ?? 0;
 
     assert.equal(message?.status, 'Sent');
     assert.ok(after > before);
+  });
+
+  it('blocks manual handoff when a new duplicate appears after approval', () => {
+    const approved = relateReducer(createTestState(), {
+      type: 'approveMessage',
+      messageId: 'msg-mira-checkin'
+    });
+    const target = approved.messages.find(message => message.id === 'msg-mira-checkin');
+    assert.ok(target?.scheduledFor);
+    const changed = {
+      ...approved,
+      messages: [
+        ...approved.messages,
+        {
+          ...target,
+          id: 'newly-sent-after-approval',
+          status: 'Sent' as const,
+          sentAt: target.scheduledFor,
+          approvedAt: undefined,
+          approvalExpiresAt: undefined
+        }
+      ]
+    };
+
+    const next = relateReducer(changed, {
+      type: 'manualHandoff',
+      messageId: target.id,
+      nowIso: new Date(Date.parse(target.scheduledFor) + 1_000).toISOString()
+    });
+
+    assert.equal(next.messages.find(message => message.id === target.id)?.status, 'Scheduled');
+    assert.match(next.activity[0].detail, /duplicate risk changed/i);
   });
 
   it('blocks manual handoff before approval', () => {
@@ -553,12 +736,13 @@ describe('relateReducer feature contract', () => {
       eventId: 'e-asha-bday',
       itemId: 'write-wish'
     });
-    const after = next.events
+    const afterItem = next.events
       .find(event => event.id === 'e-asha-bday')
-      ?.checklist.find(item => item.id === 'write-wish')?.done;
+      ?.checklist.find(item => item.id === 'write-wish');
 
     assert.equal(before, false);
-    assert.equal(after, true);
+    assert.equal(afterItem?.done, true);
+    assert.match(afterItem?.completedForOccurrence ?? '', /^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('records private memories without making them AI prompt context', () => {
@@ -594,6 +778,7 @@ describe('relateReducer feature contract', () => {
           status: 'Scheduled' as const,
           approvedAt: '2026-07-09T09:00:00.000Z',
           approvalExpiresAt: '2999-07-16T09:00:00.000Z',
+          scheduledFor: '2026-07-10T08:00:00.000Z',
           body: 'Congratulations Rajesh, wishing you continued success and a meaningful year ahead.'
         },
         ...base.messages
@@ -685,7 +870,7 @@ describe('relateReducer feature contract', () => {
     assert.equal(next.reminderPlans, state.reminderPlans);
     assert.equal(next.activity[0].type, 'Setup');
     assert.equal(next.activity[0].title, 'Setup Check dry run completed');
-    assert.equal(next.activity[0].targetScreen, 'more');
+    assert.equal(next.activity[0].targetScreen, 'setupCheck');
     assert.match(next.activity[0].detail, /4\/9 checks ready/);
   });
 
@@ -699,12 +884,21 @@ describe('relateReducer feature contract', () => {
     });
     const restored = relateReducer(modified, {
       type: 'restoreBackup',
-      restoredState: state,
+      restoredState: {
+        ...state,
+        activeScreen: 'wishPreview',
+        selectedContactId: 'c-asha',
+        selectedEventId: 'e-asha-bday',
+        selectedMessageId: 'msg-asha-bday'
+      },
       recordCount: state.contacts.length + state.events.length + state.messages.length
     });
 
     assert.equal(restored.memories.length, state.memories.length);
     assert.equal(restored.activeScreen, 'more');
+    assert.equal(restored.selectedContactId, undefined);
+    assert.equal(restored.selectedEventId, undefined);
+    assert.equal(restored.selectedMessageId, undefined);
     assert.match(restored.activity[0].title, /restored/i);
     assert.doesNotMatch(JSON.stringify(restored.memories), /Temporary memory/);
   });
@@ -880,6 +1074,62 @@ describe('relateReducer feature contract', () => {
     assert.equal(stillReview?.status, 'Needs review');
   });
 
+  it('returns only live time-bound schedules to review when the device time zone changes', () => {
+    const base = createTestState();
+    const state = {
+      ...base,
+      messages: [
+        {
+          ...base.messages[0],
+          id: 'msg-old-zone',
+          status: 'Scheduled' as const,
+          scheduledFor: '2026-07-20T09:00:00.000Z',
+          scheduledTimeZone: 'UTC',
+          approvedAt: '2026-07-10T09:00:00.000Z',
+          approvalExpiresAt: '2026-07-17T09:00:00.000Z'
+        },
+        {
+          ...base.messages[1],
+          id: 'msg-manual-no-time',
+          status: 'Scheduled' as const,
+          scheduledFor: undefined,
+          approvedAt: '2026-07-10T09:00:00.000Z',
+          approvalExpiresAt: '2026-07-17T09:00:00.000Z'
+        },
+        {
+          ...base.messages[0],
+          id: 'msg-already-sent',
+          status: 'Sent' as const,
+          scheduledFor: '2026-07-20T09:00:00.000Z',
+          scheduledTimeZone: 'UTC',
+          sentAt: '2026-07-20T09:00:00.000Z'
+        }
+      ]
+    };
+
+    const changed = relateReducer(state, {
+      type: 'reconcileScheduledMessageTimeZone',
+      timeZone: 'America/New_York'
+    });
+    const reviewed = changed.messages.find(message => message.id === 'msg-old-zone');
+
+    assert.equal(reviewed?.status, 'Needs review');
+    assert.equal(reviewed?.scheduledFor, undefined);
+    assert.equal(reviewed?.scheduledTimeZone, undefined);
+    assert.equal(reviewed?.approvedAt, undefined);
+    assert.match(reviewed?.lastError ?? '', /time zone is missing or no longer matches/i);
+    assert.equal(changed.messages.find(message => message.id === 'msg-manual-no-time')?.status, 'Scheduled');
+    assert.equal(changed.messages.find(message => message.id === 'msg-already-sent')?.status, 'Sent');
+    assert.match(changed.activity[0].detail, /1 scheduled message\(s\) returned to review/i);
+    assert.strictEqual(
+      relateReducer(changed, {
+        type: 'reconcileScheduledMessageTimeZone',
+        timeZone: 'America/New_York'
+      }),
+      changed
+    );
+  });
+
   it('returns scheduled messages to review when schedule settings now block their timing', () => {
     const base = createTestState();
     const state = {
@@ -974,7 +1224,10 @@ describe('relateReducer feature contract', () => {
     assert.equal(changed.activity[0].severity, 'Warning');
     assert.match(changed.activity[0].detail, /3 contact\(s\) changed effective automation mode/i);
     assert.match(changed.activity[0].detail, /1 scheduled message\(s\) returned to review/i);
-    assert.equal(repeated.messages.find(message => message.id === 'msg-queued-before-automation-change')?.status, 'Needs review');
+    assert.equal(
+      repeated.messages.find(message => message.id === 'msg-queued-before-automation-change')?.status,
+      'Needs review'
+    );
     assert.match(repeated.activity[0].detail, /Automation mode remains VIP approve/i);
     assert.doesNotMatch(repeated.activity[0].detail, /returned to review/i);
   });
@@ -1032,15 +1285,24 @@ describe('relateReducer feature contract', () => {
 
   it('stores email sender configuration and marks provider email sends complete', () => {
     const state = createTestState();
-    const withEmailMessage = {
-      ...state,
-      settings: {
-        ...state.settings,
-        emailEnabled: true
+    const configured = relateReducer(
+      {
+        ...state,
+        settings: {
+          ...state.settings,
+          emailEnabled: true
+        }
       },
+      {
+        type: 'setEmailSender',
+        senderEmail: ' me@example.com '
+      }
+    );
+    const withEmailMessage = {
+      ...configured,
       messages: [
         {
-          ...state.messages[0],
+          ...configured.messages[0],
           id: 'msg-email-rajesh',
           contactId: 'c-rajesh',
           eventId: 'e-rajesh-work',
@@ -1048,18 +1310,16 @@ describe('relateReducer feature contract', () => {
           status: 'Scheduled' as const,
           approvedAt: '2026-07-09T09:00:00.000Z',
           approvalExpiresAt: '2999-07-16T09:00:00.000Z',
+          scheduledFor: '2026-07-10T08:00:00.000Z',
           body: 'Congratulations Rajesh, wishing you continued success and a meaningful year ahead.'
         },
-        ...state.messages
+        ...configured.messages
       ]
     };
-    const configured = relateReducer(withEmailMessage, {
-      type: 'setEmailSender',
-      senderEmail: ' me@example.com '
-    });
-    const sent = relateReducer(configured, {
+    const sent = relateReducer(withEmailMessage, {
       type: 'emailSent',
-      messageId: 'msg-email-rajesh'
+      messageId: 'msg-email-rajesh',
+      nowIso: '2026-07-10T09:00:00.000Z'
     });
     const message = sent.messages.find(item => item.id === 'msg-email-rajesh');
 
@@ -1067,6 +1327,45 @@ describe('relateReducer feature contract', () => {
     assert.equal(message?.status, 'Sent');
     assert.equal(sent.emailDelivery.status, 'Ready');
     assert.match(sent.activity[0].title, /Email sent/);
+  });
+
+  it('rejects invalid sender settings and returns queued email to review when sender configuration changes', () => {
+    const state = createTestState();
+    state.settings.emailEnabled = true;
+    state.emailDelivery = {
+      status: 'Ready',
+      senderEmail: 'old.sender@example.com',
+      lastCheckedAt: '2026-07-10T08:00:00.000Z'
+    };
+    state.messages.unshift({
+      ...state.messages[0],
+      id: 'queued-email-setting-change',
+      contactId: 'c-rajesh',
+      eventId: undefined,
+      channel: 'Email',
+      status: 'Scheduled',
+      approvedAt: '2026-07-10T08:00:00.000Z',
+      approvalExpiresAt: '2026-07-17T08:00:00.000Z',
+      body: 'A review-safe provider email queued before the sender configuration changes.'
+    });
+
+    const invalid = relateReducer(state, { type: 'setEmailSender', senderEmail: 'not-an-email' });
+    const changed = relateReducer(state, { type: 'setEmailSender', senderEmail: ' NEW.SENDER@EXAMPLE.COM ' });
+    const cleared = relateReducer(state, { type: 'setEmailSender', senderEmail: '' });
+    const changedMessage = changed.messages.find(message => message.id === 'queued-email-setting-change');
+    const clearedMessage = cleared.messages.find(message => message.id === 'queued-email-setting-change');
+
+    assert.equal(invalid, state);
+    assert.equal(changed.emailDelivery.senderEmail, 'new.sender@example.com');
+    assert.equal(changed.emailDelivery.status, 'Ready');
+    assert.equal(changedMessage?.status, 'Needs review');
+    assert.equal(changedMessage?.approvedAt, undefined);
+    assert.match(changedMessage?.lastError ?? '', /sender configuration changed/i);
+    assert.equal(cleared.emailDelivery.senderEmail, undefined);
+    assert.equal(cleared.emailDelivery.status, 'Not configured');
+    assert.equal(cleared.emailDelivery.lastCheckedAt, undefined);
+    assert.equal(clearedMessage?.status, 'Needs review');
+    assert.doesNotMatch(JSON.stringify([changed.activity[0], cleared.activity[0]]), /new\.sender|old\.sender/i);
   });
 
   it('marks provider email failures on the affected message for recovery', () => {
@@ -1161,6 +1460,42 @@ describe('relateReducer feature contract', () => {
     assert.equal(retried.messages.find(item => item.id === 'msg-email-unknown')?.status, 'Delivery unknown');
   });
 
+  it('commits only a matching provider reconciliation attempt', () => {
+    const state = createTestState();
+    const messageId = 'msg-email-reconcile';
+    const unknown = relateReducer(
+      {
+        ...state,
+        messages: [{ ...state.messages[0], id: messageId, channel: 'Email', status: 'Scheduled' }, ...state.messages]
+      },
+      {
+        type: 'emailDeliveryUnknown',
+        messageId,
+        idempotencyKey: 'attempt-reconcile',
+        error: { kind: 'delivery-unknown', message: 'Provider result was lost.' }
+      }
+    );
+    const stale = relateReducer(unknown, {
+      type: 'emailDeliveryReconciled',
+      messageId,
+      idempotencyKey: 'different-attempt',
+      status: 'sent'
+    });
+    const sent = relateReducer(unknown, {
+      type: 'emailDeliveryReconciled',
+      messageId,
+      idempotencyKey: 'attempt-reconcile',
+      status: 'sent',
+      deliveryId: 'delivery-reconciled'
+    });
+    assert.equal(stale.messages.find(message => message.id === messageId)?.status, 'Delivery unknown');
+    assert.equal(sent.messages.find(message => message.id === messageId)?.status, 'Sent');
+    assert.equal(
+      sent.messages.find(message => message.id === messageId)?.emailDeliveryAttempt?.deliveryId,
+      'delivery-reconciled'
+    );
+  });
+
   it('does not record stale email success when the message is no longer send-ready', () => {
     const state = createTestState();
     const withEmailMessage = {
@@ -1227,5 +1562,80 @@ describe('relateReducer feature contract', () => {
     assert.equal(message?.sentAt, undefined);
     assert.equal(sent.emailDelivery.status, 'Error');
     assert.match(sent.emailDelivery.lastError ?? '', /expired/i);
+  });
+
+  it('applies per-contact scheduling preferences and keeps invalid times out of state', () => {
+    const state = createTestState();
+    state.messages = [];
+    const withTime = relateReducer(state, {
+      type: 'setContactCustomSendTime',
+      contactId: 'c-asha',
+      time: '18:45'
+    });
+    const withQuietBehavior = relateReducer(withTime, {
+      type: 'setContactQuietHoursBehavior',
+      contactId: 'c-asha',
+      behavior: 'Defer'
+    });
+    const drafted = relateReducer(withQuietBehavior, {
+      type: 'generateMessage',
+      contactId: 'c-asha',
+      eventId: 'e-asha-bday',
+      reason: 'Birthday'
+    });
+    const generated = drafted.messages.find(message => !state.messages.some(item => item.id === message.id));
+
+    assert.equal(withTime.contacts.find(contact => contact.id === 'c-asha')?.customSendTime, '18:45');
+    assert.equal(new Date(generated?.scheduledFor ?? '').getHours(), 18);
+    assert.equal(new Date(generated?.scheduledFor ?? '').getMinutes(), 45);
+
+    const changedBeforeApproval = relateReducer(drafted, {
+      type: 'setContactCustomSendTime',
+      contactId: 'c-asha',
+      time: '19:15'
+    });
+    const approved = relateReducer(changedBeforeApproval, {
+      type: 'approveMessage',
+      messageId: generated?.id ?? 'missing-message'
+    });
+    const scheduled = approved.messages.find(message => message.id === generated?.id);
+    assert.equal(scheduled?.status, 'Scheduled');
+    assert.equal(new Date(scheduled?.scheduledFor ?? '').getHours(), 19);
+    assert.equal(new Date(scheduled?.scheduledFor ?? '').getMinutes(), 15);
+
+    const invalid = relateReducer(withTime, {
+      type: 'setContactCustomSendTime',
+      contactId: 'c-asha',
+      time: '25:00'
+    });
+    assert.equal(invalid.contacts.find(contact => contact.id === 'c-asha')?.customSendTime, '18:45');
+    assert.match(invalid.activity[0].title, /not saved/i);
+  });
+
+  it('skips only automatic draft preparation when a contact opts out', () => {
+    const state = createTestState();
+    state.contacts = state.contacts.map(contact =>
+      contact.id === 'c-mira' ? { ...contact, skipAuto: true } : contact
+    );
+
+    const automatic = relateReducer(state, {
+      type: 'generateMessage',
+      contactId: 'c-mira',
+      eventId: 'e-mira-checkin',
+      reason: 'Check-in',
+      generationOrigin: 'Automatic'
+    });
+    const requested = relateReducer(state, {
+      type: 'generateMessage',
+      contactId: 'c-mira',
+      eventId: 'e-mira-checkin',
+      reason: 'Check-in',
+      generationOrigin: 'User requested'
+    });
+
+    assert.equal(automatic.messages.length, state.messages.length);
+    assert.match(automatic.activity[0].title, /automatic draft skipped/i);
+    assert.equal(requested.messages.length, state.messages.length + 1);
+    assert.equal(requested.messages[0].status, 'Needs review');
   });
 });

@@ -44,6 +44,12 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      - name: Set up JDK 17 for Expo Android compilation
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: Install exact dependencies
         run: npm ci
 
@@ -59,8 +65,14 @@ jobs:
       - name: Verify formatting
         run: npm run format:check
 
-      - name: Test before evidence generation
-        run: npm test
+      - name: Test with coverage thresholds before evidence generation
+        run: npm run test:coverage
+
+      - name: Prebuild a temporary Expo Android project and compile debug
+        run: npm run test:native-prebuild
+
+      - name: Build the temporary web functional harness
+        run: npm run web:export
 
       - name: Generate command-derived release evidence
         run: npm run release:evidence -- --fail-on-blockers

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { relateReducer } from '../state/relateReducer';
 import { createTestState } from '../test/testState';
 import { buildAiDraftRequest } from './aiDrafting';
 import { buildAiContextPreview } from './aiContextPreview';
@@ -39,16 +38,65 @@ describe('AI context preview contract', () => {
     }
   });
 
+  it('previews guidance as instructions rather than recipient-mentionable memories', () => {
+    const base = createTestState();
+    const state = {
+      ...base,
+      memories: [
+        {
+          ...base.memories[0],
+          id: 'fact',
+          category: 'Milestone' as const,
+          body: 'Finished a first marathon in May.'
+        },
+        {
+          ...base.memories[0],
+          id: 'avoid',
+          body: 'Avoid in messages: office gossip.'
+        },
+        {
+          ...base.memories[0],
+          id: 'language',
+          body: 'Preferred language/style: formal Hindi.'
+        },
+        {
+          ...base.memories[0],
+          id: 'private',
+          category: 'Private' as const,
+          body: 'Secret family detail.'
+        }
+      ]
+    };
+    const preview = buildAiContextPreview(state, 'c-asha', 'e-asha-bday');
+
+    assert.deepEqual(
+      preview.optionalMemories.map(memory => memory.body),
+      ['Finished a first marathon in May.']
+    );
+    assert.deepEqual(
+      preview.generationConstraints.map(constraint => constraint.kind),
+      ['avoid', 'language-style']
+    );
+    assert.equal(preview.privateMemoryCount, 1);
+    assert.doesNotMatch(JSON.stringify(preview.optionalMemories), /office gossip|formal Hindi/i);
+    assert.doesNotMatch(JSON.stringify(preview), /Secret family detail/i);
+    assert.match(preview.summary, /generation constraint\(s\) selected as instructions only/i);
+  });
+
   it('keeps prior message text out of the preview while reporting eligibility', () => {
-    const approved = relateReducer(createTestState(), {
-      type: 'approveMessage',
-      messageId: 'msg-mira-checkin'
-    });
-    const state = relateReducer(approved, {
-      type: 'manualHandoff',
-      messageId: 'msg-mira-checkin',
-      nowIso: '2026-07-09T10:00:00.000Z'
-    });
+    const base = createTestState();
+    const state = {
+      ...base,
+      messages: base.messages.map(message =>
+        message.id === 'msg-mira-checkin'
+          ? {
+              ...message,
+              status: 'Sent' as const,
+              sentAt: '2026-07-09T10:00:00.000Z'
+            }
+          : message
+      )
+    };
     const preview = buildAiContextPreview(state, 'c-mira', 'e-mira-checkin');
 
     assert.equal(preview.priorMessages.count, 1);

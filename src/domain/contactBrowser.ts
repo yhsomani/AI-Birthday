@@ -78,10 +78,21 @@ const matchesQuery = (contact: Contact, query: string) => {
   if (!normalized) {
     return true;
   }
-  return [contact.name, contact.relationship, contact.group, contact.notesSummary]
+  const textMatch = [contact.name, contact.relationship, contact.group, contact.notesSummary]
     .join(' ')
     .toLowerCase()
     .includes(normalized);
+  if (textMatch) return true;
+  const normalizedRouteQuery = normalized.replace(/[^a-z0-9+@.]/g, '');
+  if (!normalizedRouteQuery) return false;
+  return [contact.phone, contact.email, ...(contact.routes?.map(route => route.value) ?? [])]
+    .filter((value): value is string => Boolean(value))
+    .some(value =>
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9+@.]/g, '')
+        .includes(normalizedRouteQuery)
+    );
 };
 
 const matchesQuality = (row: ContactBrowserRow, quality: ContactQualityFilter) =>
@@ -95,6 +106,7 @@ export const buildContactBrowserRows = (
   const nextEventByContact = nextEventsByContact(state.events, now);
 
   return state.contacts
+    .filter(contact => !contact.archivedAt)
     .map(contact => {
       const nextEvent = nextEventByContact.get(contact.id);
       return {
@@ -111,8 +123,10 @@ export const buildContactBrowserRows = (
         return a.contact.healthScore - b.contact.healthScore || a.contact.name.localeCompare(b.contact.name);
       }
       if (options.sort === 'Next event') {
-        return (a.nextEvent?.date ?? '9999').localeCompare(b.nextEvent?.date ?? '9999') ||
-          a.contact.name.localeCompare(b.contact.name);
+        return (
+          (a.nextEvent?.date ?? '9999').localeCompare(b.nextEvent?.date ?? '9999') ||
+          a.contact.name.localeCompare(b.contact.name)
+        );
       }
       return a.contact.name.localeCompare(b.contact.name);
     });

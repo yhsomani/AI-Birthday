@@ -61,10 +61,7 @@ const createStore = (harness: Harness) =>
     keychainAccessible: 1
   });
 
-const expectProtectedStorageError = async (
-  action: () => Promise<unknown>,
-  code: ProtectedStorageError['code']
-) => {
+const expectProtectedStorageError = async (action: () => Promise<unknown>, code: ProtectedStorageError['code']) => {
   await assert.rejects(action, error => {
     assert.ok(error instanceof ProtectedStorageError);
     assert.equal(error.code, code);
@@ -90,10 +87,7 @@ describe('secureStateStore fail-closed boundary', () => {
     harness.backend.isAvailableAsync = async () => false;
     const store = createStore(harness);
 
-    await expectProtectedStorageError(
-      () => store.setItem('relateai.secure.state.v1', 'secret-value'),
-      'unavailable'
-    );
+    await expectProtectedStorageError(() => store.setItem('relateai.secure.state.v1', 'secret-value'), 'unavailable');
 
     assert.equal(harness.protectedValues.size, 0);
     assert.equal('setItem' in harness.legacyInventory, false);
@@ -107,10 +101,7 @@ describe('secureStateStore fail-closed boundary', () => {
     const store = createStore(harness);
 
     await expectProtectedStorageError(() => store.getItem('relateai.secure.state.v1'), 'read-failed');
-    assert.deepEqual(harness.calls, [
-      'protected:available',
-      'legacy:list-keys'
-    ]);
+    assert.deepEqual(harness.calls, ['protected:available', 'legacy:list-keys']);
     assert.equal('getItem' in harness.legacyInventory, false);
   });
 
@@ -121,10 +112,7 @@ describe('secureStateStore fail-closed boundary', () => {
     };
     const store = createStore(harness);
 
-    await expectProtectedStorageError(
-      () => store.setItem('relateai.secure.state.v1', 'secret-value'),
-      'write-failed'
-    );
+    await expectProtectedStorageError(() => store.setItem('relateai.secure.state.v1', 'secret-value'), 'write-failed');
 
     assert.equal(harness.protectedValues.size, 0);
     assert.equal('setItem' in harness.legacyInventory, false);
@@ -135,15 +123,9 @@ describe('secureStateStore fail-closed boundary', () => {
     harness.legacyKeys.add('fallback.relateai.secure.state.v1');
     const store = createStore(harness);
 
-    await expectProtectedStorageError(
-      () => store.getItem('relateai.secure.state.v1'),
-      'legacy-plaintext-detected'
-    );
+    await expectProtectedStorageError(() => store.getItem('relateai.secure.state.v1'), 'legacy-plaintext-detected');
 
-    assert.deepEqual(harness.calls, [
-      'protected:available',
-      'legacy:list-keys'
-    ]);
+    assert.deepEqual(harness.calls, ['protected:available', 'legacy:list-keys']);
     assert.equal('getItem' in harness.legacyInventory, false);
   });
 
@@ -184,10 +166,7 @@ describe('secureStateStore fail-closed boundary', () => {
     harness.legacyKeys.add('fallback.state');
     const store = createStore(harness);
 
-    await expectProtectedStorageError(
-      () => store.setItem('state', 'secret-value'),
-      'legacy-plaintext-detected'
-    );
+    await expectProtectedStorageError(() => store.setItem('state', 'secret-value'), 'legacy-plaintext-detected');
 
     assert.equal(harness.legacyKeys.has('fallback.state'), true);
     assert.equal(harness.protectedValues.has('state'), false);
@@ -215,12 +194,12 @@ describe('secureStateStore fail-closed boundary', () => {
     };
     const store = createStore(harness);
 
-    await expectProtectedStorageError(
-      () => store.setItem('state', 'secret-value'),
-      'write-verification-failed'
-    );
+    await expectProtectedStorageError(() => store.setItem('state', 'secret-value'), 'write-verification-failed');
 
-    assert.equal(harness.calls.some(call => call.startsWith('legacy:remove:')), false);
+    assert.equal(
+      harness.calls.some(call => call.startsWith('legacy:remove:')),
+      false
+    );
   });
 
   it('attempts legacy cleanup but still reports protected removal as unavailable', async () => {

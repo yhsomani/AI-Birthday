@@ -1,13 +1,11 @@
 import { createProductionInitialState } from '../data/productionState';
-import {
-  isAccountModeAvailable,
-  isAutomationModeAvailable,
-  productAvailability
-} from '../config/productAvailability';
+import { isAccountModeAvailable, isAutomationModeAvailable, productAvailability } from '../config/productAvailability';
 import type { AiDraftContextOptions, AiDraftError, AiDraftVariants } from '../domain/aiDrafting';
-import { calendarCandidatesToEvents } from '../domain/calendarSync';
+import { buildActivityHistory } from '../domain/activityHistory';
+import { calendarCandidatesToEvents, type CalendarImportResolutions } from '../domain/calendarSync';
 import {
   applyResolvedPreferencesToContact,
+  contactAllowsAutomaticDraftGeneration,
   normalizeRelationshipGroupDefaults,
   resolveContactPreferencesForContact
 } from '../domain/contactPreferences';
@@ -18,14 +16,54 @@ import {
   validateEnrichmentAnswer,
   type ContactEnrichmentPromptId
 } from '../domain/contactEnrichment';
-import { importContacts } from '../domain/contactImport';
-import { buildEmailDeliveryRequest, type EmailDeliveryError } from '../domain/emailDelivery';
-import { detectDuplicateMessageRisk } from '../domain/duplicateGuard';
-import { toggleEventPreparationChecklistStep, type EventPreparationStepId } from '../domain/eventPreparation';
+import {
+  applyContactArchive,
+  applyContactDelete,
+  applyContactEdit,
+  applyContactMerge,
+  applyContactRestore,
+  buildStandaloneContact,
+  previewContactArchive,
+  previewContactDelete,
+  previewContactEdit,
+  previewContactMerge,
+  type StandaloneContactInput
+} from '../domain/contactLifecycle';
+import { importContacts, type ContactImportResolutions } from '../domain/contactImport';
+import {
+  buildEmailDeliveryRequest,
+  isValidEmailAddress,
+  normalizeEmailAddress,
+  type EmailDeliveryError
+} from '../domain/emailDelivery';
+import {
+  assessDuplicateMessageRisk,
+  detectDuplicateMessageRisk,
+  messageDraftRevision,
+  messageOccurrenceDate
+} from '../domain/duplicateGuard';
+import {
+  eventPreparationOccurrenceKey,
+  toggleEventChecklistItemForOccurrence,
+  toggleEventPreparationChecklistStep,
+  type EventPreparationStepId
+} from '../domain/eventPreparation';
+import {
+  applyEventDelete,
+  applyEventEdit,
+  previewEventDelete,
+  previewEventEdit,
+  type EventEditInput
+} from '../domain/eventLifecycle';
+import { applyEventMerge, previewEventMerge } from '../domain/eventConflictLifecycle';
 import { buildDefaultEventChecklist, validateManualEventInput } from '../domain/events';
 import { buildMessageFollowUpPlan, type FollowUpDelayDays } from '../domain/followUps';
 import { validateGiftBudgetInput, validateGiftInput } from '../domain/giftAdvisor';
-import { buildMessageApprovalWindow, messageApprovalWindowIssue } from '../domain/messageApproval';
+import {
+  buildMessageApprovalWindow,
+  messageApprovalWindowIssue,
+  messageLifecycleTransitionIssue
+} from '../domain/messageApproval';
 import { validateMessageBodyForChannel } from '../domain/messageBodyPolicy';
 import {
   buildMessageBulkActionReport,
@@ -34,21 +72,26 @@ import {
   type MessageBulkAction
 } from '../domain/messageInbox';
 import { buildMessageTestPlan } from '../domain/messageTesting';
-import { buildTemplateDraft } from '../domain/messageTemplates';
+import { buildLocalTemplateFallback, buildTemplateDraft } from '../domain/messageTemplates';
 import { validateMemoryNoteInput } from '../domain/memoryVault';
-import { nextOnboardingStep } from '../domain/onboarding';
-import { recurrenceFromDate } from '../domain/occasionDates';
+import { nextOnboardingStep, onboardingTransitionIssue, requiredOnboardingStepIds } from '../domain/onboarding';
+import { eventOccurrenceLocalDateKey, recurrenceFromDate } from '../domain/occasionDates';
+import { firstMentionableMemoryTextForContact } from '../domain/personalizationContextPolicy';
 import { buildReminderPlanningResult } from '../domain/reminders';
 import { checkInCadenceOptions, relationshipGroupOptions } from '../domain/relationshipHealth';
 import {
   adjustTriggerForSchedulingPolicy,
   automationModes,
+  messageDispatchTimingIssue,
+  normalizeScheduleTimeZone,
+  scheduleMessageForEvent,
+  scheduleTimeZonesMatch,
   validateBlackoutInput,
+  validateDefaultSendTime,
   validateQuietHours
 } from '../domain/schedulingPolicy';
 import { analyzeManualStyleSamples, analyzeSentMessageStyle } from '../domain/styleCoach';
 import type {
-  ActivityItem,
   AppState,
   AccountMode,
   AutomationMode,
@@ -57,6 +100,7 @@ import type {
   ComposerReason,
   Contact,
   ContactGroupDefaults,
+  ContactQuietHoursBehavior,
   EventType,
   GiftCategory,
   GiftRecord,
@@ -78,13 +122,44 @@ import type {
   SystemPermissionCapability,
   Tone
 } from '../domain/types';
+import { prependActivity as addActivity } from './activityTransitions';
+import {
+  allocateCommandMetadata,
+  commandId,
+  localCalendarYear,
+  systemCommandDependencies,
+  type CommandDependencies,
+  type CommandIdCounts,
+  type CommandMetadata
+} from './commandMetadata';
 
 export type RelateAction =
   | { type: 'hydrate'; state: AppState }
-  | { type: 'navigate'; screen: Screen; contactId?: string; messageId?: string }
+  | { type: 'reconcileScheduledMessageTimeZone'; timeZone: string }
+  | { type: 'navigate'; screen: Screen; contactId?: string; eventId?: string; messageId?: string }
   | { type: 'setSearch'; query: string }
+  | { type: 'resolveActivity'; activityId: string }
+  | { type: 'addContact'; input: StandaloneContactInput }
+  | { type: 'editContact'; contactId: string; input: ContactEssentialsInput; confirmationToken: string }
+  | { type: 'archiveContact'; contactId: string; confirmationToken: string }
+  | { type: 'restoreContact'; contactId: string }
+  | { type: 'deleteContact'; contactId: string; confirmationToken: string }
+  | {
+      type: 'mergeContacts';
+      survivorContactId: string;
+      mergedContactId: string;
+      confirmationToken: string;
+    }
   | { type: 'toggleChecklist'; eventId: string; itemId: string }
   | { type: 'togglePreparationStep'; eventId: string; stepId: EventPreparationStepId }
+  | { type: 'editEvent'; eventId: string; input: EventEditInput; confirmationToken?: string }
+  | { type: 'deleteEvent'; eventId: string; confirmationToken: string }
+  | {
+      type: 'mergeEvents';
+      survivorEventId: string;
+      mergedEventId: string;
+      confirmationToken: string;
+    }
   | {
       type: 'addManualEvent';
       contactId?: string;
@@ -101,6 +176,7 @@ export type RelateAction =
       discardEditedBody?: boolean;
     }
   | { type: 'editMessage'; messageId: string; body: string }
+  | { type: 'setMessageChannel'; messageId: string; channel: MessageChannel }
   | {
       type: 'generateMessage';
       contactId: string;
@@ -110,6 +186,8 @@ export type RelateAction =
       excludedMemoryIds?: string[];
       includePriorMessages?: boolean;
       feedback?: MessageRegenerationFeedback;
+      regenerationSource?: MessageRegenerationSource;
+      generationOrigin?: 'User requested' | 'Automatic';
     }
   | { type: 'createTemplateDraft'; contactId: string; reason: ComposerReason; body: string; templateId?: string }
   | {
@@ -121,6 +199,8 @@ export type RelateAction =
       privacySummary: string;
       observation?: AiProviderObservation;
       feedback?: MessageRegenerationFeedback;
+      regenerationSource?: MessageRegenerationSource;
+      generationOrigin?: 'User requested' | 'Automatic';
     }
   | { type: 'aiProviderReady'; privacySummary: string; observation?: AiProviderObservation }
   | { type: 'aiProviderFailure'; error: AiDraftError; privacySummary?: string; observation?: AiProviderObservation }
@@ -128,9 +208,9 @@ export type RelateAction =
   | { type: 'acknowledgeDuplicateRisk'; messageId: string }
   | { type: 'rejectMessage'; messageId: string; reviewNext?: boolean }
   | { type: 'revokeMessage'; messageId: string }
-  | { type: 'bulkMessageAction'; action: MessageBulkAction; messageIds: string[] }
+  | { type: 'bulkMessageAction'; action: MessageBulkAction; messageIds: string[]; nowIso?: string }
   | { type: 'testMessageRoute'; messageId: string }
-  | { type: 'manualHandoff'; messageId: string; nowIso?: string }
+  | { type: 'manualHandoff'; messageId: string; nowIso?: string; shareFallbackUsed?: boolean }
   | { type: 'scheduleMessageFollowUp'; messageId: string; delayDays: FollowUpDelayDays; nowIso?: string }
   | { type: 'retryMessage'; messageId: string }
   | { type: 'addMemory'; contactId: string; category: MemoryCategory; body: string }
@@ -159,6 +239,9 @@ export type RelateAction =
   | { type: 'setCheckInCadence'; contactId: string; days: number }
   | { type: 'setContactChannel'; contactId: string; channel: MessageChannel }
   | { type: 'setContactAutomationMode'; contactId: string; mode: AutomationMode }
+  | { type: 'setContactCustomSendTime'; contactId: string; time?: string }
+  | { type: 'setContactQuietHoursBehavior'; contactId: string; behavior: ContactQuietHoursBehavior }
+  | { type: 'setContactSkipAuto'; contactId: string; enabled: boolean }
   | { type: 'useGroupDefaultsForContact'; contactId: string }
   | { type: 'snoozeCheckIn'; contactId: string; days: number; nowIso?: string }
   | { type: 'markContactedElsewhere'; contactId: string; nowIso?: string }
@@ -168,7 +251,14 @@ export type RelateAction =
   | { type: 'emailProviderFailure'; error: EmailDeliveryError; messageId?: string }
   | { type: 'emailDeliveryAccepted'; messageId: string; idempotencyKey: string; deliveryId: string }
   | { type: 'emailDeliveryUnknown'; error: EmailDeliveryError; messageId: string; idempotencyKey: string }
-  | { type: 'emailSent'; messageId: string; idempotencyKey?: string; deliveryId?: string }
+  | {
+      type: 'emailDeliveryReconciled';
+      messageId: string;
+      idempotencyKey: string;
+      status: 'accepted' | 'sent' | 'failed';
+      deliveryId?: string;
+    }
+  | { type: 'emailSent'; messageId: string; idempotencyKey?: string; deliveryId?: string; nowIso?: string }
   | { type: 'setOnboardingGoal'; goal: OnboardingGoal }
   | { type: 'setOnboardingStep'; stepId: OnboardingStepId }
   | { type: 'advanceOnboarding' }
@@ -188,12 +278,20 @@ export type RelateAction =
   | { type: 'toggleSetting'; key: keyof AppState['settings'] }
   | { type: 'setAutomationMode'; mode: AutomationMode }
   | { type: 'setQuietHours'; start: string; end: string }
-  | { type: 'addBlackout'; label: string; startDate: string; endDate: string }
+  | { type: 'setDefaultSendTime'; time: string }
+  | {
+      type: 'addBlackout';
+      label: string;
+      startDate: string;
+      endDate: string;
+      behavior?: 'Block' | 'Defer';
+      channels?: MessageChannel[];
+    }
   | { type: 'removeBlackout'; blackoutId: string }
-  | { type: 'importContacts'; records: ImportedContactRecord[] }
+  | { type: 'importContacts'; records: ImportedContactRecord[]; resolutions?: ContactImportResolutions }
   | { type: 'planReminders' }
   | { type: 'reminderPlansReconciled'; plans: ReminderPlan[] }
-  | { type: 'calendarImported'; candidates: CalendarImportCandidate[] }
+  | { type: 'calendarImported'; candidates: CalendarImportCandidate[]; resolutions?: CalendarImportResolutions }
   | { type: 'calendarExported'; count: number }
   | { type: 'calendarError'; message: string }
   | { type: 'persistenceSaving' }
@@ -203,50 +301,77 @@ export type RelateAction =
   | { type: 'restoreBackup'; restoredState: AppState; recordCount: number }
   | { type: 'analyticsExported'; rowCount: number; format?: 'CSV report' | 'Summary' }
   | { type: 'setupDoctorDryRunRecorded'; detail: string }
+  | { type: 'setStyleEnabled'; enabled: boolean }
   | { type: 'trainStyle' }
   | { type: 'trainStyleFromSamples'; samples: string }
   | { type: 'trainStyleFromSentMessages' };
 
+export type MessageRegenerationSource = Readonly<{
+  messageId: string;
+  expectedRevision: string;
+}>;
+
+type WithCommandMetadata<Action> = Action extends RelateAction ? Action & { metadata: CommandMetadata } : never;
+
+export type EnrichedRelateAction = WithCommandMetadata<RelateAction>;
+
+const commandIdCounts = (action: RelateAction): CommandIdCounts => {
+  const counts: CommandIdCounts = { activity: 1 };
+  switch (action.type) {
+    case 'addContact':
+      return { ...counts, contact: 1 };
+    case 'addManualEvent':
+      return { ...counts, contact: 1, event: 1 };
+    case 'generateMessage':
+    case 'createTemplateDraft':
+    case 'createAiDraft':
+      return { ...counts, message: 1 };
+    case 'scheduleMessageFollowUp':
+      return { ...counts, event: 1, reminder: 1 };
+    case 'addMemory':
+    case 'answerEnrichmentPrompt':
+      return { ...counts, memory: 1 };
+    case 'addGift':
+      return { ...counts, gift: 1 };
+    case 'addBlackout':
+      return { ...counts, blackout: 1 };
+    case 'importContacts':
+      return { ...counts, contact: action.records.length, event: action.records.length };
+    case 'calendarImported':
+      return { ...counts, contact: action.candidates.length, event: action.candidates.length };
+    case 'createBackup':
+      return { ...counts, backup: 1 };
+    default:
+      return counts;
+  }
+};
+
+export const enrichRelateAction = (
+  action: RelateAction,
+  dependencies: CommandDependencies = systemCommandDependencies
+): EnrichedRelateAction => {
+  const occurredAtOverride = 'nowIso' in action ? action.nowIso : undefined;
+  return {
+    ...action,
+    metadata: allocateCommandMetadata(dependencies, commandIdCounts(action), occurredAtOverride)
+  } as EnrichedRelateAction;
+};
+
 export { createProductionInitialState } from '../data/productionState';
 
-const nowIso = () => new Date().toISOString();
-
-const addDaysIso = (days: number, fromIso?: string) => {
-  const next = fromIso ? new Date(fromIso) : new Date();
-  next.setDate(next.getDate() + days);
+const addDaysIso = (days: number, fromIso: string) => {
+  const next = new Date(fromIso);
+  next.setUTCDate(next.getUTCDate() + days);
   return next.toISOString();
 };
 
-const addActivity = (
-  state: AppState,
-  type: ActivityItem['type'],
-  title: string,
-  detail: string,
-  severity: ActivityItem['severity'] = 'Info',
-  target?: Pick<ActivityItem, 'targetScreen' | 'contactId' | 'messageId' | 'actionLabel'>
-): ActivityItem[] => [
-  {
-    id: `activity-${Date.now()}-${state.activity.length}`,
-    type,
-    title,
-    detail,
-    severity,
-    createdAt: nowIso(),
-    ...target
-  },
-  ...state.activity
-];
-
 const findContact = (state: AppState, contactId: string) =>
-  state.contacts.find(contact => contact.id === contactId);
+  state.contacts.find(contact => contact.id === contactId && !contact.archivedAt);
 
 const findEvent = (state: AppState, eventId?: string) =>
   eventId ? state.events.find(event => event.id === eventId) : undefined;
 
-const explicitPreferenceOverridesForContact = (
-  state: AppState,
-  contact: Contact
-): Contact['preferenceOverrides'] => ({
+const explicitPreferenceOverridesForContact = (state: AppState, contact: Contact): Contact['preferenceOverrides'] => ({
   preferredChannel: contact.preferredChannel,
   tone: contact.tone,
   checkInCadenceDays: contact.checkInCadenceDays,
@@ -272,11 +397,8 @@ const updateContactPreferenceOverride = (
 };
 
 const getAiContext = (state: AppState, contactId: string, options: AiDraftContextOptions = {}) => {
-  const excludedMemoryIds = new Set(options.excludedMemoryIds ?? []);
-  return state.memories
-    .filter(note => note.contactId === contactId && note.category !== 'Private' && !excludedMemoryIds.has(note.id))
-    .map(note => note.body)
-    .slice(0, 3);
+  const text = firstMentionableMemoryTextForContact(state, contactId, options.excludedMemoryIds);
+  return text ? [text] : [];
 };
 
 const buildDraftText = (
@@ -302,7 +424,9 @@ const buildDraftText = (
               ? `Hi ${contact.name}, just following up and hoping everything went smoothly.${contextLine}`
               : `Happy birthday ${contact.name}! Wishing you a ${tone} day and a year filled with good moments.${contextLine}`;
 
-  const instructionText = [...(feedback?.instructions ?? []), feedback?.customInstruction ?? ''].join(' ').toLowerCase();
+  const instructionText = [...(feedback?.instructions ?? []), feedback?.customInstruction ?? '']
+    .join(' ')
+    .toLowerCase();
   const feedbackLine =
     instructionText.includes('less generic') ||
     instructionText.includes('more specific') ||
@@ -319,6 +443,7 @@ const buildDraftText = (
 };
 
 const buildMessageDraft = (
+  metadata: CommandMetadata,
   state: AppState,
   contactId: string,
   eventId: string | undefined,
@@ -328,24 +453,49 @@ const buildMessageDraft = (
     fallbackReason?: string;
     contextOptions?: AiDraftContextOptions;
     feedback?: MessageRegenerationFeedback;
+    occurrenceDate?: string;
   } = {}
 ): MessageDraft | undefined => {
   const contact = findContact(state, contactId);
   const event = findEvent(state, eventId);
-  if (!contact) {
+  if (!contact || (eventId !== undefined && (!event || event.contactId !== contactId))) {
     return undefined;
   }
 
   const context = getAiContext(state, contactId, options.contextOptions);
   const preferences = resolveContactPreferencesForContact(state.settings, contact);
+  const localFallback = options.fallbackReason
+    ? buildLocalTemplateFallback(state, contactId, reason, {
+        excludedMemoryIds: options.contextOptions?.excludedMemoryIds,
+        feedback: options.feedback,
+        averageLength: state.styleProfile.enabledForAiDrafts ? state.styleProfile.averageLength : 160
+      })
+    : undefined;
+  if (localFallback && !localFallback.ok) return undefined;
   const standard =
     options.providerVariants?.standard ??
-    buildDraftText(contact, reason, context, state.styleProfile.averageLength, preferences.tone, options.feedback);
+    (localFallback?.ok
+      ? localFallback.body
+      : buildDraftText(
+          contact,
+          reason,
+          context,
+          state.styleProfile.enabledForAiDrafts ? state.styleProfile.averageLength : 160,
+          preferences.tone,
+          options.feedback
+        ));
   const short =
-    options.providerVariants?.short ?? (standard.length > 88 ? `${standard.slice(0, 85).trimEnd()}...` : standard);
+    options.providerVariants?.short ??
+    (localFallback?.ok
+      ? localFallback.variants.short
+      : standard.length > 88
+        ? `${standard.slice(0, 85).trimEnd()}...`
+        : standard);
   const warm =
     options.providerVariants?.warm ??
-    `${standard} ${contact.isVip ? 'You are important to me, and I hope this feels personal.' : 'Hope this brings a small smile.'}`;
+    (localFallback?.ok
+      ? localFallback.variants.warm
+      : `${standard} ${contact.isVip ? 'You are important to me, and I hope this feels personal.' : 'Hope this brings a small smile.'}`);
   const quality = options.providerVariants
     ? 'AI draft'
     : options.fallbackReason
@@ -353,11 +503,19 @@ const buildMessageDraft = (
       : context.length > 0
         ? 'AI draft'
         : 'Needs more context';
+  const schedule = event
+    ? scheduleMessageForEvent(event, state.settings, preferences.preferredChannel, new Date(metadata.occurredAt), {
+        customSendTime: preferences.customSendTime,
+        quietHoursBehavior: preferences.quietHoursBehavior
+      })
+    : { adjustments: [] as string[] };
 
   return {
-    id: `msg-${Date.now()}-${state.messages.length}`,
+    id: commandId(metadata, 'message'),
     contactId,
     eventId,
+    occurrenceDate:
+      options.occurrenceDate ?? (event ? eventOccurrenceLocalDateKey(event, new Date(metadata.occurredAt)) : undefined),
     reason,
     status: 'Needs review',
     channel: preferences.preferredChannel,
@@ -368,80 +526,222 @@ const buildMessageDraft = (
       warm
     },
     selectedVariant: 'standard',
-    scheduledFor: event?.date,
+    scheduledFor: schedule.scheduledFor,
     quality,
-    readiness: options.feedback
-      ? 'Regenerated with feedback for review'
-      : contact.dnd
-        ? 'Blocked by do-not-disturb'
-        : preferences.preferredChannel === 'Manual'
-          ? 'Use manual handoff'
-          : options.providerVariants
-            ? 'Provider draft ready for review'
-            : preferences.automationMode === 'Fully auto'
-              ? 'Eligible for full automation after review safeguards'
-              : preferences.automationMode === 'Smart approve'
-                ? 'Smart approval eligible after review'
-                : preferences.automationMode === 'VIP approve'
-                  ? contact.isVip
-                    ? 'VIP review required'
-                    : 'Review required by group policy'
-                  : 'Ready for review',
+    readiness: schedule.issue
+      ? 'Schedule needs review before approval'
+      : options.feedback
+        ? 'Regenerated with feedback for review'
+        : contact.dnd
+          ? 'Blocked by do-not-disturb'
+          : preferences.preferredChannel === 'Manual'
+            ? 'Use manual handoff'
+            : options.providerVariants
+              ? 'Provider draft ready for review'
+              : preferences.automationMode === 'Fully auto'
+                ? 'Eligible for full automation after review safeguards'
+                : preferences.automationMode === 'Smart approve'
+                  ? 'Smart approval eligible after review'
+                  : preferences.automationMode === 'VIP approve'
+                    ? contact.isVip
+                      ? 'VIP review required'
+                      : 'Review required by group policy'
+                    : 'Ready for review',
     regenerationFeedback: options.feedback,
-    lastError: options.fallbackReason
+    lastError: schedule.issue ?? options.fallbackReason
   };
 };
 
-const updateMessage = (
-  state: AppState,
-  messageId: string,
-  updater: (message: MessageDraft) => MessageDraft
-) => state.messages.map(message => (message.id === messageId ? updater(message) : message));
+const updateMessage = (state: AppState, messageId: string, updater: (message: MessageDraft) => MessageDraft) =>
+  state.messages.map(message => (message.id === messageId ? updater(message) : message));
 
 const clearApprovalMetadata = (message: MessageDraft): MessageDraft => {
-  const { approvedAt, approvalExpiresAt, ...withoutApproval } = message;
+  const {
+    approvedAt: _approvedAt,
+    approvalExpiresAt: _approvalExpiresAt,
+    scheduledTimeZone: _scheduledTimeZone,
+    duplicateAcknowledged: _duplicateAcknowledged,
+    duplicateAcknowledgementFingerprint: _duplicateAcknowledgementFingerprint,
+    ...withoutApproval
+  } = message;
   return withoutApproval;
+};
+
+const withCurrentDuplicateRisk = (state: AppState, message: MessageDraft): MessageDraft => {
+  const assessment = assessDuplicateMessageRisk(state, message);
+  if (!assessment.risk.risk) {
+    const {
+      duplicateWarning: _duplicateWarning,
+      duplicateAcknowledged: _duplicateAcknowledged,
+      duplicateAcknowledgementFingerprint: _duplicateAcknowledgementFingerprint,
+      ...withoutDuplicateRisk
+    } = message;
+    return withoutDuplicateRisk;
+  }
+  if (!assessment.acknowledged) {
+    const {
+      duplicateAcknowledged: _duplicateAcknowledged,
+      duplicateAcknowledgementFingerprint: _duplicateAcknowledgementFingerprint,
+      ...withoutStaleAcknowledgement
+    } = message;
+    return {
+      ...withoutStaleAcknowledgement,
+      duplicateWarning: assessment.risk.message
+    };
+  }
+  return {
+    ...message,
+    duplicateWarning: assessment.risk.message,
+    duplicateAcknowledged: true,
+    duplicateAcknowledgementFingerprint: assessment.fingerprint
+  };
+};
+
+type DraftInsertionResult = { ok: true; draft: MessageDraft; messages: MessageDraft[] } | { ok: false; reason: string };
+
+const insertDraftForReview = (
+  state: AppState,
+  draft: MessageDraft,
+  regenerationSource?: MessageRegenerationSource
+): DraftInsertionResult => {
+  let riskState = state;
+  if (regenerationSource) {
+    const source = state.messages.find(message => message.id === regenerationSource.messageId);
+    if (
+      !source ||
+      messageDraftRevision(source) !== regenerationSource.expectedRevision ||
+      !['Needs review', 'Draft', 'Blocked', 'Failed'].includes(source.status) ||
+      source.contactId !== draft.contactId ||
+      source.eventId !== draft.eventId ||
+      source.reason !== draft.reason ||
+      (source.eventId !== undefined && messageOccurrenceDate(state, source) !== draft.occurrenceDate)
+    ) {
+      return {
+        ok: false,
+        reason: 'The source draft changed while regeneration was running. Review the current draft and try again.'
+      };
+    }
+    const clearedSource = clearApprovalMetadata(source);
+    const { duplicateWarning: _duplicateWarning, lastError: _lastError, ...sourceHistory } = clearedSource;
+    riskState = {
+      ...state,
+      messages: state.messages.map(message =>
+        message.id === source.id
+          ? {
+              ...sourceHistory,
+              status: 'Rejected',
+              readiness: 'Superseded by regenerated draft'
+            }
+          : message
+      )
+    };
+  }
+
+  const duplicateRisk = detectDuplicateMessageRisk(riskState, draft);
+  const reviewedDraft = duplicateRisk.risk
+    ? {
+        ...draft,
+        duplicateWarning: duplicateRisk.message,
+        readiness: 'Duplicate risk needs review before approval'
+      }
+    : draft;
+  return { ok: true, draft: reviewedDraft, messages: [reviewedDraft, ...riskState.messages] };
+};
+
+const withChangedMessageBody = (state: AppState, message: MessageDraft, body: string): MessageDraft => {
+  const changed = clearApprovalMetadata({
+    ...message,
+    body
+  });
+  return withCurrentDuplicateRisk(state, changed);
 };
 
 const DND_APPROVAL_WARNING =
   'Contact is in do-not-disturb. Disable DND or complete a deliberate manual handoff before scheduling.';
 
 const approveMessageTransition = (
+  state: AppState,
   message: MessageDraft,
-  routeIssue?: string,
-  approvedAtIso = nowIso()
+  routeIssue: string | undefined,
+  approvedAtIso: string
 ): MessageDraft => {
-  const bodyPolicy = validateMessageBodyForChannel(message);
+  let scheduledMessage = message;
+  let scheduleIssue: string | undefined;
+  if (message.eventId) {
+    const event = state.events.find(item => item.id === message.eventId && item.contactId === message.contactId);
+    if (!event) {
+      scheduleIssue = 'The linked event is no longer valid for this recipient. Return the message to review.';
+    } else {
+      const approvalTime = new Date(approvedAtIso);
+      const currentOccurrence = eventOccurrenceLocalDateKey(event, approvalTime);
+      if (message.occurrenceDate && message.occurrenceDate !== currentOccurrence) {
+        scheduleIssue =
+          'This draft targets an event occurrence that has passed. Regenerate it for the current occurrence before approval.';
+      } else {
+        const contact = state.contacts.find(item => item.id === message.contactId);
+        const preferences = contact ? resolveContactPreferencesForContact(state.settings, contact) : undefined;
+        const schedule = scheduleMessageForEvent(event, state.settings, message.channel, approvalTime, {
+          customSendTime: preferences?.customSendTime,
+          quietHoursBehavior: preferences?.quietHoursBehavior
+        });
+        scheduleIssue = schedule.issue;
+        scheduledMessage = {
+          ...message,
+          occurrenceDate: message.occurrenceDate ?? currentOccurrence,
+          scheduledFor: schedule.scheduledFor,
+          scheduledTimeZone: schedule.scheduledTimeZone
+        };
+      }
+    }
+  } else if (message.scheduledFor) {
+    scheduleIssue =
+      'This draft has a scheduled time without event context. Clear the stale time or link an event before approval.';
+  }
+  const bodyPolicy = validateMessageBodyForChannel(scheduledMessage);
   if (!bodyPolicy.ok) {
     return {
-      ...clearApprovalMetadata(message),
+      ...clearApprovalMetadata(scheduledMessage),
       status: 'Blocked',
       readiness: bodyPolicy.message,
       lastError: bodyPolicy.message
     };
   }
-  if (message.duplicateWarning && !message.duplicateAcknowledged) {
+  if (scheduledMessage.duplicateWarning && !scheduledMessage.duplicateAcknowledged) {
     return {
-      ...clearApprovalMetadata(message),
+      ...clearApprovalMetadata(scheduledMessage),
       status: 'Blocked',
       readiness: 'Explicitly continue or edit before approval',
-      lastError: message.duplicateWarning
+      lastError: scheduledMessage.duplicateWarning
+    };
+  }
+  if (scheduleIssue) {
+    return {
+      ...clearApprovalMetadata(scheduledMessage),
+      status: 'Blocked',
+      readiness: 'Fix schedule before approval',
+      lastError: scheduleIssue
     };
   }
   if (routeIssue) {
     const blockedByDnd = /do-not-disturb/i.test(routeIssue);
     return {
-      ...clearApprovalMetadata(message),
+      ...clearApprovalMetadata(scheduledMessage),
       status: 'Blocked',
       readiness: blockedByDnd ? 'Blocked by contact do-not-disturb' : 'Fix delivery route before approval',
       lastError: blockedByDnd ? DND_APPROVAL_WARNING : routeIssue
     };
   }
   return {
-    ...message,
+    ...scheduledMessage,
     ...buildMessageApprovalWindow(approvedAtIso),
     status: 'Scheduled',
-    readiness: bodyPolicy.warning ?? (message.channel === 'Manual' ? 'Ready for manual handoff' : 'Approved and scheduled'),
+    readiness:
+      bodyPolicy.warning ??
+      (state.contacts.find(contact => contact.id === scheduledMessage.contactId)?.dnd
+        ? 'Contact do-not-disturb: approved only for a deliberate manual handoff'
+        : scheduledMessage.channel === 'Manual'
+          ? 'Ready for manual handoff'
+          : 'Approved and scheduled'),
     lastError: undefined
   };
 };
@@ -505,7 +805,8 @@ const channelDisabledReviewWarning = (channel: MessageChannel) =>
 
 const markScheduledChannelMessagesForReview = (
   messages: MessageDraft[],
-  channel: MessageChannel
+  channel: MessageChannel,
+  reason = channelDisabledReviewWarning(channel)
 ): { messages: MessageDraft[]; count: number } => {
   let count = 0;
   return {
@@ -518,7 +819,7 @@ const markScheduledChannelMessagesForReview = (
         ...clearApprovalMetadata(message),
         status: 'Needs review',
         readiness: 'Review after channel setting changed',
-        lastError: channelDisabledReviewWarning(channel)
+        lastError: reason
       };
     }),
     count
@@ -539,9 +840,14 @@ const markSchedulePolicyConflictsForReview = (
         return message;
       }
       const scheduledFor = new Date(message.scheduledFor);
+      const policy = Number.isNaN(scheduledFor.getTime())
+        ? undefined
+        : adjustTriggerForSchedulingPolicy(scheduledFor, settings, message.channel);
       const adjustments = Number.isNaN(scheduledFor.getTime())
         ? ['Scheduled time is invalid.']
-        : adjustTriggerForSchedulingPolicy(scheduledFor, settings).adjustments;
+        : policy?.blockedBy
+          ? [`Blocked by blackout: ${policy.blockedBy}.`]
+          : (policy?.adjustments ?? []);
       if (adjustments.length === 0) {
         return message;
       }
@@ -575,6 +881,40 @@ const markScheduledAutomationMessagesForReview = (
         status: 'Needs review',
         readiness: 'Review after automation mode changed',
         lastError: AUTOMATION_MODE_REVIEW_WARNING
+      };
+    }),
+    count
+  };
+};
+
+const TIME_ZONE_REVIEW_WARNING =
+  'The saved schedule time zone is missing or no longer matches this device. Review and approve again to recalculate the intended local send time.';
+
+const markChangedTimeZoneSchedulesForReview = (
+  messages: MessageDraft[],
+  currentTimeZone: string
+): { messages: MessageDraft[]; count: number } => {
+  let count = 0;
+  return {
+    messages: messages.map(message => {
+      if (
+        message.status !== 'Scheduled' ||
+        !message.scheduledFor ||
+        scheduleTimeZonesMatch(message.scheduledTimeZone, currentTimeZone)
+      ) {
+        return message;
+      }
+      count += 1;
+      const {
+        scheduledFor: _scheduledFor,
+        scheduledTimeZone: _scheduledTimeZone,
+        ...withoutStaleSchedule
+      } = clearApprovalMetadata(message);
+      return {
+        ...withoutStaleSchedule,
+        status: 'Needs review',
+        readiness: 'Review after device time-zone change',
+        lastError: TIME_ZONE_REVIEW_WARNING
       };
     }),
     count
@@ -617,14 +957,17 @@ const markAiDraftMessagesForReview = (messages: MessageDraft[]): { messages: Mes
 };
 
 const applyBulkMessageTransition = (
+  state: AppState,
   message: MessageDraft,
   action: MessageBulkAction,
-  routeIssue?: string,
-  approvedAtIso?: string
+  routeIssue: string | undefined,
+  approvedAtIso: string
 ): MessageDraft => {
   switch (action) {
-    case 'Approve':
-      return approveMessageTransition(message, routeIssue, approvedAtIso);
+    case 'Approve': {
+      const currentMessage = withCurrentDuplicateRisk(state, message);
+      return approveMessageTransition(state, currentMessage, routeIssue, approvedAtIso);
+    }
     case 'Reject':
       return rejectMessageTransition(message);
     case 'Retry':
@@ -660,7 +1003,7 @@ const emailDeliveryFailureTransition = (message: MessageDraft, error: EmailDeliv
         lastError: error.message
       };
 
-const manualHandoffIssue = (state: AppState, message: MessageDraft, nowIsoValue = nowIso()) => {
+const manualHandoffIssue = (state: AppState, message: MessageDraft, nowIsoValue: string, shareFallbackUsed = false) => {
   if (message.status !== 'Scheduled') {
     return 'Approve the message before manual handoff.';
   }
@@ -672,7 +1015,16 @@ const manualHandoffIssue = (state: AppState, message: MessageDraft, nowIsoValue 
   if (approvalIssue) {
     return approvalIssue;
   }
-  return messageApprovalRouteIssue(state, message);
+  const duplicateRisk = assessDuplicateMessageRisk(state, message);
+  if (duplicateRisk.risk.risk && !duplicateRisk.acknowledged) {
+    return 'Duplicate risk changed after approval. Review and explicitly acknowledge the current warning before sending.';
+  }
+  return (
+    messageApprovalRouteIssue(state, message, {
+      allowDndManualControl: true,
+      allowShareFallback: shareFallbackUsed
+    }) ?? messageDispatchTimingIssue(state, message, new Date(nowIsoValue))
+  );
 };
 
 const bulkActivityTitle = (action: MessageBulkAction, skippedCount: number) => {
@@ -682,9 +1034,52 @@ const bulkActivityTitle = (action: MessageBulkAction, skippedCount: number) => {
 
 const normalizeLoadedState = (loadedState: AppState): AppState => {
   const defaults = createProductionInitialState();
+  const normalizedGroupDefaults = normalizeRelationshipGroupDefaults(loadedState.settings?.groupDefaults);
+  const safeGroupDefaults = Object.fromEntries(
+    Object.entries(normalizedGroupDefaults).map(([group, groupDefaults]) => {
+      const restoredMode = loadedState.settings?.groupDefaults?.[group as RelationshipGroup]?.automationMode;
+      return [
+        group,
+        {
+          ...groupDefaults,
+          automationMode:
+            restoredMode !== undefined && !isAutomationModeAvailable(restoredMode)
+              ? 'Always ask'
+              : isAutomationModeAvailable(groupDefaults.automationMode)
+                ? groupDefaults.automationMode
+                : 'Always ask'
+        }
+      ];
+    })
+  ) as AppState['settings']['groupDefaults'];
   return {
     ...defaults,
     ...loadedState,
+    styleProfile: {
+      ...defaults.styleProfile,
+      ...loadedState.styleProfile,
+      commonGreetings: Array.isArray(loadedState.styleProfile?.commonGreetings)
+        ? loadedState.styleProfile.commonGreetings.slice(0, 5)
+        : defaults.styleProfile.commonGreetings
+    },
+    contacts: loadedState.contacts.map(contact => {
+      const { customSendTime, ...withoutCustomSendTime } = contact;
+      return {
+        ...withoutCustomSendTime,
+        ...(customSendTime && !validateDefaultSendTime(customSendTime) ? { customSendTime } : {}),
+        quietHoursBehavior: contact.quietHoursBehavior === 'Block' ? 'Block' : 'Defer',
+        skipAuto: contact.skipAuto ?? false,
+        ...(contact.preferenceOverrides?.automationMode &&
+        !isAutomationModeAvailable(contact.preferenceOverrides.automationMode)
+          ? {
+              preferenceOverrides: {
+                ...contact.preferenceOverrides,
+                automationMode: 'Always ask' as const
+              }
+            }
+          : {})
+      };
+    }),
     settings: {
       ...defaults.settings,
       ...loadedState.settings,
@@ -698,7 +1093,7 @@ const normalizeLoadedState = (loadedState: AppState): AppState => {
         ...defaults.settings.quietHours,
         ...loadedState.settings?.quietHours
       },
-      groupDefaults: normalizeRelationshipGroupDefaults(loadedState.settings?.groupDefaults),
+      groupDefaults: safeGroupDefaults,
       blackouts: Array.isArray(loadedState.settings?.blackouts)
         ? loadedState.settings.blackouts
         : defaults.settings.blackouts
@@ -742,12 +1137,13 @@ const normalizeLoadedState = (loadedState: AppState): AppState => {
 
 const uniqueSteps = (steps: OnboardingStepId[]) => [...new Set(steps)];
 
-const createClearedLocalState = (previousState: AppState): AppState => {
+const createClearedLocalState = (previousState: AppState, metadata: CommandMetadata): AppState => {
   const cleared = createProductionInitialState();
   const next: AppState = {
     ...cleared,
     activeScreen: 'onboarding',
     selectedContactId: undefined,
+    selectedEventId: undefined,
     selectedMessageId: undefined,
     contacts: [],
     events: [],
@@ -763,7 +1159,7 @@ const createClearedLocalState = (previousState: AppState): AppState => {
     },
     privacy: {
       ...cleared.privacy,
-      localDataClearConfirmedAt: nowIso()
+      localDataClearConfirmedAt: metadata.occurredAt
     },
     persistence: {
       status: 'Ready'
@@ -771,23 +1167,300 @@ const createClearedLocalState = (previousState: AppState): AppState => {
   };
   return {
     ...next,
-    activity: addActivity(next, 'Setup', 'Local data cleared', 'Contacts, events, messages, memories, gifts, and backups were cleared.')
+    activity: addActivity(
+      metadata,
+      next,
+      'Setup',
+      'Local data cleared',
+      'Contacts, events, messages, memories, gifts, and backups were cleared.'
+    )
   };
 };
 
-export const relateReducer = (state: AppState, action: RelateAction): AppState => {
+export const relateTransition = (state: AppState, action: EnrichedRelateAction): AppState => {
   switch (action.type) {
     case 'hydrate':
       return normalizeLoadedState(action.state);
+    case 'reconcileScheduledMessageTimeZone': {
+      const currentTimeZone = normalizeScheduleTimeZone(action.timeZone);
+      if (!currentTimeZone) return state;
+      const reviewUpdate = markChangedTimeZoneSchedulesForReview(state.messages, currentTimeZone);
+      if (reviewUpdate.count === 0) return state;
+      return {
+        ...state,
+        messages: reviewUpdate.messages,
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Message',
+          'Scheduled messages need time review',
+          `${reviewUpdate.count} scheduled message(s) returned to review after a device time-zone change. No message was sent; approve again to recalculate the intended local time.`,
+          'Warning',
+          {
+            targetScreen: 'messages',
+            actionLabel: 'Review messages'
+          }
+        )
+      };
+    }
     case 'navigate':
       return {
         ...state,
         activeScreen: action.screen,
-        selectedContactId: action.contactId ?? state.selectedContactId,
-        selectedMessageId: action.messageId ?? state.selectedMessageId
+        selectedContactId: action.contactId,
+        selectedEventId: action.eventId,
+        selectedMessageId: action.messageId
       };
     case 'setSearch':
       return { ...state, searchQuery: action.query };
+    case 'resolveActivity': {
+      const target = state.activity.find(item => item.id === action.activityId);
+      const row = target ? buildActivityHistory([target], { state }).rows[0] : undefined;
+      if (!target || row?.status !== 'Open') return state;
+      const resolvedActivity = state.activity.map(item =>
+        item.id === target.id
+          ? {
+              ...item,
+              status: 'Resolved' as const,
+              resolvedAt: action.metadata.occurredAt
+            }
+          : item
+      );
+      return {
+        ...state,
+        activity: addActivity(
+          action.metadata,
+          { activity: resolvedActivity },
+          'Setup',
+          'Activity issue resolved',
+          'An open Activity History issue was marked resolved by the user.',
+          'Info',
+          {
+            targetScreen: 'activityHistory',
+            actionLabel: 'View activity'
+          }
+        )
+      };
+    }
+    case 'addContact': {
+      const result = buildStandaloneContact(state, action.input, commandId(action.metadata, 'contact'));
+      if (!result.ok) {
+        return {
+          ...state,
+          activity: addActivity(action.metadata, state, 'Contact', 'Contact not added', result.reason, 'Warning', {
+            targetScreen: 'contacts',
+            actionLabel: 'Review contacts'
+          })
+        };
+      }
+      return {
+        ...state,
+        activeScreen: 'contactDetail',
+        selectedContactId: result.contact.id,
+        contacts: [result.contact, ...state.contacts],
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Contact',
+          'Contact added',
+          'A standalone local contact was added and is ready for profile review.',
+          'Info',
+          {
+            targetScreen: 'contactDetail',
+            contactId: result.contact.id,
+            actionLabel: 'Open contact'
+          }
+        )
+      };
+    }
+    case 'editContact': {
+      const preview = previewContactEdit(state, action.contactId, action.input);
+      if (!preview.ok) {
+        return {
+          ...state,
+          activity: addActivity(action.metadata, state, 'Contact', 'Contact not changed', preview.reason, 'Warning')
+        };
+      }
+      if (preview.exactIdentityCandidateIds.length > 0) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Contact',
+            'Contact change needs identity review',
+            'The edited phone or email already belongs to another contact. Merge the contacts or keep the existing identity unchanged.',
+            'Warning',
+            { targetScreen: 'contactDetail', contactId: action.contactId, actionLabel: 'Review identity conflict' }
+          )
+        };
+      }
+      if (preview.confirmationToken !== action.confirmationToken) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Contact',
+            'Contact change needs review',
+            'The contact or its linked records changed after preview. Review the impact again before saving.',
+            'Warning',
+            { targetScreen: 'contactDetail', contactId: action.contactId, actionLabel: 'Review contact' }
+          )
+        };
+      }
+      const next = applyContactEdit(state, action.contactId, preview.normalized);
+      return {
+        ...next,
+        activity: addActivity(
+          action.metadata,
+          next,
+          'Contact',
+          'Contact saved after review',
+          `${preview.changedFields.length} field(s) changed. ${preview.impact.activeMessageCount} active message(s) were rechecked.`,
+          'Info',
+          { targetScreen: 'contactDetail', contactId: action.contactId, actionLabel: 'Open contact' }
+        )
+      };
+    }
+    case 'archiveContact': {
+      const preview = previewContactArchive(state, action.contactId);
+      if (!preview.ok || preview.confirmationToken !== action.confirmationToken) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Contact',
+            'Contact not archived',
+            preview.ok
+              ? 'The contact or its linked records changed after preview. Review the impact again.'
+              : preview.reason,
+            'Warning'
+          )
+        };
+      }
+      const next = applyContactArchive(state, action.contactId, action.metadata.occurredAt);
+      return {
+        ...next,
+        activity: addActivity(
+          action.metadata,
+          next,
+          'Contact',
+          'Contact archived',
+          `Relationship history was preserved. ${preview.impact.reminderCount} reminder(s) were removed and ${preview.impact.activeMessageCount} active message(s) require review.`
+        )
+      };
+    }
+    case 'restoreContact': {
+      const contact = state.contacts.find(item => item.id === action.contactId);
+      if (!contact?.archivedAt) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Contact',
+            'Contact not restored',
+            contact ? 'Contact is not archived.' : 'Contact could not be found.',
+            'Warning'
+          )
+        };
+      }
+      const next = applyContactRestore(state, action.contactId);
+      return {
+        ...next,
+        activity: addActivity(
+          action.metadata,
+          next,
+          'Contact',
+          'Contact restored',
+          'The contact is active again. Reminder planning remains review-controlled.',
+          'Info',
+          { targetScreen: 'contactDetail', contactId: action.contactId, actionLabel: 'Open contact' }
+        )
+      };
+    }
+    case 'deleteContact': {
+      const preview = previewContactDelete(state, action.contactId);
+      if (!preview.ok || preview.confirmationToken !== action.confirmationToken) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Contact',
+            'Contact not deleted',
+            preview.ok
+              ? 'The contact or its linked records changed after preview. Review the impact again.'
+              : preview.reason,
+            'Warning'
+          )
+        };
+      }
+      if (!preview.deletionAllowed) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Contact',
+            'Contact deletion blocked',
+            `${preview.relationshipHistoryCount} relationship-history record(s) must be preserved. Archive this contact instead.`,
+            'Warning',
+            { targetScreen: 'contactDetail', contactId: action.contactId, actionLabel: 'Review archive' }
+          )
+        };
+      }
+      const next = applyContactDelete(state, action.contactId);
+      return {
+        ...next,
+        activity: addActivity(
+          action.metadata,
+          next,
+          'Contact',
+          'Contact deleted',
+          `${preview.impact.eventCount} event(s), ${preview.impact.reminderCount} reminder(s), and ${preview.impact.activeMessageCount} active message(s) were removed after confirmation.`
+        )
+      };
+    }
+    case 'mergeContacts': {
+      const preview = previewContactMerge(state, action.survivorContactId, action.mergedContactId);
+      if (!preview.ok || preview.confirmationToken !== action.confirmationToken) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Contact',
+            'Contacts not merged',
+            preview.ok
+              ? 'The contacts or their linked records changed after preview. Review both profiles again.'
+              : preview.reason,
+            'Warning'
+          )
+        };
+      }
+      const next = applyContactMerge(state, action.survivorContactId, action.mergedContactId);
+      return {
+        ...next,
+        activeScreen: 'contactDetail',
+        selectedContactId: action.survivorContactId,
+        activity: addActivity(
+          action.metadata,
+          next,
+          'Contact',
+          'Contacts merged after review',
+          `${preview.impact.eventCount} event(s), ${preview.impact.activeMessageCount + preview.impact.historyMessageCount} message(s), ${preview.impact.memoryCount} memory record(s), and ${preview.impact.giftCount} gift record(s) were preserved.`,
+          'Info',
+          {
+            targetScreen: 'contactDetail',
+            contactId: action.survivorContactId,
+            actionLabel: 'Open merged contact'
+          }
+        )
+      };
+    }
     case 'toggleChecklist':
       return {
         ...state,
@@ -795,9 +1468,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           event.id === action.eventId
             ? {
                 ...event,
-                checklist: event.checklist.map(item =>
-                  item.id === action.itemId ? { ...item, done: !item.done } : item
-                )
+                checklist: toggleEventChecklistItemForOccurrence(event, action.itemId, action.metadata.localDate)
               }
             : event
         )
@@ -809,11 +1480,110 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           event.id === action.eventId
             ? {
                 ...event,
-                checklist: toggleEventPreparationChecklistStep(event.type, event.checklist, action.stepId)
+                checklist: toggleEventPreparationChecklistStep(
+                  event.type,
+                  event.checklist,
+                  action.stepId,
+                  eventPreparationOccurrenceKey(event, action.metadata.localDate),
+                  event.date.slice(0, 10)
+                )
               }
             : event
         )
       };
+    case 'editEvent': {
+      const preview = previewEventEdit(state, action.eventId, action.input);
+      if (!preview.ok) {
+        return {
+          ...state,
+          activity: addActivity(action.metadata, state, 'Event', 'Event not changed', preview.reason, 'Warning')
+        };
+      }
+      if (preview.requiresConfirmation && preview.confirmationToken !== action.confirmationToken) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Event',
+            'Event change needs review',
+            'Linked reminders, messages, calendar state, or conflicts changed. Review the event impact again.',
+            'Warning',
+            { targetScreen: 'events', actionLabel: 'Review event' }
+          )
+        };
+      }
+      const next = applyEventEdit(state, action.eventId, preview.normalized);
+      return {
+        ...next,
+        activeScreen: 'events',
+        selectedContactId: preview.normalized.contactId,
+        activity: addActivity(
+          action.metadata,
+          next,
+          'Event',
+          'Event changed after review',
+          `${preview.changedFields.length} field(s) changed. ${preview.impact.reminderCount} reminder(s) were cleared for reconciliation and ${preview.impact.activeMessageCount} active message(s) require review.`
+        )
+      };
+    }
+    case 'deleteEvent': {
+      const preview = previewEventDelete(state, action.eventId);
+      if (!preview.ok || preview.confirmationToken !== action.confirmationToken) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Event',
+            'Event not deleted',
+            preview.ok
+              ? 'The event or its linked records changed after preview. Review the impact again.'
+              : preview.reason,
+            'Warning'
+          )
+        };
+      }
+      const next = applyEventDelete(state, action.eventId);
+      return {
+        ...next,
+        activeScreen: 'events',
+        activity: addActivity(
+          action.metadata,
+          next,
+          'Event',
+          'Event deleted',
+          `${preview.impact.reminderCount} reminder(s) were removed. ${preview.impact.activeMessageCount + preview.impact.historyMessageCount} linked message(s) were preserved without the deleted event reference.`
+        )
+      };
+    }
+    case 'mergeEvents': {
+      const preview = previewEventMerge(state, action.survivorEventId, action.mergedEventId);
+      if (!preview.ok || preview.confirmationToken !== action.confirmationToken) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Event',
+            'Event merge needs review',
+            preview.ok ? 'The event conflict changed. Review the impact again.' : preview.reason,
+            'Warning'
+          )
+        };
+      }
+      const next = applyEventMerge(state, action.survivorEventId, action.mergedEventId);
+      return {
+        ...next,
+        activity: addActivity(
+          action.metadata,
+          next,
+          'Event',
+          'Event conflicts merged',
+          `${preview.activeMessageCount} active message(s) require review and ${preview.reminderCount} reminder(s) were cleared for reconciliation.`
+        )
+      };
+    }
     case 'addManualEvent': {
       const validation = validateManualEventInput(action, state.contacts, state.events);
       if (!validation.ok) {
@@ -821,6 +1591,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           ...state,
           activeScreen: 'eventForm',
           activity: addActivity(
+            action.metadata,
             state,
             'Event',
             'Event not saved',
@@ -835,6 +1606,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           ...state,
           activeScreen: 'eventForm',
           activity: addActivity(
+            action.metadata,
             state,
             'Event',
             'Review event conflict',
@@ -844,11 +1616,10 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         };
       }
 
-      const timestamp = Date.now();
       const createdContact: Contact | undefined = validation.normalized.contactId
         ? undefined
         : {
-            id: `contact-${timestamp}-${state.contacts.length}`,
+            id: commandId(action.metadata, 'contact'),
             name: validation.normalized.newContactName ?? 'New contact',
             relationship: 'Other',
             group: 'Other',
@@ -867,12 +1638,12 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         return {
           ...state,
           activeScreen: 'eventForm',
-          activity: addActivity(state, 'Event', 'Event not saved', 'A contact is required.', 'Warning')
+          activity: addActivity(action.metadata, state, 'Event', 'Event not saved', 'A contact is required.', 'Warning')
         };
       }
 
       const event = {
-        id: `event-${timestamp}-${state.events.length}`,
+        id: commandId(action.metadata, 'event'),
         contactId,
         type: validation.normalized.eventType,
         label: validation.normalized.label,
@@ -890,6 +1661,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         contacts: createdContact ? [createdContact, ...state.contacts] : state.contacts,
         events: [event, ...state.events],
         activity: addActivity(
+          action.metadata,
           state,
           'Event',
           'Event saved',
@@ -903,6 +1675,9 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       return {
         ...state,
         messages: updateMessage(state, action.messageId, message => {
+          if (messageLifecycleTransitionIssue(message, 'select-variant')) {
+            return message;
+          }
           if (message.selectedVariant === action.variant) {
             return message;
           }
@@ -910,61 +1685,154 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           if (hasEditedBody && !action.discardEditedBody) {
             return message;
           }
-          return {
-            ...message,
-            selectedVariant: action.variant,
-            body: message.variants[action.variant]
-          };
+          return withChangedMessageBody(
+            state,
+            {
+              ...message,
+              selectedVariant: action.variant
+            },
+            message.variants[action.variant]
+          );
         })
       };
     case 'editMessage':
       return {
         ...state,
         messages: updateMessage(state, action.messageId, message => {
-          const nextMessage = {
-            ...message,
-            body: action.body
-          };
+          if (messageLifecycleTransitionIssue(message, 'edit') || message.body === action.body) {
+            return message;
+          }
+          const nextMessage = withChangedMessageBody(state, message, action.body);
           const bodyPolicy = validateMessageBodyForChannel(nextMessage);
           return {
             ...nextMessage,
-            readiness: !bodyPolicy.ok ? bodyPolicy.message : bodyPolicy.warning ?? message.readiness
+            readiness: !bodyPolicy.ok ? bodyPolicy.message : (bodyPolicy.warning ?? message.readiness)
           };
         })
       };
+    case 'setMessageChannel': {
+      const target = state.messages.find(message => message.id === action.messageId);
+      if (!target || messageLifecycleTransitionIssue(target, 'edit') || target.channel === action.channel) {
+        return state;
+      }
+      return {
+        ...state,
+        messages: updateMessage(state, action.messageId, message => {
+          const { scheduledFor: _scheduledFor, ...withoutStaleSchedule } = clearApprovalMetadata(message);
+          const changed = withCurrentDuplicateRisk(state, {
+            ...withoutStaleSchedule,
+            channel: action.channel,
+            status: 'Needs review'
+          });
+          const bodyPolicy = validateMessageBodyForChannel(changed);
+          return {
+            ...changed,
+            readiness: bodyPolicy.ok
+              ? (bodyPolicy.warning ?? 'Channel changed; review before approval')
+              : bodyPolicy.message,
+            lastError: bodyPolicy.ok ? undefined : bodyPolicy.message
+          };
+        }),
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Message',
+          'Message channel changed',
+          `Channel changed to ${action.channel}. Review the message before approval.`
+        )
+      };
+    }
     case 'generateMessage': {
-      const draft = buildMessageDraft(state, action.contactId, action.eventId, action.reason, {
+      if ((action.feedback === undefined) !== (action.regenerationSource === undefined)) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'AI',
+            'Message regeneration not applied',
+            'Regeneration must be bound to the exact active source draft.',
+            'Warning'
+          )
+        };
+      }
+      const regenerationSourceMessage = action.regenerationSource
+        ? state.messages.find(message => message.id === action.regenerationSource?.messageId)
+        : undefined;
+      const generationContact = findContact(state, action.contactId);
+      if (
+        action.generationOrigin === 'Automatic' &&
+        generationContact &&
+        !contactAllowsAutomaticDraftGeneration(generationContact)
+      ) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'AI',
+            'Automatic draft skipped',
+            'This contact opted out of proactive draft generation. A user-requested draft remains available.',
+            'Info'
+          )
+        };
+      }
+      const draft = buildMessageDraft(action.metadata, state, action.contactId, action.eventId, action.reason, {
         fallbackReason: action.fallbackReason,
         contextOptions: {
           excludedMemoryIds: action.excludedMemoryIds,
           includePriorMessages: action.includePriorMessages
         },
-        feedback: action.feedback
+        feedback: action.feedback,
+        occurrenceDate: regenerationSourceMessage ? messageOccurrenceDate(state, regenerationSourceMessage) : undefined
       });
       if (!draft) {
         return {
           ...state,
-          activity: addActivity(state, 'AI', 'Draft not created', 'The selected contact could not be found.', 'Error')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'AI',
+            'Draft not created',
+            action.eventId
+              ? 'The selected active contact and event are unavailable or no longer belong together.'
+              : 'The selected active contact could not be found.',
+            'Error'
+          )
         };
       }
-      const duplicateRisk = detectDuplicateMessageRisk(state, draft);
-      const reviewedDraft = duplicateRisk.risk
-        ? {
-            ...draft,
-            duplicateWarning: duplicateRisk.message,
-            readiness: 'Duplicate risk needs review before approval'
-          }
-        : draft;
+      const insertion = insertDraftForReview(state, draft, action.regenerationSource);
+      if (!insertion.ok) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'AI',
+            'Message regeneration not applied',
+            insertion.reason,
+            'Warning'
+          )
+        };
+      }
+      const reviewedDraft = insertion.draft;
       return {
         ...state,
-        messages: [reviewedDraft, ...state.messages],
+        messages: insertion.messages,
         activeScreen: 'wishPreview',
         selectedMessageId: reviewedDraft.id,
         selectedContactId: reviewedDraft.contactId,
         activity: addActivity(
+          action.metadata,
           state,
           'AI',
-          action.fallbackReason ? 'Template fallback created' : 'Draft created',
+          action.feedback
+            ? action.fallbackReason
+              ? 'Message regeneration fallback created'
+              : 'Draft regenerated'
+            : action.fallbackReason
+              ? 'Template fallback created'
+              : 'Draft created',
           action.fallbackReason ??
             (action.feedback
               ? `${draft.reason} draft was regenerated with feedback and is ready for review.`
@@ -974,11 +1842,18 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       };
     }
     case 'createTemplateDraft': {
-      const result = buildTemplateDraft(state, action);
+      const result = buildTemplateDraft(state, action, commandId(action.metadata, 'message'));
       if (!result.ok) {
         return {
           ...state,
-          activity: addActivity(state, 'Message', 'Template draft not created', result.reason, 'Warning')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Message',
+            'Template draft not created',
+            result.reason,
+            'Warning'
+          )
         };
       }
       const duplicateRisk = detectDuplicateMessageRisk(state, result.draft);
@@ -997,6 +1872,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         selectedMessageId: reviewedDraft.id,
         selectedContactId: reviewedDraft.contactId,
         activity: addActivity(
+          action.metadata,
           state,
           'Message',
           'Template draft created',
@@ -1005,37 +1881,87 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       };
     }
     case 'createAiDraft': {
-      const draft = buildMessageDraft(state, action.contactId, action.eventId, action.reason, {
+      if ((action.feedback === undefined) !== (action.regenerationSource === undefined)) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'AI',
+            'Message regeneration not applied',
+            'Regeneration must be bound to the exact active source draft.',
+            'Warning'
+          )
+        };
+      }
+      const regenerationSourceMessage = action.regenerationSource
+        ? state.messages.find(message => message.id === action.regenerationSource?.messageId)
+        : undefined;
+      const generationContact = findContact(state, action.contactId);
+      if (
+        action.generationOrigin === 'Automatic' &&
+        generationContact &&
+        !contactAllowsAutomaticDraftGeneration(generationContact)
+      ) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'AI',
+            'Automatic draft skipped',
+            'This contact opted out of proactive draft generation. A user-requested draft remains available.',
+            'Info'
+          )
+        };
+      }
+      const draft = buildMessageDraft(action.metadata, state, action.contactId, action.eventId, action.reason, {
         providerVariants: action.variants,
-        feedback: action.feedback
+        feedback: action.feedback,
+        occurrenceDate: regenerationSourceMessage ? messageOccurrenceDate(state, regenerationSourceMessage) : undefined
       });
       if (!draft) {
         return {
           ...state,
-          activity: addActivity(state, 'AI', 'AI draft not created', 'The selected contact could not be found.', 'Error')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'AI',
+            'AI draft not created',
+            'The selected contact could not be found.',
+            'Error'
+          )
         };
       }
-      const duplicateRisk = detectDuplicateMessageRisk(state, draft);
-      const reviewedDraft = duplicateRisk.risk
-        ? {
-            ...draft,
-            duplicateWarning: duplicateRisk.message,
-            readiness: 'Duplicate risk needs review before approval'
-          }
-        : draft;
+      const insertion = insertDraftForReview(state, draft, action.regenerationSource);
+      if (!insertion.ok) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'AI',
+            'Message regeneration not applied',
+            insertion.reason,
+            'Warning'
+          )
+        };
+      }
+      const reviewedDraft = insertion.draft;
       return {
         ...state,
-        messages: [reviewedDraft, ...state.messages],
+        messages: insertion.messages,
         activeScreen: 'wishPreview',
         selectedMessageId: reviewedDraft.id,
         selectedContactId: reviewedDraft.contactId,
         aiProvider: {
           status: 'Ready',
-          lastCheckedAt: nowIso(),
+          lastCheckedAt: action.metadata.occurredAt,
           lastPrivacySummary: action.privacySummary,
           lastObservation: action.observation
         },
         activity: addActivity(
+          action.metadata,
           state,
           'AI',
           action.feedback ? 'AI draft regenerated' : 'AI draft created',
@@ -1050,23 +1976,23 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         ...state,
         aiProvider: {
           status: 'Ready',
-          lastCheckedAt: nowIso(),
+          lastCheckedAt: action.metadata.occurredAt,
           lastPrivacySummary: action.privacySummary,
           lastObservation: action.observation
         },
-        activity: addActivity(state, 'AI', 'AI provider ready', action.privacySummary)
+        activity: addActivity(action.metadata, state, 'AI', 'AI provider ready', action.privacySummary)
       };
     case 'aiProviderFailure':
       return {
         ...state,
         aiProvider: {
           status: 'Error',
-          lastCheckedAt: nowIso(),
+          lastCheckedAt: action.metadata.occurredAt,
           lastError: action.error.message,
           lastPrivacySummary: action.privacySummary,
           lastObservation: action.observation
         },
-        activity: addActivity(state, 'AI', 'AI provider unavailable', action.error.message, 'Warning')
+        activity: addActivity(action.metadata, state, 'AI', 'AI provider unavailable', action.error.message, 'Warning')
       };
     case 'approveMessage': {
       const message = state.messages.find(item => item.id === action.messageId);
@@ -1074,6 +2000,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         return {
           ...state,
           activity: addActivity(
+            action.metadata,
             state,
             'Message',
             'Message not approved',
@@ -1082,10 +2009,24 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           )
         };
       }
+      const lifecycleIssue = messageLifecycleTransitionIssue(message, 'approve');
+      if (lifecycleIssue) {
+        return {
+          ...state,
+          activity: addActivity(action.metadata, state, 'Message', 'Message not approved', lifecycleIssue, 'Warning', {
+            targetScreen: 'wishPreview',
+            messageId: message.id,
+            contactId: message.contactId,
+            actionLabel: 'Review message'
+          })
+        };
+      }
+      const currentMessage = withCurrentDuplicateRisk(state, message);
       const approvedMessage = approveMessageTransition(
-        message,
-        messageApprovalRouteIssue(state, message),
-        action.nowIso ?? nowIso()
+        state,
+        currentMessage,
+        messageApprovalRouteIssue(state, currentMessage, { allowDndManualControl: true }),
+        action.metadata.occurredAt
       );
       const nextMessages = updateMessage(state, action.messageId, () => approvedMessage);
       const nextState = {
@@ -1098,6 +2039,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           ? reviewNextNavigation(nextState, action.messageId)
           : {}),
         activity: addActivity(
+          action.metadata,
           state,
           'Message',
           approvedMessage.status === 'Blocked' ? 'Message approval blocked' : 'Message approved',
@@ -1114,17 +2056,49 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         )
       };
     }
-    case 'acknowledgeDuplicateRisk':
+    case 'acknowledgeDuplicateRisk': {
+      const message = state.messages.find(item => item.id === action.messageId);
+      const lifecycleIssue = message
+        ? messageLifecycleTransitionIssue(message, 'acknowledge-duplicate')
+        : 'This message is no longer available.';
+      const assessment = message ? assessDuplicateMessageRisk(state, message) : undefined;
+      if (!message || lifecycleIssue || !assessment?.risk.risk || !assessment.fingerprint) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Message',
+            'Duplicate risk not acknowledged',
+            lifecycleIssue ?? 'No current duplicate risk requires acknowledgement.',
+            'Warning',
+            message
+              ? {
+                  targetScreen: 'wishPreview',
+                  messageId: message.id,
+                  contactId: message.contactId,
+                  actionLabel: 'Review message'
+                }
+              : undefined
+          )
+        };
+      }
+      const wasBlockedByDuplicate =
+        message.status === 'Blocked' &&
+        (message.lastError === message.duplicateWarning || /similar message/i.test(message.lastError ?? ''));
       return {
         ...state,
         messages: updateMessage(state, action.messageId, message => ({
           ...message,
+          duplicateWarning: assessment.risk.risk ? assessment.risk.message : message.duplicateWarning,
           duplicateAcknowledged: true,
-          status: message.status === 'Blocked' ? 'Needs review' : message.status,
+          duplicateAcknowledgementFingerprint: assessment.fingerprint,
+          status: wasBlockedByDuplicate ? 'Needs review' : message.status,
           readiness: 'Duplicate risk acknowledged; review once more before approval',
-          lastError: message.lastError === message.duplicateWarning ? undefined : message.lastError
+          lastError: wasBlockedByDuplicate ? undefined : message.lastError
         })),
         activity: addActivity(
+          action.metadata,
           state,
           'Message',
           'Duplicate risk acknowledged',
@@ -1137,7 +2111,25 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           }
         )
       };
+    }
     case 'rejectMessage': {
+      const message = state.messages.find(item => item.id === action.messageId);
+      const lifecycleIssue = message
+        ? messageLifecycleTransitionIssue(message, 'reject')
+        : 'This message is no longer available.';
+      if (!message || lifecycleIssue) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Message',
+            'Message not rejected',
+            lifecycleIssue ?? 'This message is no longer available.',
+            'Warning'
+          )
+        };
+      }
       const nextState = {
         ...state,
         messages: updateMessage(state, action.messageId, rejectMessageTransition)
@@ -1145,29 +2137,69 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       return {
         ...nextState,
         ...(action.reviewNext ? reviewNextNavigation(nextState, action.messageId) : {}),
-        activity: addActivity(state, 'Message', 'Message rejected', 'The draft will not be sent.', 'Info', {
-          targetScreen: 'messages',
-          messageId: action.messageId,
-          actionLabel: 'Open messages'
-        })
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Message',
+          'Message rejected',
+          'The draft will not be sent.',
+          'Info',
+          {
+            targetScreen: 'messages',
+            messageId: action.messageId,
+            actionLabel: 'Open messages'
+          }
+        )
       };
     }
-    case 'revokeMessage':
+    case 'revokeMessage': {
+      const message = state.messages.find(item => item.id === action.messageId);
+      const lifecycleIssue = message
+        ? messageLifecycleTransitionIssue(message, 'revoke')
+        : 'This message is no longer available.';
+      if (!message || lifecycleIssue) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Message',
+            'Message approval not revoked',
+            lifecycleIssue ?? 'This message is no longer available.',
+            'Warning'
+          )
+        };
+      }
       return {
         ...state,
         messages: updateMessage(state, action.messageId, revokeMessageTransition),
-        activity: addActivity(state, 'Message', 'Message approval revoked', 'Review the message before scheduling again.', 'Info', {
-          targetScreen: 'wishPreview',
-          messageId: action.messageId,
-          actionLabel: 'Review message'
-        })
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Message',
+          'Message approval revoked',
+          'Review the message before scheduling again.',
+          'Info',
+          {
+            targetScreen: 'wishPreview',
+            messageId: action.messageId,
+            actionLabel: 'Review message'
+          }
+        )
       };
+    }
     case 'bulkMessageAction': {
-      const report = buildMessageBulkActionReport(state, action.messageIds, action.action);
+      const report = buildMessageBulkActionReport(
+        state,
+        action.messageIds,
+        action.action,
+        new Date(action.metadata.occurredAt)
+      );
       if (report.eligibleIds.length === 0) {
         return {
           ...state,
           activity: addActivity(
+            action.metadata,
             state,
             'Message',
             bulkActivityTitle(action.action, report.skipped.length),
@@ -1178,15 +2210,22 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       }
 
       const eligibleIds = new Set(report.eligibleIds);
-      const approvedAtIso = nowIso();
+      const approvedAtIso = action.metadata.occurredAt;
       return {
         ...state,
         messages: state.messages.map(message =>
           eligibleIds.has(message.id)
-            ? applyBulkMessageTransition(message, action.action, messageApprovalRouteIssue(state, message), approvedAtIso)
+            ? applyBulkMessageTransition(
+                state,
+                message,
+                action.action,
+                messageApprovalRouteIssue(state, message),
+                approvedAtIso
+              )
             : message
         ),
         activity: addActivity(
+          action.metadata,
           state,
           'Message',
           bulkActivityTitle(action.action, report.skipped.length),
@@ -1201,6 +2240,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         return {
           ...state,
           activity: addActivity(
+            action.metadata,
             state,
             'Message',
             'Test send blocked',
@@ -1222,6 +2262,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
             : item
         ),
         activity: addActivity(
+          action.metadata,
           state,
           'Message',
           plan.title,
@@ -1236,6 +2277,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         return {
           ...state,
           activity: addActivity(
+            action.metadata,
             state,
             'Message',
             'Manual handoff not completed',
@@ -1244,18 +2286,18 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           )
         };
       }
-      const completedAt = action.nowIso ?? nowIso();
-      const issue = manualHandoffIssue(state, message, completedAt);
+      const completedAt = action.metadata.occurredAt;
+      const issue = manualHandoffIssue(state, message, completedAt, action.shareFallbackUsed);
       if (issue) {
         return {
           ...state,
-        activity: addActivity(state, 'Message', 'Manual handoff not completed', issue, 'Warning', {
-          targetScreen: 'wishPreview',
-          messageId: action.messageId,
-          contactId: message.contactId,
-          actionLabel: 'Review handoff'
-        })
-      };
+          activity: addActivity(action.metadata, state, 'Message', 'Manual handoff not completed', issue, 'Warning', {
+            targetScreen: 'wishPreview',
+            messageId: action.messageId,
+            contactId: message.contactId,
+            actionLabel: 'Review handoff'
+          })
+        };
       }
       return {
         ...state,
@@ -1266,22 +2308,35 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           sentAt: completedAt
         })),
         contacts: state.contacts.map(contact => {
-          return message?.contactId === contact.id ? { ...contact, lastContactedAt: completedAt, healthScore: Math.min(100, contact.healthScore + 5) } : contact;
+          return message?.contactId === contact.id
+            ? { ...contact, lastContactedAt: completedAt, healthScore: Math.min(100, contact.healthScore + 5) }
+            : contact;
         }),
-        activity: addActivity(state, 'Message', 'Manual handoff completed', 'The user retained final control in the destination app.', 'Info', {
-          targetScreen: 'chatHistory',
-          messageId: action.messageId,
-          contactId: message.contactId,
-          actionLabel: 'Open chat history'
-        })
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Message',
+          'Manual handoff completed',
+          'The user retained final control in the destination app.',
+          'Info',
+          {
+            targetScreen: 'chatHistory',
+            messageId: action.messageId,
+            contactId: message.contactId,
+            actionLabel: 'Open chat history'
+          }
+        )
       };
     }
     case 'scheduleMessageFollowUp': {
-      const plan = buildMessageFollowUpPlan(state, action.messageId, action.delayDays, action.nowIso);
+      const plan = buildMessageFollowUpPlan(state, action.messageId, action.delayDays, action.metadata.occurredAt, {
+        eventId: commandId(action.metadata, 'event'),
+        reminderId: commandId(action.metadata, 'reminder')
+      });
       if (!plan.ok) {
         return {
           ...state,
-          activity: addActivity(state, 'Event', 'Follow-up not scheduled', plan.reason, 'Warning')
+          activity: addActivity(action.metadata, state, 'Event', 'Follow-up not scheduled', plan.reason, 'Warning')
         };
       }
 
@@ -1292,6 +2347,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         events: [plan.event, ...state.events],
         reminderPlans: [plan.reminderPlan, ...state.reminderPlans],
         activity: addActivity(
+          action.metadata,
           state,
           'Event',
           'Follow-up scheduled',
@@ -1309,6 +2365,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         return {
           ...state,
           activity: addActivity(
+            action.metadata,
             state,
             'Message',
             'Message retry blocked',
@@ -1327,11 +2384,19 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       return {
         ...state,
         messages: updateMessage(state, action.messageId, retryMessageTransition),
-        activity: addActivity(state, 'Message', 'Message retry prepared', 'Review the message before retrying.', 'Info', {
-          targetScreen: 'wishPreview',
-          messageId: action.messageId,
-          actionLabel: 'Review retry'
-        })
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Message',
+          'Message retry prepared',
+          'Review the message before retrying.',
+          'Info',
+          {
+            targetScreen: 'wishPreview',
+            messageId: action.messageId,
+            actionLabel: 'Review retry'
+          }
+        )
       };
     }
     case 'addMemory': {
@@ -1339,27 +2404,30 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!validation.ok) {
         return {
           ...state,
-          activity: addActivity(state, 'Memory', 'Memory not saved', validation.message, 'Warning')
+          activity: addActivity(action.metadata, state, 'Memory', 'Memory not saved', validation.message, 'Warning')
         };
       }
       return {
         ...state,
         memories: [
           {
-            id: `memory-${Date.now()}-${state.memories.length}`,
+            id: commandId(action.metadata, 'memory'),
             contactId: action.contactId,
             category: action.category,
             body: validation.value.body,
             pinned: action.category !== 'Private',
-            createdAt: nowIso()
+            createdAt: action.metadata.occurredAt
           },
           ...state.memories
         ],
         activity: addActivity(
+          action.metadata,
           state,
           'Memory',
           'Memory saved',
-          action.category === 'Private' ? 'Private memory is excluded from AI context.' : 'Memory can improve future drafts.'
+          action.category === 'Private'
+            ? 'Private memory is excluded from AI context.'
+            : 'Memory can improve future drafts.'
         )
       };
     }
@@ -1368,14 +2436,21 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!memory) {
         return {
           ...state,
-          activity: addActivity(state, 'Memory', 'Memory not updated', 'This note is no longer available.', 'Warning')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Memory',
+            'Memory not updated',
+            'This note is no longer available.',
+            'Warning'
+          )
         };
       }
       const validation = validateMemoryNoteInput(state, memory.contactId, action.body);
       if (!validation.ok) {
         return {
           ...state,
-          activity: addActivity(state, 'Memory', 'Memory not updated', validation.message, 'Warning')
+          activity: addActivity(action.metadata, state, 'Memory', 'Memory not updated', validation.message, 'Warning')
         };
       }
       return {
@@ -1391,10 +2466,13 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
             : item
         ),
         activity: addActivity(
+          action.metadata,
           state,
           'Memory',
           'Memory updated',
-          action.category === 'Private' ? 'Private memory is excluded from AI context.' : 'Memory can improve future drafts.'
+          action.category === 'Private'
+            ? 'Private memory is excluded from AI context.'
+            : 'Memory can improve future drafts.'
         )
       };
     }
@@ -1403,17 +2481,27 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!memory) {
         return {
           ...state,
-          activity: addActivity(state, 'Memory', 'Memory not pinned', 'This note is no longer available.', 'Warning')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Memory',
+            'Memory not pinned',
+            'This note is no longer available.',
+            'Warning'
+          )
         };
       }
       return {
         ...state,
         memories: state.memories.map(item => (item.id === action.memoryId ? { ...item, pinned: !item.pinned } : item)),
         activity: addActivity(
+          action.metadata,
           state,
           'Memory',
           memory.pinned ? 'Memory unpinned' : 'Memory pinned',
-          memory.pinned ? 'The note remains searchable in recent memories.' : 'Pinned notes appear first in Memory Vault.'
+          memory.pinned
+            ? 'The note remains searchable in recent memories.'
+            : 'Pinned notes appear first in Memory Vault.'
         )
       };
     }
@@ -1422,13 +2510,26 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!memory) {
         return {
           ...state,
-          activity: addActivity(state, 'Memory', 'Memory not deleted', 'This note is no longer available.', 'Warning')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Memory',
+            'Memory not deleted',
+            'This note is no longer available.',
+            'Warning'
+          )
         };
       }
       return {
         ...state,
         memories: state.memories.filter(item => item.id !== action.memoryId),
-        activity: addActivity(state, 'Memory', 'Memory deleted', 'The note was removed from this contact.')
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Memory',
+          'Memory deleted',
+          'The note was removed from this contact.'
+        )
       };
     }
     case 'answerEnrichmentPrompt': {
@@ -1436,7 +2537,14 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!contact) {
         return {
           ...state,
-          activity: addActivity(state, 'Memory', 'Enrichment not saved', 'Contact could not be found.', 'Warning')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Memory',
+            'Enrichment not saved',
+            'Contact could not be found.',
+            'Warning'
+          )
         };
       }
       const prompt = resolveContactEnrichmentPrompt(state, action.contactId, action.promptId);
@@ -1444,6 +2552,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         return {
           ...state,
           activity: addActivity(
+            action.metadata,
             state,
             'Memory',
             'Enrichment not saved',
@@ -1456,7 +2565,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!validation.ok) {
         return {
           ...state,
-          activity: addActivity(state, 'Memory', 'Enrichment not saved', validation.message, 'Warning')
+          activity: addActivity(action.metadata, state, 'Memory', 'Enrichment not saved', validation.message, 'Warning')
         };
       }
       return {
@@ -1466,16 +2575,17 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         ),
         memories: [
           {
-            id: `memory-${Date.now()}`,
+            id: commandId(action.metadata, 'memory'),
             contactId: action.contactId,
             category: prompt.category,
             body: buildEnrichmentMemoryBody(prompt, validation.value),
             pinned: prompt.category !== 'Private',
-            createdAt: nowIso()
+            createdAt: action.metadata.occurredAt
           },
           ...state.memories
         ],
         activity: addActivity(
+          action.metadata,
           state,
           'Memory',
           'Enrichment saved',
@@ -1487,7 +2597,14 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!findContact(state, action.contactId)) {
         return {
           ...state,
-          activity: addActivity(state, 'Gift', 'Gift not saved', 'Contact could not be found.', 'Warning')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Gift',
+            'Gift not saved',
+            'Contact could not be found.',
+            'Warning'
+          )
         };
       }
       const giftValidation = validateGiftInput({
@@ -1501,39 +2618,58 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!giftValidation.ok) {
         return {
           ...state,
-          activity: addActivity(state, 'Gift', 'Gift not saved', giftValidation.message, 'Warning')
+          activity: addActivity(action.metadata, state, 'Gift', 'Gift not saved', giftValidation.message, 'Warning')
         };
       }
       return {
         ...state,
         gifts: [
           {
-            id: `gift-${Date.now()}`,
+            id: commandId(action.metadata, 'gift'),
             contactId: action.contactId,
             name: giftValidation.value.name,
             category: giftValidation.value.category,
             occasion: giftValidation.value.occasion,
             cost: giftValidation.value.cost,
-            year: new Date().getFullYear(),
+            year: localCalendarYear(action.metadata.localDate),
             feedback: giftValidation.value.feedback ?? 'Unknown',
             notes: giftValidation.value.notes || 'Recorded from Gift Advisor.'
           },
           ...state.gifts
         ],
-        activity: addActivity(state, 'Gift', 'Gift saved', `${giftValidation.value.name} was added to gift history.`)
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Gift',
+          'Gift saved',
+          `${giftValidation.value.name} was added to gift history.`
+        )
       };
     case 'deleteGift': {
       const gift = state.gifts.find(item => item.id === action.giftId);
       if (!gift) {
         return {
           ...state,
-          activity: addActivity(state, 'Gift', 'Gift not deleted', 'This gift record is no longer available.', 'Warning')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Gift',
+            'Gift not deleted',
+            'This gift record is no longer available.',
+            'Warning'
+          )
         };
       }
       return {
         ...state,
         gifts: state.gifts.filter(item => item.id !== action.giftId),
-        activity: addActivity(state, 'Gift', 'Gift deleted', `${gift.name} was removed from gift history.`)
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Gift',
+          'Gift deleted',
+          `${gift.name} was removed from gift history.`
+        )
       };
     }
     case 'updateGiftBudget': {
@@ -1541,14 +2677,21 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!contact) {
         return {
           ...state,
-          activity: addActivity(state, 'Gift', 'Gift budget not saved', 'Contact could not be found.', 'Warning')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Gift',
+            'Gift budget not saved',
+            'Contact could not be found.',
+            'Warning'
+          )
         };
       }
       const validation = validateGiftBudgetInput({ annualGiftBudget: action.annualGiftBudget });
       if (!validation.ok) {
         return {
           ...state,
-          activity: addActivity(state, 'Gift', 'Gift budget not saved', validation.message, 'Warning')
+          activity: addActivity(action.metadata, state, 'Gift', 'Gift budget not saved', validation.message, 'Warning')
         };
       }
       return {
@@ -1562,6 +2705,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
             : item
         ),
         activity: addActivity(
+          action.metadata,
           state,
           'Gift',
           'Gift budget saved',
@@ -1574,7 +2718,14 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!contact) {
         return {
           ...state,
-          activity: addActivity(state, 'Contact', 'Contact not saved', 'Contact could not be found.', 'Warning')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Contact',
+            'Contact not saved',
+            'Contact could not be found.',
+            'Warning'
+          )
         };
       }
       const preferences = resolveContactPreferencesForContact(state.settings, contact);
@@ -1582,7 +2733,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!validation.ok) {
         return {
           ...state,
-          activity: addActivity(state, 'Contact', 'Contact not saved', validation.message, 'Warning')
+          activity: addActivity(action.metadata, state, 'Contact', 'Contact not saved', validation.message, 'Warning')
         };
       }
       const reviewUpdate = markContactMessagesForReview(state.messages, [action.contactId]);
@@ -1598,6 +2749,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         ),
         messages: reviewUpdate.messages,
         activity: addActivity(
+          action.metadata,
           state,
           'Contact',
           'Contact saved',
@@ -1641,7 +2793,13 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
             : contact
         ),
         messages: groupReviewUpdate.messages,
-        activity: addActivity(state, 'Contact', 'Relationship group updated', `Contact moved to ${action.group}.`)
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Contact',
+          'Relationship group updated',
+          `Contact moved to ${action.group}.`
+        )
       };
     case 'setRelationshipGroupDefault': {
       if (!relationshipGroupOptions.includes(action.group)) {
@@ -1671,7 +2829,13 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
             : contact
         ),
         messages: reviewUpdate.messages,
-        activity: addActivity(state, 'Contact', 'Relationship group defaults updated', `${action.group} defaults changed.`)
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Contact',
+          'Relationship group defaults updated',
+          `${action.group} defaults changed.`
+        )
       };
     }
     case 'toggleContactVip':
@@ -1680,7 +2844,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         contacts: state.contacts.map(contact =>
           contact.id === action.contactId ? { ...contact, isVip: !contact.isVip } : contact
         ),
-        activity: addActivity(state, 'Contact', 'VIP setting updated', 'Contact priority was changed.')
+        activity: addActivity(action.metadata, state, 'Contact', 'VIP setting updated', 'Contact priority was changed.')
       };
     case 'toggleContactDnd': {
       const reviewUpdate = markContactMessagesForReview(state.messages, [action.contactId]);
@@ -1690,14 +2854,27 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           contact.id === action.contactId ? { ...contact, dnd: !contact.dnd } : contact
         ),
         messages: reviewUpdate.messages,
-        activity: addActivity(state, 'Contact', 'Do-not-disturb updated', 'Contact automation preference was changed.')
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Contact',
+          'Do-not-disturb updated',
+          'Contact automation preference was changed.'
+        )
       };
     }
     case 'setCheckInCadence':
       if (!checkInCadenceOptions.includes(action.days)) {
         return {
           ...state,
-          activity: addActivity(state, 'Contact', 'Check-in cadence not saved', 'Choose a supported cadence.', 'Warning')
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Contact',
+            'Check-in cadence not saved',
+            'Choose a supported cadence.',
+            'Warning'
+          )
         };
       }
       const cadenceReviewUpdate = markContactMessagesForReview(state.messages, [action.contactId]);
@@ -1709,7 +2886,13 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
             : contact
         ),
         messages: cadenceReviewUpdate.messages,
-        activity: addActivity(state, 'Contact', 'Check-in cadence updated', `Cadence changed to ${action.days} day(s).`)
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Contact',
+          'Check-in cadence updated',
+          `Cadence changed to ${action.days} day(s).`
+        )
       };
     case 'setContactChannel': {
       const reviewUpdate = markContactMessagesForReview(state.messages, [action.contactId]);
@@ -1728,6 +2911,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         return {
           ...state,
           activity: addActivity(
+            action.metadata,
             state,
             'Setup',
             'Unattended automation unavailable',
@@ -1748,8 +2932,100 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
             : contact
         ),
         messages: automationReviewUpdate.messages,
-        activity: addActivity(state, 'Contact', 'Contact automation override updated', `${action.mode} selected for this contact.`)
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Contact',
+          'Contact automation override updated',
+          `${action.mode} selected for this contact.`
+        )
       };
+    case 'setContactCustomSendTime': {
+      const contact = findContact(state, action.contactId);
+      const validationIssue = action.time === undefined ? undefined : validateDefaultSendTime(action.time);
+      if (!contact || validationIssue) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Contact',
+            'Custom send time not saved',
+            validationIssue ?? 'Contact could not be found.',
+            'Warning'
+          )
+        };
+      }
+      const reviewUpdate = markContactMessagesForReview(state.messages, [contact.id]);
+      return {
+        ...state,
+        contacts: state.contacts.map(item => {
+          if (item.id !== contact.id) return item;
+          const { customSendTime: _customSendTime, ...withoutCustomSendTime } = item;
+          return action.time ? { ...withoutCustomSendTime, customSendTime: action.time } : withoutCustomSendTime;
+        }),
+        messages: reviewUpdate.messages,
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Contact',
+          'Custom send time updated',
+          action.time
+            ? `Event-linked drafts for this contact use ${action.time} before global safety adjustments.`
+            : 'Event-linked drafts for this contact now use the global default send time.'
+        )
+      };
+    }
+    case 'setContactQuietHoursBehavior': {
+      const contact = findContact(state, action.contactId);
+      if (!contact || (action.behavior !== 'Defer' && action.behavior !== 'Block')) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Contact',
+            'Quiet-hours behavior not saved',
+            contact ? 'Choose Defer or Block.' : 'Contact could not be found.',
+            'Warning'
+          )
+        };
+      }
+      const reviewUpdate = markContactMessagesForReview(state.messages, [contact.id]);
+      return {
+        ...state,
+        contacts: state.contacts.map(item =>
+          item.id === contact.id ? { ...item, quietHoursBehavior: action.behavior } : item
+        ),
+        messages: reviewUpdate.messages,
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Contact',
+          'Quiet-hours behavior updated',
+          action.behavior === 'Block'
+            ? 'Intended send times inside global quiet hours are blocked for review.'
+            : 'Global quiet hours safely defer intended send times for this contact.'
+        )
+      };
+    }
+    case 'setContactSkipAuto': {
+      const contact = findContact(state, action.contactId);
+      if (!contact) return state;
+      return {
+        ...state,
+        contacts: state.contacts.map(item => (item.id === contact.id ? { ...item, skipAuto: action.enabled } : item)),
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Contact',
+          'Proactive drafting preference updated',
+          action.enabled
+            ? 'Automatic draft preparation is skipped; user-requested drafting remains available.'
+            : 'Proactive draft preparation is allowed under the active review-first policy.'
+        )
+      };
+    }
     case 'useGroupDefaultsForContact': {
       const reviewUpdate = markContactMessagesForReview(state.messages, [action.contactId]);
       return {
@@ -1762,22 +3038,39 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
             ...contact,
             preferenceOverrides: {}
           };
-          return applyResolvedPreferencesToContact(inherited, resolveContactPreferencesForContact(state.settings, inherited));
+          return applyResolvedPreferencesToContact(
+            inherited,
+            resolveContactPreferencesForContact(state.settings, inherited)
+          );
         }),
         messages: reviewUpdate.messages,
-        activity: addActivity(state, 'Contact', 'Group defaults applied', 'Contact now inherits group preferences.')
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Contact',
+          'Group defaults applied',
+          'Contact now inherits group preferences.'
+        )
       };
     }
     case 'snoozeCheckIn':
       return {
         ...state,
         contacts: state.contacts.map(contact =>
-          contact.id === action.contactId ? { ...contact, checkInSnoozedUntil: addDaysIso(action.days, action.nowIso) } : contact
+          contact.id === action.contactId
+            ? { ...contact, checkInSnoozedUntil: addDaysIso(action.days, action.metadata.occurredAt) }
+            : contact
         ),
-        activity: addActivity(state, 'Contact', 'Check-in snoozed', `Reminder moved by ${action.days} day(s).`)
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Contact',
+          'Check-in snoozed',
+          `Reminder moved by ${action.days} day(s).`
+        )
       };
     case 'markContactedElsewhere': {
-      const contactedAt = action.nowIso ?? nowIso();
+      const contactedAt = action.metadata.occurredAt;
       return {
         ...state,
         contacts: state.contacts.map(contact => {
@@ -1792,6 +3085,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           };
         }),
         activity: addActivity(
+          action.metadata,
           state,
           'Contact',
           'Contact marked contacted',
@@ -1806,29 +3100,64 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           ...state.settings,
           locale: action.locale
         },
-        activity: addActivity(state, 'Setup', 'Language updated', `Locale changed to ${action.locale}.`)
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Setup',
+          'Language updated',
+          `Locale changed to ${action.locale}.`
+        )
       };
-    case 'setEmailSender':
+    case 'setEmailSender': {
+      const senderEmail = normalizeEmailAddress(action.senderEmail);
+      if (senderEmail.length > 0 && !isValidEmailAddress(senderEmail)) return state;
+      if ((state.emailDelivery.senderEmail ?? '') === senderEmail) return state;
+      const senderChanged = normalizeEmailAddress(state.emailDelivery.senderEmail) !== senderEmail;
+      const reviewUpdate = senderChanged
+        ? markScheduledChannelMessagesForReview(
+            state.messages,
+            'Email',
+            'Email sender configuration changed. Review before scheduling or sending.'
+          )
+        : { messages: state.messages, count: 0 };
       return {
         ...state,
+        messages: reviewUpdate.messages,
         emailDelivery: {
           ...state.emailDelivery,
-          senderEmail: action.senderEmail.trim(),
-          status: action.senderEmail.trim().length > 0 ? state.emailDelivery.status : 'Not configured',
+          senderEmail: senderEmail || undefined,
+          status: senderEmail ? state.emailDelivery.status : 'Not configured',
+          lastCheckedAt: senderEmail ? state.emailDelivery.lastCheckedAt : undefined,
           lastError: undefined
         },
-        activity: addActivity(state, 'Setup', 'Email sender updated', 'Email sender configuration changed.')
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Setup',
+          'Email sender updated',
+          reviewUpdate.count > 0
+            ? `Email sender configuration changed. ${reviewUpdate.count} scheduled email message(s) returned to review.`
+            : 'Email sender configuration changed.',
+          reviewUpdate.count > 0 ? 'Warning' : 'Info'
+        )
       };
+    }
     case 'emailProviderReady':
       return {
         ...state,
         emailDelivery: {
           ...state.emailDelivery,
           status: 'Ready',
-          lastCheckedAt: nowIso(),
+          lastCheckedAt: action.metadata.occurredAt,
           lastError: undefined
         },
-        activity: addActivity(state, 'Setup', 'Email provider ready', 'Email delivery endpoint accepted the message.')
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Setup',
+          'Email provider ready',
+          'Email delivery endpoint accepted the message.'
+        )
       };
     case 'emailProviderFailure':
       return {
@@ -1839,10 +3168,11 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         emailDelivery: {
           ...state.emailDelivery,
           status: 'Error',
-          lastCheckedAt: nowIso(),
+          lastCheckedAt: action.metadata.occurredAt,
           lastError: action.error.message
         },
         activity: addActivity(
+          action.metadata,
           state,
           'Setup',
           'Email delivery failed',
@@ -1858,7 +3188,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         )
       };
     case 'emailDeliveryAccepted': {
-      const acceptedAt = nowIso();
+      const acceptedAt = action.metadata.occurredAt;
       return {
         ...state,
         messages: updateMessage(state, action.messageId, message => ({
@@ -1880,6 +3210,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           lastError: undefined
         },
         activity: addActivity(
+          action.metadata,
           state,
           'Message',
           'Email accepted by provider',
@@ -1894,7 +3225,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       };
     }
     case 'emailDeliveryUnknown': {
-      const attemptedAt = nowIso();
+      const attemptedAt = action.metadata.occurredAt;
       return {
         ...state,
         messages: updateMessage(state, action.messageId, message =>
@@ -1919,6 +3250,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           lastError: action.error.message
         },
         activity: addActivity(
+          action.metadata,
           state,
           'Message',
           'Email delivery status unknown',
@@ -1932,26 +3264,158 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         )
       };
     }
+    case 'emailDeliveryReconciled': {
+      const message = state.messages.find(item => item.id === action.messageId);
+      const attempt = message?.emailDeliveryAttempt;
+      if (
+        !message ||
+        !attempt ||
+        attempt.idempotencyKey !== action.idempotencyKey ||
+        (message.status !== 'Delivery pending' && message.status !== 'Delivery unknown')
+      ) {
+        return {
+          ...state,
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Message',
+            'Email reconciliation ignored',
+            'The saved delivery attempt changed before reconciliation completed.',
+            'Warning'
+          )
+        };
+      }
+      const reconciledAt = action.metadata.occurredAt;
+      if (action.status === 'accepted') {
+        return {
+          ...state,
+          messages: updateMessage(state, action.messageId, current => ({
+            ...current,
+            status: 'Delivery pending',
+            readiness: 'Provider still reports accepted; delivery remains pending',
+            lastError: undefined,
+            emailDeliveryAttempt: {
+              idempotencyKey: action.idempotencyKey,
+              status: 'Accepted',
+              deliveryId: action.deliveryId ?? attempt.deliveryId,
+              updatedAt: reconciledAt
+            }
+          })),
+          emailDelivery: {
+            ...state.emailDelivery,
+            status: 'Ready',
+            lastCheckedAt: reconciledAt,
+            lastError: undefined
+          }
+        };
+      }
+      if (action.status === 'failed') {
+        return {
+          ...state,
+          messages: updateMessage(state, action.messageId, current => ({
+            ...current,
+            status: 'Failed',
+            readiness: 'Provider confirmed delivery failure; review before retrying',
+            lastError: 'The provider confirmed that this delivery attempt failed.',
+            emailDeliveryAttempt: {
+              idempotencyKey: action.idempotencyKey,
+              status: 'Failed',
+              deliveryId: action.deliveryId ?? attempt.deliveryId,
+              updatedAt: reconciledAt
+            }
+          })),
+          emailDelivery: {
+            ...state.emailDelivery,
+            status: 'Error',
+            lastCheckedAt: reconciledAt,
+            lastError: 'The provider confirmed a delivery failure.'
+          },
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Message',
+            'Email failure reconciled',
+            'The provider confirmed failure. A new attempt requires review.',
+            'Warning',
+            { targetScreen: 'wishPreview', messageId: action.messageId, actionLabel: 'Review email' }
+          )
+        };
+      }
+      return {
+        ...state,
+        messages: updateMessage(state, action.messageId, current => ({
+          ...current,
+          status: 'Sent',
+          readiness: 'Email delivery confirmed by provider reconciliation',
+          lastError: undefined,
+          sentAt: reconciledAt,
+          emailDeliveryAttempt: {
+            idempotencyKey: action.idempotencyKey,
+            status: 'Sent',
+            deliveryId: action.deliveryId ?? attempt.deliveryId,
+            updatedAt: reconciledAt
+          }
+        })),
+        contacts: state.contacts.map(contact =>
+          contact.id === message.contactId
+            ? {
+                ...contact,
+                lastContactedAt: reconciledAt,
+                healthScore: Math.min(100, contact.healthScore + 5)
+              }
+            : contact
+        ),
+        emailDelivery: {
+          ...state.emailDelivery,
+          status: 'Ready',
+          lastCheckedAt: reconciledAt,
+          lastError: undefined
+        },
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Message',
+          'Email sent status reconciled',
+          'The provider confirmed that the idempotent delivery attempt was sent.',
+          'Info',
+          {
+            targetScreen: 'chatHistory',
+            messageId: action.messageId,
+            contactId: message.contactId,
+            actionLabel: 'Open chat history'
+          }
+        )
+      };
+    }
     case 'emailSent': {
-      const request = buildEmailDeliveryRequest(state, action.messageId);
+      const requestedSentAt = action.nowIso ?? action.metadata.occurredAt;
+      const sentAt = Number.isNaN(Date.parse(requestedSentAt)) ? action.metadata.occurredAt : requestedSentAt;
+      const request = buildEmailDeliveryRequest(state, action.messageId, new Date(sentAt));
       if (!request.ok) {
         return {
           ...state,
           emailDelivery: {
             ...state.emailDelivery,
             status: 'Error',
-            lastCheckedAt: nowIso(),
+            lastCheckedAt: action.metadata.occurredAt,
             lastError: request.error.message
           },
-          activity: addActivity(state, 'Message', 'Email sent status not recorded', request.error.message, 'Warning', {
-            targetScreen: 'messages',
-            messageId: action.messageId,
-            actionLabel: 'Open messages'
-          })
+          activity: addActivity(
+            action.metadata,
+            state,
+            'Message',
+            'Email sent status not recorded',
+            request.error.message,
+            'Warning',
+            {
+              targetScreen: 'messages',
+              messageId: action.messageId,
+              actionLabel: 'Open messages'
+            }
+          )
         };
       }
       const sentMessage = state.messages.find(item => item.id === action.messageId);
-      const sentAt = nowIso();
       return {
         ...state,
         messages: updateMessage(state, action.messageId, message => ({
@@ -1977,38 +3441,58 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           lastCheckedAt: sentAt,
           lastError: undefined
         },
-        activity: addActivity(state, 'Message', 'Email sent', 'The approved email was sent by the configured provider.', 'Info', {
-          targetScreen: sentMessage ? 'chatHistory' : 'messages',
-          messageId: action.messageId,
-          contactId: sentMessage?.contactId,
-          actionLabel: sentMessage ? 'Open chat history' : 'Open messages'
-        })
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Message',
+          'Email sent',
+          'The approved email was sent by the configured provider.',
+          'Info',
+          {
+            targetScreen: sentMessage ? 'chatHistory' : 'messages',
+            messageId: action.messageId,
+            contactId: sentMessage?.contactId,
+            actionLabel: sentMessage ? 'Open chat history' : 'Open messages'
+          }
+        )
       };
     }
-    case 'setOnboardingGoal':
+    case 'setOnboardingGoal': {
+      const newlyRequired = requiredOnboardingStepIds(action.goal);
       return {
         ...state,
         onboarding: {
           ...state.onboarding,
           selectedGoal: action.goal,
-          lastUpdatedAt: nowIso()
+          skippedStepIds: state.onboarding.skippedStepIds.filter(stepId => !newlyRequired.includes(stepId)),
+          lastUpdatedAt: action.metadata.occurredAt
         },
-        activity: addActivity(state, 'Setup', 'Onboarding goal updated', `Goal changed to ${action.goal}.`)
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Setup',
+          'Onboarding goal updated',
+          `Goal changed to ${action.goal}.`
+        )
       };
-    case 'setOnboardingStep':
+    }
+    case 'setOnboardingStep': {
+      if (onboardingTransitionIssue(state, { type: 'set-step', stepId: action.stepId })) return state;
       return {
         ...state,
         activeScreen: 'onboarding',
         onboarding: {
           ...state.onboarding,
           currentStepId: action.stepId,
-          lastUpdatedAt: nowIso()
+          lastUpdatedAt: action.metadata.occurredAt
         }
       };
+    }
     case 'advanceOnboarding': {
       const currentStepId = state.onboarding.currentStepId;
+      if (onboardingTransitionIssue(state, { type: 'advance' })) return state;
       if (currentStepId === 'finish') {
-        return relateReducer(state, { type: 'completeOnboarding' });
+        return relateTransition(state, { type: 'completeOnboarding', metadata: action.metadata });
       }
       return {
         ...state,
@@ -2016,22 +3500,33 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           ...state.onboarding,
           currentStepId: nextOnboardingStep(currentStepId),
           completedStepIds: uniqueSteps([...state.onboarding.completedStepIds, currentStepId]),
-          lastUpdatedAt: nowIso()
+          skippedStepIds: state.onboarding.skippedStepIds.filter(stepId => stepId !== currentStepId),
+          lastUpdatedAt: action.metadata.occurredAt
         }
       };
     }
-    case 'skipOnboardingStep':
+    case 'skipOnboardingStep': {
+      if (onboardingTransitionIssue(state, { type: 'skip', stepId: action.stepId })) return state;
       return {
         ...state,
         onboarding: {
           ...state.onboarding,
           currentStepId: nextOnboardingStep(action.stepId),
+          completedStepIds: state.onboarding.completedStepIds.filter(stepId => stepId !== action.stepId),
           skippedStepIds: uniqueSteps([...state.onboarding.skippedStepIds, action.stepId]),
-          lastUpdatedAt: nowIso()
+          lastUpdatedAt: action.metadata.occurredAt
         },
-        activity: addActivity(state, 'Setup', 'Onboarding step skipped', `${action.stepId} can be completed later.`)
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Setup',
+          'Onboarding step skipped',
+          `${action.stepId} can be completed later.`
+        )
       };
+    }
     case 'completeOnboarding':
+      if (onboardingTransitionIssue(state, { type: 'complete' })) return state;
       return {
         ...state,
         activeScreen: 'home',
@@ -2040,9 +3535,16 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           completed: true,
           currentStepId: 'finish',
           completedStepIds: uniqueSteps([...state.onboarding.completedStepIds, 'finish']),
-          lastUpdatedAt: nowIso()
+          skippedStepIds: state.onboarding.skippedStepIds.filter(stepId => stepId !== 'finish'),
+          lastUpdatedAt: action.metadata.occurredAt
         },
-        activity: addActivity(state, 'Setup', 'Onboarding completed', 'Home is ready; setup gaps remain available from Settings and Setup Check.')
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Setup',
+          'Onboarding completed',
+          'Home is ready; setup gaps remain available from Settings and Setup Check.'
+        )
       };
     case 'reopenOnboarding':
       return {
@@ -2050,7 +3552,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         activeScreen: 'onboarding',
         onboarding: {
           ...state.onboarding,
-          lastUpdatedAt: nowIso()
+          lastUpdatedAt: action.metadata.occurredAt
         }
       };
     case 'setAccountMode':
@@ -2062,6 +3564,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
             accountMode: 'Local'
           },
           activity: addActivity(
+            action.metadata,
             state,
             'Setup',
             'Google sync unavailable',
@@ -2079,9 +3582,10 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         onboarding: {
           ...state.onboarding,
           completedStepIds: uniqueSteps([...state.onboarding.completedStepIds, 'account']),
-          lastUpdatedAt: nowIso()
+          lastUpdatedAt: action.metadata.occurredAt
         },
         activity: addActivity(
+          action.metadata,
           state,
           'Setup',
           'Account mode updated',
@@ -2097,7 +3601,13 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           ...state.settings,
           accountMode: 'Local'
         },
-        activity: addActivity(state, 'Setup', 'Account disconnected', 'Provider sync was disconnected while local data was retained.')
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Setup',
+          'Account disconnected',
+          'Provider sync was disconnected while local data was retained.'
+        )
       };
     case 'recordPermissionDecision': {
       const notificationsBlocked =
@@ -2118,6 +3628,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         },
         reminderPlans: clearedReminderCount > 0 ? [] : state.reminderPlans,
         activity: addActivity(
+          action.metadata,
           state,
           'Setup',
           `${action.capability} permission ${action.decision.toLowerCase()}`,
@@ -2140,9 +3651,14 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         ...state,
         privacy: {
           ...state.privacy,
-          whatsappHandoffConsent: !state.privacy.whatsappHandoffConsent
+          whatsappHandoffConsent: !state.privacy.whatsappHandoffConsent,
+          permissionDecisions: {
+            ...state.privacy.permissionDecisions,
+            'WhatsApp handoff': state.privacy.whatsappHandoffConsent ? 'Denied' : 'Granted'
+          }
         },
         activity: addActivity(
+          action.metadata,
           state,
           'Setup',
           'Manual WhatsApp handoff consent updated',
@@ -2152,7 +3668,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         )
       };
     case 'clearLocalDataConfirmed':
-      return createClearedLocalState(state);
+      return createClearedLocalState(state, action.metadata);
     case 'toggleSetting': {
       const value = state.settings[action.key];
       if (typeof value !== 'boolean') {
@@ -2165,7 +3681,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           ? markScheduledChannelMessagesForReview(state.messages, deliveryChannel)
           : action.key === 'aiEnabled' && nextValue === false
             ? markAiDraftMessagesForReview(state.messages)
-          : { messages: state.messages, count: 0 };
+            : { messages: state.messages, count: 0 };
       const clearedReminderCount =
         action.key === 'notificationsEnabled' && nextValue === false ? state.reminderPlans.length : 0;
       const reminderPlans = clearedReminderCount > 0 ? [] : state.reminderPlans;
@@ -2174,9 +3690,9 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           ? `${String(action.key)} changed. ${reviewUpdate.count} scheduled ${deliveryChannel} message(s) returned to review.`
           : reviewUpdate.count > 0 && action.key === 'aiEnabled'
             ? `${String(action.key)} changed. ${reviewUpdate.count} unsent AI draft message(s) flagged for manual review.`
-          : clearedReminderCount > 0
-            ? `${String(action.key)} changed. ${clearedReminderCount} notification reminder plan(s) cleared; reminders remain visible in-app.`
-          : `${String(action.key)} changed.`;
+            : clearedReminderCount > 0
+              ? `${String(action.key)} changed. ${clearedReminderCount} notification reminder plan(s) cleared; reminders remain visible in-app.`
+              : `${String(action.key)} changed.`;
       return {
         ...state,
         settings: {
@@ -2186,6 +3702,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         messages: reviewUpdate.messages,
         reminderPlans,
         activity: addActivity(
+          action.metadata,
           state,
           'Setup',
           'Setting updated',
@@ -2199,6 +3716,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         return {
           ...state,
           activity: addActivity(
+            action.metadata,
             state,
             'Setup',
             'Unattended automation unavailable',
@@ -2223,6 +3741,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         },
         messages: reviewUpdate.messages,
         activity: addActivity(
+          action.metadata,
           state,
           'Setup',
           'Automation mode updated',
@@ -2241,7 +3760,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (problem) {
         return {
           ...state,
-          activity: addActivity(state, 'Setup', 'Quiet hours not saved', problem, 'Warning')
+          activity: addActivity(action.metadata, state, 'Setup', 'Quiet hours not saved', problem, 'Warning')
         };
       }
       const settings = {
@@ -2254,6 +3773,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         settings,
         messages: reviewUpdate.messages,
         activity: addActivity(
+          action.metadata,
           state,
           'Setup',
           'Quiet hours updated',
@@ -2264,23 +3784,59 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         )
       };
     }
+    case 'setDefaultSendTime': {
+      const time = action.time.trim();
+      const problem = validateDefaultSendTime(time);
+      if (problem) {
+        return {
+          ...state,
+          activity: addActivity(action.metadata, state, 'Setup', 'Default send time not saved', problem, 'Warning')
+        };
+      }
+      let count = 0;
+      const messages = state.messages.map(message => {
+        if (message.status !== 'Scheduled' || !message.eventId) return message;
+        count += 1;
+        return {
+          ...clearApprovalMetadata(message),
+          status: 'Needs review' as const,
+          readiness: 'Review after default send time changed',
+          lastError: SCHEDULE_POLICY_REVIEW_WARNING
+        };
+      });
+      return {
+        ...state,
+        settings: { ...state.settings, defaultSendTime: time },
+        messages,
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Setup',
+          'Default send time updated',
+          `${time}.${count > 0 ? ` ${count} scheduled message(s) returned to review.` : ''}`,
+          count > 0 ? 'Warning' : 'Info'
+        )
+      };
+    }
     case 'addBlackout': {
       const validation = validateBlackoutInput({
         label: action.label,
         startDate: action.startDate,
-        endDate: action.endDate
+        endDate: action.endDate,
+        behavior: action.behavior,
+        channels: action.channels
       });
       if (!validation.ok) {
         return {
           ...state,
-          activity: addActivity(state, 'Setup', 'Blackout not saved', validation.message, 'Warning')
+          activity: addActivity(action.metadata, state, 'Setup', 'Blackout not saved', validation.message, 'Warning')
         };
       }
       const settings = {
         ...state.settings,
         blackouts: [
           {
-            id: `blackout-${Date.now()}`,
+            id: commandId(action.metadata, 'blackout'),
             ...validation.value
           },
           ...state.settings.blackouts
@@ -2292,10 +3848,13 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         settings,
         messages: reviewUpdate.messages,
         activity: addActivity(
+          action.metadata,
           state,
           'Setup',
           'Blackout added',
-          `${validation.value.label} will pause reminders.${
+          `${validation.value.label} will ${validation.value.behavior === 'Block' ? 'block' : 'defer'} ${
+            validation.value.channels?.join(', ') ?? 'all reminder and message'
+          } activity.${
             reviewUpdate.count > 0 ? ` ${reviewUpdate.count} scheduled message(s) returned to review.` : ''
           }`,
           reviewUpdate.count > 0 ? 'Warning' : 'Info'
@@ -2309,24 +3868,33 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           ...state.settings,
           blackouts: state.settings.blackouts.filter(blackout => blackout.id !== action.blackoutId)
         },
-        activity: addActivity(state, 'Setup', 'Blackout removed', 'Reminder blackout window removed.')
+        activity: addActivity(action.metadata, state, 'Setup', 'Blackout removed', 'Reminder blackout window removed.')
       };
     case 'importContacts': {
-      const result = importContacts(state, action.records);
+      const result = importContacts(
+        state,
+        action.records,
+        {
+          contactIds: action.metadata.ids.contact,
+          eventIds: action.metadata.ids.event
+        },
+        action.resolutions
+      );
       return {
         ...state,
         contacts: result.contacts,
         events: result.events,
         activity: addActivity(
+          action.metadata,
           state,
           'Contact',
           'Contacts imported',
-          `${result.added} added, ${result.updated} updated, ${result.skipped} skipped. Review imported birthdays before sending.`
+          `${result.added} added, ${result.updated} updated, ${result.skipped} skipped, ${result.unresolved} need review. Review imported birthdays before sending.`
         )
       };
     }
     case 'planReminders': {
-      const planning = buildReminderPlanningResult(state);
+      const planning = buildReminderPlanningResult(state, [7, 1, 0], new Date(action.metadata.occurredAt));
       const issueDetail =
         planning.issues.length > 0
           ? ` ${planning.issues.map(issue => `${issue.title}: ${issue.detail}`).join(' ')}`
@@ -2335,6 +3903,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         ...state,
         reminderPlans: planning.plans,
         activity: addActivity(
+          action.metadata,
           state,
           'Event',
           planning.plans.length > 0 ? 'Reminders planned' : 'Reminders need setup',
@@ -2349,22 +3918,31 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         reminderPlans: action.plans
       };
     case 'calendarImported': {
-      const result = calendarCandidatesToEvents(state, action.candidates);
+      const result = calendarCandidatesToEvents(
+        state,
+        action.candidates,
+        {
+          contactIds: action.metadata.ids.contact,
+          eventIds: action.metadata.ids.event
+        },
+        action.resolutions
+      );
       return {
         ...state,
         contacts: result.contacts,
         events: result.events,
         calendarSync: {
           ...state.calendarSync,
-          lastImportedAt: nowIso(),
+          lastImportedAt: action.metadata.occurredAt,
           importedCount: state.calendarSync.importedCount + result.addedEvents,
           lastError: undefined
         },
         activity: addActivity(
+          action.metadata,
           state,
           'Event',
           'Calendar events imported',
-          `${result.addedEvents} event(s), ${result.addedContacts} contact(s), ${result.skipped} skipped.`
+          `${result.addedEvents} event(s), ${result.addedContacts} contact(s), ${result.skipped} skipped, ${result.unresolved} need review.`
         )
       };
     }
@@ -2373,11 +3951,17 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         ...state,
         calendarSync: {
           ...state.calendarSync,
-          lastExportedAt: nowIso(),
+          lastExportedAt: action.metadata.occurredAt,
           exportedCount: state.calendarSync.exportedCount + action.count,
           lastError: undefined
         },
-        activity: addActivity(state, 'Event', 'Events exported to calendar', `${action.count} event(s) exported.`)
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Event',
+          'Events exported to calendar',
+          `${action.count} event(s) exported.`
+        )
       };
     case 'calendarError':
       return {
@@ -2386,7 +3970,7 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           ...state.calendarSync,
           lastError: action.message
         },
-        activity: addActivity(state, 'Event', 'Calendar sync failed', action.message, 'Warning')
+        activity: addActivity(action.metadata, state, 'Event', 'Calendar sync failed', action.message, 'Warning')
       };
     case 'persistenceSaving':
       return {
@@ -2420,8 +4004,8 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         ...state,
         backups: [
           {
-            id: `backup-${Date.now()}`,
-            createdAt: nowIso(),
+            id: commandId(action.metadata, 'backup'),
+            createdAt: action.metadata.occurredAt,
             recordCount:
               state.contacts.length +
               state.events.length +
@@ -2433,7 +4017,13 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
           },
           ...state.backups
         ],
-        activity: addActivity(state, 'Backup', 'Encrypted backup created', 'Backup file export completed.')
+        activity: addActivity(
+          action.metadata,
+          state,
+          'Backup',
+          'Encrypted backup created',
+          'Backup file export completed.'
+        )
       };
     case 'restoreBackup': {
       const restoredState = normalizeLoadedState(action.restoredState);
@@ -2441,8 +4031,10 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
         ...restoredState,
         activeScreen: 'more',
         selectedContactId: undefined,
+        selectedEventId: undefined,
         selectedMessageId: undefined,
         activity: addActivity(
+          action.metadata,
           restoredState,
           'Backup',
           'Encrypted backup restored',
@@ -2455,19 +4047,38 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       return {
         ...state,
         activity: addActivity(
+          action.metadata,
           state,
           'Analytics',
-          'Analytics report exported',
-          `${action.rowCount} redacted ${analyticsFormat === 'Summary' ? 'summary line' : 'report row'}(s) shared.`
+          analyticsFormat === 'Summary' ? 'Analytics summary shared' : 'Analytics report prepared',
+          `${action.rowCount} redacted ${analyticsFormat === 'Summary' ? 'summary line(s) shared' : 'report row(s) prepared for user-controlled sharing'}.`
         )
       };
     case 'setupDoctorDryRunRecorded':
       return {
         ...state,
-        activity: addActivity(state, 'Setup', 'Setup Check dry run completed', action.detail, 'Info', {
-          targetScreen: 'more',
+        activity: addActivity(action.metadata, state, 'Setup', 'Setup Check dry run completed', action.detail, 'Info', {
+          targetScreen: 'setupCheck',
           actionLabel: 'Open Setup Check'
         })
+      };
+    case 'setStyleEnabled':
+      if (state.styleProfile.enabledForAiDrafts === action.enabled) return state;
+      return {
+        ...state,
+        styleProfile: {
+          ...state.styleProfile,
+          enabledForAiDrafts: action.enabled
+        },
+        activity: addActivity(
+          action.metadata,
+          state,
+          'AI',
+          `Style use ${action.enabled ? 'enabled' : 'disabled'}`,
+          action.enabled
+            ? 'The current Style Coach profile will shape future AI drafts.'
+            : 'Future AI drafts will use contact preferences without the Style Coach profile.'
+        )
       };
     case 'trainStyle':
     case 'trainStyleFromSentMessages': {
@@ -2475,13 +4086,17 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!result.ok) {
         return {
           ...state,
-          activity: addActivity(state, 'AI', 'Style profile not updated', result.message, 'Warning')
+          activity: addActivity(action.metadata, state, 'AI', 'Style profile not updated', result.message, 'Warning')
         };
       }
       return {
         ...state,
-        styleProfile: result.profile,
+        styleProfile: {
+          ...result.profile,
+          enabledForAiDrafts: state.styleProfile.enabledForAiDrafts
+        },
         activity: addActivity(
+          action.metadata,
           state,
           'AI',
           'Style profile updated',
@@ -2494,13 +4109,17 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       if (!result.ok) {
         return {
           ...state,
-          activity: addActivity(state, 'AI', 'Style profile not updated', result.message, 'Warning')
+          activity: addActivity(action.metadata, state, 'AI', 'Style profile not updated', result.message, 'Warning')
         };
       }
       return {
         ...state,
-        styleProfile: result.profile,
+        styleProfile: {
+          ...result.profile,
+          enabledForAiDrafts: state.styleProfile.enabledForAiDrafts
+        },
         activity: addActivity(
+          action.metadata,
           state,
           'AI',
           'Style profile updated',
@@ -2512,3 +4131,14 @@ export const relateReducer = (state: AppState, action: RelateAction): AppState =
       return state;
   }
 };
+
+const hasCommandMetadata = (action: RelateAction | EnrichedRelateAction): action is EnrichedRelateAction =>
+  'metadata' in action;
+
+export const createRelateReducer =
+  (dependencies: CommandDependencies) =>
+  (state: AppState, action: RelateAction | EnrichedRelateAction): AppState =>
+    relateTransition(state, hasCommandMetadata(action) ? action : enrichRelateAction(action, dependencies));
+
+/** Compatibility reducer for existing UI and test callers. */
+export const relateReducer = createRelateReducer(systemCommandDependencies);

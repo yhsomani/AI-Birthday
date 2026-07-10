@@ -1,3 +1,4 @@
+import { buildOwnedNotificationPlans, validateOwnedNotificationPlanForState } from './notificationPlans';
 import { buildReminderNotificationData, readNotificationRouteUrl } from './notificationRoutes';
 import type { AppState, Screen } from './types';
 
@@ -27,26 +28,14 @@ const addIssue = (issues: NotificationReadinessIssue[], issue: NotificationReadi
   issues.push(issue);
 };
 
-const compactSensitiveValues = (state: AppState) =>
-  [
-    ...state.contacts.flatMap(contact => [contact.name, contact.phone, contact.email]),
-    ...state.messages.map(message => message.body),
-    ...state.memories.filter(memory => memory.category === 'Private').map(memory => memory.body)
-  ]
-    .map(value => value?.trim())
-    .filter((value): value is string => Boolean(value && value.length >= 4));
-
-const payloadTextFor = (plan: AppState['reminderPlans'][number]) =>
-  `${plan.title} ${plan.body} ${JSON.stringify(buildReminderNotificationData(plan))}`;
-
 export const buildNotificationReadinessReport = (state: AppState, now = new Date()): NotificationReadinessReport => {
   const issues: NotificationReadinessIssue[] = [];
   const notificationDecision = state.privacy.permissionDecisions.Notifications;
   const notificationAuthorization = state.privacy.permissionRecords?.Notifications?.systemAuthorization;
-  const sensitiveValues = compactSensitiveValues(state);
   let safeRouteCount = 0;
   let staleRouteCount = 0;
   let schedulableCount = 0;
+  const notificationPlans = buildOwnedNotificationPlans(state, state.reminderPlans, now);
 
   if (!state.settings.notificationsEnabled) {
     addIssue(issues, {
@@ -55,7 +44,7 @@ export const buildNotificationReadinessReport = (state: AppState, now = new Date
       title: 'Notifications are off',
       detail: 'Reminder plans stay visible in Home, Events, and Messages until notifications are enabled.',
       actionLabel: 'Open settings',
-      targetScreen: 'more'
+      targetScreen: 'settings'
     });
   }
 
@@ -67,7 +56,7 @@ export const buildNotificationReadinessReport = (state: AppState, now = new Date
       detail:
         'RelateAI cannot change this restriction. Reminder work remains visible in-app; review device or managed-device settings.',
       actionLabel: 'Open privacy settings',
-      targetScreen: 'more'
+      targetScreen: 'settings'
     });
   } else if (notificationAuthorization === 'unavailable') {
     addIssue(issues, {
@@ -76,16 +65,20 @@ export const buildNotificationReadinessReport = (state: AppState, now = new Date
       title: 'Notification status could not be checked',
       detail: 'The app will not change owned native schedules until live permission status can be read again.',
       actionLabel: 'Open privacy settings',
-      targetScreen: 'more'
+      targetScreen: 'settings'
     });
-  } else if (notificationDecision === 'Denied' || notificationDecision === 'Unavailable') {
+  } else if (
+    notificationAuthorization === 'denied' ||
+    notificationDecision === 'Denied' ||
+    notificationDecision === 'Unavailable'
+  ) {
     addIssue(issues, {
       id: 'notification-permission-blocked',
       severity: 'Warning',
       title: 'Notification permission unavailable',
       detail: 'The app will keep reminder and approval work visible in-app until permission is granted again.',
       actionLabel: 'Open privacy settings',
-      targetScreen: 'more'
+      targetScreen: 'settings'
     });
   } else if (notificationDecision === 'Not requested') {
     addIssue(issues, {
@@ -95,7 +88,7 @@ export const buildNotificationReadinessReport = (state: AppState, now = new Date
       detail:
         'Ask for notification permission only after explaining that reminders open review surfaces and never send messages.',
       actionLabel: 'Open privacy settings',
-      targetScreen: 'more'
+      targetScreen: 'settings'
     });
   }
 
@@ -106,27 +99,25 @@ export const buildNotificationReadinessReport = (state: AppState, now = new Date
       title: 'Reminder plans are not prepared',
       detail: 'Plan reminders so upcoming events can be scheduled with safe notification routes.',
       actionLabel: 'Plan reminders',
-      targetScreen: 'more'
+      targetScreen: 'setupCheck'
     });
   }
 
-  state.reminderPlans.forEach(plan => {
-    const event = state.events.find(item => item.id === plan.eventId);
-    const contact = state.contacts.find(item => item.id === plan.contactId);
+  notificationPlans.forEach(plan => {
     const triggerAt = new Date(plan.triggerAt);
     const notificationData = buildReminderNotificationData(plan);
     const routeUrl = readNotificationRouteUrl(notificationData);
-    const payload = payloadTextFor(plan);
+    const referenceValidation = validateOwnedNotificationPlanForState(state, plan, now);
 
-    if (!event || !contact) {
+    if (!referenceValidation.ok && referenceValidation.reason !== 'invalid-plan') {
       staleRouteCount += 1;
       addIssue(issues, {
         id: `stale-route-${plan.id}`,
         severity: 'Error',
-        title: 'Reminder route is stale',
-        detail: 'A reminder references a missing contact or event. Re-plan reminders before device scheduling.',
+        title: 'Notification route is stale',
+        detail: 'A notification references an item that is missing, archived, mismatched, or already handled.',
         actionLabel: 'Plan reminders',
-        targetScreen: 'more'
+        targetScreen: 'setupCheck'
       });
       return;
     }
@@ -135,10 +126,10 @@ export const buildNotificationReadinessReport = (state: AppState, now = new Date
       addIssue(issues, {
         id: `unsafe-route-${plan.id}`,
         severity: 'Error',
-        title: 'Reminder route is not safe',
+        title: 'Notification route is not safe',
         detail: 'Notification actions must only open review surfaces and must never send or mutate data directly.',
         actionLabel: 'Plan reminders',
-        targetScreen: 'more'
+        targetScreen: 'setupCheck'
       });
     } else {
       safeRouteCount += 1;
@@ -151,7 +142,7 @@ export const buildNotificationReadinessReport = (state: AppState, now = new Date
         title: 'Reminder time is invalid',
         detail: 'A reminder has an unreadable trigger time. Re-plan reminders before scheduling.',
         actionLabel: 'Plan reminders',
-        targetScreen: 'more'
+        targetScreen: 'setupCheck'
       });
     } else if (triggerAt.getTime() <= now.getTime()) {
       addIssue(issues, {
@@ -160,22 +151,10 @@ export const buildNotificationReadinessReport = (state: AppState, now = new Date
         title: 'Reminder time has passed',
         detail: 'A reminder trigger is already in the past and will be skipped by native scheduling.',
         actionLabel: 'Plan reminders',
-        targetScreen: 'more'
+        targetScreen: 'setupCheck'
       });
     } else {
       schedulableCount += 1;
-    }
-
-    if (sensitiveValues.some(value => payload.includes(value))) {
-      addIssue(issues, {
-        id: `sensitive-payload-${plan.id}`,
-        severity: 'Error',
-        title: 'Notification payload exposes private data',
-        detail:
-          'Notification title, body, and route data must avoid contact names, phone numbers, emails, private notes, and message bodies.',
-        actionLabel: 'Plan reminders',
-        targetScreen: 'more'
-      });
     }
   });
 
@@ -186,9 +165,9 @@ export const buildNotificationReadinessReport = (state: AppState, now = new Date
     status === 'Blocked'
       ? `Notification readiness is blocked by ${issues.filter(issue => issue.severity === 'Error').length} issue(s).`
       : status === 'Warning'
-        ? `Notification readiness needs review: ${schedulableCount} schedulable reminder(s), ${issues.filter(issue => issue.severity === 'Warning').length} warning(s).`
+        ? `Notification readiness needs review: ${schedulableCount} schedulable notification(s), ${issues.filter(issue => issue.severity === 'Warning').length} warning(s).`
         : schedulableCount > 0
-          ? `Notification readiness is ready with ${schedulableCount} safe reminder notification(s).`
+          ? `Notification readiness is ready with ${schedulableCount} safe notification(s).`
           : 'No reminder notifications are currently needed.';
 
   return {

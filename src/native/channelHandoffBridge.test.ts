@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
 const source = readFileSync(join(process.cwd(), 'src/native/channelHandoffBridge.ts'), 'utf8');
-const appSource = readFileSync(join(process.cwd(), 'src/App.tsx'), 'utf8');
+const commandSource = readFileSync(join(process.cwd(), 'src/application/commandRuntime.ts'), 'utf8');
+const productionSource = readFileSync(join(process.cwd(), 'src/application/createProductionRuntime.ts'), 'utf8');
 
 describe('channel handoff native bridge source contract', () => {
   it('opens destinations through Linking and maps dismissed share sheets without recording sends', () => {
@@ -17,10 +18,11 @@ describe('channel handoff native bridge source contract', () => {
     assert.doesNotMatch(source, /manualHandoff|dispatch|relateReducer/);
   });
 
-  it('keeps App sent recording behind the explicit completion confirmation', () => {
-    assert.match(appSource, /openManualHandoffTarget\(/);
-    assert.match(appSource, /result\.needsSentConfirmation/);
-    assert.match(appSource, /target\.markSentLabel, onPress: \(\) => dispatch\(\{ type: 'manualHandoff'/);
-    assert.doesNotMatch(appSource, /message: target\.reason \? `\$\{message\.body\}\\n\\n\$\{target\.reason\}`/);
+  it('keeps sent recording behind the command runtime explicit completion confirmation', () => {
+    assert.match(productionSource, /openManualHandoffTarget/);
+    assert.match(commandSource, /result\.needsSentConfirmation/);
+    assert.match(commandSource, /handoffConfirmations\.set/);
+    assert.match(commandSource, /type: 'manualHandoff'/);
+    assert.doesNotMatch(commandSource, /message: target\.reason \? `\$\{message\.body\}\\n\\n\$\{target\.reason\}`/);
   });
 });

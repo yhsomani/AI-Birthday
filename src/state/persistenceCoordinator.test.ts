@@ -98,6 +98,32 @@ describe('ordered persistence coordinator', () => {
 
     await assert.rejects(() => coordinator.schedule(state), /unavailable/);
     assert.equal((await coordinator.schedule(state)).status, 'unchanged');
+    await assert.rejects(() => coordinator.flush(), /unavailable/);
     assert.equal(attempts, 1);
+  });
+
+  it('passes the last verified state as the dirty-write baseline and advances it only after success', async () => {
+    const initial = createProductionInitialState();
+    const first = { ...initial, searchQuery: 'first' };
+    const second = { ...first, searchQuery: 'second' };
+    const third = { ...second, searchQuery: 'third' };
+    const baselines: (string | undefined)[] = [];
+    const coordinator = new PersistenceCoordinator({
+      async save(state, previousState) {
+        baselines.push(previousState?.searchQuery);
+        if (state.searchQuery === 'second') throw new Error('commit failed');
+      },
+      async inspect() {
+        return undefined;
+      },
+      nowIso: () => '2026-07-10T00:00:00.000Z'
+    });
+    coordinator.reset(JSON.stringify(initial), initial);
+
+    assert.equal((await coordinator.schedule(first)).status, 'persisted');
+    await assert.rejects(() => coordinator.schedule(second), /commit failed/);
+    assert.equal((await coordinator.schedule(third)).status, 'persisted');
+
+    assert.deepEqual(baselines, ['', 'first', 'first']);
   });
 });
