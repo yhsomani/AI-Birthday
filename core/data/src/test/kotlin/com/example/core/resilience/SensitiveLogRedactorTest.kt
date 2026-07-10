@@ -16,7 +16,8 @@ class SensitiveLogRedactorTest {
     fun redact_removesEmailBearerTokenAndSensitiveQueryValues() {
         val input = "user=aarav@example.com Authorization=Bearer ya29.secret-token " +
             "url=https://people.googleapis.com/v1/people/me/connections?personFields=names&syncToken=sync-secret&pageToken=page-secret " +
-            "phone=+91 98765 43210 apiKey=AIzaSyFakeFakeFakeFakeFakeFake password=hunter2"
+            "phone=+91 98765 43210 apiKey=AIzaSyFakeFakeFakeFakeFakeFake password=hunter2 " +
+            "senderEmailPassword=app-password geminiApiKey=gemini-token"
 
         val redacted = SensitiveLogRedactor.redact(input)
 
@@ -27,12 +28,16 @@ class SensitiveLogRedactorTest {
         assertFalse(redacted.contains("+91 98765 43210"))
         assertFalse(redacted.contains("AIzaSyFakeFakeFakeFakeFakeFake"))
         assertFalse(redacted.contains("hunter2"))
+        assertFalse(redacted.contains("app-password"))
+        assertFalse(redacted.contains("gemini-token"))
         assertTrue(redacted.contains("[REDACTED_EMAIL]"))
         assertTrue(redacted.contains("Bearer [REDACTED]"))
         assertTrue(redacted.contains("connections?[REDACTED_QUERY]"))
         assertTrue(redacted.contains("[REDACTED_PHONE]"))
         assertTrue(redacted.contains("apiKey=[REDACTED]"))
         assertTrue(redacted.contains("password=[REDACTED]"))
+        assertTrue(redacted.contains("senderEmailPassword=[REDACTED]"))
+        assertTrue(redacted.contains("geminiApiKey=[REDACTED]"))
     }
 
     @Test
@@ -71,7 +76,7 @@ class SensitiveLogRedactorTest {
     fun healthMonitor_redactsSensitiveErrorSnapshots() {
         HealthMonitor.recordError(
             context = "GeminiClient.generate user=aarav@example.com",
-            error = "apiKey=AIzaSyFakeFakeFakeFakeFakeFake password=hunter2 token=secret-token",
+            error = "apiKey=AIzaSyFakeFakeFakeFakeFakeFake password=hunter2 token=secret-token senderEmailPassword=app-password",
         )
 
         val recentErrors = HealthMonitor.snapshot().recentErrors.joinToString("\n")
@@ -80,10 +85,12 @@ class SensitiveLogRedactorTest {
         assertFalse(recentErrors.contains("AIzaSyFakeFakeFakeFakeFakeFake"))
         assertFalse(recentErrors.contains("hunter2"))
         assertFalse(recentErrors.contains("secret-token"))
+        assertFalse(recentErrors.contains("app-password"))
         assertTrue(recentErrors.contains("[REDACTED_EMAIL]"))
         assertTrue(recentErrors.contains("apiKey=[REDACTED]"))
         assertTrue(recentErrors.contains("password=[REDACTED]"))
         assertTrue(recentErrors.contains("token=[REDACTED]"))
+        assertTrue(recentErrors.contains("senderEmailPassword=[REDACTED]"))
     }
 
     @Test
