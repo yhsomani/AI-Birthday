@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -52,10 +54,13 @@ internal fun EventsList(
     } else {
         buildEventTrustStates(events)
     }
-    val groupedEvents = events.groupBy {
-        val cal = java.util.Calendar.getInstance()
-        cal.timeInMillis = it.nextOccurrenceMs
-        cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+    // ⚡ Bolt: Memoized expensive grouping and Calendar allocation to prevent GC churn on recomposition
+    val groupedEvents = remember(events) {
+        events.groupBy {
+            val cal = java.util.Calendar.getInstance()
+            cal.timeInMillis = it.nextOccurrenceMs
+            cal.getDisplayName(java.util.Calendar.MONTH, java.util.Calendar.LONG, Locale.getDefault()) ?: "Other"
+        }
     }
 
     LazyColumn(
@@ -66,17 +71,16 @@ internal fun EventsList(
             item(key = month) {
                 SectionHeader(title = month)
             }
-            monthEvents.forEach { event ->
-                item(key = event.id.value) {
-                    EventCard(
-                        event = event,
-                        trustState = resolvedEventTrust.getValue(event.id.value),
-                        isResolving = resolvingEventId == event.id.value,
-                        currentTimeMillis = currentTimeMillis,
-                        onMerge = { onMergeEvent(event.id.value) },
-                        onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
-                    )
-                }
+            // ⚡ Bolt: Using built-in items extension instead of manual loop for better LazyColumn performance
+            items(monthEvents, key = { it.id.value }) { event ->
+                EventCard(
+                    event = event,
+                    trustState = resolvedEventTrust.getValue(event.id.value),
+                    isResolving = resolvingEventId == event.id.value,
+                    currentTimeMillis = currentTimeMillis,
+                    onMerge = { onMergeEvent(event.id.value) },
+                    onKeepSeparate = { onKeepSeparateEvent(event.id.value) },
+                )
             }
         }
         item {
