@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   dependency-review:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.repository == 'yhsomani/AI-Birthday'
     runs-on: ubuntu-latest
     permissions:
       contents: read
