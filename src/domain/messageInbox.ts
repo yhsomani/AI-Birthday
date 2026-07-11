@@ -467,11 +467,19 @@ export const buildMessageInbox = (state: AppState, options: MessageInboxOptions)
 
   const counts = messageInboxTabs.reduce(
     (acc, tab) => {
-      acc[tab] = rows.filter(row => messageMatchesTab(row.message, tab, nowIso)).length;
+      acc[tab] = tab === 'All' ? rows.length : 0;
       return acc;
     },
     {} as Record<MessageInboxTab, number>
   );
+
+  for (let i = 0; i < rows.length; i++) {
+    const message = rows[i].message;
+    counts[tabForMessage(message)]++;
+    if (isScheduledForDate(message, nowIso)) {
+      counts['Today']++;
+    }
+  }
 
   const query = options.query.trim().toLowerCase();
   const filteredRows = rows
