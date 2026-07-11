@@ -70,6 +70,7 @@ export const MinimalFunctionalShell = ({
           accessibilityLabel={t(locale, 'functionalConsole.commandJson')}
           autoCapitalize="none"
           autoCorrect={false}
+          editable={!running && commandEnabled}
           maxLength={maxCommandLength}
           multiline
           onChangeText={setRawCommand}
@@ -79,6 +80,7 @@ export const MinimalFunctionalShell = ({
           accessibilityLabel={t(locale, 'functionalConsole.secret')}
           autoCapitalize="none"
           autoCorrect={false}
+          editable={!running && commandEnabled}
           maxLength={maxSecretLength}
           onChangeText={setCommandSecret}
           secureTextEntry
