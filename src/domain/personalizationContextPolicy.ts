@@ -59,7 +59,7 @@ type TextClassification = {
 const controlCharacters = /[\u0000-\u001f\u007f]/g;
 const recipientRoutePattern = /(?:\+?\d[\d\s().-]{7,}\d|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|https?:\/\/|www\.)/i;
 const credentialPattern =
-  /\b(?:api[- ]?key|app password|credential|otp|passcode|password|secret token|access token|private key)\b/i;
+  /\b[a-zA-Z0-9_]*(?:api[-_ ]?key|app password|credential|passcode|password|secret token|access token|private key)[a-zA-Z0-9_]*\b|\botp\b/i;
 
 const explicitMentionPrefix =
   /^(?:message should mention|messages? (?:can|may) mention|mention in messages?|safe to mention|recipient-visible fact|relationship context)\s*[:\-]\s*/i;
