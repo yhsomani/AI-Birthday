@@ -1747,6 +1747,10 @@ const parseCommandRecord = (value: Record<string, unknown>): HarnessCommand | un
       : undefined;
   }
 
+  if (value.type === 'data.recover') {
+    return hasOnlyKeys(value, ['type']) ? { type: 'data.recover' } : undefined;
+  }
+
   if (value.type === 'permissions.preflight') {
     if (
       !hasOnlyKeys(value, ['type', 'capability']) ||

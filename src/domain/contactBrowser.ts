@@ -1,4 +1,4 @@
-import { buildContactEnrichmentPlan } from './contactEnrichment';
+import { buildContactEnrichmentPlans } from './contactEnrichment';
 import { resolveContactPreferencesForContact } from './contactPreferences';
 import type { AppState, Contact, RelationshipEvent, RelationshipGroup } from './types';
 import { localDateKey, materializeEventOccurrence } from './occasionDates';
@@ -51,8 +51,12 @@ const nextEventsByContact = (events: RelationshipEvent[], now: Date) => {
   return byContact;
 };
 
-const labelsFor = (state: AppState, contact: Contact, nextEvent: RelationshipEvent | undefined) => {
-  const enrichmentPlan = buildContactEnrichmentPlan(state, contact.id);
+const labelsFor = (
+  state: AppState,
+  contact: Contact,
+  nextEvent: RelationshipEvent | undefined,
+  enrichmentScore: number
+) => {
   const preferences = resolveContactPreferencesForContact(state.settings, contact);
   const labels: string[] = [];
   if (contact.isVip) {
@@ -67,7 +71,7 @@ const labelsFor = (state: AppState, contact: Contact, nextEvent: RelationshipEve
   if (contact.healthScore < 60) {
     labels.push('Low health');
   }
-  if ((enrichmentPlan?.score ?? 0) < 50) {
+  if (enrichmentScore < 50) {
     labels.push('Needs details');
   }
   return labels;
@@ -104,6 +108,7 @@ export const buildContactBrowserRows = (
   now: Date = new Date()
 ): ContactBrowserRow[] => {
   const nextEventByContact = nextEventsByContact(state.events, now);
+  const enrichmentByContact = buildContactEnrichmentPlans(state);
 
   return state.contacts
     .filter(contact => !contact.archivedAt)
@@ -112,7 +117,7 @@ export const buildContactBrowserRows = (
       return {
         contact,
         nextEvent,
-        qualityLabels: labelsFor(state, contact, nextEvent)
+        qualityLabels: labelsFor(state, contact, nextEvent, enrichmentByContact.get(contact.id)?.score ?? 0)
       };
     })
     .filter(row => matchesQuery(row.contact, options.query))

@@ -1,6 +1,7 @@
 export type OperationalIssueCode =
   | 'storage-unavailable'
   | 'persistence-failed'
+  | 'data-lifecycle-recovery-required'
   | 'reminder-reconciliation-failed'
   | 'widget-sync-failed'
   | 'permission-refresh-failed'

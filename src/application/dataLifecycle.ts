@@ -1,4 +1,5 @@
 import { createProductionInitialState } from '../data/productionState';
+import { resolveCrossPlatformCryptoProvider } from '../crypto/crossPlatformCrypto';
 import { buildOwnedNotificationPlans, type OwnedNotificationPlan } from '../domain/notificationPlans';
 import type { AppState } from '../domain/types';
 import type { EntityRepositoryStatePort } from '../state/entityRepositoryPersistence';
@@ -16,6 +17,16 @@ export const DATA_LIFECYCLE_JOURNAL_KEY = 'relateai.secure.data-lifecycle.v1';
 export type DataLifecycleOperation = 'clear' | 'restore';
 export type DataLifecyclePhase =
   'intent-recorded' | 'native-cleanup' | 'storage-commit' | 'storage-verified' | 'native-reconciliation';
+
+const dataLifecyclePhases = new Set<DataLifecyclePhase>([
+  'intent-recorded',
+  'native-cleanup',
+  'storage-commit',
+  'storage-verified',
+  'native-reconciliation'
+]);
+const lifecycleCrypto = resolveCrossPlatformCryptoProvider();
+const utf8 = new TextEncoder();
 
 export interface DataLifecycleJournal {
   version: 1;
@@ -55,6 +66,22 @@ export type RestoreTransactionResult =
       message: string;
     };
 
+export class InvalidDataLifecycleJournalError extends Error {
+  constructor() {
+    super('Protected data-operation metadata is invalid. Confirm corrupt-storage recovery before continuing.');
+    this.name = 'InvalidDataLifecycleJournalError';
+  }
+}
+
+export class DataLifecycleStateMismatchError extends Error {
+  constructor() {
+    super(
+      'An interrupted restore does not match either verified dataset. Confirm corrupt-storage recovery before continuing.'
+    );
+    this.name = 'DataLifecycleStateMismatchError';
+  }
+}
+
 const recordJournal = async (
   dependencies: DataLifecycleDependencies,
   journal: DataLifecycleJournal,
@@ -88,32 +115,46 @@ const startJournal = async (
   return journal;
 };
 
-export const readDataLifecycleJournal = async (store: KeyValueStore): Promise<DataLifecycleJournal | undefined> => {
-  const raw = await store.getItem(DATA_LIFECYCLE_JOURNAL_KEY);
-  if (!raw) {
-    return undefined;
-  }
+const parseDataLifecycleJournal = (raw: string): DataLifecycleJournal | undefined => {
   try {
     const value = JSON.parse(raw) as Partial<DataLifecycleJournal>;
     if (
       value.version === 1 &&
       (value.operation === 'clear' || value.operation === 'restore') &&
       typeof value.operationId === 'string' &&
+      /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/.test(value.operationId) &&
       typeof value.phase === 'string' &&
+      dataLifecyclePhases.has(value.phase as DataLifecyclePhase) &&
       typeof value.startedAt === 'string' &&
+      value.startedAt.length <= 40 &&
+      Number.isFinite(new Date(value.startedAt).getTime()) &&
       typeof value.updatedAt === 'string' &&
-      (value.targetStateChecksum === undefined || typeof value.targetStateChecksum === 'string') &&
-      (value.previousStateChecksum === undefined || typeof value.previousStateChecksum === 'string')
+      value.updatedAt.length <= 40 &&
+      Number.isFinite(new Date(value.updatedAt).getTime()) &&
+      (value.targetStateChecksum === undefined || /^(?:[0-9a-f]{8}|[0-9a-f]{64})$/.test(value.targetStateChecksum)) &&
+      (value.previousStateChecksum === undefined ||
+        /^(?:[0-9a-f]{8}|[0-9a-f]{64})$/.test(value.previousStateChecksum)) &&
+      (value.operation === 'clear'
+        ? value.phase !== 'native-reconciliation' &&
+          value.targetStateChecksum === undefined &&
+          value.previousStateChecksum === undefined
+        : value.phase !== 'native-cleanup' && value.targetStateChecksum !== undefined)
     ) {
       return value as DataLifecycleJournal;
     }
   } catch {
-    // Invalid operational metadata is not user data and can be replaced by a new transaction.
+    // Parsing is intentionally side-effect free. The caller keeps invalid
+    // metadata in place and routes through confirmed corrupt-storage recovery.
   }
   return undefined;
 };
 
-const stateChecksum = (state: AppState) => {
+export const readDataLifecycleJournal = async (store: KeyValueStore): Promise<DataLifecycleJournal | undefined> => {
+  const raw = await store.getItem(DATA_LIFECYCLE_JOURNAL_KEY);
+  return raw ? parseDataLifecycleJournal(raw) : undefined;
+};
+
+const legacyStateChecksum = (state: AppState) => {
   const value = JSON.stringify(state);
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
@@ -121,6 +162,16 @@ const stateChecksum = (state: AppState) => {
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0).toString(16).padStart(8, '0');
+};
+
+const stateChecksum = async (state: AppState) => {
+  const digest = await lifecycleCrypto.sha256(utf8.encode(JSON.stringify(state)));
+  return [...digest].map(byte => byte.toString(16).padStart(2, '0')).join('');
+};
+
+const stateMatchesChecksum = async (state: AppState | undefined, expected: string | undefined): Promise<boolean> => {
+  if (!state || !expected) return false;
+  return expected.length === 8 ? legacyStateChecksum(state) === expected : (await stateChecksum(state)) === expected;
 };
 
 const assertNoRelationshipRecords = (state: AppState | undefined) => {
@@ -216,8 +267,8 @@ export const restoreLocalDataTransaction = async (
   canonicalState.persistence = { status: 'Ready' };
   const previousState = await loadDurableState(dependencies);
   let journal = await startJournal(dependencies, 'restore', {
-    targetStateChecksum: stateChecksum(canonicalState),
-    previousStateChecksum: previousState ? stateChecksum(previousState) : undefined
+    targetStateChecksum: await stateChecksum(canonicalState),
+    previousStateChecksum: previousState ? await stateChecksum(previousState) : undefined
   });
 
   journal = await recordJournal(dependencies, journal, 'storage-commit');
@@ -255,8 +306,10 @@ export type DataLifecycleStartupRecovery =
 export const recoverInterruptedDataLifecycle = async (
   dependencies: DataLifecycleDependencies
 ): Promise<DataLifecycleStartupRecovery> => {
-  const initialJournal = await readDataLifecycleJournal(dependencies.store);
-  if (!initialJournal) return { status: 'none' };
+  const rawJournal = await dependencies.store.getItem(DATA_LIFECYCLE_JOURNAL_KEY);
+  if (!rawJournal) return { status: 'none' };
+  const initialJournal = parseDataLifecycleJournal(rawJournal);
+  if (!initialJournal) throw new InvalidDataLifecycleJournalError();
 
   if (initialJournal.operation === 'clear') {
     let journal = initialJournal;
@@ -276,17 +329,13 @@ export const recoverInterruptedDataLifecycle = async (
   }
 
   const current = await loadDurableState(dependencies);
-  const currentChecksum = current ? stateChecksum(current) : undefined;
-  if (initialJournal.phase === 'intent-recorded' || currentChecksum === initialJournal.previousStateChecksum) {
+  const matchesPrevious = await stateMatchesChecksum(current, initialJournal.previousStateChecksum);
+  if (initialJournal.phase === 'intent-recorded' || matchesPrevious) {
     await dependencies.store.removeItem(DATA_LIFECYCLE_JOURNAL_KEY);
     return { status: 'aborted-before-commit', operation: 'restore' };
   }
-  if (!current || !initialJournal.targetStateChecksum || currentChecksum !== initialJournal.targetStateChecksum) {
-    return {
-      status: 'reconciliation-required',
-      operation: 'restore',
-      message: 'An interrupted restore could not be matched to either the previous or replacement dataset.'
-    };
+  if (!current || !(await stateMatchesChecksum(current, initialJournal.targetStateChecksum))) {
+    throw new DataLifecycleStateMismatchError();
   }
 
   try {

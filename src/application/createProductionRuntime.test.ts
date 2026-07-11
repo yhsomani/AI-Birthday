@@ -39,5 +39,8 @@ describe('production runtime composition contract', () => {
     assert.match(source, /sendEmailMessage/);
     assert.match(source, /restoreLocalDataTransaction/);
     assert.match(source, /clearLocalDataTransaction/);
+    assert.match(source, /runDataReplacement: operation => runtime\.runDataReplacement\(operation\)/);
+    assert.match(source, /authoritativeState = await repository\.loadState\(\)/);
+    assert.match(source, /runtime\.installVerifiedState\(authoritativeState\)/);
   });
 });

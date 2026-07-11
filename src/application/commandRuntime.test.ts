@@ -43,6 +43,7 @@ const fixture = (initialState: AppState = createTestState()) => {
   const actions: RelateAction[] = [];
   const installedStates: AppState[] = [];
   const preflightCalls: SystemPermissionCapability[] = [];
+  let dataReplacementCount = 0;
   const permissionRecords = grantedPermissionRecords(state);
   const operations = new OperationCoordinator({
     now: () => `2026-07-10T10:00:${String(operationTick++).padStart(2, '0')}.000Z`,
@@ -58,6 +59,10 @@ const fixture = (initialState: AppState = createTestState()) => {
     installVerifiedState: next => {
       installedStates.push(next);
       state = next;
+    },
+    runDataReplacement: operation => {
+      dataReplacementCount += 1;
+      return operation();
     },
     operations,
     createConfirmationToken: () => `restore-confirmation-${requestId + 1}`,
@@ -127,6 +132,7 @@ const fixture = (initialState: AppState = createTestState()) => {
       cleared.persistence.status = 'Ready';
       return cleared;
     },
+    recoverDataLifecycle: async () => ({ status: 'resolved', outcome: 'none' }),
     refreshPermissions: async () => permissionRecords,
     preflightPermission: async (_current, capability) => {
       preflightCalls.push(capability);
@@ -159,6 +165,7 @@ const fixture = (initialState: AppState = createTestState()) => {
     actions,
     installedStates,
     preflightCalls,
+    getDataReplacementCount: () => dataReplacementCount,
     getState: () => state,
     setState: (next: AppState) => {
       state = next;
@@ -200,6 +207,8 @@ describe('bounded harness command parser', () => {
     assert.equal(parseHarnessCommand({ type: 'analytics.open-action', insightId: 'bad id' }).ok, false);
     assert.equal(parseHarnessCommand({ type: 'analytics.export-confirm', confirmationToken: 'bad token' }).ok, false);
     assert.equal(parseHarnessCommand({ type: 'data.clear', confirmation: 'yes' }).ok, false);
+    assert.equal(parseHarnessCommand({ type: 'data.recover' }).ok, true);
+    assert.equal(parseHarnessCommand({ type: 'data.recover', extra: true }).ok, false);
     assert.equal(
       parseHarnessCommand({
         type: 'events.import-text',
@@ -673,6 +682,26 @@ describe('application command runtime', () => {
     assert.doesNotMatch(JSON.stringify(home), /Asha Mehra|Mira Kapoor|Rajesh Nair/);
     assert.doesNotMatch(JSON.stringify(test.runtime.operationSnapshots()), /Asha Mehra|Mira Kapoor|Use manual handoff/);
     assert.doesNotMatch(JSON.stringify([first, second, archived, events, messages]), /Private body must not appear/);
+  });
+
+  it('sorts every valid upcoming event before contacts with no event', async () => {
+    const state = createTestState();
+    state.events = [
+      {
+        ...state.events[0],
+        id: 'event-year-9999',
+        contactId: 'c-asha',
+        type: 'Custom',
+        date: '9999-12-31T12:00:00.000Z',
+        recurrence: undefined
+      }
+    ];
+    const test = fixture(state);
+    const result = await test.runtime.execute({ type: 'contacts.query', sort: 'Upcoming event' });
+    const page = result.status === 'succeeded' && result.value.kind === 'contacts-page' ? result.value : undefined;
+
+    assert.equal(page?.items[0]?.id, 'c-asha');
+    assert.equal(page?.items[0]?.nextEvent?.occurrence.startsWith('9999-12-31'), true);
   });
 
   it('exposes the exhaustive non-private command catalog before entity-specific workflows', async () => {
@@ -2604,6 +2633,79 @@ describe('application command runtime', () => {
     assert.equal(cleared.status, 'succeeded');
     assert.equal(test.installedStates.length, 2);
     assert.equal(test.getState().contacts.length, 0);
+    assert.equal(test.getDataReplacementCount(), 2);
+  });
+
+  it('revalidates restore preview state inside the replacement barrier before writing', async () => {
+    const test = fixture();
+    const passphrase = 'correct horse 123 battery';
+    const restoredState = createTestState();
+    restoredState.onboarding.completed = true;
+    const raw = await createEncryptedBackup(restoredState, passphrase, { iterations: 1_000 });
+    test.dependencies.decryptBackup = async () => restoredState;
+    let restoreCalls = 0;
+    test.dependencies.restoreData = async restored => {
+      restoreCalls += 1;
+      return { status: 'restored', state: restored };
+    };
+    const previewed = await test.runtime.execute({ type: 'backup.restore-preview', raw, passphrase });
+    assert.equal(previewed.status, 'succeeded');
+    const confirmationToken =
+      previewed.status === 'succeeded' && previewed.value.kind === 'backup-restore-preview'
+        ? previewed.value.confirmationToken
+        : '';
+    test.dependencies.runDataReplacement = async operation => {
+      const changed = relateReducer(test.getState(), { type: 'navigate', screen: 'contacts' });
+      test.setState(changed);
+      return operation();
+    };
+
+    const result = await test.runtime.execute({ type: 'backup.restore-confirm', confirmationToken });
+
+    assert.equal(result.status, 'failed');
+    assert.equal(result.status === 'failed' ? result.error.code : undefined, 'restore-preview-stale');
+    assert.equal(restoreCalls, 0);
+    assert.equal(test.installedStates.at(-1)?.activeScreen, 'contacts');
+    assert.equal(test.getState().activeScreen, 'contacts');
+  });
+
+  it('runs explicit data lifecycle recovery and returns only a redacted completion result', async () => {
+    const test = fixture();
+    let recoveryCalls = 0;
+    test.dependencies.recoverDataLifecycle = async signal => {
+      recoveryCalls += 1;
+      assert.equal(signal.aborted, false);
+      return { status: 'reconciliation-required', operation: 'restore' };
+    };
+
+    const blocked = await test.runtime.execute({ type: 'data.recover' });
+    assert.equal(blocked.status, 'failed');
+    assert.equal(blocked.status === 'failed' ? blocked.error.code : undefined, 'data-lifecycle-recovery-required');
+    assert.equal(blocked.status === 'failed' ? blocked.error.retryable : undefined, true);
+
+    test.dependencies.recoverDataLifecycle = async signal => {
+      recoveryCalls += 1;
+      assert.equal(signal.aborted, false);
+      return { status: 'resolved', outcome: 'resumed', operation: 'restore' };
+    };
+    const resolved = await test.runtime.execute({ type: 'data.recover' });
+
+    assert.equal(recoveryCalls, 2);
+    assert.equal(test.getDataReplacementCount(), 2);
+    assert.equal(resolved.status, 'succeeded');
+    assert.equal(
+      resolved.status === 'succeeded' && resolved.value.kind === 'data-lifecycle-recovery'
+        ? resolved.value.outcome
+        : undefined,
+      'resumed'
+    );
+    assert.equal(
+      resolved.status === 'succeeded' && resolved.value.kind === 'data-lifecycle-recovery'
+        ? resolved.value.journalCleared
+        : undefined,
+      true
+    );
+    assert.doesNotMatch(JSON.stringify(resolved), /relationship|reminder plan|widget payload/i);
   });
 
   it('records a saved backup immediately only when the adapter verifies a user-accessible portable copy', async () => {

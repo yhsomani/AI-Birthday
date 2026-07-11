@@ -16,6 +16,7 @@ describe('app error boundary component contract', () => {
     assert.match(source, /accessibilityRole="alert"/);
     assert.match(source, /accessibilityRole="header"/);
     assert.match(source, /accessibilityRole="button"/);
-    assert.doesNotMatch(source, /StyleSheet|style=|ui\/theme/);
+    assert.match(source, /<Pressable/);
+    assert.doesNotMatch(source, /StyleSheet|style=|ui\/theme|TouchableOpacity|Animated\./);
   });
 });

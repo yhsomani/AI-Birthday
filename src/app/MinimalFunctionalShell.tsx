@@ -1,13 +1,7 @@
 import React, { useState } from 'react';
-import { SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Pressable, SafeAreaView, ScrollView, Text, TextInput } from 'react-native';
 import type { SupportedLocale } from '../domain/types';
 import { t } from '../i18n/i18n';
-
-export type FunctionalCommandExample = Readonly<{
-  id: string;
-  description: string;
-  input: string;
-}>;
 
 export type MinimalFunctionalShellProps = {
   locale: SupportedLocale;
@@ -15,7 +9,9 @@ export type MinimalFunctionalShellProps = {
   summary: readonly string[];
   operations: readonly string[];
   issues: readonly string[];
-  examples: readonly FunctionalCommandExample[];
+  initialCommand: string;
+  maxCommandLength: number;
+  maxSecretLength: number;
   execute(raw: string, secret: string): Promise<Readonly<{ output: string; clearInput: boolean }>>;
 };
 
@@ -29,10 +25,12 @@ export const MinimalFunctionalShell = ({
   summary,
   operations,
   issues,
-  examples,
+  initialCommand,
+  maxCommandLength,
+  maxSecretLength,
   execute
 }: MinimalFunctionalShellProps) => {
-  const [rawCommand, setRawCommand] = useState(examples[0]?.input ?? '');
+  const [rawCommand, setRawCommand] = useState(initialCommand);
   const [commandSecret, setCommandSecret] = useState('');
   const [result, setResult] = useState(t(locale, 'functionalConsole.result.none'));
   const [running, setRunning] = useState(false);
@@ -72,6 +70,7 @@ export const MinimalFunctionalShell = ({
           accessibilityLabel={t(locale, 'functionalConsole.commandJson')}
           autoCapitalize="none"
           autoCorrect={false}
+          maxLength={maxCommandLength}
           multiline
           onChangeText={setRawCommand}
           value={rawCommand}
@@ -80,11 +79,12 @@ export const MinimalFunctionalShell = ({
           accessibilityLabel={t(locale, 'functionalConsole.secret')}
           autoCapitalize="none"
           autoCorrect={false}
+          maxLength={maxSecretLength}
           onChangeText={setCommandSecret}
           secureTextEntry
           value={commandSecret}
         />
-        <TouchableOpacity
+        <Pressable
           accessibilityLabel={t(locale, 'functionalConsole.execute')}
           accessibilityRole="button"
           accessibilityState={{ disabled: running || !commandEnabled }}
@@ -92,21 +92,8 @@ export const MinimalFunctionalShell = ({
           onPress={() => void run()}
         >
           <Text>{t(locale, running ? 'functionalConsole.running' : 'functionalConsole.execute')}</Text>
-        </TouchableOpacity>
+        </Pressable>
         <Text accessibilityLiveRegion="polite">{result}</Text>
-
-        <Text accessibilityRole="header">{t(locale, 'functionalConsole.examples')}</Text>
-        {examples.map(example => (
-          <TouchableOpacity
-            accessibilityLabel={t(locale, 'functionalConsole.loadCommand', { id: example.id })}
-            accessibilityRole="button"
-            key={example.id}
-            onPress={() => setRawCommand(example.input)}
-          >
-            <Text>{example.id}</Text>
-            <Text>{example.description}</Text>
-          </TouchableOpacity>
-        ))}
 
         <Text accessibilityRole="header">{t(locale, 'functionalConsole.operations')}</Text>
         {operations.length === 0 ? <Text>{t(locale, 'functionalConsole.operationsEmpty')}</Text> : null}
@@ -119,7 +106,6 @@ export const MinimalFunctionalShell = ({
         {issues.map(line => (
           <Text key={line}>{line}</Text>
         ))}
-        <View />
       </ScrollView>
     </SafeAreaView>
   );

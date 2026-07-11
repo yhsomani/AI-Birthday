@@ -11,6 +11,20 @@ import { AppRuntimeController } from './appRuntimeController';
 import { PermissionReminderCoordinator, permissionDecisionsFromRecords } from './permissionReminderCoordinator';
 import { createTestState } from '../test/testState';
 
+const completesWithin = async <T>(promise: Promise<T>, stage: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timed out while ${stage}.`)), 2_000);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
 const fixture = (
   options: {
     load?: () => Promise<PersistenceLoadResult>;
@@ -43,6 +57,7 @@ const fixture = (
     persistence,
     reduce: relateReducer,
     permissionReminders: {
+      flush: async () => undefined,
       afterHydration: async () => {
         lifecycleCalls.push('hydration');
         return { status: 'reconciled' } as never;
@@ -320,6 +335,210 @@ describe('application runtime controller', () => {
     await test.controller.flush();
     assert.equal(test.controller.getSnapshot().state.onboarding.completed, true);
     assert.equal(test.saved.length, 0);
+  });
+
+  it('drains prior writes and queues new commits across an authoritative data replacement', async () => {
+    let releaseOldSave: (() => void) | undefined;
+    const oldSaveGate = new Promise<void>(resolve => {
+      releaseOldSave = resolve;
+    });
+    let blockNextSave = false;
+    const initial = createTestState();
+    const test = fixture({
+      load: async () => ({ status: 'loaded', state: initial, migrated: false, version: 6 }),
+      save: async () => {
+        if (!blockNextSave) return;
+        blockNextSave = false;
+        await oldSaveGate;
+      }
+    });
+    await test.controller.start();
+    blockNextSave = true;
+
+    const oldCommit = test.controller.dispatchAndCommit({
+      type: 'setQuietHours',
+      start: '20:00',
+      end: '06:00'
+    });
+    let replacementEntered = false;
+    let signalReplacementEntry: (() => void) | undefined;
+    const replacementEntry = new Promise<void>(resolve => {
+      signalReplacementEntry = resolve;
+    });
+    let releaseReplacement: (() => void) | undefined;
+    const replacementGate = new Promise<void>(resolve => {
+      releaseReplacement = resolve;
+    });
+    const replacement = test.controller.runDataReplacement(async () => {
+      replacementEntered = true;
+      signalReplacementEntry?.();
+      await replacementGate;
+      test.controller.installVerifiedState(createProductionInitialState());
+    });
+
+    await Promise.resolve();
+    assert.equal(replacementEntered, false, 'replacement must wait for the prior verified write');
+    releaseOldSave?.();
+    await completesWithin(oldCommit, 'draining the old commit');
+    await completesWithin(replacementEntry, 'entering the replacement');
+
+    let queuedCommitSettled = false;
+    const queuedCommit = test.controller.dispatchAndCommit({ type: 'navigate', screen: 'contacts' }).then(() => {
+      queuedCommitSettled = true;
+    });
+    await Promise.resolve();
+    assert.equal(queuedCommitSettled, false, 'new commits must wait behind the replacement barrier');
+
+    releaseReplacement?.();
+    await completesWithin(replacement, 'installing the replacement');
+    await completesWithin(queuedCommit, 'committing after the replacement');
+
+    assert.equal(test.controller.getSnapshot().phase, 'ready');
+    assert.equal(test.controller.getSnapshot().state.contacts.length, 0);
+    assert.equal(test.saved.at(-1)?.contacts.length, 0);
+  });
+
+  for (const replacementKind of ['clear', 'restore'] as const) {
+    it(`drains an overlapping foreground reminder lifecycle before ${replacementKind} replacement`, async () => {
+      const original = createTestState();
+      const authoritative = createProductionInitialState();
+      if (replacementKind === 'restore') {
+        authoritative.contacts = [{ ...original.contacts[0], id: 'restored-contact' }];
+      }
+      const livePermissions: LivePermissionSnapshot = {
+        schemaVersion: 1,
+        checkedAt: '2026-07-10T08:30:00.000Z',
+        contacts: { kind: 'permission', state: 'granted', granted: true },
+        calendar: { kind: 'permission', state: 'granted', granted: true },
+        notifications: { kind: 'permission', state: 'granted', granted: true },
+        biometric: {
+          kind: 'capability',
+          state: 'granted',
+          ready: true,
+          reason: 'ready',
+          modalities: ['fingerprint'],
+          rawAuthenticationTypes: [1],
+          queryComplete: true
+        }
+      };
+      let foregroundReadPending = false;
+      let releaseForegroundRead: (() => void) | undefined;
+      const foregroundReadGate = new Promise<void>(resolve => {
+        releaseForegroundRead = resolve;
+      });
+      let signalForegroundRead: (() => void) | undefined;
+      const foregroundReadStarted = new Promise<void>(resolve => {
+        signalForegroundRead = resolve;
+      });
+      const order: string[] = [];
+      const controllerReference = {} as { current: AppRuntimeController };
+      const permissionReminders = new PermissionReminderCoordinator({
+        now: () => new Date('2026-07-10T08:30:00.000Z'),
+        readPermissionSnapshot: async () => {
+          if (foregroundReadPending) {
+            foregroundReadPending = false;
+            order.push('foreground-read');
+            signalForegroundRead?.();
+            await foregroundReadGate;
+          }
+          return livePermissions;
+        },
+        reconcileReminderNotifications: async plans => {
+          order.push(`native:${plans.map(plan => plan.contactId).join(',') || 'empty'}`);
+          return {
+            scheduled: plans.length,
+            skipped: 0,
+            cancelled: 0,
+            unchanged: 0
+          };
+        },
+        onPermissionRecordsChanged: async records => {
+          const current = controllerReference.current.getSnapshot().state;
+          await controllerReference.current.dispatchAndCommit({
+            type: 'permissionsReconciled',
+            records,
+            decisions: permissionDecisionsFromRecords(records, current.privacy.permissionDecisions)
+          });
+        },
+        onReminderPlansChanged: async plans => {
+          await controllerReference.current.dispatchAndCommit({ type: 'reminderPlansReconciled', plans });
+        }
+      });
+      const persistence = new PersistenceCoordinator({
+        save: async () => undefined,
+        inspect: async () => undefined,
+        nowIso: () => '2026-07-10T08:30:00.000Z'
+      });
+      const controller = new AppRuntimeController({
+        loadState: async () => ({ status: 'loaded', state: original, migrated: false, version: 6 }),
+        persistence,
+        reduce: relateReducer,
+        permissionReminders,
+        syncWidget: async () => undefined,
+        issues: new OperationalIssueQueue({
+          now: () => '2026-07-10T08:30:00.000Z',
+          createId: () => `replacement-${replacementKind}-issue`
+        })
+      });
+      controllerReference.current = controller;
+      await controller.start();
+      order.length = 0;
+
+      foregroundReadPending = true;
+      const foreground = controller.setVisibility('foreground');
+      await completesWithin(foregroundReadStarted, 'starting foreground permission refresh');
+      let replacementEntered = false;
+      const replacement = controller.runDataReplacement(async () => {
+        replacementEntered = true;
+        order.push(`replacement:${replacementKind}`);
+        controller.installVerifiedState(authoritative);
+      });
+
+      await Promise.resolve();
+      assert.equal(replacementEntered, false, 'replacement must drain the captured foreground lifecycle');
+      releaseForegroundRead?.();
+      await completesWithin(Promise.all([foreground, replacement]), `settling foreground ${replacementKind} overlap`);
+
+      const replacementIndex = order.indexOf(`replacement:${replacementKind}`);
+      const oldNativeIndexes = order
+        .map((entry, index) => ({ entry, index }))
+        .filter(item => item.entry.startsWith('native:') && item.entry !== 'native:empty')
+        .map(item => item.index);
+      assert.ok(
+        oldNativeIndexes.length > 0,
+        'the captured original lifecycle should have reconciled before replacement'
+      );
+      assert.ok(oldNativeIndexes.every(index => index < replacementIndex));
+      assert.equal(
+        controller.getSnapshot().state.contacts[0]?.id,
+        replacementKind === 'restore' ? 'restored-contact' : undefined
+      );
+
+      order.length = 0;
+      await controller.setVisibility('foreground');
+      assert.ok(order.includes('native:empty'), 'post-replacement foreground work must use the authoritative state');
+      assert.equal(
+        order.some(entry => entry.includes('c-mira') || entry.includes('c-asha')),
+        false
+      );
+    });
+  }
+
+  it('fails closed when a data replacement exits without installing authoritative state', async () => {
+    const test = fixture();
+    await test.controller.start();
+
+    await assert.rejects(
+      test.controller.runDataReplacement(async () => undefined),
+      /did not install/i
+    );
+
+    assert.equal(test.controller.getSnapshot().phase, 'failed');
+    assert.equal(test.controller.getSnapshot().state.contacts.length, 0);
+    assert.equal(
+      test.issues.active().some(issue => issue.code === 'data-lifecycle-recovery-required'),
+      true
+    );
   });
 
   it('unschedules and durably saves an identified draft before publishing hydration in a new time zone', async () => {

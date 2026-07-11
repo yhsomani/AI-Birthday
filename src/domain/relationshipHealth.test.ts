@@ -2,9 +2,18 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { relateReducer } from '../state/relateReducer';
 import { createTestState } from '../test/testState';
-import { buildRelationshipHealthInsight } from './relationshipHealth';
+import { buildRelationshipHealthInsight, buildRelationshipHealthInsights } from './relationshipHealth';
 
 describe('relationship health and classification contract', () => {
+  it('keeps indexed batch insights equivalent to individual contact insights', () => {
+    const state = createTestState();
+    const now = new Date('2026-07-09T10:00:00.000Z');
+    const insights = buildRelationshipHealthInsights(state, now);
+    for (const contact of state.contacts) {
+      assert.deepEqual(insights.get(contact.id), buildRelationshipHealthInsight(state, contact.id, now));
+    }
+  });
+
   it('explains relationship health with actionable non-shaming reasons', () => {
     const state = createTestState();
     const insight = buildRelationshipHealthInsight(state, 'c-mira', new Date('2026-07-09T10:00:00.000Z'));

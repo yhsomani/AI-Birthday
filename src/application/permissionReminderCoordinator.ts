@@ -306,6 +306,11 @@ export class PermissionReminderCoordinator {
 
   constructor(private readonly dependencies: PermissionReminderCoordinatorDependencies) {}
 
+  /** Resolves after all permission reads and native reminder reconciliation already queued have settled. */
+  flush(): Promise<void> {
+    return this.tail;
+  }
+
   private now() {
     return (this.dependencies.now ?? (() => new Date()))();
   }

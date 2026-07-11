@@ -3,11 +3,9 @@ import { describe, it } from 'node:test';
 import type { Screen } from '../domain/types';
 import {
   NAVIGATION_SCREENS,
-  buildBrowserNavigationHistoryState,
   createNavigationState,
   currentNavigationRoute,
   reduceNavigation,
-  readBrowserNavigationHistoryState,
   resolveNavigationDestination,
   restoreNavigationState,
   type NavigationEntities,
@@ -90,7 +88,7 @@ describe('typed navigation history', () => {
       screen: 'chatHistory',
       contactId: 'contact-asha'
     });
-    transition = reduceNavigation(state, { type: 'back', source: 'browser-history' }, entities);
+    transition = reduceNavigation(state, { type: 'back', source: 'ui' }, entities);
     assert.deepEqual(currentNavigationRoute(transition.state), {
       screen: 'contactDetail',
       contactId: 'contact-asha'
@@ -290,15 +288,13 @@ describe('typed navigation history', () => {
     assert.equal(transition.outcome.recoveredCount, 2);
   });
 
-  it('models Android and browser root-back intents without mutating navigation', () => {
+  it('models Android and UI root-back intents without mutating navigation', () => {
     const state = createNavigationState({ screen: 'home' }, entities);
     const android = reduceNavigation(state, { type: 'back', source: 'android-hardware' }, entities);
-    const browser = reduceNavigation(state, { type: 'back', source: 'browser-history' }, entities);
     const ui = reduceNavigation(state, { type: 'back', source: 'ui' }, entities);
 
     assert.equal(android.state, state);
     assert.equal(android.outcome.back?.disposition, 'exit-app');
-    assert.equal(browser.outcome.back?.disposition, 'delegate-to-browser');
     assert.equal(ui.outcome.back?.disposition, 'unhandled');
   });
 
@@ -328,21 +324,5 @@ describe('typed navigation history', () => {
       stack: [{ screen: 'more' }, { screen: 'backup' }, { screen: 'setupCheck' }]
     };
     assert.deepEqual(restoreNavigationState(JSON.parse(JSON.stringify(secondary)), entities), secondary);
-  });
-
-  it('round-trips browser back/forward snapshots while preserving unrelated history state', () => {
-    let navigation = createNavigationState({ screen: 'messages' }, entities);
-    navigation = push(navigation, {
-      screen: 'wishPreview',
-      messageId: 'message-asha'
-    });
-    const browserState = buildBrowserNavigationHistoryState({ routerKey: 'keep-me' }, navigation, 2);
-    const decoded: unknown = JSON.parse(JSON.stringify(browserState));
-    const restored = readBrowserNavigationHistoryState(decoded, entities);
-
-    assert.equal(browserState.routerKey, 'keep-me');
-    assert.equal(restored?.depth, 2);
-    assert.deepEqual(restored?.navigation, navigation);
-    assert.equal(readBrowserNavigationHistoryState({ unrelated: true }, entities), undefined);
   });
 });

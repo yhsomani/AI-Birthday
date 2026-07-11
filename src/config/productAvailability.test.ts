@@ -3,7 +3,6 @@ import { describe, it } from 'node:test';
 import { createTestState } from '../test/testState';
 import { relateReducer } from '../state/relateReducer';
 import { automationModes } from '../domain/schedulingPolicy';
-import { t } from '../i18n/i18n';
 import {
   availableAccountModes,
   isAccountModeAvailable,
@@ -49,16 +48,5 @@ describe('truthful release capability availability', () => {
 
     assert.equal(hydrated.settings.accountMode, 'Local');
     assert.equal(hydrated.settings.automationMode, 'Always ask');
-  });
-
-  it('labels unavailable sync and unattended automation truthfully in every locale', () => {
-    for (const locale of ['en-IN', 'hi-IN', 'en-Hinglish'] as const) {
-      assert.match(t(locale, 'feature.more.account.googleSync'), /not available|उपलब्ध नहीं|available nahi/i);
-      assert.match(
-        t(locale, 'feature.more.settings.automation.fullyAuto'),
-        /not available|उपलब्ध नहीं|available nahi/i
-      );
-      assert.doesNotMatch(t(locale, 'feature.more.account.providerDisconnected'), /sign-in.*not (?:connected|कनेक्ट)/i);
-    }
   });
 });

@@ -27,10 +27,54 @@ describe('bounded provider response transport', () => {
     });
   });
 
+  it('cancels an oversized chunked body before calling an all-at-once text reader', async () => {
+    let readCount = 0;
+    let cancelled = false;
+    let textCalled = false;
+    const chunks = [new TextEncoder().encode('{"payload":"'), new Uint8Array(128), new TextEncoder().encode('"}')];
+    const response = {
+      ok: true,
+      status: 200,
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'content-type' ? 'application/json' : null)
+      },
+      body: {
+        getReader: () => ({
+          read: async () => (readCount < chunks.length ? { done: false, value: chunks[readCount++] } : { done: true }),
+          cancel: async () => {
+            cancelled = true;
+          }
+        })
+      },
+      text: async () => {
+        textCalled = true;
+        throw new Error('streaming path must not allocate the complete body');
+      }
+    };
+
+    assert.deepEqual(await readBoundedJsonResponse(response, 64), { ok: false, reason: 'body-too-large' });
+    assert.equal(cancelled, true);
+    assert.equal(textCalled, false);
+    assert.equal(readCount, 2);
+  });
+
+  it('requires a declared bound from compatibility transports without a readable body', async () => {
+    const response = staticJsonResponse({ ok: true });
+    response.headers.get = name => (name.toLowerCase() === 'content-type' ? 'application/json' : null);
+    assert.deepEqual(await readBoundedJsonResponse(response, 1024), {
+      ok: false,
+      reason: 'content-length'
+    });
+  });
+
   it('rejects malformed JSON without exposing its body', async () => {
     const response = staticJsonResponse({});
     response.text = async () => '{broken';
-    response.headers.get = name => (name.toLowerCase() === 'content-type' ? 'application/json' : null);
+    response.headers.get = name => {
+      if (name.toLowerCase() === 'content-type') return 'application/json';
+      if (name.toLowerCase() === 'content-length') return '7';
+      return null;
+    };
     assert.deepEqual(await readBoundedJsonResponse(response, 1024), {
       ok: false,
       reason: 'invalid-json'

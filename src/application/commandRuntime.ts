@@ -30,7 +30,7 @@ import {
   type ContactImportReviewItem
 } from '../domain/contactImport';
 import { allContactRoutes, importedContactRoutes } from '../domain/contactIdentity';
-import { buildContactEnrichmentPlan } from '../domain/contactEnrichment';
+import { buildContactEnrichmentPlan, buildContactEnrichmentPlans } from '../domain/contactEnrichment';
 import { resolveContactPreferencesForContact } from '../domain/contactPreferences';
 import { buildContactTimeline } from '../domain/contactTimeline';
 import {
@@ -55,7 +55,7 @@ import { buildHomePlanner } from '../domain/homePlanner';
 import { buildGiftBudgetSummary, buildGiftSuggestions } from '../domain/giftAdvisor';
 import { buildManualComposerState } from '../domain/manualComposer';
 import { buildMemoryVaultReport } from '../domain/memoryVault';
-import { buildRelationshipHealthInsight } from '../domain/relationshipHealth';
+import { buildRelationshipHealthInsight, buildRelationshipHealthInsights } from '../domain/relationshipHealth';
 import { messageApprovalWindowIssue } from '../domain/messageApproval';
 import { validateMessageBodyForChannel } from '../domain/messageBodyPolicy';
 import {
@@ -286,7 +286,7 @@ const commandMutatesState = (command: HarnessCommand) =>
   ].includes(command.type);
 
 const commandIsExclusive = (command: HarnessCommand) =>
-  command.type === 'backup.restore-confirm' || command.type === 'data.clear';
+  command.type === 'backup.restore-confirm' || command.type === 'data.clear' || command.type === 'data.recover';
 
 const fnvFingerprint = (value: string, seed = 2166136261) => {
   let hash = seed;
@@ -657,6 +657,8 @@ const scopeFor = (command: HarnessCommand): string => {
       return 'data:restore';
     case 'data.clear':
       return 'data:clear';
+    case 'data.recover':
+      return 'data:recover';
     case 'permissions.refresh':
       return 'permissions:refresh';
     case 'permissions.preflight':
@@ -900,6 +902,13 @@ export class HarnessCommandRuntime {
     this.pendingContactImport = undefined;
     this.pendingCalendarImport = undefined;
     this.pendingBulkMessageAction = undefined;
+  }
+
+  private clearDataReplacementSessions() {
+    this.clearBackgroundSensitiveSessions();
+    this.pendingBackupExport = undefined;
+    this.handoffConfirmations.clear();
+    this.emailDeliveryLocks.clear();
   }
 
   lockSensitiveSession() {
@@ -1148,17 +1157,19 @@ export class HarnessCommandRuntime {
     const state = this.dependencies.getState();
     const query = normalizedSearchText(command.query ?? '');
     const now = this.dependencies.now();
-    const healthByContact = new Map(
-      state.contacts.map(contact => [contact.id, buildRelationshipHealthInsight(state, contact.id, now)])
-    );
-    const nextEventForContact = (contactId: string) =>
-      state.events
-        .filter(event => event.contactId === contactId)
-        .map(event => ({ event, occurrence: eventOccurrenceIso(event, now) }))
-        .filter((item): item is { event: AppState['events'][number]; occurrence: string } => Boolean(item.occurrence))
-        .sort((left, right) => left.occurrence.localeCompare(right.occurrence))[0];
-    const nextEventTime = (contactId: string) =>
-      Date.parse(nextEventForContact(contactId)?.occurrence ?? '') || Number.POSITIVE_INFINITY;
+    const healthByContact = buildRelationshipHealthInsights(state, now);
+    const enrichmentByContact = buildContactEnrichmentPlans(state);
+    const contactIdsWithEvents = new Set<string>();
+    const nextEventByContact = new Map<string, { event: AppState['events'][number]; occurrence: string }>();
+    for (const event of state.events) {
+      contactIdsWithEvents.add(event.contactId);
+      const occurrence = eventOccurrenceIso(event, now);
+      if (!occurrence) continue;
+      const existing = nextEventByContact.get(event.contactId);
+      if (!existing || occurrence < existing.occurrence) {
+        nextEventByContact.set(event.contactId, { event, occurrence });
+      }
+    }
     const channelMissing = (contact: AppState['contacts'][number]) => {
       const channel = resolveContactPreferencesForContact(state.settings, contact).preferredChannel;
       const routes = allContactRoutes(contact);
@@ -1173,13 +1184,10 @@ export class HarnessCommandRuntime {
       if (!command.includeArchived && contact.archivedAt) continue;
       if (command.group && contact.group !== command.group) continue;
       if (command.vip !== undefined && contact.isVip !== command.vip) continue;
-      if (
-        command.missingEvent !== undefined &&
-        state.events.some(event => event.contactId === contact.id) === command.missingEvent
-      ) {
-        continue;
-      }
-      if (command.missingChannel !== undefined && channelMissing(contact) !== command.missingChannel) continue;
+      const missingEvent = !contactIdsWithEvents.has(contact.id);
+      if (command.missingEvent !== undefined && missingEvent !== command.missingEvent) continue;
+      const isChannelMissing = channelMissing(contact);
+      if (command.missingChannel !== undefined && isChannelMissing !== command.missingChannel) continue;
       const relationshipHealth = healthByContact.get(contact.id);
       if (!relationshipHealth) {
         return failure('query-state-invalid', 'Relationship health could not be derived for a stored contact.');
@@ -1187,7 +1195,7 @@ export class HarnessCommandRuntime {
       if (command.lowHealth !== undefined && relationshipHealth.score < 60 !== command.lowHealth) continue;
       if (
         command.needsPersonalization !== undefined &&
-        (buildContactEnrichmentPlan(state, contact.id)?.score ?? 0) < 50 !== command.needsPersonalization
+        (enrichmentByContact.get(contact.id)?.score ?? 0) < 50 !== command.needsPersonalization
       ) {
         continue;
       }
@@ -1230,12 +1238,13 @@ export class HarnessCommandRuntime {
       ) {
         continue;
       }
-      const enrichmentScore = buildContactEnrichmentPlan(state, contact.id)?.score ?? 0;
-      const nextEvent = nextEventForContact(contact.id);
+      const enrichmentScore = enrichmentByContact.get(contact.id)?.score ?? 0;
+      const nextEvent = nextEventByContact.get(contact.id);
+      const preferences = resolveContactPreferencesForContact(state.settings, contact);
       const qualityLabels: ContactQueryItem['qualityLabels'] = [];
       if (contact.isVip) qualityLabels.push('VIP');
       if (!nextEvent) qualityLabels.push('Missing event');
-      if (channelMissing(contact)) qualityLabels.push('Missing channel');
+      if (isChannelMissing) qualityLabels.push('Missing channel');
       if (relationshipHealth.score < 60) qualityLabels.push('Low health');
       if (enrichmentScore < 50) qualityLabels.push('Needs details');
       items.push({
@@ -1248,11 +1257,11 @@ export class HarnessCommandRuntime {
         archived: Boolean(contact.archivedAt),
         archivedAt: safeIso(contact.archivedAt),
         group: contact.group,
-        preferredChannel: resolveContactPreferencesForContact(state.settings, contact).preferredChannel,
+        preferredChannel: preferences.preferredChannel,
         language: contact.language,
         isVip: contact.isVip,
         dnd: contact.dnd,
-        checkInCadenceDays: resolveContactPreferencesForContact(state.settings, contact).checkInCadenceDays,
+        checkInCadenceDays: preferences.checkInCadenceDays,
         healthScore: relationshipHealth.score,
         personalizationScore: enrichmentScore,
         qualityLabels,
@@ -1277,7 +1286,11 @@ export class HarnessCommandRuntime {
           return left.healthScore - right.healthScore;
         }
         if (command.sort === 'Upcoming event') {
-          return nextEventTime(left.id) - nextEventTime(right.id);
+          const leftOccurrence = left.nextEvent?.occurrence;
+          const rightOccurrence = right.nextEvent?.occurrence;
+          if (!leftOccurrence) return rightOccurrence ? 1 : 0;
+          if (!rightOccurrence) return -1;
+          return leftOccurrence.localeCompare(rightOccurrence);
         }
         return normalizedSearchText(left.name).localeCompare(normalizedSearchText(right.name));
       }
@@ -5139,15 +5152,29 @@ export class HarnessCommandRuntime {
       );
     }
     this.pendingRestore = undefined;
-    // Once restore starts its journaled durable transaction must settle even if
-    // a caller drops interest in the operation result.
-    const result = await this.dependencies.restoreData(pending.restoredState, new AbortController().signal);
-    await this.dependencies.installVerifiedState(result.state);
-    return succeeded({
-      kind: 'backup-restore',
-      status: result.status,
-      recordCount: totalBackupRecords(countBackupRecords(result.state)),
-      nativeReconciliationRequired: result.status === 'reconciliation-required'
+    return this.dependencies.runDataReplacement(async () => {
+      // The replacement barrier can wait for an already-started lifecycle or
+      // navigation commit. Revalidate against the now-quiescent authoritative
+      // snapshot before the restore journal records any write intent.
+      const verifiedCurrent = this.dependencies.getState();
+      if (pending.baseStateFingerprint !== fnvFingerprint(JSON.stringify(verifiedCurrent))) {
+        await this.dependencies.installVerifiedState(verifiedCurrent);
+        return failure(
+          'restore-preview-stale',
+          'Local data changed after preview. Create a new restore preview before replacing it.'
+        );
+      }
+      // Once restore starts its journaled durable transaction must settle even
+      // if a caller drops interest in the operation result.
+      const result = await this.dependencies.restoreData(pending.restoredState, new AbortController().signal);
+      await this.dependencies.installVerifiedState(result.state);
+      this.clearDataReplacementSessions();
+      return succeeded({
+        kind: 'backup-restore',
+        status: result.status,
+        recordCount: totalBackupRecords(countBackupRecords(result.state)),
+        nativeReconciliationRequired: result.status === 'reconciliation-required'
+      });
     });
   }
 
@@ -5156,23 +5183,46 @@ export class HarnessCommandRuntime {
     if (!this.isApplicationLocked() && !this.sensitiveAuthorizationAvailable(state)) {
       return failure('fresh-unlock-required', 'Unlock RelateAI again before clearing private data.');
     }
-    // Clear is journaled and non-cancellable after intent is recorded.
-    const cleared = await this.dependencies.clearData(state, new AbortController().signal);
-    if (
-      cleared.contacts.length > 0 ||
-      cleared.events.length > 0 ||
-      cleared.memories.length > 0 ||
-      cleared.gifts.length > 0 ||
-      cleared.messages.length > 0 ||
-      cleared.backups.length > 0 ||
-      cleared.reminderPlans.length > 0
-    ) {
-      return failure('clear-verification-failed', 'Transactional clear did not return a verified empty state.');
-    }
-    await this.dependencies.installVerifiedState(cleared);
-    this.handoffConfirmations.clear();
-    this.emailDeliveryLocks.clear();
-    return succeeded({ kind: 'data-clear', cleared: true });
+    return this.dependencies.runDataReplacement(async () => {
+      // Clear is journaled and non-cancellable after intent is recorded.
+      const cleared = await this.dependencies.clearData(state, new AbortController().signal);
+      if (
+        cleared.contacts.length > 0 ||
+        cleared.events.length > 0 ||
+        cleared.memories.length > 0 ||
+        cleared.gifts.length > 0 ||
+        cleared.messages.length > 0 ||
+        cleared.backups.length > 0 ||
+        cleared.reminderPlans.length > 0
+      ) {
+        throw new Error('Transactional clear did not return a verified empty state.');
+      }
+      await this.dependencies.installVerifiedState(cleared);
+      this.clearDataReplacementSessions();
+      return succeeded({ kind: 'data-clear', cleared: true });
+    });
+  }
+
+  private async runDataLifecycleRecovery(signal: AbortSignal) {
+    assertNotAborted(signal);
+    return this.dependencies.runDataReplacement(async () => {
+      const result = await this.dependencies.recoverDataLifecycle(new AbortController().signal);
+      this.clearDataReplacementSessions();
+      if (result.status === 'reconciliation-required') {
+        return failure(
+          'data-lifecycle-recovery-required',
+          'The interrupted data operation still needs reminder or widget reconciliation. Retry when native services are available.',
+          true
+        );
+      }
+      return succeeded({
+        kind: 'data-lifecycle-recovery',
+        status: 'resolved',
+        outcome: result.outcome,
+        operation: result.operation,
+        journalCleared: true
+      });
+    });
   }
 
   private async runPermissionRefresh(signal: AbortSignal) {
@@ -5748,6 +5798,8 @@ export class HarnessCommandRuntime {
           return await this.runBackupRestoreConfirm(command);
         case 'data.clear':
           return await this.runDataClear(signal);
+        case 'data.recover':
+          return await this.runDataLifecycleRecovery(signal);
         case 'permissions.refresh':
           return await this.runPermissionRefresh(signal);
         case 'permissions.preflight':
@@ -5800,6 +5852,7 @@ export class HarnessCommandRuntime {
       command.type !== 'biometric.unlock' &&
       command.type !== 'biometric.disable' &&
       command.type !== 'data.clear' &&
+      command.type !== 'data.recover' &&
       command.type !== 'system.catalog' &&
       this.isApplicationLocked()
     ) {

@@ -24,7 +24,10 @@ export interface AppRuntimeDependencies {
   resetFailedStorage?(): Promise<void>;
   persistence: PersistenceCoordinator;
   reduce(state: AppState, action: RelateAction): AppState;
-  permissionReminders?: Pick<PermissionReminderCoordinator, 'afterHydration' | 'onForeground' | 'afterCommittedChange'>;
+  permissionReminders?: Pick<
+    PermissionReminderCoordinator,
+    'afterHydration' | 'onForeground' | 'afterCommittedChange' | 'flush'
+  >;
   getCurrentTimeZone?(): string;
   syncWidget(state: AppState): Promise<void>;
   issues: OperationalIssueQueue;
@@ -49,8 +52,19 @@ export class AppRuntimeController {
   private visibility: AppVisibility = 'foreground';
   private pendingDurableChanges = new Set<DurableChange>();
   private lastVerifiedState: AppState = createProductionInitialState();
+  private dataReplacementPreparing = false;
+  private dataReplacementActive = false;
+  private dataReplacementStateInstalled = false;
+  private dataReplacementCompletion: Promise<void> = Promise.resolve();
+  private completeDataReplacement?: () => void;
 
   constructor(private readonly dependencies: AppRuntimeDependencies) {}
+
+  private async waitForDataReplacement(): Promise<void> {
+    while (this.dataReplacementPreparing || this.dataReplacementActive) {
+      await this.dataReplacementCompletion;
+    }
+  }
 
   private currentTimeZone() {
     try {
@@ -309,7 +323,7 @@ export class AppRuntimeController {
   }
 
   dispatch(action: RelateAction): AppState {
-    if (this.current.phase !== 'ready') return this.current.state;
+    if (this.current.phase !== 'ready' || this.dataReplacementActive) return this.current.state;
     const previous = this.current.state;
     const next = this.dependencies.reduce(previous, action);
     if (next === previous) return previous;
@@ -321,6 +335,7 @@ export class AppRuntimeController {
 
   /** Applies one action and resolves only after its latest state is durably verified. */
   async dispatchAndCommit(action: RelateAction): Promise<AppState> {
+    if (this.dataReplacementActive) await this.dataReplacementCompletion;
     if (this.current.phase !== 'ready') {
       throw new Error('The application runtime is not ready for a durable command.');
     }
@@ -345,11 +360,77 @@ export class AppRuntimeController {
     const persistedState = persistableState(readyState);
     this.dependencies.persistence.reset(JSON.stringify(persistedState), persistedState);
     this.lastVerifiedState = readyState;
+    if (this.dataReplacementActive) this.dataReplacementStateInstalled = true;
     this.publish('ready', readyState);
+  }
+
+  /**
+   * Prevents ordinary persistence from interleaving with a journaled repository
+   * replacement. The operation must install its authoritative verified state
+   * before the barrier opens again; otherwise the runtime fails closed.
+   */
+  async runDataReplacement<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.current.phase !== 'ready') {
+      throw new Error('The application runtime is not ready for a protected data replacement.');
+    }
+    if (this.dataReplacementPreparing || this.dataReplacementActive) {
+      throw new Error('Another protected data replacement is already active.');
+    }
+
+    this.dataReplacementCompletion = new Promise<void>(resolve => {
+      this.completeDataReplacement = resolve;
+    });
+    this.dataReplacementPreparing = true;
+    try {
+      // Foreground permission reads can commit derived records and schedule
+      // notifications from the state they captured. Drain that whole queue
+      // before replacing its source state so stale native work cannot finish
+      // after a clear or restore.
+      await this.dependencies.permissionReminders?.flush();
+      // Let any already-verified commit finish all of its reconciliation work
+      // before closing the barrier. Repeat if that work queued another commit.
+      // Once quiescent, JavaScript cannot interleave another dispatch before
+      // the synchronous active flag below is set.
+      while (true) {
+        const observedCommit = this.commitTail;
+        await this.dependencies.persistence.flush();
+        await observedCommit;
+        if (observedCommit === this.commitTail) break;
+      }
+      this.dataReplacementActive = true;
+      this.dataReplacementPreparing = false;
+      this.dataReplacementStateInstalled = false;
+      const result = await operation();
+      if (!this.dataReplacementStateInstalled) {
+        throw new Error('Protected data replacement did not install its verified state.');
+      }
+      return result;
+    } catch (error) {
+      this.pendingDurableChanges.clear();
+      this.dependencies.issues.report({
+        code: 'data-lifecycle-recovery-required',
+        severity: 'blocking',
+        summary: 'Protected data replacement did not complete. The runtime is fail-closed.',
+        recovery: 'reconcile'
+      });
+      this.publish('failed', {
+        ...createProductionInitialState(),
+        persistence: { status: 'Error', error: 'Protected data replacement requires recovery.' }
+      });
+      throw error;
+    } finally {
+      this.dataReplacementPreparing = false;
+      this.dataReplacementActive = false;
+      this.dataReplacementStateInstalled = false;
+      this.completeDataReplacement?.();
+      this.completeDataReplacement = undefined;
+    }
   }
 
   async setVisibility(visibility: AppVisibility) {
     this.visibility = visibility;
+    await this.waitForDataReplacement();
+    if (this.visibility !== visibility) return;
     if (visibility === 'background') {
       await this.dependencies.persistence.flush();
       return;
@@ -359,6 +440,11 @@ export class AppRuntimeController {
       type: 'reconcileScheduledMessageTimeZone',
       timeZone: this.currentTimeZone()
     });
+    // A replacement may have begun while the time-zone commit was settling.
+    // Capture state for foreground native work only after that replacement has
+    // published its authoritative snapshot.
+    await this.waitForDataReplacement();
+    if (this.current.phase !== 'ready' || this.visibility !== visibility) return;
     const result = await this.dependencies.permissionReminders?.onForeground(this.current.state);
     if (result?.status === 'reconciliation-failed') {
       this.dependencies.issues.report({

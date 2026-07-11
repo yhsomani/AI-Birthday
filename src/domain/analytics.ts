@@ -1,6 +1,6 @@
-import { buildContactEnrichmentPlan } from './contactEnrichment';
+import { buildContactEnrichmentPlans } from './contactEnrichment';
 import { resolveContactPreferencesForContact } from './contactPreferences';
-import { buildRelationshipHealthInsight } from './relationshipHealth';
+import { buildRelationshipHealthInsights } from './relationshipHealth';
 import type { AppState, Contact, RelationshipEvent, Screen } from './types';
 import { localDateKey, materializeEventOccurrence } from './occasionDates';
 
@@ -119,9 +119,8 @@ export const buildAnalyticsDashboard = (
   const start = rangeStart(range, now);
   const activeContacts = state.contacts.filter(contact => !contact.archivedAt);
   const activeContactIds = new Set(activeContacts.map(contact => contact.id));
-  const healthByContact = new Map(
-    activeContacts.map(contact => [contact.id, buildRelationshipHealthInsight(state, contact.id, now)] as const)
-  );
+  const healthByContact = buildRelationshipHealthInsights(state, now);
+  const enrichmentByContact = buildContactEnrichmentPlans(state);
   const healthScoreFor = (contact: Contact) => healthByContact.get(contact.id)?.score ?? 0;
   const eventContactIds = new Set(
     state.events.filter(event => activeContactIds.has(event.contactId)).map(event => event.contactId)
@@ -192,7 +191,7 @@ export const buildAnalyticsDashboard = (
     });
   }
   const weakestPlan = activeContacts
-    .map(contact => buildContactEnrichmentPlan(state, contact.id))
+    .map(contact => enrichmentByContact.get(contact.id))
     .filter((plan): plan is NonNullable<typeof plan> => Boolean(plan))
     .sort((a, b) => a.score - b.score)[0];
   if (weakestPlan && weakestPlan.score < 50) {
@@ -274,6 +273,7 @@ export const buildAnalyticsCsvReport = (
   now: Date = new Date()
 ) => {
   const nextEventByContact = nextEventsByContact(state.events, now);
+  const healthByContact = buildRelationshipHealthInsights(state, now);
   const rows: (string | number | undefined)[][] = [
     ['Section', 'Name', 'Value', 'Detail'],
     ...dashboard.metrics.map(metric => ['Metric', metric.label, metric.value, metric.detail]),
@@ -297,7 +297,7 @@ export const buildAnalyticsCsvReport = (
         return [
           'Contact summary',
           contact.name,
-          buildRelationshipHealthInsight(state, contact.id, now)?.score ?? 0,
+          healthByContact.get(contact.id)?.score ?? 0,
           `${contact.relationship}; ${contact.group}; next event ${nextEvent?.label ?? 'none'}`
         ];
       })

@@ -1,72 +1,52 @@
 # Release Checklist
 
-Last reviewed: 2026-07-10
+Last reviewed: 2026-07-11
 
 This checklist is the production gate for RelateAI. A release is not ready until every required item is completed against the exact build submitted to distribution.
 
 ## Build and Test Gate
 
-- Use the pinned Node 24.18.0/npm 11.6.x toolchain (`nvm use`) and install from the lockfile with `npm ci`.
+- Use the pinned Node 24.18.0/npm 11.6.0 toolchain (`nvm use`, `corepack enable npm`) and install from the lockfile with `npm ci`. Confirm `npm --version` prints exactly `11.6.0`.
 - Prove the clean-checkout order before evidence generation:
 
   ```bash
   test ! -e reports/react-native-release-evidence.json
-  npm run typecheck
-  npm test
+  node --import tsx src/config/releaseEvidenceCli.ts --source-only --fail-on-blockers
   ```
 
-- Generate the release record with `npm run release:evidence -- --fail-on-blockers`. The generator executes typecheck, test, audit, Expo dependency compatibility, a production web export, and diff checks itself; no environment variable or manual report edit can mark a check passed through the supported workflow.
-- Keep the React Native `npm test` script on the full source-contract suite without per-file process isolation unless CI has proven child `node`/`esbuild` process isolation is reliable for the exact release environment.
-- Attach the CI-produced `reports/react-native-release-evidence.json` and its GitHub provenance attestation to the release record. Confirm it names the exact release commit, reports `dirty: false`, matches the submitted lockfile hash and Node/npm versions, and contains exit-code/timing/output-hash proof for every required command. Resolve every `blockers` entry. Pending signed-build, device-smoke, or store-submission warnings require attached evidence, not a locally edited status.
+- Generate CI/source validation with `node --import tsx src/config/releaseEvidenceCli.ts --source-only --fail-on-blockers`. This mode executes every source/native command gate but is explicitly not production approval; pending signed-build, device-smoke, and store-submission items remain warnings.
+- Generate the final release record with `node --import tsx src/config/releaseEvidenceCli.ts --production --device-evidence=/path/to/device-evidence.json --fail-on-blockers`. The external JSON array must contain the five signed Android/iOS build, Android/iOS device-smoke, and store-submission items with their exact ids and `Attached`, `Pending`, or `Failed` status. Every `Attached` item must include a schema-versioned record with a unique evidence id, timestamp, owner, credential-free HTTPS source URL, exact commit, working-tree SHA-256, app version, and applicable signed artifact SHA-256 values. Device-smoke records also identify platform, device, OS, and test run; store evidence identifies both Google Play and App Store Connect records. Production mode blocks free-form `Attached` claims, candidate/artifact mismatches, malformed, duplicated, missing, pending, or failed evidence. Generated-native/legacy status is derived from the checkout and cannot be supplied externally.
+- The checked-in CLI executes typecheck, lint, formatting, thresholded coverage, native prebuild/debug compile, audit, Expo dependency compatibility, and diff checks itself; CI invokes it directly once rather than trusting a mutable package alias or duplicating those gates. The CLI validates the exact package alias and every inner gate script before accepting command results. No environment variable or manual report edit can mark a command passed through the supported workflow. Web is excluded because this release has no protected web persistence adapter.
+- Keep both the React Native `npm test` and thresholded `npm run test:coverage` scripts on the quoted full source-contract glob without per-file process isolation. Release evidence validates their exact command bodies before accepting command results.
+- Attach the CI-produced source-only `reports/react-native-release-evidence.json` and its GitHub provenance attestation to the release record. Confirm it names the exact release commit, reports `dirty: false`, matches the submitted lockfile hash and exact npm 11.6.0 version, and contains exit-code/timing/output-hash proof for every required command. The separate final production assessment must contain no blockers; pending or failed signed-build, device-smoke, or store-submission evidence is a blocker, never production-ready warning. A release owner must open and verify every linked primary evidence record; the JSON validator does not replace that external review.
 - The report is an ignored operational artifact. It must never be imported by `src/App.tsx`, required by typecheck/test/bundle, or displayed as attached runtime evidence. Setup Check must safely report it as unattached.
-- Confirm the large dataset workflow contract remains green after changing Contacts, Messages, Events, Analytics, widgets, persistence, or export behavior.
-- Confirm normalized persistence and storage health inspection tests remain green after changing local storage, migrations, backup/restore, local-data clearing, Setup Check storage readiness, or large-state workflows.
-- Confirm account access tests remain green after changing account mode, provider disconnect, sign-out copy, backup recommendations, local data clearing, or destructive-action confirmations.
-- Confirm the React Native localization contract remains green after changing translation keys, locale metadata, pluralized counts, settings language selection, primary navigation, Onboarding controls/goal/status labels, primary screen headings, Events/Event card/Add Event controls/event type/time/month/status labels, Messages controls/status/channel/sort/bulk labels, Contacts/Contact Detail controls/group/quality/sort/tone/channel/timeline labels, Home widget summary/tile/accessibility labels, Home and Contact Detail check-in reminder title/detail/action/summary labels, Contact Detail contact-language/check-in/relationship-health/group/cadence/automation/timeline-entry metadata/empty-state labels, Memory Vault category/AI-use labels, Gift Advisor category/feedback/confidence/budget labels, Manual Composer controls/reason labels, Chat History controls/channel metadata, Wish Preview controls/status/channel/quality/tone/variant labels/confirmations, Template Library reason/tone labels, More Account/Privacy/Calendar/Reminder/Import/Template/Persistence/Setup Wizard summaries/details/actions/Setup Check diagnostics/Style Coach/AI Provider/Analytics/Backup/Activity History controls/titles/details/Settings controls, native feedback for manual handoff/contact import/reminder scheduling/calendar sync/event file import, lock screen, home dashboard, or localized system feedback.
-- Confirm the React Native accessibility contract remains green after changing touch targets, form inputs, tabs, checklists, or primary navigation.
-- Confirm the React Native primary interaction contract remains green after changing tab routing, screen rendering, Home/Events/Messages/Contacts/More actions, review flows, or destructive confirmations.
-- Confirm event file import tests remain green after changing CSV/vCard parsing, native document picking, calendar import candidates, or imported-event review behavior.
-- Confirm calendar sync tests remain green after changing device-calendar export notes, idempotent export reconciliation, stale mirrored-event cleanup, or import candidate handling.
-- Confirm Event Preparation tests remain green after changing checklist step relevance, legacy checklist id compatibility, derived completion from memories/drafts/reminders/channels, event-card next-step guidance, or reminder planning actions.
-- Confirm AI provider governance tests remain green after changing provider endpoint readiness, request filtering, local rate limits, response safety/language checks, fallback behavior, or redacted observations.
-- Confirm Manual Composer tests remain green after changing writing reasons, template selection, context privacy summaries, minimum-body validation, AI readiness/fallback guidance, or non-event draft creation.
-- Confirm Message Template Library tests remain green after changing local template catalog browsing, contact/occasion/tone selection, tone fallback explanations, template body rendering, private-note exclusion, or review-first draft creation.
-- Confirm email delivery tests remain green after changing sender setup, provider endpoint readiness, provider request validation, approval-window checks, provider send success, stale-success handling, or failed-message recovery.
-- Confirm message body policy tests remain green after changing minimum message length, channel character caps, SMS multipart guidance, approval gating, route tests, manual handoff, or provider delivery validation.
-- Confirm contact essentials tests remain green after changing contact profile fields, phone/email validation, language options, gift budget handling, stale-message review guardrails, DND and route-aware approval blocking, or profile save behavior.
-- Confirm guided contact enrichment tests remain green after changing personalization scoring, missing-signal summaries, core prompts, enrichment-answer validation, saved memory categories, or redacted activity copy.
-- Confirm relationship check-in tests remain green after changing cadence calculations, Home check-in queue behavior, snooze semantics, mark-contacted actions, last-contact history, or Contact Detail check-in controls.
-- Confirm Memory Vault tests remain green after changing memory note validation, search, pinning, editing, deletion confirmation, private-note AI exclusion, or Contact Detail note controls.
-- Confirm Gift Advisor tests remain green after changing gift validation, budget summaries, suggestions, duplicate warnings, private-note exclusion, gift recording, deletion confirmation, or missing-record recovery.
-- Confirm analytics tests remain green after changing dashboard metrics, shareable summaries, CSV export, insight routing, redaction, or analytics activity logging.
-- Confirm activity history tests remain green after changing activity row metadata, recovery target validation, stale-target fallback, filters, redaction, or recovery navigation.
-- Confirm contact group preference tests remain green after changing relationship groups, group defaults, contact tone/channel/cadence/automation overrides, AI drafting context, templates, analytics, or setup readiness.
-- Confirm recipient-specific tone controls tests remain green after changing contact tone choices, inherited tone sources, Wish Preview tone impact explanations, template fallback explanations, or tone-adjustment routing.
-- Confirm settings/channel/schedule guardrail tests remain green after changing SMS, WhatsApp, email, notification enablement/permission state, reminder plans, quiet hours, blackouts, automation mode, AI enablement, account-mode, or queued-message consequence behavior.
-- Confirm notification readiness and scheduling reconciliation tests remain green after changing reminder notification copy, notification permission fallbacks, route payload data, stale route handling, lock-screen privacy, stale/changed reminder cleanup, unrelated scheduled-notification preservation, or Setup Check reminder diagnostics.
-- Confirm Setup Check tests remain green after changing diagnostic grouping, provider endpoint readiness checks, recommended fixes, dry-run snapshots, setup actions, redaction, or activity logging.
-- Confirm manual handoff and native bridge tests remain green after changing approval, approval expiry, route readiness, channel deep links, Linking/share behavior, approved-text-only copy/share fallback, share-sheet dismissal handling, destination-app prompts, explicit mark-sent confirmation, or sent-message recording.
-- Confirm message test-send route tests remain green after changing Wish Preview testing, channel readiness checks, channel body validation, SMS multipart guidance, route setup guidance, or message lifecycle transitions.
-- Confirm Wish Preview regeneration feedback tests remain green after changing feedback chips, custom feedback limits, regeneration request payloads, local fallback regeneration, saved feedback metadata, or feedback logging behavior.
-- Confirm Wish Preview review-next tests remain green after changing approval, rejection, selected message routing, queue ordering, or handled-message navigation.
+- Confirm the exhaustive command catalog and parser/runtime suites remain green. Every retained feature must be reachable through a strict command, including preview/confirm, cancellation, lock, and failure recovery boundaries.
+- Confirm the temporary-UI surface contract remains green: exactly the command shell and render-error boundary are active React components, with no theme, styling, visual assets, icons, animations, or obsolete design contracts.
+- Confirm the active localization contract remains green for the functional console, notifications, home widget, locale resolution, pluralization, date/month formatting, and currency formatting. Deleted feature-screen copy is not an active release contract.
+- Confirm persistence, encrypted repository, migration, storage-health, backup/restore, interrupted lifecycle recovery, cryptographic erasure, and local-data clear fault-injection tests remain green.
+- Confirm contact/event import, identity conflict, lifecycle, recurrence, preparation, check-in, memory, gift, preference, tone, and relationship-health tests remain green.
+- Confirm drafting, templates, message review/approval, duplicate prevention, scheduling, provider email idempotency/reconciliation, manual handoff, and activity recovery tests remain green.
+- Confirm permission, reminder, notification-route, widget, shortcut, calendar, file-import, biometric, deep-link, Android-back, and native adapter tests remain green.
+- Confirm provider endpoint/session, request filtering, streaming response bounds, fallback, redaction, analytics sharing, setup, and product-availability tests remain green.
+- Confirm large-dataset and dirty-write repository tests remain green after changing queries, persistence, analytics, widget summaries, or exports.
 - Confirm `app.json` contains stable RN native identifiers, `runtimeVersion.policy = appVersion`, iOS `buildNumber`, Android `versionCode`, and no direct SMS, SMS inbox, call-log, phone-number, exact-alarm, or AccessibilityService permissions. The `react native release configuration contract` test protects this.
 - Confirm the Android home widget plugin and app-shell contracts remain green after changing widget summary payloads, widget routes, Expo config plugins, Android manifest receivers, generated widget resources, JS-to-native widget sync, or external-surface privacy copy.
 - Confirm `eas.json` contains development, preview, and production profiles; production Android must build an app bundle and production iOS must not target simulator builds.
 - Produce signed EAS production builds for Android and iOS with release credentials before store upload.
-- Confirm release evidence records `activeReleaseSurface.legacyKotlinGradleArtifactPaths` as an empty array. Treat any reintroduced legacy Android/Gradle path as release evidence drift that must be resolved before signing.
+- Confirm release evidence records `activeReleaseSurface.legacyKotlinGradleArtifactPaths` as an empty array. Treat any checked-in `android/` or `ios/` generated native tree, or reintroduced legacy Android/Gradle path, as release evidence drift that must be resolved before signing.
 - Run focused release-risk tests when changing permissions, dispatch, backup, auth, localization, or navigation.
 - Confirm pull requests with dependency changes pass GitHub Dependency Review for moderate-or-higher vulnerabilities and denied licenses.
 - Run `git diff --check` before handoff.
 - Confirm no generated, local, signing, or secret files are accidentally staged.
 - Confirm provider config changes do not add credentials, backend secrets, signing material, or platform service keys to the client repository.
 
-## React Native Visual and Device UX Gate
+## Temporary Functional Harness Device Gate
 
-- Keep source-level React Native accessibility, localization, and primary interaction contracts green for every UI change.
-- Before release, attach screenshots or video from the exact signed EAS candidate on Android and iOS for Home, Events, Messages, Contacts, More, Wish Preview, Settings, Backup/Restore, and any changed feature surface.
-- Include compact-phone, typical-phone, large-font, and Hindi/Hinglish spot checks when text density or localization changes.
+- Treat the command shell only as an execution harness; do not spend release work on visual polish, screenshots for aesthetic approval, themes, icons, animation, or feature-screen layout.
+- On the exact signed candidate, verify that the command input, secure secret input, execute action, redacted output, operation list, issue list, and render-error retry remain operable and accessible with English, Hindi, and Hinglish settings.
+- Run `system.catalog` and representative read, mutation, preview/confirm, native-adapter, cancellation, lock/unlock, backup, destructive-clear, and `data.recover` commands on Android and iOS.
 - Verify widget, shortcut, notification, calendar, contact import, backup file, biometric lock, and channel handoff flows on physical devices or approved release-device simulators where platform policy allows.
-- Generated Expo/native artifacts, reports, and local visual review files must remain unstaged. Upload release evidence through the CI/release record instead of committing it or coupling it to runtime source.
+- Generated Expo/native artifacts, reports, and device evidence must remain unstaged. Upload release evidence through the CI/release record instead of committing it or coupling it to runtime source.
 
 ## Play Policy Gate
 
@@ -87,12 +67,12 @@ Release requirements:
 
 Signoff record:
 
-| Item | Owner | Date | Status | Notes |
-| --- | --- | --- | --- | --- |
-| RN build excludes AccessibilityService automation | TBD | TBD | Pending | Source config and release evidence block `android.permission.BIND_ACCESSIBILITY_SERVICE`; signed-build manifest review is still required before Play release. |
-| Manual WhatsApp handoff reviewed | TBD | TBD | Pending | Verify approved-text-only handoff and explicit mark-sent confirmation. |
-| Data Safety consistency reviewed | TBD | TBD | Pending | Must match privacy policy, store listing, and final build. |
-| Future WhatsApp automation decision | TBD | TBD | Pending | Required only if unattended automation is reintroduced. |
+| Item                                              | Owner | Date | Status  | Notes                                                                                                                                                         |
+| ------------------------------------------------- | ----- | ---- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RN build excludes AccessibilityService automation | TBD   | TBD  | Pending | Source config and release evidence block `android.permission.BIND_ACCESSIBILITY_SERVICE`; signed-build manifest review is still required before Play release. |
+| Manual WhatsApp handoff reviewed                  | TBD   | TBD  | Pending | Verify approved-text-only handoff and explicit mark-sent confirmation.                                                                                        |
+| Data Safety consistency reviewed                  | TBD   | TBD  | Pending | Must match privacy policy, store listing, and final build.                                                                                                    |
+| Future WhatsApp automation decision               | TBD   | TBD  | Pending | Required only if unattended automation is reintroduced.                                                                                                       |
 
 ### User Data and Data Safety
 
@@ -136,7 +116,7 @@ Release requirements:
 - Dependency changes pass the CI dependency-review gate, and the final release branch has no unresolved dependency graph or Dependabot security alerts. The guarded CI gate uses `actions/dependency-review-action@v4`, fails on `moderate` or higher vulnerability severity, and denies `GPL-2.0`, `GPL-3.0`, `AGPL-3.0`, `LGPL-2.1`, and `LGPL-3.0`.
 - Do not commit service account JSON, private keys, OAuth access or refresh tokens, client secrets, signing material, SMTP credentials, Gemini keys, platform service configs, or local project variants. Provider credentials belong on backend services, not in the React Native client.
 - No API keys, OAuth tokens, SMTP passwords, database keys, phone/email fixtures, raw AI responses, or message bodies appear in logs, test output, backups, or analytics exports outside explicit user export flows.
-- Release provider endpoints use HTTPS without embedded credentials and do not target localhost, `.local`, loopback, or private-network hosts. Local provider endpoints are allowed only for explicit development testing and must not be present in production build configuration.
+- Release provider endpoints use HTTPS without embedded credentials and do not target localhost, `.local`, loopback, or private-network hosts. Local provider endpoints require both the compile-time `__DEV__` build flag and an explicit public development flag; that public flag alone cannot enable local traffic in a release build.
 - React Native app-state persistence remains versioned, normalized for large collections, bounded for oversized entries, and recoverable after missing or corrupt local storage entries.
 - Backup encryption passphrases remain separate from live app unlock state and are never stored, logged, or recoverable by support.
 - Sign-out or local-data clearing clears local RN app state, secure settings, pending reminders, widget summaries, provider endpoint preferences, and auth/account state through one explicit user-confirmed path.
@@ -152,26 +132,26 @@ Release requirements:
 - Sign-out copy and release notes must treat sign-out as destructive local cleanup: contacts, events, messages, memories, gifts, backups in local state, reminder plans, widget summaries, secure settings, provider endpoint preferences, credentials, and auth/account state are cleared through the explicit local-data clearing path.
 - Before risky operations such as sign-out, device change, uninstall/clear-data guidance, beta migration, or replace import, the UI/release notes should direct users to create a restorable encrypted backup when preserving local data matters.
 
-## UX and Accessibility Gate
+## Temporary Harness Accessibility Gate
 
-- Primary workflows pass manual large-font review.
-- Hindi and English primary flows are checked for clipping, stale copy, and untranslated user-facing text.
-- Critical actions have accessible labels and clear enabled/disabled states.
-- Permission-denied, setup-missing, offline, loading, empty, and failure states are visible and recoverable.
-- Screenshot or device validation covers Home, Messages, Wish Preview, Contact Detail, Events, Setup Check, Settings, Backup/Restore, and onboarding/setup.
+- Command and secure-secret inputs and the execute/retry actions expose correct accessible labels, roles, and enabled/disabled states.
+- Large commands and redacted results remain scrollable and reviewable at the platform's supported large-text settings.
+- Runtime loading, locked, failed-storage, permission-denied, provider-unavailable, operation-failed, and interrupted-data-recovery states remain visible as redacted text with executable recovery commands.
+- Hindi and Hinglish active harness, notification, and widget strings receive a human language spot check. No deleted feature-screen localization is release scope.
 
 ## Device Release Smoke Test
 
 - Fresh install starts in an empty local-only onboarding state with no sample relationships, fake-account path, sample-contact import, or demo reset. If provider sign-in is enabled in a future release, add a separate signed-device gate for the complete token/sync/delete lifecycle.
-- Contact sync/import, manual contact creation, event discovery/manual event creation, wish generation, review/edit/regenerate, channel body validation and SMS multipart guidance, DND and route-unavailable approval blocking, approval expiry/re-approval, approval, schedule, send/test, activity history, backup export, restore preview, Android launcher shortcuts, Android home widget navigation, and Setup Check all work.
+- Through the strict command harness, validate contact import/manual creation, event import/manual creation, drafting, review/edit/regenerate, channel validation, DND/route blocking, approval expiry/re-approval, scheduling, handoff/test, activity recovery, backup export/restore preview, launcher shortcuts, home widget navigation, and Setup Check.
 - Permission denial paths are exercised for contacts, notifications, calendar, biometric lock, and manual handoff fallbacks.
 - Reboot or app-reopen recovery restores scheduled review reminders without direct message sending.
 - Backup export/import round trip succeeds and excludes secrets.
 - Backup export/import does not restore stale local diagnostic snapshots; Setup Check diagnostics are rebuilt from current state.
 - The active React Native clear/sign-out use case clears durable local state and native scheduled artifacts exactly once, verifies completion, and returns to empty first-run state.
+- Interrupt clear and restore at native reconciliation, confirm the lifecycle blocker survives ordinary state commits, then run `data.recover` and verify the durable journal disappears only after reminders and widget state reconcile.
 
 ## Release Notes Requirements
 
 - Mention high-risk permission/API changes, especially Accessibility, SMS, contacts, exact alarms, auth, backup, and notification behavior.
 - Mention user-visible setup, consent, denial, or fallback behavior changes.
-- Include test commands and device/screenshot evidence links in the release record.
+- Include test commands and functional device-evidence links in the release record.

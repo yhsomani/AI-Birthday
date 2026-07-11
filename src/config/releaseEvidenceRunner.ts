@@ -42,7 +42,19 @@ export const executableReleaseEvidenceCommands: EvidenceCommandSpec[] = [
     executable: npmExecutable,
     args: ['run', 'typecheck']
   },
-  { id: 'test', command: 'npm test', executable: npmExecutable, args: ['test'] },
+  { id: 'lint', command: 'npm run lint', executable: npmExecutable, args: ['run', 'lint'] },
+  {
+    id: 'format-check',
+    command: 'npm run format:check',
+    executable: npmExecutable,
+    args: ['run', 'format:check']
+  },
+  {
+    id: 'test-coverage',
+    command: 'npm run test:coverage',
+    executable: npmExecutable,
+    args: ['run', 'test:coverage']
+  },
   {
     id: 'native-prebuild',
     command: 'npm run test:native-prebuild',
@@ -61,12 +73,6 @@ export const executableReleaseEvidenceCommands: EvidenceCommandSpec[] = [
     command: 'npx expo install --check',
     executable: npxExecutable,
     args: ['expo', 'install', '--check']
-  },
-  {
-    id: 'web-export',
-    command: 'npx expo export --platform web --output-dir reports/web-export',
-    executable: npxExecutable,
-    args: ['expo', 'export', '--platform', 'web', '--output-dir', 'reports/web-export']
   },
   { id: 'diff-check', command: 'git diff --check', executable: 'git', args: ['diff', '--check'] }
 ];

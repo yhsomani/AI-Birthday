@@ -169,6 +169,7 @@ describe('Expo Android native plugin prebuild integration', () => {
         ['relateai://messages', 'relateai://event/new']
       );
       assert.ok(shortcutNodes.every(item => item.intent?.[0]?.$?.['android:action'] === 'android.intent.action.VIEW'));
+      assert.ok(shortcutNodes.every(item => item.$?.['android:rank'] === undefined));
 
       const providerInfo = (await XML.readXMLAsync({
         path: join(androidRoot, 'res/xml/relateai_home_widget.xml')

@@ -30,8 +30,7 @@ const renderShortcutXml = (shortcuts, androidPackage) => {
     android:icon="@mipmap/ic_launcher"
     android:shortcutShortLabel="@string/${resourceNameFor(shortcut, 'short')}"
     android:shortcutLongLabel="@string/${resourceNameFor(shortcut, 'long')}"
-    android:shortcutDisabledMessage="@string/${resourceNameFor(shortcut, 'disabled')}"
-    android:rank="${shortcut.rank}">
+    android:shortcutDisabledMessage="@string/${resourceNameFor(shortcut, 'disabled')}">
     <intent
       android:action="android.intent.action.VIEW"
       android:targetPackage="${escapeXml(androidPackage)}"
@@ -139,6 +138,10 @@ const validateShortcutGenerationAsync = async (projectRoot, androidPackage) => {
       `RelateAI launcher shortcut ${definition.id} must be generated exactly once.`
     );
     const intents = matches[0].intent ?? [];
+    assertCondition(
+      matches[0].$?.['android:rank'] === undefined,
+      `RelateAI launcher shortcut ${definition.id} must not emit the unsupported static android:rank attribute.`
+    );
     assertCondition(intents.length === 1, `RelateAI launcher shortcut ${definition.id} must have exactly one intent.`);
     assertCondition(
       intents[0].$?.['android:action'] === 'android.intent.action.VIEW' &&
@@ -177,7 +180,7 @@ const withRelateAiShortcuts = config => {
   return config;
 };
 
-module.exports = createRunOncePlugin(withRelateAiShortcuts, 'with-relateai-shortcuts', '2.0.0');
+module.exports = createRunOncePlugin(withRelateAiShortcuts, 'with-relateai-shortcuts', '2.1.0');
 module.exports.renderShortcutXml = renderShortcutXml;
 module.exports.addShortcutMetadataToMainActivity = addShortcutMetadataToMainActivity;
 module.exports.validateShortcutGenerationAsync = validateShortcutGenerationAsync;

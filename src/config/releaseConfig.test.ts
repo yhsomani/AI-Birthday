@@ -11,14 +11,16 @@ const appConfig = JSON.parse(readFileSync(join(rootDir, 'app.json'), 'utf8')) as
     version?: string;
     runtimeVersion?: { policy?: string } | string;
     scheme?: string;
+    platforms?: string[];
     ios?: {
       bundleIdentifier?: string;
       buildNumber?: string;
-      infoPlist?: Record<string, string>;
+      infoPlist?: Record<string, unknown>;
     };
     android?: {
       package?: string;
       versionCode?: number;
+      allowBackup?: boolean;
       permissions?: string[];
       blockedPermissions?: string[];
     };
@@ -38,12 +40,14 @@ describe('react native release configuration contract', () => {
     assert.equal(appConfig.expo.name, 'RelateAI');
     assert.equal(appConfig.expo.slug, 'relateai');
     assert.equal(appConfig.expo.scheme, 'relateai');
+    assert.deepEqual(appConfig.expo.platforms, ['android', 'ios']);
     assert.match(appConfig.expo.version ?? '', /^\d+\.\d+\.\d+$/);
     assert.deepEqual(appConfig.expo.runtimeVersion, { policy: 'appVersion' });
     assert.equal(appConfig.expo.android?.package, 'com.relateai.app');
     assert.equal(appConfig.expo.ios?.bundleIdentifier, 'com.relateai.app');
     assert.ok(Number.isInteger(appConfig.expo.android?.versionCode));
     assert.ok((appConfig.expo.android?.versionCode ?? 0) > 0);
+    assert.equal(appConfig.expo.android?.allowBackup, false);
     assert.match(appConfig.expo.ios?.buildNumber ?? '', /^\d+$/);
   });
 
@@ -84,14 +88,27 @@ describe('react native release configuration contract', () => {
     ].forEach(permission => {
       assert.equal(blocked.has(permission), true, `${permission} should be blocked from merged manifests`);
     });
+    [
+      'android.permission.WRITE_CONTACTS',
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.SYSTEM_ALERT_WINDOW'
+    ].forEach(permission => {
+      assert.equal(blocked.has(permission), true, `${permission} should be removed from merged release manifests`);
+    });
   });
 
   it('keeps sensitive permission copy explicit and scoped to user-initiated actions', () => {
     const infoPlist = appConfig.expo.ios?.infoPlist ?? {};
 
-    assert.match(infoPlist.NSContactsUsageDescription ?? '', /only when you ask/i);
-    assert.match(infoPlist.NSCalendarsUsageDescription ?? '', /only when you ask/i);
-    assert.match(infoPlist.NSFaceIDUsageDescription ?? '', /only when you enable/i);
+    assert.match(String(infoPlist.NSContactsUsageDescription ?? ''), /only when you ask/i);
+    assert.match(String(infoPlist.NSCalendarsUsageDescription ?? ''), /only when you ask/i);
+    assert.match(String(infoPlist.NSCalendarsFullAccessUsageDescription ?? ''), /only when you ask/i);
+    assert.match(String(infoPlist.NSFaceIDUsageDescription ?? ''), /only when you enable/i);
+    assert.deepEqual(infoPlist.NSAppTransportSecurity, {
+      NSAllowsArbitraryLoads: false,
+      NSAllowsLocalNetworking: false
+    });
   });
 
   it('keeps WhatsApp and SMS policy aligned to manual handoff instead of AccessibilityService automation', () => {

@@ -14,11 +14,12 @@ describe('release evidence command runner', () => {
       executableReleaseEvidenceCommands.map(item => item.command),
       [
         'npm run typecheck',
-        'npm test',
+        'npm run lint',
+        'npm run format:check',
+        'npm run test:coverage',
         'npm run test:native-prebuild',
         'npm audit --audit-level=moderate',
         'npx expo install --check',
-        'npx expo export --platform web --output-dir reports/web-export',
         'git diff --check'
       ]
     );

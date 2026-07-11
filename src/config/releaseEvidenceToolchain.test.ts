@@ -20,6 +20,8 @@ describe('release toolchain and clean-checkout contract', () => {
     const packageJson = JSON.parse(read('package.json')) as {
       packageManager?: string;
       engines?: { node?: string; npm?: string };
+      scripts?: Record<string, string>;
+      dependencies?: Record<string, string>;
     };
     const packageLock = JSON.parse(read('package-lock.json')) as {
       packages?: Record<string, { engines?: { node?: string; npm?: string } }>;
@@ -29,8 +31,13 @@ describe('release toolchain and clean-checkout contract', () => {
     assert.equal(read('.node-version').trim(), '24.18.0');
     assert.equal(read('.npmrc').trim(), 'engine-strict=true');
     assert.equal(packageJson.packageManager, 'npm@11.6.0');
-    assert.deepEqual(packageJson.engines, { node: '>=24.18.0 <25', npm: '>=11.6.0 <12' });
+    assert.deepEqual(packageJson.engines, { node: '>=24.18.0 <25', npm: '11.6.0' });
     assert.deepEqual(packageLock.packages?.['']?.engines, packageJson.engines);
+    assert.equal(packageJson.scripts?.['release:evidence'], 'node --import tsx src/config/releaseEvidenceCli.ts');
+    assert.equal(packageJson.scripts?.web, undefined);
+    assert.equal(packageJson.scripts?.['web:export'], undefined);
+    assert.equal(packageJson.dependencies?.['react-dom'], undefined);
+    assert.equal(packageJson.dependencies?.['react-native-web'], undefined);
   });
 
   it('keeps ignored release reports outside source module dependencies', () => {
@@ -48,15 +55,25 @@ describe('release toolchain and clean-checkout contract', () => {
     const workflow = read('.github/workflows/android.yml');
     const evidenceCli = read('src/config/releaseEvidenceCli.ts');
     assert.match(workflow, /node-version-file: \.nvmrc/);
+    assert.match(workflow, /corepack enable npm[\s\S]+npm --version[\s\S]+11\.6\.0/);
     assert.match(workflow, /run: npm ci/);
     assert.match(
       workflow,
-      /test ! -e reports\/react-native-release-evidence\.json[\s\S]+npm run typecheck[\s\S]+npm run test:coverage[\s\S]+npm run test:native-prebuild[\s\S]+npm run release:evidence -- --fail-on-blockers/
+      /test ! -e reports\/react-native-release-evidence\.json[\s\S]+node --import tsx src\/config\/releaseEvidenceCli\.ts --source-only --fail-on-blockers/
+    );
+    assert.doesNotMatch(workflow, /npm run release:evidence/);
+    assert.doesNotMatch(
+      workflow,
+      /run: npm run (?:typecheck|lint|format:check|test:coverage|test:native-prebuild)\s*$/m
     );
     assert.match(workflow, /actions\/setup-java@v4[\s\S]+java-version: '17'/);
     assert.match(workflow, /actions\/attest-build-provenance@v2/);
+    assert.doesNotMatch(workflow, /web:export|expo export --platform web/);
     assert.match(evidenceCli, /executeReleaseEvidenceCommands/);
     assert.match(evidenceCli, /collectReleaseEvidenceProvenance/);
+    assert.match(evidenceCli, /--source-only/);
+    assert.match(evidenceCli, /--device-evidence=/);
+    assert.match(evidenceCli, /'android',[\s\S]+\s+'ios',/);
     assert.doesNotMatch(evidenceCli, /RELATEAI_RELEASE_[A-Z_]+_STATUS/);
   });
 
@@ -70,6 +87,9 @@ describe('release toolchain and clean-checkout contract', () => {
     assert.match(nativePrebuildScript, /mkdtemp/);
     assert.match(nativePrebuildScript, /'prebuild', '--clean', '--no-install', '--platform', 'android'/);
     assert.match(nativePrebuildScript, /':app:assembleDebug'/);
+    assert.match(nativePrebuildScript, /assertAndroidReleasePolicyAsync/);
+    assert.match(nativePrebuildScript, /android:allowBackup/);
+    assert.match(nativePrebuildScript, /WRITE_CONTACTS/);
     assert.match(nativePrebuildScript, /requires JDK 17/);
     assert.match(nativePrebuildScript, /rm\(fixtureRoot, \{ recursive: true, force: true \}\)/);
   });
@@ -77,12 +97,18 @@ describe('release toolchain and clean-checkout contract', () => {
   it('documents endpoint-only public configuration and no client provider secret', () => {
     const environmentTemplate = read('.env.example');
     const releaseChecklist = read('docs/operations/release-checklist.md');
+    const providerDevelopmentMode = read('src/native/providerDevelopmentMode.ts');
+    const aiProviderClient = read('src/native/aiProviderClient.ts');
+    const emailSenderClient = read('src/native/emailSenderClient.ts');
 
     assert.match(environmentTemplate, /EXPO_PUBLIC_RELATE_AI_ENDPOINT=/);
     assert.match(environmentTemplate, /EXPO_PUBLIC_RELATE_EMAIL_ENDPOINT=/);
     assert.match(environmentTemplate, /EXPO_PUBLIC_RELATE_EMAIL_STATUS_ENDPOINT=/);
     assert.match(environmentTemplate, /Never put API[\s\S]+provider secrets here/i);
     assert.doesNotMatch(environmentTemplate, /GEMINI_API_KEY|AIza[0-9A-Za-z_-]+/);
+    assert.match(providerDevelopmentMode, /typeof __DEV__ !== 'undefined'[\s\S]+developmentBuild && publicFlag/);
+    assert.match(aiProviderClient, /buildAllowsLocalProviderEndpoints/);
+    assert.match(emailSenderClient, /buildAllowsLocalProviderEndpoints/);
     assert.doesNotMatch(
       releaseChecklist,
       /ProductionReadinessConfigTest|network_security_config\.xml|AuthManager\.signOut/

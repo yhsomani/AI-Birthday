@@ -23,8 +23,6 @@ const WIDGET_MODULE_CLASS = 'RelateAiHomeWidgetModule';
 const WIDGET_PACKAGE_CLASS = 'RelateAiHomeWidgetPackage';
 const WIDGET_PROVIDER_RESOURCE_NAME = 'relateai_home_widget';
 const WIDGET_LAYOUT_NAME = 'relateai_home_widget';
-const WIDGET_BACKGROUND_NAME = 'relateai_home_widget_background';
-const WIDGET_ACTION_BACKGROUND_NAME = 'relateai_home_widget_action_background';
 const WIDGET_METADATA_NAME = 'android.appwidget.provider';
 const MAIN_APPLICATION_GENERATED_TAG = 'relateai-home-widget-package';
 
@@ -51,24 +49,8 @@ const renderWidgetProviderInfoXml = () => `<?xml version="1.0" encoding="utf-8"?
     android:minResizeHeight="90dp"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/${WIDGET_LAYOUT_NAME}"
-    android:previewImage="@mipmap/ic_launcher"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen" />
-`;
-
-const renderWidgetBackgroundXml = () => `<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#FFFDF8" />
-    <stroke android:width="1dp" android:color="#D7DEE8" />
-    <corners android:radius="18dp" />
-</shape>
-`;
-
-const renderWidgetActionBackgroundXml = () => `<?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="#174A63" />
-    <corners android:radius="14dp" />
-</shape>
 `;
 
 const renderWidgetLayoutXml = () => `<?xml version="1.0" encoding="utf-8"?>
@@ -76,10 +58,8 @@ const renderWidgetLayoutXml = () => `<?xml version="1.0" encoding="utf-8"?>
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/${WIDGET_BACKGROUND_NAME}"
     android:contentDescription="@string/relateai_widget_default_title"
-    android:orientation="vertical"
-    android:padding="14dp">
+    android:orientation="vertical">
 
     <TextView
         android:id="@+id/widget_title"
@@ -87,75 +67,47 @@ const renderWidgetLayoutXml = () => `<?xml version="1.0" encoding="utf-8"?>
         android:layout_height="wrap_content"
         android:ellipsize="end"
         android:maxLines="1"
-        android:text="@string/relateai_widget_default_title"
-        android:textColor="#111827"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+        android:text="@string/relateai_widget_default_title" />
 
     <TextView
         android:id="@+id/widget_subtitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
         android:ellipsize="end"
         android:maxLines="2"
-        android:text="@string/relateai_widget_default_subtitle"
-        android:textColor="#4B5563"
-        android:textSize="12sp" />
+        android:text="@string/relateai_widget_default_subtitle" />
 
     <TextView
         android:id="@+id/widget_primary"
         android:layout_width="match_parent"
-        android:layout_height="32dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/${WIDGET_ACTION_BACKGROUND_NAME}"
+        android:layout_height="wrap_content"
         android:ellipsize="end"
-        android:gravity="center_vertical"
         android:maxLines="1"
-        android:paddingLeft="12dp"
-        android:paddingRight="12dp"
-        android:text="@string/relateai_widget_open_home"
-        android:textColor="#FFFFFF"
-        android:textSize="12sp"
-        android:textStyle="bold" />
+        android:text="@string/relateai_widget_open_home" />
 
     <TextView
         android:id="@+id/widget_secondary"
         android:layout_width="match_parent"
-        android:layout_height="30dp"
-        android:layout_marginTop="6dp"
+        android:layout_height="wrap_content"
         android:ellipsize="end"
-        android:gravity="center_vertical"
         android:maxLines="1"
-        android:paddingLeft="4dp"
-        android:paddingRight="4dp"
-        android:text="@string/relateai_widget_open_events"
-        android:textColor="#174A63"
-        android:textSize="12sp" />
+        android:text="@string/relateai_widget_open_events" />
 
     <TextView
         android:id="@+id/widget_tertiary"
         android:layout_width="match_parent"
-        android:layout_height="30dp"
+        android:layout_height="wrap_content"
         android:ellipsize="end"
-        android:gravity="center_vertical"
         android:maxLines="1"
-        android:paddingLeft="4dp"
-        android:paddingRight="4dp"
-        android:text="@string/relateai_widget_open_messages"
-        android:textColor="#174A63"
-        android:textSize="12sp" />
+        android:text="@string/relateai_widget_open_messages" />
 
     <TextView
         android:id="@+id/widget_privacy"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:text="@string/relateai_widget_privacy_note"
-        android:textColor="#6B7280"
-        android:textSize="10sp" />
+        android:text="@string/relateai_widget_privacy_note" />
 </LinearLayout>
 `;
 
@@ -564,7 +516,6 @@ const withWidgetResources = config =>
       const androidRoot = path.join(config.modRequest.projectRoot, 'android/app/src/main');
       const xmlDir = path.join(androidRoot, 'res/xml');
       const layoutDir = path.join(androidRoot, 'res/layout');
-      const drawableDir = path.join(androidRoot, 'res/drawable');
       const providerDir = path.join(androidRoot, 'java', androidPackagePath(androidPackage), 'widget');
 
       await writeGeneratedFileAsync(
@@ -572,14 +523,6 @@ const withWidgetResources = config =>
         renderWidgetProviderInfoXml()
       );
       await writeGeneratedFileAsync(path.join(layoutDir, `${WIDGET_LAYOUT_NAME}.xml`), renderWidgetLayoutXml());
-      await writeGeneratedFileAsync(
-        path.join(drawableDir, `${WIDGET_BACKGROUND_NAME}.xml`),
-        renderWidgetBackgroundXml()
-      );
-      await writeGeneratedFileAsync(
-        path.join(drawableDir, `${WIDGET_ACTION_BACKGROUND_NAME}.xml`),
-        renderWidgetActionBackgroundXml()
-      );
       await writeGeneratedFileAsync(
         path.join(providerDir, `${WIDGET_PROVIDER_CLASS}.java`),
         renderWidgetProviderJava(androidPackage)
@@ -714,11 +657,9 @@ const withRelateAiHomeWidget = config => {
   return config;
 };
 
-module.exports = createRunOncePlugin(withRelateAiHomeWidget, 'with-relateai-home-widget', '2.0.0');
+module.exports = createRunOncePlugin(withRelateAiHomeWidget, 'with-relateai-home-widget', '2.1.0');
 module.exports.addWidgetPackageToMainApplication = addWidgetPackageToMainApplication;
 module.exports.addWidgetReceiverToManifest = addWidgetReceiverToManifest;
-module.exports.renderWidgetActionBackgroundXml = renderWidgetActionBackgroundXml;
-module.exports.renderWidgetBackgroundXml = renderWidgetBackgroundXml;
 module.exports.renderWidgetLayoutXml = renderWidgetLayoutXml;
 module.exports.renderWidgetModuleJava = renderWidgetModuleJava;
 module.exports.renderWidgetPackageJava = renderWidgetPackageJava;

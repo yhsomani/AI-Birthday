@@ -1574,11 +1574,23 @@ export class EncryptedTransactionalEntityStore implements EntityRepository {
 
   async destroyAllData(): Promise<void> {
     await this.exclusive(async () => {
-      const files = await this.files.list();
-      await Promise.all(files.map(file => this.files.remove(file)));
-      await this.protectedStore.removeItem(ENTITY_STORE_MASTER_KEY);
+      // Invalidate the only decryption capability before touching ciphertext.
+      // File cleanup can fail partially on a real device; verified key removal
+      // must still make every remaining generation cryptographically unreadable.
       this.masterKeyPromise = undefined;
       this.indexCache = undefined;
+      await this.protectedStore.removeItem(ENTITY_STORE_MASTER_KEY);
+      if ((await this.protectedStore.getItem(ENTITY_STORE_MASTER_KEY)) !== null) {
+        throw new EntityStoreError('master-key-invalid', 'The protected entity-store master key could not be erased.');
+      }
+      const files = await this.files.list();
+      const removals = await Promise.allSettled(files.map(file => this.files.remove(file)));
+      if (removals.some(result => result.status === 'rejected')) {
+        throw new EntityStoreError(
+          'corrupt-store',
+          'The repository key was erased, but app-owned encrypted file cleanup did not finish.'
+        );
+      }
     });
   }
 

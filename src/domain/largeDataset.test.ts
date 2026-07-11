@@ -4,9 +4,11 @@ import { describe, it } from 'node:test';
 import { createTestState } from '../test/testState';
 import { buildAnalyticsCsvReport, buildAnalyticsDashboard } from './analytics';
 import { buildContactBrowserRows } from './contactBrowser';
+import { buildContactEnrichmentPlans } from './contactEnrichment';
 import { buildEventMonthView, filterRelationshipEvents } from './eventBrowser';
 import { buildHomeWidgetSummary } from './homeWidget';
 import { buildMessageInbox } from './messageInbox';
+import { buildRelationshipHealthInsights } from './relationshipHealth';
 import type { AppState, Contact, MemoryNote, MessageChannel, MessageDraft, RelationshipEvent } from './types';
 
 const groups = ['Family', 'Friends', 'Work', 'Close friends', 'Other'] as const;
@@ -110,6 +112,20 @@ const buildLargeState = (count: number, now: Date): AppState => {
 };
 
 describe('large dataset workflow contract', () => {
+  it('indexes enrichment and relationship health without per-contact aggregate rescans at 10k scale', () => {
+    const now = new Date('2026-07-09T10:00:00.000Z');
+    const state = buildLargeState(10_000, now);
+    const startedAt = performance.now();
+
+    const enrichment = buildContactEnrichmentPlans(state);
+    const health = buildRelationshipHealthInsights(state, now);
+    const elapsedMs = performance.now() - startedAt;
+
+    assert.equal(enrichment.size, state.contacts.length);
+    assert.equal(health.size, state.contacts.length);
+    assert.ok(elapsedMs < 5000, `10k contact indexes took ${Math.round(elapsedMs)}ms`);
+  });
+
   it('keeps primary RN list and report builders bounded on production-sized local data', () => {
     const now = new Date('2026-07-09T10:00:00.000Z');
     const state = buildLargeState(900, now);

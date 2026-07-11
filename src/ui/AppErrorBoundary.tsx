@@ -1,5 +1,5 @@
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import type { OperationalIssueInput } from '../application/operationalIssues';
 
 type AppErrorBoundaryProps = {
@@ -43,13 +43,13 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
         <Text>
           {this.props.message ?? 'Your local relationship data was not changed. Restart this screen to try again.'}
         </Text>
-        <TouchableOpacity
+        <Pressable
           accessibilityLabel={this.props.retryLabel ?? 'Restart screen'}
           accessibilityRole="button"
           onPress={this.retry}
         >
           <Text>{this.props.retryLabel ?? 'Restart screen'}</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
     );
   }

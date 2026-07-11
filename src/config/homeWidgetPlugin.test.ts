@@ -29,6 +29,7 @@ type HomeWidgetPlugin = {
 
 const loadPlugin = createRequire(import.meta.url);
 const homeWidgetPlugin = loadPlugin('../../plugins/with-relateai-home-widget') as HomeWidgetPlugin;
+const pluginSource = readFileSync(join(process.cwd(), 'plugins/with-relateai-home-widget.js'), 'utf8');
 const bridgeSource = readFileSync(join(process.cwd(), 'src/native/homeWidgetBridge.ts'), 'utf8');
 const appConfig = JSON.parse(readFileSync(join(process.cwd(), 'app.json'), 'utf8')) as {
   expo: {
@@ -42,7 +43,7 @@ describe('React Native Android home widget plugin contract', () => {
     assert.ok(appConfig.expo.plugins?.includes('./plugins/with-relateai-shortcuts'));
   });
 
-  it('renders widget metadata with periodic refresh and a fixed safe layout', () => {
+  it('renders widget metadata with periodic refresh and only the functional safe layout', () => {
     const providerInfo = homeWidgetPlugin.renderWidgetProviderInfoXml();
     const layout = homeWidgetPlugin.renderWidgetLayoutXml();
 
@@ -50,8 +51,27 @@ describe('React Native Android home widget plugin contract', () => {
     assert.match(providerInfo, /android:initialLayout="@layout\/relateai_home_widget"/);
     assert.match(providerInfo, /android:resizeMode="horizontal\|vertical"/);
     assert.match(providerInfo, /android:widgetCategory="home_screen"/);
+    assert.doesNotMatch(providerInfo, /android:previewImage=/);
+    for (const id of [
+      'widget_root',
+      'widget_title',
+      'widget_subtitle',
+      'widget_primary',
+      'widget_secondary',
+      'widget_tertiary',
+      'widget_privacy'
+    ]) {
+      assert.match(layout, new RegExp(`@\\+id/${id}`));
+    }
+    assert.match(layout, /android:contentDescription="@string\/relateai_widget_default_title"/);
     assert.match(layout, /@string\/relateai_widget_privacy_note/);
     assert.match(layout, /@string\/relateai_widget_open_messages/);
+    assert.doesNotMatch(
+      layout,
+      /android:(?:background|gravity|layout_margin\w*|padding\w*|textColor|textSize|textStyle)=/
+    );
+    assert.doesNotMatch(layout, /@drawable\//);
+    assert.doesNotMatch(pluginSource, /res\/drawable|renderWidget(?:Action)?BackgroundXml/);
     assert.doesNotMatch(layout, /SEND_SMS|READ_SMS|phone|email|delete|send now/i);
   });
 

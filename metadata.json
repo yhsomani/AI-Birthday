@@ -1,6 +1,6 @@
 {
   "name": "RelateAI",
-  "description": "On-Device AI Relationship OS",
+  "description": "Local-first relationship reminder and review assistant",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

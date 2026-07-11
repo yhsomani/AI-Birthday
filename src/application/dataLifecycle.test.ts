@@ -8,6 +8,7 @@ import type { EntityRepositoryStatePort } from '../state/entityRepositoryPersist
 import { clearState, loadState, saveState, type KeyValueStore } from '../state/persistence';
 import {
   clearLocalDataTransaction,
+  DataLifecycleStateMismatchError,
   DATA_LIFECYCLE_JOURNAL_KEY,
   readDataLifecycleJournal,
   recoverInterruptedDataLifecycle,
@@ -148,6 +149,32 @@ describe('transactional local data lifecycle', () => {
 
     await assert.rejects(() => clearLocalDataTransaction(deps, createTestState()), /native failure/);
     assert.equal((await readDataLifecycleJournal(store))?.phase, 'native-cleanup');
+  });
+
+  it('fails closed on malformed journal phases instead of skipping required cleanup', async () => {
+    const store = new MemoryStore();
+    const original = createTestState();
+    await saveState(store, original);
+    const malformed = JSON.stringify({
+      version: 1,
+      operation: 'clear',
+      operationId: 'clear-malformed',
+      phase: 'skip-native-cleanup',
+      startedAt: '2026-07-10T11:00:00.000Z',
+      updatedAt: '2026-07-10T11:00:00.000Z'
+    });
+    await store.setItem(DATA_LIFECYCLE_JOURNAL_KEY, malformed);
+    const log: string[] = [];
+
+    await assert.rejects(
+      recoverInterruptedDataLifecycle(dependencies(store, log)),
+      /Confirm corrupt-storage recovery before continuing/
+    );
+
+    assert.deepEqual(log, []);
+    assert.equal((await loadState(store))?.contacts.length, original.contacts.length);
+    assert.equal(await store.getItem(DATA_LIFECYCLE_JOURNAL_KEY), malformed);
+    assert.equal(await readDataLifecycleJournal(store), undefined);
   });
 
   it('publishes restore only after storage verification and native reconciliation', async () => {
@@ -329,5 +356,58 @@ describe('transactional local data lifecycle', () => {
     assert.equal(repository.replacements.length, 1);
     assert.deepEqual(log, ['reconcile-reminders', 'sync-widget']);
     assert.equal(await readDataLifecycleJournal(store), undefined);
+  });
+
+  it('fails fatally when interrupted restore state matches neither verified dataset', async () => {
+    const store = new MemoryStore();
+    const previous = createTestState();
+    await saveState(store, previous);
+    const restored = createTestState();
+    restored.onboarding.completed = true;
+    const deps = dependencies(store, []);
+    deps.reconcileReminders = async () => {
+      throw new Error('leave restore journal active');
+    };
+    const initialRestore = await restoreLocalDataTransaction(deps, restored);
+    assert.equal(initialRestore.status, 'reconciliation-required');
+
+    const unrelated = createTestState();
+    unrelated.settings.locale = 'hi-IN';
+    await saveState(store, unrelated);
+
+    await assert.rejects(
+      recoverInterruptedDataLifecycle(deps),
+      (error: unknown) => error instanceof DataLifecycleStateMismatchError
+    );
+    assert.notEqual(await store.getItem(DATA_LIFECYCLE_JOURNAL_KEY), null);
+  });
+
+  it('writes SHA-256 lifecycle fingerprints while accepting legacy eight-character recovery journals', async () => {
+    const store = new MemoryStore();
+    const deps = dependencies(store, []);
+    deps.reconcileReminders = async () => {
+      throw new Error('keep journal for inspection');
+    };
+    const result = await restoreLocalDataTransaction(deps, createTestState());
+    assert.equal(result.status, 'reconciliation-required');
+    assert.match((await readDataLifecycleJournal(store))?.targetStateChecksum ?? '', /^[0-9a-f]{64}$/);
+
+    const current = await loadState(store);
+    assert.ok(current);
+    const legacyValue = JSON.stringify(current);
+    let legacyHash = 2166136261;
+    for (let index = 0; index < legacyValue.length; index += 1) {
+      legacyHash ^= legacyValue.charCodeAt(index);
+      legacyHash = Math.imul(legacyHash, 16777619);
+    }
+    const journal = await readDataLifecycleJournal(store);
+    assert.ok(journal);
+    await store.setItem(
+      DATA_LIFECYCLE_JOURNAL_KEY,
+      JSON.stringify({ ...journal, targetStateChecksum: (legacyHash >>> 0).toString(16).padStart(8, '0') })
+    );
+
+    const recovered = await recoverInterruptedDataLifecycle(dependencies(store, []));
+    assert.deepEqual(recovered, { status: 'resumed', operation: 'restore' });
   });
 });

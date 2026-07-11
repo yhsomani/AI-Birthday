@@ -91,8 +91,8 @@ export interface NavigationState {
   stack: readonly NavigationRoute[];
 }
 
-export type NavigationBackSource = 'ui' | 'android-hardware' | 'browser-history';
-export type NavigationBackDisposition = 'consumed' | 'exit-app' | 'delegate-to-browser' | 'unhandled';
+export type NavigationBackSource = 'ui' | 'android-hardware';
+export type NavigationBackDisposition = 'consumed' | 'exit-app' | 'unhandled';
 
 export type NavigationAction =
   | { type: 'push'; destination: NavigationDestination }
@@ -264,8 +264,6 @@ const rootBackDisposition = (source: NavigationBackSource): NavigationBackDispos
   switch (source) {
     case 'android-hardware':
       return 'exit-app';
-    case 'browser-history':
-      return 'delegate-to-browser';
     case 'ui':
       return 'unhandled';
   }
@@ -452,57 +450,5 @@ export const restoreNavigationState = (value: unknown, entities: NavigationEntit
   return {
     schemaVersion: 1,
     stack: stack.length ? stack : [{ screen: 'home' }]
-  };
-};
-
-export interface BrowserNavigationSnapshot {
-  schemaVersion: 1;
-  depth: number;
-  navigation: NavigationState;
-}
-
-const BROWSER_NAVIGATION_STATE_KEY = 'relateAINavigation';
-
-/** Preserves unrelated browser history state while attaching serializable app navigation. */
-export const buildBrowserNavigationHistoryState = (
-  existingState: unknown,
-  navigation: NavigationState,
-  depth: number
-): Record<string, unknown> => {
-  const existing =
-    existingState && typeof existingState === 'object' && !Array.isArray(existingState)
-      ? (existingState as Record<string, unknown>)
-      : {};
-  return {
-    ...existing,
-    [BROWSER_NAVIGATION_STATE_KEY]: {
-      schemaVersion: 1,
-      depth: Math.max(0, Math.trunc(depth)),
-      navigation
-    } satisfies BrowserNavigationSnapshot
-  };
-};
-
-/** Reads browser back/forward state through the same stale-safe route restoration boundary. */
-export const readBrowserNavigationHistoryState = (
-  value: unknown,
-  entities: NavigationEntities
-): BrowserNavigationSnapshot | undefined => {
-  if (!value || typeof value !== 'object') return undefined;
-  const marker = (value as Record<string, unknown>)[BROWSER_NAVIGATION_STATE_KEY];
-  if (!marker || typeof marker !== 'object') return undefined;
-  const candidate = marker as Record<string, unknown>;
-  if (
-    candidate.schemaVersion !== 1 ||
-    typeof candidate.depth !== 'number' ||
-    !Number.isFinite(candidate.depth) ||
-    candidate.depth < 0
-  ) {
-    return undefined;
-  }
-  return {
-    schemaVersion: 1,
-    depth: Math.trunc(candidate.depth),
-    navigation: restoreNavigationState(candidate.navigation, entities)
   };
 };

@@ -10,15 +10,19 @@ describe('temporary functionality-first application shell', () => {
     assert.match(source, /<MinimalFunctionalShell/);
     assert.match(source, /production\.commands\.execute/);
     assert.match(source, /MAX_RESULT_CHARACTERS/);
+    assert.match(source, /INITIAL_COMMAND = JSON\.stringify\(\{ type: 'system\.catalog' \}\)/);
+    assert.match(source, /maxCommandLength=\{MAX_RUNTIME_COMMAND_BYTES\}/);
+    assert.match(source, /maxSecretLength=\{MAX_BACKUP_PASSPHRASE_LENGTH\}/);
+    assert.doesNotMatch(source, /commandExamples|FunctionalCommandExample/);
     assert.doesNotMatch(source, /StyleSheet|style=|ui\/theme|AppDialog|Animated\.|<Image\b/);
   });
 
-  it('retains non-visual lifecycle, deep-link, notification, Android-back, and browser-history adapters', () => {
+  it('retains non-visual lifecycle, deep-link, notification, and Android-back adapters', () => {
     assert.match(source, /parseRelateDeepLink/);
     assert.match(source, /addNotificationResponseReceivedListener/);
     assert.match(source, /NativeAppState\.addEventListener/);
     assert.match(source, /BackHandler\.addEventListener/);
-    assert.match(source, /window\.addEventListener\('popstate'/);
+    assert.doesNotMatch(source, /\bwindow\.|browser-history|popstate/);
     assert.match(source, /production\.commands\.onBackground/);
   });
 

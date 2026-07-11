@@ -44,6 +44,7 @@ import type { BackupFileExportResult, BackupFilePickResult } from '../native/bac
 import type { EmailReconciliationResult, EmailSendResult } from '../native/emailSenderClient';
 import type { RelateAction } from '../state/relateReducer';
 import type { RestoreTransactionResult } from './dataLifecycle';
+import type { DataLifecycleRecoveryResult } from './dataLifecycleRecovery';
 import type { OperationCoordinator, OperationError, OperationSnapshot } from './operationCoordinator';
 import type {
   PermissionAuthorizationRecords,
@@ -363,6 +364,7 @@ export type HarnessCommand =
   | { type: 'backup.restore-preview-selected'; selectionToken: string; passphrase: string }
   | { type: 'backup.restore-confirm'; confirmationToken: string }
   | { type: 'data.clear'; confirmation: 'CLEAR LOCAL DATA' }
+  | { type: 'data.recover' }
   | { type: 'permissions.refresh' }
   | { type: 'permissions.preflight'; capability: SystemPermissionCapability }
   | {
@@ -923,6 +925,13 @@ export type RedactedCommandValue =
     }
   | { kind: 'data-clear'; cleared: true }
   | {
+      kind: 'data-lifecycle-recovery';
+      status: 'resolved';
+      outcome: Extract<DataLifecycleRecoveryResult, { status: 'resolved' }>['outcome'];
+      operation?: Extract<DataLifecycleRecoveryResult, { status: 'resolved' }>['operation'];
+      journalCleared: true;
+    }
+  | {
       kind: 'permission-refresh';
       statuses: {
         capability: SystemPermissionCapability;
@@ -1104,6 +1113,7 @@ export interface CommandRuntimeDependencies {
   getState(): AppState;
   dispatch(action: RelateAction): void | Promise<void>;
   installVerifiedState(state: AppState): void | Promise<void>;
+  runDataReplacement<T>(operation: () => Promise<T>): Promise<T>;
   operations: OperationCoordinator;
   createConfirmationToken(): string;
   now(): Date;
@@ -1137,6 +1147,7 @@ export interface CommandRuntimeDependencies {
   decryptBackup(raw: string, passphrase: string, signal: AbortSignal): Promise<AppState>;
   restoreData(restoredState: AppState, signal: AbortSignal): Promise<RestoreTransactionResult>;
   clearData(previousState: AppState, signal: AbortSignal): Promise<AppState>;
+  recoverDataLifecycle(signal: AbortSignal): Promise<DataLifecycleRecoveryResult>;
   refreshPermissions(state: AppState, signal: AbortSignal): Promise<PermissionAuthorizationRecords>;
   preflightPermission(
     state: AppState,

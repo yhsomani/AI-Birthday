@@ -2,9 +2,11 @@
 
 Last updated: 2026-07-10
 
-This document defines the ideal final-product behavior for RelateAI features from a functional and user-experience perspective. It is the feature single source of truth for product, design, development, QA, support, and AI coding agents.
+> **Superseded on 2026-07-11.** This file is retained only as evidence of the previous 28-area scope hypothesis and current implementation contracts. It is not product authority. The business/end-user product scope is now `../SSOT.md`; the reset analysis and decision trail begin at `product-reset/README.md`.
 
-This document intentionally describes expected behavior only. It keeps the focus on user-facing outcomes, product rules, and acceptance criteria.
+At the time it was authored, this document described the intended final behavior of the broad feature set. It now serves only as a historical implementation-contract inventory for product, design, development, QA, support, and AI coding agents.
+
+The content below records previous expected behavior, product rules, and acceptance criteria. It must not be interpreted as an approved future scope or a competing source of truth.
 
 ## Product Behavior Principles
 

@@ -51,7 +51,7 @@ describe('UI-independent navigation runtime', () => {
     assert.deepEqual(test.controller.snapshot().stack, [{ screen: 'events' }]);
   });
 
-  it('restores browser state through stale-safe entity validation', async () => {
+  it('restores persisted navigation state through stale-safe entity validation', async () => {
     const test = fixture();
     await test.controller.restore({
       schemaVersion: 1,

@@ -138,6 +138,7 @@ export const supportedHarnessCommandTypes = [
   'backup.restore-preview-selected',
   'backup.restore-confirm',
   'data.clear',
+  'data.recover',
   'permissions.refresh',
   'permissions.preflight',
   'permissions.request',
@@ -205,11 +206,12 @@ export const commandCatalogWorkflows = [
   },
   {
     id: 'setup-recovery',
-    purpose: 'Inspect the current recommended setup fix and execute only its bounded action.',
+    purpose: 'Inspect the current setup fix, refresh permissions, or resume an interrupted data operation.',
     examples: [
       '{"type":"setup.inspect"}',
       '{"type":"setup.open-action","checkId":"<check id>"}',
-      '{"type":"permissions.refresh"}'
+      '{"type":"permissions.refresh"}',
+      '{"type":"data.recover"}'
     ]
   },
   {
@@ -265,6 +267,7 @@ export const buildCommandCatalog = () => ({
     'Run query or inspect commands first to obtain current opaque ids.',
     'Preview/apply commands require the fresh confirmation token returned by preview.',
     'Backup passphrases belong only in the secure field through $SECURE_INPUT.',
+    'Run data.recover when a blocking lifecycle issue reports interrupted clear or restore reconciliation.',
     'Failed non-secret input remains editable; successful input and every secret are cleared.'
   ]
 });

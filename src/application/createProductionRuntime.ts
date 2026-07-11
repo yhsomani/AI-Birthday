@@ -36,6 +36,7 @@ import {
   restoreLocalDataTransaction,
   type DataLifecycleDependencies
 } from './dataLifecycle';
+import { DataLifecycleRecoveryCoordinator } from './dataLifecycleRecovery';
 import { createNativePermissionReminderCoordinator } from './nativePermissionReminderCoordinator';
 import { createNativePermissionRequestCoordinator } from './nativePermissionRequestCoordinator';
 import { NavigationRuntimeController } from './navigationRuntime';
@@ -78,6 +79,11 @@ export const createProductionRuntime = (options: ProductionRuntimeOptions = {}) 
     createEntityRepositoryPersistenceAdapter({ repository: repositoryPromise, nowIso })
   );
   const dataLifecycleReference = {} as { current: DataLifecycleDependencies };
+  const dataLifecycleRecovery = new DataLifecycleRecoveryCoordinator({
+    store: secureStateStore,
+    recover: () => recoverInterruptedDataLifecycle(dataLifecycleReference.current),
+    issues: appOperationalIssues
+  });
 
   const runtimeReference = {} as { current: AppRuntimeController };
   const permissionReminders = createNativePermissionReminderCoordinator({
@@ -107,15 +113,7 @@ export const createProductionRuntime = (options: ProductionRuntimeOptions = {}) 
 
   const runtime = new AppRuntimeController({
     loadState: async () => {
-      const recovery = await recoverInterruptedDataLifecycle(dataLifecycleReference.current);
-      if (recovery.status === 'reconciliation-required') {
-        appOperationalIssues.report({
-          code: 'persistence-failed',
-          severity: 'blocking',
-          summary: 'An interrupted data operation requires explicit recovery before it can be considered complete.',
-          recovery: 'reconcile'
-        });
-      }
+      await dataLifecycleRecovery.reconcile();
       return loadEntityRepositoryState(repositoryPromise, nowIso);
     },
     resetFailedStorage: async () => {
@@ -187,6 +185,7 @@ export const createProductionRuntime = (options: ProductionRuntimeOptions = {}) 
       await navigation.synchronize();
     },
     installVerifiedState: state => runtime.installVerifiedState(state),
+    runDataReplacement: operation => runtime.runDataReplacement(operation),
     operations,
     createConfirmationToken: createRequestId,
     now: () => new Date(),
@@ -274,8 +273,45 @@ export const createProductionRuntime = (options: ProductionRuntimeOptions = {}) 
       if (signal.aborted) throw new Error('Operation cancelled.');
       return state;
     },
-    restoreData: restoredState => restoreLocalDataTransaction(dataLifecycleDependencies, restoredState),
-    clearData: previousState => clearLocalDataTransaction(dataLifecycleDependencies, previousState),
+    restoreData: async restoredState => {
+      try {
+        const result = await restoreLocalDataTransaction(dataLifecycleDependencies, restoredState);
+        if (result.status === 'reconciliation-required') {
+          dataLifecycleRecovery.reportRequired();
+        } else {
+          await dataLifecycleRecovery.reconcile();
+        }
+        return result;
+      } catch (error) {
+        await dataLifecycleRecovery.reportRequiredIfJournalPresent();
+        throw error;
+      }
+    },
+    clearData: async previousState => {
+      try {
+        const clearedState = await clearLocalDataTransaction(dataLifecycleDependencies, previousState);
+        await dataLifecycleRecovery.reconcile();
+        return clearedState;
+      } catch (error) {
+        await dataLifecycleRecovery.reportRequiredIfJournalPresent();
+        throw error;
+      }
+    },
+    recoverDataLifecycle: signal => {
+      if (signal.aborted) throw new Error('Operation cancelled.');
+      return dataLifecycleRecovery
+        .reconcile(async () => {
+          const authoritativeState = await repository.loadState();
+          if (!authoritativeState) {
+            throw new Error('Recovered protected storage did not contain a verified application state.');
+          }
+          runtime.installVerifiedState(authoritativeState);
+        })
+        .then(result => {
+          if (signal.aborted) throw new Error('Operation cancelled.');
+          return result;
+        });
+    },
     refreshPermissions: async state => (await permissionReminders.onForeground(state)).records,
     preflightPermission: (state, capability) => permissionReminders.beforeOperation(state, capability),
     requestPermission: (state, request) => permissionRequests.request(state, request),
@@ -315,6 +351,7 @@ export const createProductionRuntime = (options: ProductionRuntimeOptions = {}) 
     permissionReminders,
     permissionRequests,
     persistence,
+    dataLifecycleRecovery,
     issues: appOperationalIssues
   };
 };

@@ -5,7 +5,6 @@
     "longLabel": "Review messages",
     "disabledMessage": "Open RelateAI to review messages.",
     "url": "relateai://messages",
-    "rank": 0,
     "effect": "navigate"
   },
   {
@@ -14,7 +13,6 @@
     "longLabel": "Add relationship event",
     "disabledMessage": "Open RelateAI to add a relationship event.",
     "url": "relateai://event/new",
-    "rank": 1,
     "effect": "navigate"
   }
 ]

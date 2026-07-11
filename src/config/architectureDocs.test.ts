@@ -16,7 +16,7 @@ describe('architecture documentation contract', () => {
     assert.match(adr, /React Native \/ Expo/);
     assert.match(adr, /src\/App\.tsx/);
     assert.match(adr, /legacy Android\/Gradle artifacts are historical references only/i);
-    assert.match(adr, /npm run release:evidence/);
+    assert.match(adr, /node --import tsx src\/config\/releaseEvidenceCli\.ts/);
   });
 
   it('marks legacy Android architecture ADRs as historical for the active RN app', () => {
@@ -35,13 +35,13 @@ describe('architecture documentation contract', () => {
     });
   });
 
-  it('keeps React Native migration status aligned with removed legacy artifacts', () => {
+  it('keeps React Native migration status aligned with removed generated-native and legacy artifacts', () => {
     const migrationStatus = readDoc('docs/react-native-migration-status.md');
     const appSource = readDoc('src/App.tsx');
     const evidenceCli = readDoc('src/config/releaseEvidenceCli.ts');
 
     assert.match(migrationStatus, /legacy Android\/Gradle artifacts have been removed/i);
-    assert.match(migrationStatus, /scans for legacy Android\/Gradle artifact drift/i);
+    assert.match(migrationStatus, /scans for generated-native and legacy artifact drift/i);
     assert.doesNotMatch(migrationStatus, /until explicit archival\/removal approval/i);
     assert.doesNotMatch(migrationStatus, /remaining legacy Android\/Gradle artifact paths/i);
 

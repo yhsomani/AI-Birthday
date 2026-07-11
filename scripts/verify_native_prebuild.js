@@ -1,5 +1,5 @@
 const { spawn, spawnSync } = require('node:child_process');
-const { access, cp, mkdir, mkdtemp, rm, symlink } = require('node:fs/promises');
+const { access, cp, mkdir, mkdtemp, readFile, rm, symlink } = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 
@@ -48,6 +48,37 @@ const runAsync = (executable, args, cwd) =>
     });
   });
 
+const assertAndroidReleasePolicyAsync = async androidRoot => {
+  const manifestPath = path.join(androidRoot, 'app', 'src', 'main', 'AndroidManifest.xml');
+  const manifest = await readFile(manifestPath, 'utf8');
+  const activePermissions = [...manifest.matchAll(/<uses-permission\b[^>]*>/g)]
+    .map(match => match[0])
+    .filter(tag => !/tools:node=["']remove["']/.test(tag))
+    .map(tag => tag.match(/android:name=["']([^"']+)["']/)?.[1])
+    .filter(Boolean);
+  const forbidden = new Set([
+    'android.permission.WRITE_CONTACTS',
+    'android.permission.READ_EXTERNAL_STORAGE',
+    'android.permission.WRITE_EXTERNAL_STORAGE',
+    'android.permission.SYSTEM_ALERT_WINDOW',
+    'android.permission.SEND_SMS',
+    'android.permission.READ_SMS',
+    'android.permission.RECEIVE_SMS',
+    'android.permission.READ_CALL_LOG',
+    'android.permission.READ_PHONE_NUMBERS',
+    'android.permission.USE_EXACT_ALARM',
+    'android.permission.SCHEDULE_EXACT_ALARM',
+    'android.permission.BIND_ACCESSIBILITY_SERVICE'
+  ]);
+  const drift = activePermissions.filter(permission => forbidden.has(permission));
+  if (drift.length > 0) {
+    throw new Error(`Generated Android manifest contains forbidden active permissions: ${drift.join(', ')}`);
+  }
+  if (!/<application\b[^>]*android:allowBackup=["']false["']/.test(manifest)) {
+    throw new Error('Generated Android manifest must disable platform auto backup.');
+  }
+};
+
 const copyProjectInputsAsync = async fixtureRoot => {
   const projectFiles = ['app.json', 'index.js', 'package.json', 'package-lock.json'];
   for (const relativePath of projectFiles) {
@@ -85,6 +116,7 @@ const main = async () => {
     await runAsync(expoExecutable, ['prebuild', '--clean', '--no-install', '--platform', 'android'], fixtureRoot);
 
     const androidRoot = path.join(fixtureRoot, 'android');
+    await assertAndroidReleasePolicyAsync(androidRoot);
     const gradleExecutable = path.join(androidRoot, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
     await runAsync(gradleExecutable, [':app:assembleDebug', '--no-daemon', '--stacktrace'], androidRoot);
   } finally {

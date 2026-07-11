@@ -1,5 +1,5 @@
 import { buildCheckInReminderQueue } from './checkIns';
-import { buildContactEnrichmentPlan } from './contactEnrichment';
+import { buildContactEnrichmentPlans } from './contactEnrichment';
 import { eventOccurrenceIso } from './occasionDates';
 import type { AppState, Screen } from './types';
 
@@ -46,6 +46,7 @@ export const buildHomePlanner = (state: AppState, now = new Date(), context: Hom
   const activeContacts = state.contacts.filter(contact => !contact.archivedAt);
   const activeContactIds = new Set(activeContacts.map(contact => contact.id));
   const actions: HomePlannerAction[] = [];
+  const enrichmentByContact = buildContactEnrichmentPlans(state);
 
   state.messages
     .filter(
@@ -153,7 +154,7 @@ export const buildHomePlanner = (state: AppState, now = new Date(), context: Hom
   }
 
   const weakestEnrichment = activeContacts
-    .map(contact => buildContactEnrichmentPlan(state, contact.id))
+    .map(contact => enrichmentByContact.get(contact.id))
     .filter((plan): plan is NonNullable<typeof plan> => Boolean(plan))
     .filter(plan => plan.score < 50)
     .sort((left, right) => left.score - right.score || left.contactId.localeCompare(right.contactId))[0];

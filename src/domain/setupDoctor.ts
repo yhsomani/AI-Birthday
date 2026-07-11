@@ -1,4 +1,4 @@
-import { buildContactEnrichmentPlan } from './contactEnrichment';
+import { buildContactEnrichmentPlans } from './contactEnrichment';
 import { buildNotificationReadinessReport } from './notificationReadiness';
 import { buildPrivacyCenterReport } from './privacyCenter';
 import { providerEndpointReadinessFromConfigured, type ProviderEndpointReadiness } from './providerEndpointReadiness';
@@ -156,6 +156,7 @@ export const buildSetupDoctorReport = (
   env: SetupDoctorEnvironment,
   now: Date = new Date()
 ): SetupDoctorReport => {
+  const enrichmentByContact = buildContactEnrichmentPlans(state);
   const pendingMessages = state.messages.filter(
     message => message.status === 'Needs review' || message.status === 'Draft'
   );
@@ -163,7 +164,7 @@ export const buildSetupDoctorReport = (
     message => message.status === 'Failed' || message.status === 'Blocked' || message.status === 'Delivery unknown'
   );
   const weakContactPlans = state.contacts
-    .map(contact => buildContactEnrichmentPlan(state, contact.id))
+    .map(contact => enrichmentByContact.get(contact.id))
     .filter((plan): plan is NonNullable<typeof plan> => Boolean(plan))
     .filter(plan => plan.score < 50)
     .sort((a, b) => a.score - b.score);

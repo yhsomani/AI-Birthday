@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { relateReducer } from '../state/relateReducer';
 import { createTestState } from '../test/testState';
-import { buildContactEnrichmentPlan, validateEnrichmentAnswer } from './contactEnrichment';
+import { buildContactEnrichmentPlan, buildContactEnrichmentPlans, validateEnrichmentAnswer } from './contactEnrichment';
 
 const createSparseContactState = () => {
   const state = createTestState();
@@ -33,6 +33,14 @@ const createSparseContactState = () => {
 };
 
 describe('guided contact enrichment contract', () => {
+  it('keeps indexed batch plans equivalent to individual contact plans', () => {
+    const state = createTestState();
+    const plans = buildContactEnrichmentPlans(state);
+    for (const contact of state.contacts) {
+      assert.deepEqual(plans.get(contact.id), buildContactEnrichmentPlan(state, contact.id));
+    }
+  });
+
   it('surfaces the highest-priority missing personalization prompts', () => {
     const plan = buildContactEnrichmentPlan(createSparseContactState(), 'c-sparse');
 

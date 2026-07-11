@@ -2,6 +2,8 @@
 
 Last updated: 2026-07-10
 
+> **Superseded on 2026-07-11.** This prior roadmap assumed the broad feature inventory was the correct starting point. It is retained as historical input only. Use `../SSOT.md` and `product-reset/product-vision-and-roadmap.md` for current product direction and evidence gates.
+
 This document uses `docs/feature-fssot.md` as the feature scope baseline and identifies:
 
 - Features that are not useful enough for ordinary end users to be prominent.

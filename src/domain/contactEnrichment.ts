@@ -109,17 +109,20 @@ const summaryFor = (score: number, completedSignals: string[], missingSignals: s
   return `Personalization is ${score}%. Next missing detail: ${missingSignals[0]}.`;
 };
 
-export const buildContactEnrichmentPlan = (state: AppState, contactId: string): ContactEnrichmentPlan | undefined => {
-  const contact = state.contacts.find(item => item.id === contactId);
-  if (!contact) {
-    return undefined;
-  }
+type ContactEnrichmentFacts = Readonly<{
+  memories: MemoryNote[];
+  hasGift: boolean;
+  hasEvent: boolean;
+  hasSentMessage: boolean;
+}>;
 
-  const memories = nonPrivateMemories(state, contactId);
+const buildContactEnrichmentPlanFromFacts = (
+  state: Pick<AppState, 'settings'>,
+  contact: Contact,
+  facts: ContactEnrichmentFacts
+): ContactEnrichmentPlan => {
+  const { memories, hasGift, hasEvent, hasSentMessage } = facts;
   const preferences = resolveContactPreferencesForContact(state.settings, contact);
-  const gifts = state.gifts.filter(gift => gift.contactId === contactId);
-  const events = state.events.filter(event => event.contactId === contactId);
-  const sentMessages = state.messages.filter(message => message.contactId === contactId && message.status === 'Sent');
   const completedSignals: string[] = [];
   let score = 0;
 
@@ -143,13 +146,13 @@ export const buildContactEnrichmentPlan = (state: AppState, contactId: string): 
     score += 10;
     completedSignals.push('language guidance');
   }
-  if (events.length > 0) {
+  if (hasEvent) {
     score += 10;
     completedSignals.push('relationship events');
   }
-  if (gifts.length > 0 || sentMessages.length > 0) {
+  if (hasGift || hasSentMessage) {
     score += 5;
-    completedSignals.push(gifts.length > 0 ? 'gift history' : 'sent history');
+    completedSignals.push(hasGift ? 'gift history' : 'sent history');
   }
 
   const promptIds: ContactEnrichmentPromptId[] = [];
@@ -174,7 +177,7 @@ export const buildContactEnrichmentPlan = (state: AppState, contactId: string): 
   const finalScore = Math.min(100, score);
 
   return {
-    contactId,
+    contactId: contact.id,
     score: finalScore,
     label: labelForScore(finalScore),
     prompts: promptIds.map(id => promptFor(id, contact)).sort((a, b) => a.priority - b.priority),
@@ -182,6 +185,44 @@ export const buildContactEnrichmentPlan = (state: AppState, contactId: string): 
     missingSignals,
     summary: summaryFor(finalScore, completedSignals, missingSignals)
   };
+};
+
+export const buildContactEnrichmentPlan = (state: AppState, contactId: string): ContactEnrichmentPlan | undefined => {
+  const contact = state.contacts.find(item => item.id === contactId);
+  if (!contact) return undefined;
+  return buildContactEnrichmentPlanFromFacts(state, contact, {
+    memories: nonPrivateMemories(state, contactId),
+    hasGift: state.gifts.some(gift => gift.contactId === contactId),
+    hasEvent: state.events.some(event => event.contactId === contactId),
+    hasSentMessage: state.messages.some(message => message.contactId === contactId && message.status === 'Sent')
+  });
+};
+
+/** Builds all enrichment scores in one indexed pass for list/report workloads. */
+export const buildContactEnrichmentPlans = (state: AppState): ReadonlyMap<string, ContactEnrichmentPlan> => {
+  const memoriesByContact = new Map<string, MemoryNote[]>();
+  for (const memory of state.memories) {
+    if (memory.category === 'Private') continue;
+    const values = memoriesByContact.get(memory.contactId) ?? [];
+    values.push(memory);
+    memoriesByContact.set(memory.contactId, values);
+  }
+  const giftContacts = new Set(state.gifts.map(gift => gift.contactId));
+  const eventContacts = new Set(state.events.map(event => event.contactId));
+  const sentMessageContacts = new Set(
+    state.messages.filter(message => message.status === 'Sent').map(message => message.contactId)
+  );
+  return new Map(
+    state.contacts.map(contact => [
+      contact.id,
+      buildContactEnrichmentPlanFromFacts(state, contact, {
+        memories: memoriesByContact.get(contact.id) ?? [],
+        hasGift: giftContacts.has(contact.id),
+        hasEvent: eventContacts.has(contact.id),
+        hasSentMessage: sentMessageContacts.has(contact.id)
+      })
+    ])
+  );
 };
 
 export const resolveContactEnrichmentPrompt = (

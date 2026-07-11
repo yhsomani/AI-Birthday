@@ -50,37 +50,24 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Activate exact npm from packageManager
+        run: |
+          corepack enable npm
+          test "$(npm --version)" = "11.6.0"
+
       - name: Install exact dependencies
         run: npm ci
 
       - name: Prove clean checkout has no generated release report
         run: test ! -e reports/react-native-release-evidence.json
 
-      - name: Type-check before evidence generation
-        run: npm run typecheck
-
-      - name: Lint active source
-        run: npm run lint
-
-      - name: Verify formatting
-        run: npm run format:check
-
-      - name: Test with coverage thresholds before evidence generation
-        run: npm run test:coverage
-
-      - name: Prebuild a temporary Expo Android project and compile debug
-        run: npm run test:native-prebuild
-
-      - name: Build the temporary web functional harness
-        run: npm run web:export
-
-      - name: Generate command-derived release evidence
-        run: npm run release:evidence -- --fail-on-blockers
+      - name: Execute release gates and generate command-derived source-only evidence
+        run: node --import tsx src/config/releaseEvidenceCli.ts --source-only --fail-on-blockers
 
       - name: Upload release evidence
         uses: actions/upload-artifact@v4
         with:
-          name: react-native-release-evidence-${{ github.sha }}
+          name: react-native-source-evidence-${{ github.sha }}
           path: reports/react-native-release-evidence.json
           if-no-files-found: error
           retention-days: 30

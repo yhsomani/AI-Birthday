@@ -6,9 +6,11 @@ import {
 import { evaluateProviderEndpointReadiness } from '../domain/providerEndpointReadiness';
 import {
   EMAIL_PROVIDER_RESPONSE_MAX_BYTES,
+  fetchProviderResponse,
   readBoundedJsonResponse,
   type ProviderResponseLike
 } from './providerTransport';
+import { buildAllowsLocalProviderEndpoints } from './providerDevelopmentMode';
 
 export type EmailSenderConfig = {
   endpoint?: string;
@@ -55,14 +57,15 @@ export const readEmailSenderConfig = (): EmailSenderConfig => ({
   endpoint: process.env.EXPO_PUBLIC_RELATE_EMAIL_ENDPOINT?.trim() || undefined,
   statusEndpoint: process.env.EXPO_PUBLIC_RELATE_EMAIL_STATUS_ENDPOINT?.trim() || undefined,
   timeoutMs: Number(process.env.EXPO_PUBLIC_RELATE_EMAIL_TIMEOUT_MS) || 12000,
-  allowLocalProviderEndpoint:
-    process.env.EXPO_PUBLIC_RELATE_ALLOW_LOCAL_PROVIDER_ENDPOINTS?.trim().toLowerCase() === 'true'
+  allowLocalProviderEndpoint: buildAllowsLocalProviderEndpoints(
+    process.env.EXPO_PUBLIC_RELATE_ALLOW_LOCAL_PROVIDER_ENDPOINTS
+  )
 });
 
 export const reconcileEmailDelivery = async (
   attempt: { idempotencyKey: string; deliveryId?: string },
   config: EmailSenderConfig = readEmailSenderConfig(),
-  fetcher: EmailFetch = globalThis.fetch as EmailFetch
+  fetcher: EmailFetch = fetchProviderResponse
 ): Promise<EmailReconciliationResult> => {
   if (
     !attempt.idempotencyKey ||
@@ -181,7 +184,7 @@ const validSessionToken = (config: EmailSenderConfig, nowMs: number) => {
 export const sendEmailMessage = async (
   request: EmailDeliveryRequest,
   config: EmailSenderConfig = readEmailSenderConfig(),
-  fetcher: EmailFetch = globalThis.fetch as EmailFetch
+  fetcher: EmailFetch = fetchProviderResponse
 ): Promise<EmailSendResult> => {
   if (!config.endpoint) {
     return {

@@ -26,6 +26,8 @@ class MemoryFiles implements EncryptedStoreFileAdapter {
   removes = 0;
   writtenNames: string[] = [];
   tearNextCheckpoint = false;
+  failRemoveName?: string;
+  events?: string[];
 
   async read(name: string) {
     this.reads += 1;
@@ -45,6 +47,8 @@ class MemoryFiles implements EncryptedStoreFileAdapter {
 
   async remove(name: string) {
     this.removes += 1;
+    this.events?.push(`file:${name}`);
+    if (name === this.failRemoveName) throw new Error('simulated encrypted file cleanup failure');
     this.values.delete(name);
   }
 
@@ -64,6 +68,7 @@ class MemoryProtectedStore implements ProtectedRepositoryKeyStore {
   readonly values = new Map<string, string>();
   available = true;
   writes = 0;
+  events?: string[];
 
   async getItem(key: string) {
     return this.values.get(key) ?? null;
@@ -75,6 +80,7 @@ class MemoryProtectedStore implements ProtectedRepositoryKeyStore {
   }
 
   async removeItem(key: string) {
+    this.events?.push(`key:${key}`);
     this.values.delete(key);
   }
 
@@ -168,6 +174,27 @@ describe('encrypted transactional entity store', () => {
     assert.equal(harness.files.values.size, 0);
     assert.equal(harness.protectedStore.values.has(ENTITY_STORE_MASTER_KEY), false);
     assert.equal(await repository.loadState(), undefined);
+  });
+
+  it('cryptographically erases first and continues bounded file cleanup after one removal fails', async () => {
+    const harness = createHarness();
+    const repository = harness.makeStore();
+    await repository.replaceState(createTestState());
+    const encryptedFiles = [...harness.files.values.keys()];
+    const failedFile = encryptedFiles[0];
+    assert.ok(failedFile);
+    const events: string[] = [];
+    harness.files.events = events;
+    harness.protectedStore.events = events;
+    harness.files.failRemoveName = failedFile;
+
+    await assert.rejects(repository.destroyAllData(), /key was erased.*cleanup did not finish/i);
+
+    assert.equal(events[0], `key:${ENTITY_STORE_MASTER_KEY}`);
+    assert.equal(harness.protectedStore.values.has(ENTITY_STORE_MASTER_KEY), false);
+    assert.equal(harness.files.values.has(failedFile), true);
+    assert.equal(harness.files.removes, encryptedFiles.length);
+    await assert.rejects(repository.loadState(), /master key is unavailable/i);
   });
 
   it('writes through the injected Expo crypto path and reopens with Web Crypto', async () => {

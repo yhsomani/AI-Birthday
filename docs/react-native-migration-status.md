@@ -1,10 +1,12 @@
 # React Native Migration Status
 
-Last updated: 2026-07-10
+Last updated: 2026-07-11
 
-This document tracks the active React Native replacement. The behavior baseline is
-`feature-fssot.md`, modified by the product-priority decisions in
-`feature-roadmap-analysis.md`.
+> This document reports implementation and release status only. It does not define future product scope. The zero-based business and end-user direction is `../SSOT.md`, with supporting analysis in `product-reset/README.md`.
+
+This document tracks the active React Native replacement. The implementation was built
+against the now-superseded `feature-fssot.md` and `feature-roadmap-analysis.md`; those
+files remain useful only for explaining what the current code attempts to implement.
 
 ## Active Runtime
 
@@ -15,11 +17,13 @@ The visible React Native surface is intentionally a temporary functionality cons
 
 - one bounded JSON command input;
 - redacted runtime, operation, issue, and record-count output;
-- a small set of example commands needed to exercise the runtime;
+- the exhaustive `system.catalog` command loaded by default;
 - no feature-screen layout, theme, animation, icon system, or visual design.
 
 The console is not the product UX and must not be used as a design reference. A later
-Figma implementation will replace it while retaining the application and domain APIs.
+Figma implementation will replace it. The reset may selectively reuse reviewed safety
+rules and domain policies, but it is not required to retain the current application API,
+global state shape, command protocol, or feature taxonomy.
 Private record content is never rendered by the console. Successful non-secret command
 input is cleared, failed non-secret input remains editable for retry, and secure input is
 always cleared. Backgrounding clears the temporary shell, and biometric lock prevents
@@ -44,8 +48,7 @@ The replacement is local-first and organized around these boundaries:
   channel handoff, backups, biometric authentication, shortcuts, and the home widget;
 - short-lived authenticated provider-session seams for AI and email, with no persisted
   provider token or client-side provider secret;
-- UI-independent navigation, deep-link, notification-entry, Android-back, and browser
-  history state.
+- UI-independent navigation, deep-link, notification-entry, and Android-back state.
 
 Core behavior includes conflict-aware contact and event import, manual contact/event
 lifecycle actions, relationship check-ins, event preparation, reminder planning,
@@ -78,33 +81,39 @@ When these integrations are unavailable, the client fails closed or uses the doc
 local/manual fallback. It must never silently claim provider readiness or successful
 delivery.
 
+The checked-in application composition supplies `unavailableProviderSessions`; endpoint
+environment variables alone cannot enable AI or email backend calls. Provider-backed
+release claims require a separate authenticated session composition plus backend and
+device evidence.
+
 ## Validation
 
 Use the pinned Node and npm versions and run:
 
 ```bash
 nvm use
+corepack enable npm
+npm --version # must print 11.6.0
 npm ci
-npm run typecheck
-npm run lint
-npm run format:check
-npm test
-npm run test:coverage
-npm run test:native-prebuild
-npm audit --audit-level=moderate
-npx expo install --check
-npx expo export --platform web --output-dir reports/web-export
-git diff --check
-npm run release:evidence -- --fail-on-blockers
+node --import tsx src/config/releaseEvidenceCli.ts --source-only --fail-on-blockers
 ```
 
-`test:native-prebuild` requires JDK 17 and an Android SDK. Release evidence is valid only
+The checked-in CLI is invoked directly so a package-script change cannot replace the
+evidence generator. It validates the exact package alias and executes typecheck, lint, formatting, thresholded coverage, native
+prebuild/debug compile, dependency audit, Expo dependency compatibility, and diff checks
+once. Its native prebuild gate requires JDK 17 and an Android SDK. The command above produces an
+explicitly source-only assessment; it cannot approve a production release. Final production
+evidence must run without `--source-only`, provide the external signed-build/device/store
+evidence file with structured attachments bound to the exact commit, working-tree
+fingerprint, app version, and signed artifact hashes, and contain no blockers. Release evidence is valid only
 when produced from the exact candidate checkout; it records command results and source,
 lockfile, and toolchain provenance. Dirty local work, a missing signed build, or missing
-device evidence must not be represented as a production-ready store release.
+device evidence must not be represented as a production-ready store release. A release
+owner independently verifies every linked primary evidence record.
 
 ## Migration Rule
 
-Any reintroduced legacy Android/Kotlin/Gradle application path is release drift. Native
+Any checked-in `android/` or `ios/` generated tree or reintroduced legacy
+Android/Kotlin/Gradle application path is release drift. Native
 files generated by the Expo prebuild validation fixture are temporary build artifacts,
-not a second product implementation. Release evidence scans for legacy Android/Gradle artifact drift.
+not a second product implementation. Release evidence scans for generated-native and legacy artifact drift.

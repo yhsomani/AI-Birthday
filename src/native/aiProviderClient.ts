@@ -9,9 +9,11 @@ import {
 import { evaluateProviderEndpointReadiness } from '../domain/providerEndpointReadiness';
 import {
   AI_PROVIDER_RESPONSE_MAX_BYTES,
+  fetchProviderResponse,
   readBoundedJsonResponse,
   type ProviderResponseLike
 } from './providerTransport';
+import { buildAllowsLocalProviderEndpoints } from './providerDevelopmentMode';
 
 export type AiProviderConfig = {
   endpoint?: string;
@@ -37,8 +39,9 @@ export const readAiProviderConfig = (): AiProviderConfig => ({
   endpoint: process.env.EXPO_PUBLIC_RELATE_AI_ENDPOINT?.trim() || undefined,
   timeoutMs: Number(process.env.EXPO_PUBLIC_RELATE_AI_TIMEOUT_MS) || 12000,
   maxRequestsPerMinute: Number(process.env.EXPO_PUBLIC_RELATE_AI_MAX_REQUESTS_PER_MINUTE) || 12,
-  allowLocalProviderEndpoint:
-    process.env.EXPO_PUBLIC_RELATE_ALLOW_LOCAL_PROVIDER_ENDPOINTS?.trim().toLowerCase() === 'true'
+  allowLocalProviderEndpoint: buildAllowsLocalProviderEndpoints(
+    process.env.EXPO_PUBLIC_RELATE_ALLOW_LOCAL_PROVIDER_ENDPOINTS
+  )
 });
 
 const timeoutError: AiDraftError = {
@@ -96,7 +99,7 @@ const withObservation = (
 export const requestAiDraft = async (
   request: AiDraftRequest,
   config: AiProviderConfig = readAiProviderConfig(),
-  fetcher: AiFetch = globalThis.fetch as AiFetch,
+  fetcher: AiFetch = fetchProviderResponse,
   externalSignal?: AbortSignal
 ): Promise<AiDraftResponseResult> => {
   const startedAt = Date.now();

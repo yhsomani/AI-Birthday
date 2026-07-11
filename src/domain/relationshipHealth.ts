@@ -167,3 +167,40 @@ export const buildRelationshipHealthInsight = (
     reviewNeeded
   };
 };
+
+/** Builds relationship-health insights with one aggregate-indexing pass. */
+export const buildRelationshipHealthInsights = (
+  state: AppState,
+  now: Date = new Date()
+): ReadonlyMap<string, RelationshipHealthInsight> => {
+  const groupByContact = <Value extends { contactId: string }>(values: readonly Value[]) => {
+    const grouped = new Map<string, Value[]>();
+    for (const value of values) {
+      const items = grouped.get(value.contactId) ?? [];
+      items.push(value);
+      grouped.set(value.contactId, items);
+    }
+    return grouped;
+  };
+  const memories = groupByContact(state.memories);
+  const messages = groupByContact(state.messages);
+  const events = groupByContact(state.events);
+  const gifts = groupByContact(state.gifts);
+  const insights = new Map<string, RelationshipHealthInsight>();
+  for (const contact of state.contacts) {
+    const insight = buildRelationshipHealthInsight(
+      {
+        ...state,
+        contacts: [contact],
+        memories: memories.get(contact.id) ?? [],
+        messages: messages.get(contact.id) ?? [],
+        events: events.get(contact.id) ?? [],
+        gifts: gifts.get(contact.id) ?? []
+      },
+      contact.id,
+      now
+    );
+    if (insight) insights.set(contact.id, insight);
+  }
+  return insights;
+};
