@@ -1,0 +1,950 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://birthday-autopilot.invalid/schemas/cloud-release-evidence-v1.json",
+  "title": "Birthday Autopilot production Firebase and Google Cloud release evidence",
+  "description": "Structural contract only. The semantic validator additionally binds clean source, external file digests, live configuration, cross-field invariants, expiry, and an Ed25519 authority signature. The repository template is intentionally not approvable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "product",
+    "status",
+    "source",
+    "validity",
+    "project",
+    "identityAndApis",
+    "aiLogic",
+    "appCheck",
+    "functions",
+    "firestore",
+    "secrets",
+    "iam",
+    "observability",
+    "costControls",
+    "hosting",
+    "prohibitedServices",
+    "verification",
+    "operations",
+    "evidenceReferences",
+    "approvals"
+  ],
+  "properties": {
+    "$schema": { "const": "./cloud-release-evidence.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "product": { "const": "birthday-autopilot" },
+    "status": { "enum": ["pending", "approved"] },
+    "source": { "$ref": "#/$defs/source" },
+    "validity": { "$ref": "#/$defs/validity" },
+    "project": { "$ref": "#/$defs/project" },
+    "identityAndApis": { "$ref": "#/$defs/identityAndApis" },
+    "aiLogic": { "$ref": "#/$defs/aiLogic" },
+    "appCheck": { "$ref": "#/$defs/appCheck" },
+    "functions": { "$ref": "#/$defs/functions" },
+    "firestore": { "$ref": "#/$defs/firestore" },
+    "secrets": { "$ref": "#/$defs/secrets" },
+    "iam": { "$ref": "#/$defs/iam" },
+    "observability": { "$ref": "#/$defs/observability" },
+    "costControls": { "$ref": "#/$defs/costControls" },
+    "hosting": { "$ref": "#/$defs/hosting" },
+    "prohibitedServices": { "$ref": "#/$defs/prohibitedServices" },
+    "verification": { "$ref": "#/$defs/verification" },
+    "operations": { "$ref": "#/$defs/operations" },
+    "evidenceReferences": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidenceReference" }
+    },
+    "approvals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/approval" }
+    }
+  },
+  "$defs": {
+    "nullableText": { "type": ["string", "null"] },
+    "nullableBoolean": { "type": ["boolean", "null"] },
+    "nullableInteger": { "type": ["integer", "null"] },
+    "nullableNumber": { "type": ["number", "null"] },
+    "nullableDigest": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullableRevision": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "nullableInstant": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "nullableStringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "repository",
+        "clean",
+        "projectAboutSha256",
+        "firebaseJsonSha256",
+        "functionsSourceTreeSha256",
+        "functionsLockSha256",
+        "firestoreRulesSha256",
+        "firestoreIndexesSha256",
+        "ttlPoliciesSha256",
+        "hostingSourceTreeSha256",
+        "deploymentProvenanceEvidenceId"
+      ],
+      "properties": {
+        "revision": { "$ref": "#/$defs/nullableRevision" },
+        "repository": {
+          "const": "https://github.com/yhsomani/AI-Birthday.git"
+        },
+        "clean": { "$ref": "#/$defs/nullableBoolean" },
+        "projectAboutSha256": { "$ref": "#/$defs/nullableDigest" },
+        "firebaseJsonSha256": { "$ref": "#/$defs/nullableDigest" },
+        "functionsSourceTreeSha256": { "$ref": "#/$defs/nullableDigest" },
+        "functionsLockSha256": { "$ref": "#/$defs/nullableDigest" },
+        "firestoreRulesSha256": { "$ref": "#/$defs/nullableDigest" },
+        "firestoreIndexesSha256": { "$ref": "#/$defs/nullableDigest" },
+        "ttlPoliciesSha256": { "$ref": "#/$defs/nullableDigest" },
+        "hostingSourceTreeSha256": { "$ref": "#/$defs/nullableDigest" },
+        "deploymentProvenanceEvidenceId": {
+          "const": "source-deployment-provenance"
+        }
+      }
+    },
+    "validity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generatedAt", "validUntil", "maximumAgeDays"],
+      "properties": {
+        "generatedAt": { "$ref": "#/$defs/nullableInstant" },
+        "validUntil": { "$ref": "#/$defs/nullableInstant" },
+        "maximumAgeDays": { "const": 30 }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tier",
+        "projectId",
+        "projectNumber",
+        "androidAppId",
+        "iosAppId",
+        "webAppId",
+        "androidPackage",
+        "iosBundle",
+        "functionsRegion",
+        "firestoreLocation",
+        "retainedProjectId",
+        "retainedProjectAssignment",
+        "noCrossTierSharing",
+        "evidenceIds"
+      ],
+      "properties": {
+        "tier": { "const": "production" },
+        "projectId": { "$ref": "#/$defs/nullableText" },
+        "projectNumber": { "$ref": "#/$defs/nullableText" },
+        "androidAppId": { "$ref": "#/$defs/nullableText" },
+        "iosAppId": { "$ref": "#/$defs/nullableText" },
+        "webAppId": { "$ref": "#/$defs/nullableText" },
+        "androidPackage": { "const": "com.yashsomani.birthdayautopilot" },
+        "iosBundle": { "const": "com.yashsomani.birthdayautopilot" },
+        "functionsRegion": { "const": "asia-south1" },
+        "firestoreLocation": { "const": "asia-south1" },
+        "retainedProjectId": { "const": "relateai-birthday-ysomani" },
+        "retainedProjectAssignment": {
+          "type": ["string", "null"],
+          "enum": ["development", "staging", "production", null]
+        },
+        "noCrossTierSharing": { "$ref": "#/$defs/nullableBoolean" },
+        "evidenceIds": { "$ref": "#/$defs/nullableStringArray" }
+      }
+    },
+    "androidOauthClient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "clientId",
+        "applicationId",
+        "signingCertificateSha1"
+      ],
+      "properties": {
+        "channel": {
+          "type": ["string", "null"],
+          "enum": ["google-play", "direct-managed", null]
+        },
+        "clientId": { "$ref": "#/$defs/nullableText" },
+        "applicationId": { "const": "com.yashsomani.birthdayautopilot" },
+        "signingCertificateSha1": { "$ref": "#/$defs/nullableText" }
+      }
+    },
+    "iosOauthClient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clientId", "bundleId", "teamId", "reversedClientId"],
+      "properties": {
+        "clientId": { "$ref": "#/$defs/nullableText" },
+        "bundleId": { "const": "com.yashsomani.birthdayautopilot" },
+        "teamId": { "$ref": "#/$defs/nullableText" },
+        "reversedClientId": { "$ref": "#/$defs/nullableText" }
+      }
+    },
+    "identityAndApis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "firebaseGoogleProviderEnabled",
+        "peopleApiEnabled",
+        "peopleScope",
+        "webOauthClientId",
+        "androidOauthClients",
+        "iosOauthClient",
+        "oneVisibleGoogleChoice",
+        "noOauthClientSecretInApps",
+        "accountLifecycleTestsPassed",
+        "peopleConsentTestsPassed",
+        "publicApiKeysRestricted",
+        "firebaseClientConfigsRefreshed",
+        "evidenceIds"
+      ],
+      "properties": {
+        "firebaseGoogleProviderEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "peopleApiEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "peopleScope": {
+          "const": "https://www.googleapis.com/auth/contacts.readonly"
+        },
+        "webOauthClientId": { "$ref": "#/$defs/nullableText" },
+        "androidOauthClients": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/androidOauthClient" }
+        },
+        "iosOauthClient": { "$ref": "#/$defs/iosOauthClient" },
+        "oneVisibleGoogleChoice": { "$ref": "#/$defs/nullableBoolean" },
+        "noOauthClientSecretInApps": { "$ref": "#/$defs/nullableBoolean" },
+        "accountLifecycleTestsPassed": { "$ref": "#/$defs/nullableBoolean" },
+        "peopleConsentTestsPassed": { "$ref": "#/$defs/nullableBoolean" },
+        "publicApiKeysRestricted": { "$ref": "#/$defs/nullableBoolean" },
+        "firebaseClientConfigsRefreshed": { "$ref": "#/$defs/nullableBoolean" },
+        "evidenceIds": { "$ref": "#/$defs/nullableStringArray" }
+      }
+    },
+    "aiLogic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "sdkSurface",
+        "model",
+        "location",
+        "apiService",
+        "authenticatedUsersOnly",
+        "remoteConfigKey",
+        "defaultOff",
+        "activatedCanonicalTrueOnly",
+        "monitoring",
+        "generativeLanguageApiAllowedOnMobileKeys",
+        "billingEnabled",
+        "providerQuotasConfigured",
+        "perUserRateLimitConfigured",
+        "budgetAlertsConfigured",
+        "killSwitchTested",
+        "providerTermsApproved",
+        "dataGovernanceApproved",
+        "modelAvailabilityCheckedAt",
+        "evidenceIds"
+      ],
+      "properties": {
+        "provider": { "const": "vertex-ai" },
+        "sdkSurface": { "const": "firebase-ai-logic" },
+        "model": { "const": "gemini-3.5-flash" },
+        "location": { "const": "global" },
+        "apiService": { "const": "firebasevertexai.googleapis.com" },
+        "authenticatedUsersOnly": { "$ref": "#/$defs/nullableBoolean" },
+        "remoteConfigKey": { "const": "gemini_suggestions_enabled" },
+        "defaultOff": { "$ref": "#/$defs/nullableBoolean" },
+        "activatedCanonicalTrueOnly": { "$ref": "#/$defs/nullableBoolean" },
+        "monitoring": { "type": ["string", "null"], "enum": ["off", null] },
+        "generativeLanguageApiAllowedOnMobileKeys": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "billingEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "providerQuotasConfigured": { "$ref": "#/$defs/nullableBoolean" },
+        "perUserRateLimitConfigured": { "$ref": "#/$defs/nullableBoolean" },
+        "budgetAlertsConfigured": { "$ref": "#/$defs/nullableBoolean" },
+        "killSwitchTested": { "$ref": "#/$defs/nullableBoolean" },
+        "providerTermsApproved": { "$ref": "#/$defs/nullableBoolean" },
+        "dataGovernanceApproved": { "$ref": "#/$defs/nullableBoolean" },
+        "modelAvailabilityCheckedAt": { "$ref": "#/$defs/nullableInstant" },
+        "evidenceIds": { "$ref": "#/$defs/nullableStringArray" }
+      }
+    },
+    "androidAppCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "firebaseAppId",
+        "channel",
+        "distributionScope",
+        "signingCertificateSha256",
+        "provider",
+        "playRecognizedRequired",
+        "licensedRequired",
+        "deviceIntegrityRequired",
+        "debugProvider"
+      ],
+      "properties": {
+        "firebaseAppId": { "$ref": "#/$defs/nullableText" },
+        "channel": {
+          "type": ["string", "null"],
+          "enum": ["google-play", "direct-managed", null]
+        },
+        "distributionScope": {
+          "type": ["string", "null"],
+          "enum": ["outside-play-only", "play-only", "mixed", null]
+        },
+        "signingCertificateSha256": { "$ref": "#/$defs/nullableDigest" },
+        "provider": { "const": "play-integrity" },
+        "playRecognizedRequired": { "$ref": "#/$defs/nullableBoolean" },
+        "licensedRequired": { "$ref": "#/$defs/nullableBoolean" },
+        "deviceIntegrityRequired": { "$ref": "#/$defs/nullableBoolean" },
+        "debugProvider": { "$ref": "#/$defs/nullableBoolean" }
+      }
+    },
+    "iosAppCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "firebaseAppId",
+        "provider",
+        "teamId",
+        "productionEnvironment",
+        "fallbackPolicyApproved",
+        "debugProvider"
+      ],
+      "properties": {
+        "firebaseAppId": { "$ref": "#/$defs/nullableText" },
+        "provider": {
+          "type": ["string", "null"],
+          "enum": ["app-attest", null]
+        },
+        "teamId": { "$ref": "#/$defs/nullableText" },
+        "productionEnvironment": { "$ref": "#/$defs/nullableBoolean" },
+        "fallbackPolicyApproved": { "$ref": "#/$defs/nullableBoolean" },
+        "debugProvider": { "$ref": "#/$defs/nullableBoolean" }
+      }
+    },
+    "webAppCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "firebaseAppId",
+        "provider",
+        "siteKeySha256",
+        "debugProvider"
+      ],
+      "properties": {
+        "firebaseAppId": { "$ref": "#/$defs/nullableText" },
+        "provider": { "const": "recaptcha-enterprise" },
+        "siteKeySha256": { "$ref": "#/$defs/nullableDigest" },
+        "debugProvider": { "$ref": "#/$defs/nullableBoolean" }
+      }
+    },
+    "appCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "androidRegistrations",
+        "iosRegistrations",
+        "webRegistration",
+        "aiLogicEnforced",
+        "callableBaselineEnforced",
+        "limitedUseReplayForStateChanges",
+        "limitedUseReplayForCompanionStatus",
+        "signedChannelsTested",
+        "evidenceIds"
+      ],
+      "properties": {
+        "androidRegistrations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/androidAppCheck" }
+        },
+        "iosRegistrations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/iosAppCheck" }
+        },
+        "webRegistration": { "$ref": "#/$defs/webAppCheck" },
+        "aiLogicEnforced": { "$ref": "#/$defs/nullableBoolean" },
+        "callableBaselineEnforced": { "$ref": "#/$defs/nullableBoolean" },
+        "limitedUseReplayForStateChanges": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "limitedUseReplayForCompanionStatus": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "signedChannelsTested": { "$ref": "#/$defs/nullableBoolean" },
+        "evidenceIds": { "$ref": "#/$defs/nullableStringArray" }
+      }
+    },
+    "functions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "region",
+        "runtime",
+        "runtimeServiceAccount",
+        "deployedSourceRevision",
+        "callableNames",
+        "scheduledNames",
+        "commonOptions",
+        "scheduledOptions",
+        "requestBodiesLogged",
+        "rawExceptionsLogged",
+        "deploymentEvidenceId",
+        "liveSmokeEvidenceId"
+      ],
+      "properties": {
+        "generation": { "const": 2 },
+        "region": { "const": "asia-south1" },
+        "runtime": { "const": "nodejs22" },
+        "runtimeServiceAccount": { "$ref": "#/$defs/nullableText" },
+        "deployedSourceRevision": { "$ref": "#/$defs/nullableRevision" },
+        "callableNames": { "$ref": "#/$defs/nullableStringArray" },
+        "scheduledNames": { "$ref": "#/$defs/nullableStringArray" },
+        "commonOptions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enforceAppCheck",
+            "consumeAppCheckToken",
+            "timeoutSeconds",
+            "memory",
+            "minInstances",
+            "maxInstances",
+            "concurrency"
+          ],
+          "properties": {
+            "enforceAppCheck": { "$ref": "#/$defs/nullableBoolean" },
+            "consumeAppCheckToken": { "$ref": "#/$defs/nullableBoolean" },
+            "timeoutSeconds": { "const": 30 },
+            "memory": { "const": "256MiB" },
+            "minInstances": { "const": 0 },
+            "maxInstances": { "const": 20 },
+            "concurrency": { "const": 20 }
+          }
+        },
+        "scheduledOptions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schedule",
+            "timeZone",
+            "timeoutSeconds",
+            "memory",
+            "maxInstances"
+          ],
+          "properties": {
+            "schedule": { "const": "every 1 minutes" },
+            "timeZone": { "const": "Etc/UTC" },
+            "timeoutSeconds": { "const": 300 },
+            "memory": { "const": "256MiB" },
+            "maxInstances": { "const": 1 }
+          }
+        },
+        "requestBodiesLogged": { "$ref": "#/$defs/nullableBoolean" },
+        "rawExceptionsLogged": { "$ref": "#/$defs/nullableBoolean" },
+        "deploymentEvidenceId": { "const": "functions-deployment" },
+        "liveSmokeEvidenceId": { "const": "functions-live-smoke" }
+      }
+    },
+    "firestore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "databaseId",
+        "databaseType",
+        "location",
+        "directClientRules",
+        "deployedRulesSha256",
+        "deployedIndexesSha256",
+        "deployedTtlPolicySha256",
+        "ttlCollectionGroups",
+        "logicalExpiryEnforcedTransactionally",
+        "pointInTimeRecovery",
+        "backupScheduleCount",
+        "recursiveDeletionVerified",
+        "authDeletionAbsenceVerified",
+        "continuityState",
+        "ledgerGeneration",
+        "emptyLedgerTreatedAsNoSendProof",
+        "evidenceIds"
+      ],
+      "properties": {
+        "databaseId": { "const": "(default)" },
+        "databaseType": { "const": "FIRESTORE_NATIVE" },
+        "location": { "const": "asia-south1" },
+        "directClientRules": { "const": "deny-all" },
+        "deployedRulesSha256": { "$ref": "#/$defs/nullableDigest" },
+        "deployedIndexesSha256": { "$ref": "#/$defs/nullableDigest" },
+        "deployedTtlPolicySha256": { "$ref": "#/$defs/nullableDigest" },
+        "ttlCollectionGroups": { "$ref": "#/$defs/nullableStringArray" },
+        "logicalExpiryEnforcedTransactionally": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "pointInTimeRecovery": {
+          "type": ["string", "null"],
+          "enum": ["disabled", null]
+        },
+        "backupScheduleCount": { "$ref": "#/$defs/nullableInteger" },
+        "recursiveDeletionVerified": { "$ref": "#/$defs/nullableBoolean" },
+        "authDeletionAbsenceVerified": { "$ref": "#/$defs/nullableBoolean" },
+        "continuityState": {
+          "type": ["string", "null"],
+          "enum": ["HEALTHY", null]
+        },
+        "ledgerGeneration": { "$ref": "#/$defs/nullableText" },
+        "emptyLedgerTreatedAsNoSendProof": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "evidenceIds": { "$ref": "#/$defs/nullableStringArray" }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "secretName",
+        "secretValueIncluded",
+        "currentSecretManagerVersionId",
+        "previousSecretManagerVersionId",
+        "currentKeyLabel",
+        "previousKeyLabel",
+        "currentCreatedAt",
+        "previousLastWriteAt",
+        "previousRetainUntil",
+        "longestAliasRetentionDays",
+        "rotationCadenceDays",
+        "replicationPolicyApproved",
+        "runtimeAccessorOnly",
+        "repositoryAndCiValueAbsent",
+        "metadataEvidenceId",
+        "rotationEvidenceId"
+      ],
+      "properties": {
+        "secretName": { "const": "COORDINATION_HMAC_KEYRING" },
+        "secretValueIncluded": { "$ref": "#/$defs/nullableBoolean" },
+        "currentSecretManagerVersionId": { "$ref": "#/$defs/nullableText" },
+        "previousSecretManagerVersionId": { "$ref": "#/$defs/nullableText" },
+        "currentKeyLabel": { "$ref": "#/$defs/nullableText" },
+        "previousKeyLabel": { "$ref": "#/$defs/nullableText" },
+        "currentCreatedAt": { "$ref": "#/$defs/nullableInstant" },
+        "previousLastWriteAt": { "$ref": "#/$defs/nullableInstant" },
+        "previousRetainUntil": { "$ref": "#/$defs/nullableInstant" },
+        "longestAliasRetentionDays": { "const": 400 },
+        "rotationCadenceDays": { "$ref": "#/$defs/nullableInteger" },
+        "replicationPolicyApproved": { "$ref": "#/$defs/nullableBoolean" },
+        "runtimeAccessorOnly": { "$ref": "#/$defs/nullableBoolean" },
+        "repositoryAndCiValueAbsent": { "$ref": "#/$defs/nullableBoolean" },
+        "metadataEvidenceId": { "const": "secret-keyring-metadata" },
+        "rotationEvidenceId": { "const": "secret-rotation" }
+      }
+    },
+    "iamCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "firestoreCoordination",
+        "firebaseAuthDeletion",
+        "secretVersionAccessForKeyringOnly",
+        "appCheckTokenVerification",
+        "schedulerInvocation"
+      ],
+      "properties": {
+        "firestoreCoordination": { "$ref": "#/$defs/nullableBoolean" },
+        "firebaseAuthDeletion": { "$ref": "#/$defs/nullableBoolean" },
+        "secretVersionAccessForKeyringOnly": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "appCheckTokenVerification": { "$ref": "#/$defs/nullableBoolean" },
+        "schedulerInvocation": { "$ref": "#/$defs/nullableBoolean" }
+      }
+    },
+    "iam": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtimeServiceAccount",
+        "auditServiceAccount",
+        "workloadIdentityFederation",
+        "serviceAccountKeyFilesUsed",
+        "runtimeUserManagedKeyCount",
+        "auditUserManagedKeyCount",
+        "broadPrimitiveRolesAbsent",
+        "wildcardPermissionsAbsent",
+        "capabilities",
+        "reviewedAt",
+        "policyEvidenceId",
+        "effectivePermissionsEvidenceId"
+      ],
+      "properties": {
+        "runtimeServiceAccount": { "$ref": "#/$defs/nullableText" },
+        "auditServiceAccount": { "$ref": "#/$defs/nullableText" },
+        "workloadIdentityFederation": { "$ref": "#/$defs/nullableBoolean" },
+        "serviceAccountKeyFilesUsed": { "$ref": "#/$defs/nullableBoolean" },
+        "runtimeUserManagedKeyCount": { "$ref": "#/$defs/nullableInteger" },
+        "auditUserManagedKeyCount": { "$ref": "#/$defs/nullableInteger" },
+        "broadPrimitiveRolesAbsent": { "$ref": "#/$defs/nullableBoolean" },
+        "wildcardPermissionsAbsent": { "$ref": "#/$defs/nullableBoolean" },
+        "capabilities": { "$ref": "#/$defs/iamCapabilities" },
+        "reviewedAt": { "$ref": "#/$defs/nullableInstant" },
+        "policyEvidenceId": { "const": "iam-policy" },
+        "effectivePermissionsEvidenceId": {
+          "const": "iam-effective-permissions"
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requestBodiesExcluded",
+        "rawExceptionsExcluded",
+        "contactMessagePromptContentExcluded",
+        "aiMonitoring",
+        "aiPromptResponseExcluded",
+        "defaultLoggingExclusionName",
+        "applicationLogRetentionDays",
+        "dataAccessAuditRetentionDays",
+        "deletionCorrelationAccessRestricted",
+        "logSinksReviewed",
+        "unapprovedCrashAndAnalyticsAbsent",
+        "evidenceId"
+      ],
+      "properties": {
+        "requestBodiesExcluded": { "$ref": "#/$defs/nullableBoolean" },
+        "rawExceptionsExcluded": { "$ref": "#/$defs/nullableBoolean" },
+        "contactMessagePromptContentExcluded": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "aiMonitoring": { "type": ["string", "null"], "enum": ["off", null] },
+        "aiPromptResponseExcluded": { "$ref": "#/$defs/nullableBoolean" },
+        "defaultLoggingExclusionName": { "$ref": "#/$defs/nullableText" },
+        "applicationLogRetentionDays": { "$ref": "#/$defs/nullableInteger" },
+        "dataAccessAuditRetentionDays": { "$ref": "#/$defs/nullableInteger" },
+        "deletionCorrelationAccessRestricted": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "logSinksReviewed": { "$ref": "#/$defs/nullableBoolean" },
+        "unapprovedCrashAndAnalyticsAbsent": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "evidenceId": { "const": "logging-privacy" }
+      }
+    },
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currencyCode", "units"],
+      "properties": {
+        "currencyCode": { "$ref": "#/$defs/nullableText" },
+        "units": { "$ref": "#/$defs/nullableInteger" }
+      }
+    },
+    "quota": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "limit", "unit"],
+      "properties": {
+        "name": { "$ref": "#/$defs/nullableText" },
+        "limit": { "$ref": "#/$defs/nullableInteger" },
+        "unit": { "$ref": "#/$defs/nullableText" }
+      }
+    },
+    "costControls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "billingAccountId",
+        "billingEnabled",
+        "monthlyBudget",
+        "budgetAlertsNotHardCap",
+        "providerHardQuotasConfigured",
+        "quotas",
+        "quotaOwnerEmails",
+        "incidentContactEmails",
+        "evidenceId"
+      ],
+      "properties": {
+        "billingAccountId": { "$ref": "#/$defs/nullableText" },
+        "billingEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "monthlyBudget": { "$ref": "#/$defs/money" },
+        "budgetAlertsNotHardCap": { "$ref": "#/$defs/nullableBoolean" },
+        "providerHardQuotasConfigured": { "$ref": "#/$defs/nullableBoolean" },
+        "quotas": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/quota" }
+        },
+        "quotaOwnerEmails": { "$ref": "#/$defs/nullableStringArray" },
+        "incidentContactEmails": { "$ref": "#/$defs/nullableStringArray" },
+        "evidenceId": { "const": "quota-budget" }
+      }
+    },
+    "hosting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "siteId",
+        "deployedVersionId",
+        "publicBaseUrl",
+        "privacyUrl",
+        "termsUrl",
+        "supportUrl",
+        "deletionUrl",
+        "identityVerifiedSupportUrl",
+        "firebaseConfigSha256",
+        "releaseConfigSha256",
+        "deployedArtifactSha256",
+        "recaptchaEnterpriseAppCheckRegistered",
+        "securityHeadersVerified",
+        "legalCopyApproved",
+        "hindiCopyApproved",
+        "deletionSagaTested",
+        "evidenceId"
+      ],
+      "properties": {
+        "siteId": { "$ref": "#/$defs/nullableText" },
+        "deployedVersionId": { "$ref": "#/$defs/nullableText" },
+        "publicBaseUrl": { "$ref": "#/$defs/nullableText" },
+        "privacyUrl": { "$ref": "#/$defs/nullableText" },
+        "termsUrl": { "$ref": "#/$defs/nullableText" },
+        "supportUrl": { "$ref": "#/$defs/nullableText" },
+        "deletionUrl": { "$ref": "#/$defs/nullableText" },
+        "identityVerifiedSupportUrl": { "$ref": "#/$defs/nullableText" },
+        "firebaseConfigSha256": { "$ref": "#/$defs/nullableDigest" },
+        "releaseConfigSha256": { "$ref": "#/$defs/nullableDigest" },
+        "deployedArtifactSha256": { "$ref": "#/$defs/nullableDigest" },
+        "recaptchaEnterpriseAppCheckRegistered": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "securityHeadersVerified": { "$ref": "#/$defs/nullableBoolean" },
+        "legalCopyApproved": { "$ref": "#/$defs/nullableBoolean" },
+        "hindiCopyApproved": { "$ref": "#/$defs/nullableBoolean" },
+        "deletionSagaTested": { "$ref": "#/$defs/nullableBoolean" },
+        "evidenceId": { "const": "hosting-release" }
+      }
+    },
+    "prohibitedServices": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "realtimeDatabaseEnabled",
+        "cloudStorageEnabled",
+        "fcmEnabled",
+        "analyticsEnabled",
+        "adSdkEnabled",
+        "crashlyticsEnabled",
+        "performanceMonitoringEnabled",
+        "directMobileFirestorePathPresent",
+        "rawContactOrMessageCloudStorePresent",
+        "evidenceId"
+      ],
+      "properties": {
+        "realtimeDatabaseEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "cloudStorageEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "fcmEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "analyticsEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "adSdkEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "crashlyticsEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "performanceMonitoringEnabled": { "$ref": "#/$defs/nullableBoolean" },
+        "directMobileFirestorePathPresent": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "rawContactOrMessageCloudStorePresent": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "evidenceId": { "const": "prohibited-services" }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "firebaseAuthLifecyclePassed",
+        "peopleConsentAndRevocationPassed",
+        "androidSignedAttestationPassed",
+        "iosSignedAttestationPassed",
+        "androidAiLogicCallPassed",
+        "iosAiLogicCallPassed",
+        "stateChangingCallableProbePassed",
+        "companionStatusProbePassed",
+        "replayedLimitedUseTokenRejected",
+        "directFirestoreAnonymousDenied",
+        "directFirestoreAuthenticatedDenied",
+        "ttlPoliciesObserved",
+        "recursiveDeletionAbsencePassed",
+        "signedOutReceiptPassed",
+        "contentLeakScanFindingCount",
+        "debugProviderFindingCount",
+        "liveAuditEvidenceId",
+        "signedChannelEvidenceId",
+        "deletionEvidenceId"
+      ],
+      "properties": {
+        "firebaseAuthLifecyclePassed": { "$ref": "#/$defs/nullableBoolean" },
+        "peopleConsentAndRevocationPassed": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "androidSignedAttestationPassed": { "$ref": "#/$defs/nullableBoolean" },
+        "iosSignedAttestationPassed": { "$ref": "#/$defs/nullableBoolean" },
+        "androidAiLogicCallPassed": { "$ref": "#/$defs/nullableBoolean" },
+        "iosAiLogicCallPassed": { "$ref": "#/$defs/nullableBoolean" },
+        "stateChangingCallableProbePassed": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "companionStatusProbePassed": { "$ref": "#/$defs/nullableBoolean" },
+        "replayedLimitedUseTokenRejected": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "directFirestoreAnonymousDenied": { "$ref": "#/$defs/nullableBoolean" },
+        "directFirestoreAuthenticatedDenied": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "ttlPoliciesObserved": { "$ref": "#/$defs/nullableBoolean" },
+        "recursiveDeletionAbsencePassed": { "$ref": "#/$defs/nullableBoolean" },
+        "signedOutReceiptPassed": { "$ref": "#/$defs/nullableBoolean" },
+        "contentLeakScanFindingCount": { "$ref": "#/$defs/nullableInteger" },
+        "debugProviderFindingCount": { "$ref": "#/$defs/nullableInteger" },
+        "liveAuditEvidenceId": { "const": "live-readonly-audit" },
+        "signedChannelEvidenceId": { "const": "signed-channel-smoke" },
+        "deletionEvidenceId": { "const": "deletion-live-smoke" }
+      }
+    },
+    "operations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "globalControlState",
+        "ledgerGeneration",
+        "emptyLedgerNeverUsedAsNoSendProof",
+        "disasterCreatesReviewedNewGeneration",
+        "reRegistrationAndReapprovalRequiredAfterDisaster",
+        "sameDateAutomationBlockedAfterDisaster",
+        "userLedgerBackupsNeverRestored",
+        "rtoMinutes",
+        "availabilityTargetPercent",
+        "p95CallableLatencyMs",
+        "errorBudgetWindowDays",
+        "deletionSlaHours",
+        "loadContentionTestPassed",
+        "regionalFailureTestPassed",
+        "incidentRollbackReady",
+        "continuityEvidenceId",
+        "sloEvidenceId",
+        "incidentEvidenceId"
+      ],
+      "properties": {
+        "globalControlState": {
+          "type": ["string", "null"],
+          "enum": ["HEALTHY", null]
+        },
+        "ledgerGeneration": { "$ref": "#/$defs/nullableText" },
+        "emptyLedgerNeverUsedAsNoSendProof": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "disasterCreatesReviewedNewGeneration": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "reRegistrationAndReapprovalRequiredAfterDisaster": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "sameDateAutomationBlockedAfterDisaster": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "userLedgerBackupsNeverRestored": { "$ref": "#/$defs/nullableBoolean" },
+        "rtoMinutes": { "$ref": "#/$defs/nullableInteger" },
+        "availabilityTargetPercent": { "$ref": "#/$defs/nullableNumber" },
+        "p95CallableLatencyMs": { "$ref": "#/$defs/nullableInteger" },
+        "errorBudgetWindowDays": { "$ref": "#/$defs/nullableInteger" },
+        "deletionSlaHours": { "$ref": "#/$defs/nullableInteger" },
+        "loadContentionTestPassed": { "$ref": "#/$defs/nullableBoolean" },
+        "regionalFailureTestPassed": { "$ref": "#/$defs/nullableBoolean" },
+        "incidentRollbackReady": { "$ref": "#/$defs/nullableBoolean" },
+        "continuityEvidenceId": { "const": "continuity-dr" },
+        "sloEvidenceId": { "const": "slo-load-cost" },
+        "incidentEvidenceId": { "const": "incident-rollback" }
+      }
+    },
+    "evidenceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "sha256",
+        "capturedAt",
+        "validUntil",
+        "issuer",
+        "kind"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "path": { "$ref": "#/$defs/nullableText" },
+        "sha256": { "$ref": "#/$defs/nullableDigest" },
+        "capturedAt": { "$ref": "#/$defs/nullableInstant" },
+        "validUntil": { "$ref": "#/$defs/nullableInstant" },
+        "issuer": { "$ref": "#/$defs/nullableText" },
+        "kind": {
+          "type": ["string", "null"],
+          "enum": [
+            "approval",
+            "attestation",
+            "cli-export",
+            "console-export",
+            "provenance",
+            "review",
+            "runbook",
+            "test-report",
+            null
+          ]
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "approver",
+        "decision",
+        "approvedAt",
+        "validUntil",
+        "evidenceId"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "backend",
+            "cloud-owner",
+            "finance",
+            "privacy",
+            "release",
+            "security",
+            "sre"
+          ]
+        },
+        "approver": { "$ref": "#/$defs/nullableText" },
+        "decision": { "enum": ["pending", "approved"] },
+        "approvedAt": { "$ref": "#/$defs/nullableInstant" },
+        "validUntil": { "$ref": "#/$defs/nullableInstant" },
+        "evidenceId": { "type": "string" }
+      }
+    }
+  }
+}

@@ -17,6 +17,7 @@ final class IOSCompanionNotificationRouter: NSObject, UNUserNotificationCenterDe
   private static let identifierPrefix = "birthday-autopilot.reminder.v1."
   private let lock = NSLock()
   private var deferredRequestId: String?
+  private var pendingAttentionRouteId: String?
 
   private override init() {
     super.init()
@@ -38,6 +39,18 @@ final class IOSCompanionNotificationRouter: NSObject, UNUserNotificationCenterDe
   func takeProjection(
     completion: @escaping (Result<[String: Any], CompanionStoreError>) -> Void
   ) {
+    lock.lock()
+    let attentionRouteId = pendingAttentionRouteId
+    pendingAttentionRouteId = nil
+    lock.unlock()
+    if let attentionRouteId {
+      completion(.success([
+        "kind": "attention",
+        "routeId": attentionRouteId,
+        "source": "attention",
+      ]))
+      return
+    }
     CompanionProtectedStore.shared.takePendingNativeRoute { result in
       completion(result.map { route in
         route?.projection ?? ["kind": "none"]
@@ -50,6 +63,13 @@ final class IOSCompanionNotificationRouter: NSObject, UNUserNotificationCenterDe
     willPresent notification: UNNotification,
     withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
   ) {
+    if IOSCompanionAttentionNotifier.isAttentionIdentifier(
+      notification.request.identifier
+    ) {
+      // The active app already exposes the richer in-app attention item.
+      completionHandler([])
+      return
+    }
     guard Self.opaqueRequestId(from: notification.request) != nil else {
       completionHandler([])
       return
@@ -66,6 +86,25 @@ final class IOSCompanionNotificationRouter: NSObject, UNUserNotificationCenterDe
     didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
+    if response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+      IOSCompanionAttentionNotifier.isAttentionIdentifier(
+        response.notification.request.identifier
+      )
+    {
+      lock.lock()
+      pendingAttentionRouteId = UUID().uuidString.lowercased()
+      lock.unlock()
+      center.removeDeliveredNotifications(
+        withIdentifiers: [response.notification.request.identifier]
+      )
+      NotificationCenter.default.post(
+        name: .companionNativeRouteAvailable,
+        object: self,
+        userInfo: ["kind": "available"]
+      )
+      completionHandler()
+      return
+    }
     guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
       let requestId = Self.opaqueRequestId(from: response.notification.request)
     else {

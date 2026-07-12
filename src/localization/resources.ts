@@ -115,7 +115,7 @@ const english = {
   'message.androidDisclosure':
     'This is a preview only. Android may submit this exact approved text only after every real activation gate passes. Submission would not prove delivery.',
   'message.iosDisclosure':
-    'This is the proposed prefill. Apple’s system composer remains editable; you control recipients, text, sender line, and Send.',
+    'This is the proposed prefill. Review the recipient and text, then decide whether to tap Send. Apple Messages and iOS control the available sender line and final transport; this app cannot select or guarantee either.',
   'message.segmentTitle': 'Estimated SMS plan',
   'message.segmentValue': '1 Unicode segment • Carrier charges may apply',
   'message.composerFixture': 'Try companion handoff fixture',
@@ -153,14 +153,6 @@ const english = {
   'settings.system': 'System',
   'settings.light': 'Light',
   'settings.dark': 'Dark',
-  'settings.language': 'Language and layout fixtures',
-  'settings.english': 'English',
-  'settings.hindi': 'हिन्दी',
-  'settings.pseudo': 'Pseudo RTL',
-  'settings.hindiCaveat':
-    'Hindi is a layout fixture pending human language review.',
-  'settings.pseudoCaveat':
-    'Pseudo RTL tests mirroring and text expansion. It is not a supported language.',
   'settings.reminders': 'Companion reminder fixture',
   'settings.remindersBody':
     'Changes in-memory fixture state only; no notification is scheduled.',
@@ -304,7 +296,7 @@ const hindi: typeof english = {
   'message.androidDisclosure':
     'यह केवल पूर्वावलोकन है। सभी वास्तविक सक्रियण जाँच पास होने पर ही Android यही स्वीकृत टेक्स्ट जमा कर सकता है। जमा होना डिलीवरी का प्रमाण नहीं है।',
   'message.iosDisclosure':
-    'यह प्रस्तावित प्रीफ़िल है। Apple का सिस्टम कंपोज़र संपादन योग्य रहता है; प्राप्तकर्ता, टेक्स्ट, भेजने वाली लाइन और Send आप नियंत्रित करते हैं।',
+    'यह प्रस्तावित प्रीफ़िल है। प्राप्तकर्ता और टेक्स्ट की समीक्षा करके तय करें कि Send दबाना है या नहीं। उपलब्ध भेजने वाली लाइन और अंतिम ट्रांसपोर्ट को Apple Messages व iOS नियंत्रित करते हैं; यह ऐप किसी को चुन या पक्का नहीं कर सकता।',
   'message.segmentTitle': 'अनुमानित SMS योजना',
   'message.segmentValue': '1 यूनिकोड सेगमेंट • कैरियर शुल्क लग सकता है',
   'message.composerFixture': 'कम्पैनियन हैंडऑफ़ नमूना आज़माएँ',
@@ -342,14 +334,6 @@ const hindi: typeof english = {
   'settings.system': 'सिस्टम',
   'settings.light': 'हल्का',
   'settings.dark': 'गहरा',
-  'settings.language': 'भाषा और लेआउट नमूने',
-  'settings.english': 'English',
-  'settings.hindi': 'हिन्दी',
-  'settings.pseudo': 'छद्म RTL',
-  'settings.hindiCaveat':
-    'हिन्दी केवल लेआउट नमूना है; मानव भाषा समीक्षा बाकी है।',
-  'settings.pseudoCaveat':
-    'छद्म RTL मिररिंग और टेक्स्ट विस्तार जाँचता है। यह समर्थित भाषा नहीं है।',
   'settings.reminders': 'कम्पैनियन रिमाइंडर नमूना',
   'settings.remindersBody':
     'केवल मेमोरी में नमूना स्थिति बदलती है; कोई सूचना तय नहीं होती।',

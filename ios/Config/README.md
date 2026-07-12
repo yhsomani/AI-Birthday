@@ -12,6 +12,10 @@ command-line build-setting overrides. The copy phase validates the plist's tier,
 and reversed URL scheme before copying it into the product. Release requires a valid prod config;
 Debug remains buildable without provider access and fails closed at runtime.
 
+A Release device/archive build also requires `BIRTHDAY_SOURCE_REVISION` to equal the clean
+checkout's full lowercase Git revision. It is embedded as `BirthdaySourceRevision`, and the final
+signed archive/IPA verifier binds it to the authority-approved artifact evidence.
+
 Release also defaults `BIRTHDAY_PRIVACY_REVIEW_APPROVED` to `NO`. CI may set it to `YES` only
 after the privacy inventory, SDK manifests, App Store privacy answers, Google-specific-service
 login rationale, deletion URL, and reviewer materials have named review evidence. The app privacy

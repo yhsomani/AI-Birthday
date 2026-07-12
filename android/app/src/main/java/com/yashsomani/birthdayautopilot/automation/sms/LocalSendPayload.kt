@@ -15,6 +15,7 @@ internal sealed interface LocalSendPayload {
   val messageEncoding: String
   val expectedPartCount: Int
   val subscriptionId: Int
+  val simPolicyKind: String
   val callbackGeneration: String
   val roamingAllowed: Boolean
   val foregroundConfirmationNonceHash: String?
@@ -31,6 +32,7 @@ private data class LedgerLocalSendPayload(
   override val messageEncoding: String,
   override val expectedPartCount: Int,
   override val subscriptionId: Int,
+  override val simPolicyKind: String,
   override val callbackGeneration: String,
   override val roamingAllowed: Boolean,
   override val foregroundConfirmationNonceHash: String?,
@@ -82,6 +84,7 @@ internal object LocalSendPayloadLoader {
           messageEncoding = approval.messageEncoding,
           expectedPartCount = approval.segmentCount,
           subscriptionId = approval.resolvedSubscriptionId,
+          simPolicyKind = approval.simPolicyKind,
           callbackGeneration = attempt.callbackGeneration,
           roamingAllowed = policy.roamingAllowed,
           foregroundConfirmationNonceHash = null,
@@ -105,6 +108,7 @@ internal object LocalSendPayloadLoader {
           messageEncoding = test.messageEncoding,
           expectedPartCount = test.segmentCount,
           subscriptionId = test.resolvedSubscriptionId,
+          simPolicyKind = test.simPolicyKind,
           callbackGeneration = attempt.callbackGeneration,
           roamingAllowed = false,
           foregroundConfirmationNonceHash = test.foregroundConfirmationNonceHash,

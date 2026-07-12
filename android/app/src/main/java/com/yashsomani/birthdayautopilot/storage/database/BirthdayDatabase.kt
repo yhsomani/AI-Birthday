@@ -47,11 +47,12 @@ import com.yashsomani.birthdayautopilot.lifecycle.LifecycleProjectionDao
     ContactBirthdayChoiceEntity::class,
     ConfigurationReviewEntity::class,
   ],
-  version = 4,
+  version = 5,
   autoMigrations = [
     AutoMigration(from = 1, to = 2, spec = Migration1To2Spec::class),
     AutoMigration(from = 2, to = 3),
     AutoMigration(from = 3, to = 4),
+    AutoMigration(from = 4, to = 5, spec = Migration4To5Spec::class),
   ],
   exportSchema = true,
 )
@@ -63,6 +64,7 @@ abstract class BirthdayDatabase : RoomDatabase() {
   abstract fun automationOrchestrationDao(): AutomationOrchestrationDao
   abstract fun configurationDao(): ConfigurationDao
   abstract fun smsOutcomeDao(): SmsOutcomeDao
+  internal abstract fun retentionDao(): RetentionDao
   internal abstract fun lifecycleProjectionDao(): LifecycleProjectionDao
 
   companion object {

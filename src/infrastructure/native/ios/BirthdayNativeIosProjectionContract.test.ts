@@ -10,6 +10,7 @@ import {
   bootstrapProjectionSchema,
   homeProjectionSchema,
   peoplePageSchema,
+  policyPreviewSchema,
   privacyInventorySchema,
   setupProjectionSchema,
   syncProjectionSchema,
@@ -80,6 +81,7 @@ describe('BirthdayNative iOS projection contract', () => {
     expect(() =>
       setupProjectionSchema.parse({
         step: 'google-account',
+        initialActivationCompleted: false,
         eligibility,
         account,
         contacts,
@@ -146,6 +148,19 @@ describe('BirthdayNative iOS projection contract', () => {
         localStorageBytes: 256,
         consentVersions: [],
         externalSmsCopiesNotControlled: true,
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts policy previews with more than 20 same-day iOS proposals', () => {
+    expect(() =>
+      policyPreviewSchema.parse({
+        kind: 'valid',
+        handle: 'ios-dense-date-policy-review',
+        summary: '09:00–11:00',
+        simulatedDays: 400,
+        maximumPlannedInLocalDay: 21,
+        maximumPlannedInRolling24Hours: 27,
       }),
     ).not.toThrow();
   });

@@ -10,14 +10,32 @@ const read = path => readFileSync(new URL(path, root), 'utf8');
 const androidGateway = read(
   'android/app/src/main/java/com/yashsomani/birthdayautopilot/gemini/AndroidGeminiSuggestionGateway.kt',
 );
+const androidOperationalGate = read(
+  'android/app/src/main/java/com/yashsomani/birthdayautopilot/gemini/AndroidGeminiOperationalGate.kt',
+);
+const androidAppGraph = read(
+  'android/app/src/main/java/com/yashsomani/birthdayautopilot/AppGraph.kt',
+);
+const androidMainApplication = read(
+  'android/app/src/main/java/com/yashsomani/birthdayautopilot/MainApplication.kt',
+);
+const androidMainActivity = read(
+  'android/app/src/main/java/com/yashsomani/birthdayautopilot/MainActivity.kt',
+);
 const iosPolicyPath =
   'ios/BirthdayAutopilot/Gemini/GeminiSuggestionPolicy.swift';
 const iosGatewayPath =
   'ios/BirthdayAutopilot/Gemini/IOSGeminiSuggestionGateway.swift';
 const iosProvenancePath =
   'ios/BirthdayAutopilot/Gemini/GeminiCandidateProvenanceRegistry.swift';
+const iosOperationalGatePath =
+  'ios/BirthdayAutopilot/Gemini/IOSGeminiOperationalGate.swift';
+const iosOperationalPolicyPath =
+  'ios/BirthdayAutopilot/Gemini/IOSGeminiOperationalPolicy.swift';
 const iosPolicy = read(iosPolicyPath);
 const iosGateway = read(iosGatewayPath);
+const iosOperationalGate = read(iosOperationalGatePath);
+const iosOperationalPolicy = read(iosOperationalPolicyPath);
 const iosProvenance = read(iosProvenancePath);
 const androidProvenance = read(
   'android/app/src/main/java/com/yashsomani/birthdayautopilot/gemini/GeminiCandidateProvenanceRegistry.kt',
@@ -30,6 +48,15 @@ const iosWorkflowModels = read(
 );
 const iosIdentity = read(
   'ios/BirthdayAutopilot/Identity/IOSGoogleIdentityCoordinator.swift',
+);
+const iosAppDelegate = read('ios/BirthdayAutopilot/AppDelegate.swift');
+const iosProject = read('ios/BirthdayAutopilot.xcodeproj/project.pbxproj');
+const podLock = read('ios/Podfile.lock');
+const liveMessage = read('src/features/live/LiveMessageScreen.tsx');
+const messageModel = read('src/domain/messages/model.ts');
+const releaseRunbook = read('docs/IOS_RELEASE_EVIDENCE.md');
+const androidReleaseRunbook = read(
+  'docs/ANDROID_RESTRICTED_RELEASE_EVIDENCE.md',
 );
 
 test('native Gemini dependencies are exact and use one Firebase family', () => {
@@ -44,15 +71,32 @@ test('native Gemini dependencies are exact and use one Firebase family', () => {
     gradle,
     /implementation\("com\.google\.firebase:firebase-appcheck-playintegrity:19\.2\.0"\)/u,
   );
+  assert.match(
+    gradle,
+    /implementation\("com\.google\.firebase:firebase-config:23\.1\.0"\)/u,
+  );
   for (const pod of [
     'FirebaseCore',
+    'FirebaseABTesting',
     'FirebaseAuth',
     'FirebaseAppCheck',
     'FirebaseFunctions',
     'FirebaseAILogic',
+    'FirebaseRemoteConfig',
   ]) {
     assert.match(podfile, new RegExp(`pod '${pod}', '12\\.15\\.0'`, 'u'));
   }
+  assert.match(podLock, /- FirebaseRemoteConfig \(12\.15\.0\):/u);
+  assert.match(podLock, /- FirebaseRemoteConfig \(= 12\.15\.0\)/u);
+  assert.match(
+    podfile,
+    /pod 'FirebaseABTesting', '12\.15\.0', :modular_headers => true/u,
+  );
+  assert.match(podLock, /- FirebaseABTesting \(12\.15\.0\):/u);
+  assert.match(podLock, /- FirebaseABTesting \(= 12\.15\.0\)/u);
+  assert.match(podLock, /- FirebaseInstallations \(12\.15\.0\):/u);
+  assert.match(podLock, /- FirebaseRemoteConfigInterop \(12\.15\.0\)/u);
+  assert.doesNotMatch(`${podfile}\n${podLock}`, /FirebaseAnalytics/u);
   assert.doesNotMatch(androidGateway, /firebase\.ai\.ondevice|OnDevice/u);
   assert.match(readme, /beta-labeled on-device interop module/u);
   assert.doesNotMatch(gradle, /exclude[^\n]*firebase-ai-ondevice-interop/u);
@@ -130,6 +174,184 @@ test('iOS generate-suggestions route awaits the native gateway and returns its s
   );
 });
 
+test('iOS Gemini is fail-closed behind one bounded native Remote Config switch', () => {
+  assert.match(
+    iosOperationalPolicy,
+    /parameterKey = "gemini_suggestions_enabled"/u,
+  );
+  assert.match(iosOperationalPolicy, /inAppDefault = false/u);
+  assert.match(
+    iosOperationalPolicy,
+    /sourceIsRemote && canonicalString == "true" && boolValue/u,
+  );
+  assert.match(
+    iosOperationalGate,
+    /settings\.minimumFetchInterval =[\s\S]*?minimumFetchIntervalSeconds/u,
+  );
+  assert.match(
+    iosOperationalGate,
+    /settings\.fetchTimeout = IOSGeminiOperationalPolicy\.fetchTimeoutSeconds/u,
+  );
+  assert.match(
+    iosOperationalGate,
+    /config\.setDefaults\([\s\S]*?NSNumber\(value: IOSGeminiOperationalPolicy\.inAppDefault\)/u,
+  );
+  assert.match(iosOperationalGate, /try await config\.fetchAndActivate\(\)/u);
+  assert.match(
+    iosOperationalGate,
+    /localCompletionTimeoutSeconds[\s\S]*?fetchGeneration &\+= 1[\s\S]*?fetchInFlight = false/u,
+  );
+  assert.match(
+    iosOperationalGate,
+    /sourceIsRemote: value\.source == \.remote[\s\S]*?canonicalString: value\.stringValue[\s\S]*?boolValue: value\.boolValue/u,
+  );
+
+  const generationPath =
+    iosGateway.match(
+      /func generate\(request payload:[\s\S]*?private func provenance/u,
+    )?.[0] ?? '';
+  const switchRead = generationPath.indexOf(
+    'operationalGate.foregroundSuggestionsEnabled()',
+  );
+  const appCheck = generationPath.indexOf('appCheckReadyWithinTimeout()');
+  const providerCall = generationPath.indexOf('generateProviderText');
+  assert.ok(switchRead > 0);
+  assert.ok(appCheck > switchRead);
+  assert.ok(providerCall > appCheck);
+  assert.match(
+    generationPath,
+    /foregroundSuggestionsEnabled\(\) else[\s\S]*?fallback\("policy-suspended"\)/u,
+  );
+  assert.match(
+    iosIdentity,
+    /FirebaseApp\.configure[\s\S]*?configureOperationalGateAfterFirebaseLaunch/u,
+  );
+  assert.match(
+    iosAppDelegate,
+    /applicationDidBecomeActive[\s\S]*?refreshOperationalGateInBackground/u,
+  );
+
+  assert.doesNotMatch(
+    iosOperationalGate,
+    /import FirebaseInstallations|Installations\.installations|installationID|addOnConfigUpdateListener|setCustomSignals|print\s*\(|NSLog\s*\(|Logger\s*\(/u,
+  );
+  assert.doesNotMatch(
+    `${liveMessage}\n${messageModel}`,
+    /gemini_suggestions_enabled|FirebaseRemoteConfig|RemoteConfig\.remoteConfig/u,
+  );
+  assert.match(liveMessage, /BUILT_IN_MESSAGE_TEMPLATES\.map/u);
+  assert.match(
+    liveMessage,
+    /suggestions\?\.kind === 'fallback'[\s\S]*?suggestionUnavailable/u,
+  );
+  const builtInTemplates =
+    messageModel.match(
+      /export const BUILT_IN_MESSAGE_TEMPLATES:[\s\S]*?\] as const;/u,
+    )?.[0] ?? '';
+  assert.equal(
+    (builtInTemplates.match(/id: '(?:en|hi)-(?:personalized|generic)'/gu) ?? [])
+      .length,
+    4,
+  );
+  assert.match(releaseRunbook, /gemini_suggestions_enabled/u);
+  assert.match(releaseRunbook, /in-app default is \*\*false\*\*/u);
+  assert.match(releaseRunbook, /Firebase's native Installations token/u);
+  assert.equal(
+    (iosProject.match(/IOSGeminiOperationalPolicy\.swift in Sources/gu) ?? [])
+      .length,
+    2,
+  );
+  assert.equal(
+    (iosProject.match(/IOSGeminiOperationalGate\.swift in Sources/gu) ?? [])
+      .length,
+    2,
+  );
+});
+
+test('Android Gemini is fail-closed behind one bounded native Remote Config switch', () => {
+  assert.match(
+    androidOperationalGate,
+    /PARAMETER_KEY = "gemini_suggestions_enabled"/u,
+  );
+  assert.match(androidOperationalGate, /IN_APP_DEFAULT = false/u);
+  assert.match(
+    androidOperationalGate,
+    /sourceIsRemote && canonicalString == "true" && boolValue/u,
+  );
+  assert.match(
+    androidOperationalGate,
+    /MINIMUM_FETCH_INTERVAL_SECONDS = 60L \* 60L/u,
+  );
+  assert.match(androidOperationalGate, /FIREBASE_FETCH_TIMEOUT_SECONDS = 8L/u);
+  assert.match(
+    androidOperationalGate,
+    /LOCAL_COMPLETION_TIMEOUT_MILLIS = 10_000L/u,
+  );
+  assert.match(
+    androidOperationalGate,
+    /setMinimumFetchIntervalInSeconds\([\s\S]*?MINIMUM_FETCH_INTERVAL_SECONDS/u,
+  );
+  assert.match(
+    androidOperationalGate,
+    /setFetchTimeoutInSeconds\(AndroidGeminiOperationalPolicy\.FIREBASE_FETCH_TIMEOUT_SECONDS\)/u,
+  );
+  assert.match(
+    androidOperationalGate,
+    /setDefaultsAsync\([\s\S]*?PARAMETER_KEY\s+to\s+AndroidGeminiOperationalPolicy\.IN_APP_DEFAULT/u,
+  );
+  assert.match(androidOperationalGate, /remoteConfig\.fetchAndActivate\(\)/u);
+  assert.match(
+    androidOperationalGate,
+    /value\.source == FirebaseRemoteConfig\.VALUE_SOURCE_REMOTE[\s\S]*?value\.asString\(\)[\s\S]*?value\.asBoolean\(\)/u,
+  );
+  assert.match(
+    androidOperationalGate,
+    /AndroidIdentityConfigurationResolver\(appContext, BuildConfig\.APP_ENV\)\.resolve\(\)[\s\S]*?IdentityConfigurationResult\.Missing -> return null/u,
+  );
+
+  const generationPath =
+    androidGateway.match(
+      /suspend fun generate\(requestJson:[\s\S]*?fun peekProvenance/u,
+    )?.[0] ?? '';
+  const switchRead = generationPath.indexOf(
+    'operationalGate.foregroundSuggestionsEnabled()',
+  );
+  const accountBinding = generationPath.indexOf('client.accountSessionKey()');
+  const appCheck = generationPath.indexOf('client.appCheckReady()');
+  const providerCall = generationPath.indexOf('client.generate(');
+  assert.ok(switchRead > 0);
+  assert.ok(accountBinding > switchRead);
+  assert.ok(appCheck > accountBinding);
+  assert.ok(providerCall > appCheck);
+  assert.match(
+    generationPath,
+    /refreshInBackground\(\)[\s\S]*?!operationalGate\.foregroundSuggestionsEnabled\(\)[\s\S]*?fallbackProjection\("policy-suspended"\)/u,
+  );
+  assert.match(
+    androidAppGraph,
+    /AndroidGeminiSuggestionGateway\([\s\S]*?operationalGate = geminiOperationalGate/u,
+  );
+  assert.match(
+    androidMainApplication,
+    /onCreate\(\)[\s\S]*?configureGeminiOperationalGate\(\)/u,
+  );
+  assert.match(
+    androidMainActivity,
+    /onResume\(\)[\s\S]*?refreshGeminiOperationalGate\(\)/u,
+  );
+  assert.doesNotMatch(
+    androidOperationalGate,
+    /FirebaseInstallations|installationID|addOnConfigUpdateListener|setCustomSignals|Log\.[dievw]\s*\(|Logger\s*\(/u,
+  );
+  assert.doesNotMatch(
+    `${liveMessage}\n${messageModel}`,
+    /gemini_suggestions_enabled|FirebaseRemoteConfig|getInstance\(configuration\.firebaseApp\)/u,
+  );
+  assert.match(androidReleaseRunbook, /gemini_suggestions_enabled/u);
+  assert.match(androidReleaseRunbook, /in-app default is \*\*false\*\*/u);
+  assert.match(androidReleaseRunbook, /Firebase's native Installations token/u);
+});
+
 test('native provenance is digest-only, bounded, expiring and account-bound', () => {
   const combined = `${androidProvenance}\n${iosProvenance}`;
   assert.match(androidProvenance, /MAXIMUM_ENTRIES = 3/u);
@@ -187,7 +409,13 @@ test(
   'new Swift sources parse with the installed compiler even when full Xcode is unavailable',
   { skip: process.platform !== 'darwin' },
   () => {
-    for (const path of [iosPolicyPath, iosProvenancePath, iosGatewayPath]) {
+    for (const path of [
+      iosPolicyPath,
+      iosProvenancePath,
+      iosOperationalPolicyPath,
+      iosOperationalGatePath,
+      iosGatewayPath,
+    ]) {
       const result = spawnSync(
         'swiftc',
         ['-frontend', '-parse', fileURLToPath(new URL(path, root))],

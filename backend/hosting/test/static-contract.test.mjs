@@ -138,6 +138,12 @@ test('deletion and privacy copy state the irreducible boundaries', () => {
   assert.match(privacy, /400 days/iu);
   assert.match(privacy, /never stores raw contacts/iu);
   assert.match(privacy, /temporary session storage/iu);
+  assert.match(privacy, /content-free, not data-free/iu);
+  assert.match(privacy, /Firebase Installations token/iu);
+  assert.match(privacy, /Only for people enabled on Android/iu);
+  assert.match(privacy, /iOS does not register recipients/iu);
+  assert.match(privacy, /message history/iu);
+  assert.match(privacy, /cannot promise immediate erasure of provider logs/iu);
 });
 
 test('Firebase Hosting deploy is release-gated and applies security headers', () => {

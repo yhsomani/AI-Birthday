@@ -47,6 +47,7 @@ internal class AndroidSmsGateway(
   private val birthdayDao: BirthdayDao,
   private val submissionGate: SubmissionGate = SubmissionGate(context),
   private val readinessProbe: AndroidReadinessProbe = AndroidReadinessProbe(context),
+  private val subscriptionChangeSignalStore: SubscriptionChangeSignalStore,
 ) {
   private val appContext = context.applicationContext
   private val planSource = AndroidSmsManagerPlanSource(appContext)
@@ -106,23 +107,42 @@ internal class AndroidSmsGateway(
     } catch (_: RuntimeException) {
       return SmsSubmissionResult.Refused("SMS_CALLBACK_REGISTRATION_FAILED")
     }
-    val pendingIntents = try {
-      createPendingIntents(identities)
-    } catch (_: RuntimeException) {
-      null
-    } catch (_: LinkageError) {
-      null
-    } ?: return SmsSubmissionResult.Refused("SMS_CALLBACK_COLLISION")
+    val pendingIntentCreation = createPendingIntents(identities)
+    val pendingIntents = when (pendingIntentCreation) {
+      is PendingIntentCreation.Success -> pendingIntentCreation.allocation
+      is PendingIntentCreation.Failed -> {
+        val tokensRetired = retireUnsubmittedTokens(permit, identities, nowMillis)
+        return SmsSubmissionResult.Refused(
+          if (pendingIntentCreation.rollbackComplete && tokensRetired) {
+            "SMS_CALLBACK_COLLISION"
+          } else {
+            "SMS_CALLBACK_ROLLBACK_FAILED"
+          },
+        )
+      }
+    }
 
     val bootCount = currentBootCount()
-      ?: return SmsSubmissionResult.Refused("SMS_BOOT_ANCHOR_UNAVAILABLE")
+      ?: return rollbackAndRefuse(
+        permit,
+        identities,
+        pendingIntents,
+        nowMillis,
+        "SMS_BOOT_ANCHOR_UNAVAILABLE",
+      )
     val beforeBoundaryElapsed = SystemClock.elapsedRealtime()
     val boundaryWallMillis = System.currentTimeMillis()
     if (
       environment.subscriptionId != payload.subscriptionId ||
       !foregroundTestAuthorized(permit, payload, boundaryWallMillis) ||
       beforeBoundaryElapsed >= permit.deadlineElapsedRealtimeMillis
-    ) return SmsSubmissionResult.Refused("SMS_DEADLINE_OR_SIM_CHANGED")
+    ) return rollbackAndRefuse(
+      permit,
+      identities,
+      pendingIntents,
+      nowMillis,
+      "SMS_DEADLINE_OR_SIM_CHANGED",
+    )
     val boundaryCommitted = ledger.commitApiBoundary(
       permit = permit,
       expectedAttemptRevision = attempt.revision,
@@ -132,7 +152,13 @@ internal class AndroidSmsGateway(
       payloadHash = payload.payloadHash,
       subscriptionId = payload.subscriptionId,
     )
-    if (!boundaryCommitted) return SmsSubmissionResult.Refused("SMS_API_BARRIER_REJECTED")
+    if (!boundaryCommitted) return rollbackAndRefuse(
+      permit,
+      identities,
+      pendingIntents,
+      nowMillis,
+      "SMS_API_BARRIER_REJECTED",
+    )
 
     // External settings cannot participate in the Room/file lock. Re-read them after the durable
     // barrier and immediately before the platform call. Any change sacrifices this Armed attempt.
@@ -150,31 +176,38 @@ internal class AndroidSmsGateway(
     return try {
       val platformBoundaryRan = if (permit.purpose == OperationPurpose.TEST) {
         ForegroundActivityRegistry.withCurrentActivity {
-          if (!foregroundTestAuthorized(permit, payload, System.currentTimeMillis(), true)) {
+          if (
+            subscriptionChangeSignalStore.pendingGeneration() != null ||
+            !foregroundTestAuthorized(permit, payload, System.currentTimeMillis(), true)
+          ) {
             false
           } else {
             submitToPlatform(
               manager = finalEnvironment.manager,
               destination = payload.destinationE164,
               parts = finalPlan.orderedParts,
-              sentIntents = pendingIntents.first,
-              deliveryIntents = pendingIntents.second,
+              sentIntents = pendingIntents.sent,
+              deliveryIntents = pendingIntents.delivery,
             )
             true
           }
         } == true
       } else {
-        submitToPlatform(
-          manager = finalEnvironment.manager,
-          destination = payload.destinationE164,
-          parts = finalPlan.orderedParts,
-          sentIntents = pendingIntents.first,
-          deliveryIntents = pendingIntents.second,
-        )
-        true
+        if (subscriptionChangeSignalStore.pendingGeneration() != null) {
+          false
+        } else {
+          submitToPlatform(
+            manager = finalEnvironment.manager,
+            destination = payload.destinationE164,
+            parts = finalPlan.orderedParts,
+            sentIntents = pendingIntents.sent,
+            deliveryIntents = pendingIntents.delivery,
+          )
+          true
+        }
       }
       if (!platformBoundaryRan) {
-        return SmsSubmissionResult.OutcomeUnknown("SMS_TEST_LEFT_FOREGROUND")
+        return SmsSubmissionResult.OutcomeUnknown("SMS_FINAL_GATE_CLOSED")
       }
       val persisted = ledger.markSmsManagerAccepted(
         permit = permit,
@@ -220,6 +253,8 @@ internal class AndroidSmsGateway(
 
   @SuppressLint("MissingPermission")
   private fun verifyEnvironment(payload: LocalSendPayload): VerifiedSmsEnvironment? {
+    subscriptionChangeSignalStore.observe(SubscriptionChangeFingerprint.read(appContext))
+    if (subscriptionChangeSignalStore.pendingGeneration() != null) return null
     if (!BuildConfig.RESTRICTED_SMS_CAPABLE) return null
     if (
       ContextCompat.checkSelfPermission(appContext, Manifest.permission.SEND_SMS) !=
@@ -229,14 +264,24 @@ internal class AndroidSmsGateway(
       !appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_MESSAGING) ||
       !SubscriptionManager.isValidSubscriptionId(payload.subscriptionId)
     ) return null
-    val readiness = readinessProbe.read()
+    val readiness = readinessProbe.read(payload.subscriptionId)
     if (
-      readiness.eligibility.kind != EligibilityKind.SUPPORTED ||
-      readiness.smsPermissionGranted != true
+      !(if (payload.purpose == OperationPurpose.TEST) {
+        readiness.eligibility.allowsForegroundTest()
+      } else {
+        readiness.eligibility.kind == EligibilityKind.SUPPORTED
+      }) ||
+      readiness.smsPermissionGranted != true ||
+      !readiness.schedulerStartupReady
     ) return null
     return try {
       val subscriptions = appContext.getSystemService(SubscriptionManager::class.java)
-      if (!subscriptions.isActiveSubscriptionId(payload.subscriptionId)) return null
+      if (!SubscriptionBindingPolicy.matches(
+          policyKind = payload.simPolicyKind,
+          approvedSubscriptionId = payload.subscriptionId,
+          currentDefaultSubscriptionId = currentDefaultSmsSubscriptionIdOrNull(),
+          approvedSubscriptionActive = subscriptions.isActiveSubscriptionId(payload.subscriptionId),
+        )) return null
       if (!payload.roamingAllowed && subscriptions.isNetworkRoaming(payload.subscriptionId)) return null
       val telephony = appContext.getSystemService(TelephonyManager::class.java)
         .createForSubscriptionId(payload.subscriptionId)
@@ -280,29 +325,96 @@ internal class AndroidSmsGateway(
 
   private fun createPendingIntents(
     identities: List<CallbackIdentity>,
-  ): Pair<ArrayList<PendingIntent>, ArrayList<PendingIntent>>? {
-    val sent = ArrayList<PendingIntent>()
-    val delivery = ArrayList<PendingIntent>()
-    for (identity in identities.sortedWith(compareBy({ it.token.partIndex }, { it.token.kind }))) {
-      val existing = PendingIntent.getBroadcast(
-        appContext,
-        identity.token.callbackRequestCode,
-        identity.intent,
-        CallbackIdentityFactory.pendingIntentFlags(identity.token.kind, noCreate = true),
+  ): PendingIntentCreation {
+    val ordered = identities.sortedWith(compareBy({ it.token.partIndex }, { it.token.kind }))
+    val expectedKinds = ordered.groupBy { it.token.partIndex }.values.all { part ->
+      part.map { it.token.kind }.toSet() == CallbackKind.entries.toSet()
+    }
+    if (
+      ordered.isEmpty() ||
+      ordered.map { it.token.callbackRequestCode }.distinct().size != ordered.size ||
+      !expectedKinds
+    ) return PendingIntentCreation.Failed(rollbackComplete = true)
+    return when (
+      val result = CallbackAllocationTransaction.allocate(
+        items = ordered,
+        collisionExists = { identity ->
+          PendingIntent.getBroadcast(
+            appContext,
+            identity.token.callbackRequestCode,
+            identity.intent,
+            CallbackIdentityFactory.pendingIntentFlags(identity.token.kind, noCreate = true),
+          ) != null
+        },
+        create = { identity ->
+          PendingIntent.getBroadcast(
+            appContext,
+            identity.token.callbackRequestCode,
+            identity.intent,
+            CallbackIdentityFactory.pendingIntentFlags(identity.token.kind),
+          )
+        },
+        cancel = PendingIntent::cancel,
       )
-      if (existing != null) return null
-      val created = PendingIntent.getBroadcast(
-        appContext,
-        identity.token.callbackRequestCode,
-        identity.intent,
-        CallbackIdentityFactory.pendingIntentFlags(identity.token.kind),
-      )
-      when (identity.token.kind) {
-        CallbackKind.SENT -> sent.add(created)
-        CallbackKind.DELIVERY -> delivery.add(created)
+    ) {
+      is CallbackAllocationResult.Failed -> PendingIntentCreation.Failed(result.rollbackComplete)
+      is CallbackAllocationResult.Success -> {
+        val sent = ArrayList<PendingIntent>()
+        val delivery = ArrayList<PendingIntent>()
+        ordered.zip(result.allocations).forEach { (identity, pendingIntent) ->
+          when (identity.token.kind) {
+            CallbackKind.SENT -> sent += pendingIntent
+            CallbackKind.DELIVERY -> delivery += pendingIntent
+          }
+        }
+        if (sent.size == delivery.size && sent.isNotEmpty()) {
+          PendingIntentCreation.Success(
+            PendingIntentAllocation(sent, delivery, result.allocations),
+          )
+        } else {
+          PendingIntentCreation.Failed(
+            CallbackAllocationTransaction.rollback(result.allocations, PendingIntent::cancel),
+          )
+        }
       }
     }
-    return if (sent.size == delivery.size && sent.isNotEmpty()) sent to delivery else null
+  }
+
+  private suspend fun rollbackAndRefuse(
+    permit: ArmedAttemptPermit,
+    identities: List<CallbackIdentity>,
+    allocation: PendingIntentAllocation,
+    retiredAtMillis: Long,
+    safeCode: String,
+  ): SmsSubmissionResult.Refused {
+    val pendingIntentsCancelled = CallbackAllocationTransaction.rollback(
+      allocation.all,
+      PendingIntent::cancel,
+    )
+    val tokensRetired = retireUnsubmittedTokens(permit, identities, retiredAtMillis)
+    return SmsSubmissionResult.Refused(
+      if (pendingIntentsCancelled && tokensRetired) safeCode else "SMS_CALLBACK_ROLLBACK_FAILED",
+    )
+  }
+
+  private suspend fun retireUnsubmittedTokens(
+    permit: ArmedAttemptPermit,
+    identities: List<CallbackIdentity>,
+    retiredAtMillis: Long,
+  ): Boolean {
+    val tokenIds = identities.map { it.token.callbackTokenId }
+    if (tokenIds.isEmpty()) return false
+    return try {
+      ledger.retireUnsubmittedCallbackTokens(
+        sendAttemptId = permit.sendAttemptId,
+        tokenIds = tokenIds,
+        retiredAtMillis = retiredAtMillis,
+      ) == tokenIds.size
+    } catch (_: RuntimeException) {
+      false
+    } catch (_: LinkageError) {
+      false
+    }
   }
 
   @Suppress("DEPRECATION")
@@ -369,6 +481,17 @@ internal class AndroidSmsGateway(
     val subscriptionId: Int,
     val manager: SmsManager,
   )
+
+  private data class PendingIntentAllocation(
+    val sent: ArrayList<PendingIntent>,
+    val delivery: ArrayList<PendingIntent>,
+    val all: List<PendingIntent>,
+  )
+
+  private sealed interface PendingIntentCreation {
+    data class Success(val allocation: PendingIntentAllocation) : PendingIntentCreation
+    data class Failed(val rollbackComplete: Boolean) : PendingIntentCreation
+  }
 
   private companion object {
     val E164 = Regex("^\\+[1-9][0-9]{7,14}$")

@@ -1,5 +1,6 @@
 export const TOOLCHAIN_VERSIONS = Object.freeze({
   node: '24.18.0',
+  functionsNode: '22.23.1',
   npm: '11.6.0',
   reactNative: '0.86.0',
   ruby: '3.4.10',

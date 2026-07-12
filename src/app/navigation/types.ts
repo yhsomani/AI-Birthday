@@ -12,6 +12,7 @@ export type RootStackParamList = {
   ApprovedMessage: undefined;
   PersonDetail: { personId: string };
   DataBoundary: undefined;
+  HelpLegal: undefined;
 };
 
 declare global {

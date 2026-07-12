@@ -191,7 +191,11 @@ final class IOSAccountDeletionLocalCleanupCoordinator {
 
     CompanionMessageModule.beginAccountDeletionShutdown { [weak self] in
       guard let self else { return }
-      self.reminderCoordinator.cancelAppOwnedNotifications {
+      self.reminderCoordinator.cancelAppOwnedNotifications { notificationsCancelled in
+        guard notificationsCancelled else {
+          self.finish(receipt: self.receiptStore.current())
+          return
+        }
         Task { @MainActor in
           let identityCleared = await self.identity.completeAccountDeletionLocalShutdown()
           guard identityCleared else {

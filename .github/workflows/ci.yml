@@ -14,6 +14,256 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backend-node22:
+    name: Backend on deployed Node 22 runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up deployed Functions Node.js line
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: backend/functions/.nvmrc
+          cache: npm
+          cache-dependency-path: backend/functions/package-lock.json
+
+      - name: Pin npm
+        run: npm install --global npm@11.6.0
+
+      - name: Verify Functions toolchain
+        run: |
+          test "$(node --version)" = "v22.23.1"
+          test "$(npm --version)" = "11.6.0"
+
+      - name: Install backend dependencies
+        run: npm --prefix backend/functions ci
+
+      - name: Typecheck, lint, build, and enforce coverage
+        run: npm --prefix backend/functions run check
+
+      - name: Reject high-severity and runtime moderate backend advisories
+        run: npm --prefix backend/functions run audit:ci
+
+      - name: Set up Java for Firebase Emulator Suite
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Run backend emulator safety tests
+        run: npm run backend:test:emulator
+
+      - name: Generate backend dependency evidence
+        run: |
+          mkdir -p release-evidence/backend
+          npm --prefix backend/functions sbom --sbom-format=cyclonedx > release-evidence/backend/functions.cdx.json
+          node tools/create-evidence-manifest.mjs \
+            --base . \
+            --label backend-node22-candidate \
+            --output release-evidence/backend/sha256-manifest.json \
+            backend/functions/package-lock.json \
+            backend/functions/lib \
+            backend/functions/coverage \
+            release-evidence/backend/functions.cdx.json
+          test -s release-evidence/backend/sha256-manifest.json
+
+      - name: Retain backend build, coverage, and SBOM evidence
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: backend-node22-candidate-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            backend/functions/package-lock.json
+            backend/functions/lib/
+            backend/functions/coverage/
+            release-evidence/backend/
+
+  android-instrumentation:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Android API 29 instrumentation
+            api-level: 29
+            target: google_apis
+            expected-page-size: '4096'
+            artifact-suffix: api29
+          - label: Android API 36 instrumentation
+            api-level: 36
+            target: google_apis
+            expected-page-size: '4096'
+            artifact-suffix: api36
+          - label: Android API 37 16 KB instrumentation
+            api-level: 37
+            target: google_apis_ps16k
+            expected-page-size: '16384'
+            artifact-suffix: api37-16kb
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Pin npm
+        run: npm install --global npm@11.6.0
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Set up Java
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install pinned Android build dependencies
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager \
+            'platforms;android-36' \
+            'build-tools;36.0.0' \
+            'ndk;27.1.12297006'
+
+      - name: Execute the complete Android instrumentation suite
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: ${{ matrix.target }}
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            test "$(adb shell getconf PAGE_SIZE | tr -d '\r')" = "${{ matrix.expected-page-size }}"
+            cd android
+            ./gradlew \
+              :app:connectedDevDebugAndroidTest \
+              -PreactNativeArchitectures=x86_64 \
+              --no-configuration-cache
+
+      - name: Retain Android instrumentation reports
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: android-${{ matrix.artifact-suffix }}-instrumentation
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            android/app/build/reports/androidTests/
+            android/app/build/outputs/androidTest-results/
+
+  android-device-e2e:
+    name: Android API 29 isolated UI E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Pin npm
+        run: npm install --global npm@11.6.0
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Set up Java
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
+
+      - name: Install pinned Android build dependencies
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager \
+            'platforms;android-36' \
+            'build-tools;36.0.0' \
+            'ndk;27.1.12297006'
+
+      - name: Install checksum-verified Maestro
+        run: |
+          echo "MOBILE_E2E_TOOL_DIR=$RUNNER_TEMP/maestro-cli" >> "$GITHUB_ENV"
+          tools/install-maestro.sh "$RUNNER_TEMP/maestro-cli" >/dev/null
+
+      - name: Exercise the isolated fixture on API 29
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 29
+          arch: x86_64
+          target: google_apis
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            mkdir -p "$RUNNER_TEMP/mobile-e2e/android"
+            npm start -- --reset-cache > "$RUNNER_TEMP/mobile-e2e/android/metro.log" 2>&1 &
+            METRO_PID=$!
+            trap 'kill "$METRO_PID" 2>/dev/null || true' EXIT
+            for attempt in $(seq 1 60); do
+              if curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'; then
+                break
+              fi
+              kill -0 "$METRO_PID"
+              sleep 1
+            done
+            curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'
+            cd android
+            ./gradlew \
+              :app:assembleE2eDebug \
+              :app:lintE2eDebug \
+              :app:processProdReleaseManifest \
+              -PreactNativeArchitectures=x86_64 \
+              --no-configuration-cache
+            cd ..
+            if [ -d android/app/build/generated/res/google-services/e2e ] && \
+              [ -n "$(find android/app/build/generated/res/google-services/e2e -type f -print -quit)" ]; then
+              echo 'Google Services generated resources leaked into e2eDebug.' >&2
+              exit 1
+            fi
+            npm run e2e:manifest:verify
+            adb install -r android/app/build/outputs/apk/e2e/debug/app-e2e-debug.apk
+            adb reverse tcp:8081 tcp:8081
+            E2E_REPORT_ROOT="$RUNNER_TEMP/mobile-e2e/android/smoke" npm run e2e:android
+            adb shell settings put system font_scale 1.3
+            adb shell am force-stop com.yashsomani.birthdayautopilot.e2e
+            E2E_REPORT_ROOT="$RUNNER_TEMP/mobile-e2e/android/large-text" npm run e2e:android:large-text
+            adb shell settings put system font_scale 1.0
+            test -s "$RUNNER_TEMP/mobile-e2e/android/smoke/report.xml"
+            test -s "$RUNNER_TEMP/mobile-e2e/android/large-text/report.xml"
+
+      - name: Retain Android device E2E evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: android-api29-isolated-ui-e2e
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/mobile-e2e/android/
+            android/app/build/outputs/apk/e2e/debug/app-e2e-debug.apk
+            android/app/build/intermediates/merged_manifests/e2eDebug/
+            android/app/build/intermediates/merged_manifests/prodRelease/
+
   quality-and-android:
     name: Quality and Android dev artifact
     runs-on: ubuntu-latest
@@ -21,10 +271,10 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -49,8 +299,11 @@ jobs:
           npm --prefix backend/functions ci
           npm --prefix backend/hosting ci
 
+      - name: Validate the fail-closed store-submission template
+        run: npm run store:template:check
+
       - name: Run mobile and control-plane checks
-        run: npm run check:all
+        run: npm run check:portable
 
       - name: Reject committed credentials and misplaced client configs
         run: npm run security:secrets
@@ -59,16 +312,17 @@ jobs:
         run: |
           npm audit --audit-level=high
           npm audit --prefix backend/functions --audit-level=high
+          npm audit --prefix backend/functions --omit=dev --audit-level=moderate
           npm audit --prefix backend/hosting --audit-level=high
 
       - name: Set up Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
 
       - name: Install pinned Android SDK components
         run: |
@@ -89,21 +343,131 @@ jobs:
         run: >-
           ./gradlew
           :app:testDevDebugUnitTest
+          :app:testDevDebugOptimizedUnitTest
+          :app:testDevReleaseUnitTest
+          :app:testStagingDebugUnitTest
+          :app:testStagingDebugOptimizedUnitTest
+          :app:testStagingReleaseUnitTest
+          :app:testLabReleaseUnitTest
+          :app:testProdReleaseUnitTest
+          :app:testE2eDebugUnitTest
           :app:compileDevDebugAndroidTestKotlin
+          :app:compileStagingDebugAndroidTestKotlin
+          :app:assembleDevDebugAndroidTest
+          :app:assembleStagingDebugAndroidTest
           :app:lintDevDebug
+          :app:lintDevRelease
+          :app:lintStagingDebug
+          :app:lintStagingRelease
+          :app:lintLabRelease
+          :app:lintProdRelease
+          :app:lintE2eDebug
           :app:assembleDevDebug
+          :app:assembleDevRelease
+          :app:assembleStagingDebug
+          :app:assembleStagingRelease
+          :app:assembleE2eDebug
           --no-configuration-cache
 
       - name: Verify the unrestricted Android artifact
-        run: >-
-          tools/verify-android-apk.sh
-          android/app/build/outputs/apk/dev/debug/app-dev-debug.apk
-          com.yashsomani.birthdayautopilot.dev
+        run: |
+          tools/verify-android-apk.sh \
+            android/app/build/outputs/apk/dev/debug/app-dev-debug.apk \
+            com.yashsomani.birthdayautopilot.dev
+          tools/verify-android-apk.sh \
+            android/app/build/outputs/apk/dev/release/app-dev-release-unsigned.apk \
+            com.yashsomani.birthdayautopilot.dev \
+            --unsigned-dev-release
+
+      - name: Generate mobile and Hosting dependency evidence
+        run: |
+          mkdir -p release-evidence/mobile
+          npm sbom --sbom-format=cyclonedx > release-evidence/mobile/mobile.cdx.json
+          npm --prefix backend/hosting sbom --sbom-format=cyclonedx > release-evidence/mobile/hosting.cdx.json
+          node tools/generate-native-sbom.mjs \
+            --kind gradle \
+            --lock android/app/gradle.lockfile \
+            --output release-evidence/mobile/android-complete-graph.cdx.json \
+            --application-name Birthday-Autopilot-Android-Complete-Graph \
+            --version 1.0
+          node tools/generate-native-sbom.mjs \
+            --kind gradle \
+            --lock android/app/gradle.lockfile \
+            --configuration prodReleaseRuntimeClasspath \
+            --output release-evidence/mobile/android-prod-runtime.cdx.json \
+            --application-name Birthday-Autopilot-Android-Prod-Runtime \
+            --version 1.0
+          node tools/generate-native-sbom.mjs \
+            --kind gradle \
+            --lock android/buildscript-gradle.lockfile \
+            --output release-evidence/mobile/android-build-plugins-native.cdx.json \
+            --application-name Birthday-Autopilot-Android-Build-Plugins \
+            --version 1.0
+          node tools/scan-native-vulnerabilities.mjs \
+            --dependency-set \
+              android-complete-graph \
+              gradle \
+              android/app/gradle.lockfile \
+              release-evidence/mobile/android-complete-graph.cdx.json \
+            --dependency-set \
+              android-prod-runtime \
+              gradle \
+              android/app/gradle.lockfile \
+              release-evidence/mobile/android-prod-runtime.cdx.json \
+            --dependency-set \
+              android-build-plugins \
+              gradle \
+              android/buildscript-gradle.lockfile \
+              release-evidence/mobile/android-build-plugins-native.cdx.json \
+            --output release-evidence/mobile/android-native-osv.json
+          node tools/verify-javascript-licenses.mjs --output release-evidence/mobile/javascript-licenses.json
+          node tools/create-evidence-manifest.mjs \
+            --base . \
+            --label mobile-android-candidate \
+            --output release-evidence/mobile/sha256-manifest.json \
+            package-lock.json \
+            backend/hosting/package-lock.json \
+            android/app/gradle.lockfile \
+            android/buildscript-gradle.lockfile \
+            android/settings-gradle.lockfile \
+            android/gradle/verification-metadata.xml \
+            android/app/build/outputs/apk/dev \
+            android/app/build/reports \
+            backend/hosting/public \
+            coverage \
+            release-evidence/mobile/mobile.cdx.json \
+            release-evidence/mobile/hosting.cdx.json \
+            tools/native-advisory-exceptions.json \
+            release-evidence/mobile/android-complete-graph.cdx.json \
+            release-evidence/mobile/android-prod-runtime.cdx.json \
+            release-evidence/mobile/android-build-plugins-native.cdx.json \
+            release-evidence/mobile/android-native-osv.json \
+            release-evidence/mobile/javascript-licenses.json
+          test -s release-evidence/mobile/sha256-manifest.json
+
+      - name: Retain Android artifacts, reports, coverage, and SBOM evidence
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: mobile-android-candidate-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            package-lock.json
+            backend/hosting/package-lock.json
+            android/app/gradle.lockfile
+            android/buildscript-gradle.lockfile
+            android/settings-gradle.lockfile
+            android/gradle/verification-metadata.xml
+            android/app/build/outputs/apk/dev/
+            android/app/build/reports/
+            backend/hosting/public/
+            coverage/
+            release-evidence/mobile/
 
   ios-build:
     name: iOS unsigned simulator build
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 75
     env:
       BUNDLE_FROZEN: 'true'
       COCOAPODS_DISABLE_STATS: 'true'
@@ -111,10 +475,10 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -129,6 +493,12 @@ jobs:
 
       - name: Install mobile dependencies
         run: npm ci
+
+      - name: Set up Java for the pinned Maestro CLI
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: '21'
 
       - name: Verify the path-safe React Native codegen installation
         run: npm run codegen:check
@@ -159,7 +529,7 @@ jobs:
 
       - name: Parse Swift sources
         run: >-
-          find ios/BirthdayAutopilot tests/ios -name '*.swift' -print0
+          find ios/BirthdayAutopilot ios/BirthdayAutopilotTests tests/ios -name '*.swift' -print0
           | xargs -0 xcrun swiftc -frontend -parse
 
       - name: Validate Xcode and plist structure
@@ -167,9 +537,13 @@ jobs:
           plutil -lint \
             ios/BirthdayAutopilot/Info.plist \
             ios/BirthdayAutopilot/Info-Debug.plist \
+            ios/BirthdayAutopilot/Info-E2E.plist \
             ios/BirthdayAutopilot/PrivacyInfo.xcprivacy \
+            ios/BirthdayAutopilot/BirthdayAutopilot-Debug.entitlements \
             ios/BirthdayAutopilot/BirthdayAutopilot.entitlements \
+            ios/BirthdayAutopilot/BirthdayAutopilot-E2E.entitlements \
             ios/BirthdayAutopilot.xcodeproj/project.pbxproj
+          xmllint --noout ios/BirthdayAutopilot.xcodeproj/xcshareddata/xcschemes/BirthdayAutopilotE2E.xcscheme
           xcodebuild -workspace ios/BirthdayAutopilot.xcworkspace -list
           ruby -c ios/Podfile
           sh -n ios/scripts/copy-google-config.sh
@@ -178,11 +552,66 @@ jobs:
       - name: Run the standalone People parser contract
         run: |
           xcrun swiftc \
+            ios/BirthdayAutopilot/Contacts/IOSPeopleSyncFencePolicy.swift \
             ios/BirthdayAutopilot/Contacts/PeopleContracts.swift \
             ios/BirthdayAutopilot/Contacts/PeopleJSONParser.swift \
             tests/ios/PeopleParserContractTests.swift \
             -o "$RUNNER_TEMP/PeopleParserContractTests"
           "$RUNNER_TEMP/PeopleParserContractTests"
+
+      - name: Run the standalone Gemini operational-switch contract
+        run: |
+          xcrun swiftc \
+            ios/BirthdayAutopilot/Gemini/IOSGeminiOperationalPolicy.swift \
+            tests/ios/GeminiOperationalPolicyTests.swift \
+            -o "$RUNNER_TEMP/GeminiOperationalPolicyTests"
+          "$RUNNER_TEMP/GeminiOperationalPolicyTests"
+
+      - name: Run the standalone companion placeholder contract
+        run: |
+          xcrun swiftc \
+            ios/BirthdayAutopilot/Automation/IOSCompanionMessagePlaceholderPolicy.swift \
+            tests/ios/CompanionMessagePlaceholderPolicyTests.swift \
+            -o "$RUNNER_TEMP/CompanionMessagePlaceholderPolicyTests"
+          "$RUNNER_TEMP/CompanionMessagePlaceholderPolicyTests"
+
+      - name: Run the standalone persisted-draft recovery contract
+        run: |
+          xcrun swiftc \
+            ios/BirthdayAutopilot/Automation/IOSCompanionMessagePlaceholderPolicy.swift \
+            ios/BirthdayAutopilot/Automation/IOSCompanionWorkflowModels.swift \
+            tests/ios/CompanionPersistedDraftRecoveryTests.swift \
+            -o "$RUNNER_TEMP/CompanionPersistedDraftRecoveryTests"
+          "$RUNNER_TEMP/CompanionPersistedDraftRecoveryTests"
+
+      - name: Run hosted iOS native unit tests
+        run: |
+          export BIRTHDAY_IOS_SIMULATOR_RUNTIME="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          SIMULATOR_UDID="$(xcrun simctl list devices available -j | ruby -rjson -e '
+            runtimes = JSON.parse(STDIN.read).fetch("devices")
+            expected = "com.apple.CoreSimulator.SimRuntime.iOS-#{ENV.fetch("BIRTHDAY_IOS_SIMULATOR_RUNTIME").tr(".", "-")}"
+            devices = runtimes.fetch(expected) do
+              abort "Pinned iOS simulator runtime #{expected} is not installed"
+            end
+            candidate = devices.find do |device|
+              device["isAvailable"] && device["name"].start_with?("iPhone")
+            end
+            abort "No available iPhone simulator" unless candidate
+            print candidate.fetch("udid")
+          ')"
+          xcodebuild \
+            -workspace ios/BirthdayAutopilot.xcworkspace \
+            -scheme BirthdayAutopilot \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/BirthdayAutopilotTestDerivedData" \
+            -resultBundlePath "$RUNNER_TEMP/BirthdayAutopilotTests.xcresult" \
+            -only-testing:BirthdayAutopilotTests \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            BIRTHDAY_IOS_SIMULATOR_COMPILE_SMOKE=YES \
+            test
+          test -d "$RUNNER_TEMP/BirthdayAutopilotTests.xcresult"
 
       - name: Build the unsigned iOS simulator app
         run: >-
@@ -194,5 +623,196 @@ jobs:
           -destination 'generic/platform=iOS Simulator'
           -derivedDataPath "$RUNNER_TEMP/BirthdayAutopilotDerivedData"
           CODE_SIGNING_ALLOWED=NO
-          BIRTHDAY_FIREBASE_CONFIG_REQUIRED=NO
+          CODE_SIGNING_REQUIRED=NO
+          BIRTHDAY_IOS_SIMULATOR_COMPILE_SMOKE=YES
           build
+
+      - name: Build the minified unsigned iOS Release simulator app
+        run: >-
+          xcodebuild
+          -workspace ios/BirthdayAutopilot.xcworkspace
+          -scheme BirthdayAutopilot
+          -configuration Release
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/BirthdayAutopilotDerivedData"
+          CODE_SIGNING_ALLOWED=NO
+          CODE_SIGNING_REQUIRED=NO
+          BIRTHDAY_IOS_SIMULATOR_COMPILE_SMOKE=YES
+          build
+
+      - name: Exercise the isolated fixture on an iOS simulator
+        run: |
+          set -euo pipefail
+          export BIRTHDAY_IOS_SIMULATOR_RUNTIME="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          SIMULATOR_UDID="$(xcrun simctl list devices available -j | ruby -rjson -e '
+            runtimes = JSON.parse(STDIN.read).fetch("devices")
+            expected = "com.apple.CoreSimulator.SimRuntime.iOS-#{ENV.fetch("BIRTHDAY_IOS_SIMULATOR_RUNTIME").tr(".", "-")}"
+            devices = runtimes.fetch(expected) do
+              abort "Pinned iOS simulator runtime #{expected} is not installed"
+            end
+            candidate = devices.find do |device|
+              device["isAvailable"] && device["name"].start_with?("iPhone")
+            end
+            abort "No available iPhone simulator" unless candidate
+            print candidate.fetch("udid")
+          ')"
+          xcrun simctl boot "$SIMULATOR_UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$SIMULATOR_UDID" -b
+          xcodebuild \
+            -workspace ios/BirthdayAutopilot.xcworkspace \
+            -scheme BirthdayAutopilotE2E \
+            -configuration E2E \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/BirthdayAutopilotE2EDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            BIRTHDAY_IOS_SIMULATOR_COMPILE_SMOKE=YES \
+            build
+          E2E_APP="$RUNNER_TEMP/BirthdayAutopilotE2EDerivedData/Build/Products/E2E-iphonesimulator/BirthdayAutopilot.app"
+          test -d "$E2E_APP"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$E2E_APP/Info.plist")" = 'com.yashsomani.birthdayautopilot.e2e'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :BirthdayE2EFixture' "$E2E_APP/Info.plist")" = 'true'
+          test ! -e "$E2E_APP/GoogleService-Info.plist"
+          if nm -gj "$E2E_APP/BirthdayAutopilot" | grep -F '_OBJC_CLASS_$_BirthdayNative' >/dev/null; then
+            echo 'The production BirthdayNative provider leaked into the E2E binary.' >&2
+            exit 1
+          fi
+          tar -C "$(dirname "$E2E_APP")" \
+            -czf "$RUNNER_TEMP/BirthdayAutopilot-E2E-simulator.app.tar.gz" \
+            "$(basename "$E2E_APP")"
+          mkdir -p "$RUNNER_TEMP/mobile-e2e/ios"
+          npm start -- --reset-cache > "$RUNNER_TEMP/mobile-e2e/ios/metro.log" 2>&1 &
+          METRO_PID=$!
+          cleanup() {
+            xcrun simctl ui "$SIMULATOR_UDID" content_size medium >/dev/null 2>&1 || true
+            kill "$METRO_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'; then
+              break
+            fi
+            kill -0 "$METRO_PID"
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8081/status | grep -q 'packager-status:running'
+          export MOBILE_E2E_TOOL_DIR="$RUNNER_TEMP/maestro-cli"
+          tools/install-maestro.sh "$MOBILE_E2E_TOOL_DIR" >/dev/null
+          xcrun simctl uninstall "$SIMULATOR_UDID" com.yashsomani.birthdayautopilot.e2e 2>/dev/null || true
+          xcrun simctl install "$SIMULATOR_UDID" "$E2E_APP"
+          E2E_REPORT_ROOT="$RUNNER_TEMP/mobile-e2e/ios/smoke" npm run e2e:ios
+          xcrun simctl ui "$SIMULATOR_UDID" content_size accessibility-extra-extra-large
+          xcrun simctl terminate "$SIMULATOR_UDID" com.yashsomani.birthdayautopilot.e2e 2>/dev/null || true
+          E2E_REPORT_ROOT="$RUNNER_TEMP/mobile-e2e/ios/large-text" npm run e2e:ios:large-text
+          test -s "$RUNNER_TEMP/mobile-e2e/ios/smoke/report.xml"
+          test -s "$RUNNER_TEMP/mobile-e2e/ios/large-text/report.xml"
+
+      - name: Preserve iOS app-bundle structure in archives
+        run: |
+          tar -C "$RUNNER_TEMP/BirthdayAutopilotDerivedData/Build/Products/Debug-iphonesimulator" \
+            -czf "$RUNNER_TEMP/BirthdayAutopilot-Debug-simulator.app.tar.gz" \
+            BirthdayAutopilot.app
+          tar -C "$RUNNER_TEMP/BirthdayAutopilotDerivedData/Build/Products/Release-iphonesimulator" \
+            -czf "$RUNNER_TEMP/BirthdayAutopilot-Release-simulator.app.tar.gz" \
+            BirthdayAutopilot.app
+          tar -tzf "$RUNNER_TEMP/BirthdayAutopilot-Debug-simulator.app.tar.gz" >/dev/null
+          tar -tzf "$RUNNER_TEMP/BirthdayAutopilot-Release-simulator.app.tar.gz" >/dev/null
+
+      - name: Generate locked iOS native dependency evidence
+        run: |
+          mkdir -p release-evidence/ios
+          cp package-lock.json "$RUNNER_TEMP/Mobile-package-lock.json"
+          cp ios/Podfile.lock "$RUNNER_TEMP/Podfile.lock"
+          cp Gemfile.lock "$RUNNER_TEMP/Gemfile.lock"
+          npm sbom --sbom-format=cyclonedx > "$RUNNER_TEMP/BirthdayAutopilot-Mobile.cdx.json"
+          node tools/generate-native-sbom.mjs \
+            --kind cocoapods \
+            --lock "$RUNNER_TEMP/Podfile.lock" \
+            --output release-evidence/ios/ios-cocoapods.cdx.json \
+            --application-name Birthday-Autopilot-iOS \
+            --version 1.0
+          node tools/scan-native-vulnerabilities.mjs \
+            --dependency-set \
+              ios-cocoapods \
+              cocoapods \
+              "$RUNNER_TEMP/Podfile.lock" \
+              release-evidence/ios/ios-cocoapods.cdx.json \
+            --output release-evidence/ios/ios-native-osv.json
+          node tools/verify-javascript-licenses.mjs \
+            --output release-evidence/ios/javascript-licenses.json
+          cp \
+            release-evidence/ios/javascript-licenses.json \
+            "$RUNNER_TEMP/BirthdayAutopilot-JavaScript-licenses.json"
+          cp \
+            release-evidence/ios/ios-cocoapods.cdx.json \
+            "$RUNNER_TEMP/BirthdayAutopilot-iOS.cdx.json"
+          cp \
+            release-evidence/ios/ios-native-osv.json \
+            "$RUNNER_TEMP/BirthdayAutopilot-iOS-native-osv.json"
+          cp \
+            tools/cocoapods-osv-source-map.json \
+            "$RUNNER_TEMP/CocoaPods-OSV-source-map.json"
+          cp \
+            tools/native-advisory-exceptions.json \
+            "$RUNNER_TEMP/Native-advisory-exceptions.json"
+          test -s "$RUNNER_TEMP/BirthdayAutopilot-Mobile.cdx.json"
+          test -s "$RUNNER_TEMP/BirthdayAutopilot-iOS.cdx.json"
+          test -s "$RUNNER_TEMP/BirthdayAutopilot-iOS-native-osv.json"
+          test -s "$RUNNER_TEMP/CocoaPods-OSV-source-map.json"
+          test -s "$RUNNER_TEMP/Native-advisory-exceptions.json"
+          test -s "$RUNNER_TEMP/BirthdayAutopilot-JavaScript-licenses.json"
+
+      - name: Generate complete iOS simulator candidate manifest
+        run: |
+          node tools/create-evidence-manifest.mjs \
+            --base "$RUNNER_TEMP" \
+            --label ios-simulator-candidate \
+            --output release-evidence/ios/sha256-manifest.json \
+            BirthdayAutopilotDerivedData/Build/Products/Debug-iphonesimulator/BirthdayAutopilot.app \
+            BirthdayAutopilotDerivedData/Build/Products/Release-iphonesimulator/BirthdayAutopilot.app \
+            BirthdayAutopilot-Debug-simulator.app.tar.gz \
+            BirthdayAutopilot-Release-simulator.app.tar.gz \
+            BirthdayAutopilotTests.xcresult \
+            BirthdayAutopilot-Mobile.cdx.json \
+            BirthdayAutopilot-iOS.cdx.json \
+            BirthdayAutopilot-iOS-native-osv.json \
+            CocoaPods-OSV-source-map.json \
+            Native-advisory-exceptions.json \
+            BirthdayAutopilot-JavaScript-licenses.json \
+            Mobile-package-lock.json \
+            Podfile.lock \
+            Gemfile.lock
+          test -s release-evidence/ios/sha256-manifest.json
+
+      - name: Retain unsigned iOS app evidence
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ios-simulator-candidate-evidence
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/BirthdayAutopilot-Debug-simulator.app.tar.gz
+            ${{ runner.temp }}/BirthdayAutopilot-Release-simulator.app.tar.gz
+            ${{ runner.temp }}/BirthdayAutopilotTests.xcresult/
+            ${{ runner.temp }}/BirthdayAutopilot-Mobile.cdx.json
+            ${{ runner.temp }}/BirthdayAutopilot-iOS.cdx.json
+            ${{ runner.temp }}/BirthdayAutopilot-iOS-native-osv.json
+            ${{ runner.temp }}/CocoaPods-OSV-source-map.json
+            ${{ runner.temp }}/Native-advisory-exceptions.json
+            ${{ runner.temp }}/BirthdayAutopilot-JavaScript-licenses.json
+            ${{ runner.temp }}/Mobile-package-lock.json
+            ${{ runner.temp }}/Podfile.lock
+            ${{ runner.temp }}/Gemfile.lock
+            release-evidence/ios/sha256-manifest.json
+
+      - name: Retain iOS device E2E evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ios-isolated-ui-e2e
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/BirthdayAutopilot-E2E-simulator.app.tar.gz
+            ${{ runner.temp }}/mobile-e2e/ios/

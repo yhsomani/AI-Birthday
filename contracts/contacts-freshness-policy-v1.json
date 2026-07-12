@@ -1,0 +1,107 @@
+{
+  "version": "contacts-freshness-v1",
+  "normalMaximumAgeMillis": 604800000,
+  "automationMaximumAgeMillis": 2592000000,
+  "cases": [
+    {
+      "id": "normal-at-seven-days",
+      "storedState": "FRESH",
+      "trustedNowMillis": 4000000000,
+      "lastSuccessMillis": 3395200000,
+      "lastErrorCode": null,
+      "expectedBand": "NORMAL",
+      "allowsAutomation": true,
+      "expectedProjection": "fresh"
+    },
+    {
+      "id": "warning-after-seven-days",
+      "storedState": "FRESH",
+      "trustedNowMillis": 4000000000,
+      "lastSuccessMillis": 3395199999,
+      "lastErrorCode": null,
+      "expectedBand": "STALE_WARNING",
+      "allowsAutomation": true,
+      "expectedProjection": "stale"
+    },
+    {
+      "id": "warning-at-thirty-days",
+      "storedState": "STALE_WARNING",
+      "trustedNowMillis": 4000000000,
+      "lastSuccessMillis": 1408000000,
+      "lastErrorCode": "NETWORK_UNAVAILABLE",
+      "expectedBand": "STALE_WARNING",
+      "allowsAutomation": true,
+      "expectedProjection": "stale"
+    },
+    {
+      "id": "pause-after-thirty-days",
+      "storedState": "STALE_WARNING",
+      "trustedNowMillis": 4000000000,
+      "lastSuccessMillis": 1407999999,
+      "lastErrorCode": "NETWORK_UNAVAILABLE",
+      "expectedBand": "SAFETY_PAUSED",
+      "allowsAutomation": false,
+      "expectedProjection": "stale"
+    },
+    {
+      "id": "transient-day-one-failure-retains-normal-data",
+      "storedState": "STALE_WARNING",
+      "trustedNowMillis": 4000000000,
+      "lastSuccessMillis": 3913600000,
+      "lastErrorCode": "NETWORK_UNAVAILABLE",
+      "expectedBand": "NORMAL",
+      "allowsAutomation": true,
+      "expectedProjection": "failed-retained"
+    },
+    {
+      "id": "explicit-authorization-loss-pauses-immediately",
+      "storedState": "AUTH_ACTION_REQUIRED",
+      "trustedNowMillis": 4000000000,
+      "lastSuccessMillis": 4000000000,
+      "lastErrorCode": "CONTACTS_AUTHORIZATION_REQUIRED",
+      "expectedBand": "SAFETY_PAUSED",
+      "allowsAutomation": false,
+      "expectedProjection": "authorization-required"
+    },
+    {
+      "id": "durable-safety-pause-is-not-overridden-by-age",
+      "storedState": "SAFETY_PAUSED",
+      "trustedNowMillis": 4000000000,
+      "lastSuccessMillis": 4000000000,
+      "lastErrorCode": "CONTACT_MATERIAL_CHANGED",
+      "expectedBand": "SAFETY_PAUSED",
+      "allowsAutomation": false,
+      "expectedProjection": "stale"
+    },
+    {
+      "id": "future-success-fails-closed",
+      "storedState": "FRESH",
+      "trustedNowMillis": 4000000000,
+      "lastSuccessMillis": 4000000001,
+      "lastErrorCode": null,
+      "expectedBand": "UNTRUSTED",
+      "allowsAutomation": false,
+      "expectedProjection": "stale"
+    },
+    {
+      "id": "missing-trusted-time-fails-closed",
+      "storedState": "FRESH",
+      "trustedNowMillis": null,
+      "lastSuccessMillis": 4000000000,
+      "lastErrorCode": null,
+      "expectedBand": "UNTRUSTED",
+      "allowsAutomation": false,
+      "expectedProjection": "stale"
+    },
+    {
+      "id": "never-synced-remains-unavailable",
+      "storedState": "NEVER_SYNCED",
+      "trustedNowMillis": 4000000000,
+      "lastSuccessMillis": null,
+      "lastErrorCode": null,
+      "expectedBand": "UNTRUSTED",
+      "allowsAutomation": false,
+      "expectedProjection": "never-synced"
+    }
+  ]
+}

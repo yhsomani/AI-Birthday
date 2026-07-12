@@ -22,6 +22,7 @@ enum class BirthdayJobState {
   PARTIAL_DELIVERY,
   PARTIAL_DELIVERY_UNKNOWN,
   DELIVERY_UNKNOWN,
+  PARTIAL_UNKNOWN,
   SUBMISSION_UNKNOWN,
   PERMANENT_FAILURE,
   SKIPPED,
@@ -90,11 +91,13 @@ object BirthdayTransitionPolicy {
     BirthdayJobState.SUBMISSION_BARRIER_CONSUMED to setOf(
       BirthdayJobState.SUBMITTED,
       BirthdayJobState.SUBMISSION_UNKNOWN,
+      BirthdayJobState.PERMANENT_FAILURE,
     ),
     BirthdayJobState.SUBMITTED to setOf(
       BirthdayJobState.SENT_FROM_DEVICE,
       BirthdayJobState.RETRYABLE_ZERO,
-      BirthdayJobState.PARTIAL_DELIVERY_UNKNOWN,
+      BirthdayJobState.RETRY_EXHAUSTED,
+      BirthdayJobState.PARTIAL_UNKNOWN,
       BirthdayJobState.SUBMISSION_UNKNOWN,
       BirthdayJobState.PERMANENT_FAILURE,
     ),

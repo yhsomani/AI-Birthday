@@ -48,6 +48,19 @@ class PeopleDeltaStageMapperTest {
   }
 
   @Test
+  fun `national number uses the current runtime region supplied for this sync`() {
+    val prepared = mapper("generation", homeRegion = "IN").prepare(
+      listOf(contact(phone = "9876543210", type = "mobile")),
+      emptyMap(),
+    )
+    val phone = prepared.phones.single()
+
+    assertEquals(PhoneRecordState.READY, phone.state)
+    assertEquals("+919876543210", phone.normalizedE164)
+    assertEquals("IN", phone.regionCode)
+  }
+
+  @Test
   fun `incremental deletion becomes a provider-value-free tombstone`() {
     val delta = PeopleContactDelta(
       resourceName = "people/abc",
@@ -66,10 +79,13 @@ class PeopleDeltaStageMapperTest {
     assertFalse(contact.toString().contains("people/abc"))
   }
 
-  private fun mapper(generation: String) = PeopleDeltaStageMapper(
+  private fun mapper(
+    generation: String,
+    homeRegion: String? = null,
+  ) = PeopleDeltaStageMapper(
     accountId = "a_${"1".repeat(64)}",
     generationId = generation,
-    homeRegion = null,
+    homeRegion = homeRegion,
     stagedAtMillis = 1_000,
   )
 

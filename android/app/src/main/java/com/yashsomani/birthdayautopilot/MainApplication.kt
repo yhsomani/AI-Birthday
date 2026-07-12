@@ -3,6 +3,8 @@ package com.yashsomani.birthdayautopilot
 import android.app.Application
 import androidx.work.Configuration
 import com.yashsomani.birthdayautopilot.automation.workers.AutomationScheduler
+import com.yashsomani.birthdayautopilot.automation.workers.SchedulerStartupCoordinator
+import com.yashsomani.birthdayautopilot.automation.workers.SchedulerStartupStateStore
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -33,6 +35,10 @@ class MainApplication : Application(), ReactApplication, Configuration.Provider 
   override fun onCreate() {
     super.onCreate()
     loadReactNative(this)
-    AutomationScheduler.ensureScheduled(this)
+    SchedulerStartupCoordinator.initialize(SchedulerStartupStateStore(this)) {
+      AutomationScheduler.ensureScheduled(this)
+      appGraph.startSubscriptionChangeObservation()
+    }
+    appGraph.configureGeminiOperationalGate()
   }
 }

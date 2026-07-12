@@ -50,6 +50,28 @@ data class EligibilityDecision(
     require((kind == EligibilityKind.SUPPORTED) == (primaryReason == null))
     require(primaryReason !in otherReasons)
   }
+
+  /**
+   * A foreground TEST deliberately does not require unattended background execution readiness.
+   * Distribution, device, Play services, SIM, and validated-network failures still fail closed.
+   */
+  fun allowsForegroundTest(): Boolean {
+    if (kind == EligibilityKind.UNSUPPORTED) return false
+    return buildList {
+      primaryReason?.let(::add)
+      addAll(otherReasons)
+    }.all { it in FOREGROUND_TEST_EXEMPT_REASONS }
+  }
+
+  private companion object {
+    val FOREGROUND_TEST_EXEMPT_REASONS = setOf(
+      EligibilityReason.BACKGROUND_RESTRICTED,
+      EligibilityReason.DOZE_EXEMPTION_MISSING,
+      EligibilityReason.UNUSED_APP_RESTRICTIONS_UNSAFE,
+      EligibilityReason.DATA_SAVER_RESTRICTED,
+      EligibilityReason.LOW_POWER_STANDBY_UNSAFE,
+    )
+  }
 }
 
 class DistributionEligibilityEvaluator {

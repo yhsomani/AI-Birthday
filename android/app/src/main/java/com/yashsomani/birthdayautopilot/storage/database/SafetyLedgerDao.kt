@@ -8,6 +8,9 @@ import androidx.room.Transaction
 import com.yashsomani.birthdayautopilot.automation.state.BirthdayJobState
 import com.yashsomani.birthdayautopilot.automation.state.TestJobState
 import com.yashsomani.birthdayautopilot.core.model.AccountMode
+import com.yashsomani.birthdayautopilot.messages.MessageContentPolicy
+import com.yashsomani.birthdayautopilot.messages.MessageTemplateValidator
+import com.yashsomani.birthdayautopilot.planning.BirthdayCapacityPolicy
 import kotlin.math.abs
 
 @Dao
@@ -60,14 +63,119 @@ abstract class SafetyLedgerDao {
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   abstract suspend fun putReadinessState(readiness: ReadinessStateEntity)
 
+  @Insert(onConflict = OnConflictStrategy.IGNORE)
+  protected abstract suspend fun insertReadinessStateIfAbsent(
+    readiness: ReadinessStateEntity,
+  ): Long
+
   @Query("SELECT * FROM accounts_v2 WHERE accountId = :accountId")
   abstract suspend fun getAccount(accountId: String): AccountRecordEntity?
+
+  @Query("SELECT * FROM readiness_state_v2 WHERE accountId = :accountId")
+  abstract suspend fun getReadinessState(accountId: String): ReadinessStateEntity?
+
+  @Query(
+    """
+    UPDATE readiness_state_v2
+    SET scheduler = 'RUNNING',
+        overall = :safeCode,
+        evaluatedAtMillis = :atMillis,
+        revision = revision + 1
+    WHERE accountId = :accountId
+      AND revision = :expectedRevision
+      AND revision < 9223372036854775807
+    """,
+  )
+  protected abstract suspend fun casBeginReconcileHeartbeat(
+    accountId: String,
+    expectedRevision: Long,
+    safeCode: String,
+    atMillis: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE readiness_state_v2
+    SET scheduler = :status,
+        overall = :safeCode,
+        evaluatedAtMillis = CASE
+          WHEN evaluatedAtMillis < :atMillis THEN :atMillis
+          ELSE evaluatedAtMillis
+        END,
+        revision = revision + 1
+    WHERE accountId = :accountId
+      AND revision = :expectedRevision
+      AND revision < 9223372036854775807
+    """,
+  )
+  protected abstract suspend fun casFinishReconcileHeartbeat(
+    accountId: String,
+    expectedRevision: Long,
+    status: String,
+    safeCode: String,
+    atMillis: Long,
+  ): Int
+
+  /**
+   * Starts one scheduler heartbeat and returns the exact revision lease owned by this worker.
+   * Room serializes the transaction; the finish CAS still prevents an older concurrent worker
+   * from overwriting a heartbeat begun later.
+   */
+  @Transaction
+  internal open suspend fun beginReconcileHeartbeat(
+    accountId: String,
+    atMillis: Long,
+  ): ReconcileHeartbeatLease? {
+    if (atMillis < 0) return null
+    val account = getAccount(accountId)
+      ?.takeIf { it.activeSlot == 1 && it.state == AccountRecordState.ACTIVE }
+      ?: return null
+    var current = getReadinessState(account.accountId)
+    if (current == null) {
+      val inserted = insertReadinessStateIfAbsent(
+        ReconcileHeartbeatPolicy.initialRow(account.accountId, atMillis),
+      )
+      if (inserted != -1L) return ReconcileHeartbeatLease(account.accountId, revision = 0)
+      current = getReadinessState(account.accountId) ?: return null
+    }
+    if (current.revision == Long.MAX_VALUE) return null
+    if (
+      casBeginReconcileHeartbeat(
+        accountId = account.accountId,
+        expectedRevision = current.revision,
+        safeCode = ReconcileHeartbeatPolicy.RUNNING_SAFE_CODE,
+        atMillis = atMillis,
+      ) != 1
+    ) return null
+    return ReconcileHeartbeatLease(account.accountId, current.revision + 1)
+  }
+
+  /** Finishes only the heartbeat revision created by [beginReconcileHeartbeat]. */
+  @Transaction
+  internal open suspend fun finishReconcileHeartbeat(
+    lease: ReconcileHeartbeatLease,
+    status: ReconcileHeartbeatStatus,
+    safeCode: String,
+    atMillis: Long,
+  ): Boolean {
+    if (status == ReconcileHeartbeatStatus.RUNNING || atMillis < 0 || lease.revision < 0) return false
+    return casFinishReconcileHeartbeat(
+      accountId = lease.accountId,
+      expectedRevision = lease.revision,
+      status = status.name,
+      safeCode = ReconcileHeartbeatPolicy.normalizeSafeCode(safeCode),
+      atMillis = atMillis,
+    ) == 1
+  }
 
   @Query("SELECT * FROM installation_bindings_v2 WHERE installationId = :installationId")
   abstract suspend fun getInstallation(installationId: String): InstallationBindingEntity?
 
   @Query("SELECT * FROM approval_snapshots_v2 WHERE approvalId = :approvalId")
   abstract suspend fun getApproval(approvalId: String): ApprovalSnapshotEntity?
+
+  @Query("SELECT * FROM message_templates_v2 WHERE templateId = :templateId")
+  protected abstract suspend fun messageTemplateRow(templateId: String): MessageTemplateEntity?
 
   @Query("SELECT * FROM automation_policies_v2 WHERE policyId = :policyId")
   abstract suspend fun getAutomationPolicy(policyId: String): AutomationPolicyEntity?
@@ -143,6 +251,21 @@ abstract class SafetyLedgerDao {
   @Query("SELECT * FROM local_destination_guards_v2 WHERE occurrenceId = :occurrenceId")
   protected abstract suspend fun destinationGuardRow(occurrenceId: String): LocalDestinationGuardEntity?
 
+  @Query(
+    """
+    SELECT COUNT(*) FROM local_destination_guards_v2
+    WHERE accountId = :accountId
+      AND localDate = :localDate
+      AND channel = :channel
+      AND armedOrLater = 1
+    """,
+  )
+  abstract suspend fun armedBirthdayGuardCount(
+    accountId: String,
+    localDate: String,
+    channel: String,
+  ): Int
+
   @Query("SELECT * FROM callback_tokens_v2 WHERE callbackTokenId = :tokenId")
   protected abstract suspend fun callbackTokenRow(tokenId: String): CallbackTokenEntity?
 
@@ -168,6 +291,21 @@ abstract class SafetyLedgerDao {
     kind: CallbackKind,
     observedAtMillis: Long,
   ): CallbackTokenEntity?
+
+  @Query(
+    """
+    UPDATE callback_tokens_v2
+    SET state = 'RETIRED', retiredAtMillis = COALESCE(retiredAtMillis, :retiredAtMillis)
+    WHERE sendAttemptId = :sendAttemptId
+      AND callbackTokenId IN (:tokenIds)
+      AND state = 'EXPECTED'
+    """,
+  )
+  abstract suspend fun retireUnsubmittedCallbackTokens(
+    sendAttemptId: String,
+    tokenIds: List<String>,
+    retiredAtMillis: Long,
+  ): Int
 
   @Query(
     "SELECT * FROM send_attempts_v2 WHERE purpose = :purpose AND operationId = :operationId AND attemptNumber = :attemptNumber",
@@ -423,6 +561,32 @@ abstract class SafetyLedgerDao {
   @Query(
     """
     UPDATE coordination_permits_v2
+    SET state = 'ARMED_SUPPRESSED',
+        trustedServerNowMillis = :serverNowMillis,
+        serverSubmitNotAfterMillis = :serverSubmitNotAfterMillis,
+        effectiveSubmitNotAfterMillis = :effectiveSubmitNotAfterMillis,
+        noWriteReason = 'LATE_ARMED_EVIDENCE',
+        revision = revision + 1,
+        updatedAtMillis = :updatedAtMillis
+    WHERE permitId = :permitId
+      AND state = 'COORDINATION_UNKNOWN'
+      AND armRequestId = :armRequestId
+      AND revision = :expectedRevision
+    """,
+  )
+  protected abstract suspend fun suppressUnknownArmedPermitRow(
+    permitId: String,
+    armRequestId: String,
+    expectedRevision: Long,
+    serverNowMillis: Long,
+    serverSubmitNotAfterMillis: Long,
+    effectiveSubmitNotAfterMillis: Long?,
+    updatedAtMillis: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE coordination_permits_v2
     SET state = 'NO_WRITE',
         noWriteReason = :reason,
         revision = revision + 1,
@@ -434,6 +598,76 @@ abstract class SafetyLedgerDao {
     """,
   )
   protected abstract suspend fun casRecordNoWrite(
+    permitId: String,
+    armRequestId: String,
+    expectedRevision: Long,
+    reason: String,
+    updatedAtMillis: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE coordination_permits_v2
+    SET state = 'NO_WRITE',
+        noWriteReason = :reason,
+        revision = revision + 1,
+        updatedAtMillis = :updatedAtMillis
+    WHERE permitId = :permitId
+      AND state = 'COORDINATION_UNKNOWN'
+      AND armRequestId = :armRequestId
+      AND revision = :expectedRevision
+    """,
+  )
+  protected abstract suspend fun closeUnknownWithNoWriteRow(
+    permitId: String,
+    armRequestId: String,
+    expectedRevision: Long,
+    reason: String,
+    updatedAtMillis: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE birthday_occurrences_v2
+    SET state = :nextState,
+        revision = revision + 1,
+        claimedBlockerRevision = NULL,
+        updatedAtMillis = :updatedAtMillis,
+        terminalAtMillis = :terminalAtMillis,
+        safeOutcomeCode = :reason
+    WHERE occurrenceId = :occurrenceId
+      AND state = 'COORDINATION_UNKNOWN'
+      AND attemptNumber = :expectedAttempt
+      AND revision = :expectedRevision
+    """,
+  )
+  protected abstract suspend fun refineUnknownBirthdayNoWriteRow(
+    occurrenceId: String,
+    expectedAttempt: Int,
+    expectedRevision: Long,
+    nextState: BirthdayJobState,
+    updatedAtMillis: Long,
+    terminalAtMillis: Long?,
+    reason: String,
+  ): Int
+
+  @Query(
+    """
+    UPDATE coordination_permits_v2
+    SET state = 'CLOUD_CLAIMED',
+        armRequestId = NULL,
+        armDispatched = 0,
+        armStartBlockerRevision = NULL,
+        noWriteReason = :reason,
+        revision = revision + 1,
+        updatedAtMillis = :updatedAtMillis
+    WHERE permitId = :permitId
+      AND state = 'ARM_RECONCILING'
+      AND armRequestId = :armRequestId
+      AND revision = :expectedRevision
+    """,
+  )
+  protected abstract suspend fun casReturnPermitToCloudClaimed(
     permitId: String,
     armRequestId: String,
     expectedRevision: Long,
@@ -472,6 +706,49 @@ abstract class SafetyLedgerDao {
     expectedRevision: Long,
     startedAtMillis: Long,
     sentWatchdogAtMillis: Long,
+  ): Int
+
+  @Query(
+    """
+    UPDATE send_attempts_v2
+    SET state = 'PERMANENT_FAILURE',
+        terminalAtMillis = :failedAtMillis,
+        safeOutcomeCode = :safeCode,
+        revision = revision + 1
+    WHERE sendAttemptId = :sendAttemptId
+      AND permitId = :permitId
+      AND state = 'BARRIER_CONSUMED'
+      AND revision = :expectedRevision
+    """,
+  )
+  protected abstract suspend fun casAttemptSynchronousRefusal(
+    sendAttemptId: String,
+    permitId: String,
+    expectedRevision: Long,
+    failedAtMillis: Long,
+    safeCode: String,
+  ): Int
+
+  @Query(
+    """
+    UPDATE birthday_occurrences_v2
+    SET state = 'PERMANENT_FAILURE',
+        revision = revision + 1,
+        updatedAtMillis = :failedAtMillis,
+        terminalAtMillis = :failedAtMillis,
+        safeOutcomeCode = :safeCode
+    WHERE occurrenceId = :occurrenceId
+      AND state = 'SUBMISSION_BARRIER_CONSUMED'
+      AND attemptNumber = :expectedAttempt
+      AND revision = :expectedRevision
+    """,
+  )
+  protected abstract suspend fun casBirthdaySynchronousRefusal(
+    occurrenceId: String,
+    expectedAttempt: Int,
+    expectedRevision: Long,
+    failedAtMillis: Long,
+    safeCode: String,
   ): Int
 
   @Query(
@@ -1147,6 +1424,218 @@ abstract class SafetyLedgerDao {
     return true
   }
 
+  /**
+   * TOO_EARLY is an authoritative no-write result, but it is not a terminal payload refusal. The
+   * exact old Arm request remains spent server-side while this local claim waits for a fresh
+   * request identity after the shared spacing fence.
+   */
+  @Transaction
+  open suspend fun recordRetryableTooEarlyNoWrite(
+    permitId: String,
+    expectedPermitRevision: Long,
+    armRequestId: String,
+    trustedServerNowMillis: Long,
+    recordedAtMillis: Long,
+  ): Boolean {
+    val permit = getCoordinationPermit(permitId) ?: return false
+    if (
+      permit.purpose != OperationPurpose.BIRTHDAY ||
+      permit.state != CoordinationPermitState.ARM_RECONCILING ||
+      permit.armRequestId != armRequestId ||
+      permit.revision != expectedPermitRevision
+    ) return false
+    val occurrence = getBirthdayOccurrence(permit.operationId) ?: return false
+    if (
+      occurrence.state != BirthdayJobState.ARM_RECONCILING ||
+      occurrence.attemptNumber != permit.attemptNumber ||
+      occurrence.revision == Long.MAX_VALUE ||
+      trustedServerNowMillis < permit.trustedServerNowMillis ||
+      trustedServerNowMillis >= occurrence.resolvedWindowEndMillis ||
+      trustedServerNowMillis >= permit.claimExpiresAtMillis
+    ) return false
+    if (
+      casReturnPermitToCloudClaimed(
+        permitId,
+        armRequestId,
+        expectedPermitRevision,
+        "TOO_EARLY",
+        recordedAtMillis,
+      ) != 1
+    ) return false
+    val nextState = if (permit.attemptNumber == 1) {
+      BirthdayJobState.CLOUD_CLAIMED
+    } else {
+      BirthdayJobState.RETRY_CLAIMED
+    }
+    check(
+      casBirthdayState(
+        occurrence.occurrenceId,
+        BirthdayJobState.ARM_RECONCILING,
+        occurrence.attemptNumber,
+        occurrence.revision,
+        nextState,
+        occurrence.attemptNumber,
+        occurrence.claimedBlockerRevision,
+        recordedAtMillis,
+        "NO_WRITE_TOO_EARLY",
+      ) == 1,
+    ) { "too-early-operation-cas-lost" }
+    return true
+  }
+
+  /** Late status evidence refines display/safety state only; it can never mint a permit. */
+  @Transaction
+  open suspend fun refineCoordinationUnknownAsArmedSuppressed(
+    permitId: String,
+    expectedPermitRevision: Long,
+    evidence: AuthoritativeArmedEvidence,
+    recordedAtMillis: Long,
+  ): Boolean {
+    val permit = getCoordinationPermit(permitId) ?: return false
+    if (
+      permit.state != CoordinationPermitState.COORDINATION_UNKNOWN ||
+      permit.revision != expectedPermitRevision ||
+      permit.armRequestId != evidence.armRequestId ||
+      evidence.serverSubmitNotAfterMillis > permit.maxPossibleSubmitNotAfterMillis ||
+      evidence.serverSubmitNotAfterMillis <= evidence.serverNowMillis
+    ) return false
+    val effectiveDeadline = when (permit.purpose) {
+      OperationPurpose.BIRTHDAY -> getBirthdayOccurrence(permit.operationId)?.let {
+        minOf(it.resolvedWindowEndMillis, evidence.serverSubmitNotAfterMillis)
+      }
+      OperationPurpose.TEST -> evidence.serverSubmitNotAfterMillis
+    }
+    if (
+      suppressUnknownArmedPermitRow(
+        permitId,
+        evidence.armRequestId,
+        expectedPermitRevision,
+        evidence.serverNowMillis,
+        evidence.serverSubmitNotAfterMillis,
+        effectiveDeadline,
+        recordedAtMillis,
+      ) != 1
+    ) return false
+    when (permit.purpose) {
+      OperationPurpose.BIRTHDAY -> {
+        val occurrence = checkNotNull(getBirthdayOccurrence(permit.operationId))
+        check(
+          casBirthdayState(
+            occurrence.occurrenceId,
+            BirthdayJobState.COORDINATION_UNKNOWN,
+            occurrence.attemptNumber,
+            occurrence.revision,
+            BirthdayJobState.ARMED_SUPPRESSED,
+            occurrence.attemptNumber,
+            occurrence.claimedBlockerRevision,
+            recordedAtMillis,
+            "LATE_ARMED_EVIDENCE_SUPPRESSED",
+          ) == 1,
+        ) { "late-armed-birthday-cas-lost" }
+      }
+      OperationPurpose.TEST -> {
+        val test = checkNotNull(getTestJob(permit.operationId))
+        check(
+          casTestState(
+            test.testJobId,
+            TestJobState.COORDINATION_UNKNOWN,
+            test.revision,
+            TestJobState.ARMED_SUPPRESSED,
+            recordedAtMillis,
+            recordedAtMillis,
+            "LATE_ARMED_EVIDENCE_SUPPRESSED",
+          ) == 1,
+        ) { "late-armed-test-cas-lost" }
+      }
+    }
+    return true
+  }
+
+  @Transaction
+  open suspend fun refineTestCoordinationUnknownAsNoWrite(
+    permitId: String,
+    expectedPermitRevision: Long,
+    armRequestId: String,
+    typedReason: String,
+    recordedAtMillis: Long,
+  ): Boolean {
+    if (typedReason !in NO_WRITE_REASONS) return false
+    val permit = getCoordinationPermit(permitId) ?: return false
+    if (
+      permit.purpose != OperationPurpose.TEST ||
+      permit.state != CoordinationPermitState.COORDINATION_UNKNOWN ||
+      permit.revision != expectedPermitRevision ||
+      permit.armRequestId != armRequestId
+    ) return false
+    val test = getTestJob(permit.operationId) ?: return false
+    if (
+      closeUnknownWithNoWriteRow(
+        permitId,
+        armRequestId,
+        expectedPermitRevision,
+        typedReason,
+        recordedAtMillis,
+      ) != 1
+    ) return false
+    check(
+      casTestState(
+        test.testJobId,
+        TestJobState.COORDINATION_UNKNOWN,
+        test.revision,
+        TestJobState.FAILED,
+        recordedAtMillis,
+        recordedAtMillis,
+        "NO_WRITE_$typedReason",
+      ) == 1,
+    ) { "late-no-write-test-cas-lost" }
+    return true
+  }
+
+  @Transaction
+  open suspend fun refineBirthdayCoordinationUnknownAsNoWrite(
+    permitId: String,
+    expectedPermitRevision: Long,
+    armRequestId: String,
+    typedReason: String,
+    recordedAtMillis: Long,
+  ): Boolean {
+    if (typedReason !in NO_WRITE_REASONS) return false
+    val permit = getCoordinationPermit(permitId) ?: return false
+    if (
+      permit.purpose != OperationPurpose.BIRTHDAY ||
+      permit.state != CoordinationPermitState.COORDINATION_UNKNOWN ||
+      permit.revision != expectedPermitRevision ||
+      permit.armRequestId != armRequestId
+    ) return false
+    val occurrence = getBirthdayOccurrence(permit.operationId) ?: return false
+    val nextState = when {
+      typedReason == "EXPIRED" -> BirthdayJobState.MISSED
+      typedReason == "EXPIRED_RETRY" -> BirthdayJobState.RETRY_EXHAUSTED
+      else -> BirthdayJobState.CANCELLED
+    }
+    if (
+      closeUnknownWithNoWriteRow(
+        permitId,
+        armRequestId,
+        expectedPermitRevision,
+        typedReason,
+        recordedAtMillis,
+      ) != 1
+    ) return false
+    check(
+      refineUnknownBirthdayNoWriteRow(
+        occurrence.occurrenceId,
+        occurrence.attemptNumber,
+        occurrence.revision,
+        nextState,
+        recordedAtMillis,
+        recordedAtMillis,
+        "NO_WRITE_$typedReason",
+      ) == 1,
+    ) { "late-no-write-birthday-cas-lost" }
+    return true
+  }
+
   /** Called by the sole SMS gateway immediately before its one SmsManager call. */
   @Transaction
   open suspend fun commitApiBoundary(
@@ -1207,6 +1696,83 @@ abstract class SafetyLedgerDao {
       apiBoundaryWallMillis,
       sentWatchdogAtMillis,
     ) == 1
+  }
+
+  /**
+   * Binds a synchronous gateway refusal before SmsManager was entered to a terminal failure.
+   * A refusal can never be reconstructed as an ambiguous API call merely because the caller
+   * returns or the process dies after this transaction commits.
+   */
+  @Transaction
+  open suspend fun recordSynchronousSubmissionRefusal(
+    permit: ArmedAttemptPermit,
+    safeCode: String,
+    failedAtMillis: Long,
+  ): Boolean {
+    if (!SAFE_OUTCOME_CODE.matches(safeCode) || failedAtMillis < 0) return false
+    val durablePermit = getCoordinationPermit(permit.permitId) ?: return false
+    val attempt = getSendAttempt(permit.sendAttemptId) ?: return false
+    if (
+      durablePermit.state != CoordinationPermitState.BARRIER_CONSUMED ||
+      durablePermit.operationId != permit.operationId ||
+      durablePermit.purpose != permit.purpose ||
+      durablePermit.attemptNumber != permit.attemptNumber ||
+      durablePermit.installationId != permit.installationId ||
+      durablePermit.senderEpoch != permit.senderEpoch ||
+      durablePermit.payloadHash != permit.payloadHash ||
+      attempt.permitId != permit.permitId ||
+      attempt.operationId != permit.operationId ||
+      attempt.purpose != permit.purpose ||
+      attempt.attemptNumber != permit.attemptNumber ||
+      attempt.installationId != permit.installationId ||
+      attempt.payloadHash != permit.payloadHash
+    ) return false
+
+    if (attempt.state in SYNCHRONOUS_REFUSAL_ALREADY_TERMINAL_STATES) return true
+    if (attempt.state != SendAttemptState.BARRIER_CONSUMED) return false
+    if (
+      casAttemptSynchronousRefusal(
+        attempt.sendAttemptId,
+        durablePermit.permitId,
+        attempt.revision,
+        failedAtMillis,
+        safeCode,
+      ) != 1
+    ) return false
+
+    when (permit.purpose) {
+      OperationPurpose.BIRTHDAY -> {
+        val occurrence = checkNotNull(getBirthdayOccurrence(permit.operationId)) {
+          "refused-birthday-operation-missing"
+        }
+        check(
+          casBirthdaySynchronousRefusal(
+            occurrence.occurrenceId,
+            occurrence.attemptNumber,
+            occurrence.revision,
+            failedAtMillis,
+            safeCode,
+          ) == 1,
+        ) { "refused-birthday-operation-cas-lost" }
+      }
+      OperationPurpose.TEST -> {
+        val test = checkNotNull(getTestJob(permit.operationId)) {
+          "refused-test-operation-missing"
+        }
+        check(
+          casTestState(
+            test.testJobId,
+            TestJobState.BARRIER_CONSUMED,
+            test.revision,
+            TestJobState.PERMANENT_FAILURE,
+            failedAtMillis,
+            failedAtMillis,
+            safeCode,
+          ) == 1,
+        ) { "refused-test-operation-cas-lost" }
+      }
+    }
+    return true
   }
 
   @Transaction
@@ -1525,6 +2091,8 @@ abstract class SafetyLedgerDao {
     val account = getAccount(occurrence.accountId) ?: return null
     if (account.state != AccountRecordState.ACTIVE || account.activeSlot != 1) return null
     val approval = getApproval(occurrence.approvalId) ?: return null
+    val sourceTemplateId = approval.sourceTemplateId ?: return null
+    val template = messageTemplateRow(sourceTemplateId) ?: return null
     val policy = policyRow(occurrence.policyId) ?: return null
     val contact = contactRow(occurrence.contactId) ?: return null
     val recipient = recipientPolicyRow(occurrence.contactId) ?: return null
@@ -1535,10 +2103,22 @@ abstract class SafetyLedgerDao {
     val coordination = coordinationRow(occurrence.accountId) ?: return null
     val installationId = coordination.activeInstallationId ?: return null
     val installation = getInstallation(installationId) ?: return null
+    val guard = destinationGuardRow(occurrence.occurrenceId) ?: return null
+    val armedOnCivilDate = armedBirthdayGuardCount(
+      occurrence.accountId,
+      occurrence.localDate,
+      occurrence.channel,
+    )
+    val effectiveEndMinute = policy.graceEndMinute ?: policy.windowEndMinute
     if (
       approval.state != ApprovalRecordState.ACTIVE ||
       approval.accountId != occurrence.accountId ||
       approval.contactId != occurrence.contactId ||
+      template.accountId != occurrence.accountId ||
+      template.validationState != TemplateValidationState.VALID ||
+      template.templateVersion != approval.sourceTemplateVersion ||
+      template.validatorVersion != MessageTemplateValidator.VALIDATOR_VERSION ||
+      MessageContentPolicy.validate(approval.exactMessage).isNotEmpty() ||
       approval.contentHash != occurrence.payloadHash ||
       approval.destinationFingerprint != occurrence.destinationFingerprint ||
       approval.contactMaterialRevision != contact.materialRevision ||
@@ -1547,12 +2127,31 @@ abstract class SafetyLedgerDao {
       approval.policyId != policy.policyId ||
       approval.policyRevision != policy.revision ||
       policy.state != PolicyRecordState.ACTIVE ||
+      policy.dailyCap !in 1..BirthdayCapacityPolicy.MAX_DAILY_CAP ||
+      approval.windowStartMinute != policy.windowStartMinute ||
+      approval.windowEndMinute != policy.windowEndMinute ||
+      approval.graceEndMinute != policy.graceEndMinute ||
+      approval.latePolicy != policy.latePolicy ||
+      occurrence.timeZoneId != policy.timeZoneId ||
+      !BirthdayCapacityPolicy.exactWindowBindingMatches(
+        localDate = occurrence.localDate,
+        timeZoneId = policy.timeZoneId,
+        resolvedWindowStartMillis = occurrence.resolvedWindowStartMillis,
+        resolvedWindowEndMillis = occurrence.resolvedWindowEndMillis,
+        startMinute = policy.windowStartMinute,
+        effectiveEndMinute = effectiveEndMinute,
+      ) ||
+      !BirthdayCapacityPolicy.allowsArm(
+        armedOnCivilDate = armedOnCivilDate,
+        dailyCap = policy.dailyCap,
+        occurrenceAlreadyArmed = guard.armedOrLater,
+      ) ||
       contact.state != ContactSnapshotState.ACTIVE ||
       recipient.state != RecipientEnrollmentState.ENABLED ||
       recipient.approvalId != approval.approvalId ||
       phone.state != PhoneRecordState.READY ||
       phone.destinationFingerprint != occurrence.destinationFingerprint ||
-      sync.freshness !in setOf(SyncFreshness.FRESH, SyncFreshness.STALE_WARNING) ||
+      !PeopleDataFreshnessPolicy.allowsUnattendedAutomation(sync, trustedNowMillis) ||
       reset.status != ResetSafetyStatus.CLEAR ||
       reset.overflowBlocked ||
       reset.resetGeneration != coordination.resetGeneration ||
@@ -1573,7 +2172,6 @@ abstract class SafetyLedgerDao {
         ConsentDecision.GRANTED ||
       activeDestinationBlockCount(occurrence.accountId, occurrence.destinationFingerprint) != 0
     ) return null
-    val guard = destinationGuardRow(occurrence.occurrenceId) ?: return null
     if (
       guard.accountId != occurrence.accountId ||
       guard.destinationFingerprint != occurrence.destinationFingerprint ||
@@ -1781,6 +2379,12 @@ abstract class SafetyLedgerDao {
       "BUDGET_BLOCKED",
       "GUARD_BLOCKED",
     )
+    private val SYNCHRONOUS_REFUSAL_ALREADY_TERMINAL_STATES = setOf(
+      SendAttemptState.RETRYABLE_ZERO,
+      SendAttemptState.PERMANENT_FAILURE,
+      SendAttemptState.TERMINAL,
+    )
+    private val SAFE_OUTCOME_CODE = Regex("^[A-Z][A-Z0-9_]{2,63}$")
     private val UUID_SHAPE = Regex(
       "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
     )

@@ -107,6 +107,7 @@ export type ContactDetail = Readonly<{
   phoneChoices: readonly ContactPhoneChoice[];
   birthdayChoices: readonly BirthdayChoice[];
   selectedPhoneId?: PhoneChoiceId | undefined;
+  selectedDestinationBlocked: boolean;
   selectedBirthdayId?: BirthdayChoiceId | undefined;
   nextOccurrenceLabel?: string | undefined;
   lastOutcomeLabel?: string | undefined;

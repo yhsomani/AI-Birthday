@@ -65,11 +65,13 @@ export function LiveAndroidDeviceControls({
   onAccountReload,
   onOpenAutomation,
   port,
+  showNotifications = true,
 }: {
   account?: ProjectionEnvelope<AccountProjection> | undefined;
   onAccountReload: () => Promise<unknown>;
   onOpenAutomation: () => void;
   port: LiveAppPort;
+  showNotifications?: boolean | undefined;
 }) {
   const { language, t } = useAppLocalization();
   const loadNotifications = useCallback(
@@ -253,20 +255,24 @@ export function LiveAndroidDeviceControls({
 
   return (
     <>
-      <SectionHeading title={t('live.device.notifications.title')} />
-      <AppText color="muted">{t('live.device.notifications.body')}</AppText>
       <LiveActionFeedback problem={problem} message={message} />
-      {notifications.state.kind === 'loading' ? (
+      {showNotifications ? (
+        <>
+          <SectionHeading title={t('live.device.notifications.title')} />
+          <AppText color="muted">{t('live.device.notifications.body')}</AppText>
+        </>
+      ) : null}
+      {showNotifications && notifications.state.kind === 'loading' ? (
         <LiveLoading label={t('live.device.notifications.loading')} />
       ) : null}
-      {notifications.state.kind === 'error' ? (
+      {showNotifications && notifications.state.kind === 'error' ? (
         <LiveError
           title={t('live.device.notifications.unavailable')}
           problem={notifications.state.problem}
           onRetry={() => notifications.reload()}
         />
       ) : null}
-      {notifications.state.kind === 'ready' ? (
+      {showNotifications && notifications.state.kind === 'ready' ? (
         <Card>
           {notifications.state.refreshProblem ? (
             <LiveRefreshProblem problem={notifications.state.refreshProblem} />
@@ -347,7 +353,7 @@ export function LiveAndroidDeviceControls({
         </Card>
       ) : null}
       {review ? (
-        <Card accessibilityLabel={t('live.device.transfer.reviewTitle')}>
+        <Card>
           <AppText variant="heading">
             {t('live.device.transfer.reviewTitle')}
           </AppText>

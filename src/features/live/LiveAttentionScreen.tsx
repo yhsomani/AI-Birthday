@@ -11,6 +11,7 @@ import {
   Button,
   Card,
   Screen,
+  SectionHeading,
   StatusRow,
 } from '../../design-system/components/Primitives';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
@@ -33,11 +34,83 @@ const gateKeys: Record<AndroidGateName | IosGateName, TranslationKey> = {
   composer: 'live.settings.gate.composer',
 };
 
+type AttentionCategory = 'account' | 'contacts' | 'approval' | 'platform';
+type AppRepairRoute = 'people' | 'message' | 'automation' | 'settings';
+
+const categoryFor = (issue: ReadinessIssue): AttentionCategory => {
+  if (
+    issue.code.startsWith('account-') ||
+    issue.code === 'active-sender-other-device' ||
+    issue.code === 'transfer-pending' ||
+    issue.code === 'firebase-account-deleting' ||
+    issue.code === 'coordination-unavailable'
+  ) {
+    return 'account';
+  }
+  if (
+    issue.code.startsWith('contacts-') ||
+    issue.code.startsWith('birthday-') ||
+    issue.code.startsWith('phone-') ||
+    issue.code === 'duplicate-destination' ||
+    issue.code === 'leap-policy-required' ||
+    issue.code === 'safe-given-name-missing' ||
+    issue.code === 'source-contact-deleted' ||
+    issue.code === 'stable-source-missing'
+  ) {
+    return 'contacts';
+  }
+  if (
+    issue.code.startsWith('approval-') ||
+    issue.code.startsWith('template-') ||
+    issue.code === 'invalid-window' ||
+    issue.code === 'invalid-daily-cap' ||
+    issue.code === 'window-capacity-conflict'
+  ) {
+    return 'approval';
+  }
+  return 'platform';
+};
+
+const repairRouteFor = (issue: ReadinessIssue): AppRepairRoute | undefined => {
+  const category = categoryFor(issue);
+  if (category === 'contacts' || issue.code.startsWith('approval-')) {
+    return 'people';
+  }
+  if (issue.code.startsWith('template-')) return 'message';
+  if (category === 'approval' || issue.code.includes('sim')) {
+    return 'automation';
+  }
+  if (category === 'account') return 'settings';
+  return undefined;
+};
+
+const categoryKeys: Record<AttentionCategory, TranslationKey> = {
+  account: 'live.attention.categoryAccount',
+  contacts: 'live.attention.categoryContacts',
+  approval: 'live.attention.categoryApproval',
+  platform: 'live.attention.categoryPlatform',
+};
+
+const routeKeys: Record<AppRepairRoute, TranslationKey> = {
+  people: 'live.attention.openPeople',
+  message: 'live.attention.openMessage',
+  automation: 'live.attention.openAutomation',
+  settings: 'live.attention.openSettings',
+};
+
 export function LiveAttentionScreen({
   onBack,
+  onOpenAutomation,
+  onOpenMessage,
+  onOpenPeople,
+  onOpenSettings,
   port,
 }: {
   onBack: () => void;
+  onOpenAutomation: () => void;
+  onOpenMessage: () => void;
+  onOpenPeople: () => void;
+  onOpenSettings: () => void;
   port: LiveAppPort;
 }) {
   const { t } = useAppLocalization();
@@ -46,6 +119,16 @@ export function LiveAttentionScreen({
   const [pendingIssue, setPendingIssue] = useState<string>();
   const [problem, setProblem] = useState<NativeProblem>();
   const [message, setMessage] = useState<string>();
+  const visibleIssues =
+    issues.state.kind === 'ready'
+      ? issues.state.result.envelope.value
+      : ([] as readonly ReadinessIssue[]);
+  const appRepairActions: Record<AppRepairRoute, () => void> = {
+    people: onOpenPeople,
+    message: onOpenMessage,
+    automation: onOpenAutomation,
+    settings: onOpenSettings,
+  };
 
   const performIssueAction = async (issue: ReadinessIssue) => {
     if (!issue.action || issues.state.kind !== 'ready') {
@@ -105,44 +188,70 @@ export function LiveAttentionScreen({
           {issues.state.refreshProblem ? (
             <LiveRefreshProblem problem={issues.state.refreshProblem} />
           ) : null}
-          {issues.state.result.envelope.value.length === 0 ? (
+          {visibleIssues.length === 0 ? (
             <Card>
               <AppText>{t('live.attention.empty')}</AppText>
             </Card>
           ) : (
-            issues.state.result.envelope.value.map(issue => (
-              <Card key={issue.id}>
-                <StatusRow
-                  title={t(safeReasonMessageKey(issue.code))}
-                  detail={t('live.common.blocks', {
-                    value: issue.blocks
-                      .map(block => t(gateKeys[block]))
-                      .join(', '),
+            (Object.keys(categoryKeys) as AttentionCategory[]).map(category => {
+              const grouped = visibleIssues.filter(
+                issue => categoryFor(issue) === category,
+              );
+              if (grouped.length === 0) return null;
+              return (
+                <React.Fragment key={category}>
+                  <SectionHeading title={t(categoryKeys[category])} />
+                  {grouped.map(issue => {
+                    const repairRoute = repairRouteFor(issue);
+                    return (
+                      <Card key={issue.id}>
+                        <StatusRow
+                          title={t(safeReasonMessageKey(issue.code))}
+                          detail={t('live.common.blocks', {
+                            value: issue.blocks
+                              .map(block => t(gateKeys[block]))
+                              .join(', '),
+                          })}
+                          tone={
+                            issue.severity === 'blocking'
+                              ? 'critical'
+                              : 'warning'
+                          }
+                        />
+                        <AppText color="muted" variant="caption">
+                          {t('live.common.code', { value: issue.code })}
+                        </AppText>
+                        {issue.action ? (
+                          <Button
+                            label={
+                              pendingIssue === issue.id
+                                ? t('live.settings.opening')
+                                : t('live.attention.openAction')
+                            }
+                            disabled={pendingIssue !== undefined}
+                            onPress={() => performIssueAction(issue)}
+                            variant="secondary"
+                            testID={`live-attention-action-${issue.id}`}
+                          />
+                        ) : repairRoute ? (
+                          <Button
+                            label={t(routeKeys[repairRoute])}
+                            disabled={pendingIssue !== undefined}
+                            onPress={appRepairActions[repairRoute]}
+                            variant="secondary"
+                            testID={`live-attention-route-${issue.id}`}
+                          />
+                        ) : (
+                          <AppText color="muted">
+                            {t('live.attention.noAction')}
+                          </AppText>
+                        )}
+                      </Card>
+                    );
                   })}
-                  tone={issue.severity === 'blocking' ? 'critical' : 'warning'}
-                />
-                <AppText color="muted" variant="caption">
-                  {t('live.common.code', { value: issue.code })}
-                </AppText>
-                {issue.action ? (
-                  <Button
-                    label={
-                      pendingIssue === issue.id
-                        ? t('live.settings.opening')
-                        : t('live.attention.openAction')
-                    }
-                    disabled={pendingIssue !== undefined}
-                    onPress={() => performIssueAction(issue)}
-                    variant="secondary"
-                    testID={`live-attention-action-${issue.id}`}
-                  />
-                ) : (
-                  <AppText color="muted">
-                    {t('live.attention.noAction')}
-                  </AppText>
-                )}
-              </Card>
-            ))
+                </React.Fragment>
+              );
+            })
           )}
           <Button
             label={

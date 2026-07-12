@@ -47,32 +47,48 @@ test('iOS contact-derived reset uses the replay-protected native callable contra
   }
 });
 
-test('iOS never clears contacts or revokes Google before reset completion', () => {
+test('iOS disconnect is local-only while all-scope revoke waits for reset completion', () => {
+  const localStart = workflow.indexOf(
+    'private func performLocalContactsDisconnect(',
+  );
   const resetStart = workflow.indexOf(
     'private func performContactDerivedReset(',
   );
-  const cleanupStart = workflow.indexOf(
-    'private func finishContactDerivedLocalCleanup(',
+  const providerStart = workflow.indexOf(
+    'private func disconnectGoogleProviderAfterRemoteReset(',
   );
-  const resetBody = workflow.slice(resetStart, cleanupStart);
-  const cleanupBody = workflow.slice(
-    cleanupStart,
-    workflow.indexOf('private func clearContactDerivedWorkflow(', cleanupStart),
+  const finishStart = workflow.indexOf(
+    'private func finishProviderRevocationCleanup(',
   );
+  const localBody = workflow.slice(localStart, resetStart);
+  const resetBody = workflow.slice(resetStart, providerStart);
+  const providerBody = workflow.slice(providerStart, finishStart);
 
-  assert.ok(resetStart >= 0 && cleanupStart > resetStart);
+  assert.ok(localStart >= 0 && resetStart > localStart);
+  assert.ok(providerStart > resetStart && finishStart > providerStart);
+  assert.ok(
+    localBody.indexOf('cancelPlansAndNotifications') <
+      localBody.indexOf('clearContactsRetainingBinding'),
+  );
+  assert.ok(
+    localBody.indexOf('clearContactsRetainingBinding') <
+      localBody.indexOf('clearContactDerivedState'),
+  );
+  assert.ok(
+    localBody.indexOf('clearContactDerivedState') <
+      localBody.indexOf('performContactDerivedReset'),
+  );
   assert.ok(
     resetBody.indexOf('.ensureRecentExactGoogleAuthentication') <
       resetBody.indexOf('contactResetClient.startOrReplay'),
   );
   assert.ok(
     resetBody.indexOf('contactResetClient.startOrReplay') <
-      resetBody.indexOf('finishContactDerivedLocalCleanup'),
+      resetBody.indexOf('disconnectGoogleProviderAfterRemoteReset'),
   );
   assert.doesNotMatch(resetBody, /clearContactsRetainingBinding/u);
-  assert.doesNotMatch(resetBody, /revokeGoogleAccessAfterSafetyShutdown/u);
-  assert.match(cleanupBody, /clearContactsRetainingBinding/u);
-  assert.match(cleanupBody, /revokeGoogleAccessAfterSafetyShutdown/u);
+  assert.match(providerBody, /disconnectGoogleProviderAfterLocalCleanup/u);
+  assert.match(providerBody, /markProviderRevoked/u);
 
   const disconnectCase = workflow.slice(
     workflow.indexOf(
@@ -94,8 +110,14 @@ test('iOS never clears contacts or revokes Google before reset completion', () =
       workflow.indexOf('private func performPrivacyAction('),
     ),
   );
-  assert.match(disconnectCase, /performContactDerivedReset/u);
+  assert.match(disconnectCase, /performLocalContactsDisconnect/u);
+  assert.doesNotMatch(disconnectCase, /performContactDerivedReset/u);
+  assert.match(
+    revokeCase,
+    /"local-cleared", "verifying", "remote-draining", "provider-revoked"/u,
+  );
   assert.match(revokeCase, /performContactDerivedReset/u);
+  assert.match(revokeCase, /performLocalContactsDisconnect/u);
   assert.doesNotMatch(revokeCase, /wipeCompanionData/u);
 });
 
@@ -107,9 +129,48 @@ test('iOS projects and resumes durable privacy work without exposing Android tra
   assert.match(workflow, /performPrivacyAction\([\s\S]*operation: operation/u);
   assert.match(
     workflow,
-    /"preissuedPermitMayFinish": \[[\s\S]*"delete-account", "disconnect-contacts", "revoke-google-access"/u,
+    /"preissuedPermitMayFinish": \[[\s\S]*"delete-account", "revoke-google-access"/u,
   );
+  assert.doesNotMatch(
+    workflow,
+    /"preissuedPermitMayFinish": \[[\s\S]{0,160}"disconnect-contacts"/u,
+  );
+  assert.match(
+    workflow,
+    /"remoteConnectionRequired": \[[\s\S]*"delete-account", "revoke-google-access"/u,
+  );
+  const localDisconnect = workflow.slice(
+    workflow.indexOf('private func performLocalContactsDisconnect('),
+    workflow.indexOf('private func performContactDerivedReset('),
+  );
+  assert.match(localDisconnect, /cancelPlansAndNotifications/u);
+  assert.match(localDisconnect, /clearContactsRetainingBinding/u);
+  assert.match(localDisconnect, /clearContactDerivedState/u);
+  assert.doesNotMatch(
+    localDisconnect,
+    /ensureRecentExactGoogleAuthentication/u,
+  );
+  assert.doesNotMatch(localDisconnect, /contactResetClient/u);
   assert.doesNotMatch(bridge, /prepare-sender-transfer/u);
+});
+
+test('durable privacy operation projections reuse their persisted transition timestamp', () => {
+  const projection = workflow.slice(
+    workflow.indexOf('private static func privacyOperationPayload('),
+    workflow.indexOf('static func accountDeletionReceiptPayload('),
+  );
+  assert.match(
+    projection,
+    /"completedAt": dateString\(operation\.updatedAt\)/u,
+  );
+  assert.equal(
+    (
+      projection.match(/"updatedAt": dateString\(operation\.updatedAt\)/gu) ??
+      []
+    ).length,
+    4,
+  );
+  assert.doesNotMatch(projection, /dateString\(Date\(\)\)/u);
 });
 
 test('the reset client is a compiled application source', () => {

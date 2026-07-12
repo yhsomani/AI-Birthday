@@ -1,0 +1,133 @@
+{
+  "$schema": "./ios-release-evidence.schema.json",
+  "schemaVersion": 1,
+  "product": "birthday-autopilot-ios",
+  "status": "replace-before-release",
+  "sourceRevision": "<clean-40-character-lowercase-git-commit>",
+  "artifact": {
+    "archiveTreeSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "ipaSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "exportOptionsSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "bundleIdentifier": "com.yashsomani.birthdayautopilot",
+    "marketingVersion": "<version>",
+    "buildNumber": "<build-number>",
+    "minimumOSVersion": "15.1",
+    "platform": "iphoneos",
+    "appBinarySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "embeddedFrameworksManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "firebase": {
+    "environment": "prod",
+    "projectId": "<production-project-id>",
+    "projectNumber": "<production-project-number>",
+    "googleAppId": "<production-google-app-id>",
+    "oauthClientId": "<production-ios-oauth-client-id>",
+    "reversedClientId": "<production-reversed-client-id>",
+    "configSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "apiKeySha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "signing": {
+    "distributionMethod": "app-store-connect",
+    "teamIdentifier": "<apple-team-id>",
+    "archiveCertificateExpiration": "<rfc3339-utc-instant>",
+    "archiveCertificateSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "exportedCertificateExpiration": "<rfc3339-utc-instant>",
+    "exportedCertificateSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "archiveProvisioningProfileUuid": "<ARCHIVE-PROFILE-UUID>",
+    "archiveProvisioningProfileName": "<archive-profile-name>",
+    "archiveProvisioningProfileExpiration": "<rfc3339-utc-instant>",
+    "exportedProvisioningProfileUuid": "<EXPORTED-PROFILE-UUID>",
+    "exportedProvisioningProfileName": "<exported-profile-name>",
+    "exportedProvisioningProfileExpiration": "<rfc3339-utc-instant>",
+    "applicationIdentifier": "<team-id>.com.yashsomani.birthdayautopilot"
+  },
+  "security": {
+    "entitlementsSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "infoPlistSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "privacyManifestSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "arm64Only": false,
+    "debugEntitlementAbsent": false,
+    "appAttestProduction": false,
+    "backupExclusionVerified": false,
+    "protectedStoreVerified": false,
+    "debugProviderAbsent": false,
+    "noForbiddenCapabilities": false,
+    "noForbiddenUrlSchemes": false,
+    "privacyManifestReviewed": false
+  },
+  "references": {
+    "artifactProvenance": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "mobileSbom": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "nativeSbom": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "dependencyAudit": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "firebaseReview": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "protectedStorageBackup": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "physicalDeviceMatrix": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "performance": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "accessibility": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "privacyReview": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "appStoreSubmission": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "loginServicesReview": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "accountDeletion": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "incidentRollback": {
+      "path": "<path>",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "approvals": {
+    "approvedAt": "<rfc3339-utc-instant>",
+    "validUntil": "<rfc3339-utc-instant-no-more-than-90-days-later>",
+    "nativeSupplyChainReviewed": false,
+    "firebaseAndAppCheckVerified": false,
+    "protectedStorageAndBackupVerified": false,
+    "physicalDeviceMatrixPassed": false,
+    "performanceBudgetsPassed": false,
+    "accessibilityPassed": false,
+    "privacyMaterialsApproved": false,
+    "appStoreSubmissionMaterialsApproved": false,
+    "loginServicesRationaleApproved": false,
+    "accountDeletionVerified": false,
+    "rollbackAndIncidentReady": false,
+    "companionOnlyClaimsApproved": false,
+    "noBackgroundSmsVerified": false
+  }
+}

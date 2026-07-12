@@ -1,6 +1,7 @@
 package com.yashsomani.birthdayautopilot.attention
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -204,6 +205,13 @@ internal object AttentionClassificationPolicy {
     "BIRTHDAY_PARTIAL_DELIVERY" to AttentionClassification(AttentionCategory.FAILURE, 2),
     "BIRTHDAY_OUTCOME_UNKNOWN" to AttentionClassification(AttentionCategory.UNKNOWN, 2),
     "RECONCILE_ATTEMPTS_EXHAUSTED" to AttentionClassification(AttentionCategory.FAILURE, 2),
+    "CONTACTS_AUTHORIZATION_REQUIRED" to AttentionClassification(AttentionCategory.ACCOUNT, 2),
+    "CONTACTS_PERMISSION_DENIED" to AttentionClassification(AttentionCategory.ACCOUNT, 2),
+    "CONTACTS_PROVIDER_MALFORMED" to AttentionClassification(AttentionCategory.FAILURE, 2),
+    "CONTACTS_BOUND_EXCEEDED" to AttentionClassification(AttentionCategory.FAILURE, 2),
+    "CONTACTS_STORAGE_FAILURE" to AttentionClassification(AttentionCategory.FAILURE, 2),
+    "CONTACTS_BACKGROUND_ATTEMPTS_EXHAUSTED" to AttentionClassification(AttentionCategory.FAILURE, 2),
+    "DATA_RETENTION_ATTEMPTS_EXHAUSTED" to AttentionClassification(AttentionCategory.FAILURE, 2),
     "SMS_EVIDENCE_ATTEMPTS_EXHAUSTED" to AttentionClassification(AttentionCategory.FAILURE, 2),
     "SMS_REPORT_ATTEMPTS_EXHAUSTED" to AttentionClassification(AttentionCategory.FAILURE, 2),
     "CALLBACK_CANCELLATION_FAILED" to AttentionClassification(AttentionCategory.FAILURE, 2),
@@ -242,7 +250,11 @@ internal class AndroidAttentionNotifier(context: Context) {
         .toLocalDate()
         .toString()
       if (
-        !notificationsAllowed() ||
+        (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+          appContext,
+          Manifest.permission.POST_NOTIFICATIONS,
+        ) != PackageManager.PERMISSION_GRANTED) ||
+        settingsRequired(appContext) ||
         !dedupe.isEligible(classified.category, localDate, classified.severity)
       ) return@synchronized
       val tapIdentity = routes.issueTapIdentity() ?: return@synchronized
@@ -260,15 +272,18 @@ internal class AndroidAttentionNotifier(context: Context) {
         )
         val notification = Notification.Builder(appContext, CHANNEL_ID)
           .setSmallIcon(R.drawable.ic_launcher_monochrome)
-          .setContentTitle("Birthday Autopilot needs attention")
-          .setContentText("Open the app to review a safety or setup item.")
+          .setContentTitle(appContext.getString(R.string.attention_notification_title))
+          .setContentText(appContext.getString(R.string.attention_notification_body))
           .setCategory(Notification.CATEGORY_STATUS)
           .setVisibility(Notification.VISIBILITY_PRIVATE)
           .setOnlyAlertOnce(true)
           .setAutoCancel(true)
           .setContentIntent(pendingIntent)
           .build()
-        manager.notify(classified.category.notificationId, notification)
+        postAfterRuntimePermissionCheck(
+          classified.category.notificationId,
+          notification,
+        )
         true
       }.getOrDefault(false)
       if (posted) dedupe.reserve(classified.category, localDate, classified.severity)
@@ -282,23 +297,25 @@ internal class AndroidAttentionNotifier(context: Context) {
     return routes.acceptTapIdentity(identity)
   }
 
-  private fun notificationsAllowed(): Boolean =
-    (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
-      appContext,
-      Manifest.permission.POST_NOTIFICATIONS,
-    ) == PackageManager.PERMISSION_GRANTED) && !settingsRequired(appContext)
-
   private fun createChannel() {
     val channel = NotificationChannel(
       CHANNEL_ID,
-      "Attention needed",
+      appContext.getString(R.string.attention_channel_name),
       NotificationManager.IMPORTANCE_DEFAULT,
     ).apply {
-      description = "Content-free safety and setup reminders"
+      description = appContext.getString(R.string.attention_channel_description)
       lockscreenVisibility = Notification.VISIBILITY_PRIVATE
       setShowBadge(false)
     }
     manager.createNotificationChannel(channel)
+  }
+
+  // onSafeCode returns before reaching this boundary unless the Android 13+
+  // runtime permission is granted. Keep the lint suppression at the one
+  // framework call instead of hiding checks across the notifier.
+  @SuppressLint("NotificationPermission")
+  private fun postAfterRuntimePermissionCheck(id: Int, notification: Notification) {
+    manager.notify(id, notification)
   }
 
   companion object {

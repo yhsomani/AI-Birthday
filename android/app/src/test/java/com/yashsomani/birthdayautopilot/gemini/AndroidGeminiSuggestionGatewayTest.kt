@@ -107,6 +107,7 @@ class AndroidGeminiSuggestionGatewayTest {
     val gateway = AndroidGeminiSuggestionGateway(
       client = client,
       rateGuard = GeminiUxRateGuard(store, cooldownMillis = 0),
+      operationalGate = EnabledOperationalGate,
       wallClockMillis = { 0 },
       elapsedClockMillis = { 0 },
     )
@@ -137,6 +138,7 @@ class AndroidGeminiSuggestionGatewayTest {
     val gateway = AndroidGeminiSuggestionGateway(
       client = client,
       rateGuard = GeminiUxRateGuard(MemoryRateStore(), cooldownMillis = 0),
+      operationalGate = EnabledOperationalGate,
       provenanceRegistry = GeminiCandidateProvenanceRegistry(elapsedClockMillis = { 0 }),
       wallClockMillis = { 0 },
       elapsedClockMillis = { 0 },
@@ -162,6 +164,7 @@ class AndroidGeminiSuggestionGatewayTest {
     val gateway = AndroidGeminiSuggestionGateway(
       client = client,
       rateGuard = GeminiUxRateGuard(MemoryRateStore(), cooldownMillis = 0),
+      operationalGate = EnabledOperationalGate,
       provenanceRegistry = registry,
       wallClockMillis = { 0 },
       elapsedClockMillis = { elapsed },
@@ -192,6 +195,25 @@ class AndroidGeminiSuggestionGatewayTest {
     assertEquals(null, gateway.peekProvenance(draft))
   }
 
+  @Test
+  fun `operational switch blocks before account App Check and provider work`() = runTest {
+    val client = FakeClient()
+    val gate = FakeOperationalGate(enabled = false)
+    val gateway = AndroidGeminiSuggestionGateway(
+      client = client,
+      rateGuard = GeminiUxRateGuard(MemoryRateStore(), cooldownMillis = 0),
+      operationalGate = gate,
+      wallClockMillis = { 0 },
+      elapsedClockMillis = { 0 },
+    )
+
+    assertEquals("policy-suspended", gateway.generate(personalizedRequest()).getString("reason"))
+    assertEquals(1, gate.refreshes)
+    assertEquals(0, client.sessionReads)
+    assertEquals(0, client.appCheckCalls)
+    assertEquals(0, client.providerCalls)
+  }
+
   private fun personalizedRequest() = JSONObject()
     .put("language", "en")
     .put("tone", "warm")
@@ -214,12 +236,43 @@ class AndroidGeminiSuggestionGatewayTest {
     var response: String? = validResponse
     var sessionKey: String? = "test-account-key"
     var generateBlock: (suspend () -> String?)? = null
+    var sessionReads = 0
+    var appCheckCalls = 0
+    var providerCalls = 0
 
-    override fun accountSessionKey() = sessionKey?.takeIf { authenticated }
+    override fun accountSessionKey(): String? {
+      sessionReads++
+      return sessionKey?.takeIf { authenticated }
+    }
     override fun isOnline() = online
-    override suspend fun appCheckReady() = appCheck
-    override suspend fun generate(systemInstruction: String, prompt: String): String? =
-      generateBlock?.invoke() ?: response
+    override suspend fun appCheckReady(): Boolean {
+      appCheckCalls++
+      return appCheck
+    }
+    override suspend fun generate(systemInstruction: String, prompt: String): String? {
+      providerCalls++
+      return generateBlock?.invoke() ?: response
+    }
+  }
+
+  private class FakeOperationalGate(private val enabled: Boolean) : GeminiOperationalGate {
+    var refreshes = 0
+
+    override fun configureAfterFirebaseLaunch() = Unit
+
+    override fun refreshInBackground() {
+      refreshes++
+    }
+
+    override fun foregroundSuggestionsEnabled(): Boolean = enabled
+  }
+
+  private object EnabledOperationalGate : GeminiOperationalGate {
+    override fun configureAfterFirebaseLaunch() = Unit
+
+    override fun refreshInBackground() = Unit
+
+    override fun foregroundSuggestionsEnabled(): Boolean = true
   }
 
   private companion object {

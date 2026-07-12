@@ -8,6 +8,12 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
+project 'BirthdayAutopilot',
+  'Debug' => :debug,
+  'E2E' => :debug,
+  'Smoke' => :debug,
+  'Release' => :release
+
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
@@ -26,15 +32,29 @@ target 'BirthdayAutopilot' do
   pod 'FirebaseAppCheck', '12.15.0', :modular_headers => true
   pod 'FirebaseAILogic', '12.15.0'
   pod 'FirebaseFunctions', '12.15.0'
+  pod 'FirebaseRemoteConfig', '12.15.0'
   # Firebase's Swift pods are linked statically by the React Native target.
   # Generate modules only for the Objective-C interoperability leaves that
   # Swift imports; avoid globally changing every React Native pod header mode.
   pod 'FirebaseAppCheckInterop', '12.15.0', :modular_headers => true
+  pod 'FirebaseABTesting', '12.15.0', :modular_headers => true
   pod 'FirebaseAuthInterop', '12.15.0', :modular_headers => true
   pod 'FirebaseMessagingInterop', '12.15.0', :modular_headers => true
   pod 'GoogleUtilities', '8.1.2', :modular_headers => true
   pod 'RecaptchaInterop', '101.0.0', :modular_headers => true
   pod 'GoogleSignIn', '9.1.0'
+  # BA-04 must use the maintained Google-libphonenumber metadata port for
+  # canonical E.164/type validation and its dedicated short-number metadata
+  # for emergency/short-code/cost rejection. Keep the two Swift facades on the
+  # same exact release; parsing success alone is never SMS capability proof.
+  # The facade podspecs use pessimistic transitive constraints, so pin the
+  # Objective-C metadata owners too; otherwise a later 1.7.x dataset can enter
+  # a nominally 1.7.3 build. Modular headers are limited to these dependencies
+  # because React Native links this target as static libraries.
+  pod 'libPhoneNumber-iOS', '1.7.3', :modular_headers => true
+  pod 'libPhoneNumberShortNumber', '1.7.3', :modular_headers => true
+  pod 'libPhoneNumber-iOS-SwiftCore', '1.7.3'
+  pod 'libPhoneNumber-iOS-SwiftShortNumber', '1.7.3'
 
   use_react_native!(
     :path => config[:reactNativePath],

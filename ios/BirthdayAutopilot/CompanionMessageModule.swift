@@ -14,6 +14,17 @@ private struct CompanionOpenRequest {
   let actionNonce: String
 }
 
+private struct CompanionReviewMaterial: Equatable {
+  let accountGeneration: String
+  let occurrenceId: String
+  let occurrenceCivilDate: String
+  let recipient: String
+  let body: String
+  let state: CompanionProposalState
+  let contactMaterialRevision: UInt64
+  let selectedPhoneId: String
+}
+
 private struct CompanionForegroundPresenter {
   let controller: UIViewController
   let sceneIdentifier: String
@@ -56,6 +67,9 @@ final class CompanionMessageModule: NSObject, MFMessageComposeViewControllerDele
   )
 
   private let store = CompanionProtectedStore.shared
+  private let peopleStore = CompanionPeopleStore.shared
+  private let peopleSync = IOSPeopleSyncCoordinator.shared
+  private let workflow = IOSCompanionWorkflowEngine.shared
   private let statusClient = IOSCompanionStatusClient.shared
   private let sessionGeneration = UUID().uuidString.lowercased()
   private var isPreparing = false
@@ -93,7 +107,10 @@ final class CompanionMessageModule: NSObject, MFMessageComposeViewControllerDele
     resolve(
       UIApplication.shared.applicationState == .active
         && MFMessageComposeViewController.canSendText() && Self.foregroundPresenter() != nil
-        && !Self.accountDeletionShutdown && !isPreparing && presentedController == nil
+        && !Self.accountDeletionShutdown
+        && !IOSPeopleBackgroundRefreshCoordinator.shared
+          .contactsAccessIsSuspendedForPrivacy
+        && !isPreparing && presentedController == nil
     )
   }
 
@@ -106,7 +123,10 @@ final class CompanionMessageModule: NSObject, MFMessageComposeViewControllerDele
     rejecter reject: @escaping RCTPromiseRejectBlock
   ) {
     dispatchPrecondition(condition: .onQueue(.main))
-    guard !Self.accountDeletionShutdown, !isPreparing,
+    guard !Self.accountDeletionShutdown,
+      !IOSPeopleBackgroundRefreshCoordinator.shared
+        .contactsAccessIsSuspendedForPrivacy,
+      !isPreparing,
       presentedController == nil, pendingResolve == nil,
       let presenter = Self.foregroundPresenter()
     else {
@@ -130,6 +150,142 @@ final class CompanionMessageModule: NSObject, MFMessageComposeViewControllerDele
       return
     }
     isPreparing = true
+    store.readProjectionStatus { [weak self] result in
+      guard let self else {
+        reject("COMPOSER_MODULE_UNAVAILABLE", "COMPOSER_MODULE_UNAVAILABLE", nil)
+        return
+      }
+      guard case .success(let status) = result,
+        status.workflow?.privacyOperations.contains(where: {
+          !["complete", "failed"].contains($0.phase)
+        }) != true,
+        let originalMaterial = self.reviewMaterial(
+          proposalId: request.proposalId,
+          expectedRevision: request.expectedRevision,
+          status: status,
+          binding: binding
+        )
+      else {
+        self.isPreparing = false
+        self.rejectSafe(reject, code: "COMPOSER_PROPOSAL_STALE")
+        return
+      }
+      self.refreshPeopleBeforeReview(
+        request: request,
+        originalMaterial: originalMaterial,
+        binding: binding,
+        presenter: presenter,
+        resolve: resolve,
+        reject: reject
+      )
+    }
+  }
+
+  private func refreshPeopleBeforeReview(
+    request: CompanionReviewRequest,
+    originalMaterial: CompanionReviewMaterial,
+    binding: IOSNativeGoogleAccountBinding,
+    presenter: CompanionForegroundPresenter,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard !IOSPeopleBackgroundRefreshCoordinator.shared
+      .contactsAccessIsSuspendedForPrivacy
+    else {
+      isPreparing = false
+      rejectSafe(reject, code: "COMPOSER_CONTACTS_FRESHNESS_UNAVAILABLE")
+      return
+    }
+    peopleSync.sync(interactiveAuthorization: false) { [weak self] outcome in
+      guard let self else {
+        reject("COMPOSER_MODULE_UNAVAILABLE", "COMPOSER_MODULE_UNAVAILABLE", nil)
+        return
+      }
+      guard case .completed = outcome else {
+        self.isPreparing = false
+        let code: String
+        if case .failed(let failure) = outcome,
+          [.authorizationRequired, .forbidden, .repeatedUnauthorized].contains(failure)
+        {
+          code = "COMPOSER_CONTACTS_RECONNECT_REQUIRED"
+        } else {
+          code = "COMPOSER_CONTACTS_FRESHNESS_UNAVAILABLE"
+        }
+        self.rejectSafe(reject, code: code)
+        return
+      }
+      guard !Self.accountDeletionShutdown,
+        IOSGoogleIdentityCoordinator.shared.exactSessionBinding() == binding,
+        let currentPresenter = Self.foregroundPresenter(),
+        currentPresenter.sceneIdentifier == presenter.sceneIdentifier
+      else {
+        self.isPreparing = false
+        self.rejectSafe(reject, code: "COMPOSER_FOREGROUND_REQUIRED")
+        return
+      }
+      self.workflow.reconcileAfterPeopleSync(binding: binding) { [weak self] in
+        self?.validateRefreshedReview(
+          request: request,
+          originalMaterial: originalMaterial,
+          binding: binding,
+          presenter: presenter,
+          resolve: resolve,
+          reject: reject
+        )
+      }
+    }
+  }
+
+  private func validateRefreshedReview(
+    request: CompanionReviewRequest,
+    originalMaterial: CompanionReviewMaterial,
+    binding: IOSNativeGoogleAccountBinding,
+    presenter: CompanionForegroundPresenter,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    store.readProjectionStatus { [weak self] result in
+      guard let self else {
+        reject("COMPOSER_MODULE_UNAVAILABLE", "COMPOSER_MODULE_UNAVAILABLE", nil)
+        return
+      }
+      guard case .success(let status) = result,
+        let refreshedMaterial = self.reviewMaterial(
+          proposalId: request.proposalId,
+          expectedRevision: nil,
+          status: status,
+          binding: binding
+        ), refreshedMaterial == originalMaterial,
+        !Self.accountDeletionShutdown,
+        IOSGoogleIdentityCoordinator.shared.exactSessionBinding() == binding,
+        let currentPresenter = Self.foregroundPresenter(),
+        currentPresenter.sceneIdentifier == presenter.sceneIdentifier
+      else {
+        self.isPreparing = false
+        self.rejectSafe(reject, code: "COMPOSER_PROPOSAL_STALE")
+        return
+      }
+      let refreshedRequest = CompanionReviewRequest(
+        proposalId: request.proposalId,
+        expectedRevision: status.revision
+      )
+      self.refreshCoexistenceAndPrepare(
+        request: refreshedRequest,
+        binding: binding,
+        presenter: presenter,
+        resolve: resolve,
+        reject: reject
+      )
+    }
+  }
+
+  private func refreshCoexistenceAndPrepare(
+    request: CompanionReviewRequest,
+    binding: IOSNativeGoogleAccountBinding,
+    presenter: CompanionForegroundPresenter,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
     statusClient.refreshControlImmediatelyBeforeReview(binding: binding) {
       [weak self] status in
       guard let self else {
@@ -169,6 +325,48 @@ final class CompanionMessageModule: NSObject, MFMessageComposeViewControllerDele
         reject: reject
       )
     }
+  }
+
+  private func reviewMaterial(
+    proposalId: String,
+    expectedRevision: String?,
+    status: CompanionProjectionStatus,
+    binding: IOSNativeGoogleAccountBinding
+  ) -> CompanionReviewMaterial? {
+    guard expectedRevision == nil || status.revision == expectedRevision,
+      let workflow = status.workflow, workflow.account.matches(binding),
+      let proposal = status.proposals.first(where: { $0.proposalId == proposalId }),
+      proposal.accountGeneration == binding.accountGeneration,
+      let occurrence = workflow.occurrences.first(where: { $0.proposalId == proposalId }),
+      occurrence.occurrenceId == proposal.occurrenceId,
+      occurrence.civilDate == proposal.occurrenceCivilDate,
+      let configuration = workflow.contacts.first(where: {
+        $0.contactId == occurrence.contactId
+      }), configuration.enrollment == .enabled,
+      configuration.approvalHash != nil,
+      let contact = peopleStore.privateContact(localId: occurrence.contactId),
+      !contact.deleted,
+      contact.materialRevision == configuration.materialRevision,
+      let phoneId = configuration.selectedPhoneId,
+      contact.phones.first(where: { $0.localId == phoneId })?.e164 == proposal.recipient,
+      let draft = workflow.messageDraft,
+      IOSBirthdayMessageContentPolicy.renderedBody(
+        templateText: draft.text,
+        placeholderMode: draft.placeholderMode,
+        givenName: contact.givenName,
+        declaredLanguage: draft.language
+      ) == proposal.body
+    else { return nil }
+    return CompanionReviewMaterial(
+      accountGeneration: proposal.accountGeneration,
+      occurrenceId: proposal.occurrenceId,
+      occurrenceCivilDate: proposal.occurrenceCivilDate,
+      recipient: proposal.recipient,
+      body: proposal.body,
+      state: proposal.state,
+      contactMaterialRevision: contact.materialRevision,
+      selectedPhoneId: phoneId
+    )
   }
 
   private func prepareStoredReview(
@@ -536,7 +734,7 @@ final class CompanionMessageModule: NSObject, MFMessageComposeViewControllerDele
         return codePoint == 0x09 || codePoint == 0x0A || codePoint == 0x0D
       }
       return codePoint != 0x7F
-    }
+    } && IOSBirthdayMessageContentPolicy.isSafeRenderedBody(value)
   }
 
   private static func presentationPreconditionsHold() -> Bool {

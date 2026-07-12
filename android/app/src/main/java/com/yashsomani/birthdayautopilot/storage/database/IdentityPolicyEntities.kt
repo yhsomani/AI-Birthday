@@ -21,6 +21,7 @@ data class AccountRecordEntity(
   val googleSubjectHash: String,
   val firebaseUid: String,
   val displayEmail: String?,
+  /** Attachment-time metadata retained for schema compatibility; never a live locale source. */
   val localeTag: String,
   val state: AccountRecordState,
   val revision: Long,

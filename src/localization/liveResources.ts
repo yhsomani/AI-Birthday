@@ -10,6 +10,7 @@ export const liveEnglish = {
   'live.common.refresh': 'Refresh',
   'live.common.refreshing': 'Refreshing…',
   'live.common.checking': 'Checking…',
+  'live.common.saving': 'Saving…',
   'live.common.checkingState': 'Checking',
   'live.common.allowed': 'Allowed',
   'live.common.loading': 'Loading…',
@@ -31,7 +32,11 @@ export const liveEnglish = {
   'live.common.reference': 'Support reference: {{reference}}',
   'live.common.blocks': 'Blocks: {{value}}',
   'live.common.countPeople': '{{count}} people',
+  'live.common.countPeople_one': '{{count}} person',
+  'live.common.countPeople_other': '{{count}} people',
   'live.common.countChecks': '{{count}} blocking checks',
+  'live.common.countChecks_one': '{{count}} blocking check',
+  'live.common.countChecks_other': '{{count}} blocking checks',
   'live.common.projectionTime': 'Checked {{time}}',
   'live.nav.activity': 'Activity',
   'live.nav.attention': 'Needs attention',
@@ -127,6 +132,10 @@ export const liveEnglish = {
     'iPhone requires you to review the editable Messages screen and tap Send yourself.',
   'live.reason.platformUnsupported':
     'This feature is not supported on this phone or platform.',
+  'live.reason.systemComposerUnavailable':
+    'No foreground Android messaging app can open this reviewed draft. Nothing was sent.',
+  'live.reason.systemComposerOutcomeUnknown':
+    'The app could not prove whether Android opened the composer. Today’s unattended occurrence stays retired to prevent a duplicate. Check your messaging app manually; no delivery is claimed.',
   'live.reason.policySuspended':
     'This feature is paused by the current safety policy. Review readiness before continuing.',
   'live.reason.resetSafetyBlocked':
@@ -147,15 +156,25 @@ export const liveEnglish = {
     'The saved information changed. Refresh and review the latest version.',
   'live.reason.templateBidiControl':
     'Remove hidden text-direction characters from the message.',
+  'live.reason.templateBirthdayIntentRequired':
+    'Write a clear, positive birthday greeting before previewing the message.',
   'live.reason.templateControlCharacter':
     'Remove unsupported control characters from the message.',
   'live.reason.templateEmpty': 'Write a birthday message before previewing it.',
   'live.reason.templatePlaceholderCount':
     'Use {firstName} exactly once for a named message, or not at all for a generic message.',
+  'live.reason.templatePromotionalContent':
+    'Keep the birthday message personal. Remove sales, discounts, coupons and promotional offers.',
+  'live.reason.templateSensitiveContent':
+    'Remove age, health, identity, relationship or memory claims that the app cannot safely verify.',
+  'live.reason.templateTrackingNotAllowed':
+    'Remove hashtags and tracking or referral codes from the birthday message.',
   'live.reason.templateUnsupportedPlaceholder':
     'Use only the supported {firstName} placeholder.',
   'live.reason.templateUrlNotAllowed':
     'Remove links from the birthday message.',
+  'live.reason.templateLanguageMismatch':
+    'Write the message in the selected language, then preview it again.',
   'live.reason.testBudgetExhausted':
     'The protected test limit was reached. Wait for the rolling safety window before testing again.',
   'live.reason.testReceiptInvalid':
@@ -200,7 +219,21 @@ export const liveEnglish = {
     'Automatic SMS stays off until every safety check, approval, test and permission passes.',
   'live.setup.iosBody':
     'iPhone can remind you, but you review the Messages screen and tap Send yourself.',
-  'live.setup.checksLabel': 'Live setup checks',
+  'live.setup.costTitle': 'Permissions and possible carrier charges',
+  'live.setup.androidConsent':
+    'An SMS may use your plan or incur carrier charges. Messaging and SIM permissions are explained and requested only when you start the required test; automation stays off until then.',
+  'live.setup.iosConsent':
+    'Reminders do not send messages. SMS or MMS sent from Messages can incur carrier charges. iOS and Messages control the available sender line and final transport; this app cannot select or guarantee either.',
+  'live.setup.contactsPrivacyTitle': 'Your Contacts privacy boundary',
+  'live.setup.contactsPrivacyAndroid':
+    'Birthday Autopilot keeps imported raw names, phone numbers, birthdays and source fields in protected, encrypted storage on this phone. Only after you enable an Android recipient do fixed-length pseudonymous duplicate-safety bases and bounded occurrence/send timing cross to Firebase. Those values are not raw Contacts and are not anonymous. Firebase account, installation, attestation and service metadata can also cross the device boundary; review Privacy for the full inventory.',
+  'live.setup.contactsPrivacyIos':
+    'Birthday Autopilot keeps imported raw names, phone numbers, birthdays and source fields in protected, encrypted storage on this iPhone. iOS does not register recipients with Android duplicate-safety coordination and cannot send automatically. Firebase account, installation, App Check, Remote Config and service metadata can still cross the device boundary; review Privacy for the full inventory.',
+  'live.setup.senderGateTitle': "Choose this phone's role",
+  'live.setup.senderGateBody':
+    'Another Android phone is active. This phone will not read Contacts or change birthday settings unless you explicitly transfer the sender role. You can safely leave it on Standby.',
+  'live.setup.senderGatePendingBody':
+    'Sender transfer is still being verified. Contacts and birthday settings remain locked on this phone until the transfer completes safely.',
   'live.setup.eligibility': 'Phone compatibility',
   'live.setup.compatibility.checking': 'Checking this phone',
   'live.setup.compatibility.supported': 'Supported for this edition',
@@ -213,8 +246,11 @@ export const liveEnglish = {
   'live.setup.connecting': 'Connecting',
   'live.setup.reconnect': 'Reconnect needed',
   'live.setup.notSynced': 'Not synced',
-  'live.setup.syncing': '{{mode}} sync in progress',
+  'live.setup.syncingFull': 'Full Contacts sync in progress',
+  'live.setup.syncingIncremental': 'Contacts update in progress',
   'live.setup.contactsVerified': '{{count}} contacts checked',
+  'live.setup.contactsVerified_one': '{{count}} contact checked',
+  'live.setup.contactsVerified_other': '{{count}} contacts checked',
   'live.setup.contactsAttention': 'Needs attention: {{reason}}',
   'live.setup.contactsRetained': 'Last safe copy kept: {{reason}}',
   'live.setup.contactsPermission': 'Google Contacts access is needed',
@@ -242,6 +278,73 @@ export const liveEnglish = {
     'The request finished and setup was checked again. The screen never advances a step by itself.',
   'live.setup.actionUnverified':
     'The request was accepted, but setup could not be checked again. Refresh before doing anything else.',
+  'live.guidedSetup.title': 'Finish setting up Birthday Autopilot',
+  'live.guidedSetup.body':
+    'Your Google account and Contacts import are ready. Finish the remaining choices now, or leave and return without losing saved progress.',
+  'live.guidedSetup.step': 'Step {{step}} of 4',
+  'live.guidedSetup.stepThreeBody':
+    'Choose at least one person, save a message, and review the delivery or reminder window.',
+  'live.guidedSetup.androidStepFourBody':
+    'Send the required protected test, repair any blocking checks, then explicitly turn on automation.',
+  'live.guidedSetup.iosStepFourBody':
+    'Review notification and Messages readiness, then explicitly turn on reminders.',
+  'live.guidedSetup.stepOne': '1. Google account',
+  'live.guidedSetup.stepTwo': '2. Read-only Contacts',
+  'live.guidedSetup.complete': 'Complete',
+  'live.guidedSetup.people': 'People',
+  'live.guidedSetup.ready': 'Ready',
+  'live.guidedSetup.peopleNeeded': 'Choose at least one ready person.',
+  'live.guidedSetup.message': 'Message',
+  'live.guidedSetup.messageNeeded': 'Save a reviewed message.',
+  'live.guidedSetup.window': 'Delivery or reminder window',
+  'live.guidedSetup.windowNeeded': 'Save the global window.',
+  'live.guidedSetup.approvals': 'Exact recipient approvals',
+  'live.guidedSetup.approvalNeeded':
+    'Review the exact message, number, birthday and delivery behavior.',
+  'live.guidedSetup.checking': 'Checking saved setup…',
+  'live.guidedSetup.progressUnavailable': 'Saved setup could not be checked',
+  'live.guidedSetup.choosePeople': 'Choose people',
+  'live.guidedSetup.writeMessage': 'Write a message',
+  'live.guidedSetup.chooseWindow': 'Choose the time window',
+  'live.guidedSetup.reviewApprovals': 'Review exact messages',
+  'live.guidedSetup.testAndEnable': 'Test and turn on automation',
+  'live.guidedSetup.enableReminders': 'Turn on reminders',
+  'live.guidedSetup.openFinalStep': 'Open the final step',
+  'live.guidedSetup.finishLater': 'Finish later',
+  'live.guidedSetup.savedProgress':
+    'Saved native progress remains available when you return.',
+  'live.guidedSetup.approvalTitle': 'Approve exact messages',
+  'live.guidedSetup.approvalBody':
+    'Review the frozen message and destination for every chosen person. A later material change invalidates that approval safely.',
+  'live.guidedSetup.approvalChecking': 'Checking people waiting for approval…',
+  'live.guidedSetup.approvalUnavailable': 'Approvals could not be loaded',
+  'live.guidedSetup.approvalComplete': 'Every ready chosen person is approved',
+  'live.guidedSetup.continueFinalStep': 'Continue to the final step',
+  'live.guidedSetup.approvalPending': '{{count}} chosen people need approval',
+  'live.guidedSetup.approvalPending_one':
+    '{{count}} chosen person needs approval',
+  'live.guidedSetup.approvalPending_other':
+    '{{count}} chosen people need approval',
+  'live.guidedSetup.reviewExactMessages': 'Review exact details',
+  'live.guidedSetup.exactApprovalRequired': 'Explicit approval is required',
+  'live.guidedSetup.exactApprovalBody':
+    'Confirm only after checking each exact message, masked destination, birthday and platform behavior below.',
+  'live.guidedSetup.exactApprovalBatchBody':
+    'Review this group of {{count}} exact messages. {{processed}} of {{total}} selected people were handled before this group.',
+  'live.guidedSetup.approvalIncomplete': 'Approval review is incomplete',
+  'live.guidedSetup.approvalIncompleteBody':
+    '{{completed}} of {{total}} selected people are complete. The batch stopped before everyone was handled; retry to check the remaining people.',
+  'live.guidedSetup.approvalBlocked': '{{count}} people still need repair',
+  'live.guidedSetup.approvalBlocked_one': '{{count}} person still needs repair',
+  'live.guidedSetup.approvalBlocked_other':
+    '{{count}} people still need repair',
+  'live.guidedSetup.approvalBlockedBody':
+    'This confirmation approves only the ready people shown. Repair the others in People and review them again.',
+  'live.guidedSetup.confirmExactMessages': 'Approve these exact messages',
+  'live.guidedSetup.approvalSaved':
+    'Exact approvals saved. Check for any remaining people.',
+  'live.guidedSetup.approvalSavedWithBlocked':
+    '{{approved}} exact approvals were saved. {{blocked}} people still need repair.',
   'live.home.loading': 'Loading birthday status',
   'live.home.unavailable': 'Home status is unavailable',
   'live.home.platformMismatch': 'Phone platform could not be verified',
@@ -275,35 +378,52 @@ export const liveEnglish = {
   'live.home.iosNotConfiguredBody':
     'No reminder or Messages handoff is active.',
   'live.home.upcoming': 'Upcoming',
-  'live.home.nextPlan': 'Next birthday plan',
   'live.home.birthday': 'Birthday',
   'live.home.window': 'Time window',
   'live.home.phone': 'Phone',
   'live.home.planNotOutcome':
     'This is a plan, not proof that a message was sent.',
+  'live.home.approvedMessage': 'Approved message',
+  'live.home.approvedMessageBody':
+    'This exact text is bound to the current recipient approval. Editing a material detail invalidates it.',
   'live.home.reviewToday': 'Review today’s birthday decision',
   'live.home.reviewTodayIos': 'Review today’s Messages proposal',
   'live.home.preparingToday': 'Preparing today’s review…',
   'live.home.todayReviewTitle': 'Confirm what should happen today?',
   'live.home.todayNormalPath':
     'Use the protected normal path during the current valid window',
+  'live.home.todaySystemComposer':
+    'Open Android’s messaging app with this reviewed recipient and draft',
   'live.home.todayNextYear': 'Do not act today; begin planning next year',
   'live.home.todayExplicitConfirmation':
     'The protected service revalidated this birthday',
+  'live.home.todayNormalDisclosure':
+    'The normal path still requires protected Claim, Arm, and one-shot checks. It does not promise delivery.',
+  'live.home.todayComposerDisclosure':
+    'Only the reviewed recipient and exact approved draft shown above are prefilled. Opening retires today’s unattended occurrence. You may edit, Send, or Cancel; the app cannot observe or claim submission or delivery.',
+  'live.home.todayNextYearDisclosure':
+    'Starting next year retires today’s unattended occurrence and never sends or opens a messaging app today. To leave the existing protected schedule unchanged, close this review.',
   'live.home.confirmNormalPath': 'Confirm protected normal path',
+  'live.home.openSystemComposer': 'Open system message composer',
   'live.home.confirmNextYear': 'Confirm and start next year',
+  'live.home.keepTodaySchedule': 'Keep today’s protected schedule',
   'live.home.todayAccepted':
     'Your decision was accepted and Home was checked again. No delivery is claimed.',
+  'live.home.todayComposerOpened':
+    'Android’s message composer was opened. Today’s unattended occurrence is retired; you control Send or Cancel, and no delivery is claimed.',
+  'live.home.todayNextYearAccepted':
+    'Today’s occurrence was retired and planning will continue next year. Nothing was sent.',
   'live.home.noUpcoming': 'No upcoming birthday is reported.',
   'live.home.reviewPeople': 'Review people',
   'live.home.counts': 'Plan summary',
-  'live.home.countsLabel': 'Birthday plan counts',
   'live.home.needsAttention': 'Needs attention',
   'live.home.today': 'Today',
   'live.home.nextSeven': 'Next 7 days',
   'live.home.service': 'Protected service',
   'live.home.contacts': 'Contacts',
   'live.home.contactsFresh': '{{count}} contacts checked',
+  'live.home.contactsFresh_one': '{{count}} contact checked',
+  'live.home.contactsFresh_other': '{{count}} contacts checked',
   'live.home.contactsSyncing': 'Sync in progress',
   'live.home.contactsNever': 'Never synced',
   'live.home.contactsPermission': 'Permission needed',
@@ -312,8 +432,33 @@ export const liveEnglish = {
   'live.home.coordination': 'Last safety check',
   'live.home.openActivity': 'View activity',
   'live.home.openAttention': 'Fix a problem',
+  'live.home.fixIssues': 'Fix issues',
   'live.home.openMessage': 'Edit birthday message',
   'live.home.openAutomation': 'Automation and reminders',
+  'live.home.pause': 'Pause',
+  'live.home.pauseTitle': 'Pause birthday actions?',
+  'live.home.pauseBody':
+    'Pausing stops new unattended sends or reminders. It does not delete people, messages, approvals, or existing external SMS copies.',
+  'live.home.pauseConfirm': 'Pause now',
+  'live.home.pauseAccepted': 'Birthday actions are paused.',
+  'live.home.activeSender': 'Active Android sender',
+  'live.home.sender.transfer-pending': 'Protected transfer is pending',
+  'live.home.sender.deleting': 'Account cleanup is running',
+  'live.home.iosCompanionStatus': 'iPhone reminder and Messages readiness',
+  'live.home.iosStatusChecking': 'Checking iPhone reminder status',
+  'live.home.iosSafetyUnavailable': 'iPhone safety status is unavailable',
+  'live.home.iosSafetyUnavailableBody':
+    'Reminder and Messages readiness could not be verified. Do not assume a draft can open.',
+  'live.home.reminderPlanProblem': 'The reminder plan needs attention',
+  'live.home.reminderPlanProblemBody':
+    'iPhone reported that the current reminder plan could not be fully verified. Review Automation and reminders before relying on it.',
+  'live.home.notificationVisibility': 'Notification visibility',
+  'live.home.messageUiCapability': 'Messages screen',
+  'live.home.messageUiAvailable': 'Available for your review',
+  'live.home.messageUiUnavailable': 'Unavailable on this device',
+  'live.home.iosManagedByAndroid': 'Managed by an active Android sender',
+  'live.home.iosIssueAction':
+    'Open Automation and reminders to review the current safety state.',
   'live.home.refresh': 'Refresh home',
   'live.people.title': 'People',
   'live.people.body':
@@ -361,31 +506,53 @@ export const liveEnglish = {
   'live.people.syncNow': 'Sync contacts now',
   'live.people.nextPage': 'Next page',
   'live.people.previousPage': 'Previous page',
-  'live.people.pageEnrollmentTitle': 'Turn on ready people from this page',
+  'live.people.pageEnrollmentTitle': 'Turn on all matching ready people',
   'live.people.pageEnrollmentBody':
-    'Only the {{count}} Ready and Off people visible on this page will be reviewed. Unseen pages are never selected.',
-  'live.people.selectAllReady':
-    'Review all {{count}} ready people on this page',
-  'live.people.preparingEnrollment': 'Preparing page review…',
-  'live.people.enrollmentReviewTitle': 'Confirm this page selection?',
+    'All {{count}} matching people across every page will be checked. Only people who are Ready and Off will enter the review.',
+  'live.people.pageEnrollmentBody_one':
+    'The one matching person will be checked. Only someone who is Ready and Off will enter the review.',
+  'live.people.pageEnrollmentBody_other':
+    'All {{count}} matching people across every page will be checked. Only people who are Ready and Off will enter the review.',
+  'live.people.selectAllReady': 'Check every page for ready people',
+  'live.people.selectAllReady_one': 'Check every page for ready people',
+  'live.people.selectAllReady_other': 'Check every page for ready people',
+  'live.people.preparingEnrollment': 'Checking every page…',
+  'live.people.enrollmentReviewTitle': 'Confirm this review group?',
   'live.people.enrollmentReviewBody':
-    'Review all {{count}} people below. No person from another page is included.',
+    'Review the {{count}} people below. {{completed}} of {{total}} selected people were confirmed before this group.',
+  'live.people.enrollmentReviewBody_one':
+    'Review the one person below. {{completed}} of {{total}} selected people were confirmed before this group.',
+  'live.people.enrollmentReviewBody_other':
+    'Review the {{count}} people below. {{completed}} of {{total}} selected people were confirmed before this group.',
   'live.people.readyCount': 'Ready people',
   'live.people.attentionCount': 'Need attention',
   'live.people.explicitConfirmation': 'Your confirmation is required',
   'live.people.enrollmentDoesNotSend':
     'This turns on birthday planning only. It does not send a message, approve text, or start Android automation.',
-  'live.people.confirmPageEnrollment': 'Confirm people on this page',
+  'live.people.confirmPageEnrollment': 'Confirm this group and continue',
   'live.people.enrollmentAccepted':
-    '{{count}} people were updated and this page was checked again.',
+    '{{count}} people were updated across all pages and the visible page was checked again.',
+  'live.people.enrollmentAccepted_one':
+    '{{count}} person was updated and the visible page was checked again.',
+  'live.people.enrollmentAccepted_other':
+    '{{count}} people were updated across all pages and the visible page was checked again.',
+  'live.people.noReadyAcrossPages':
+    'Every matching page was checked. No Ready and Off people are available to review.',
+  'live.people.enrollmentIncomplete': 'People selection is incomplete',
+  'live.people.enrollmentIncompleteBody':
+    '{{completed}} of {{total}} selected people are confirmed. The batch stopped before everyone was handled; retry to check the remaining people.',
   'live.people.enrollmentAcceptedUnverified':
+    '{{count}} people were updated, but this page could not be checked again. Refresh before another action.',
+  'live.people.enrollmentAcceptedUnverified_one':
+    '{{count}} person was updated, but this page could not be checked again. Refresh before another action.',
+  'live.people.enrollmentAcceptedUnverified_other':
     '{{count}} people were updated, but this page could not be checked again. Refresh before another action.',
   'live.people.refresh': 'Refresh people',
   'live.person.back': 'Back to people',
+  'live.person.detailsTitle': 'Person details',
   'live.person.loading': 'Loading person details',
   'live.person.unavailable': 'Person details are unavailable',
   'live.person.privateBody': 'Protected details · phone numbers stay hidden',
-  'live.person.summary': 'Contact summary',
   'live.person.birthday': 'Birthday',
   'live.person.phone': 'Phone',
   'live.person.nextOccurrence': 'Next birthday',
@@ -399,6 +566,12 @@ export const liveEnglish = {
   'live.person.androidSafety': 'Android approval is required',
   'live.person.androidSafetyBody':
     'Turning on a person is not permission to send. The exact message, phone, SIM and every safety check must still pass.',
+  'live.person.androidChargeDisclosure':
+    'Your carrier may charge for every SMS segment. Roaming is used only when separately approved.',
+  'live.person.androidConsentDisclosure':
+    'Confirming stores this exact recipient, chosen phone number, birthday, message, window, SIM and segment plan for protected future birthday jobs.',
+  'live.person.iosConsentDisclosure':
+    'You decide whether to tap Send after reviewing the recipient and text. Messages and iOS control the available sender line and final transport; this app cannot select or guarantee either.',
   'live.person.iosSafety': 'You stay in control on iPhone',
   'live.person.iosSafetyBody':
     'A plan can make a reminder. You review the editable Messages screen and tap Send.',
@@ -416,6 +589,16 @@ export const liveEnglish = {
   'live.person.leapSkip': 'Skip non-leap years',
   'live.person.choiceAccepted':
     'The choice was saved and details were checked again.',
+  'live.person.googleContactsRepairTitle': 'Update the source contact',
+  'live.person.googleContactsRepairBody':
+    'Open Google Contacts without sharing a person identifier. After you return, Birthday Autopilot will sync and review this person again; it will not assume the edit succeeded.',
+  'live.person.googleContactsRegionRepairBody':
+    'This local phone format has no reliable country or region. Add the international country code (for example, +91) in Google Contacts, then return and sync again.',
+  'live.person.openGoogleContacts': 'Fix in Google Contacts',
+  'live.person.googleContactsOpened':
+    'Google Contacts opened. Return here when you are done.',
+  'live.person.googleContactsSynced':
+    'Contacts were synced again. Review the updated birthday and phone; no repair was assumed.',
   'live.person.confirmEnrollment': 'Confirm birthday plan',
   'live.person.readyAttention':
     '{{ready}} ready · {{attention}} need attention',
@@ -445,6 +628,23 @@ export const liveEnglish = {
     'The restore was saved and details were checked again. It does not create a new approval.',
   'live.person.excludeAccepted':
     'The exclusion was saved and details were checked again.',
+  'live.person.destinationBlockedTitle': 'This phone is permanently blocked',
+  'live.person.destinationBlockedBody':
+    'No birthday plan or approved message can use this normalized destination until you explicitly unblock it.',
+  'live.person.destinationBlock': 'Never message this phone',
+  'live.person.destinationBlockTitle': 'Permanently block this phone?',
+  'live.person.destinationBlockBody':
+    '{{phone}} will be blocked across every matching contact on this account. Pending unclaimed birthday work is cancelled and existing approvals cannot be reused.',
+  'live.person.destinationBlockConfirm': 'Permanently block phone',
+  'live.person.destinationUnblock': 'Unblock this phone',
+  'live.person.destinationUnblockTitle': 'Unblock this phone?',
+  'live.person.destinationUnblockBody':
+    '{{phone}} can be reviewed again, but no previous approval is restored. You must explicitly approve a new message before it can be used.',
+  'live.person.destinationUnblockConfirm': 'Confirm unblock',
+  'live.person.destinationBlockAccepted':
+    'The phone was blocked account-wide and details were checked again.',
+  'live.person.destinationUnblockAccepted':
+    'The phone was unblocked for review. No previous approval was restored.',
   'live.person.enrollmentAccepted':
     'The birthday plan was saved and checked again. Message approval and phone readiness are separate.',
   'live.person.acceptedUnverified':
@@ -453,7 +653,7 @@ export const liveEnglish = {
   'live.person.approvalTitle': 'Approve the exact Android message?',
   'live.person.iosApprovalTitle': 'Approve this iPhone Messages draft?',
   'live.person.iosApprovalBody':
-    'This approval allows a reminder and draft proposal only. The editable system Messages screen still requires you to review the final recipient and text, choose a sender line, and tap Send.',
+    'This approval allows a reminder and draft proposal only. Review the final recipient and text, then decide whether to tap Send. Messages and iOS control the available sender line and final transport; this app cannot select or guarantee either.',
   'live.person.iosApprovalReview':
     'iPhone never sends automatically. Messages remains editable, and only your tap on Send can submit the final draft.',
   'live.person.approvalConfirm': 'Confirm approval',
@@ -479,7 +679,6 @@ export const liveEnglish = {
   'live.settings.connecting': 'Connecting',
   'live.settings.reconnect': 'Reconnect needed: {{reason}}',
   'live.settings.reconnectGeneric': 'Reconnect this Google account',
-  'live.settings.cleanup': '{{operation}} cleanup pending',
   'live.settings.cleanup.disconnect': 'Contact disconnection is still running',
   'live.settings.cleanup.revoke': 'Google access cleanup is still running',
   'live.settings.cleanup.signOut': 'Sign-out cleanup is still running',
@@ -497,6 +696,8 @@ export const liveEnglish = {
   'live.settings.currentGates': 'Current checks',
   'live.settings.noBlockers': 'No blocker reported',
   'live.settings.blockerCount': '{{count}} items need attention',
+  'live.settings.blockerCount_one': '{{count}} item needs attention',
+  'live.settings.blockerCount_other': '{{count}} items need attention',
   'live.settings.opening': 'Opening…',
   'live.settings.noRepair': 'Open setup or contact support to fix this item.',
   'live.settings.inventory': 'Privacy summary',
@@ -598,7 +799,6 @@ export const liveEnglish = {
   'live.activity.loading': 'Loading activity',
   'live.activity.unavailable': 'Activity is unavailable',
   'live.activity.empty': 'No activity is reported.',
-  'live.activity.event': '{{kind}}',
   'live.activity.kind.planned': 'Birthday planned',
   'live.activity.kind.coordinationBlocked': 'Safety check blocked the job',
   'live.activity.kind.armedSuppressed': 'Duplicate send was stopped',
@@ -639,12 +839,20 @@ export const liveEnglish = {
   'live.activity.previousPage': 'Previous page',
   'live.attention.title': 'Needs attention',
   'live.attention.body': 'Fix blocking phone and account items here.',
+  'live.attention.categoryAccount': 'Account and sender role',
+  'live.attention.categoryContacts': 'Contacts and recipients',
+  'live.attention.categoryApproval': 'Message, approval and schedule',
+  'live.attention.categoryPlatform': 'Phone reliability and permissions',
   'live.attention.loading': 'Loading attention items',
   'live.attention.unavailable': 'Attention items are unavailable',
   'live.attention.empty': 'No blocking item is reported.',
   'live.attention.issue': 'A phone or account setting needs attention',
   'live.attention.noAction': 'Open setup or contact support to fix this item.',
   'live.attention.openAction': 'Open phone setting',
+  'live.attention.openPeople': 'Open People',
+  'live.attention.openMessage': 'Open message',
+  'live.attention.openAutomation': 'Open automation',
+  'live.attention.openSettings': 'Open account settings',
   'live.attention.opened':
     'The phone setting opened. Return and refresh after making a choice.',
   'live.attention.cancelled':
@@ -681,12 +889,23 @@ export const liveEnglish = {
   'live.message.previewTitle': 'Confirm this message?',
   'live.message.example': '{{name}} · {{segments}} part(s) · {{encoding}}',
   'live.message.affected': '{{count}} enabled people will need this message.',
+  'live.message.affected_one':
+    '{{count}} enabled person will need this message.',
+  'live.message.affected_other':
+    '{{count}} enabled people will need this message.',
   'live.message.save': 'Save approved message',
   'live.message.saving': 'Saving…',
   'live.message.saved':
     'The message was saved and checked again. {{count}} old approvals were cleared.',
+  'live.message.saved_one':
+    'The message was saved and checked again. {{count}} old approval was cleared.',
+  'live.message.saved_other':
+    'The message was saved and checked again. {{count}} old approvals were cleared.',
   'live.message.suggest': 'Suggest messages',
   'live.message.suggesting': 'Getting suggestions…',
+  'live.message.geminiPrivacyTitle': 'What Gemini receives',
+  'live.message.geminiPrivacyBody':
+    'Gemini receives only the selected language, tone, name style and SMS-part limit for this suggestion request. It receives no contact names, phone numbers, birthdays, message history, or current saved or draft message text.',
   'live.message.suggestionUnavailable':
     'Suggestions are unavailable: {{reason}}',
   'live.message.useSuggestion': 'Use this suggestion',
@@ -715,7 +934,7 @@ export const liveEnglish = {
   'live.policy.dailyCap': 'Maximum birthday jobs per day',
   'live.policy.iosReminderPolicy': 'iPhone reminder policy',
   'live.policy.iosReminderPolicyBody':
-    'Daily sending caps and SMS spacing do not apply on iPhone. The system limits how many pending reminders it can keep.',
+    'Daily sending caps and SMS spacing do not apply on iPhone, so eligible same-day proposals are not discarded. iOS limits the pending reminder horizon to 60 civil dates.',
   'live.policy.previewing': 'Preparing protected simulation…',
   'live.policy.preview': 'Review policy simulation',
   'live.policy.previewIos': 'Review reminder horizon',
@@ -723,11 +942,21 @@ export const liveEnglish = {
   'live.policy.issue': 'Policy change needed: {{message}}',
   'live.policy.stepTwo': '2. Review and save',
   'live.policy.summary': 'Saved-policy simulation',
+  'live.policy.summaryWithGrace':
+    '{{start}}–{{end}} · grace to {{grace}} · daily cap {{cap}}',
+  'live.policy.summaryWithoutGrace':
+    '{{start}}–{{end}} · no grace · daily cap {{cap}}',
   'live.policy.maximumDaily': 'Maximum jobs in one day',
   'live.policy.maximumRolling': 'Maximum jobs in a rolling window',
   'live.policy.simulatedDays': '{{count}} days simulated',
+  'live.policy.simulatedDays_one': '{{count}} day simulated',
+  'live.policy.simulatedDays_other': '{{count}} days simulated',
   'live.policy.iosHorizonTitle': 'Bounded reminder horizon',
   'live.policy.iosHorizonBody':
+    'The protected preview checked {{count}} days. Scheduling is best effort and may cover fewer birthdays when iPhone’s pending-notification limit is reached.',
+  'live.policy.iosHorizonBody_one':
+    'The protected preview checked {{count}} day. Scheduling is best effort and may cover fewer birthdays when iPhone’s pending-notification limit is reached.',
+  'live.policy.iosHorizonBody_other':
     'The protected preview checked {{count}} days. Scheduling is best effort and may cover fewer birthdays when iPhone’s pending-notification limit is reached.',
   'live.policy.saving': 'Saving policy…',
   'live.policy.save': 'Save this policy',
@@ -749,7 +978,6 @@ export const liveEnglish = {
   'live.automation.state.standby': 'Another phone is active',
   'live.automation.state.transferPending': 'Phone transfer pending',
   'live.automation.state.deleting': 'Account cleanup running',
-  'live.automation.testStatus': 'Protected test status: {{status}}',
   'live.automation.test.preparing': 'Preparing the protected test',
   'live.automation.test.inProgress': 'Protected test is in progress',
   'live.automation.test.submitted':
@@ -768,6 +996,17 @@ export const liveEnglish = {
   'live.automation.testReview': 'Send this protected test?',
   'live.automation.testDisclosure':
     'A test can cost money. “Submitted” does not prove delivery.',
+  'live.automation.testChargeDisclosure':
+    'This sends a real SMS now. Your carrier may charge for each SMS segment.',
+  'live.automation.activationLimitations':
+    'Android background work is best effort. Phone restrictions, network, SIM, carrier conditions or force-stop can still delay or prevent a greeting.',
+  'live.automation.permissionTitle': 'Android permission review',
+  'live.automation.sendSmsPermissionDisclosure':
+    'SEND_SMS lets this signed Android edition submit the reviewed test now and future approved birthday SMS without a birthday-day tap. It does not allow the app to read messages.',
+  'live.automation.phoneStatePermissionDisclosure':
+    'READ_PHONE_STATE is used only to verify the selected active SIM subscription before each submission. It does not read SMS or call history.',
+  'live.automation.permissionDenialDisclosure':
+    'Android may ask for both permissions after you choose Start test. If either is denied, the test is not submitted and automation stays off. Carrier charges may apply.',
   'live.automation.startTest': 'Start test',
   'live.automation.testStarted':
     'The test request was accepted. Check the live result below.',
@@ -813,7 +1052,7 @@ export const liveEnglish = {
   'live.companion.resumeReview': 'Resume iPhone reminders?',
   'live.companion.reminderRecipients': 'People eligible for reminders',
   'live.companion.activationDisclosure':
-    'This enables reminders only. iPhone never sends automatically; you review an editable system Messages screen and tap Send yourself.',
+    'This enables reminders only. iPhone never sends automatically; you review an editable system Messages screen and tap Send yourself. SMS or MMS carrier charges may apply, and iOS/Messages controls the available sender line and transport.',
   'live.companion.activate': 'Confirm and turn on reminders',
   'live.companion.resume': 'Confirm and resume reminders',
   'live.companion.pauseReview': 'Pause iPhone reminders?',
@@ -836,10 +1075,18 @@ export const liveEnglish = {
   'live.companion.permission.provisional': 'Quiet notifications allowed',
   'live.companion.permission.unknown': 'Unknown',
   'live.companion.scheduled': '{{count}} reminders scheduled',
+  'live.companion.scheduled_one': '{{count}} reminder scheduled',
+  'live.companion.scheduled_other': '{{count}} reminders scheduled',
   'live.companion.planned': '{{count}} birthday dates planned',
+  'live.companion.planned_one': '{{count}} birthday date planned',
+  'live.companion.planned_other': '{{count}} birthday dates planned',
   'live.companion.truncated':
     'Some dates could not fit in iPhone’s reminder limit.',
   'live.companion.failedReminderCount':
+    '{{count}} reminders could not be scheduled',
+  'live.companion.failedReminderCount_one':
+    '{{count}} reminder could not be scheduled',
+  'live.companion.failedReminderCount_other':
     '{{count}} reminders could not be scheduled',
   'live.companion.earliestUnscheduled': 'Earliest unscheduled birthday',
   'live.companion.requestPermission': 'Allow birthday reminders',
@@ -858,7 +1105,7 @@ export const liveEnglish = {
   'live.companion.date': 'Birthday',
   'live.companion.destination': 'Phone',
   'live.companion.editableWarning':
-    'The Messages screen is editable. You control the final phone, text, sender line and Send button.',
+    'Review the final phone and text, then decide whether to tap Send. SMS or MMS carrier charges may apply. Messages and iOS control the available sender line and final transport; this app cannot select or guarantee either.',
   'live.companion.openComposer': 'Open Messages',
   'live.companion.cancelled':
     'Messages was closed. No message was sent by the app.',
@@ -871,8 +1118,18 @@ export const liveEnglish = {
     'Messages review could not continue. No message was sent by this action.',
   'live.companion.composerBlocked':
     'Messages review is blocked until every safety check passes.',
+  'live.companion.contactsReconnectRequired':
+    'Reconnect Google Contacts, then review this Messages draft again.',
+  'live.companion.contactsFreshnessUnavailable':
+    'Contacts could not be safely refreshed. Check your connection and try the review again.',
+  'live.companion.reconnectContacts': 'Reconnect Google Contacts',
+  'live.companion.contactsRepairAccepted':
+    'Contacts access was checked again. Review the Messages draft once more.',
   'live.privacy.title': 'Privacy controls',
   'live.privacy.body': 'Review exactly what will happen before confirming.',
+  'live.privacy.screenCaptureTitle': 'Screen privacy',
+  'live.privacy.screenCaptureBody':
+    'Birthday Autopilot hides personal content in the app switcher when supported. Screenshots and recordings taken while the app is open can still contain names, phone numbers or message text. Review them before sharing.',
   'live.privacy.loading': 'Loading privacy information',
   'live.privacy.unavailable': 'Privacy information is unavailable',
   'live.privacy.choose': 'Choose an action',
@@ -991,6 +1248,19 @@ export const liveEnglish = {
     'A deletion request from this device is complete',
   'live.privacy.deletionCompleteBody':
     'The app account and server data associated with that request were verified deleted. This does not describe a newly connected account. Messages, SMS, iCloud, carrier, recipient, and outside backup copies remain outside this app.',
+  'live.privacy.cloudMetadataTitle':
+    'Cloud service metadata is content-free, not data-free',
+  'live.privacy.cloudMetadataBody':
+    'Firebase Authentication, Installations and App Check process account, installation, app/device-integrity, project, request and security metadata. Remote Config also uses a Firebase Installations token to fetch an operational AI flag. These paths do not carry raw Contacts or birthday-message content, but service metadata still crosses the device boundary.',
+  'live.privacy.androidCoordinationBoundary':
+    'For enabled Android recipients only, duplicate-safety coordination receives fixed-length pseudonymous occurrence and destination bases plus bounded timing and sender-fence values. These records can be linked within the protected account for duplicate prevention; they are not anonymous.',
+  'live.privacy.iosCoordinationBoundary':
+    'iOS does not register recipients with Android duplicate-safety coordination and cannot send automatically. It makes content-free account-status and cleanup requests for safe Android coexistence when needed.',
+  'live.privacy.geminiBoundary':
+    'Gemini suggestion requests contain only language, tone, name-style and SMS-part preferences. They exclude contact names, phone numbers, birthdays, message history and the current saved or draft message.',
+  'live.privacy.providerRetentionTitle': 'Provider retention boundary',
+  'live.privacy.providerRetentionBody':
+    'Firebase, Google, Gemini, carrier, Messages, iCloud and backup providers may retain authentication, installation, attestation, request/response, operational, abuse-prevention, billing or transport records under their own policies and legal duties. Product deletion handles Birthday Autopilot-controlled data; it cannot promise immediate erasure of provider logs or outside copies. Review the current public privacy policy for details.',
   'live.help.title': 'Help, legal and about',
   'live.help.body':
     'Read the public policies, get verified support, or use the account-deletion website without reinstalling the app.',
@@ -1026,6 +1296,15 @@ export const liveEnglish = {
   'live.diagnostics.build': 'App build',
   'live.diagnostics.system': 'Phone system',
   'live.diagnostics.transitions': 'Status changes',
+  'live.diagnostics.health': 'Reported health',
+  'live.diagnostics.healthClear': 'No technical issue reported',
+  'live.diagnostics.healthReported': '{{count}} technical checks reported',
+  'live.diagnostics.healthReported_one': '{{count}} technical check reported',
+  'live.diagnostics.healthReported_other':
+    '{{count}} technical checks reported',
+  'live.diagnostics.schedulerHeartbeat': 'Scheduler heartbeat',
+  'live.diagnostics.earliestEvent': 'Earliest retained status change',
+  'live.diagnostics.latestEvent': 'Latest retained status change',
   'live.diagnostics.capabilities': 'Technical codes',
   'live.diagnostics.share': 'Share diagnostics',
   'live.diagnostics.sharing': 'Opening share sheet…',
@@ -1046,6 +1325,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.common.refresh': 'ताज़ा करें',
   'live.common.refreshing': 'ताज़ा हो रहा है…',
   'live.common.checking': 'जाँच हो रही है…',
+  'live.common.saving': 'सहेजा जा रहा है…',
   'live.common.checkingState': 'जाँच हो रही है',
   'live.common.allowed': 'अनुमति है',
   'live.common.loading': 'लोड हो रहा है…',
@@ -1067,7 +1347,11 @@ export const liveHindi: typeof liveEnglish = {
   'live.common.reference': 'सहायता संदर्भ: {{reference}}',
   'live.common.blocks': 'रोकता है: {{value}}',
   'live.common.countPeople': '{{count}} लोग',
+  'live.common.countPeople_one': '{{count}} व्यक्ति',
+  'live.common.countPeople_other': '{{count}} लोग',
   'live.common.countChecks': '{{count}} रुकावटें',
+  'live.common.countChecks_one': '{{count}} रुकावट',
+  'live.common.countChecks_other': '{{count}} रुकावटें',
   'live.common.projectionTime': '{{time}} को जाँचा',
   'live.nav.activity': 'गतिविधि',
   'live.nav.attention': 'ध्यान चाहिए',
@@ -1154,6 +1438,10 @@ export const liveHindi: typeof liveEnglish = {
     'iPhone पर संपादन योग्य Messages स्क्रीन देखकर Send आपको दबाना होता है।',
   'live.reason.platformUnsupported':
     'यह सुविधा इस फ़ोन या प्लेटफ़ॉर्म पर समर्थित नहीं है।',
+  'live.reason.systemComposerUnavailable':
+    'कोई सक्रिय Android मैसेजिंग ऐप यह देखा गया ड्राफ़्ट नहीं खोल सकता। कुछ भी नहीं भेजा गया।',
+  'live.reason.systemComposerOutcomeUnknown':
+    'ऐप यह पक्का नहीं कर सका कि Android कंपोज़र खुला या नहीं। डुप्लिकेट रोकने के लिए आज की अनअटेंडेड योजना बंद रहेगी। अपना मैसेजिंग ऐप खुद जाँचें; डिलीवरी का दावा नहीं है।',
   'live.reason.policySuspended':
     'मौजूदा सुरक्षा नीति ने यह सुविधा रोकी है। आगे बढ़ने से पहले तैयारी देखें।',
   'live.reason.resetSafetyBlocked':
@@ -1173,14 +1461,24 @@ export const liveHindi: typeof liveEnglish = {
   'live.reason.staleRevision':
     'सहेजी जानकारी बदल गई। नवीनतम संस्करण ताज़ा करके फिर देखें।',
   'live.reason.templateBidiControl': 'संदेश से छिपे टेक्स्ट-दिशा अक्षर हटाएँ।',
+  'live.reason.templateBirthdayIntentRequired':
+    'पूर्वावलोकन से पहले साफ़ और सकारात्मक जन्मदिन शुभकामना लिखें।',
   'live.reason.templateControlCharacter':
     'संदेश से असमर्थित कंट्रोल अक्षर हटाएँ।',
   'live.reason.templateEmpty': 'पूर्वावलोकन से पहले जन्मदिन संदेश लिखें।',
   'live.reason.templatePlaceholderCount':
     'नाम वाले संदेश में {firstName} ठीक एक बार रखें, या सामान्य संदेश में बिल्कुल नहीं।',
+  'live.reason.templatePromotionalContent':
+    'जन्मदिन संदेश को निजी रखें। सेल, छूट, कूपन और प्रचार ऑफर हटाएँ।',
+  'live.reason.templateSensitiveContent':
+    'उम्र, स्वास्थ्य, पहचान, रिश्ते या यादों के ऐसे दावे हटाएँ जिन्हें ऐप सुरक्षित रूप से सत्यापित नहीं कर सकता।',
+  'live.reason.templateTrackingNotAllowed':
+    'जन्मदिन संदेश से हैशटैग और ट्रैकिंग या रेफ़रल कोड हटाएँ।',
   'live.reason.templateUnsupportedPlaceholder':
     'केवल समर्थित {firstName} प्लेसहोल्डर इस्तेमाल करें।',
   'live.reason.templateUrlNotAllowed': 'जन्मदिन संदेश से लिंक हटाएँ।',
+  'live.reason.templateLanguageMismatch':
+    'संदेश चुनी हुई भाषा में लिखें, फिर दोबारा पूर्वावलोकन करें।',
   'live.reason.testBudgetExhausted':
     'सुरक्षित टेस्ट सीमा पूरी हो गई। फिर टेस्ट से पहले चलती सुरक्षा अवधि पूरी होने दें।',
   'live.reason.testReceiptInvalid':
@@ -1225,7 +1523,21 @@ export const liveHindi: typeof liveEnglish = {
     'हर सुरक्षा जाँच, स्वीकृति, टेस्ट और अनुमति पास होने तक SMS बंद रहता है।',
   'live.setup.iosBody':
     'iPhone याद दिलाता है; Messages देखकर Send आप दबाते हैं।',
-  'live.setup.checksLabel': 'लाइव सेटअप जाँच',
+  'live.setup.costTitle': 'अनुमतियाँ और संभावित कैरियर शुल्क',
+  'live.setup.androidConsent':
+    'SMS आपके प्लान का उपयोग कर सकता है या मोबाइल ऑपरेटर शुल्क लगा सकता है। मैसेज और SIM की अनुमतियाँ केवल ज़रूरी टेस्ट शुरू करते समय समझाई और माँगी जाती हैं; तब तक ऑटोमेशन बंद रहता है।',
+  'live.setup.iosConsent':
+    'रिमाइंडर संदेश नहीं भेजते। Messages से भेजे SMS या MMS पर कैरियर शुल्क लग सकता है। उपलब्ध भेजने वाली लाइन और अंतिम ट्रांसपोर्ट को iOS व Messages नियंत्रित करते हैं; यह ऐप उन्हें चुन या पक्का नहीं कर सकता।',
+  'live.setup.contactsPrivacyTitle': 'आपके Contacts की गोपनीयता सीमा',
+  'live.setup.contactsPrivacyAndroid':
+    'Birthday Autopilot आयात किए गए कच्चे नाम, फ़ोन नंबर, जन्मदिन और स्रोत फ़ील्ड इस फ़ोन के सुरक्षित, एन्क्रिप्टेड स्टोरेज में रखता है। Android पर किसी व्यक्ति को चालू करने के बाद ही तय लंबाई वाले छद्मनामित डुप्लिकेट-सुरक्षा आधार और सीमित घटना/भेजने का समय Firebase तक जाता है। वे कच्चे Contacts नहीं हैं और अनाम नहीं हैं। Firebase खाते, इंस्टॉलेशन, सत्यापन और सेवा मेटाडेटा भी डिवाइस की सीमा से बाहर जा सकते हैं; पूरी सूची गोपनीयता में देखें।',
+  'live.setup.contactsPrivacyIos':
+    'Birthday Autopilot आयात किए गए कच्चे नाम, फ़ोन नंबर, जन्मदिन और स्रोत फ़ील्ड इस iPhone के सुरक्षित, एन्क्रिप्टेड स्टोरेज में रखता है। iOS, Android की डुप्लिकेट-सुरक्षा समन्वय सेवा में लोगों को पंजीकृत नहीं करता और अपने-आप संदेश नहीं भेज सकता। Firebase खाते, इंस्टॉलेशन, App Check, Remote Config और सेवा मेटाडेटा फिर भी डिवाइस की सीमा से बाहर जा सकते हैं; पूरी सूची गोपनीयता में देखें।',
+  'live.setup.senderGateTitle': 'इस फ़ोन की भूमिका चुनें',
+  'live.setup.senderGateBody':
+    'दूसरा Android फ़ोन सक्रिय है। भेजने वाली भूमिका साफ़ तौर पर ट्रांसफ़र किए बिना यह फ़ोन Contacts नहीं पढ़ेगा या जन्मदिन सेटिंग नहीं बदलेगा। इसे Standby पर छोड़ना सुरक्षित है।',
+  'live.setup.senderGatePendingBody':
+    'भेजने वाली भूमिका का ट्रांसफ़र अभी सत्यापित हो रहा है। सुरक्षित रूप से पूरा होने तक इस फ़ोन पर Contacts और जन्मदिन सेटिंग लॉक रहेंगी।',
   'live.setup.eligibility': 'फ़ोन अनुकूलता',
   'live.setup.compatibility.checking': 'इस फ़ोन की जाँच हो रही है',
   'live.setup.compatibility.supported': 'यह संस्करण इस फ़ोन पर समर्थित है',
@@ -1237,8 +1549,11 @@ export const liveHindi: typeof liveEnglish = {
   'live.setup.connecting': 'जुड़ रहा है',
   'live.setup.reconnect': 'फिर जोड़ना होगा',
   'live.setup.notSynced': 'सिंक नहीं हुआ',
-  'live.setup.syncing': '{{mode}} सिंक चल रहा है',
+  'live.setup.syncingFull': 'पूरा Contacts सिंक चल रहा है',
+  'live.setup.syncingIncremental': 'Contacts अपडेट चल रहा है',
   'live.setup.contactsVerified': '{{count}} संपर्क जाँचे गए',
+  'live.setup.contactsVerified_one': '{{count}} संपर्क जाँचा गया',
+  'live.setup.contactsVerified_other': '{{count}} संपर्क जाँचे गए',
   'live.setup.contactsAttention': 'ध्यान चाहिए: {{reason}}',
   'live.setup.contactsRetained': 'पिछली सुरक्षित प्रति रखी गई: {{reason}}',
   'live.setup.contactsPermission': 'Google Contacts की अनुमति चाहिए',
@@ -1266,6 +1581,75 @@ export const liveHindi: typeof liveEnglish = {
     'अनुरोध पूरा हुआ और सेटअप फिर जाँचा गया। स्क्रीन खुद चरण नहीं बढ़ाती।',
   'live.setup.actionUnverified':
     'अनुरोध स्वीकार हुआ, पर सेटअप फिर जाँचा नहीं जा सका। पहले ताज़ा करें।',
+  'live.guidedSetup.title': 'Birthday Autopilot का सेटअप पूरा करें',
+  'live.guidedSetup.body':
+    'आपका Google खाता और Contacts आयात तैयार हैं। बाकी चुनाव अभी पूरे करें या बाद में लौटें; सहेजी प्रगति सुरक्षित रहेगी।',
+  'live.guidedSetup.step': '4 में से चरण {{step}}',
+  'live.guidedSetup.stepThreeBody':
+    'कम से कम एक व्यक्ति चुनें, संदेश सहेजें और भेजने या रिमाइंडर की समय-सीमा देखें।',
+  'live.guidedSetup.androidStepFourBody':
+    'ज़रूरी सुरक्षित टेस्ट भेजें, रोकने वाली जाँच ठीक करें और फिर ऑटोमेशन साफ़ तौर पर चालू करें।',
+  'live.guidedSetup.iosStepFourBody':
+    'सूचना और Messages की तैयारी देखें और फिर रिमाइंडर साफ़ तौर पर चालू करें।',
+  'live.guidedSetup.stepOne': '1. Google खाता',
+  'live.guidedSetup.stepTwo': '2. केवल-पढ़ने वाले Contacts',
+  'live.guidedSetup.complete': 'पूरा',
+  'live.guidedSetup.people': 'लोग',
+  'live.guidedSetup.ready': 'तैयार',
+  'live.guidedSetup.peopleNeeded': 'कम से कम एक तैयार व्यक्ति चुनें।',
+  'live.guidedSetup.message': 'संदेश',
+  'live.guidedSetup.messageNeeded': 'समीक्षा किया हुआ संदेश सहेजें।',
+  'live.guidedSetup.window': 'भेजने या रिमाइंडर की समय-सीमा',
+  'live.guidedSetup.windowNeeded': 'सभी के लिए समय-सीमा सहेजें।',
+  'live.guidedSetup.approvals': 'हर व्यक्ति की सटीक मंज़ूरी',
+  'live.guidedSetup.approvalNeeded':
+    'सटीक संदेश, नंबर, जन्मदिन और भेजने का तरीका देखें।',
+  'live.guidedSetup.checking': 'सहेजा सेटअप जाँचा जा रहा है…',
+  'live.guidedSetup.progressUnavailable': 'सहेजा सेटअप जाँचा नहीं जा सका',
+  'live.guidedSetup.choosePeople': 'लोग चुनें',
+  'live.guidedSetup.writeMessage': 'संदेश लिखें',
+  'live.guidedSetup.chooseWindow': 'समय-सीमा चुनें',
+  'live.guidedSetup.reviewApprovals': 'सटीक संदेश देखें',
+  'live.guidedSetup.testAndEnable': 'टेस्ट करके ऑटोमेशन चालू करें',
+  'live.guidedSetup.enableReminders': 'रिमाइंडर चालू करें',
+  'live.guidedSetup.openFinalStep': 'अंतिम चरण खोलें',
+  'live.guidedSetup.finishLater': 'बाद में पूरा करें',
+  'live.guidedSetup.savedProgress':
+    'लौटने पर फ़ोन में सहेजी प्रगति फिर उपलब्ध होगी।',
+  'live.guidedSetup.approvalTitle': 'सटीक संदेश मंज़ूर करें',
+  'live.guidedSetup.approvalBody':
+    'हर चुने व्यक्ति का स्थिर संदेश और गंतव्य देखें। बाद में कोई ज़रूरी बदलाव होने पर यह मंज़ूरी सुरक्षित रूप से अमान्य हो जाएगी।',
+  'live.guidedSetup.approvalChecking':
+    'मंज़ूरी की प्रतीक्षा वाले लोग जाँचे जा रहे हैं…',
+  'live.guidedSetup.approvalUnavailable': 'मंज़ूरियाँ लोड नहीं हो सकीं',
+  'live.guidedSetup.approvalComplete': 'हर तैयार चुना व्यक्ति मंज़ूर है',
+  'live.guidedSetup.continueFinalStep': 'अंतिम चरण पर जाएँ',
+  'live.guidedSetup.approvalPending': '{{count}} चुने लोगों को मंज़ूरी चाहिए',
+  'live.guidedSetup.approvalPending_one':
+    '{{count}} चुने व्यक्ति को मंज़ूरी चाहिए',
+  'live.guidedSetup.approvalPending_other':
+    '{{count}} चुने लोगों को मंज़ूरी चाहिए',
+  'live.guidedSetup.reviewExactMessages': 'सटीक विवरण देखें',
+  'live.guidedSetup.exactApprovalRequired': 'साफ़ मंज़ूरी ज़रूरी है',
+  'live.guidedSetup.exactApprovalBody':
+    'नीचे हर सटीक संदेश, छिपा हुआ गंतव्य, जन्मदिन और प्लेटफ़ॉर्म व्यवहार जाँचने के बाद ही पुष्टि करें।',
+  'live.guidedSetup.exactApprovalBatchBody':
+    'इस समूह के {{count}} सटीक संदेश देखें। इस समूह से पहले {{total}} चुने लोगों में से {{processed}} पूरे हुए थे।',
+  'live.guidedSetup.approvalIncomplete': 'मंज़ूरी की समीक्षा अधूरी है',
+  'live.guidedSetup.approvalIncompleteBody':
+    '{{total}} चुने लोगों में से {{completed}} पूरे हुए। सभी के पूरे होने से पहले बैच रुक गया; बाकी लोगों को जाँचने के लिए फिर कोशिश करें।',
+  'live.guidedSetup.approvalBlocked': '{{count}} लोगों को अभी सुधार चाहिए',
+  'live.guidedSetup.approvalBlocked_one':
+    '{{count}} व्यक्ति को अभी सुधार चाहिए',
+  'live.guidedSetup.approvalBlocked_other':
+    '{{count}} लोगों को अभी सुधार चाहिए',
+  'live.guidedSetup.approvalBlockedBody':
+    'यह पुष्टि केवल दिखाए गए तैयार लोगों को मंज़ूर करती है। बाकी को People में सुधारकर फिर देखें।',
+  'live.guidedSetup.confirmExactMessages': 'इन सटीक संदेशों को मंज़ूर करें',
+  'live.guidedSetup.approvalSaved':
+    'सटीक मंज़ूरियाँ सहेजी गईं। बाकी लोगों की जाँच करें।',
+  'live.guidedSetup.approvalSavedWithBlocked':
+    '{{approved}} सटीक मंज़ूरियाँ सहेजी गईं। {{blocked}} लोगों को अभी सुधार चाहिए।',
   'live.home.loading': 'जन्मदिन स्थिति लोड हो रही है',
   'live.home.unavailable': 'होम स्थिति उपलब्ध नहीं है',
   'live.home.platformMismatch': 'फ़ोन प्लेटफ़ॉर्म सत्यापित नहीं हुआ',
@@ -1297,34 +1681,51 @@ export const liveHindi: typeof liveEnglish = {
   'live.home.iosNotConfiguredBody':
     'कोई रिमाइंडर या Messages हैंडऑफ़ सक्रिय नहीं है।',
   'live.home.upcoming': 'आने वाला',
-  'live.home.nextPlan': 'अगली जन्मदिन योजना',
   'live.home.birthday': 'जन्मदिन',
   'live.home.window': 'समय सीमा',
   'live.home.phone': 'फ़ोन',
   'live.home.planNotOutcome': 'यह योजना है, भेजे जाने का प्रमाण नहीं।',
+  'live.home.approvedMessage': 'मंज़ूर संदेश',
+  'live.home.approvedMessageBody':
+    'यह सटीक टेक्स्ट मौजूदा व्यक्ति की मंज़ूरी से जुड़ा है। ज़रूरी विवरण बदलने पर मंज़ूरी अमान्य हो जाएगी।',
   'live.home.reviewToday': 'आज के जन्मदिन का निर्णय देखें',
   'live.home.reviewTodayIos': 'आज का Messages प्रस्ताव देखें',
   'live.home.preparingToday': 'आज की समीक्षा तैयार हो रही है…',
   'live.home.todayReviewTitle': 'आज क्या होना चाहिए, पक्का करें?',
   'live.home.todayNormalPath':
     'मौजूदा सही समय-सीमा में सुरक्षित सामान्य मार्ग इस्तेमाल करें',
+  'live.home.todaySystemComposer':
+    'इस देखे गए प्राप्तकर्ता और ड्राफ़्ट के साथ Android मैसेजिंग ऐप खोलें',
   'live.home.todayNextYear': 'आज कार्रवाई न करें; अगले वर्ष की योजना शुरू करें',
   'live.home.todayExplicitConfirmation':
     'सुरक्षित सेवा ने इस जन्मदिन को फिर सत्यापित किया',
+  'live.home.todayNormalDisclosure':
+    'सामान्य मार्ग में सुरक्षित Claim, Arm और एक-बार जाँच अभी भी ज़रूरी हैं। यह डिलीवरी का वादा नहीं करता।',
+  'live.home.todayComposerDisclosure':
+    'ऊपर दिखाया गया देखा हुआ प्राप्तकर्ता और ठीक स्वीकृत ड्राफ़्ट ही पहले से भरे जाते हैं। खोलने पर आज की अनअटेंडेड योजना बंद हो जाती है। आप संपादित, Send या Cancel कर सकते हैं; ऐप सबमिशन या डिलीवरी को देख या उसका दावा नहीं कर सकता।',
+  'live.home.todayNextYearDisclosure':
+    'अगला वर्ष शुरू करने पर आज की अनअटेंडेड योजना बंद होती है और आज न संदेश भेजा जाता है, न मैसेजिंग ऐप खुलता है। मौजूदा सुरक्षित शेड्यूल को बिना बदले रखने के लिए यह समीक्षा बंद करें।',
   'live.home.confirmNormalPath': 'सुरक्षित सामान्य मार्ग पक्का करें',
+  'live.home.openSystemComposer': 'सिस्टम संदेश कंपोज़र खोलें',
   'live.home.confirmNextYear': 'पुष्टि करके अगला वर्ष शुरू करें',
+  'live.home.keepTodaySchedule': 'आज का सुरक्षित शेड्यूल रखें',
   'live.home.todayAccepted':
     'आपका निर्णय स्वीकार हुआ और होम फिर जाँचा गया। डिलीवरी का दावा नहीं है।',
+  'live.home.todayComposerOpened':
+    'Android संदेश कंपोज़र खुला। आज की अनअटेंडेड योजना बंद है; Send या Cancel आपके नियंत्रण में है और डिलीवरी का दावा नहीं है।',
+  'live.home.todayNextYearAccepted':
+    'आज की योजना बंद हुई और योजना अगले वर्ष जारी रहेगी। कुछ भी नहीं भेजा गया।',
   'live.home.noUpcoming': 'कोई आने वाला जन्मदिन रिपोर्ट नहीं हुआ।',
   'live.home.reviewPeople': 'लोग देखें',
   'live.home.counts': 'योजना सारांश',
-  'live.home.countsLabel': 'जन्मदिन योजना संख्या',
   'live.home.needsAttention': 'ध्यान चाहिए',
   'live.home.today': 'आज',
   'live.home.nextSeven': 'अगले 7 दिन',
   'live.home.service': 'सुरक्षित सेवा',
   'live.home.contacts': 'संपर्क',
   'live.home.contactsFresh': '{{count}} संपर्क जाँचे गए',
+  'live.home.contactsFresh_one': '{{count}} संपर्क जाँचा गया',
+  'live.home.contactsFresh_other': '{{count}} संपर्क जाँचे गए',
   'live.home.contactsSyncing': 'सिंक चल रहा है',
   'live.home.contactsNever': 'कभी सिंक नहीं हुआ',
   'live.home.contactsPermission': 'अनुमति चाहिए',
@@ -1333,8 +1734,33 @@ export const liveHindi: typeof liveEnglish = {
   'live.home.coordination': 'अंतिम सुरक्षा जाँच',
   'live.home.openActivity': 'गतिविधि देखें',
   'live.home.openAttention': 'समस्या ठीक करें',
+  'live.home.fixIssues': 'समस्याएँ ठीक करें',
   'live.home.openMessage': 'जन्मदिन संदेश बदलें',
   'live.home.openAutomation': 'ऑटोमेशन और रिमाइंडर',
+  'live.home.pause': 'रोकें',
+  'live.home.pauseTitle': 'जन्मदिन कार्रवाइयाँ रोकें?',
+  'live.home.pauseBody':
+    'रोकने से नए अपने-आप भेजे जाने वाले संदेश या रिमाइंडर बंद होते हैं। लोग, संदेश, मंज़ूरियाँ या बाहर मौजूद SMS प्रतियाँ नहीं मिटतीं।',
+  'live.home.pauseConfirm': 'अभी रोकें',
+  'live.home.pauseAccepted': 'जन्मदिन कार्रवाइयाँ रोकी गई हैं।',
+  'live.home.activeSender': 'सक्रिय Android सेंडर',
+  'live.home.sender.transfer-pending': 'सुरक्षित ट्रांसफ़र बाकी है',
+  'live.home.sender.deleting': 'खाता सफ़ाई चल रही है',
+  'live.home.iosCompanionStatus': 'iPhone रिमाइंडर और Messages तैयारी',
+  'live.home.iosStatusChecking': 'iPhone रिमाइंडर स्थिति जाँची जा रही है',
+  'live.home.iosSafetyUnavailable': 'iPhone सुरक्षा स्थिति उपलब्ध नहीं है',
+  'live.home.iosSafetyUnavailableBody':
+    'रिमाइंडर और Messages की तैयारी सत्यापित नहीं हुई। ड्राफ़्ट खुलने का अनुमान न लगाएँ।',
+  'live.home.reminderPlanProblem': 'रिमाइंडर योजना पर ध्यान चाहिए',
+  'live.home.reminderPlanProblemBody':
+    'iPhone ने बताया कि मौजूदा रिमाइंडर योजना पूरी तरह सत्यापित नहीं हुई। इस पर भरोसा करने से पहले ऑटोमेशन और रिमाइंडर देखें।',
+  'live.home.notificationVisibility': 'सूचना दिखाई देने की स्थिति',
+  'live.home.messageUiCapability': 'Messages स्क्रीन',
+  'live.home.messageUiAvailable': 'आपकी समीक्षा के लिए उपलब्ध',
+  'live.home.messageUiUnavailable': 'इस डिवाइस पर उपलब्ध नहीं',
+  'live.home.iosManagedByAndroid': 'सक्रिय Android सेंडर द्वारा प्रबंधित',
+  'live.home.iosIssueAction':
+    'मौजूदा सुरक्षा स्थिति देखने के लिए ऑटोमेशन और रिमाइंडर खोलें।',
   'live.home.refresh': 'होम ताज़ा करें',
   'live.people.title': 'लोग',
   'live.people.body':
@@ -1380,31 +1806,53 @@ export const liveHindi: typeof liveEnglish = {
   'live.people.syncNow': 'संपर्क अभी सिंक करें',
   'live.people.nextPage': 'अगला पृष्ठ',
   'live.people.previousPage': 'पिछला पृष्ठ',
-  'live.people.pageEnrollmentTitle': 'इस पृष्ठ के तैयार लोगों को चालू करें',
+  'live.people.pageEnrollmentTitle': 'सभी मेल खाते तैयार लोगों को चालू करें',
   'live.people.pageEnrollmentBody':
-    'केवल इस पृष्ठ पर दिख रहे {{count}} तैयार और बंद लोगों की समीक्षा होगी। दूसरे पृष्ठ कभी नहीं चुने जाते।',
-  'live.people.selectAllReady':
-    'इस पृष्ठ के सभी {{count}} तैयार लोगों को देखें',
-  'live.people.preparingEnrollment': 'पृष्ठ समीक्षा तैयार हो रही है…',
-  'live.people.enrollmentReviewTitle': 'इस पृष्ठ का चुनाव पक्का करें?',
+    'हर पृष्ठ के सभी {{count}} मेल खाते लोगों की जाँच होगी। केवल तैयार और बंद लोग समीक्षा में आएँगे।',
+  'live.people.pageEnrollmentBody_one':
+    'मेल खाते एक व्यक्ति की जाँच होगी। केवल तैयार और बंद व्यक्ति समीक्षा में आएगा।',
+  'live.people.pageEnrollmentBody_other':
+    'हर पृष्ठ के सभी {{count}} मेल खाते लोगों की जाँच होगी। केवल तैयार और बंद लोग समीक्षा में आएँगे।',
+  'live.people.selectAllReady': 'तैयार लोगों के लिए हर पृष्ठ जाँचें',
+  'live.people.selectAllReady_one': 'तैयार लोगों के लिए हर पृष्ठ जाँचें',
+  'live.people.selectAllReady_other': 'तैयार लोगों के लिए हर पृष्ठ जाँचें',
+  'live.people.preparingEnrollment': 'हर पृष्ठ जाँचा जा रहा है…',
+  'live.people.enrollmentReviewTitle': 'इस समीक्षा समूह की पुष्टि करें?',
   'live.people.enrollmentReviewBody':
-    'नीचे सभी {{count}} लोगों को देखें। दूसरे पृष्ठ का कोई व्यक्ति शामिल नहीं है।',
+    'नीचे {{count}} लोगों को देखें। इस समूह से पहले {{total}} चुने लोगों में से {{completed}} की पुष्टि हुई थी।',
+  'live.people.enrollmentReviewBody_one':
+    'नीचे एक व्यक्ति को देखें। इस समूह से पहले {{total}} चुने लोगों में से {{completed}} की पुष्टि हुई थी।',
+  'live.people.enrollmentReviewBody_other':
+    'नीचे {{count}} लोगों को देखें। इस समूह से पहले {{total}} चुने लोगों में से {{completed}} की पुष्टि हुई थी।',
   'live.people.readyCount': 'तैयार लोग',
   'live.people.attentionCount': 'ध्यान चाहिए',
   'live.people.explicitConfirmation': 'आपकी पुष्टि ज़रूरी है',
   'live.people.enrollmentDoesNotSend':
     'यह केवल जन्मदिन योजना चालू करता है। संदेश नहीं भेजता, टेक्स्ट स्वीकृत नहीं करता और Android ऑटोमेशन शुरू नहीं करता।',
-  'live.people.confirmPageEnrollment': 'इस पृष्ठ के लोगों की पुष्टि करें',
+  'live.people.confirmPageEnrollment': 'इस समूह की पुष्टि करके आगे बढ़ें',
   'live.people.enrollmentAccepted':
-    '{{count}} लोग बदले और यह पृष्ठ फिर जाँचा गया।',
+    'हर पृष्ठ के {{count}} लोग बदले और दिख रहा पृष्ठ फिर जाँचा गया।',
+  'live.people.enrollmentAccepted_one':
+    '{{count}} व्यक्ति बदला और दिख रहा पृष्ठ फिर जाँचा गया।',
+  'live.people.enrollmentAccepted_other':
+    'हर पृष्ठ के {{count}} लोग बदले और दिख रहा पृष्ठ फिर जाँचा गया।',
+  'live.people.noReadyAcrossPages':
+    'हर मेल खाता पृष्ठ जाँचा गया। समीक्षा के लिए कोई तैयार और बंद व्यक्ति नहीं मिला।',
+  'live.people.enrollmentIncomplete': 'लोगों का चुनाव अधूरा है',
+  'live.people.enrollmentIncompleteBody':
+    '{{total}} चुने लोगों में से {{completed}} की पुष्टि हुई। सभी के पूरे होने से पहले बैच रुक गया; बाकी लोगों को जाँचने के लिए फिर कोशिश करें।',
   'live.people.enrollmentAcceptedUnverified':
+    '{{count}} लोग बदले, लेकिन पृष्ठ फिर जाँचा नहीं जा सका। दूसरी कार्रवाई से पहले ताज़ा करें।',
+  'live.people.enrollmentAcceptedUnverified_one':
+    '{{count}} व्यक्ति बदला, लेकिन पृष्ठ फिर जाँचा नहीं जा सका। दूसरी कार्रवाई से पहले ताज़ा करें।',
+  'live.people.enrollmentAcceptedUnverified_other':
     '{{count}} लोग बदले, लेकिन पृष्ठ फिर जाँचा नहीं जा सका। दूसरी कार्रवाई से पहले ताज़ा करें।',
   'live.people.refresh': 'लोग ताज़ा करें',
   'live.person.back': 'लोगों पर वापस',
+  'live.person.detailsTitle': 'व्यक्ति का विवरण',
   'live.person.loading': 'व्यक्ति का विवरण लोड हो रहा है',
   'live.person.unavailable': 'व्यक्ति का विवरण उपलब्ध नहीं है',
   'live.person.privateBody': 'सुरक्षित विवरण · फ़ोन नंबर छिपे रहते हैं',
-  'live.person.summary': 'संपर्क सारांश',
   'live.person.birthday': 'जन्मदिन',
   'live.person.phone': 'फ़ोन',
   'live.person.nextOccurrence': 'अगला जन्मदिन',
@@ -1418,6 +1866,12 @@ export const liveHindi: typeof liveEnglish = {
   'live.person.androidSafety': 'Android स्वीकृति ज़रूरी है',
   'live.person.androidSafetyBody':
     'व्यक्ति चालू करना भेजने की अनुमति नहीं है। संदेश, फ़ोन, SIM और हर सुरक्षा जाँच पास होनी चाहिए।',
+  'live.person.androidChargeDisclosure':
+    'हर SMS भाग पर कैरियर शुल्क लग सकता है। रोमिंग केवल अलग से स्वीकृत होने पर इस्तेमाल होती है।',
+  'live.person.androidConsentDisclosure':
+    'पुष्टि करने पर सुरक्षित भावी जन्मदिन कामों के लिए यही प्राप्तकर्ता, चुना फ़ोन नंबर, जन्मदिन, संदेश, समय-सीमा, SIM और भाग योजना सहेजी जाती है।',
+  'live.person.iosConsentDisclosure':
+    'प्राप्तकर्ता और संदेश देखने के बाद Send दबाना है या नहीं, यह आप तय करते हैं। उपलब्ध भेजने वाली लाइन और अंतिम ट्रांसपोर्ट को Messages व iOS नियंत्रित करते हैं; यह ऐप किसी को चुन या पक्का नहीं कर सकता।',
   'live.person.iosSafety': 'iPhone पर नियंत्रण आपका है',
   'live.person.iosSafetyBody':
     'योजना रिमाइंडर बना सकती है। Messages देखकर Send आप दबाते हैं।',
@@ -1433,6 +1887,16 @@ export const liveHindi: typeof liveEnglish = {
   'live.person.leapMar01': '1 मार्च चुनें',
   'live.person.leapSkip': 'गैर-लीप वर्ष छोड़ें',
   'live.person.choiceAccepted': 'पसंद सहेजी गई और विवरण फिर जाँचा गया।',
+  'live.person.googleContactsRepairTitle': 'मूल संपर्क अपडेट करें',
+  'live.person.googleContactsRepairBody':
+    'किसी व्यक्ति की पहचान साझा किए बिना Google Contacts खोलें। लौटने पर Birthday Autopilot फिर सिंक करके इस व्यक्ति की समीक्षा करेगा; बदलाव सफल होने का अनुमान नहीं लगाएगा।',
+  'live.person.googleContactsRegionRepairBody':
+    'इस स्थानीय फ़ोन प्रारूप का देश या क्षेत्र भरोसे से तय नहीं होता। Google Contacts में अंतरराष्ट्रीय देश कोड (जैसे +91) जोड़ें, फिर लौटकर दोबारा सिंक करें।',
+  'live.person.openGoogleContacts': 'Google Contacts में ठीक करें',
+  'live.person.googleContactsOpened':
+    'Google Contacts खुला। काम पूरा होने पर यहाँ लौटें।',
+  'live.person.googleContactsSynced':
+    'Contacts फिर सिंक हुए। अपडेट हुआ जन्मदिन और फ़ोन देखें; सुधार सफल होने का अनुमान नहीं लगाया गया।',
   'live.person.confirmEnrollment': 'जन्मदिन योजना की पुष्टि करें',
   'live.person.readyAttention':
     '{{ready}} तैयार · {{attention}} पर ध्यान चाहिए',
@@ -1460,6 +1924,23 @@ export const liveHindi: typeof liveEnglish = {
   'live.person.restoreAccepted':
     'लौटाना सहेजा गया और विवरण फिर जाँचा गया। इससे नई स्वीकृति नहीं बनती।',
   'live.person.excludeAccepted': 'बाहर रखना सहेजा गया और विवरण फिर जाँचा गया।',
+  'live.person.destinationBlockedTitle': 'यह फ़ोन स्थायी रूप से ब्लॉक है',
+  'live.person.destinationBlockedBody':
+    'जब तक आप इसे साफ़ तौर पर अनब्लॉक नहीं करते, कोई जन्मदिन योजना या स्वीकृत संदेश इस सामान्यीकृत गंतव्य का उपयोग नहीं कर सकता।',
+  'live.person.destinationBlock': 'इस फ़ोन पर कभी संदेश न भेजें',
+  'live.person.destinationBlockTitle': 'इस फ़ोन को स्थायी रूप से ब्लॉक करें?',
+  'live.person.destinationBlockBody':
+    '{{phone}} इस खाते के हर मिलते संपर्क में ब्लॉक होगा। लंबित और अभी दावा न किए जन्मदिन काम रद्द होंगे और पुरानी स्वीकृतियाँ फिर इस्तेमाल नहीं होंगी।',
+  'live.person.destinationBlockConfirm': 'फ़ोन स्थायी रूप से ब्लॉक करें',
+  'live.person.destinationUnblock': 'इस फ़ोन को अनब्लॉक करें',
+  'live.person.destinationUnblockTitle': 'इस फ़ोन को अनब्लॉक करें?',
+  'live.person.destinationUnblockBody':
+    '{{phone}} की फिर समीक्षा की जा सकेगी, लेकिन कोई पुरानी स्वीकृति वापस नहीं आएगी। उपयोग से पहले नया संदेश साफ़ तौर पर स्वीकृत करना होगा।',
+  'live.person.destinationUnblockConfirm': 'अनब्लॉक की पुष्टि करें',
+  'live.person.destinationBlockAccepted':
+    'फ़ोन पूरे खाते में ब्लॉक हुआ और विवरण फिर जाँचा गया।',
+  'live.person.destinationUnblockAccepted':
+    'फ़ोन समीक्षा के लिए अनब्लॉक हुआ। कोई पुरानी स्वीकृति वापस नहीं आई।',
   'live.person.enrollmentAccepted':
     'जन्मदिन योजना सहेजी और फिर जाँची गई। संदेश स्वीकृति और फ़ोन तैयारी अलग हैं।',
   'live.person.acceptedUnverified':
@@ -1468,7 +1949,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.person.approvalTitle': 'सटीक Android संदेश स्वीकृत करें?',
   'live.person.iosApprovalTitle': 'यह iPhone Messages ड्राफ़्ट स्वीकृत करें?',
   'live.person.iosApprovalBody':
-    'यह स्वीकृति केवल रिमाइंडर और ड्राफ़्ट प्रस्ताव देती है। सिस्टम Messages स्क्रीन बदली जा सकती है; अंतिम व्यक्ति और टेक्स्ट देखें, सेंडर लाइन चुनें और Send खुद दबाएँ।',
+    'यह स्वीकृति केवल रिमाइंडर और ड्राफ़्ट प्रस्ताव देती है। अंतिम व्यक्ति और टेक्स्ट की समीक्षा करके तय करें कि Send दबाना है या नहीं। उपलब्ध भेजने वाली लाइन और अंतिम ट्रांसपोर्ट को Messages व iOS नियंत्रित करते हैं; यह ऐप किसी को चुन या पक्का नहीं कर सकता।',
   'live.person.iosApprovalReview':
     'iPhone अपने-आप कभी नहीं भेजता। Messages बदला जा सकता है और केवल आपका Send दबाना अंतिम ड्राफ़्ट जमा कर सकता है।',
   'live.person.approvalConfirm': 'स्वीकृति की पुष्टि करें',
@@ -1493,7 +1974,6 @@ export const liveHindi: typeof liveEnglish = {
   'live.settings.connecting': 'जुड़ रहा है',
   'live.settings.reconnect': 'फिर जोड़ना होगा: {{reason}}',
   'live.settings.reconnectGeneric': 'यह Google खाता फिर जोड़ें',
-  'live.settings.cleanup': '{{operation}} सफ़ाई बाकी है',
   'live.settings.cleanup.disconnect': 'संपर्क डिस्कनेक्ट होना अभी चल रहा है',
   'live.settings.cleanup.revoke': 'Google पहुँच की सफ़ाई अभी चल रही है',
   'live.settings.cleanup.signOut': 'साइन-आउट सफ़ाई अभी चल रही है',
@@ -1511,6 +1991,8 @@ export const liveHindi: typeof liveEnglish = {
   'live.settings.currentGates': 'मौजूदा जाँच',
   'live.settings.noBlockers': 'कोई रुकावट रिपोर्ट नहीं हुई',
   'live.settings.blockerCount': '{{count}} चीज़ों पर ध्यान चाहिए',
+  'live.settings.blockerCount_one': '{{count}} चीज़ पर ध्यान चाहिए',
+  'live.settings.blockerCount_other': '{{count}} चीज़ों पर ध्यान चाहिए',
   'live.settings.opening': 'खुल रहा है…',
   'live.settings.noRepair': 'इसे ठीक करने के लिए सेटअप खोलें या सहायता लें।',
   'live.settings.inventory': 'गोपनीयता सारांश',
@@ -1612,7 +2094,6 @@ export const liveHindi: typeof liveEnglish = {
   'live.activity.loading': 'गतिविधि लोड हो रही है',
   'live.activity.unavailable': 'गतिविधि उपलब्ध नहीं है',
   'live.activity.empty': 'कोई गतिविधि रिपोर्ट नहीं हुई।',
-  'live.activity.event': '{{kind}}',
   'live.activity.kind.planned': 'जन्मदिन योजना बनी',
   'live.activity.kind.coordinationBlocked': 'सुरक्षा जाँच ने काम रोका',
   'live.activity.kind.armedSuppressed': 'दूसरा संदेश रोका गया',
@@ -1652,12 +2133,20 @@ export const liveHindi: typeof liveEnglish = {
   'live.activity.previousPage': 'पिछला पृष्ठ',
   'live.attention.title': 'ध्यान चाहिए',
   'live.attention.body': 'रोकने वाली फ़ोन और खाता चीज़ें यहाँ ठीक करें।',
+  'live.attention.categoryAccount': 'खाता और भेजने वाली भूमिका',
+  'live.attention.categoryContacts': 'Contacts और लोग',
+  'live.attention.categoryApproval': 'संदेश, मंज़ूरी और समय',
+  'live.attention.categoryPlatform': 'फ़ोन की विश्वसनीयता और अनुमतियाँ',
   'live.attention.loading': 'ध्यान वाली चीज़ें लोड हो रही हैं',
   'live.attention.unavailable': 'ध्यान वाली चीज़ें उपलब्ध नहीं हैं',
   'live.attention.empty': 'कोई रोकने वाली चीज़ रिपोर्ट नहीं हुई।',
   'live.attention.issue': 'फ़ोन या खाते की सेटिंग पर ध्यान चाहिए',
   'live.attention.noAction': 'इसे ठीक करने के लिए सेटअप खोलें या सहायता लें।',
   'live.attention.openAction': 'फ़ोन सेटिंग खोलें',
+  'live.attention.openPeople': 'लोग खोलें',
+  'live.attention.openMessage': 'संदेश खोलें',
+  'live.attention.openAutomation': 'ऑटोमेशन खोलें',
+  'live.attention.openSettings': 'खाता सेटिंग खोलें',
   'live.attention.opened': 'फ़ोन सेटिंग खुली। चुनाव के बाद लौटकर ताज़ा करें।',
   'live.attention.cancelled': 'फ़ोन सेटिंग बंद हुई। सुधार का अनुमान नहीं है।',
   'live.message.title': 'जन्मदिन संदेश',
@@ -1692,12 +2181,21 @@ export const liveHindi: typeof liveEnglish = {
   'live.message.previewTitle': 'यह संदेश पक्का करें?',
   'live.message.example': '{{name}} · {{segments}} भाग · {{encoding}}',
   'live.message.affected': '{{count}} चालू लोगों के लिए यह संदेश होगा।',
+  'live.message.affected_one': '{{count}} चालू व्यक्ति के लिए यह संदेश होगा।',
+  'live.message.affected_other': '{{count}} चालू लोगों के लिए यह संदेश होगा।',
   'live.message.save': 'स्वीकृत संदेश सहेजें',
   'live.message.saving': 'सहेजा जा रहा है…',
   'live.message.saved':
     'संदेश सहेजा और फिर जाँचा गया। {{count}} पुरानी स्वीकृतियाँ हट गईं।',
+  'live.message.saved_one':
+    'संदेश सहेजा और फिर जाँचा गया। {{count}} पुरानी स्वीकृति हट गई।',
+  'live.message.saved_other':
+    'संदेश सहेजा और फिर जाँचा गया। {{count}} पुरानी स्वीकृतियाँ हट गईं।',
   'live.message.suggest': 'संदेश सुझाएँ',
   'live.message.suggesting': 'सुझाव आ रहे हैं…',
+  'live.message.geminiPrivacyTitle': 'Gemini को क्या मिलता है',
+  'live.message.geminiPrivacyBody':
+    'इस सुझाव अनुरोध के लिए Gemini को केवल चुनी गई भाषा, भाव, नाम शैली और SMS-भाग सीमा मिलती है। उसे संपर्क नाम, फ़ोन नंबर, जन्मदिन, संदेश इतिहास या मौजूदा सहेजा अथवा ड्राफ़्ट संदेश टेक्स्ट नहीं मिलता।',
   'live.message.suggestionUnavailable': 'सुझाव उपलब्ध नहीं: {{reason}}',
   'live.message.useSuggestion': 'यह सुझाव चुनें',
   'live.policy.title': 'जन्मदिन नीति',
@@ -1725,7 +2223,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.policy.dailyCap': 'हर दिन अधिकतम जन्मदिन काम',
   'live.policy.iosReminderPolicy': 'iPhone रिमाइंडर नीति',
   'live.policy.iosReminderPolicyBody':
-    'दैनिक भेजने की सीमा और SMS अंतर iPhone पर लागू नहीं होते। सिस्टम लंबित रिमाइंडरों की संख्या सीमित करता है।',
+    'दैनिक भेजने की सीमा और SMS अंतर iPhone पर लागू नहीं होते, इसलिए एक ही दिन के योग्य प्रस्ताव हटते नहीं हैं। iOS लंबित रिमाइंडर अवधि को 60 स्थानीय कैलेंडर तारीखों तक सीमित रखता है।',
   'live.policy.previewing': 'सुरक्षित सिमुलेशन बन रहा है…',
   'live.policy.preview': 'नीति सिमुलेशन देखें',
   'live.policy.previewIos': 'रिमाइंडर अवधि देखें',
@@ -1733,11 +2231,21 @@ export const liveHindi: typeof liveEnglish = {
   'live.policy.issue': 'नीति में बदलाव चाहिए: {{message}}',
   'live.policy.stepTwo': '2. देखें और सहेजें',
   'live.policy.summary': 'सहेजी नीति का सिमुलेशन',
+  'live.policy.summaryWithGrace':
+    '{{start}}–{{end}} · {{grace}} तक ग्रेस · दैनिक सीमा {{cap}}',
+  'live.policy.summaryWithoutGrace':
+    '{{start}}–{{end}} · कोई ग्रेस नहीं · दैनिक सीमा {{cap}}',
   'live.policy.maximumDaily': 'एक दिन में अधिकतम काम',
   'live.policy.maximumRolling': 'लगातार अवधि में अधिकतम काम',
   'live.policy.simulatedDays': '{{count}} दिनों का सिमुलेशन',
+  'live.policy.simulatedDays_one': '{{count}} दिन का सिमुलेशन',
+  'live.policy.simulatedDays_other': '{{count}} दिनों का सिमुलेशन',
   'live.policy.iosHorizonTitle': 'सीमित रिमाइंडर अवधि',
   'live.policy.iosHorizonBody':
+    'सुरक्षित पूर्वावलोकन ने {{count}} दिन जाँचे। शेड्यूल सर्वोत्तम प्रयास है और iPhone की लंबित सूचना सीमा पर कम जन्मदिन शामिल हो सकते हैं।',
+  'live.policy.iosHorizonBody_one':
+    'सुरक्षित पूर्वावलोकन ने {{count}} दिन जाँचा। शेड्यूल सर्वोत्तम प्रयास है और iPhone की लंबित सूचना सीमा पर कम जन्मदिन शामिल हो सकते हैं।',
+  'live.policy.iosHorizonBody_other':
     'सुरक्षित पूर्वावलोकन ने {{count}} दिन जाँचे। शेड्यूल सर्वोत्तम प्रयास है और iPhone की लंबित सूचना सीमा पर कम जन्मदिन शामिल हो सकते हैं।',
   'live.policy.saving': 'नीति सहेजी जा रही है…',
   'live.policy.save': 'यह नीति सहेजें',
@@ -1759,7 +2267,6 @@ export const liveHindi: typeof liveEnglish = {
   'live.automation.state.standby': 'दूसरा फ़ोन सक्रिय है',
   'live.automation.state.transferPending': 'फ़ोन ट्रांसफ़र बाकी है',
   'live.automation.state.deleting': 'खाता सफ़ाई चल रही है',
-  'live.automation.testStatus': 'सुरक्षित टेस्ट स्थिति: {{status}}',
   'live.automation.test.preparing': 'सुरक्षित टेस्ट तैयार हो रहा है',
   'live.automation.test.inProgress': 'सुरक्षित टेस्ट चल रहा है',
   'live.automation.test.submitted': 'SMS जमा हुआ; डिलीवरी की पुष्टि नहीं है',
@@ -1776,6 +2283,17 @@ export const liveHindi: typeof liveEnglish = {
   'live.automation.testReview': 'यह सुरक्षित टेस्ट भेजें?',
   'live.automation.testDisclosure':
     'टेस्ट पर शुल्क लग सकता है। “सबमिट” डिलीवरी का प्रमाण नहीं है।',
+  'live.automation.testChargeDisclosure':
+    'यह अभी एक असली SMS भेजता है। हर SMS भाग पर आपका कैरियर शुल्क लगा सकता है।',
+  'live.automation.activationLimitations':
+    'Android बैकग्राउंड काम सर्वोत्तम प्रयास है। फ़ोन प्रतिबंध, नेटवर्क, SIM, कैरियर स्थिति या force-stop से शुभकामना देर से जा सकती है या रुक सकती है।',
+  'live.automation.permissionTitle': 'Android अनुमति समीक्षा',
+  'live.automation.sendSmsPermissionDisclosure':
+    'SEND_SMS इस हस्ताक्षरित Android संस्करण को अभी देखा गया टेस्ट और आगे स्वीकृत जन्मदिन SMS, जन्मदिन वाले दिन टैप के बिना, जमा करने देता है। इससे ऐप संदेश पढ़ नहीं सकता।',
+  'live.automation.phoneStatePermissionDisclosure':
+    'READ_PHONE_STATE का उपयोग हर बार भेजने से पहले केवल चुने हुए सक्रिय SIM सब्सक्रिप्शन की पुष्टि के लिए होता है। यह SMS या कॉल इतिहास नहीं पढ़ता।',
+  'live.automation.permissionDenialDisclosure':
+    'Start test चुनने के बाद Android दोनों अनुमतियाँ माँग सकता है। किसी एक को मना करने पर टेस्ट जमा नहीं होगा और ऑटोमेशन बंद रहेगा। कैरियर शुल्क लग सकता है।',
   'live.automation.startTest': 'टेस्ट शुरू करें',
   'live.automation.testStarted':
     'टेस्ट अनुरोध स्वीकार हुआ। नीचे लाइव परिणाम देखें।',
@@ -1819,7 +2337,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.companion.resumeReview': 'iPhone रिमाइंडर फिर शुरू करें?',
   'live.companion.reminderRecipients': 'रिमाइंडर योग्य लोग',
   'live.companion.activationDisclosure':
-    'यह केवल रिमाइंडर चालू करता है। iPhone अपने-आप नहीं भेजता; आप बदली जा सकने वाली Messages स्क्रीन देखते और Send खुद दबाते हैं।',
+    'यह केवल रिमाइंडर चालू करता है। iPhone अपने-आप नहीं भेजता; आप बदली जा सकने वाली Messages स्क्रीन देखते और Send खुद दबाते हैं। SMS या MMS पर कैरियर शुल्क लग सकता है, और उपलब्ध भेजने वाली लाइन व ट्रांसपोर्ट को iOS/Messages नियंत्रित करते हैं।',
   'live.companion.activate': 'पुष्टि करके रिमाइंडर चालू करें',
   'live.companion.resume': 'पुष्टि करके रिमाइंडर फिर शुरू करें',
   'live.companion.pauseReview': 'iPhone रिमाइंडर रोकें?',
@@ -1842,10 +2360,17 @@ export const liveHindi: typeof liveEnglish = {
   'live.companion.permission.provisional': 'शांत सूचना की अनुमति',
   'live.companion.permission.unknown': 'अज्ञात',
   'live.companion.scheduled': '{{count}} रिमाइंडर तय हैं',
+  'live.companion.scheduled_one': '{{count}} रिमाइंडर तय है',
+  'live.companion.scheduled_other': '{{count}} रिमाइंडर तय हैं',
   'live.companion.planned': '{{count}} जन्मदिन तारीखें नियोजित हैं',
+  'live.companion.planned_one': '{{count}} जन्मदिन तारीख नियोजित है',
+  'live.companion.planned_other': '{{count}} जन्मदिन तारीखें नियोजित हैं',
   'live.companion.truncated':
     'कुछ तारीखें iPhone की रिमाइंडर सीमा में नहीं आईं।',
   'live.companion.failedReminderCount': '{{count}} रिमाइंडर तय नहीं हो सके',
+  'live.companion.failedReminderCount_one': '{{count}} रिमाइंडर तय नहीं हो सका',
+  'live.companion.failedReminderCount_other':
+    '{{count}} रिमाइंडर तय नहीं हो सके',
   'live.companion.earliestUnscheduled': 'सबसे पहला छूटा जन्मदिन',
   'live.companion.requestPermission': 'जन्मदिन रिमाइंडर की अनुमति दें',
   'live.companion.openNotificationSettings': 'सूचना सेटिंग खोलें',
@@ -1862,7 +2387,7 @@ export const liveHindi: typeof liveEnglish = {
   'live.companion.date': 'जन्मदिन',
   'live.companion.destination': 'फ़ोन',
   'live.companion.editableWarning':
-    'Messages स्क्रीन बदली जा सकती है। अंतिम फ़ोन, टेक्स्ट, सेंडर लाइन और Send आपके नियंत्रण में हैं।',
+    'अंतिम फ़ोन और टेक्स्ट की समीक्षा करके तय करें कि Send दबाना है या नहीं। SMS या MMS पर कैरियर शुल्क लग सकता है। उपलब्ध भेजने वाली लाइन और अंतिम ट्रांसपोर्ट को Messages व iOS नियंत्रित करते हैं; यह ऐप किसी को चुन या पक्का नहीं कर सकता।',
   'live.companion.openComposer': 'Messages खोलें',
   'live.companion.cancelled': 'Messages बंद हुआ। ऐप ने कोई संदेश नहीं भेजा।',
   'live.companion.failed': 'Messages पूरा नहीं हुआ। भेजना पक्का नहीं है।',
@@ -1874,8 +2399,18 @@ export const liveHindi: typeof liveEnglish = {
     'Messages समीक्षा आगे नहीं बढ़ सकी। इस कार्रवाई से कोई संदेश नहीं भेजा गया।',
   'live.companion.composerBlocked':
     'हर सुरक्षा जाँच पास होने तक Messages समीक्षा रुकी है।',
+  'live.companion.contactsReconnectRequired':
+    'Google Contacts फिर जोड़ें और फिर इस Messages ड्राफ़्ट की समीक्षा करें।',
+  'live.companion.contactsFreshnessUnavailable':
+    'Contacts को सुरक्षित रूप से ताज़ा नहीं किया जा सका। इंटरनेट कनेक्शन जाँचकर समीक्षा फिर करें।',
+  'live.companion.reconnectContacts': 'Google Contacts फिर जोड़ें',
+  'live.companion.contactsRepairAccepted':
+    'Contacts पहुँच फिर जाँची गई। Messages ड्राफ़्ट की समीक्षा दोबारा करें।',
   'live.privacy.title': 'गोपनीयता नियंत्रण',
   'live.privacy.body': 'पुष्टि से पहले सटीक परिणाम देखें।',
+  'live.privacy.screenCaptureTitle': 'स्क्रीन गोपनीयता',
+  'live.privacy.screenCaptureBody':
+    'जहाँ सिस्टम इसकी अनुमति देता है, Birthday Autopilot ऐप स्विचर में निजी सामग्री छिपाता है। ऐप खुला होने पर लिए गए स्क्रीनशॉट या रिकॉर्डिंग में नाम, फ़ोन नंबर या संदेश रह सकते हैं। साझा करने से पहले उन्हें जाँचें।',
   'live.privacy.loading': 'गोपनीयता जानकारी लोड हो रही है',
   'live.privacy.unavailable': 'गोपनीयता जानकारी उपलब्ध नहीं है',
   'live.privacy.choose': 'कार्रवाई चुनें',
@@ -1992,6 +2527,19 @@ export const liveHindi: typeof liveEnglish = {
     'इस डिवाइस से किया गया मिटाने का अनुरोध पूरा हुआ',
   'live.privacy.deletionCompleteBody':
     'उस अनुरोध से जुड़े ऐप खाते और सर्वर डेटा का मिटना सत्यापित हुआ। यह किसी नए जुड़े खाते का वर्णन नहीं करता। Messages, SMS, iCloud, कैरियर, प्राप्तकर्ता और बाहरी बैकअप प्रतियाँ इस ऐप के बाहर रहती हैं।',
+  'live.privacy.cloudMetadataTitle':
+    'क्लाउड सेवा मेटाडेटा सामग्री-रहित है, डेटा-रहित नहीं',
+  'live.privacy.cloudMetadataBody':
+    'Firebase Authentication, Installations और App Check खाते, इंस्टॉलेशन, ऐप/डिवाइस सत्यापन, प्रोजेक्ट, अनुरोध और सुरक्षा मेटाडेटा संसाधित करते हैं। Remote Config एक परिचालन AI फ़्लैग लाने के लिए Firebase Installations टोकन भी इस्तेमाल करता है। इन रास्तों से कच्चे Contacts या जन्मदिन संदेश की सामग्री नहीं जाती, लेकिन सेवा मेटाडेटा डिवाइस की सीमा से बाहर जाता है।',
+  'live.privacy.androidCoordinationBoundary':
+    'केवल चालू Android प्राप्तकर्ताओं के लिए डुप्लिकेट-सुरक्षा समन्वय को तय लंबाई वाले छद्मनामित घटना और गंतव्य आधार, साथ में सीमित समय और भेजने वाले की सुरक्षा सीमा मिलती है। डुप्लिकेट रोकने के लिए ये रिकॉर्ड सुरक्षित खाते में जोड़े जा सकते हैं; ये अनाम नहीं हैं।',
+  'live.privacy.iosCoordinationBoundary':
+    'iOS, Android की डुप्लिकेट-सुरक्षा समन्वय सेवा में लोगों को पंजीकृत नहीं करता और अपने-आप संदेश नहीं भेज सकता। ज़रूरत पर सुरक्षित Android सह-अस्तित्व के लिए वह सामग्री-रहित खाता-स्थिति और सफ़ाई अनुरोध करता है।',
+  'live.privacy.geminiBoundary':
+    'Gemini सुझाव अनुरोध में केवल भाषा, भाव, नाम शैली और SMS-भाग की पसंद होती है। उसमें संपर्क नाम, फ़ोन नंबर, जन्मदिन, संदेश इतिहास और मौजूदा सहेजा या ड्राफ़्ट संदेश नहीं होता।',
+  'live.privacy.providerRetentionTitle': 'प्रदाता की डेटा-रखाव सीमा',
+  'live.privacy.providerRetentionBody':
+    'Firebase, Google, Gemini, कैरियर, Messages, iCloud और बैकअप प्रदाता अपनी नीतियों और कानूनी दायित्वों के तहत प्रमाणीकरण, इंस्टॉलेशन, सत्यापन, अनुरोध/जवाब, परिचालन, दुरुपयोग-रोकथाम, बिलिंग या ट्रांसपोर्ट रिकॉर्ड रख सकते हैं। उत्पाद से मिटाना Birthday Autopilot के नियंत्रण वाले डेटा पर लागू होता है; यह प्रदाता लॉग या बाहरी प्रतियों के तुरंत मिटने का वादा नहीं कर सकता। विवरण के लिए मौजूदा सार्वजनिक गोपनीयता नीति देखें।',
   'live.help.title': 'सहायता, कानूनी और परिचय',
   'live.help.body':
     'सार्वजनिक नीतियाँ पढ़ें, सत्यापित सहायता लें या ऐप दोबारा इंस्टॉल किए बिना खाता मिटाने की वेबसाइट इस्तेमाल करें।',
@@ -2027,6 +2575,14 @@ export const liveHindi: typeof liveEnglish = {
   'live.diagnostics.build': 'ऐप बिल्ड',
   'live.diagnostics.system': 'फ़ोन सिस्टम',
   'live.diagnostics.transitions': 'स्थिति बदलाव',
+  'live.diagnostics.health': 'रिपोर्ट की गई स्थिति',
+  'live.diagnostics.healthClear': 'कोई तकनीकी समस्या रिपोर्ट नहीं हुई',
+  'live.diagnostics.healthReported': '{{count}} तकनीकी जाँच रिपोर्ट हुईं',
+  'live.diagnostics.healthReported_one': '{{count}} तकनीकी जाँच रिपोर्ट हुई',
+  'live.diagnostics.healthReported_other': '{{count}} तकनीकी जाँच रिपोर्ट हुईं',
+  'live.diagnostics.schedulerHeartbeat': 'शेड्यूलर संकेत',
+  'live.diagnostics.earliestEvent': 'रखी गई सबसे पहली स्थिति का बदलाव',
+  'live.diagnostics.latestEvent': 'रखी गई सबसे नई स्थिति का बदलाव',
   'live.diagnostics.capabilities': 'तकनीकी कोड',
   'live.diagnostics.share': 'डायग्नोस्टिक्स साझा करें',
   'live.diagnostics.sharing': 'शेयर स्क्रीन खुल रही है…',

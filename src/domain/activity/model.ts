@@ -54,6 +54,7 @@ export type DiagnosticsPreview = Readonly<{
   androidOrIosVersionLabel: string;
   capabilityCodes: readonly SafeReasonCode[];
   transitionCount: number;
+  schedulerHeartbeatAt?: UtcInstant | undefined;
   earliestEventAt?: UtcInstant | undefined;
   latestEventAt?: UtcInstant | undefined;
   excludesPrivateContent: true;

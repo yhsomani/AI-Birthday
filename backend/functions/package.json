@@ -17,8 +17,8 @@
     "test": "vitest run --exclude test/firestore.rules.emulator.test.ts --exclude test/controlPlane.emulator.test.ts",
     "test:coverage": "vitest run --coverage --exclude test/firestore.rules.emulator.test.ts --exclude test/controlPlane.emulator.test.ts",
     "test:emulator": "firebase emulators:exec --config ../firebase.json --project demo-birthday-autopilot --only firestore \"vitest run test/*.emulator.test.ts\"",
-    "check": "npm run typecheck && npm run lint && npm test",
-    "audit:ci": "npm audit --audit-level=high"
+    "check": "npm run typecheck && npm run lint && npm run build && npm run test:coverage",
+    "audit:ci": "npm audit --audit-level=high && npm audit --omit=dev --audit-level=moderate"
   },
   "dependencies": {
     "firebase-admin": "13.10.0",
@@ -28,7 +28,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@firebase/rules-unit-testing": "5.0.1",
-    "@types/node": "24.10.1",
+    "@types/node": "22.20.1",
     "@typescript-eslint/eslint-plugin": "8.63.0",
     "@typescript-eslint/parser": "8.63.0",
     "@vitest/coverage-v8": "4.1.10",
@@ -39,5 +39,16 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.63.0",
     "vitest": "4.1.10"
+  },
+  "overrides": {
+    "gaxios": {
+      "uuid": "11.1.1"
+    },
+    "google-gax": {
+      "uuid": "11.1.1"
+    },
+    "teeny-request": {
+      "uuid": "11.1.1"
+    }
   }
 }

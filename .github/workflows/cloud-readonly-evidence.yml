@@ -1,0 +1,284 @@
+name: Cloud production read-only evidence observation
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_revision:
+        description: Exact clean 40-character Git revision selected for the audit
+        required: true
+        type: string
+      project_id:
+        description: Exact production Firebase/Google Cloud project ID
+        required: true
+        type: string
+      project_number:
+        description: Exact production Google Cloud project number
+        required: true
+        type: string
+      billing_account_id:
+        description: Exact billing account ID attached to the production project
+        required: true
+        type: string
+      firebase_android_app_id:
+        description: Exact production Firebase Android app ID
+        required: true
+        type: string
+      firebase_ios_app_id:
+        description: Exact production Firebase iOS app ID
+        required: true
+        type: string
+      firebase_web_app_id:
+        description: Exact production Firebase web app ID used by Hosting deletion
+        required: true
+        type: string
+      runtime_service_account:
+        description: Exact dedicated Functions runtime service-account email
+        required: true
+        type: string
+      hosting_site_id:
+        description: Exact production Firebase Hosting site ID
+        required: true
+        type: string
+      logging_location:
+        description: Exact approved Cloud Logging bucket location
+        required: true
+        type: string
+      ios_app_check_provider:
+        description: Exact production iOS App Check provider compiled into this source
+        required: true
+        type: choice
+        options:
+          - app-attest
+      retained_project_assignment:
+        description: The one tier assigned to relateai-birthday-ysomani
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: cloud-production-readonly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    name: Observe configured production state without mutation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: cloud-production-readonly-audit
+    env:
+      CI: 'true'
+      CLOUDSDK_CORE_DISABLE_PROMPTS: '1'
+      PROJECT_ID: ${{ inputs.project_id }}
+      PROJECT_NUMBER: ${{ inputs.project_number }}
+      BILLING_ACCOUNT_ID: ${{ inputs.billing_account_id }}
+      ANDROID_APP_ID: ${{ inputs.firebase_android_app_id }}
+      IOS_APP_ID: ${{ inputs.firebase_ios_app_id }}
+      WEB_APP_ID: ${{ inputs.firebase_web_app_id }}
+      RUNTIME_SERVICE_ACCOUNT: ${{ inputs.runtime_service_account }}
+      HOSTING_SITE_ID: ${{ inputs.hosting_site_id }}
+      LOGGING_LOCATION: ${{ inputs.logging_location }}
+      IOS_APP_CHECK_PROVIDER: ${{ inputs.ios_app_check_provider }}
+      RETAINED_PROJECT_ASSIGNMENT: ${{ inputs.retained_project_assignment }}
+      EXPECTED_SOURCE_REVISION: ${{ inputs.source_revision }}
+      CLOUD_AUDIT_WIF_PROVIDER: ${{ vars.CLOUD_AUDIT_WIF_PROVIDER }}
+      CLOUD_AUDIT_SERVICE_ACCOUNT: ${{ vars.CLOUD_AUDIT_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Check out the workflow-selected source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_revision }}
+          persist-credentials: false
+
+      - name: Validate every explicit coordinate before authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse --verify HEAD)" = "$EXPECTED_SOURCE_REVISION"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          [[ "$PROJECT_ID" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]
+          [[ "$PROJECT_NUMBER" =~ ^[1-9][0-9]{5,19}$ ]]
+          [[ "$BILLING_ACCOUNT_ID" =~ ^[0-9A-F]{6}-[0-9A-F]{6}-[0-9A-F]{6}$ ]]
+          [[ "$ANDROID_APP_ID" =~ ^1:${PROJECT_NUMBER}:android:[0-9a-f]{8,64}$ ]]
+          [[ "$IOS_APP_ID" =~ ^1:${PROJECT_NUMBER}:ios:[0-9a-f]{8,64}$ ]]
+          [[ "$WEB_APP_ID" =~ ^1:${PROJECT_NUMBER}:web:[0-9a-f]{8,64}$ ]]
+          [[ "$RUNTIME_SERVICE_ACCOUNT" =~ ^[a-z][a-z0-9-]{2,62}@${PROJECT_ID}\.iam\.gserviceaccount\.com$ ]]
+          [[ "$HOSTING_SITE_ID" =~ ^[a-z0-9][a-z0-9-]{4,62}$ ]]
+          [[ "$LOGGING_LOCATION" =~ ^(global|eu|us|[a-z]+-[a-z]+[0-9])$ ]]
+          [[ "$CLOUD_AUDIT_SERVICE_ACCOUNT" =~ ^[a-z][a-z0-9-]{2,62}@${PROJECT_ID}\.iam\.gserviceaccount\.com$ ]]
+          [[ "$CLOUD_AUDIT_WIF_PROVIDER" =~ ^projects/[1-9][0-9]{5,19}/locations/global/workloadIdentityPools/[a-z0-9-]{4,32}/providers/[a-z0-9-]{4,32}$ ]]
+          test "$RUNTIME_SERVICE_ACCOUNT" != "$CLOUD_AUDIT_SERVICE_ACCOUNT"
+
+      - name: Set up the repository Node.js line
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Pin npm and install the locked Firebase inspection CLI
+        run: |
+          npm install --global npm@11.6.0
+          npm ci --prefix backend/functions
+          test "$(node --version)" = v24.18.0
+          test "$(npm --version)" = 11.6.0
+          test "$(backend/functions/node_modules/.bin/firebase --version)" = 15.23.0
+
+      - name: Authenticate through keyless Workload Identity Federation
+        id: google-auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ inputs.project_id }}
+          workload_identity_provider: ${{ vars.CLOUD_AUDIT_WIF_PROVIDER }}
+          service_account: ${{ vars.CLOUD_AUDIT_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Set up the exact Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          version: 575.0.1
+          project_id: ${{ inputs.project_id }}
+
+      - name: Verify the observed project and active read-only identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gcloud version --format=json | jq -r '."Google Cloud SDK"')" = 575.0.1
+          test "$(gcloud projects describe "$PROJECT_ID" --project="$PROJECT_ID" --format='value(projectNumber)')" = "$PROJECT_NUMBER"
+          test "$(gcloud auth list --filter='status:ACTIVE' --format='value(account)')" = "$CLOUD_AUDIT_SERVICE_ACCOUNT"
+          test "$(gcloud billing projects describe "$PROJECT_ID" --format='value(billingAccountName.basename())')" = "$BILLING_ACCOUNT_ID"
+
+      - name: Collect only list, describe, get-policy, and GET observations
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          output="$GITHUB_WORKSPACE/release-evidence/cloud-production-readonly/raw"
+          mkdir -p "$output"
+
+          jq -n \
+            --arg sourceRevision "$EXPECTED_SOURCE_REVISION" \
+            --arg projectId "$PROJECT_ID" \
+            --arg projectNumber "$PROJECT_NUMBER" \
+            --arg androidAppId "$ANDROID_APP_ID" \
+            --arg iosAppId "$IOS_APP_ID" \
+            --arg webAppId "$WEB_APP_ID" \
+            --arg runtimeServiceAccount "$RUNTIME_SERVICE_ACCOUNT" \
+            --arg auditServiceAccount "$CLOUD_AUDIT_SERVICE_ACCOUNT" \
+            --arg hostingSiteId "$HOSTING_SITE_ID" \
+            --arg loggingLocation "$LOGGING_LOCATION" \
+            --arg retainedProjectAssignment "$RETAINED_PROJECT_ASSIGNMENT" \
+            --arg workflowRun "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg observedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schemaVersion:1,sourceRevision:$sourceRevision,projectId:$projectId,projectNumber:$projectNumber,androidAppId:$androidAppId,iosAppId:$iosAppId,webAppId:$webAppId,runtimeServiceAccount:$runtimeServiceAccount,auditServiceAccount:$auditServiceAccount,hostingSiteId:$hostingSiteId,loggingLocation:$loggingLocation,retainedProjectAssignment:$retainedProjectAssignment,workflowRun:$workflowRun,observedAt:$observedAt,mutationAuthorized:false}' \
+            > "$output/workflow-context.json"
+
+          gcloud version --format=json > "$output/gcloud-version.json"
+          gcloud projects describe "$PROJECT_ID" --project="$PROJECT_ID" --format=json > "$output/project.json"
+          gcloud billing projects describe "$PROJECT_ID" --format=json > "$output/project-billing.json"
+          gcloud beta billing budgets list --billing-account="$BILLING_ACCOUNT_ID" --format=json > "$output/budgets.json"
+          gcloud services list --enabled --project="$PROJECT_ID" --format=json > "$output/enabled-services.json"
+
+          gcloud functions list --v2 --regions=asia-south1 --project="$PROJECT_ID" --format=json > "$output/functions-v2.json"
+          gcloud scheduler jobs list --location=asia-south1 --project="$PROJECT_ID" --format=json > "$output/scheduler-jobs.json"
+
+          gcloud firestore databases describe --database='(default)' --project="$PROJECT_ID" --format=json > "$output/firestore-database.json"
+          gcloud firestore fields ttls list --database='(default)' --project="$PROJECT_ID" --format=json > "$output/firestore-ttls.json"
+          gcloud firestore indexes composite list --database='(default)' --project="$PROJECT_ID" --format=json > "$output/firestore-indexes.json"
+          gcloud firestore backups schedules list --database='(default)' --project="$PROJECT_ID" --format=json > "$output/firestore-backup-schedules.json"
+          gcloud firestore backups list --location=- --project="$PROJECT_ID" --format=json > "$output/firestore-backups.json"
+
+          gcloud secrets describe COORDINATION_HMAC_KEYRING --project="$PROJECT_ID" --format=json > "$output/keyring-secret-metadata.json"
+          gcloud secrets versions list COORDINATION_HMAC_KEYRING --project="$PROJECT_ID" --format=json > "$output/keyring-version-metadata.json"
+
+          gcloud iam service-accounts describe "$RUNTIME_SERVICE_ACCOUNT" --project="$PROJECT_ID" --format=json > "$output/runtime-service-account.json"
+          gcloud iam service-accounts keys list --iam-account="$RUNTIME_SERVICE_ACCOUNT" --managed-by=user --project="$PROJECT_ID" --format=json > "$output/runtime-user-managed-keys.json"
+          gcloud iam service-accounts describe "$CLOUD_AUDIT_SERVICE_ACCOUNT" --project="$PROJECT_ID" --format=json > "$output/audit-service-account.json"
+          gcloud iam service-accounts keys list --iam-account="$CLOUD_AUDIT_SERVICE_ACCOUNT" --managed-by=user --project="$PROJECT_ID" --format=json > "$output/audit-user-managed-keys.json"
+          gcloud projects get-iam-policy "$PROJECT_ID" --flatten='bindings[].members' --filter="bindings.members:serviceAccount:$RUNTIME_SERVICE_ACCOUNT" --format=json > "$output/runtime-project-iam.json"
+          gcloud projects get-iam-policy "$PROJECT_ID" --flatten='bindings[].members' --filter="bindings.members:serviceAccount:$CLOUD_AUDIT_SERVICE_ACCOUNT" --format=json > "$output/audit-project-iam.json"
+
+          gcloud logging exclusions list --project="$PROJECT_ID" --format=json > "$output/logging-exclusions.json"
+          gcloud logging sinks list --project="$PROJECT_ID" --format=json > "$output/logging-sinks.json"
+          gcloud logging buckets describe _Default --location="$LOGGING_LOCATION" --project="$PROJECT_ID" --format=json > "$output/logging-default-bucket.json"
+          gcloud logging buckets describe _Required --location="$LOGGING_LOCATION" --project="$PROJECT_ID" --format=json > "$output/logging-required-bucket.json"
+
+          backend/functions/node_modules/.bin/firebase apps:list --project "$PROJECT_ID" --json --non-interactive > "$output/firebase-apps.json"
+          backend/functions/node_modules/.bin/firebase hosting:sites:list --project "$PROJECT_ID" --json --non-interactive > "$output/firebase-hosting-sites.json"
+          jq -e --arg app "$ANDROID_APP_ID" '.. | strings | select(. == $app)' "$output/firebase-apps.json" > /dev/null
+          jq -e --arg app "$IOS_APP_ID" '.. | strings | select(. == $app)' "$output/firebase-apps.json" > /dev/null
+          jq -e --arg app "$WEB_APP_ID" '.. | strings | select(. == $app)' "$output/firebase-apps.json" > /dev/null
+          jq -e --arg site "$HOSTING_SITE_ID" '.. | strings | select(. == $site)' "$output/firebase-hosting-sites.json" > /dev/null
+
+          access_token="$(gcloud auth print-access-token)"
+          curl_readonly() {
+            local endpoint="$1"
+            local destination="$2"
+            {
+              printf '%s\n' 'fail' 'silent' 'show-error' 'proto = "=https"' 'tlsv1.2' 'request = "GET"'
+              printf 'header = "Authorization: Bearer %s"\n' "$access_token"
+              printf 'url = "%s"\n' "$endpoint"
+            } | curl --config - > "$destination"
+          }
+          curl_readonly \
+            "https://firebaseappcheck.googleapis.com/v1/projects/$PROJECT_NUMBER/apps/$ANDROID_APP_ID/playIntegrityConfig" \
+            "$output/android-app-check.json"
+          test "$IOS_APP_CHECK_PROVIDER" = 'app-attest'
+          ios_provider_path=appAttestConfig
+          curl_readonly \
+            "https://firebaseappcheck.googleapis.com/v1/projects/$PROJECT_NUMBER/apps/$IOS_APP_ID/$ios_provider_path" \
+            "$output/ios-app-check.json"
+          curl_readonly \
+            "https://firebaseappcheck.googleapis.com/v1/projects/$PROJECT_NUMBER/apps/$WEB_APP_ID/recaptchaEnterpriseConfig" \
+            "$output/web-app-check.json"
+          curl_readonly \
+            "https://firebaseremoteconfig.googleapis.com/v1/projects/$PROJECT_ID/remoteConfig" \
+            "$output/remote-config.json"
+          unset access_token
+
+          test "$(jq -r '.projectId' "$output/project.json")" = "$PROJECT_ID"
+          test "$(jq -r '.projectNumber' "$output/project.json")" = "$PROJECT_NUMBER"
+          test "$(jq 'length' "$output/firestore-backup-schedules.json")" = 0
+          test "$(jq 'length' "$output/firestore-backups.json")" = 0
+          test "$(jq 'length' "$output/runtime-user-managed-keys.json")" = 0
+          test "$(jq 'length' "$output/audit-user-managed-keys.json")" = 0
+
+      - name: Create immutable observation manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/create-evidence-manifest.mjs \
+            --base "$GITHUB_WORKSPACE" \
+            --label cloud-production-readonly \
+            --output release-evidence/cloud-production-readonly/evidence-manifest.json \
+            release-evidence/cloud-production-readonly/raw
+          tar \
+            --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            --format=ustar \
+            -cf release-evidence/cloud-production-readonly/cloud-readonly-observation.tar \
+            -C release-evidence/cloud-production-readonly \
+            evidence-manifest.json raw
+          sha256sum \
+            release-evidence/cloud-production-readonly/cloud-readonly-observation.tar \
+            > release-evidence/cloud-production-readonly/cloud-readonly-observation.tar.sha256
+          git diff --exit-code
+
+      - name: Upload protected read-only observations
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: cloud-production-readonly-${{ github.run_id }}
+          path: release-evidence/cloud-production-readonly/
+          if-no-files-found: error
+          retention-days: 14

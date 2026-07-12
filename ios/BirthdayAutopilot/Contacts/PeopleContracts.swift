@@ -5,6 +5,109 @@ let birthdayContactsReadOnlyScope =
 let birthdayPeoplePersonFields = "names,birthdays,phoneNumbers,metadata"
 let birthdayPeopleContactSource = "READ_SOURCE_TYPE_CONTACT"
 
+/// Capacity supported by the current encrypted whole-snapshot store and the signed-device
+/// performance gate. Raising any value requires page-staged storage plus new 10k-or-larger RSS,
+/// latency, cancellation, and rollback evidence; it is not a cosmetic API-limit change.
+enum IOSPeopleCapacityPolicy {
+  static let maximumPeople = 10_000
+  static let maximumPageBytes = 4 * 1_024 * 1_024
+  static let maximumTotalResponseBytes = 16 * 1_024 * 1_024
+  static let maximumEncryptedSnapshotBytes = 32 * 1_024 * 1_024
+}
+
+enum IOSContactsFreshnessSourceState {
+  case verified
+  case retainedAfterFailure
+  case authorizationRequired
+  case safetyPaused
+  case unavailable
+}
+
+enum IOSContactsFreshnessBand: String {
+  case normal = "NORMAL"
+  case staleWarning = "STALE_WARNING"
+  case safetyPaused = "SAFETY_PAUSED"
+  case untrusted = "UNTRUSTED"
+}
+
+struct IOSContactsFreshnessAssessment {
+  let band: IOSContactsFreshnessBand
+  let lastSuccessAt: Date?
+
+  var allowsCompanionAction: Bool {
+    band == .normal || band == .staleWarning
+  }
+}
+
+/// Shared 7/30-day Contacts policy. All age comparisons use a recent authenticated server-time
+/// observation advanced only by a bounded, nonnegative local receipt interval. A clock rollback,
+/// future timestamp, missing observation, or arithmetic anomaly fails closed.
+enum IOSContactsFreshnessPolicy {
+  static let normalMaximumAge: TimeInterval = 7 * 24 * 60 * 60
+  static let companionMaximumAge: TimeInterval = 30 * 24 * 60 * 60
+
+  static func assess(
+    sourceState: IOSContactsFreshnessSourceState,
+    lastSuccessAt: Date?,
+    trustedNow: Date?
+  ) -> IOSContactsFreshnessAssessment {
+    if sourceState == .authorizationRequired || sourceState == .safetyPaused {
+      return IOSContactsFreshnessAssessment(
+        band: .safetyPaused,
+        lastSuccessAt: lastSuccessAt
+      )
+    }
+    guard sourceState == .verified || sourceState == .retainedAfterFailure,
+      let lastSuccessAt, let trustedNow,
+      valid(lastSuccessAt), valid(trustedNow)
+    else {
+      return IOSContactsFreshnessAssessment(
+        band: .untrusted,
+        lastSuccessAt: lastSuccessAt
+      )
+    }
+    let age = trustedNow.timeIntervalSince(lastSuccessAt)
+    guard age.isFinite, age >= 0 else {
+      return IOSContactsFreshnessAssessment(
+        band: .untrusted,
+        lastSuccessAt: lastSuccessAt
+      )
+    }
+    let band: IOSContactsFreshnessBand
+    if age <= normalMaximumAge {
+      band = .normal
+    } else if age <= companionMaximumAge {
+      band = .staleWarning
+    } else {
+      band = .safetyPaused
+    }
+    return IOSContactsFreshnessAssessment(band: band, lastSuccessAt: lastSuccessAt)
+  }
+
+  static func estimateTrustedNow(
+    serverObservedAt: Date?,
+    locallyReceivedAt: Date,
+    now: Date,
+    maximumObservationAge: TimeInterval
+  ) -> Date? {
+    guard let serverObservedAt,
+      valid(serverObservedAt), valid(locallyReceivedAt), valid(now),
+      maximumObservationAge.isFinite, maximumObservationAge >= 0
+    else { return nil }
+    let receiptAge = now.timeIntervalSince(locallyReceivedAt)
+    guard receiptAge.isFinite, receiptAge >= 0, receiptAge <= maximumObservationAge else {
+      return nil
+    }
+    let candidate = serverObservedAt.addingTimeInterval(receiptAge)
+    return valid(candidate) ? candidate : nil
+  }
+
+  private static func valid(_ date: Date) -> Bool {
+    let value = date.timeIntervalSince1970
+    return value.isFinite && value >= 0
+  }
+}
+
 enum IOSPeopleSyncMode: Equatable {
   case full
   case incremental(syncToken: String, parameterFingerprint: String)
@@ -96,17 +199,22 @@ struct IOSPeopleSyncLimits: Equatable {
 
   init(
     pageSize: Int = 1_000,
-    maximumPageBytes: Int = 8 * 1_024 * 1_024,
-    maximumTotalBytes: Int = 64 * 1_024 * 1_024,
+    maximumPageBytes: Int = IOSPeopleCapacityPolicy.maximumPageBytes,
+    maximumTotalBytes: Int = IOSPeopleCapacityPolicy.maximumTotalResponseBytes,
     maximumPages: Int = 100,
-    maximumPeople: Int = 100_000,
+    maximumPeople: Int = IOSPeopleCapacityPolicy.maximumPeople,
     maximumDuration: TimeInterval = 120
   ) {
     precondition((1...1_000).contains(pageSize))
-    precondition((1...16 * 1_024 * 1_024).contains(maximumPageBytes))
-    precondition(maximumTotalBytes >= maximumPageBytes)
+    precondition((1...IOSPeopleCapacityPolicy.maximumPageBytes).contains(maximumPageBytes))
+    precondition(
+      maximumTotalBytes >= maximumPageBytes
+        && maximumTotalBytes <= IOSPeopleCapacityPolicy.maximumTotalResponseBytes
+    )
     precondition((1...1_000).contains(maximumPages))
-    precondition(maximumPeople >= pageSize)
+    precondition(
+      maximumPeople >= pageSize && maximumPeople <= IOSPeopleCapacityPolicy.maximumPeople
+    )
     precondition((1...600).contains(maximumDuration))
     self.pageSize = pageSize
     self.maximumPageBytes = maximumPageBytes

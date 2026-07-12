@@ -12,14 +12,31 @@ import com.yashsomani.birthdayautopilot.BuildConfig
 import com.yashsomani.birthdayautopilot.auth.ForegroundActivityRegistry
 import com.yashsomani.birthdayautopilot.auth.TelephonyPermissionResult
 import com.yashsomani.birthdayautopilot.automation.orchestration.AutomationOpaqueIds
+import com.yashsomani.birthdayautopilot.automation.orchestration.SystemComposerRetirementReceipt
+import com.yashsomani.birthdayautopilot.automation.sms.SubmissionGate
 import com.yashsomani.birthdayautopilot.configuration.ConfigurationCanonicalHash
 import com.yashsomani.birthdayautopilot.configuration.ConfigurationOutcome
+import com.yashsomani.birthdayautopilot.configuration.ConfigurationOwnershipPolicy
 import com.yashsomani.birthdayautopilot.coordination.CoordinationValuePolicy
+import com.yashsomani.birthdayautopilot.contacts.UnicodeTextSafety
+import com.yashsomani.birthdayautopilot.core.model.AccountMode
+import com.yashsomani.birthdayautopilot.messages.AndroidUserControlledSmsComposer
+import com.yashsomani.birthdayautopilot.messages.SystemSmsComposerIntentPolicy
+import com.yashsomani.birthdayautopilot.messages.UserControlledSmsComposer
+import com.yashsomani.birthdayautopilot.messages.UserControlledSmsComposerDraft
+import com.yashsomani.birthdayautopilot.messages.UserControlledSmsComposerOpenResult
+import com.yashsomani.birthdayautopilot.people.recordContactsConsentDecision
+import com.yashsomani.birthdayautopilot.readiness.AndroidAppStandbyBucketDiagnosticReader
 import com.yashsomani.birthdayautopilot.storage.database.BirthdayDatabase
 import com.yashsomani.birthdayautopilot.storage.database.ConfigurationReviewEntity
+import com.yashsomani.birthdayautopilot.storage.database.ConsentDecision
+import com.yashsomani.birthdayautopilot.storage.database.ConsentKind
+import com.yashsomani.birthdayautopilot.storage.database.ControlEntity
 import com.yashsomani.birthdayautopilot.storage.database.AccountRecordState
 import com.yashsomani.birthdayautopilot.storage.database.AccountRecordEntity
 import com.yashsomani.birthdayautopilot.storage.database.InstallationRecordState
+import com.yashsomani.birthdayautopilot.storage.database.ReconcileHeartbeatPolicy
+import com.yashsomani.birthdayautopilot.storage.database.ReconcileHeartbeatStatus
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -55,16 +72,39 @@ internal sealed interface SenderTransferConfirmationOutcome {
   data class Rejected(val outcome: ConfigurationOutcome) : SenderTransferConfirmationOutcome
 }
 
+private data class SystemComposerLaunchPlan(
+  val draft: UserControlledSmsComposerDraft,
+  val retirement: SystemComposerRetirementReceipt,
+)
+
+private data class TodayOccurrenceOwnerBinding(
+  val installationId: String,
+  val senderEpoch: Long,
+  val resetGeneration: Long,
+)
+
+private sealed interface TodayOccurrenceOwnerCheck {
+  data class Ready(val binding: TodayOccurrenceOwnerBinding) : TodayOccurrenceOwnerCheck
+  data class Rejected(val outcome: ConfigurationOutcome) : TodayOccurrenceOwnerCheck
+}
+
 internal class AndroidLifecycleController(
   context: Context,
   private val database: BirthdayDatabase,
   private val activityProvider: () -> Activity? = ForegroundActivityRegistry::current,
   private val wallClockMillis: () -> Long = System::currentTimeMillis,
   private val accountSessionMatches: (AccountRecordEntity) -> Boolean = { true },
+  private val userControlledSmsComposer: UserControlledSmsComposer =
+    AndroidUserControlledSmsComposer(),
+  private val submissionGate: SubmissionGate = SubmissionGate(context),
+  private val appStandbyBucketCode: () -> String = {
+    AndroidAppStandbyBucketDiagnosticReader(context).read().wireCode
+  },
 ) {
   private val appContext = context.applicationContext
   private val dao = database.lifecycleProjectionDao()
   private val configurationDao = database.configurationDao()
+  private val safetyLedger = database.safetyLedgerDao()
   private val stateStore = LifecycleStateStore(appContext)
 
   suspend fun activityPayload(request: JSONObject): JSONObject? {
@@ -119,18 +159,33 @@ internal class AndroidLifecycleController(
   }
 
   suspend fun diagnosticsPayload(): JSONObject {
+    val standbyCode = appStandbyBucketCode()
     if (lifecycleJournalUnreadable()) {
       return JSONObject()
         .put("buildLabel", "Birthday Autopilot ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         .put("androidOrIosVersionLabel", "Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}")
-        .put("capabilityCodes", JSONArray(listOf("coordination-unavailable")))
+        .put(
+          "capabilityCodes",
+          JSONArray(listOf(standbyCode, "coordination-unavailable")),
+        )
         .put("transitionCount", 0)
         .put("excludesPrivateContent", true)
     }
     val cutoff = stateStore.activityVisibilityCutoffMillis()
     val bounds = dao.activityBounds(cutoff)
-    val codes = dao.activityPage(cutoff, false, Long.MAX_VALUE, "", 64)
+    val heartbeat = dao.activeAccount()?.let { account ->
+      ReconcileHeartbeatPolicy.snapshot(safetyLedger.getReadinessState(account.accountId))
+    }
+    val activityCodes = dao.activityPage(cutoff, false, Long.MAX_VALUE, "", 64)
       .mapNotNull { safeReason(it.safeCode ?: it.state) }
+    val schedulerCodes = buildList {
+      heartbeat?.safeCode?.let(::safeReason)?.let(::add)
+      if (
+        heartbeat?.status == ReconcileHeartbeatStatus.RETRYING ||
+        heartbeat?.status == ReconcileHeartbeatStatus.FAILED
+      ) add("scheduler-delayed")
+    }
+    val codes = (listOf(standbyCode) + activityCodes + schedulerCodes)
       .distinct()
       .take(64)
     return JSONObject()
@@ -146,6 +201,9 @@ internal class AndroidLifecycleController(
         bounds.latestMillis?.takeIf { it >= 0 }?.let {
           put("latestEventAt", Instant.ofEpochMilli(it).toString())
         }
+        heartbeat?.heartbeatAtMillis?.takeIf { it > 0 }?.let {
+          put("schedulerHeartbeatAt", Instant.ofEpochMilli(it).toString())
+        }
       }
   }
 
@@ -158,6 +216,9 @@ internal class AndroidLifecycleController(
       append("Build: ").append(preview.getString("buildLabel")).append('\n')
       append("System: ").append(preview.getString("androidOrIosVersionLabel")).append('\n')
       append("Transitions: ").append(preview.getInt("transitionCount")).append('\n')
+      if (preview.has("schedulerHeartbeatAt")) {
+        append("Scheduler heartbeat: ").append(preview.getString("schedulerHeartbeatAt")).append('\n')
+      }
       append("Codes: ").append(
         (0 until preview.getJSONArray("capabilityCodes").length()).joinToString(",") {
           preview.getJSONArray("capabilityCodes").getString(it)
@@ -234,6 +295,11 @@ internal class AndroidLifecycleController(
     val control = dao.control() ?: return internal("LIFECYCLE_CONTROL_MISSING")
     if (control.revision != expectedRevision) return stale(control.revision)
     val account = dao.activeAccount() ?: return conflict("account-reconnect-required")
+    if (!accountSessionMatches(account)) return conflict("account-reconnect-required")
+    val ownerBinding = when (val check = todayOccurrenceOwner(account.accountId, control)) {
+      is TodayOccurrenceOwnerCheck.Ready -> check.binding
+      is TodayOccurrenceOwnerCheck.Rejected -> return check.outcome
+    }
     val occurrence = dao.todayOccurrence(occurrenceId)
       ?.takeIf { it.accountId == account.accountId }
       ?: return conflict("approval-invalid")
@@ -247,21 +313,25 @@ internal class AndroidLifecycleController(
     if (!safeDisplayName(occurrence.recipient) || !safeMessage(occurrence.exactText)) {
       return internal("LIFECYCLE_PRIVATE_REVIEW_INVALID")
     }
-    val choice = if (
-      now >= occurrence.resolvedWindowStartMillis && now < occurrence.resolvedWindowEndMillis
-    ) {
-      CHOICE_NORMAL_PATH
-    } else {
-      CHOICE_NEXT_YEAR
-    }
+    val choices = TodayOccurrenceChoicePolicy.evaluate(
+      nowMillis = now,
+      windowStartMillis = occurrence.resolvedWindowStartMillis,
+      windowEndMillis = occurrence.resolvedWindowEndMillis,
+      resetSafetyAllowsBirthday =
+        dao.resetSafetyAllowsBirthday(account.accountId, occurrence.localDate) == 1,
+    )
     val payloadJson = JSONObject()
       .put("occurrenceId", occurrence.occurrenceId)
       .put("occurrenceRevision", occurrence.occurrenceRevision)
-      .put("choice", choice)
+      .put("primaryChoice", choices.primary.wireValue)
+      .put("alternativeChoice", choices.alternative?.wireValue.orEmpty())
+      .put("installationId", ownerBinding.installationId)
+      .put("senderEpoch", ownerBinding.senderEpoch)
+      .put("resetGeneration", ownerBinding.resetGeneration)
       .toString()
     val ttlExpiry = safeAdd(now, REVIEW_TTL_MILLIS)
       ?: return internal("LIFECYCLE_TIME_OVERFLOW")
-    val expires = if (choice == CHOICE_NORMAL_PATH) {
+    val expires = if (choices.primary == TodayOccurrenceChoice.NORMAL_PATH) {
       minOf(ttlExpiry, occurrence.resolvedWindowEndMillis)
     } else {
       ttlExpiry
@@ -287,84 +357,227 @@ internal class AndroidLifecycleController(
       JSONObject()
         .put("handle", handle)
         .put("recipient", occurrence.recipient)
+        .put("maskedDestination", occurrence.maskedDestination)
         .put("exactText", occurrence.exactText)
-        .put("choice", choice)
-        .put("limitationsDisclosure", TODAY_LIMITATIONS),
+        .put("choice", choices.primary.wireValue)
+        .put("limitationsDisclosure", todayLimitations(choices.primary))
+        .apply {
+          choices.alternative?.let { put("alternativeChoice", it.wireValue) }
+        },
     )
   }
 
   suspend fun confirmTodayOccurrence(
     request: JSONObject,
     expectedRevision: Long,
-  ): ConfigurationOutcome = database.withTransaction {
-    if (lifecycleJournalUnreadable()) {
-      return@withTransaction conflict("coordination-unavailable")
-    }
-    if (
-      request.keyNames() != setOf("handle", "expectedRevision") ||
-      request.optString("expectedRevision") != expectedRevision.toString()
-    ) return@withTransaction ConfigurationOutcome.InvalidRequest
-    val handle = request.optString("handle")
-    if (!TODAY_HANDLE.matches(handle)) return@withTransaction ConfigurationOutcome.InvalidRequest
-    val now = wallClockMillis()
-    val control = dao.control() ?: return@withTransaction internal("LIFECYCLE_CONTROL_MISSING")
-    if (control.revision != expectedRevision) return@withTransaction stale(control.revision)
-    val review = dao.review(handle)
-      ?: return@withTransaction conflict("approval-invalid")
-    if (
-      review.kind != REVIEW_TODAY ||
-      review.controlRevision != expectedRevision ||
-      review.blockerRevision != control.blockerRevision ||
-      review.consumedAtMillis != null ||
-      review.expiresAtMillis <= now ||
-      !ConfigurationCanonicalHash.matches(
-        ConfigurationCanonicalHash.payload(review.kind, review.payloadJson),
-        review.payloadHash,
+  ): ConfigurationOutcome = submissionGate.withExclusiveBoundary {
+    confirmTodayOccurrenceInsideBoundary(request, expectedRevision)
+  }
+
+  private suspend fun confirmTodayOccurrenceInsideBoundary(
+    request: JSONObject,
+    expectedRevision: Long,
+  ): ConfigurationOutcome {
+    var composerLaunchPlan: SystemComposerLaunchPlan? = null
+    val outcome = database.withTransaction {
+      if (lifecycleJournalUnreadable()) {
+        return@withTransaction conflict("coordination-unavailable")
+      }
+      if (
+        request.keyNames() != setOf("handle", "choice", "expectedRevision") ||
+        request.optString("expectedRevision") != expectedRevision.toString()
+      ) return@withTransaction ConfigurationOutcome.InvalidRequest
+      val requestedChoice = TodayOccurrenceChoice.fromWire(request.optString("choice"))
+        ?: return@withTransaction ConfigurationOutcome.InvalidRequest
+      val handle = request.optString("handle")
+      if (!TODAY_HANDLE.matches(handle)) return@withTransaction ConfigurationOutcome.InvalidRequest
+      val now = wallClockMillis()
+      val control = dao.control() ?: return@withTransaction internal("LIFECYCLE_CONTROL_MISSING")
+      if (control.revision != expectedRevision) return@withTransaction stale(control.revision)
+      val review = dao.review(handle)
+        ?: return@withTransaction conflict("approval-invalid")
+      if (
+        review.kind != REVIEW_TODAY ||
+        review.controlRevision != expectedRevision ||
+        review.blockerRevision != control.blockerRevision ||
+        review.consumedAtMillis != null ||
+        review.expiresAtMillis <= now ||
+        !ConfigurationCanonicalHash.matches(
+          ConfigurationCanonicalHash.payload(review.kind, review.payloadJson),
+          review.payloadHash,
+        )
+      ) return@withTransaction stale(control.revision)
+      val payload = runCatching { JSONObject(review.payloadJson) }.getOrNull()
+        ?: return@withTransaction internal("LIFECYCLE_REVIEW_CORRUPT")
+      if (payload.keyNames() != TODAY_REVIEW_KEYS) {
+        return@withTransaction internal("LIFECYCLE_REVIEW_CORRUPT")
+      }
+      val occurrenceId = payload.optString("occurrenceId")
+      val occurrenceRevision = payload.optLong("occurrenceRevision", -1)
+      val primaryChoice = TodayOccurrenceChoice.fromWire(payload.optString("primaryChoice"))
+      val alternativeChoice = payload.optString("alternativeChoice")
+        .takeIf(String::isNotEmpty)
+        ?.let(TodayOccurrenceChoice::fromWire)
+      val reviewedOwnerBinding = TodayOccurrenceOwnerBinding(
+        installationId = payload.optString("installationId"),
+        senderEpoch = payload.optLong("senderEpoch", -1),
+        resetGeneration = payload.optLong("resetGeneration", -1),
       )
-    ) return@withTransaction stale(control.revision)
-    val payload = runCatching { JSONObject(review.payloadJson) }.getOrNull()
-      ?: return@withTransaction internal("LIFECYCLE_REVIEW_CORRUPT")
-    if (payload.keyNames() != TODAY_REVIEW_KEYS) {
-      return@withTransaction internal("LIFECYCLE_REVIEW_CORRUPT")
-    }
-    val occurrenceId = payload.optString("occurrenceId")
-    val occurrenceRevision = payload.optLong("occurrenceRevision", -1)
-    val choice = payload.optString("choice")
-    if (
-      !OCCURRENCE_ID.matches(occurrenceId) ||
-      occurrenceRevision < 0 ||
-      choice !in setOf(CHOICE_NORMAL_PATH, CHOICE_NEXT_YEAR)
-    ) return@withTransaction internal("LIFECYCLE_REVIEW_CORRUPT")
-    val account = dao.activeAccount() ?: return@withTransaction conflict("account-reconnect-required")
-    val occurrence = dao.todayOccurrence(occurrenceId)
-      ?.takeIf { it.accountId == account.accountId && it.occurrenceRevision == occurrenceRevision }
-      ?: return@withTransaction stale(control.revision)
-    val changed = if (choice == CHOICE_NORMAL_PATH) {
-      database.automationOrchestrationDao().scheduleReviewedOccurrence(
-        occurrenceId,
-        occurrenceRevision,
-        now,
+      if (
+        !OCCURRENCE_ID.matches(occurrenceId) ||
+        occurrenceRevision < 0 ||
+        primaryChoice == null ||
+        (payload.optString("alternativeChoice").isNotEmpty() && alternativeChoice == null) ||
+        !INSTALLATION_ID.matches(reviewedOwnerBinding.installationId) ||
+        reviewedOwnerBinding.senderEpoch <= 0 ||
+        reviewedOwnerBinding.resetGeneration <= 0
+      ) return@withTransaction internal("LIFECYCLE_REVIEW_CORRUPT")
+      if (requestedChoice !in setOfNotNull(primaryChoice, alternativeChoice)) {
+        return@withTransaction conflict("approval-invalid")
+      }
+      val account = dao.activeAccount()
+        ?: return@withTransaction conflict("account-reconnect-required")
+      if (!accountSessionMatches(account)) {
+        return@withTransaction conflict("account-reconnect-required")
+      }
+      if (review.accountId != account.accountId) return@withTransaction stale(control.revision)
+      val currentOwnerBinding = when (val check = todayOccurrenceOwner(account.accountId, control)) {
+        is TodayOccurrenceOwnerCheck.Ready -> check.binding
+        is TodayOccurrenceOwnerCheck.Rejected -> return@withTransaction check.outcome
+      }
+      if (currentOwnerBinding != reviewedOwnerBinding) {
+        return@withTransaction conflict("active-sender-other-device")
+      }
+      val occurrence = dao.todayOccurrence(occurrenceId)
+        ?.takeIf { it.accountId == account.accountId && it.occurrenceRevision == occurrenceRevision }
+        ?: return@withTransaction stale(control.revision)
+      val zone = runCatching { ZoneId.of(occurrence.timeZoneId) }.getOrNull()
+        ?: return@withTransaction internal("LIFECYCLE_TIME_ZONE_INVALID")
+      val localDate = runCatching {
+        Instant.ofEpochMilli(now).atZone(zone).toLocalDate().toString()
+      }.getOrNull() ?: return@withTransaction internal("LIFECYCLE_TIME_INVALID")
+      if (occurrence.localDate != localDate) return@withTransaction conflict("birthday-conflict")
+      val currentChoices = TodayOccurrenceChoicePolicy.evaluate(
+        nowMillis = now,
+        windowStartMillis = occurrence.resolvedWindowStartMillis,
+        windowEndMillis = occurrence.resolvedWindowEndMillis,
+        resetSafetyAllowsBirthday =
+          dao.resetSafetyAllowsBirthday(account.accountId, occurrence.localDate) == 1,
       )
-    } else {
-      database.automationOrchestrationDao().deferReviewedOccurrenceToNextYear(
-        occurrenceId,
-        occurrenceRevision,
-        now,
+      if (requestedChoice !in setOfNotNull(currentChoices.primary, currentChoices.alternative)) {
+        return@withTransaction conflict("birthday-conflict")
+      }
+      val orchestration = database.automationOrchestrationDao()
+      val changed = when (requestedChoice) {
+        TodayOccurrenceChoice.NORMAL_PATH -> orchestration.scheduleReviewedOccurrence(
+          occurrenceId,
+          occurrenceRevision,
+          now,
+        )
+        TodayOccurrenceChoice.NEXT_YEAR -> orchestration.deferReviewedOccurrenceToNextYear(
+          occurrenceId,
+          occurrenceRevision,
+          now,
+        )
+        TodayOccurrenceChoice.SYSTEM_COMPOSER -> {
+          val draft = UserControlledSmsComposerDraft(
+            canonicalRecipient = occurrence.canonicalRecipient,
+            exactApprovedBody = occurrence.exactText,
+          )
+          if (
+            !SystemSmsComposerIntentPolicy.validDraft(draft) ||
+            !userControlledSmsComposer.canOpen(draft)
+          ) return@withTransaction conflict("system-composer-unavailable")
+          val retirement = orchestration.retireReviewedOccurrenceForSystemComposer(
+            occurrenceId,
+            occurrenceRevision,
+            now,
+          )
+          if (retirement == null) {
+            false
+          } else {
+            composerLaunchPlan = SystemComposerLaunchPlan(draft, retirement)
+            true
+          }
+        }
+      }
+      if (!changed) return@withTransaction conflict("birthday-conflict")
+      if (
+        dao.consumeReview(
+          review.reviewId,
+          review.kind,
+          review.controlRevision,
+          review.blockerRevision,
+          now,
+        ) != 1
+      ) error("today-review-consume-failed")
+      ConfigurationOutcome.Success(
+        JSONObject(),
+        setOf("automation", "home", "activity", "readiness"),
       )
     }
-    if (!changed) return@withTransaction conflict("birthday-conflict")
+    val launchPlan = composerLaunchPlan
+    if (outcome is ConfigurationOutcome.Success && launchPlan != null) {
+      when (userControlledSmsComposer.open(launchPlan.draft)) {
+        UserControlledSmsComposerOpenResult.OPENED -> Unit
+        UserControlledSmsComposerOpenResult.KNOWN_FAILURE -> {
+          val restored = database.automationOrchestrationDao()
+            .restoreKnownFailedSystemComposerRetirement(
+              launchPlan.retirement,
+              wallClockMillis(),
+            )
+          return conflict(
+            if (restored) {
+              "system-composer-unavailable"
+            } else {
+              "system-composer-outcome-unknown"
+            },
+          )
+        }
+        UserControlledSmsComposerOpenResult.UNKNOWN ->
+          return conflict("system-composer-outcome-unknown")
+      }
+    }
+    return outcome
+  }
+
+  private suspend fun todayOccurrenceOwner(
+    accountId: String,
+    control: ControlEntity,
+  ): TodayOccurrenceOwnerCheck {
+    val mode = runCatching { AccountMode.valueOf(control.accountMode) }.getOrNull()
+      ?: return TodayOccurrenceOwnerCheck.Rejected(
+      internal("LIFECYCLE_CONTROL_INVALID"),
+    )
+    ConfigurationOwnershipPolicy.blockedReason(mode)?.let { reason ->
+      return TodayOccurrenceOwnerCheck.Rejected(conflict(reason))
+    }
+    val orchestration = database.automationOrchestrationDao()
+    val local = orchestration.localInstallation()
+      ?: return TodayOccurrenceOwnerCheck.Rejected(conflict("active-sender-other-device"))
+    val coordination = orchestration.coordinationState(accountId)
+      ?: return TodayOccurrenceOwnerCheck.Rejected(conflict("coordination-unavailable"))
+    val epoch = local.senderEpoch
     if (
-      dao.consumeReview(
-        review.reviewId,
-        review.kind,
-        review.controlRevision,
-        review.blockerRevision,
-        now,
-      ) != 1
-    ) error("today-review-consume-failed")
-    ConfigurationOutcome.Success(
-      JSONObject(),
-      setOf("automation", "home", "activity", "readiness"),
+      local.accountId != accountId ||
+      local.localSlot != 1 ||
+      local.state != InstallationRecordState.ACTIVE ||
+      local.accountMode != mode ||
+      epoch == null ||
+      epoch <= 0 ||
+      local.resetGeneration <= 0 ||
+      control.activeInstallationEpoch != epoch ||
+      coordination.mode != mode ||
+      coordination.activeInstallationId != local.installationId ||
+      coordination.senderEpoch != epoch ||
+      coordination.resetGeneration != local.resetGeneration
+    ) return TodayOccurrenceOwnerCheck.Rejected(conflict("active-sender-other-device"))
+    return TodayOccurrenceOwnerCheck.Ready(
+      TodayOccurrenceOwnerBinding(
+        local.installationId,
+        epoch,
+        local.resetGeneration,
+      ),
     )
   }
 
@@ -1059,6 +1272,71 @@ internal class AndroidLifecycleController(
     return operation
   }
 
+  fun markContactResetRemoteCompleted(plan: PrivacyActionPlan): DurablePrivacyOperation? {
+    if (plan.action !in setOf("disconnect-contacts", "revoke-google-access")) return null
+    val current = stateStore.operation(plan.operationId)?.takeIf {
+      it.action == plan.action &&
+        it.localDataErased &&
+        it.state !in setOf("complete", "failed")
+    } ?: return null
+    val at = wallClockMillis().coerceAtLeast(0)
+    val completed = current.copy(
+      state = if (plan.action == "disconnect-contacts") "complete" else "verifying",
+      reason = null,
+      updatedAtMillis = at,
+      completedAtMillis = at.takeIf { plan.action == "disconnect-contacts" },
+      remoteDrainUntilMillis = null,
+      serverObservedAtMillis = null,
+      acceptedAtElapsedMillis = null,
+      acceptedBootCount = null,
+    )
+    return completed.takeIf { stateStore.putOperation(it) }
+  }
+
+  suspend fun markGoogleAccessRevoked(plan: PrivacyActionPlan): DurablePrivacyOperation? {
+    if (plan.action != "revoke-google-access") return null
+    val current = stateStore.operation(plan.operationId)?.takeIf {
+      it.action == plan.action &&
+        it.localDataErased &&
+        it.state == "verifying"
+    } ?: return null
+    val recorded = database.withTransaction {
+      val account = configurationDao.activeAccount() ?: return@withTransaction false
+      recordContactsConsentDecision(
+        dao = configurationDao,
+        accountId = account.accountId,
+        kind = ConsentKind.CONTACTS_READONLY,
+        decision = ConsentDecision.REVOKED,
+        nowMillis = wallClockMillis().coerceAtLeast(0),
+      )
+    }
+    if (!recorded) return null
+    val revoked = current.copy(
+      reason = "account-reconnect-required",
+      updatedAtMillis = wallClockMillis().coerceAtLeast(0),
+      remoteAccessRevoked = true,
+    )
+    return revoked.takeIf { stateStore.putOperation(it) }
+  }
+
+  fun markGoogleAccessRevocationPending(
+    plan: PrivacyActionPlan,
+    reason: String,
+  ): DurablePrivacyOperation? {
+    if (plan.action != "revoke-google-access") return null
+    val current = stateStore.operation(plan.operationId)?.takeIf {
+      it.action == plan.action &&
+        it.localDataErased &&
+        it.state == "verifying"
+    } ?: return null
+    val pending = current.copy(
+      reason = reason.takeIf { it in LifecycleStateStore.SAFE_REASONS }
+        ?: "internal-contract-invalid",
+      updatedAtMillis = wallClockMillis().coerceAtLeast(0),
+    )
+    return pending.takeIf { stateStore.putOperation(it) }
+  }
+
   fun markRemoteDraining(
     plan: PrivacyActionPlan,
     requestId: String,
@@ -1160,6 +1438,7 @@ internal class AndroidLifecycleController(
    */
   fun persistReleaseRequestBinding(
     plan: PrivacyActionPlan,
+    account: AccountRecordEntity,
     installationId: String,
     senderEpoch: Long,
     resetGeneration: Long,
@@ -1186,6 +1465,14 @@ internal class AndroidLifecycleController(
           current.remoteRequestResetGeneration != resetGeneration
       )) return null
     val firstBindingWrite = existing.all { it == null }
+    val existingRecoveryProof = senderReleaseRecoveryBindingProof(current)
+    val recoveryProof = existingRecoveryProof
+      ?: SenderReleaseRecoveryBindingPolicy.from(account)
+      ?: return null
+    if (
+      existingRecoveryProof != null &&
+      !SenderReleaseRecoveryBindingPolicy.matchesAccount(existingRecoveryProof, account)
+    ) return null
     val updated = current.copy(
       state = if (firstBindingWrite) "remote-pending" else current.state,
       reason = if (firstBindingWrite) "coordination-unavailable" else current.reason,
@@ -1194,6 +1481,9 @@ internal class AndroidLifecycleController(
       remoteRequestInstallationId = installationId,
       remoteRequestSenderEpoch = senderEpoch,
       remoteRequestResetGeneration = resetGeneration,
+      senderReleaseRecoverySalt = recoveryProof.salt,
+      senderReleaseRecoveryFirebaseUidHash = recoveryProof.firebaseUidHash,
+      senderReleaseRecoveryGoogleSubjectHash = recoveryProof.googleSubjectHash,
     )
     return updated.takeIf { stateStore.putOperation(it) }
   }
@@ -1234,7 +1524,9 @@ internal class AndroidLifecycleController(
         (current.requestId != null || current.authoritativeRecoveryKind == "sender-release") &&
         current.remoteRequestInstallationId == installationId &&
         current.remoteRequestSenderEpoch?.let { it > 0 } == true &&
-        current.remoteRequestResetGeneration?.let { it > 0 } == true
+        current.remoteRequestResetGeneration?.let { it > 0 } == true &&
+        (current.authoritativeRecoveryKind == "sender-release" ||
+          senderReleaseRecoveryBindingProof(current) != null)
     }
     if (!eligible) return null
     val marked = current.copy(
@@ -1300,7 +1592,83 @@ internal class AndroidLifecycleController(
     return safeAdd(latest, 1) ?: Long.MAX_VALUE
   }
 
-  fun completeExternalPrivacyAction(plan: PrivacyActionPlan): DurablePrivacyOperation = complete(plan)
+  fun markDestructiveLocalDataErased(plan: PrivacyActionPlan): DurablePrivacyOperation? {
+    val current = stateStore.operation(plan.operationId)?.takeIf {
+      it.action == plan.action &&
+        it.action in setOf("sign-out-wipe", "wipe-local-data") &&
+        it.state == "local-wiping" &&
+        it.localWipeStarted &&
+        senderReleaseRecoveryBindingProof(it) != null
+    } ?: return null
+    val erased = current.copy(
+      state = "remote-pending",
+      reason = "coordination-unavailable",
+      updatedAtMillis = wallClockMillis().coerceAtLeast(0),
+      completedAtMillis = null,
+      localDataErased = true,
+      localWipeStarted = false,
+      wipeInstallationId = null,
+      wipeCallbackGeneration = null,
+    )
+    return erased.takeIf { stateStore.putOperation(it) }
+  }
+
+  fun completeSenderReleaseRemoteCleanup(plan: PrivacyActionPlan): DurablePrivacyOperation? {
+    val current = stateStore.operation(plan.operationId)?.takeIf {
+      it.action == plan.action &&
+        it.action in setOf("sign-out-wipe", "wipe-local-data") &&
+        it.localDataErased &&
+        it.state in setOf("remote-pending", "remote-draining") &&
+        senderReleaseRecoveryBindingProof(it) != null
+    } ?: return null
+    val at = wallClockMillis().coerceAtLeast(0)
+    val completed = current.copy(
+      state = "complete",
+      reason = null,
+      updatedAtMillis = at,
+      completedAtMillis = at,
+      requestId = null,
+      remoteDrainUntilMillis = null,
+      serverObservedAtMillis = null,
+      acceptedAtElapsedMillis = null,
+      acceptedBootCount = null,
+      remoteRequestInstallationId = null,
+      remoteRequestSenderEpoch = null,
+      remoteRequestResetGeneration = null,
+      senderReleaseRecoverySalt = null,
+      senderReleaseRecoveryFirebaseUidHash = null,
+      senderReleaseRecoveryGoogleSubjectHash = null,
+    )
+    return completed.takeIf { stateStore.putOperation(it) }
+  }
+
+  fun completeAuthoritativeSenderReleaseLocalErase(
+    plan: PrivacyActionPlan,
+  ): DurablePrivacyOperation? {
+    val current = stateStore.operation(plan.operationId)?.takeIf {
+      it.action == plan.action &&
+        it.action in setOf("sign-out-wipe", "wipe-local-data") &&
+        it.authoritativeRecoveryKind == "sender-release" &&
+        it.state == "local-wiping" &&
+        it.localWipeStarted
+    } ?: return null
+    val at = wallClockMillis().coerceAtLeast(0)
+    val completed = current.copy(
+      state = "complete",
+      reason = null,
+      updatedAtMillis = at,
+      completedAtMillis = at,
+      localDataErased = true,
+      localWipeStarted = false,
+      wipeInstallationId = null,
+      wipeCallbackGeneration = null,
+      remoteRequestInstallationId = null,
+      remoteRequestSenderEpoch = null,
+      remoteRequestResetGeneration = null,
+      authoritativeRecoveryKind = null,
+    )
+    return completed.takeIf { stateStore.putOperation(it) }
+  }
 
   fun failExternalPrivacyAction(
     plan: PrivacyActionPlan,
@@ -1335,15 +1703,9 @@ internal class AndroidLifecycleController(
     )
   }
 
-  suspend fun disconnectContacts(
-    plan: PrivacyActionPlan,
-    accountId: String,
-  ): DurablePrivacyOperation = purgeContactDerivedState(plan, accountId, completeAfterPurge = true)
-
   suspend fun purgeContactDerivedState(
     plan: PrivacyActionPlan,
     accountId: String,
-    completeAfterPurge: Boolean = false,
   ): DurablePrivacyOperation {
     markLocalWiping(plan)
     return try {
@@ -1356,6 +1718,15 @@ internal class AndroidLifecycleController(
           control.automationDesired ||
           control.accountMode != "PAUSED_REPAIR"
         ) return@withTransaction false
+
+        val now = wallClockMillis().coerceAtLeast(0)
+        if (!recordContactsConsentDecision(
+            dao = configurationDao,
+            accountId = accountId,
+            kind = ConsentKind.CONTACTS_DISCLOSURE,
+            decision = ConsentDecision.REVOKED,
+            nowMillis = now,
+          )) return@withTransaction false
 
         dao.deleteDeliveryEvents(accountId)
         dao.deleteCallbackTokens(accountId)
@@ -1375,7 +1746,7 @@ internal class AndroidLifecycleController(
         dao.deleteStagingBirthdays(accountId)
         dao.deleteStagingPhones(accountId)
         dao.deleteStagingContacts(accountId)
-        check(dao.markContactsDisconnected(accountId, wallClockMillis()) == 1) {
+        check(dao.markContactsDisconnected(accountId, now) == 1) {
           "contacts-disconnect-sync-state-failed"
         }
         dao.deleteSyncGenerations(accountId)
@@ -1389,15 +1760,34 @@ internal class AndroidLifecycleController(
       }
       if (!purged) {
         markLocalCleanupPending(plan, "internal-contract-invalid")
-      } else if (completeAfterPurge) {
-        complete(plan)
       } else {
-        markLocalWiping(plan)
+        val current = stateStore.operation(plan.operationId)
+          ?.takeIf { it.action == plan.action }
+          ?: return markLocalCleanupPending(plan, "internal-contract-invalid")
+        val locallyErased = current.copy(
+          state = "remote-pending",
+          reason = "coordination-unavailable",
+          updatedAtMillis = wallClockMillis().coerceAtLeast(0),
+          completedAtMillis = null,
+          localDataErased = true,
+          authoritativeRecoveryKind = null,
+        )
+        if (stateStore.putOperation(locallyErased)) {
+          locallyErased
+        } else {
+          markLocalCleanupPending(plan, "internal-contract-invalid")
+        }
       }
     } catch (_: RuntimeException) {
       markLocalCleanupPending(plan, "internal-contract-invalid")
     }
   }
+
+  /** Local-only portion of disconnect; authoritative remote reset owns terminal completion. */
+  suspend fun disconnectContacts(
+    plan: PrivacyActionPlan,
+    accountId: String,
+  ): DurablePrivacyOperation = purgeContactDerivedState(plan, accountId)
 
   fun operationPayload(id: String): JSONObject? = if (lifecycleJournalUnreadable()) {
     unavailableOrNonePayload()
@@ -1479,6 +1869,41 @@ internal class AndroidLifecycleController(
         operation.deletionRetryAllowed &&
         operation.remoteDeletionComplete == false
     } == true
+
+  fun senderReleaseRecoveryReauthenticationAllowed(): Boolean = stateStore.latestOperation()
+    ?.let { operation ->
+      operation.action in setOf("sign-out-wipe", "wipe-local-data") &&
+        operation.localDataErased &&
+        operation.state in setOf("remote-pending", "remote-draining") &&
+        operation.requestId != null &&
+        operation.remoteRequestInstallationId != null &&
+        operation.remoteRequestSenderEpoch?.let { it > 0 } == true &&
+        operation.remoteRequestResetGeneration?.let { it > 0 } == true &&
+        senderReleaseRecoveryBindingProof(operation) != null
+    } == true
+
+  fun matchesSenderReleaseRecoveryBinding(
+    binding: com.yashsomani.birthdayautopilot.auth.NativeAccountBinding,
+  ): Boolean = stateStore.latestOperation()?.let(::senderReleaseRecoveryBindingProof)?.let { proof ->
+    SenderReleaseRecoveryBindingPolicy.matches(proof, binding)
+  } == true
+
+  fun matchesSenderReleaseRecoveryGoogleSubject(
+    googleSubject: String,
+  ): Boolean = stateStore.latestOperation()?.let(::senderReleaseRecoveryBindingProof)?.let { proof ->
+    SenderReleaseRecoveryBindingPolicy.matchesGoogleSubject(proof, googleSubject)
+  } == true
+
+  private fun senderReleaseRecoveryBindingProof(
+    operation: DurablePrivacyOperation,
+  ): SenderReleaseRecoveryBindingProof? {
+    if (operation.action !in setOf("sign-out-wipe", "wipe-local-data")) return null
+    return SenderReleaseRecoveryBindingProof(
+      salt = operation.senderReleaseRecoverySalt ?: return null,
+      firebaseUidHash = operation.senderReleaseRecoveryFirebaseUidHash ?: return null,
+      googleSubjectHash = operation.senderReleaseRecoveryGoogleSubjectHash ?: return null,
+    ).takeIf(SenderReleaseRecoveryBindingPolicy::valid)
+  }
 
   fun matchesDeletionRecoveryBinding(
     binding: com.yashsomani.birthdayautopilot.auth.NativeAccountBinding,
@@ -1777,6 +2202,17 @@ internal class AndroidLifecycleController(
       return JSONObject().put(
         "kind",
         if (result == TelephonyPermissionResult.UNAVAILABLE) "cancelled" else "opened",
+      ).put(
+        "permissionResult",
+        when (result) {
+          TelephonyPermissionResult.GRANTED -> "granted"
+          TelephonyPermissionResult.PHONE_STATE_DENIED -> "phone-state-denied"
+          TelephonyPermissionResult.PHONE_STATE_PERMANENTLY_DENIED ->
+            "phone-state-permanently-denied"
+          TelephonyPermissionResult.SMS_DENIED -> "sms-denied"
+          TelephonyPermissionResult.SMS_PERMANENTLY_DENIED -> "sms-permanently-denied"
+          TelephonyPermissionResult.UNAVAILABLE -> "unavailable"
+        },
       )
     }
     val activity = activityProvider() ?: return JSONObject().put("kind", "cancelled")
@@ -1880,6 +2316,7 @@ internal class AndroidLifecycleController(
     "PARTIAL_DELIVERY" -> "partial-delivery"
     "PARTIAL_DELIVERY_UNKNOWN" -> "partial-delivery-unknown"
     "DELIVERY_UNKNOWN" -> "delivery-unknown"
+    "PARTIAL_UNKNOWN" -> "partial-unknown"
     "SUBMISSION_UNKNOWN" -> "unknown"
     "PERMANENT_FAILURE" -> "permanent-failure"
     "SKIPPED" -> "skipped"
@@ -1968,6 +2405,12 @@ internal class AndroidLifecycleController(
     val current = stateStore.operation(plan.operationId)
       ?.takeIf { it.action == plan.action }
       ?: error("privacy-operation-missing")
+    check(current.action !in setOf("sign-out-wipe", "wipe-local-data", "disconnect-contacts")) {
+      "privacy-operation-requires-authoritative-remote-completion"
+    }
+    check(current.action != "revoke-google-access" || current.remoteAccessRevoked) {
+      "google-access-revocation-not-complete"
+    }
     val operation = current.copy(
       state = "complete",
       reason = null,
@@ -2033,12 +2476,21 @@ internal class AndroidLifecycleController(
     value.length in 1..256 && value.isNotBlank() && value.none(::unsafeUiCharacter)
 
   private fun safeMessage(value: String): Boolean =
-    value.length in 1..1_000 && value.isNotBlank() && value.none { char ->
-      unsafeUiCharacter(char) && char !in setOf('\t', '\n', '\r')
-    }
+    value.length in 1..1_000 &&
+      value.isNotBlank() &&
+      !UnicodeTextSafety.containsUnsafeMessageCodePoint(value)
 
   private fun unsafeUiCharacter(char: Char): Boolean =
     char.code == 0x7f || char.isISOControl() || Character.getType(char) == Character.FORMAT.toInt()
+
+  private fun todayLimitations(choice: TodayOccurrenceChoice): String = when (choice) {
+    TodayOccurrenceChoice.NORMAL_PATH ->
+      "The normal path still requires protected Claim, Arm, and one-shot checks. It does not promise delivery."
+    TodayOccurrenceChoice.SYSTEM_COMPOSER ->
+      "Android will receive only the freshly reviewed recipient and exact approved draft. Opening the composer retires unattended automation for today; you control edit, Send, or Cancel, and the app cannot observe or claim delivery."
+    TodayOccurrenceChoice.NEXT_YEAR ->
+      "Starting next year retires today's unattended occurrence and never sends or opens Messages today."
+  }
 
   private companion object {
     const val MAX_ACTIVITY_PAGE_SIZE = 50
@@ -2047,16 +2499,20 @@ internal class AndroidLifecycleController(
     const val REVIEW_TODAY = "TODAY_OCCURRENCE"
     const val REVIEW_TTL_MILLIS = 10 * 60 * 1_000L
     const val MAX_SAFE_JSON_INTEGER = 9_007_199_254_740_991L
-    const val CHOICE_NORMAL_PATH = "send-through-normal-path"
-    const val CHOICE_NEXT_YEAR = "start-next-year"
-    const val TODAY_LIMITATIONS =
-      "Send uses the normal protected claim, Arm, one-shot barrier, and SMS path. Choosing next year never sends today."
     val CURSOR_SOURCE = Regex("^[A-Za-z0-9][A-Za-z0-9._:-]{0,180}$")
     val OCCURRENCE_ID = Regex("^occ_[a-f0-9]{64}$")
     val TODAY_HANDLE = Regex("^to_[a-f0-9]{32}$")
     val SENDER_TRANSFER_HANDLE = Regex("^st_[a-f0-9]{32}$")
     val INSTALLATION_ID = Regex("^[a-f0-9]{32}$")
-    val TODAY_REVIEW_KEYS = setOf("occurrenceId", "occurrenceRevision", "choice")
+    val TODAY_REVIEW_KEYS = setOf(
+      "occurrenceId",
+      "occurrenceRevision",
+      "primaryChoice",
+      "alternativeChoice",
+      "installationId",
+      "senderEpoch",
+      "resetGeneration",
+    )
     val SENDER_TRANSFER_REVIEW_KEYS = setOf(
       "accountId",
       "activeInstallationId",

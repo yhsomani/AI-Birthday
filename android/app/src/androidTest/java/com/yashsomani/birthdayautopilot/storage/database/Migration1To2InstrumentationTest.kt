@@ -95,7 +95,8 @@ class Migration1To2InstrumentationTest {
         }
         database.query(
           SimpleSQLiteQuery(
-            "SELECT accountMode, automationDesired, blockerRevision, resetSafetyState FROM app_control",
+            "SELECT accountMode, automationDesired, blockerRevision, resetSafetyState, " +
+              "initialActivationCompleted FROM app_control",
           ),
         ).use { cursor ->
           cursor.moveToFirst()
@@ -103,6 +104,7 @@ class Migration1To2InstrumentationTest {
           assertEquals(0, cursor.getInt(1))
           assertEquals(10, cursor.getLong(2))
           assertEquals("REPAIR_REQUIRED", cursor.getString(3))
+          assertEquals(0, cursor.getInt(4))
         }
         database.query(
           SimpleSQLiteQuery("SELECT COUNT(*) FROM contacts WHERE localId = 'legacy-contact'"),

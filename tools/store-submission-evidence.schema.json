@@ -1,0 +1,760 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://birthday-autopilot.invalid/schemas/store-submission-evidence-v1.json",
+  "title": "Birthday Autopilot Play and App Store submission evidence",
+  "description": "Structural contract only. tools/validate-store-submission-evidence.mjs owns the stricter semantic, file-digest, source, artifact, hosting-config, submission-stage, and release-stage checks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "packageStage",
+    "sourceRevision",
+    "approvalScopeSha256",
+    "generatedAt",
+    "validUntil",
+    "releaseCoordinates",
+    "launchCountries",
+    "publicIdentity",
+    "localizations",
+    "assets",
+    "play",
+    "appStore",
+    "accessibility",
+    "evidenceReferences",
+    "approvals"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "packageStage": { "enum": ["draft", "submission", "release"] },
+    "sourceRevision": { "$ref": "#/$defs/nullableRevision" },
+    "approvalScopeSha256": { "$ref": "#/$defs/nullableSha256" },
+    "generatedAt": { "$ref": "#/$defs/nullableInstant" },
+    "validUntil": { "$ref": "#/$defs/nullableInstant" },
+    "releaseCoordinates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["android", "ios"],
+      "properties": {
+        "android": { "$ref": "#/$defs/androidCoordinate" },
+        "ios": { "$ref": "#/$defs/iosCoordinate" }
+      }
+    },
+    "launchCountries": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Z]{2}$" }
+    },
+    "publicIdentity": { "$ref": "#/$defs/publicIdentity" },
+    "localizations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en-US", "hi-IN"],
+      "properties": {
+        "en-US": { "$ref": "#/$defs/localization" },
+        "hi-IN": { "$ref": "#/$defs/localization" }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "playFeatureGraphic",
+        "playPhoneScreenshots",
+        "appStoreIphoneScreenshots"
+      ],
+      "properties": {
+        "playFeatureGraphic": { "$ref": "#/$defs/imageAsset" },
+        "playPhoneScreenshots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/screenshot" }
+        },
+        "appStoreIphoneScreenshots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/screenshot" }
+        }
+      }
+    },
+    "play": { "$ref": "#/$defs/play" },
+    "appStore": { "$ref": "#/$defs/appStore" },
+    "accessibility": { "$ref": "#/$defs/accessibility" },
+    "evidenceReferences": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidenceReference" }
+    },
+    "approvals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/approval" }
+    }
+  },
+  "$defs": {
+    "nullableText": {
+      "type": ["string", "null"]
+    },
+    "nullablePositiveInteger": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "nullableSha256": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullableRevision": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "nullableInstant": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "nullableHttpsUrl": {
+      "type": ["string", "null"],
+      "format": "uri"
+    },
+    "nullableBoolean": {
+      "type": ["boolean", "null"]
+    },
+    "reviewStatus": {
+      "enum": ["pending", "approved"]
+    },
+    "answerStatus": {
+      "enum": ["pending", "not-collected", "collected"]
+    },
+    "androidCoordinate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "applicationId",
+        "versionCode",
+        "versionName",
+        "artifactKind",
+        "artifactFileName",
+        "artifactSha256",
+        "signingCertificateSha256"
+      ],
+      "properties": {
+        "applicationId": { "const": "com.yashsomani.birthdayautopilot" },
+        "versionCode": { "const": 1 },
+        "versionName": { "const": "1.0" },
+        "artifactKind": { "const": "aab" },
+        "artifactFileName": { "$ref": "#/$defs/nullableText" },
+        "artifactSha256": { "$ref": "#/$defs/nullableSha256" },
+        "signingCertificateSha256": { "$ref": "#/$defs/nullableSha256" }
+      }
+    },
+    "iosCoordinate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundleId",
+        "shortVersion",
+        "buildNumber",
+        "artifactKind",
+        "artifactFileName",
+        "artifactSha256",
+        "distributionCertificateSha256"
+      ],
+      "properties": {
+        "bundleId": { "const": "com.yashsomani.birthdayautopilot" },
+        "shortVersion": { "const": "1.0" },
+        "buildNumber": { "const": "1" },
+        "artifactKind": { "const": "ipa" },
+        "artifactFileName": { "$ref": "#/$defs/nullableText" },
+        "artifactSha256": { "$ref": "#/$defs/nullableSha256" },
+        "distributionCertificateSha256": { "$ref": "#/$defs/nullableSha256" }
+      }
+    },
+    "publicIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "developerDisplayName",
+        "supportEmail",
+        "publicSiteBaseUrl",
+        "storeSupportUrl",
+        "privacyUrl",
+        "termsUrl",
+        "deletionUrl",
+        "identityVerifiedSupportUrl"
+      ],
+      "properties": {
+        "developerDisplayName": { "$ref": "#/$defs/nullableText" },
+        "supportEmail": { "$ref": "#/$defs/nullableText" },
+        "publicSiteBaseUrl": { "$ref": "#/$defs/nullableHttpsUrl" },
+        "storeSupportUrl": { "$ref": "#/$defs/nullableHttpsUrl" },
+        "privacyUrl": { "$ref": "#/$defs/nullableHttpsUrl" },
+        "termsUrl": { "$ref": "#/$defs/nullableHttpsUrl" },
+        "deletionUrl": { "$ref": "#/$defs/nullableHttpsUrl" },
+        "identityVerifiedSupportUrl": {
+          "$ref": "#/$defs/nullableHttpsUrl"
+        }
+      }
+    },
+    "localization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "copySha256",
+        "humanReviewReference",
+        "humanReviewSha256",
+        "play",
+        "appStore"
+      ],
+      "properties": {
+        "status": { "enum": ["candidate", "approved"] },
+        "copySha256": { "$ref": "#/$defs/nullableSha256" },
+        "humanReviewReference": { "$ref": "#/$defs/nullableText" },
+        "humanReviewSha256": { "$ref": "#/$defs/nullableSha256" },
+        "play": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title",
+            "shortDescription",
+            "fullDescription",
+            "releaseNotes"
+          ],
+          "properties": {
+            "title": { "type": "string", "minLength": 1, "maxLength": 30 },
+            "shortDescription": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "fullDescription": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "releaseNotes": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          }
+        },
+        "appStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "subtitle",
+            "promotionalText",
+            "description",
+            "keywords",
+            "whatsNew"
+          ],
+          "properties": {
+            "name": { "type": "string", "minLength": 2, "maxLength": 30 },
+            "subtitle": { "type": "string", "minLength": 1, "maxLength": 30 },
+            "promotionalText": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 170
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            },
+            "keywords": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "whatsNew": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000
+            }
+          }
+        }
+      }
+    },
+    "imageAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "file",
+        "sha256",
+        "bytes",
+        "width",
+        "height",
+        "containsRealPersonalData",
+        "approvedForStore"
+      ],
+      "properties": {
+        "status": { "enum": ["missing", "captured"] },
+        "file": { "$ref": "#/$defs/nullableText" },
+        "sha256": { "$ref": "#/$defs/nullableSha256" },
+        "bytes": { "$ref": "#/$defs/nullablePositiveInteger" },
+        "width": { "$ref": "#/$defs/nullablePositiveInteger" },
+        "height": { "$ref": "#/$defs/nullablePositiveInteger" },
+        "containsRealPersonalData": { "$ref": "#/$defs/nullableBoolean" },
+        "approvedForStore": { "$ref": "#/$defs/nullableBoolean" }
+      }
+    },
+    "screenshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "store",
+        "locale",
+        "platform",
+        "deviceClass",
+        "screenId",
+        "variant",
+        "file",
+        "sha256",
+        "bytes",
+        "width",
+        "height",
+        "captureArtifactSha256",
+        "containsRealPersonalData",
+        "imitatesSystemUi",
+        "approvedForStore",
+        "altText"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]{4,64}$" },
+        "status": { "enum": ["missing", "captured"] },
+        "store": { "enum": ["play", "app-store"] },
+        "locale": { "enum": ["en-US", "hi-IN"] },
+        "platform": { "enum": ["android", "ios"] },
+        "deviceClass": { "enum": ["phone", "iphone-6.9"] },
+        "screenId": { "type": "string", "pattern": "^[A-Z][0-9]{2}$" },
+        "variant": {
+          "enum": ["light-default", "dark-default", "light-large-text"]
+        },
+        "file": { "$ref": "#/$defs/nullableText" },
+        "sha256": { "$ref": "#/$defs/nullableSha256" },
+        "bytes": { "$ref": "#/$defs/nullablePositiveInteger" },
+        "width": { "$ref": "#/$defs/nullablePositiveInteger" },
+        "height": { "$ref": "#/$defs/nullablePositiveInteger" },
+        "captureArtifactSha256": { "$ref": "#/$defs/nullableSha256" },
+        "containsRealPersonalData": { "$ref": "#/$defs/nullableBoolean" },
+        "imitatesSystemUi": { "$ref": "#/$defs/nullableBoolean" },
+        "approvedForStore": { "$ref": "#/$defs/nullableBoolean" },
+        "altText": { "type": "string", "minLength": 1, "maxLength": 140 }
+      }
+    },
+    "dataAnswer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataType",
+        "answer",
+        "shared",
+        "ephemeral",
+        "required",
+        "linkedToIdentity",
+        "tracking",
+        "purposes",
+        "implementationNote"
+      ],
+      "properties": {
+        "dataType": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]{1,63}$" },
+        "answer": { "$ref": "#/$defs/answerStatus" },
+        "shared": { "$ref": "#/$defs/nullableBoolean" },
+        "ephemeral": { "$ref": "#/$defs/nullableBoolean" },
+        "required": { "$ref": "#/$defs/nullableBoolean" },
+        "linkedToIdentity": { "$ref": "#/$defs/nullableBoolean" },
+        "tracking": { "$ref": "#/$defs/nullableBoolean" },
+        "purposes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "app-functionality",
+              "analytics",
+              "developer-communications",
+              "advertising-or-marketing",
+              "fraud-prevention-security-compliance",
+              "personalization",
+              "account-management",
+              "other"
+            ]
+          }
+        },
+        "implementationNote": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    },
+    "reviewBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "consoleExportReference",
+        "consoleExportSha256",
+        "taxonomyReviewedAt",
+        "allCurrentConsoleQuestionsAnswered",
+        "sdkPracticesReviewed",
+        "privacyPolicyConsistent",
+        "answers"
+      ],
+      "properties": {
+        "status": { "$ref": "#/$defs/reviewStatus" },
+        "consoleExportReference": { "$ref": "#/$defs/nullableText" },
+        "consoleExportSha256": { "$ref": "#/$defs/nullableSha256" },
+        "taxonomyReviewedAt": { "$ref": "#/$defs/nullableInstant" },
+        "allCurrentConsoleQuestionsAnswered": {
+          "$ref": "#/$defs/nullableBoolean"
+        },
+        "sdkPracticesReviewed": { "$ref": "#/$defs/nullableBoolean" },
+        "privacyPolicyConsistent": { "$ref": "#/$defs/nullableBoolean" },
+        "answers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dataAnswer" }
+        }
+      }
+    },
+    "reviewAccess": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requiresGoogleSignIn",
+        "testAccountProvisioned",
+        "credentialVaultReference",
+        "credentialsEmbedded",
+        "instructionsReference",
+        "instructionsSha256"
+      ],
+      "properties": {
+        "requiresGoogleSignIn": { "const": true },
+        "testAccountProvisioned": { "$ref": "#/$defs/nullableBoolean" },
+        "credentialVaultReference": { "$ref": "#/$defs/nullableText" },
+        "credentialsEmbedded": { "const": false },
+        "instructionsReference": { "$ref": "#/$defs/nullableText" },
+        "instructionsSha256": { "$ref": "#/$defs/nullableSha256" }
+      }
+    },
+    "play": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataSafety",
+        "smsPermissions",
+        "reviewAccess",
+        "contentRating",
+        "targetAudience"
+      ],
+      "properties": {
+        "dataSafety": { "$ref": "#/$defs/reviewBundle" },
+        "smsPermissions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "permissions",
+            "declaredCoreFunctionality",
+            "unattendedPersonalBirthdaySmsOnly",
+            "defaultSmsHandlerClaimed",
+            "alternativeSmsIntentMeetsRequirement",
+            "prominentDisclosureCovered",
+            "carrierChargesDisclosed",
+            "recipientAndContentPreapproved",
+            "declarationReference",
+            "declarationSha256",
+            "demoVideoUrl",
+            "demoVideoEvidenceReference",
+            "demoVideoEvidenceSha256",
+            "reviewerInstructionsReference",
+            "reviewerInstructionsSha256",
+            "policyDecision",
+            "policyDecisionReference",
+            "policyDecisionSha256"
+          ],
+          "properties": {
+            "status": { "$ref": "#/$defs/reviewStatus" },
+            "permissions": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "android.permission.SEND_SMS",
+                  "android.permission.READ_PHONE_STATE"
+                ]
+              }
+            },
+            "declaredCoreFunctionality": { "const": "device-automation" },
+            "unattendedPersonalBirthdaySmsOnly": {
+              "$ref": "#/$defs/nullableBoolean"
+            },
+            "defaultSmsHandlerClaimed": { "const": false },
+            "alternativeSmsIntentMeetsRequirement": { "const": false },
+            "prominentDisclosureCovered": { "$ref": "#/$defs/nullableBoolean" },
+            "carrierChargesDisclosed": { "$ref": "#/$defs/nullableBoolean" },
+            "recipientAndContentPreapproved": {
+              "$ref": "#/$defs/nullableBoolean"
+            },
+            "declarationReference": { "$ref": "#/$defs/nullableText" },
+            "declarationSha256": { "$ref": "#/$defs/nullableSha256" },
+            "demoVideoUrl": { "$ref": "#/$defs/nullableHttpsUrl" },
+            "demoVideoEvidenceReference": { "$ref": "#/$defs/nullableText" },
+            "demoVideoEvidenceSha256": { "$ref": "#/$defs/nullableSha256" },
+            "reviewerInstructionsReference": { "$ref": "#/$defs/nullableText" },
+            "reviewerInstructionsSha256": { "$ref": "#/$defs/nullableSha256" },
+            "policyDecision": { "enum": ["pending", "approved", "rejected"] },
+            "policyDecisionReference": { "$ref": "#/$defs/nullableText" },
+            "policyDecisionSha256": { "$ref": "#/$defs/nullableSha256" }
+          }
+        },
+        "reviewAccess": { "$ref": "#/$defs/reviewAccess" },
+        "contentRating": { "$ref": "#/$defs/consoleDecision" },
+        "targetAudience": { "$ref": "#/$defs/consoleDecision" }
+      }
+    },
+    "consoleDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reference", "sha256"],
+      "properties": {
+        "status": { "$ref": "#/$defs/reviewStatus" },
+        "reference": { "$ref": "#/$defs/nullableText" },
+        "sha256": { "$ref": "#/$defs/nullableSha256" }
+      }
+    },
+    "appStore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "appPrivacy",
+        "privacyManifest",
+        "googleOnlyLoginRationale",
+        "reviewNotes",
+        "reviewAccess",
+        "ageRating",
+        "exportCompliance",
+        "appReviewDecision"
+      ],
+      "properties": {
+        "appPrivacy": { "$ref": "#/$defs/reviewBundle" },
+        "privacyManifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "sourcePath",
+            "sha256",
+            "tracking",
+            "trackingDomains",
+            "requiredReasonApisReviewed",
+            "mergedArchiveManifestReference",
+            "mergedArchiveManifestSha256"
+          ],
+          "properties": {
+            "status": { "$ref": "#/$defs/reviewStatus" },
+            "sourcePath": {
+              "const": "ios/BirthdayAutopilot/PrivacyInfo.xcprivacy"
+            },
+            "sha256": { "$ref": "#/$defs/nullableSha256" },
+            "tracking": { "const": false },
+            "trackingDomains": { "type": "array", "maxItems": 0 },
+            "requiredReasonApisReviewed": { "$ref": "#/$defs/nullableBoolean" },
+            "mergedArchiveManifestReference": {
+              "$ref": "#/$defs/nullableText"
+            },
+            "mergedArchiveManifestSha256": { "$ref": "#/$defs/nullableSha256" }
+          }
+        },
+        "googleOnlyLoginRationale": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "specificThirdPartyServiceClient",
+            "requiredService",
+            "oauthScope",
+            "oneVisibleGoogleAccountChoice",
+            "secondaryPrimaryLoginOffered",
+            "userManagedTokens",
+            "rationaleReference",
+            "rationaleSha256",
+            "reviewGuidelineReviewedAt",
+            "appReviewDisposition",
+            "appReviewReference",
+            "appReviewSha256",
+            "rejectionAction"
+          ],
+          "properties": {
+            "status": { "$ref": "#/$defs/reviewStatus" },
+            "specificThirdPartyServiceClient": {
+              "$ref": "#/$defs/nullableBoolean"
+            },
+            "requiredService": { "const": "Google Contacts" },
+            "oauthScope": {
+              "const": "https://www.googleapis.com/auth/contacts.readonly"
+            },
+            "oneVisibleGoogleAccountChoice": {
+              "$ref": "#/$defs/nullableBoolean"
+            },
+            "secondaryPrimaryLoginOffered": { "const": false },
+            "userManagedTokens": { "const": false },
+            "rationaleReference": { "$ref": "#/$defs/nullableText" },
+            "rationaleSha256": { "$ref": "#/$defs/nullableSha256" },
+            "reviewGuidelineReviewedAt": { "$ref": "#/$defs/nullableInstant" },
+            "appReviewDisposition": {
+              "enum": ["pending", "accepted", "rejected"]
+            },
+            "appReviewReference": { "$ref": "#/$defs/nullableText" },
+            "appReviewSha256": { "$ref": "#/$defs/nullableSha256" },
+            "rejectionAction": {
+              "const": "block-ios-release-and-open-identity-change-control"
+            }
+          }
+        },
+        "reviewNotes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reference",
+            "sha256",
+            "messageUiForegroundUserActionOnly",
+            "messageUiEditable",
+            "userMustTapSend",
+            "unattendedOrBackgroundSmsClaimed",
+            "senderLineOrTransportKnown",
+            "carrierDeliveryGuaranteed",
+            "notificationsBestEffort",
+            "notificationPermissionMayBeDenied",
+            "focusOrSystemMayDelayOrSuppress",
+            "carrierChargesDisclosed",
+            "externalMessagesIcloudCarrierRecipientCopiesDisclosed",
+            "accountDeletionCannotEraseExternalCopies"
+          ],
+          "properties": {
+            "status": { "$ref": "#/$defs/reviewStatus" },
+            "reference": { "$ref": "#/$defs/nullableText" },
+            "sha256": { "$ref": "#/$defs/nullableSha256" },
+            "messageUiForegroundUserActionOnly": {
+              "$ref": "#/$defs/nullableBoolean"
+            },
+            "messageUiEditable": { "$ref": "#/$defs/nullableBoolean" },
+            "userMustTapSend": { "$ref": "#/$defs/nullableBoolean" },
+            "unattendedOrBackgroundSmsClaimed": { "const": false },
+            "senderLineOrTransportKnown": { "const": false },
+            "carrierDeliveryGuaranteed": { "const": false },
+            "notificationsBestEffort": { "$ref": "#/$defs/nullableBoolean" },
+            "notificationPermissionMayBeDenied": {
+              "$ref": "#/$defs/nullableBoolean"
+            },
+            "focusOrSystemMayDelayOrSuppress": {
+              "$ref": "#/$defs/nullableBoolean"
+            },
+            "carrierChargesDisclosed": { "$ref": "#/$defs/nullableBoolean" },
+            "externalMessagesIcloudCarrierRecipientCopiesDisclosed": {
+              "$ref": "#/$defs/nullableBoolean"
+            },
+            "accountDeletionCannotEraseExternalCopies": {
+              "$ref": "#/$defs/nullableBoolean"
+            }
+          }
+        },
+        "reviewAccess": { "$ref": "#/$defs/reviewAccess" },
+        "ageRating": { "$ref": "#/$defs/consoleDecision" },
+        "exportCompliance": { "$ref": "#/$defs/consoleDecision" },
+        "appReviewDecision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["disposition", "reference", "sha256"],
+          "properties": {
+            "disposition": { "enum": ["pending", "accepted", "rejected"] },
+            "reference": { "$ref": "#/$defs/nullableText" },
+            "sha256": { "$ref": "#/$defs/nullableSha256" }
+          }
+        }
+      }
+    },
+    "accessibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "evidenceReference",
+        "evidenceSha256",
+        "englishAndHindi",
+        "talkBack",
+        "voiceOver",
+        "textAt200Percent",
+        "dynamicTypeAccessibilitySizes",
+        "darkMode",
+        "increasedContrast",
+        "reducedMotion",
+        "bidiAndPseudoRtl",
+        "storeAssetAltTextReviewed",
+        "appStoreAccessibilityLabelsSubmitted"
+      ],
+      "properties": {
+        "status": { "$ref": "#/$defs/reviewStatus" },
+        "evidenceReference": { "$ref": "#/$defs/nullableText" },
+        "evidenceSha256": { "$ref": "#/$defs/nullableSha256" },
+        "englishAndHindi": { "$ref": "#/$defs/nullableBoolean" },
+        "talkBack": { "$ref": "#/$defs/nullableBoolean" },
+        "voiceOver": { "$ref": "#/$defs/nullableBoolean" },
+        "textAt200Percent": { "$ref": "#/$defs/nullableBoolean" },
+        "dynamicTypeAccessibilitySizes": { "$ref": "#/$defs/nullableBoolean" },
+        "darkMode": { "$ref": "#/$defs/nullableBoolean" },
+        "increasedContrast": { "$ref": "#/$defs/nullableBoolean" },
+        "reducedMotion": { "$ref": "#/$defs/nullableBoolean" },
+        "bidiAndPseudoRtl": { "$ref": "#/$defs/nullableBoolean" },
+        "storeAssetAltTextReviewed": { "$ref": "#/$defs/nullableBoolean" },
+        "appStoreAccessibilityLabelsSubmitted": {
+          "$ref": "#/$defs/nullableBoolean"
+        }
+      }
+    },
+    "evidenceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "sha256"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$" },
+        "path": { "$ref": "#/$defs/nullableText" },
+        "sha256": { "$ref": "#/$defs/nullableSha256" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "status",
+        "approver",
+        "reference",
+        "sha256",
+        "scopeSha256",
+        "approvedAt",
+        "validUntil"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "product",
+            "engineering",
+            "security",
+            "privacy",
+            "legal-policy",
+            "accessibility-ux",
+            "operations-support",
+            "release"
+          ]
+        },
+        "status": { "$ref": "#/$defs/reviewStatus" },
+        "approver": { "$ref": "#/$defs/nullableText" },
+        "reference": { "$ref": "#/$defs/nullableText" },
+        "sha256": { "$ref": "#/$defs/nullableSha256" },
+        "scopeSha256": { "$ref": "#/$defs/nullableSha256" },
+        "approvedAt": { "$ref": "#/$defs/nullableInstant" },
+        "validUntil": { "$ref": "#/$defs/nullableInstant" }
+      }
+    }
+  }
+}

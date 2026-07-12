@@ -167,6 +167,9 @@ struct CompanionProjectionStatus {
   let resetSafetyOverflowed: Bool
   let resetSafetyVerified: Bool
   let coexistence: Coexistence
+  /// Recent authenticated server time advanced by at most the bounded control-observation age.
+  /// Nil is deliberately different from the device wall clock and always fails freshness closed.
+  let trustedNow: Date?
   let lastReminderReconciledAt: Date?
   let reminderHorizonState: CompanionReminderHorizonState?
   // Native-only workflow data used to build validated React Native
@@ -256,6 +259,9 @@ private struct CompanionProtectedSnapshot: Codable {
   var composerRecords: [CompanionComposerRecord]
   var reminderPlans: [CompanionReminderPlan]
   var notificationIdentities: [CompanionNotificationIdentity]
+  // Optional keeps schema-v2 snapshots written before bounded daily companion
+  // attention notifications forward-readable. Values are content-free civil dates.
+  var attentionNotificationDays: [String: String]?
   var reminderHorizon: CompanionReminderHorizon?
   // Optional migrates schema-v2 snapshots created before durable cold-launch
   // notification routing. This contains no notification request identity.
@@ -280,6 +286,7 @@ private struct CompanionProtectedSnapshot: Codable {
       composerRecords: [],
       reminderPlans: [],
       notificationIdentities: [],
+      attentionNotificationDays: [:],
       reminderHorizon: nil,
       pendingNativeRoute: nil,
       workflow: nil,
@@ -301,6 +308,7 @@ private struct CompanionProtectedSnapshot: Codable {
       composerRecords: [],
       reminderPlans: [],
       notificationIdentities: [],
+      attentionNotificationDays: [:],
       reminderHorizon: nil,
       pendingNativeRoute: nil,
       workflow: nil,
@@ -326,7 +334,7 @@ final class CompanionProtectedStore {
   private static let maximumComposerRecords = 1_024
   private static let maximumProposals = 1_024
   private static let maximumReminderPlans = 500
-  private static let maximumWorkflowContacts = 100_000
+  private static let maximumWorkflowContacts = IOSPeopleCapacityPolicy.maximumPeople
   private static let maximumWorkflowReviews = 32
   private static let maximumWorkflowActivity = 2_048
   private static let maximumWorkflowOperations = 32
@@ -353,7 +361,11 @@ final class CompanionProtectedStore {
 
   private init(
     fileManager: FileManager = .default,
-    calendar: Calendar = .autoupdatingCurrent
+    calendar: Calendar = {
+      var value = Calendar(identifier: .gregorian)
+      value.timeZone = .autoupdatingCurrent
+      return value
+    }()
   ) {
     self.fileManager = fileManager
     self.calendar = calendar
@@ -366,7 +378,7 @@ final class CompanionProtectedStore {
     queue.async {
       let result: Result<CompanionProjectionStatus, CompanionStoreError>
       do {
-        let snapshot = try self.loadSnapshot()
+        let snapshot = try self.loadSnapshotApplyingRetention(now: now)
         let fileURL = try self.storeFileURL()
         let attributes = try self.fileManager.attributesOfItem(atPath: fileURL.path)
         let fileSize = (attributes[.size] as? NSNumber)?.uint64Value ?? 0
@@ -375,6 +387,7 @@ final class CompanionProtectedStore {
         }
 
         let coexistence: CompanionProjectionStatus.Coexistence
+        let trustedNow: Date?
         if let control = snapshot.control {
           let age = now.timeIntervalSince(control.checkedAt)
           if age < -Self.maximumFutureClockSkew || age > Self.coexistenceMaximumAge {
@@ -391,8 +404,15 @@ final class CompanionProtectedStore {
               coexistence = .staleOrUnknown
             }
           }
+          trustedNow = IOSContactsFreshnessPolicy.estimateTrustedNow(
+            serverObservedAt: control.trustedServerTime,
+            locallyReceivedAt: control.checkedAt,
+            now: now,
+            maximumObservationAge: Self.coexistenceMaximumAge
+          )
         } else {
           coexistence = .unavailable
+          trustedNow = nil
         }
 
         result = .success(
@@ -408,6 +428,7 @@ final class CompanionProtectedStore {
             resetSafetyOverflowed: snapshot.resetSafety.overflowed,
             resetSafetyVerified: snapshot.resetSafety.verifiedCivilDate != nil,
             coexistence: coexistence,
+            trustedNow: trustedNow,
             lastReminderReconciledAt: snapshot.reminderHorizon?.reconciledAt,
             reminderHorizonState: snapshot.reminderHorizon?.state,
             workflow: snapshot.workflow,
@@ -457,6 +478,29 @@ final class CompanionProtectedStore {
     }
   }
 
+  /// Postcondition used by retained sign-out/revoke. A write acknowledgement
+  /// alone is insufficient because an interrupted protected-store write must
+  /// never leave a usable review nonce or cached coexistence proof behind.
+  func verifyAccountSessionInvalidated(completion: @escaping (Bool) -> Void) {
+    queue.async {
+      let verified: Bool
+      do {
+        let snapshot = try self.loadSnapshot()
+        verified = snapshot.control == nil
+          && (snapshot.workflow?.reviews.isEmpty ?? true)
+          && snapshot.proposals.allSatisfy { proposal in
+            proposal.reviewNonceDigest == nil
+              && proposal.reviewNonceExpiresAt == nil
+              && proposal.reviewSessionGeneration == nil
+              && proposal.reviewSceneIdentifier == nil
+          }
+      } catch {
+        verified = false
+      }
+      DispatchQueue.main.async { completion(verified) }
+    }
+  }
+
   /// Advances the shared bridge revision after another protected native store
   /// commits. No external store content is copied into the companion ledger.
   func markExternalProjectionChanged(
@@ -492,7 +536,7 @@ final class CompanionProtectedStore {
     queue.async {
       let result: Result<CompanionWorkflowReadSnapshot, CompanionStoreError>
       do {
-        let snapshot = try self.loadSnapshot()
+        let snapshot = try self.loadSnapshotApplyingRetention(now: Date())
         result = .success(
           CompanionWorkflowReadSnapshot(
             revision: String(snapshot.projectionRevision ?? 0),
@@ -546,6 +590,223 @@ final class CompanionProtectedStore {
         snapshot.workflow = workflow
         return value
       }
+      DispatchQueue.main.async { completion(result) }
+    }
+  }
+
+  /// Completes Clear activity in one protected-store transaction. Retryable
+  /// cancelled/failed proposals remain available for a new explicit review,
+  /// while their display-only records are removed. Reported-sent/unknown
+  /// operations retain only the opaque repeat-safety marker; their recipient
+  /// and message proposal is removed immediately rather than waiting 30 days.
+  func completeClearActivity(
+    operationId: String,
+    binding: IOSNativeGoogleAccountBinding,
+    now: Date = Date(),
+    completion: @escaping (
+      Result<CompanionWorkflowPrivacyOperation, CompanionStoreError>
+    ) -> Void
+  ) {
+    queue.async {
+      guard Self.isBoundedOpaqueIdentifier(operationId) else {
+        DispatchQueue.main.async { completion(.failure(.invalidWorkflowState)) }
+        return
+      }
+      let result: Result<CompanionWorkflowPrivacyOperation, CompanionStoreError> =
+        self.transaction { snapshot in
+          guard var workflow = snapshot.workflow,
+            workflow.account.matches(binding),
+            let operationIndex = workflow.privacyOperations.firstIndex(where: {
+              $0.id == operationId && $0.action == "clear-activity"
+                && $0.phase == "local-wiping"
+            })
+          else { throw CompanionStoreError.invalidWorkflowState }
+
+          workflow.activity.removeAll()
+
+          let terminalProposalIds = Set(
+            snapshot.composerRecords.compactMap { record -> String? in
+              record.outcome == .reportedSent || record.outcome == .outcomeUnknown
+                ? record.proposalId : nil
+            }
+          )
+          snapshot.proposals.removeAll {
+            terminalProposalIds.contains($0.proposalId)
+          }
+          snapshot.composerRecords.removeAll {
+            $0.outcome == .cancelled || $0.outcome == .failed
+          }
+          workflow.activityClearedAt = snapshot.composerRecords.isEmpty ? nil : now
+
+          workflow.privacyOperations[operationIndex].phase = "complete"
+          workflow.privacyOperations[operationIndex].reason = nil
+          workflow.privacyOperations[operationIndex].updatedAt = now
+          let completed = workflow.privacyOperations[operationIndex]
+          snapshot.workflow = workflow
+          return completed
+        }
+      DispatchQueue.main.async { completion(result) }
+    }
+  }
+
+  /// Atomically removes every contact-derived workflow payload after the
+  /// People store has committed its local clear. Content-free composer outcome
+  /// markers and the privacy operation journal remain, while proposal bodies,
+  /// destinations, approvals, reminders, routes, and selected contact material
+  /// are removed together. A local disclosure revocation is recorded in the
+  /// same transaction so a crash cannot expose cleared contacts as consented.
+  func clearContactDerivedState(
+    operationId: String,
+    action: String,
+    completionPhase: String,
+    binding: IOSNativeGoogleAccountBinding,
+    now: Date = Date(),
+    completion: @escaping (
+      Result<CompanionWorkflowPrivacyOperation, CompanionStoreError>
+    ) -> Void
+  ) {
+    queue.async {
+      guard Self.isBoundedOpaqueIdentifier(operationId),
+        ["disconnect-contacts", "revoke-google-access"].contains(action),
+        ["complete", "local-cleared"].contains(completionPhase)
+      else {
+        DispatchQueue.main.async { completion(.failure(.invalidWorkflowState)) }
+        return
+      }
+      let result: Result<CompanionWorkflowPrivacyOperation, CompanionStoreError> =
+        self.transaction { snapshot in
+          guard var workflow = snapshot.workflow,
+            workflow.account.matches(binding),
+            workflow.configurationGeneration < UInt64.max,
+            let operationIndex = workflow.privacyOperations.firstIndex(where: {
+              $0.id == operationId && $0.action == action
+                && $0.phase == "local-wiping"
+            }),
+            IOSCompanionConsentLedgerPolicy.recordDisclosureRevoked(
+              receipts: &workflow.consentReceipts,
+              at: now
+            )
+          else { throw CompanionStoreError.invalidWorkflowState }
+
+          workflow.configurationGeneration += 1
+          workflow.contacts.removeAll()
+          workflow.blockedDestinations = []
+          workflow.occurrences.removeAll()
+          workflow.reviews.removeAll()
+          workflow.desired = .paused
+          workflow.privacyOperations[operationIndex].phase = completionPhase
+          workflow.privacyOperations[operationIndex].reason = nil
+          workflow.privacyOperations[operationIndex].updatedAt = now
+          let updatedOperation = workflow.privacyOperations[operationIndex]
+          snapshot.proposals.removeAll()
+          Self.applyReminderPlans([], to: &snapshot)
+          snapshot.reminderHorizon = nil
+          snapshot.pendingNativeRoute = nil
+          snapshot.workflow = workflow
+          return updatedOperation
+        }
+      DispatchQueue.main.async { completion(result) }
+    }
+  }
+
+  /// Serial, restart-safe state transition for a durable privacy saga. The
+  /// irreversible provider/terminal milestones are monotonic, and stale local
+  /// callbacks cannot send a revoke operation back through local cleanup.
+  func transitionPrivacyOperation(
+    operationId: String,
+    action: String,
+    phase requestedPhase: String,
+    reason: String?,
+    binding: IOSNativeGoogleAccountBinding,
+    now: Date = Date(),
+    completion: @escaping (
+      Result<CompanionWorkflowPrivacyOperation, CompanionStoreError>
+    ) -> Void
+  ) {
+    queue.async {
+      let allowedPhases: Set<String> = [
+        "queued", "pausing", "remote-pending", "remote-draining",
+        "local-wiping", "local-cleared", "verifying", "provider-revoked",
+        "complete", "failed",
+      ]
+      guard Self.isBoundedOpaqueIdentifier(operationId),
+        Self.isBoundedOpaqueIdentifier(action),
+        allowedPhases.contains(requestedPhase),
+        reason.map(Self.isBoundedOpaqueIdentifier) ?? true
+      else {
+        DispatchQueue.main.async { completion(.failure(.invalidWorkflowState)) }
+        return
+      }
+      let result: Result<CompanionWorkflowPrivacyOperation, CompanionStoreError> =
+        self.transaction { snapshot in
+          guard var workflow = snapshot.workflow,
+            workflow.account.matches(binding),
+            let operationIndex = workflow.privacyOperations.firstIndex(where: {
+              $0.id == operationId && $0.action == action
+            })
+          else { throw CompanionStoreError.invalidWorkflowState }
+          let current = workflow.privacyOperations[operationIndex]
+          if ["complete", "failed"].contains(current.phase)
+            || (current.phase == "provider-revoked"
+              && !["provider-revoked", "complete"].contains(requestedPhase))
+            || (action == "revoke-google-access"
+              && [
+                "local-cleared", "verifying", "remote-draining",
+                "provider-revoked",
+              ].contains(current.phase)
+              && ["local-wiping", "remote-pending"].contains(requestedPhase))
+          {
+            return current
+          }
+          workflow.privacyOperations[operationIndex].phase = requestedPhase
+          workflow.privacyOperations[operationIndex].reason = reason
+          workflow.privacyOperations[operationIndex].updatedAt = now
+          let updatedOperation = workflow.privacyOperations[operationIndex]
+          snapshot.workflow = workflow
+          return updatedOperation
+        }
+      DispatchQueue.main.async { completion(result) }
+    }
+  }
+
+  /// Commits the irreversible provider-disconnect milestone without a public
+  /// projection CAS. External provider state cannot be rolled back, so a
+  /// concurrent read or unrelated projection write must not strand the saga in
+  /// a phase that would require an already-revoked Google session to retry.
+  func markContactsProviderRevoked(
+    operationId: String,
+    binding: IOSNativeGoogleAccountBinding,
+    now: Date = Date(),
+    completion: @escaping (
+      Result<CompanionWorkflowPrivacyOperation, CompanionStoreError>
+    ) -> Void
+  ) {
+    queue.async {
+      guard Self.isBoundedOpaqueIdentifier(operationId) else {
+        DispatchQueue.main.async { completion(.failure(.invalidWorkflowState)) }
+        return
+      }
+      let result: Result<CompanionWorkflowPrivacyOperation, CompanionStoreError> =
+        self.transaction { snapshot in
+          guard var workflow = snapshot.workflow,
+            workflow.account.matches(binding),
+            let operationIndex = workflow.privacyOperations.firstIndex(where: {
+              $0.id == operationId && $0.action == "revoke-google-access"
+            })
+          else { throw CompanionStoreError.invalidWorkflowState }
+          if workflow.privacyOperations[operationIndex].phase == "provider-revoked" {
+            return workflow.privacyOperations[operationIndex]
+          }
+          guard ["local-cleared", "verifying", "remote-draining"]
+            .contains(workflow.privacyOperations[operationIndex].phase)
+          else { throw CompanionStoreError.invalidWorkflowState }
+          workflow.privacyOperations[operationIndex].phase = "provider-revoked"
+          workflow.privacyOperations[operationIndex].reason = nil
+          workflow.privacyOperations[operationIndex].updatedAt = now
+          let updatedOperation = workflow.privacyOperations[operationIndex]
+          snapshot.workflow = workflow
+          return updatedOperation
+        }
       DispatchQueue.main.async { completion(result) }
     }
   }
@@ -631,6 +892,32 @@ final class CompanionProtectedStore {
         snapshot.workflow = workflow
         snapshot.proposals = retained + safeProposals
         Self.applyReminderPlans(safePlans, to: &snapshot)
+      }
+      DispatchQueue.main.async { completion(result) }
+    }
+  }
+
+  /// Records onboarding completion only after the exact configuration has a persisted, fully
+  /// reconciled notification horizon. Desired reminders alone are not evidence of activation.
+  func markReminderActivationCompleted(
+    binding: IOSNativeGoogleAccountBinding,
+    expectedConfigurationGeneration: UInt64,
+    completion: @escaping (Result<Void, CompanionStoreError>) -> Void
+  ) {
+    queue.async {
+      let result: Result<Void, CompanionStoreError> = self.transaction { snapshot in
+        guard var workflow = snapshot.workflow,
+          workflow.account.matches(binding),
+          workflow.configurationGeneration == expectedConfigurationGeneration,
+          workflow.desired == .remindersOn,
+          !snapshot.reminderPlans.isEmpty,
+          snapshot.reminderHorizon?.state == .full,
+          !(snapshot.reminderHorizon?.observedRequestIds.isEmpty ?? true)
+        else {
+          throw CompanionStoreError.staleMaterial
+        }
+        workflow.hasEverActivatedReminders = true
+        snapshot.workflow = workflow
       }
       DispatchQueue.main.async { completion(result) }
     }
@@ -987,7 +1274,7 @@ final class CompanionProtectedStore {
             throw CompanionStoreError.repeatSuppressed
           }
 
-          self.pruneComposerRecords(in: &snapshot, now: now)
+          Self.pruneComposerRecords(in: &snapshot, now: now)
           guard snapshot.composerRecords.count < Self.maximumComposerRecords else {
             throw CompanionStoreError.ledgerCapacityReached
           }
@@ -1244,6 +1531,36 @@ final class CompanionProtectedStore {
     }
   }
 
+  /// Atomically claims one generic attention notification per category and
+  /// local civil day. The claim contains no contact, message, account, or route
+  /// data and is removed with the protected store.
+  func claimAttentionNotification(
+    kind: IOSCompanionAttentionKind,
+    civilDate: String,
+    completion: @escaping (Result<Bool, CompanionStoreError>) -> Void
+  ) {
+    guard Self.resetReleaseThreshold(for: civilDate) != nil else {
+      completion(.failure(.invalidWorkflowState))
+      return
+    }
+    queue.async {
+      let result: Result<Bool, CompanionStoreError> = self.transaction { snapshot in
+        var claims = snapshot.attentionNotificationDays ?? [:]
+        guard claims.count <= IOSCompanionAttentionKind.allCases.count,
+          claims.keys.allSatisfy({ IOSCompanionAttentionKind(rawValue: $0) != nil })
+        else { throw CompanionStoreError.storageUnavailable }
+        guard IOSCompanionRetentionPolicy.mayAdvanceAttentionClaim(
+          previousCivilDate: claims[kind.rawValue],
+          to: civilDate
+        ) else { return false }
+        claims[kind.rawValue] = civilDate
+        snapshot.attentionNotificationDays = claims
+        return true
+      }
+      DispatchQueue.main.async { completion(result) }
+    }
+  }
+
   /// Removes all prior state/key material and installs a new non-contact reset
   /// generation before completion, so wipe never creates an unsafe open gap.
   func wipeAndInstallResetSafety(
@@ -1363,9 +1680,22 @@ final class CompanionProtectedStore {
     if workflow.reviews.count > maximumWorkflowReviews {
       workflow.reviews = Array(workflow.reviews.suffix(maximumWorkflowReviews))
     }
+    workflow.activity.removeAll { activity in
+      IOSCompanionRetentionPolicy.detailHasExpired(
+        recordedAt: activity.occurredAt,
+        now: now
+      )
+    }
     workflow.activity.sort { $0.occurredAt < $1.occurredAt }
     if workflow.activity.count > maximumWorkflowActivity {
       workflow.activity = Array(workflow.activity.suffix(maximumWorkflowActivity))
+    }
+    workflow.privacyOperations.removeAll { operation in
+      ["complete", "failed"].contains(operation.phase)
+        && IOSCompanionRetentionPolicy.detailHasExpired(
+          recordedAt: operation.updatedAt,
+          now: now
+        )
     }
     workflow.privacyOperations.sort { $0.updatedAt < $1.updatedAt }
     if workflow.privacyOperations.count > maximumWorkflowOperations {
@@ -1408,6 +1738,7 @@ final class CompanionProtectedStore {
         of: "(?:https?://|www\\.)\\S+",
         options: [.regularExpression, .caseInsensitive]
       ) == nil
+      && IOSBirthdayMessageContentPolicy.isSafeRenderedBody(value)
       && value.unicodeScalars.allSatisfy { scalar in
         if forbidden.contains(scalar) { return false }
         if scalar.value <= 0x1F {
@@ -1427,6 +1758,13 @@ final class CompanionProtectedStore {
       "coordination-blocked", "paused", "reminder-scheduled", "settings-changed",
       "sync",
     ]
+    guard
+      let normalizedBlockedDestinations = IOSCompanionDestinationBlocklistPolicy.normalized(
+        workflow.blockedDestinations
+      ),
+      normalizedBlockedDestinations == (workflow.blockedDestinations ?? []),
+      IOSCompanionConsentLedgerPolicy.isValid(workflow.consentReceipts)
+    else { return false }
     guard workflow.contacts.count <= maximumWorkflowContacts,
       workflow.reviews.count <= maximumWorkflowReviews,
       workflow.occurrences.count <= maximumReminderPlans,
@@ -1476,7 +1814,7 @@ final class CompanionProtectedStore {
         }
         && (review.messageDraft.map(validateMessageDraft) ?? true)
         && (review.policy.map { policy in
-          (1...20).contains(policy.dailyCap)
+          (1...20).contains(policy.legacyAndroidDailyCap)
             && policy.primaryStart.count <= 12 && policy.primaryEnd.count <= 12
             && policy.graceEnd?.count ?? 0 <= 12
         } ?? true)
@@ -1503,7 +1841,7 @@ final class CompanionProtectedStore {
       guard validateMessageDraft(draft) else { return false }
     }
     if let policy = workflow.policy {
-      guard (1...20).contains(policy.dailyCap),
+      guard (1...20).contains(policy.legacyAndroidDailyCap),
         policy.primaryStart.count <= 12, policy.primaryEnd.count <= 12,
         policy.graceEnd?.count ?? 0 <= 12
       else { return false }
@@ -1518,12 +1856,18 @@ final class CompanionProtectedStore {
       ["warm", "simple", "cheerful"].contains(draft.tone),
       ["given-name", "generic"].contains(draft.placeholderMode),
       (1...2).contains(draft.requestedSegmentCap),
-      isSafeMessageBody(draft.text)
+      isSafeMessageBody(draft.text),
+      IOSCompanionMessagePlaceholderPolicy.isValid(
+        text: draft.text,
+        placeholderMode: draft.placeholderMode
+      ), IOSBirthdayMessageContentPolicy.issueCodes(
+        text: draft.text,
+        declaredLanguage: draft.language
+      ).isEmpty
     else { return false }
-    guard let provenance = draft.provenance else { return true }
+    guard let provenance = draft.provenance else { return false }
     guard ["USER", "GEMINI", "BUILT_IN"].contains(provenance.source),
-      !provenance.validatorVersion.isEmpty,
-      provenance.validatorVersion.utf8.count <= 128
+      provenance.validatorVersion == IOSBirthdayMessageContentPolicy.validatorVersion
     else { return false }
     if provenance.source == "GEMINI" {
       return (provenance.modelIdentifier.map {
@@ -1605,28 +1949,47 @@ final class CompanionProtectedStore {
     }
   }
 
-  private func pruneComposerRecords(
+  private static func pruneComposerRecords(
     in snapshot: inout CompanionProtectedSnapshot,
     now: Date
   ) {
-    guard snapshot.composerRecords.count >= Self.maximumComposerRecords - 32 else { return }
-    let retryableCutoff = calendar.date(byAdding: .day, value: -31, to: now) ?? now
-    let terminalAgeCutoff = calendar.date(byAdding: .day, value: -30, to: now) ?? now
+    let expiredDetailProposalIDs = Set(
+      snapshot.composerRecords.compactMap { record -> String? in
+        switch record.outcome {
+        case .cancelled, .failed, .outcomeUnknown, .reportedSent:
+          let recordedAt = record.resolvedAt ?? record.openedAt
+          return IOSCompanionRetentionPolicy.detailHasExpired(
+            recordedAt: recordedAt,
+            now: now
+          ) ? record.proposalId : nil
+        case .openCommitted, .presented:
+          return nil
+        }
+      }
+    )
+    // The ComposerRecord is the content-free terminal marker. Once detail has
+    // aged out, the proposal's destination and message are no longer needed.
+    snapshot.proposals.removeAll {
+      expiredDetailProposalIDs.contains($0.proposalId)
+    }
+
     let trustedServerTime = snapshot.control?.trustedServerTime
     let removableOperationIds = Set(
       snapshot.composerRecords.compactMap { record -> String? in
+        let recordedAt = record.resolvedAt ?? record.openedAt
         switch record.outcome {
         case .cancelled, .failed:
-          return record.openedAt < retryableCutoff ? record.operationId : nil
+          return IOSCompanionRetentionPolicy.detailHasExpired(
+            recordedAt: recordedAt,
+            now: now
+          ) ? record.operationId : nil
         case .outcomeUnknown, .reportedSent:
-          guard record.openedAt < terminalAgeCutoff,
-            let trustedServerTime,
-            let releaseAfter = Self.resetReleaseThreshold(for: record.occurrenceCivilDate),
-            trustedServerTime > releaseAfter
-          else {
-            return nil
-          }
-          return record.operationId
+          return IOSCompanionRetentionPolicy.mayReleaseTerminalMarker(
+            recordedAt: recordedAt,
+            now: now,
+            trustedServerTime: trustedServerTime,
+            releaseAfter: Self.resetReleaseThreshold(for: record.occurrenceCivilDate)
+          ) ? record.operationId : nil
         case .openCommitted, .presented:
           return nil
         }
@@ -1637,12 +2000,69 @@ final class CompanionProtectedStore {
     }
   }
 
+  @discardableResult
+  private static func applyAppOwnedRetention(
+    in snapshot: inout CompanionProtectedSnapshot,
+    now: Date
+  ) -> Bool {
+    let proposalIDsBefore = snapshot.proposals.map(\.proposalId)
+    let composerIDsBefore = snapshot.composerRecords.map(\.operationId)
+    let reviewIDsBefore = snapshot.workflow?.reviews.map(\.handle) ?? []
+    let activityIDsBefore = snapshot.workflow?.activity.map(\.id) ?? []
+    let activityClearedAtBefore = snapshot.workflow?.activityClearedAt
+    let privacyIDsBefore = snapshot.workflow?.privacyOperations.map(\.id) ?? []
+    let attentionClaimsBefore = snapshot.attentionNotificationDays ?? [:]
+
+    if var workflow = snapshot.workflow {
+      pruneWorkflowMetadata(&workflow, now: now)
+      snapshot.workflow = workflow
+    }
+    pruneComposerRecords(in: &snapshot, now: now)
+    if var workflow = snapshot.workflow, let cutoff = workflow.activityClearedAt,
+      !snapshot.composerRecords.contains(where: { $0.openedAt <= cutoff })
+    {
+      // Once no retained composer record can project a pre-clear event, the
+      // content-free cutoff itself no longer serves a purpose.
+      workflow.activityClearedAt = nil
+      snapshot.workflow = workflow
+    }
+    snapshot.attentionNotificationDays = (snapshot.attentionNotificationDays ?? [:])
+      .filter { _, civilDate in
+        !IOSCompanionRetentionPolicy.attentionClaimHasExpired(
+          civilDate: civilDate,
+          now: now
+        )
+      }
+
+    return proposalIDsBefore != snapshot.proposals.map(\.proposalId)
+      || composerIDsBefore != snapshot.composerRecords.map(\.operationId)
+      || reviewIDsBefore != (snapshot.workflow?.reviews.map(\.handle) ?? [])
+      || activityIDsBefore != (snapshot.workflow?.activity.map(\.id) ?? [])
+      || activityClearedAtBefore != snapshot.workflow?.activityClearedAt
+      || privacyIDsBefore != (snapshot.workflow?.privacyOperations.map(\.id) ?? [])
+      || attentionClaimsBefore != (snapshot.attentionNotificationDays ?? [:])
+  }
+
+  private func loadSnapshotApplyingRetention(
+    now: Date
+  ) throws -> CompanionProtectedSnapshot {
+    var snapshot = try loadSnapshot()
+    guard Self.applyAppOwnedRetention(in: &snapshot, now: now) else {
+      return snapshot
+    }
+    try bumpProjectionRevision(in: &snapshot)
+    try persist(snapshot)
+    publishProjectionChange(revision: String(snapshot.projectionRevision ?? 0))
+    return snapshot
+  }
+
   private func transaction<Value>(
     persistMutationOnFailure: Bool = false,
     _ body: (inout CompanionProtectedSnapshot) throws -> Value
   ) -> Result<Value, CompanionStoreError> {
     do {
       var snapshot = try loadSnapshot()
+      _ = Self.applyAppOwnedRetention(in: &snapshot, now: Date())
       do {
         let value = try body(&snapshot)
         try bumpProjectionRevision(in: &snapshot)
@@ -1735,15 +2155,51 @@ final class CompanionProtectedStore {
 
       let decoder = JSONDecoder()
       decoder.dateDecodingStrategy = .millisecondsSince1970
-      let snapshot = try decoder.decode(CompanionProtectedSnapshot.self, from: plaintext)
+      var snapshot = try decoder.decode(CompanionProtectedSnapshot.self, from: plaintext)
       guard snapshot.schemaVersion == CompanionProtectedSnapshot.currentSchemaVersion else {
         throw CompanionStoreError.unsupportedSchema
+      }
+      var recoveredPersistedDraft = false
+      if var workflow = snapshot.workflow {
+        switch IOSCompanionPersistedDraftRecovery.apply(
+          to: &workflow,
+          now: Date(),
+          validatorVersion: IOSBirthdayMessageContentPolicy.validatorVersion,
+          contentIssueCodes: { text, language in
+            IOSBirthdayMessageContentPolicy.issueCodes(
+              text: text,
+              declaredLanguage: language
+            )
+          }
+        ) {
+        case .unchanged:
+          break
+        case .removedInvalidReviews:
+          snapshot.workflow = workflow
+          recoveredPersistedDraft = true
+        case .revalidatedDraft, .clearedInvalidDraft:
+          snapshot.workflow = workflow
+          snapshot.proposals.removeAll()
+          Self.applyReminderPlans([], to: &snapshot)
+          snapshot.reminderHorizon = nil
+          snapshot.pendingNativeRoute = nil
+          recoveredPersistedDraft = true
+        case .unrecoverable:
+          return try resetStore(at: fileURL)
+        }
       }
       guard snapshot.composerRecords.count <= Self.maximumComposerRecords,
         snapshot.proposals.count <= Self.maximumProposals,
         snapshot.reminderPlans.count <= Self.maximumReminderPlans,
         snapshot.notificationIdentities.count <= Self.maximumReminderPlans,
         snapshot.resetSafety.blockedCivilDates.count <= Self.maximumResetDates,
+        snapshot.attentionNotificationDays.map { claims in
+          claims.count <= IOSCompanionAttentionKind.allCases.count
+            && claims.allSatisfy { key, civilDate in
+              IOSCompanionAttentionKind(rawValue: key) != nil
+                && Self.resetReleaseThreshold(for: civilDate) != nil
+            }
+        } ?? true,
         snapshot.pendingNativeRoute.map { route in
           Self.isBoundedOpaqueIdentifier(route.routeId)
             && route.createdAt.timeIntervalSince1970.isFinite
@@ -1781,6 +2237,13 @@ final class CompanionProtectedStore {
         snapshot.workflow.map(Self.validateWorkflow) ?? true
       else {
         return try resetStore(at: fileURL)
+      }
+      if recoveredPersistedDraft {
+        try bumpProjectionRevision(in: &snapshot)
+        try persist(snapshot)
+        publishProjectionChange(
+          revision: String(snapshot.projectionRevision ?? 0)
+        )
       }
       return snapshot
     } catch CompanionStoreError.unsupportedSchema {

@@ -5,7 +5,6 @@ import {
   StyleProp,
   StyleSheet,
   Switch,
-  TextInput,
   View,
   ViewStyle,
 } from 'react-native';
@@ -15,6 +14,7 @@ import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
 import { StatusTone, minimumTargetSize, radii, spacing } from '../tokens/theme';
 import { AppText } from './AppText';
+import { AccessibleTextInput } from './AccessibleTextInput';
 import { Icon, IconName } from './Icon';
 
 type ScreenProps = PropsWithChildren<{
@@ -57,16 +57,16 @@ export function Screen({
 export function Card({
   children,
   style,
-  accessibilityLabel,
+  testID,
 }: PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
-  accessibilityLabel?: string;
+  testID?: string;
 }>) {
   const { colors, isHighContrast } = useAppTheme();
   return (
     <View
       accessible={false}
-      accessibilityLabel={accessibilityLabel}
+      testID={testID}
       style={[
         styles.card,
         {
@@ -232,6 +232,7 @@ export function ReadinessBanner({
   actionLabel,
   actionDisabled = false,
   onAction,
+  testID,
 }: {
   title: string;
   detail: string;
@@ -239,6 +240,7 @@ export function ReadinessBanner({
   actionLabel?: string;
   actionDisabled?: boolean;
   onAction?: () => void;
+  testID?: string;
 }) {
   const { colors } = useAppTheme();
   const status = toneValues(tone, colors);
@@ -248,6 +250,7 @@ export function ReadinessBanner({
       accessible={!hasAction}
       accessibilityRole={hasAction ? undefined : 'summary'}
       accessibilityLabel={hasAction ? undefined : `${title}. ${detail}`}
+      testID={testID}
       style={[
         styles.banner,
         { backgroundColor: status.surface, borderColor: status.color },
@@ -365,10 +368,9 @@ export function SearchField({
       ]}
     >
       <Icon name="search" color={colors.textMuted} size={20} />
-      <TextInput
+      <AccessibleTextInput
         accessibilityLabel={label}
         accessibilityHint={hint}
-        allowFontScaling
         autoCorrect={false}
         placeholder={label}
         placeholderTextColor={colors.textMuted}
@@ -438,7 +440,19 @@ export function LabeledSwitch({
 }) {
   const { colors } = useAppTheme();
   return (
-    <View style={styles.switchRow}>
+    <Pressable
+      accessibilityHint={detail}
+      accessibilityLabel={title}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      hitSlop={spacing.sm}
+      onPress={onValueChange}
+      style={({ pressed }) => [
+        styles.switchRow,
+        { opacity: pressed ? 0.78 : 1 },
+      ]}
+      testID={testID}
+    >
       <View style={styles.flexText}>
         <AppText variant="label">{title}</AppText>
         <AppText color="muted" style={styles.detailText}>
@@ -446,15 +460,14 @@ export function LabeledSwitch({
         </AppText>
       </View>
       <Switch
-        accessibilityLabel={title}
-        accessibilityHint={detail}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        pointerEvents="none"
         value={value}
-        onValueChange={onValueChange}
         trackColor={{ false: colors.border, true: colors.accent }}
         thumbColor={value ? colors.onAccent : colors.surfaceRaised}
-        testID={testID}
       />
-    </View>
+    </Pressable>
   );
 }
 
@@ -634,7 +647,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  searchInput: { flex: 1, fontSize: 17, paddingVertical: spacing.sm },
+  searchInput: {
+    flex: 1,
+    fontSize: 17,
+    minHeight: minimumTargetSize,
+    paddingVertical: spacing.sm,
+  },
   settingRow: {
     minHeight: minimumTargetSize,
     paddingVertical: spacing.md,

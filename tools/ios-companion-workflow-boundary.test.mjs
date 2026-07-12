@@ -10,18 +10,50 @@ const composer = read('ios/BirthdayAutopilot/CompanionMessageModule.swift');
 const protectedStore = read(
   'ios/BirthdayAutopilot/CompanionProtectedStore.swift',
 );
+const peopleStore = read(
+  'ios/BirthdayAutopilot/Database/CompanionPeopleStore.swift',
+);
+const peopleContracts = read(
+  'ios/BirthdayAutopilot/Contacts/PeopleContracts.swift',
+);
+const presentationFormatter = read(
+  'ios/BirthdayAutopilot/Contacts/IOSNativePresentationFormatter.swift',
+);
 const reminder = read('ios/BirthdayAutopilot/CompanionReminderModule.swift');
+const attentionNotifier = read(
+  'ios/BirthdayAutopilot/Notifications/IOSCompanionAttentionNotifier.swift',
+);
+const notificationRouter = read(
+  'ios/BirthdayAutopilot/Notifications/IOSCompanionNotificationRouter.swift',
+);
 const status = read(
   'ios/BirthdayAutopilot/Automation/IOSCompanionStatusClient.swift',
 );
 const workflow = read(
   'ios/BirthdayAutopilot/Automation/IOSCompanionWorkflowEngine.swift',
 );
+const workflowModels = read(
+  'ios/BirthdayAutopilot/Automation/IOSCompanionWorkflowModels.swift',
+);
+const placeholderPolicy = read(
+  'ios/BirthdayAutopilot/Automation/IOSCompanionMessagePlaceholderPolicy.swift',
+);
+const nativeTests = read(
+  'ios/BirthdayAutopilotTests/BirthdayAutopilotNativeTests.swift',
+);
+const featureSchemas = read('src/infrastructure/native/featureSchemas.ts');
 const project = read('ios/BirthdayAutopilot.xcodeproj/project.pbxproj');
 const podfile = read('ios/Podfile');
 const identity = read(
   'ios/BirthdayAutopilot/Identity/IOSGoogleIdentityCoordinator.swift',
 );
+const retentionPolicy = read(
+  'ios/BirthdayAutopilot/Privacy/IOSCompanionRetentionPolicy.swift',
+);
+const localizationProvider = read('src/localization/LocalizationProvider.tsx');
+const productionI18n = read('src/localization/i18n.ts');
+const fixtureSettings = read('src/features/settings/SettingsScreen.tsx');
+const liveSettings = read('src/features/live/LiveSettingsScreen.tsx');
 
 test('iOS companion coordination is strict, replay-protected and fail closed', () => {
   assert.match(status, /Functions\.functions\(region: Self\.region\)/u);
@@ -164,15 +196,155 @@ test('all live iOS feature areas are wired and privacy cancels reminders before 
   );
   assert.match(
     workflow,
-    /private static let planningDays = 400[\s\S]*?for date in self\.occurrenceDates/u,
+    /enum IOSCompanionRecurrencePlanner[\s\S]*?static let planningDays = 400/u,
   );
+  assert.match(workflow, /for date in self\.occurrenceDates/u);
   assert.match(
     workflow,
     /let now = Date\(\)[\s\S]*?calendar\.date\(byAdding: \.day, value: 6, to: now\) \?\? now/u,
   );
   assert.match(
     workflow,
-    /private func occurrenceDates[\s\S]*?value: Self\.planningDays[\s\S]*?values\.append\(value\)/u,
+    /private func occurrenceDates[\s\S]*?IOSCompanionRecurrencePlanner\.occurrenceDates/u,
+  );
+  assert.match(workflow, /value: planningDays - 1/u);
+  assert.match(workflow, /Calendar\(identifier: \.gregorian\)/u);
+});
+
+test('iOS keeps every eligible same-day proposal beyond Android send caps', () => {
+  const rebuild =
+    workflow.match(
+      /private func rebuildPlan[\s\S]*?\n\s*private func finishMutation/u,
+    )?.[0] ?? '';
+  const preview =
+    workflow.match(
+      /private func previewPolicy[\s\S]*?\n\s*private func savePolicy/u,
+    )?.[0] ?? '';
+  const simulation =
+    workflow.match(
+      /private func simulate[\s\S]*?\n\s*private func nextOccurrence/u,
+    )?.[0] ?? '';
+  const previewSchema =
+    featureSchemas.match(
+      /export const policyPreviewSchema[\s\S]*?\n\]\);/u,
+    )?.[0] ?? '';
+
+  assert.match(
+    rebuild,
+    /for candidate in candidates[\s\S]*?occurrences\.append[\s\S]*?proposals\.append[\s\S]*?plans\.append/u,
+  );
+  assert.doesNotMatch(
+    rebuild,
+    /countByDate|rollingInstants|dailyCap|legacyAndroidDailyCap|rolling24|< 20/u,
+  );
+  assert.doesNotMatch(
+    preview,
+    /window-capacity-conflict|firstConflictDate|"field": "dailyCap"/u,
+  );
+  assert.match(
+    workflow,
+    /strictInteger\(raw\["dailyCap"\], range: 1\.\.\.1_000_000\)/u,
+  );
+  assert.doesNotMatch(
+    workflow,
+    /strictInteger\(raw\["dailyCap"\], range: 1\.\.\.20\)/u,
+  );
+  assert.doesNotMatch(
+    simulation,
+    /firstConflictDate|rollingConflict|dailyConflict|> 20|legacyAndroidDailyCap/u,
+  );
+  assert.match(workflowModels, /legacyAndroidDailyCap = "dailyCap"/u);
+  assert.match(
+    workflow,
+    /private static func approvalMatches[\s\S]*?includeLegacyAndroidDailyCap: true[\s\S]*?return storedHash == legacy/u,
+  );
+  assert.doesNotMatch(workflow, /up to [^"\n]*\/day/u);
+  assert.match(
+    previewSchema,
+    /maximumPlannedInLocalDay:[^\n]*max\(1_000_000\)/u,
+  );
+  assert.match(
+    previewSchema,
+    /maximumPlannedInRolling24Hours:[\s\S]*?max\(1_000_000\)/u,
+  );
+
+  assert.match(
+    workflow,
+    /private static let planningDays = IOSCompanionRecurrencePlanner\.planningDays/u,
+  );
+  assert.match(reminder, /private static let maximumScheduledDateCount = 60/u);
+  assert.match(
+    reminder,
+    /var earliestByCivilDate:[\s\S]*?for plan in schedule\.plans[\s\S]*?earliestByCivilDate\[plan\.civilDate\]/u,
+  );
+  assert.match(
+    reminder,
+    /Array\(candidates\.prefix\(Self\.maximumScheduledDateCount\)\)/u,
+  );
+});
+
+test('iOS recurrence has an executable twenty-year and exact 400-day acceptance matrix', () => {
+  assert.match(
+    workflow,
+    /enum IOSCompanionRecurrencePlanner[\s\S]*?value: planningDays - 1/u,
+  );
+  assert.match(workflow, /private var calendar: Calendar[\s\S]*?\.gregorian/u);
+  assert.match(
+    reminder,
+    /private static func schedulingCalendar[\s\S]*?\.gregorian/u,
+  );
+  assert.match(
+    protectedStore,
+    /calendar: Calendar = \{[\s\S]*?Calendar\(identifier: \.gregorian\)[\s\S]*?timeZone = \.autoupdatingCurrent/u,
+  );
+  assert.match(reminder, /value: maximumPlanningDays - 1/u);
+  assert.doesNotMatch(reminder, /Calendar\.autoupdatingCurrent/u);
+  for (const testName of [
+    'testCompanionRecurrencePlannerCoversTwentyYearsAndEveryLeapPolicy',
+    'testCompanionRecurrencePlannerUsesExactlyFourHundredCivilDates',
+    'testCompanionRecurrencePlannerIsGregorianAcrossDSTZonesAndCalendarPreferences',
+    'testCompanionRecurrencePlannerRecalculatesUTCPlusFourteenToUTCMinusTwelveTravel',
+  ]) {
+    assert.match(nativeTests, new RegExp(`func ${testName}`, 'u'));
+  }
+  assert.match(nativeTests, /for year in 2024\.\.\.2043/u);
+  assert.match(nativeTests, /"feb-28"[\s\S]*?"mar-01"[\s\S]*?"skip"/u);
+  assert.match(project, /BirthdayAutopilotNativeTests\.swift in Sources/u);
+});
+
+test('iOS reset safety preserves eight dates and makes the ninth fail closed', () => {
+  assert.match(protectedStore, /private static let maximumResetDates = 8/u);
+  const observation =
+    protectedStore.match(
+      /private func observeResetDate[\s\S]*?private func resolveDanglingComposerOperations/u,
+    )?.[0] ?? '';
+  assert.match(
+    observation,
+    /blockedCivilDates\.count < Self\.maximumResetDates[\s\S]*?blockedCivilDates\.append[\s\S]*?else \{[\s\S]*?overflowed = true/u,
+  );
+  assert.doesNotMatch(observation, /removeFirst|removeLast|prefix\(/u);
+  const verifiedDate =
+    protectedStore.match(
+      /func establishVerifiedResetSafetyDate[\s\S]*?func prepareComposerReview/u,
+    )?.[0] ?? '';
+  assert.match(
+    verifiedDate,
+    /blockedCivilDates\.count < Self\.maximumResetDates[\s\S]*?overflowed = true[\s\S]*?resetFenceOverflow/u,
+  );
+});
+
+test('iOS disclosures leave sender-line availability and transport to Messages and iOS', () => {
+  assert.match(
+    workflow,
+    /Messages and iOS control the available sender line and final transport/u,
+  );
+  assert.doesNotMatch(
+    workflow,
+    /choose (?:a |the )?sender line|control (?:the )?sender line/u,
+  );
+  assert.match(
+    composer,
+    /does not know the final[\s\S]*?sender line, transport, carrier acceptance, or delivery/u,
   );
 });
 
@@ -230,8 +402,50 @@ test('native JSON integer parsing rejects booleans, fractions and non-finite val
   assert.match(policyParser, /graceMinutes - startMinutes <= 240/u);
 });
 
+test('iOS uses one strict placeholder policy and narrowly repairs unsafe persisted drafts', () => {
+  assert.match(
+    placeholderPolicy,
+    /static let givenNamePlaceholder = "\{firstName\}"/u,
+  );
+  assert.match(
+    placeholderPolicy,
+    /case "generic":[\s\S]*?placeholderCount == 0/u,
+  );
+  assert.match(
+    placeholderPolicy,
+    /case "given-name":[\s\S]*?placeholderCount == 1/u,
+  );
+  assert.match(
+    placeholderPolicy,
+    /!withoutSupportedPlaceholder\.contains\("\{"\)[\s\S]*?!withoutSupportedPlaceholder\.contains\("\}"\)/u,
+  );
+  assert.match(workflow, /IOSCompanionMessagePlaceholderPolicy\.issue/u);
+  assert.match(workflow, /IOSCompanionMessagePlaceholderPolicy\.isValid/u);
+  assert.match(workflow, /IOSCompanionMessagePlaceholderPolicy\.render/u);
+  assert.match(composer, /IOSBirthdayMessageContentPolicy\.renderedBody/u);
+  assert.match(
+    composer,
+    /IOSBirthdayMessageContentPolicy\.isSafeRenderedBody/u,
+  );
+  assert.match(protectedStore, /IOSCompanionPersistedDraftRecovery\.apply/u);
+  assert.match(
+    protectedStore,
+    /case \.revalidatedDraft, \.clearedInvalidDraft:[\s\S]*?snapshot\.proposals\.removeAll\(\)[\s\S]*?Self\.applyReminderPlans\(\[\], to: &snapshot\)/u,
+  );
+  assert.match(workflowModels, /workflow\.desired = \.paused/u);
+  assert.match(workflowModels, /reasons\.insert\("template-changed"\)/u);
+  for (const testName of [
+    'testCompanionMessagePlaceholderPolicyRejectsEveryUnsafeStructure',
+    'testPersistedInvalidDraftRecoveryFailsClosedWithoutDeletingDurableUserData',
+    'testPersistedValidGenericDraftNeedsNoGivenNameAndDoesNotRecover',
+  ]) {
+    assert.match(nativeTests, new RegExp(`func ${testName}`, 'u'));
+  }
+});
+
 test('Xcode and CocoaPods include every native companion workflow dependency', () => {
   for (const file of [
+    'IOSCompanionMessagePlaceholderPolicy.swift',
     'IOSCompanionWorkflowModels.swift',
     'IOSCompanionWorkflowEngine.swift',
     'IOSCompanionStatusClient.swift',
@@ -245,6 +459,7 @@ test('Xcode and CocoaPods include every native companion workflow dependency', (
     'FirebaseAuth',
     'FirebaseAppCheck',
     'FirebaseFunctions',
+    'FirebaseRemoteConfig',
     'FirebaseAILogic',
     'GoogleSignIn',
   ]) {
@@ -281,4 +496,338 @@ test('iOS diagnostics are content-free, revision-fenced and use the system share
   ]) {
     assert.doesNotMatch(diagnostics, new RegExp(forbidden, 'u'));
   }
+});
+
+test('composer review refreshes People material before coexistence and nonce minting', () => {
+  const peopleRefresh = composer.indexOf(
+    'peopleSync.sync(interactiveAuthorization: false)',
+  );
+  const reconcile = composer.indexOf('workflow.reconcileAfterPeopleSync');
+  const materialValidation = composer.indexOf(
+    'refreshedMaterial == originalMaterial',
+  );
+  const coexistenceRefresh = composer.indexOf(
+    'statusClient.refreshControlImmediatelyBeforeReview',
+  );
+  const nonceMint = composer.indexOf('store.prepareComposerReview');
+
+  assert.ok(peopleRefresh > 0);
+  assert.ok(reconcile > peopleRefresh);
+  assert.ok(materialValidation > reconcile);
+  assert.ok(coexistenceRefresh > materialValidation);
+  assert.ok(nonceMint > coexistenceRefresh);
+  assert.match(composer, /COMPOSER_CONTACTS_RECONNECT_REQUIRED/u);
+  assert.match(composer, /COMPOSER_CONTACTS_FRESHNESS_UNAVAILABLE/u);
+  assert.match(
+    composer,
+    /contact\.materialRevision == configuration\.materialRevision/u,
+  );
+  assert.match(
+    composer,
+    /contact\.phones\.first[\s\S]*?\.e164 == proposal\.recipient/u,
+  );
+  assert.match(composer, /let selectedPhoneId: String/u);
+  assert.match(composer, /selectedPhoneId: phoneId/u);
+});
+
+test('privacy shutdown drains stale notification adds and verifies final absence', () => {
+  assert.match(reminder, /registerNotificationAdd\(generation: generation\)/u);
+  assert.match(
+    reminder,
+    /!self\.isCurrentReconciliation\(generation\)[\s\S]*?removePendingNotificationRequests[\s\S]*?finishNotificationAdd/u,
+  );
+  assert.match(
+    reminder,
+    /waitForNotificationAddsToDrain[\s\S]*?removeAndVerifyAppOwnedNotifications/u,
+  );
+  assert.match(
+    reminder,
+    /getPendingNotificationRequests[\s\S]*?getDeliveredNotifications[\s\S]*?completion\(!remaining\)/u,
+  );
+  assert.match(reminder, /REMINDER_CANCELLATION_UNVERIFIED/u);
+});
+
+test('iOS companion attention notifications are generic, bounded, deduplicated and cancellable', () => {
+  assert.match(
+    attentionNotifier,
+    /enum IOSCompanionAttentionKind[\s\S]*?case composer[\s\S]*?case contacts[\s\S]*?case coordination[\s\S]*?case reminders/u,
+  );
+  assert.match(attentionNotifier, /getNotificationSettings/u);
+  assert.doesNotMatch(attentionNotifier, /requestAuthorization/u);
+  assert.match(
+    attentionNotifier,
+    /getPendingNotificationRequests[\s\S]*?getDeliveredNotifications[\s\S]*?alreadyPresent/u,
+  );
+  assert.match(
+    attentionNotifier,
+    /kind\.rawValue \+ "\." \+ civilDate[\s\S]*?claimAttentionNotification/u,
+  );
+  assert.match(
+    attentionNotifier,
+    /stalePending[\s\S]*?staleDelivered[\s\S]*?removeDeliveredNotifications/u,
+  );
+  assert.match(attentionNotifier, /content\.userInfo = \[:\]/u);
+  assert.match(
+    attentionNotifier,
+    /func beginCancellationDrain[\s\S]*?cancellationDepth \+= 1[\s\S]*?drainWaiters/u,
+  );
+  assert.match(
+    attentionNotifier,
+    /private func begin[\s\S]*?guard cancellationDepth == 0/u,
+  );
+  assert.doesNotMatch(
+    attentionNotifier,
+    /recipient|phoneNumber|messageBody|contactName|displayName/u,
+  );
+  assert.match(
+    notificationRouter,
+    /isAttentionIdentifier[\s\S]*?completionHandler\(\[\]\)/u,
+  );
+  assert.match(
+    notificationRouter,
+    /pendingAttentionRouteId = UUID\(\)\.uuidString\.lowercased\(\)[\s\S]*?companionNativeRouteAvailable/u,
+  );
+  assert.match(
+    notificationRouter,
+    /let attentionRouteId = pendingAttentionRouteId[\s\S]*?"kind": "attention"[\s\S]*?"source": "attention"/u,
+  );
+  assert.match(
+    protectedStore,
+    /func claimAttentionNotification[\s\S]*?mayAdvanceAttentionClaim[\s\S]*?attentionNotificationDays = claims/u,
+  );
+  assert.match(
+    reminder,
+    /cancelAppOwnedNotifications[\s\S]*?beginCancellationDrain[\s\S]*?removeAndVerifyAppOwnedNotifications[\s\S]*?endCancellationDrain/u,
+  );
+  assert.match(reminder, /if !successful[\s\S]*?notify\(\.reminders\)/u);
+  assert.equal(
+    (project.match(/IOSCompanionAttentionNotifier\.swift in Sources/gu) ?? [])
+      .length,
+    2,
+  );
+});
+
+test('retained sign-out proves protected review capability was invalidated', () => {
+  assert.match(
+    protectedStore,
+    /func verifyAccountSessionInvalidated[\s\S]*?snapshot\.control == nil[\s\S]*?reviewNonceDigest == nil/u,
+  );
+  assert.match(
+    identity,
+    /func completeSignOutAfterSafetyShutdown[\s\S]*?peopleStore\.wipe[\s\S]*?invalidateCompanionAccountSession/u,
+  );
+  assert.match(
+    identity,
+    /private func invalidateCompanionAccountSession[\s\S]*?verifyAccountSessionInvalidated/u,
+  );
+  assert.match(
+    workflow,
+    /case "sign-out-retain"[\s\S]*?cancelPlansAndNotifications[\s\S]*?result\["kind"\] as\? String == "ok"[\s\S]*?completeSignOutAfterSafetyShutdown/u,
+  );
+  assert.match(
+    identity,
+    /let companionSessionInvalidated = await invalidateCompanionAccountSession\(\)[\s\S]*?guard firebaseSignOutSucceeded, sdkSessionsAbsent,[\s\S]*?peopleCleanupSucceeded, companionSessionInvalidated[\s\S]*?enterIdentitySafetyInterlock/u,
+  );
+});
+
+test('iOS app-owned detail is pruned at 30 days while terminal safety stays trusted-time fenced', () => {
+  assert.match(retentionPolicy, /30 \* 24 \* 60 \* 60/u);
+  assert.match(
+    retentionPolicy,
+    /now\.timeIntervalSince\(recordedAt\) >= detailedRetention/u,
+  );
+  assert.match(
+    retentionPolicy,
+    /mayReleaseTerminalMarker[\s\S]*?abs\(now\.timeIntervalSince\(trustedServerTime\)\) <= trustedTimeFreshness[\s\S]*?trustedServerTime > releaseAfter/u,
+  );
+  assert.match(
+    protectedStore,
+    /workflow\.activity\.removeAll[\s\S]*?detailHasExpired/u,
+  );
+  assert.match(
+    protectedStore,
+    /workflow\.privacyOperations\.removeAll[\s\S]*?\["complete", "failed"\]/u,
+  );
+  assert.match(
+    protectedStore,
+    /expiredDetailProposalIDs[\s\S]*?snapshot\.proposals\.removeAll/u,
+  );
+  assert.match(
+    protectedStore,
+    /func completeClearActivity[\s\S]*?terminalProposalIds[\s\S]*?snapshot\.proposals\.removeAll[\s\S]*?snapshot\.composerRecords\.removeAll/u,
+  );
+  assert.match(
+    protectedStore,
+    /workflow\.activityClearedAt = snapshot\.composerRecords\.isEmpty \? nil : now/u,
+  );
+  assert.match(
+    workflow,
+    /case "clear-activity":[\s\S]*?store\.completeClearActivity/u,
+  );
+  assert.match(
+    workflow,
+    /activityCutoff\.map\(\{ record\.openedAt > \$0 \}\)[\s\S]*?activityCutoff\.map\(\{ terminalAt > \$0 \}\)/u,
+  );
+  assert.match(
+    workflow,
+    /visibleComposerActivityCount[\s\S]*?openedVisible[\s\S]*?terminalVisible/u,
+  );
+  assert.match(
+    protectedStore,
+    /attentionNotificationDays = \(snapshot\.attentionNotificationDays \?\? \[:\]\)[\s\S]*?attentionClaimHasExpired/u,
+  );
+  assert.match(
+    protectedStore,
+    /activityClearedAtBefore[\s\S]*?no retained composer record can project a pre-clear event[\s\S]*?activityClearedAt = nil/u,
+  );
+  assert.match(
+    protectedStore,
+    /case \.outcomeUnknown, \.reportedSent:[\s\S]*?mayReleaseTerminalMarker/u,
+  );
+  assert.match(
+    protectedStore,
+    /func loadSnapshotApplyingRetention[\s\S]*?bumpProjectionRevision[\s\S]*?persist/u,
+  );
+  assert.match(
+    protectedStore,
+    /func readProjectionStatus[\s\S]*?loadSnapshotApplyingRetention\(now: now\)/u,
+  );
+  assert.match(
+    protectedStore,
+    /func readWorkflowSnapshot[\s\S]*?loadSnapshotApplyingRetention\(now: Date\(\)\)/u,
+  );
+  assert.equal(
+    (project.match(/IOSCompanionRetentionPolicy\.swift in Sources/gu) ?? [])
+      .length,
+    2,
+  );
+  assert.equal(
+    (
+      project.match(/IOSCompanionRetentionPolicyTests\.swift in Sources/gu) ??
+      []
+    ).length,
+    2,
+  );
+});
+
+test('iOS setup records activation only after a full reconciled reminder horizon', () => {
+  assert.match(
+    workflowModels,
+    /var hasEverActivatedReminders: Bool\?[\s\S]*?hasEverActivatedReminders: false/u,
+  );
+  assert.match(
+    protectedStore,
+    /func markReminderActivationCompleted[\s\S]*?workflow\.desired == \.remindersOn[\s\S]*?reminderHorizon\?\.state == \.full[\s\S]*?observedRequestIds\.isEmpty[\s\S]*?workflow\.hasEverActivatedReminders = true/u,
+  );
+  const activation =
+    workflow.match(
+      /private func confirmActivation[\s\S]*?\n\s*private func pauseAll/u,
+    )?.[0] ?? '';
+  assert.match(activation, /workflow\.desired = \.remindersOn/u);
+  assert.doesNotMatch(activation, /hasEverActivatedReminders = true/u);
+  assert.match(
+    workflow,
+    /private func finishMutation[\s\S]*?rebuildPlan[\s\S]*?case \.failed\(let problem\)[\s\S]*?completion\(\.failure\(problem\)\)/u,
+  );
+  assert.match(
+    bridge,
+    /private func setup[\s\S]*?"initialActivationCompleted"[\s\S]*?hasEverActivatedReminders == true/u,
+  );
+  assert.doesNotMatch(
+    bridge,
+    /hasEverActivatedReminders == true \|\| \$0\.desired == \.remindersOn/u,
+  );
+  assert.match(
+    reminder,
+    /replenishPlanBeforeReconciliation[\s\S]*?exactSessionBinding[\s\S]*?reconcileReminderPlanForLifecycle/u,
+  );
+});
+
+test('iOS whole-snapshot People capacity is bounded to the measured 10k release gate', () => {
+  const performanceBudgets = JSON.parse(read('tools/performance-budgets.json'));
+  assert.match(peopleContracts, /static let maximumPeople = 10_000/u);
+  assert.match(
+    peopleContracts,
+    /static let maximumTotalResponseBytes = 16 \* 1_024 \* 1_024/u,
+  );
+  assert.match(
+    peopleStore,
+    /maximumContacts = IOSPeopleCapacityPolicy\.maximumPeople/u,
+  );
+  assert.equal(
+    performanceBudgets.shared.normalizeCommit10000MaximumPeakRssMiB,
+    250,
+  );
+  assert.equal(
+    performanceBudgets.shared.normalizeCommit10000MaximumWallMs,
+    5000,
+  );
+  assert.doesNotMatch(peopleContracts, /maximumPeople: Int = 100_000/u);
+});
+
+test('iOS user-authored templates enforce Android-equivalent content and language policy', () => {
+  for (const code of [
+    'template-tracking-not-allowed',
+    'template-promotional-content',
+    'template-sensitive-content',
+    'template-language-mismatch',
+  ]) {
+    assert.match(workflow, new RegExp(`issues\\.append\\("${code}"\\)`, 'u'));
+  }
+  assert.ok(workflow.includes('^\\\\p{Devanagari}+$'));
+  assert.ok(workflow.includes('^\\\\p{Latin}+$'));
+  assert.match(
+    workflow,
+    /private func rebuildPlan[\s\S]*?IOSBirthdayMessageContentPolicy\.issueCodes[\s\S]*?\.isEmpty/u,
+  );
+  assert.match(
+    workflow,
+    /private func saveMessage[\s\S]*?currentContentIssues = IOSBirthdayMessageContentPolicy\.issueCodes[\s\S]*?guard currentContentIssues\.isEmpty/u,
+  );
+  assert.match(
+    nativeTests,
+    /testBirthdayMessageContentPolicyMatchesAndroidSafetyCategories/u,
+  );
+});
+
+test('native protected-date labels follow the current English or Hindi locale', () => {
+  assert.doesNotMatch(
+    workflow,
+    /"Birthday selected"|"Selected birthday"|"Next:|"Reminder window"|grace until/u,
+  );
+  assert.doesNotMatch(peopleStore, /Birthday option/u);
+  assert.match(
+    presentationFormatter,
+    /locale: Locale = \.autoupdatingCurrent/u,
+  );
+  assert.match(presentationFormatter, /"रिमाइंडर समय"/u);
+  assert.match(presentationFormatter, /"अतिरिक्त समय"/u);
+  assert.match(presentationFormatter, /setLocalizedDateFormatFromTemplate/u);
+  assert.match(
+    workflow,
+    /IOSNativePresentationFormatter\.nextOccurrenceLabel/u,
+  );
+  assert.match(
+    peopleStore,
+    /IOSNativePresentationFormatter\.selectedBirthdayLabel/u,
+  );
+  assert.equal(
+    (project.match(/IOSNativePresentationFormatter\.swift in Sources/gu) ?? [])
+      .length,
+    2,
+  );
+});
+
+test('production and native presentation languages both follow device settings', () => {
+  assert.match(productionI18n, /getLocales\(\)\[0\]\?\.languageCode/u);
+  assert.doesNotMatch(localizationProvider, /setLanguage|changeLanguage/u);
+  assert.doesNotMatch(
+    fixtureSettings,
+    /setLanguage|language-(?:en|hi|pseudo)/u,
+  );
+  assert.doesNotMatch(liveSettings, /setLanguage|changeLanguage/u);
+  assert.match(
+    presentationFormatter,
+    /locale: Locale = \.autoupdatingCurrent/u,
+  );
 });

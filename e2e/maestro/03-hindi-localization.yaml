@@ -1,0 +1,27 @@
+appId: ${E2E_APP_ID}
+name: Hindi localization and stable semantic identifiers
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+    arguments:
+      e2eLanguage: hi
+      e2eSetupComplete: true
+- assertVisible:
+    id: home-screen
+- assertVisible: होम
+- tapOn:
+    id: tab-settings
+- assertVisible:
+    id: settings-screen
+- assertVisible: सेटिंग्स
+- scrollUntilVisible:
+    element:
+      id: settings-open-help-legal
+    direction: DOWN
+- tapOn:
+    id: settings-open-help-legal
+- assertVisible:
+    id: fixture-help-legal-screen
+- assertVisible: सहायता, कानूनी और परिचय

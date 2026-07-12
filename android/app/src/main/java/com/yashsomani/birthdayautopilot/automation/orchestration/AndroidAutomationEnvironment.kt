@@ -9,6 +9,10 @@ import android.provider.Settings
 import android.telephony.SubscriptionManager
 import androidx.core.content.ContextCompat
 import com.yashsomani.birthdayautopilot.approvals.ApprovedSegmentPlan
+import com.yashsomani.birthdayautopilot.automation.sms.SubscriptionBindingPolicy
+import com.yashsomani.birthdayautopilot.automation.sms.SubscriptionChangeSignalStore
+import com.yashsomani.birthdayautopilot.automation.sms.SubscriptionChangeFingerprint
+import com.yashsomani.birthdayautopilot.automation.sms.currentDefaultSmsSubscriptionIdOrNull
 import com.yashsomani.birthdayautopilot.auth.ForegroundActivityRegistry
 import com.yashsomani.birthdayautopilot.messages.AndroidSmsManagerPlanSource
 import com.yashsomani.birthdayautopilot.messages.NativeSmsPlanResult
@@ -16,8 +20,8 @@ import com.yashsomani.birthdayautopilot.readiness.AndroidReadinessProbe
 import com.yashsomani.birthdayautopilot.readiness.EligibilityKind
 import com.yashsomani.birthdayautopilot.storage.database.FinalExternalGateSnapshot
 import com.yashsomani.birthdayautopilot.storage.database.OperationPurpose
+import com.yashsomani.birthdayautopilot.storage.database.PeopleDataFreshnessPolicy
 import com.yashsomani.birthdayautopilot.storage.database.SafetyLedgerDao
-import com.yashsomani.birthdayautopilot.storage.database.SyncFreshness
 import java.time.ZoneId
 
 internal interface AutomationTimeSource {
@@ -54,6 +58,7 @@ internal class AndroidFinalExternalGateSource(
   private val readinessProbe: AndroidReadinessProbe,
   private val accountSessionMatches: suspend (String) -> Boolean,
   private val timeSource: AutomationTimeSource,
+  private val subscriptionChangeSignalStore: SubscriptionChangeSignalStore,
 ) {
   private val appContext = context.applicationContext
   private val planSource = AndroidSmsManagerPlanSource(appContext)
@@ -62,19 +67,38 @@ internal class AndroidFinalExternalGateSource(
     permit: GatePermitReference,
     foregroundConfirmationNonceHash: String? = null,
   ): FinalExternalGateSnapshot {
-    val readiness = readinessProbe.read()
+    val material = loadMaterial(permit)
+    val readiness = readinessProbe.read(material?.subscriptionId)
     val account = orchestrationDao.activeAccount()
     val sync = account?.let { orchestrationDao.contactSyncState(it.accountId) }
-    val material = loadMaterial(permit)
+    val elapsedRealtimeMillis = timeSource.elapsedRealtimeMillis()
+    val bootCount = timeSource.bootCount()
+    val trustedNowMillis = account?.let {
+      TrustedTimeEstimator.estimate(
+        orchestrationDao.clockTrust(it.accountId),
+        elapsedRealtimeMillis,
+        bootCount,
+      )
+    }
     val installation = orchestrationDao.localInstallation()
+    subscriptionChangeSignalStore.observe(SubscriptionChangeFingerprint.read(appContext))
+    val subscriptionBindingStable = subscriptionChangeSignalStore.pendingGeneration() == null
     val callbackGenerationAligned = installation != null &&
       orchestrationDao.callbackCounterGeneration() == installation.callbackGeneration
     val timeZoneAligned = permit.purpose != OperationPurpose.BIRTHDAY ||
       ledger.getBirthdayOccurrence(permit.operationId)?.timeZoneId == ZoneId.systemDefault().id
-    val activeSubscription = material?.let { isActiveSubscription(it.subscriptionId) } == true
+    val activeSubscription = subscriptionBindingStable && material?.let { binding ->
+      SubscriptionBindingPolicy.matches(
+        policyKind = binding.simPolicyKind,
+        approvedSubscriptionId = binding.subscriptionId,
+        currentDefaultSubscriptionId = currentDefaultSmsSubscriptionIdOrNull(),
+        approvedSubscriptionActive = isActiveSubscription(binding.subscriptionId),
+      )
+    } == true
     val currentPlanHash = material?.let(::currentOrderedPartsHash)
     val backgroundAllowed = readiness.signals.let { signals ->
-      signals.backgroundRestricted == false &&
+      readiness.schedulerStartupReady &&
+        signals.backgroundRestricted == false &&
         signals.dozeAllowlisted == true &&
         signals.unusedAppRestrictionsDisabled == true &&
         signals.dataSaverAllowsBackground == true &&
@@ -89,11 +113,15 @@ internal class AndroidFinalExternalGateSource(
         resumedActivityPresent = ForegroundActivityRegistry.current() != null,
       )
     return FinalExternalGateSnapshot(
-      distributionEligible = readiness.eligibility.kind == EligibilityKind.SUPPORTED,
+      distributionEligible = if (permit.purpose == OperationPurpose.TEST) {
+        readiness.eligibility.allowsForegroundTest()
+      } else {
+        readiness.eligibility.kind == EligibilityKind.SUPPORTED
+      },
       accountSessionValid = account != null && accountSessionMatches(account.accountId),
-      contactsAuthorizationValid = sync?.freshness in setOf(
-        SyncFreshness.FRESH,
-        SyncFreshness.STALE_WARNING,
+      contactsAuthorizationValid = PeopleDataFreshnessPolicy.allowsUnattendedAutomation(
+        sync,
+        trustedNowMillis,
       ),
       networkValidated = readiness.signals.networkValidated == true,
       backgroundAllowed = backgroundAllowed && timeZoneAligned,
@@ -104,8 +132,8 @@ internal class AndroidFinalExternalGateSource(
       orderedPartsHash = currentPlanHash.orEmpty(),
       foregroundConfirmationValid = confirmationValid,
       foregroundConfirmationNonceHash = foregroundConfirmationNonceHash,
-      observedAtElapsedRealtimeMillis = timeSource.elapsedRealtimeMillis(),
-      bootCount = timeSource.bootCount() ?: -1,
+      observedAtElapsedRealtimeMillis = elapsedRealtimeMillis,
+      bootCount = bootCount ?: -1,
     )
   }
 
@@ -117,6 +145,7 @@ internal class AndroidFinalExternalGateSource(
         payloadHash = approval.contentHash,
         exactText = approval.exactMessage,
         subscriptionId = approval.resolvedSubscriptionId,
+        simPolicyKind = approval.simPolicyKind,
         approvedPartCount = approval.segmentCount,
         approvedEncoding = approval.messageEncoding,
         approvedPartsHash = approval.orderedPartsHash,
@@ -130,6 +159,7 @@ internal class AndroidFinalExternalGateSource(
         payloadHash = test.payloadHash,
         exactText = test.exactMessage,
         subscriptionId = test.resolvedSubscriptionId,
+        simPolicyKind = test.simPolicyKind,
         approvedPartCount = test.segmentCount,
         approvedEncoding = test.messageEncoding,
         approvedPartsHash = test.orderedPartsHash,
@@ -178,6 +208,7 @@ internal class AndroidFinalExternalGateSource(
     val payloadHash: String,
     val exactText: String,
     val subscriptionId: Int,
+    val simPolicyKind: String,
     val approvedPartCount: Int,
     val approvedEncoding: String,
     val approvedPartsHash: String,

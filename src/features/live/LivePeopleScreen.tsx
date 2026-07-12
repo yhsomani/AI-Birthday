@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import type {
@@ -30,6 +30,7 @@ import {
 import { spacing } from '../../design-system/tokens/theme';
 import type { StatusTone } from '../../design-system/tokens/theme';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
+import { bidiIsolate } from '../../localization/bidi';
 import { safeReasonMessageKey } from '../../localization/reasonCopy';
 import type { TranslationKey } from '../../localization/resources';
 import type { LiveAppPort } from './LiveAppPort';
@@ -40,6 +41,12 @@ import {
   LiveActionFeedback,
 } from './LiveProjectionState';
 import { nativeBridgeProblem } from './nativeProblem';
+import {
+  isReadyOffContact,
+  PEOPLE_PAGE_SIZE,
+  PEOPLE_REVIEW_BATCH_SIZE,
+  scanPeoplePages,
+} from './peoplePagination';
 import { useLiveProjection } from './useLiveProjection';
 
 const initials = (name: string): string =>
@@ -65,6 +72,15 @@ type EnrollmentReviewState = Readonly<{
   review: EnrollmentReview;
   revision: NativeRevision;
   queryKey: string;
+  requestedIds: readonly ContactId[];
+  remainingIds: readonly ContactId[];
+  completedCount: number;
+  totalCount: number;
+}>;
+
+type IncompleteEnrollment = Readonly<{
+  completedCount: number;
+  totalCount: number;
 }>;
 
 const invalidEnrollmentReviewProblem: NativeProblem = {
@@ -73,9 +89,11 @@ const invalidEnrollmentReviewProblem: NativeProblem = {
 };
 
 export function LivePeopleScreen({
+  onBack,
   onOpenPerson,
   port,
 }: {
+  onBack?: () => void;
   onOpenPerson: (contactId: ContactId) => void;
   port: LiveAppPort;
 }) {
@@ -85,6 +103,8 @@ export function LivePeopleScreen({
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const normalizedSearch = debouncedSearch.trim();
   const queryKey = `${filter}\u0000${normalizedSearch}`;
+  const queryKeyRef = useRef(queryKey);
+  queryKeyRef.current = queryKey;
   const [pageState, setPageState] = useState<{
     key: string;
     history: readonly (PageCursor | null)[];
@@ -100,6 +120,8 @@ export function LivePeopleScreen({
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentProblem, setEnrollmentProblem] = useState<NativeProblem>();
   const [enrollmentMessage, setEnrollmentMessage] = useState<string>();
+  const [incompleteEnrollment, setIncompleteEnrollment] =
+    useState<IncompleteEnrollment>();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 275);
@@ -112,6 +134,7 @@ export function LivePeopleScreen({
       setEnrollmentReview(undefined);
       setEnrollmentProblem(undefined);
       setEnrollmentMessage(undefined);
+      setIncompleteEnrollment(undefined);
     }
   }, [pageState.key, queryKey]);
 
@@ -129,7 +152,7 @@ export function LivePeopleScreen({
     () =>
       port.listPeople({
         filter,
-        pageSize: 50,
+        pageSize: PEOPLE_PAGE_SIZE,
         ...(normalizedSearch ? { search: normalizedSearch } : {}),
         ...(cursor ? { cursor } : {}),
       }),
@@ -208,33 +231,78 @@ export function LivePeopleScreen({
     setSyncPending(false);
   };
 
-  const preparePageEnrollment = async (
-    candidates: readonly ContactSummary[],
-    revision: NativeRevision,
+  const failEnrollment = async (
+    nextProblem: NativeProblem,
+    completedCount: number,
+    totalCount: number,
   ) => {
-    const candidateIds = candidates.slice(0, 50).map(contact => contact.id);
-    if (candidateIds.length === 0) {
+    setEnrollmentReview(undefined);
+    setEnrollmentProblem(nextProblem);
+    setIncompleteEnrollment(
+      completedCount > 0 ? { completedCount, totalCount } : undefined,
+    );
+    if (nextProblem.kind === 'stale-revision' || completedCount > 0) {
+      await people.reload();
+    }
+    setEnrollmentPending(false);
+  };
+
+  const verifyEnrollment = async (
+    completedCount: number,
+    totalCount: number,
+  ) => {
+    const refreshed = await people.reload();
+    if (refreshed.kind === 'error') {
+      setEnrollmentProblem(refreshed.problem);
+      setIncompleteEnrollment({ completedCount, totalCount });
+      setEnrollmentPending(false);
       return;
     }
-    setEnrollmentPending(true);
-    setEnrollmentProblem(undefined);
-    setEnrollmentMessage(undefined);
-    setEnrollmentReview(undefined);
+    setIncompleteEnrollment(undefined);
+    setEnrollmentMessage(
+      t('live.people.enrollmentAccepted', { count: completedCount }),
+    );
+    setEnrollmentPending(false);
+  };
+
+  const prepareNextEnrollment = async ({
+    completedCount,
+    expectedRevision,
+    remainingIds,
+    selectionQueryKey,
+    totalCount,
+  }: {
+    completedCount: number;
+    expectedRevision: NativeRevision;
+    remainingIds: readonly ContactId[];
+    selectionQueryKey: string;
+    totalCount: number;
+  }): Promise<void> => {
+    if (queryKeyRef.current !== selectionQueryKey) {
+      setEnrollmentPending(false);
+      return;
+    }
+    const candidateIds = remainingIds.slice(0, PEOPLE_REVIEW_BATCH_SIZE);
+    const followingIds = remainingIds.slice(PEOPLE_REVIEW_BATCH_SIZE);
+    if (candidateIds.length === 0) {
+      await verifyEnrollment(completedCount, totalCount);
+      return;
+    }
     let result: Awaited<ReturnType<LiveAppPort['prepareEnrollmentReview']>>;
     try {
       result = await port.prepareEnrollmentReview({
         contactIds: candidateIds,
-        expectedRevision: revision,
+        expectedRevision,
       });
     } catch {
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
-    if (result.kind === 'error') {
-      if (result.problem.kind === 'stale-revision') {
-        await people.reload();
-      }
-      setEnrollmentProblem(result.problem);
+    if (queryKeyRef.current !== selectionQueryKey) {
       setEnrollmentPending(false);
+      return;
+    }
+    if (result.kind === 'error') {
+      await failEnrollment(result.problem, completedCount, totalCount);
       return;
     }
 
@@ -255,17 +323,63 @@ export function LivePeopleScreen({
           contact.enrollment.kind === 'off',
       );
     if (!validReview) {
-      setEnrollmentProblem(invalidEnrollmentReviewProblem);
-      setEnrollmentPending(false);
+      await failEnrollment(
+        invalidEnrollmentReviewProblem,
+        completedCount,
+        totalCount,
+      );
       return;
     }
 
     setEnrollmentReview({
       review: result.envelope.value,
       revision: result.envelope.revision,
-      queryKey,
+      queryKey: selectionQueryKey,
+      requestedIds: candidateIds,
+      remainingIds: followingIds,
+      completedCount,
+      totalCount,
     });
     setEnrollmentPending(false);
+  };
+
+  const prepareAllReadyEnrollment = async () => {
+    const selectionQueryKey = queryKey;
+    setEnrollmentPending(true);
+    setEnrollmentProblem(undefined);
+    setEnrollmentMessage(undefined);
+    setEnrollmentReview(undefined);
+    setIncompleteEnrollment(undefined);
+
+    const result = await scanPeoplePages(
+      port,
+      {
+        filter,
+        ...(normalizedSearch ? { search: normalizedSearch } : {}),
+      },
+      isReadyOffContact,
+    );
+    if (queryKeyRef.current !== selectionQueryKey) {
+      setEnrollmentPending(false);
+      return;
+    }
+    if (result.kind === 'error') {
+      await failEnrollment(result.problem, 0, 0);
+      return;
+    }
+    const candidateIds = result.envelope.value.contactIds;
+    if (candidateIds.length === 0) {
+      setEnrollmentMessage(t('live.people.noReadyAcrossPages'));
+      setEnrollmentPending(false);
+      return;
+    }
+    await prepareNextEnrollment({
+      completedCount: 0,
+      expectedRevision: result.envelope.revision,
+      remainingIds: candidateIds,
+      selectionQueryKey,
+      totalCount: candidateIds.length,
+    });
   };
 
   const confirmPageEnrollment = async () => {
@@ -285,25 +399,54 @@ export function LivePeopleScreen({
       result = { kind: 'error', problem: nativeBridgeProblem };
     }
     if (result.kind === 'error') {
-      if (result.problem.kind === 'stale-revision') {
-        await people.reload();
-        setEnrollmentReview(undefined);
-      }
-      setEnrollmentProblem(result.problem);
-      setEnrollmentPending(false);
+      await failEnrollment(
+        result.problem,
+        enrollmentReview.completedCount,
+        enrollmentReview.totalCount,
+      );
       return;
     }
+
+    const requestedIds = [...enrollmentReview.requestedIds].sort();
+    const changedIds = [...result.envelope.value.changedContactIds].sort();
+    const validMutation =
+      changedIds.length === requestedIds.length &&
+      new Set(changedIds).size === changedIds.length &&
+      changedIds.every((id, index) => id === requestedIds[index]);
+    if (!validMutation) {
+      await failEnrollment(
+        invalidEnrollmentReviewProblem,
+        enrollmentReview.completedCount,
+        enrollmentReview.totalCount,
+      );
+      return;
+    }
+
+    const completedCount =
+      enrollmentReview.completedCount + enrollmentReview.requestedIds.length;
     setEnrollmentReview(undefined);
+    if (enrollmentReview.remainingIds.length === 0) {
+      await verifyEnrollment(completedCount, enrollmentReview.totalCount);
+      return;
+    }
+    await prepareNextEnrollment({
+      completedCount,
+      expectedRevision: result.envelope.revision,
+      remainingIds: enrollmentReview.remainingIds,
+      selectionQueryKey: enrollmentReview.queryKey,
+      totalCount: enrollmentReview.totalCount,
+    });
+  };
+
+  const cancelEnrollmentReview = async () => {
+    if (!enrollmentReview) return;
+    const { completedCount, totalCount } = enrollmentReview;
+    setEnrollmentReview(undefined);
+    if (completedCount === 0) return;
+    setEnrollmentPending(true);
+    setIncompleteEnrollment({ completedCount, totalCount });
     const refreshed = await people.reload();
-    setEnrollmentMessage(
-      refreshed.kind === 'ok'
-        ? t('live.people.enrollmentAccepted', {
-            count: result.envelope.value.changedContactIds.length,
-          })
-        : t('live.people.enrollmentAcceptedUnverified', {
-            count: result.envelope.value.changedContactIds.length,
-          }),
-    );
+    if (refreshed.kind === 'error') setEnrollmentProblem(refreshed.problem);
     setEnrollmentPending(false);
   };
 
@@ -313,6 +456,14 @@ export function LivePeopleScreen({
       includeBottomInset={false}
       testID="live-people-screen"
     >
+      {onBack ? (
+        <Button
+          label={t('live.common.back')}
+          onPress={onBack}
+          variant="ghost"
+          testID="live-people-back"
+        />
+      ) : null}
       <AppText variant="title" accessibilityRole="header">
         {t('live.people.title')}
       </AppText>
@@ -367,59 +518,49 @@ export function LivePeopleScreen({
             })}
             supporting={t('live.people.supporting')}
           />
-          {(() => {
-            const candidates = people.state.result.envelope.value.items
-              .filter(
-                contact =>
-                  contact.readiness.kind === 'ready' &&
-                  contact.enrollment.kind === 'off',
-              )
-              .slice(0, 50);
-            return candidates.length > 0 ? (
-              <>
-                <LiveActionFeedback
-                  problem={enrollmentProblem}
-                  message={enrollmentMessage}
-                />
-                <Card>
-                  <AppText variant="heading">
-                    {t('live.people.pageEnrollmentTitle')}
-                  </AppText>
-                  <AppText color="muted">
-                    {t('live.people.pageEnrollmentBody', {
-                      count: candidates.length,
-                    })}
-                  </AppText>
-                  {!enrollmentReview ? (
-                    <Button
-                      label={
-                        enrollmentPending
-                          ? t('live.people.preparingEnrollment')
-                          : t('live.people.selectAllReady', {
-                              count: candidates.length,
-                            })
-                      }
-                      disabled={enrollmentPending}
-                      onPress={() => {
-                        if (people.state.kind === 'ready') {
-                          preparePageEnrollment(
-                            candidates,
-                            people.state.result.envelope.revision,
-                          ).catch(() => undefined);
-                        }
-                      }}
-                      testID="live-people-select-page-ready"
-                    />
-                  ) : null}
-                </Card>
-              </>
-            ) : enrollmentMessage || enrollmentProblem ? (
-              <LiveActionFeedback
-                problem={enrollmentProblem}
-                message={enrollmentMessage}
+          <LiveActionFeedback
+            problem={enrollmentProblem}
+            message={enrollmentMessage}
+          />
+          {incompleteEnrollment ? (
+            <ReadinessBanner
+              title={t('live.people.enrollmentIncomplete')}
+              detail={t('live.people.enrollmentIncompleteBody', {
+                completed: incompleteEnrollment.completedCount,
+                total: incompleteEnrollment.totalCount,
+              })}
+              tone="warning"
+            />
+          ) : null}
+          {!enrollmentReview &&
+          (people.state.result.envelope.value.items.some(isReadyOffContact) ||
+            people.state.result.envelope.value.nextCursor !== undefined ||
+            activeHistory.length > 1) ? (
+            <Card>
+              <AppText variant="heading">
+                {t('live.people.pageEnrollmentTitle')}
+              </AppText>
+              <AppText color="muted">
+                {t('live.people.pageEnrollmentBody', {
+                  count: people.state.result.envelope.value.totalCount,
+                })}
+              </AppText>
+              <Button
+                label={
+                  enrollmentPending
+                    ? t('live.people.preparingEnrollment')
+                    : t('live.people.selectAllReady', {
+                        count: people.state.result.envelope.value.totalCount,
+                      })
+                }
+                disabled={enrollmentPending}
+                onPress={() =>
+                  prepareAllReadyEnrollment().catch(() => undefined)
+                }
+                testID="live-people-select-page-ready"
               />
-            ) : null;
-          })()}
+            </Card>
+          ) : null}
           {enrollmentReview && enrollmentReview.queryKey === queryKey ? (
             <Card>
               <AppText variant="heading">
@@ -428,6 +569,8 @@ export function LivePeopleScreen({
               <AppText color="muted">
                 {t('live.people.enrollmentReviewBody', {
                   count: enrollmentReview.review.recipients.length,
+                  completed: enrollmentReview.completedCount,
+                  total: enrollmentReview.totalCount,
                 })}
               </AppText>
               <KeyValue
@@ -472,7 +615,7 @@ export function LivePeopleScreen({
               <Button
                 label={t('live.common.cancel')}
                 disabled={enrollmentPending}
-                onPress={() => setEnrollmentReview(undefined)}
+                onPress={() => cancelEnrollmentReview().catch(() => undefined)}
                 variant="secondary"
                 testID="live-people-cancel-page-enrollment"
               />
@@ -502,7 +645,7 @@ export function LivePeopleScreen({
                   statusTone={statusTone(contact)}
                   onPress={() => onOpenPerson(contact.id)}
                   accessibilityLabel={t('live.people.open', {
-                    name: contact.displayName,
+                    name: bidiIsolate(contact.displayName),
                     birthday:
                       contact.birthdayLabel ??
                       t('live.people.birthdayNeedsReview'),

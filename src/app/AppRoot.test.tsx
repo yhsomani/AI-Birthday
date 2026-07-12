@@ -20,13 +20,30 @@ jest.mock('react-native-localize', () => ({
 jest.mock('react-native-safe-area-context', () => {
   const TestReact = require('react');
   const { View } = require('react-native');
+  const insets = { top: 0, right: 0, bottom: 0, left: 0 };
+  const frame = { x: 0, y: 0, width: 390, height: 844 };
+  const SafeAreaInsetsContext = TestReact.createContext(insets);
+  const SafeAreaFrameContext = TestReact.createContext(frame);
   return {
-    SafeAreaProvider: (props: { children?: unknown }) => props.children,
+    SafeAreaFrameContext,
+    SafeAreaInsetsContext,
+    SafeAreaProvider: (props: { children?: unknown }) =>
+      TestReact.createElement(
+        SafeAreaFrameContext.Provider,
+        { value: frame },
+        TestReact.createElement(
+          SafeAreaInsetsContext.Provider,
+          { value: insets },
+          props.children,
+        ),
+      ),
     SafeAreaView: (props: { children?: unknown; [key: string]: unknown }) => {
       const { children, ...viewProps } = props;
       return TestReact.createElement(View, viewProps, children);
     },
-    useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+    initialWindowMetrics: { frame, insets },
+    useSafeAreaFrame: () => frame,
+    useSafeAreaInsets: () => insets,
   };
 });
 
@@ -259,13 +276,20 @@ describe('cross-platform fixture journey', () => {
     await waitFor(() =>
       expect(screen.getByTestId('approved-message-screen')).toBeTruthy(),
     );
-    expect(screen.getByText(/system composer remains editable/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        /Messages and iOS control the available sender line and final transport/u,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/app cannot select or guarantee either/u),
+    ).toBeTruthy();
     await fireEvent.press(screen.getByTestId('record-composer-fixture'));
     expect(screen.getByTestId('composer-fixture-result')).toBeTruthy();
     expect(screen.getByText(/no message was sent/)).toBeTruthy();
   });
 
-  it('opens People details and provides Hindi and pseudo-RTL layout fixtures', async () => {
+  it('opens People details and keeps fixture language device-driven', async () => {
     await render(
       <FixturePreviewApp
         platformOverride="android"
@@ -300,18 +324,14 @@ describe('cross-platform fixture journey', () => {
       screen.getByTestId('appearance-dark').props.accessibilityState,
     ).toEqual({ selected: true });
 
-    await fireEvent.press(screen.getByTestId('language-hi'));
-    await waitFor(() => expect(screen.getByText('सेटिंग्स')).toBeTruthy());
-    expect(screen.getByText(/मानव भाषा समीक्षा/)).toBeTruthy();
-
-    await fireEvent.press(screen.getByTestId('language-pseudo'));
-    await waitFor(() =>
-      expect(
-        StyleSheet.flatten(screen.getByTestId('app-direction-root').props.style)
-          .direction,
-      ).toBe('rtl'),
-    );
-    expect(screen.getByText(/not a supported language/)).toBeTruthy();
+    expect(screen.queryByTestId('language-en')).toBeNull();
+    expect(screen.queryByTestId('language-hi')).toBeNull();
+    expect(screen.queryByTestId('language-pseudo')).toBeNull();
+    expect(appI18n.resolvedLanguage).toBe('en');
+    expect(
+      StyleSheet.flatten(screen.getByTestId('app-direction-root').props.style)
+        .direction,
+    ).toBe('ltr');
   });
 });
 

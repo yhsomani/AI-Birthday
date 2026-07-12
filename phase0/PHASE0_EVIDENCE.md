@@ -2,7 +2,7 @@
 
 Evidence through: 2026-07-12
 
-Status: active historical evidence register; gated implementation is now in progress, while activation, restricted SMS packaging/distribution, iOS production activation, store submission, and production-ready claims remain blocked by the unresolved gates below
+Status: active historical evidence register; the gated implementation candidate is locally complete, while activation, restricted SMS packaging/distribution, iOS production activation, store submission, and production-ready claims remain blocked by the unresolved gates below
 
 Authority: this file records evidence only. It is subordinate to [PROJECT_ABOUT.md](../PROJECT_ABOUT.md) and cannot change its product, safety, privacy, or release contracts.
 
@@ -14,19 +14,22 @@ Directive supersession: the user's later explicit instructions to build Birthday
 
 ### 2026-07-12 cross-platform amendment lineage
 
-| Item | SHA-256 | Evidence status |
-| --- | --- | --- |
-| Historical parent blueprint | `acf9457cb40ef3131686e7e3db39d667962f959777fb6f4d1dac3738e0f917f4` | Digest preserved; exact source unavailable for reproduction |
-| Reviewed Android+iOS amendment input | `2f4359ecc709c12efdee09780302a28a8b6a47fd495b3869e45da11d4639acc4` | Independently reviewed; document/repository inconsistencies were found, so this hash was never accepted as production-ready |
-| Companion Stitch manifest | `6856adf8627a471913810dc3df80a6d470eddd3a9a4b56c447bd68d9a6e8904e` | Non-authoritative UI inventory with 63 unique base IDs; corrected to use the app-owned **Review message** action, Android-only 400-day ledger wording, and truthful system-controlled MessageUI sender-line/transport limits; Stitch frames remain ungenerated and unaccepted |
-| Resolved authoritative blueprint | `970b22599a1c9acf5a63802e20854ae20bededa9184c0c22d7b6ea3c29e1fbde` | Binding document corrections applied and consistency-checked; implementation and all external release evidence remain unresolved as separately recorded |
+| Item                                                   | SHA-256                                                            | Evidence status                                                                                                                                                                                        |
+| ------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Historical parent blueprint                            | `acf9457cb40ef3131686e7e3db39d667962f959777fb6f4d1dac3738e0f917f4` | Digest preserved; exact source unavailable for reproduction                                                                                                                                            |
+| Reviewed Android+iOS amendment input                   | `2f4359ecc709c12efdee09780302a28a8b6a47fd495b3869e45da11d4639acc4` | Independently reviewed; document/repository inconsistencies were found, so this hash was never accepted as production-ready                                                                            |
+| Historical reviewed Companion Stitch manifest revision | `6856adf8627a471913810dc3df80a6d470eddd3a9a4b56c447bd68d9a6e8904e` | Non-authoritative historical UI-inventory revision with 63 unique base IDs; that exact prior file revision is not retained as a separate artifact, and this digest is not the hash of the current file |
+| Historical resolved authoritative blueprint revision   | `970b22599a1c9acf5a63802e20854ae20bededa9184c0c22d7b6ea3c29e1fbde` | Historical consistency-reviewed revision; that exact prior file revision is not retained as a separate artifact, and this digest is not the hash of the current file                                   |
+| Current authoritative `PROJECT_ABOUT.md` snapshot      | `8957cd2b7d464648fc179cb21f4c877d0aac2837e41c2b7c147369d7358c99f5` | Current working-tree identity only; authoritative content, but neither a signed release record nor evidence that external gates passed                                                                 |
+| Current Companion Stitch screen-manifest snapshot      | `efc88afab8e6f68d03d22e5218479852e87aee03c7ab05725a7f8a1023392483` | Current non-authoritative screen inventory identity only; no Stitch/MCP, device, accessibility, or release proof                                                                                       |
+| Current implementation-crosswalk snapshot              | `7baaf9d1cc9e73e26e3aedccbf781a293f8e7533989e8d9fa3d44d9ab30cce3c` | Current diagnostic ownership map only; nearby contract files are not test locators or implementation proof                                                                                             |
 
 Evidence applicability is intentionally narrow: the retained Android package-neutral boundary hashes and runtime observations remain reproducible where rechecked; prior present-tense repository-state assertions are historical snapshots; no historical evidence proves the new iOS protected store, Google/People integration, reminders, MessageUI safety state machine, App Check, physical-iPhone behavior, App Store acceptance, or Android/iOS coexistence.
 
 ## 1. Historical repository snapshot before gated implementation
 
 - At the time of the original snapshot, no production React Native, Android, Functions, or infrastructure scaffold existed. A deliberately quarantined disposable React Native/Android probe existed at `spikes/rn-native-boundary/` and still cannot be promoted.
-- The retained Firebase file is at `app/google-services.json`; it is historical holding configuration, not a verified active environment.
+- At the time of the original snapshot, the historical Firebase file existed at `app/google-services.json`. The current working tree deliberately omits it so it cannot become active configuration; Git history is the evidence source.
 - `DESIGN.md` is untracked and was not read, changed, or adopted as product authority.
 - At the time of the original snapshot, the repository root had no `package.json`, production wrapper, or iOS scaffold, and dependency installation was authorized only inside the reviewed disposable spike.
 
@@ -34,23 +37,26 @@ Superseding repository-state observation on 2026-07-12: a gated cross-platform R
 
 ## 2. Local toolchain evidence
 
-| Check | Evidence | Status |
-| --- | --- | --- |
-| Required Node | NVM installation `/Users/yashsomani/.nvm/versions/node/v24.18.0/bin/node` reports `v24.18.0` | Pass |
-| Required npm | The npm bundled with that exact NVM installation reports `11.6.0` | Pass |
-| Default interactive shell | Resolves Node `v20.19.6` and npm `11.13.0` until `nvm use` | Blocked until project shell activation |
-| Other shell PATH | A non-interactive shell may resolve Homebrew Node `v25.9.0`/npm `11.12.1` | Blocked unless PATH is pinned |
-| Project Node pin | `.nvmrc` now pins `24.18.0` | Pass |
-| Java | Homebrew OpenJDK `21.0.11` exists at `/opt/homebrew/opt/openjdk@21`; `JAVA_HOME` is unset, interactive PATH may resolve JDK 25, and other contexts may hit Apple's missing-runtime stub | Installed; deterministic JDK 21 wiring pending |
-| Android SDK | Exists at `/Users/yashsomani/Library/Android/sdk`; `adb` is `37.0.0` | Installed; environment wiring pending |
-| SDK command-line tools | Google command-line tools `20.0` are installed at `cmdline-tools/latest`; `sdkmanager` and `avdmanager` execute, but they warn that they understand SDK XML through version 3 while Android Studio has written version-4 metadata | Partial; reconcile CLI/Studio metadata compatibility before release |
-| Latest runtime/research SDK | Android 17/API 37 platform and Build Tools `37.0.0` are installed | Research/runtime coverage only; the supported RN 0.86 production baseline targets API 36 |
-| SDK platforms | Platforms 34, 35, 36, 36.1, and 37.0 are installed; NDK `27.1.12297006` and CMake `3.22.1` are present | Partial; future RN/AGP compatibility must be pinned |
-| Emulator coverage | Complete ARM64 Google Play images exist for API 29, API 36.1, and API 37.0; API 37 is the 16 KB page-size variant. `Birthday_API_29` and `Birthday_API_37_16K` AVDs passed headless boundary boot smokes; the pre-existing API 36.1 AVD was not booted in this run. API 30–35 images and the full release matrix remain absent | Boundary pass; release matrix still blocked |
-| adb PATH | SDK platform-tools supplies adb 37, while the interactive shell may select Homebrew adb 36 | Pending PATH ordering |
-| Physical SMS coverage | No physical single/dual-SIM device or carrier evidence is recorded | Blocked |
-| Gradle | In the historical snapshot no production wrapper existed. The disposable probe pinned wrapper `9.3.1`; the later gated implementation candidate now has its own wrapper | Probe pass; candidate wrapper presence is not release evidence |
-| Host capacity | Apple M4, 16 GB RAM; roughly 30–34 GiB free and data volume about 93% used during final spike runs | Current spike completed; volatile capacity is too tight for the full local matrix without cleanup |
+| Check                       | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                 | Status                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Required Node               | NVM installation `/Users/yashsomani/.nvm/versions/node/v24.18.0/bin/node` reports `v24.18.0`                                                                                                                                                                                                                                                                                                                             | Pass                                                                                              |
+| Required npm                | The npm bundled with that exact NVM installation reports `11.6.0`                                                                                                                                                                                                                                                                                                                                                        | Pass                                                                                              |
+| Default interactive shell   | Resolves Node `v20.19.6` and npm `11.13.0` until `nvm use`                                                                                                                                                                                                                                                                                                                                                               | Blocked until project shell activation                                                            |
+| Other shell PATH            | A non-interactive shell may resolve Homebrew Node `v25.9.0`/npm `11.12.1`                                                                                                                                                                                                                                                                                                                                                | Blocked unless PATH is pinned                                                                     |
+| Project Node pin            | `.nvmrc` now pins `24.18.0`                                                                                                                                                                                                                                                                                                                                                                                              | Pass                                                                                              |
+| Functions Node pin          | `backend/functions/.nvmrc` pins `22.23.1`; npm `11.6.0`, Node 22 type definitions, build, coverage, and the 17-test Firestore emulator suite pass on that exact runtime                                                                                                                                                                                                                                                  | Pass for local runtime compatibility; deployed runtime inspection remains external                |
+| Java                        | Homebrew OpenJDK `21.0.11` exists at `/opt/homebrew/opt/openjdk@21`; `JAVA_HOME` is unset, interactive PATH may resolve JDK 25, and other contexts may hit Apple's missing-runtime stub                                                                                                                                                                                                                                  | Installed; deterministic JDK 21 wiring pending                                                    |
+| Ruby/Bundler/CocoaPods      | Homebrew Ruby `3.4.10`, Bundler `4.0.15`, the locked bundle, and CocoaPods `1.16.2` pass the iOS doctor when `/opt/homebrew/opt/ruby@3.4/bin` is first on PATH                                                                                                                                                                                                                                                           | Pass with explicit PATH                                                                           |
+| Xcode                       | `xcode-select` resolves only `/Library/Developer/CommandLineTools`; neither `/Applications/Xcode_26.5.app` nor `/Applications/Xcode.app` exists                                                                                                                                                                                                                                                                          | Blocked: full Xcode 26.5 and the iOS 26.5 SDK are required                                        |
+| Android SDK                 | Exists at `/Users/yashsomani/Library/Android/sdk`; `adb` is `37.0.0`                                                                                                                                                                                                                                                                                                                                                     | Installed; environment wiring pending                                                             |
+| SDK command-line tools      | Google command-line tools `20.0` are installed at `cmdline-tools/latest`; `sdkmanager` and `avdmanager` execute, but they warn that they understand SDK XML through version 3 while Android Studio has written version-4 metadata                                                                                                                                                                                        | Partial; reconcile CLI/Studio metadata compatibility before release                               |
+| Latest runtime/research SDK | Android 17/API 37 platform and Build Tools `37.0.0` are installed                                                                                                                                                                                                                                                                                                                                                        | Research/runtime coverage only; the supported RN 0.86 production baseline targets API 36          |
+| SDK platforms               | Platforms 34, 35, 36, 36.1, and 37.0 are installed; NDK `27.1.12297006` and CMake `3.22.1` are present                                                                                                                                                                                                                                                                                                                   | Partial; future RN/AGP compatibility must be pinned                                               |
+| Emulator coverage           | Complete ARM64 Google Play images exist for API 29, API 36.1, and API 37.0; API 37 is the 16 KB page-size variant. The initial direct boundary-boot observation covered API 29 and API 37 only. An earlier candidate booted all three and passed its then-current 59-test instrumentation suite independently on API 29, API 36, and API 37. The expanded current 92-test source has passed only API 29; current API 36/API 37 reruns, API 30–35 images, and the full physical release matrix remain absent. | Historical production emulator boundary pass; current-source release matrix still blocked |
+| adb PATH                    | SDK platform-tools supplies adb 37, while the interactive shell may select Homebrew adb 36                                                                                                                                                                                                                                                                                                                               | Pending PATH ordering                                                                             |
+| Physical SMS coverage       | No physical single/dual-SIM device or carrier evidence is recorded                                                                                                                                                                                                                                                                                                                                                       | Blocked                                                                                           |
+| Gradle                      | In the historical snapshot no production wrapper existed. The disposable probe and production candidate pin wrapper `9.3.1`; the production wrapper now verifies the official binary distribution SHA-256                                                                                                                                                                                                                | Local integrity pass; signed release evidence remains absent                                      |
+| Host capacity               | Apple M4, 16 GB RAM; roughly 30–34 GiB free and data volume about 93% used during final spike runs                                                                                                                                                                                                                                                                                                                       | Current spike completed; volatile capacity is too tight for the full local matrix without cleanup |
 
 Reproducible check:
 
@@ -99,10 +105,10 @@ Use that only for Java tools needing the intercepted network path; do not silent
 
 ### Boundary runtime boot evidence
 
-| AVD | Direct runtime evidence | Result |
-| --- | --- | --- |
-| `Birthday_API_29` | Boot completed; SDK `29`; ABI `arm64-v8a`; kernel page size `4096`; `com.android.vending` resolves to the system `Phonesky64.apk` | Pass |
-| `Birthday_API_37_16K` | Boot completed; SDK `37`; ABI `arm64-v8a`; kernel page size `16384`; `com.android.vending` resolves to the product `Phonesky.apk` | Pass |
+| AVD                   | Direct runtime evidence                                                                                                           | Result |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| `Birthday_API_29`     | Boot completed; SDK `29`; ABI `arm64-v8a`; kernel page size `4096`; `com.android.vending` resolves to the system `Phonesky64.apk` | Pass   |
+| `Birthday_API_37_16K` | Boot completed; SDK `37`; ABI `arm64-v8a`; kernel page size `16384`; `com.android.vending` resolves to the product `Phonesky.apk` | Pass   |
 
 Both were clean headless boots with snapshots disabled and were shut down after inspection. The generated AVD configs say `PlayStore.enabled=no` even though their selected images are Google Play images; direct package inspection proves the Play Store payload exists, but an actual Google-account sign-in remains an application-level spike. These boot facts alone prove image/runtime viability only. Section 5 separately proves the narrow disposable React Native/TurboModule/Room/WorkManager boundary; neither section proves Google identity, Contacts, Firebase, Gemini, telephony, real SMS, installer allowlisting, or physical-device reliability.
 
@@ -130,7 +136,22 @@ Conclusion: the Phase 0 Firebase gate is not ready. The binding production Andro
 
 ### Current local control-plane evidence
 
-On 2026-07-12, the pinned Node 24.18.0/npm 11.6.0 and JDK 21 toolchains ran `npm run backend:test:emulator` against the isolated `demo-birthday-autopilot` project. Firebase Firestore Emulator 1.21.0 executed two test files and 17 tests successfully. The suite directly proved deny-all unauthenticated and authenticated client rules at every tested ledger depth and exercised the candidate's server-side sender fencing, TEST/Birthday separation, transfer/deletion races, signed-out receipt completion, recursive cleanup/repair paging, and crash recovery. This is local emulator evidence only: it does not prove deployed rules, IAM, App Check enforcement, production secrets, tier configuration, quotas, logging controls, retention/TTL activation, or regional reliability.
+On 2026-07-12, the pinned Functions Node 22.23.1/npm 11.6.0 and JDK 21 toolchains ran `npm run backend:test:emulator` against the isolated `demo-birthday-autopilot` project. Firebase Firestore Emulator 1.21.0 executed two test files and 17 tests successfully. The same Node 22 lane passed typecheck, lint, a deployable TypeScript build, 69 unit/security tests, and enforced coverage of 85.09% statements, 80.81% branches, 100% functions, and 85% lines. The emulator suite directly proved deny-all unauthenticated and authenticated client rules at every tested ledger depth and exercised the candidate's server-side sender fencing, TEST/Birthday separation, transfer/deletion races, signed-out receipt completion, recursive cleanup/repair paging, and crash recovery. This is local emulator evidence only: it does not prove deployed rules, IAM, App Check enforcement, production secrets, tier configuration, quotas, logging controls, retention/TTL activation, or regional reliability.
+
+### Current production Android candidate evidence — 2026-07-12
+
+This subsection records the gated production-package candidate, not the disposable Section 5 spike. With Node 24.18.0/npm 11.6.0, JDK 21, the pinned Android SDK/NDK, and no production signing or Firebase secrets:
+
+- all six dev/staging/lab/prod Debug/Release JVM variants passed 264/264 tests each (1,584 executions total), and all six lint variants reported no issues;
+- a fresh minified, non-debuggable, cleartext-disabled, unsigned dev-Release APK built and passed the dev-only unsigned verifier; the signed debug APK also passed its independent signature, permission, package, 16 KB alignment, and native-library checks;
+- the complete current 92-test Android instrumentation suite passed with no failures or skips on the API 29 ARM64 emulator, including a framework-owned launch of the real `MainActivity`; a separate Metro-backed install/launch then rendered the production setup UI with the Activity remaining resumed and no AndroidRuntime or React Native error;
+- earlier API 36 and API 37/16 KB emulator subsets remain historical evidence only. The current source revision still requires the configured CI matrix and release-device rerun on those API/page-size lanes before release;
+- lab/prod APK and AAB tasks failed closed when certificate-bound signing, exact tier Firebase configuration, and authority-signed structured release evidence were absent; schema v4 now separates the Google Play AAB upload certificate from the installed Play app-signing certificate, forbids upload fields for direct/managed APKs, and requires separate exact AAB and Play-delivered base-APK proofs; the tracked Ed25519 authority digest pin remains deliberately unprovisioned, no authority private key exists in source, and no restricted artifact was emitted; and
+- the unrestricted manifest remained free of `SEND_SMS` and `READ_PHONE_STATE` while restricted manifests remained isolated to lab/prod release variants.
+
+These results are source, JVM, emulator, lint, and non-release artifact evidence only. They do not prove an installer allowlist, Google Play policy approval, production signing, App Check, real single/dual-SIM behavior, carrier charging/delivery, OEM background reliability, physical accessibility, or the required multi-day soak.
+
+The live npm advisory check found zero vulnerabilities in the mobile and Hosting dependency trees. The Functions deployed dependency set also reports zero findings at moderate severity or above after a scoped `uuid` 11.1.1 override for three reviewed no-argument v4 callers; a test locks their exact source usage and CommonJS compatibility. The complete Functions development tree retains three moderate OpenTelemetry baggage findings confined to Firebase CLI/emulator tooling, with no high or critical finding. The audit-suggested force change would install an older incompatible Firebase CLI line, so it was not applied. CI rejects every high finding in the full tree and every moderate finding in the deployed tree, and release still requires a fresh advisory report.
 
 ## 4. Unattended SEND_SMS distribution evidence
 
@@ -140,12 +161,12 @@ On 2026-07-12, the pinned Node 24.18.0/npm 11.6.0 and JDK 21 toolchains ran `npm
 
 ### Candidate channels
 
-| Candidate | Current evidence | Decision status |
-| --- | --- | --- |
-| Public Google Play, Device automation exception | Google's current exception table expressly allows `SEND_SMS` when cross-area device automation based on user-set triggers is the app's critical core function and no alternative works. Approval is case-by-case and requires the declaration/review package | Credible consumer-first experiment; written approval required |
-| Managed Google Play private app on a fully managed device via Microsoft Intune or Android Management API | Official enterprise APIs support managed app deployment and per-app permission grant policy. This is the strongest named managed candidate, but EMM auto-grant alone does not prove the separate installer restricted-permission allowlist | Credible enterprise fallback; exact signed artifact/device proof required |
-| Ordinary browser/file-manager APK sideload | “Install unknown apps” does not prove that the installer allowlists a hard-restricted permission. No named installer/vendor commitment exists | Not a viable release candidate yet |
-| Default SMS role | Can provide another permission route only if the app is a genuine default SMS handler | Rejected by current product scope |
+| Candidate                                                                                                | Current evidence                                                                                                                                                                                                                                             | Decision status                                                           |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| Public Google Play, Device automation exception                                                          | Google's current exception table expressly allows `SEND_SMS` when cross-area device automation based on user-set triggers is the app's critical core function and no alternative works. Approval is case-by-case and requires the declaration/review package | Credible consumer-first experiment; written approval required             |
+| Managed Google Play private app on a fully managed device via Microsoft Intune or Android Management API | Official enterprise APIs support managed app deployment and per-app permission grant policy. This is the strongest named managed candidate, but EMM auto-grant alone does not prove the separate installer restricted-permission allowlist                   | Credible enterprise fallback; exact signed artifact/device proof required |
+| Ordinary browser/file-manager APK sideload                                                               | “Install unknown apps” does not prove that the installer allowlists a hard-restricted permission. No named installer/vendor commitment exists                                                                                                                | Not a viable release candidate yet                                        |
+| Default SMS role                                                                                         | Can provide another permission route only if the app is a genuine default SMS handler                                                                                                                                                                        | Rejected by current product scope                                         |
 
 Required proof before choosing an unattended channel:
 
@@ -180,16 +201,16 @@ Charter: [RN_NATIVE_BOUNDARY_SPIKE.md](RN_NATIVE_BOUNDARY_SPIKE.md)
 
 ### Pinned lanes
 
-| Item | Stock control | API 37 experiment |
-| --- | --- | --- |
-| React Native / React | `0.86.0` / `19.2.3` | Same |
-| Node / npm / JDK | `24.18.0` / `11.6.0` / `21.0.11` | Same |
-| Gradle / Kotlin / KSP | `9.3.1` / `2.1.20` / `2.1.20-2.0.1` | Same |
-| Android Gradle Plugin | Template `8.12.0` | `9.1.1` with `android.builtInKotlin=false` and `android.newDsl=false` |
-| min / compile / target | `29` / `36` / `36` | `29` / `37` / `37` |
-| Build Tools / NDK / ABI | `36.0.0` / `27.1.12297006` / ARM64 only | Same |
-| Persistence / work | Room `2.8.4` / WorkManager `2.11.2` | Same |
-| Runtime architecture | Hermes and New Architecture required | Same |
+| Item                    | Stock control                           | API 37 experiment                                                     |
+| ----------------------- | --------------------------------------- | --------------------------------------------------------------------- |
+| React Native / React    | `0.86.0` / `19.2.3`                     | Same                                                                  |
+| Node / npm / JDK        | `24.18.0` / `11.6.0` / `21.0.11`        | Same                                                                  |
+| Gradle / Kotlin / KSP   | `9.3.1` / `2.1.20` / `2.1.20-2.0.1`     | Same                                                                  |
+| Android Gradle Plugin   | Template `8.12.0`                       | `9.1.1` with `android.builtInKotlin=false` and `android.newDsl=false` |
+| min / compile / target  | `29` / `36` / `36`                      | `29` / `37` / `37`                                                    |
+| Build Tools / NDK / ABI | `36.0.0` / `27.1.12297006` / ARM64 only | Same                                                                  |
+| Persistence / work      | Room `2.8.4` / WorkManager `2.11.2`     | Same                                                                  |
+| Runtime architecture    | Hermes and New Architecture required    | Same                                                                  |
 
 The bootstrap used Community CLI `20.2.0`; the generated/retained project resolves CLI packages `20.1.0`. React Native `0.86.0` is the stable line used for this dated evidence. AGP 8.12 officially supports through API 36; AGP 9.1.1 supports API 37 and defaults to built-in Kotlin/new DSL. Therefore the target-37 lane is compatibility evidence only, not an official React Native baseline.
 
@@ -205,13 +226,13 @@ Official references:
 
 ### Accepted source and artifact identities
 
-| Evidence | SHA-256 |
-| --- | --- |
+| Evidence                                                | SHA-256                                                            |
+| ------------------------------------------------------- | ------------------------------------------------------------------ |
 | Retained source aggregate from `scripts/source-hash.sh` | `734217ba4f764074acdb43288c7f6e508d9ac8a11e1affb8d2ce5189d47d894d` |
-| `package-lock.json` | `2f6bc0d21e4a8ca65de919c456004eabd1c663d2cabd2c245f085ec94b1a8ae3` |
-| Stock target-36 `app-probe.apk` | `20dc9ec97ecc846ab78252c56f99c51942c35184ad5ac5586b311d26108be256` |
-| Isolated target-37/AGP-9.1.1 `app-probe.apk` | `4c9dec1384e88c8405a08b7c54ed95e753e70d2ad8b4602758cc2662288e4ba8` |
-| Retained target-37 configuration patch | `064cb0fecd45659796995d5e8a34d65e0fca11668e64ee83d803d67ad9adda44` |
+| `package-lock.json`                                     | `2f6bc0d21e4a8ca65de919c456004eabd1c663d2cabd2c245f085ec94b1a8ae3` |
+| Stock target-36 `app-probe.apk`                         | `20dc9ec97ecc846ab78252c56f99c51942c35184ad5ac5586b311d26108be256` |
+| Isolated target-37/AGP-9.1.1 `app-probe.apk`            | `4c9dec1384e88c8405a08b7c54ed95e753e70d2ad8b4602758cc2662288e4ba8` |
+| Retained target-37 configuration patch                  | `064cb0fecd45659796995d5e8a34d65e0fca11668e64ee83d803d67ad9adda44` |
 
 Run `spikes/rn-native-boundary/scripts/source-hash.sh` from any directory to reproduce the retained-source aggregate. It hashes the sorted per-file SHA-256 listing with stable probe-relative paths and excludes declared dependency/generated/build state. The isolated experiment existed at `/private/tmp/birthday-api37-agp911.szFoli` when recorded. Its reviewed configuration delta is retained as `phase0/rn-native-boundary-agp91.patch`; `patch --dry-run -p1` passes against the stock quarantine. Its changed configuration hashes were:
 
@@ -267,11 +288,11 @@ The Gradle command used the same explicit Node 24.18.0, JDK 21, Android SDK, and
 
 ### Clean-install process-death runtime matrix
 
-| APK lane | Runtime | Runs | Exact result |
-| --- | --- | --- | --- |
-| Stock target 36 / AGP 8.12 | API 29, ARM64, 4 KB pages | 10/10 | Pass; non-namespaced job `0`, one forced run each |
-| Stock target 36 / AGP 8.12 | API 37, ARM64, 16 KB pages | 10/10 | Pass; namespace `androidx.work.systemjobscheduler`, job `0`, two forced runs each after platform rescheduling |
-| Experimental target 37 / AGP 9.1.1 | API 37, ARM64, 16 KB pages | 10/10 | Pass in a fresh final series; namespaced job `0`, two forced runs each |
+| APK lane                           | Runtime                    | Runs  | Exact result                                                                                                  |
+| ---------------------------------- | -------------------------- | ----- | ------------------------------------------------------------------------------------------------------------- |
+| Stock target 36 / AGP 8.12         | API 29, ARM64, 4 KB pages  | 10/10 | Pass; non-namespaced job `0`, one forced run each                                                             |
+| Stock target 36 / AGP 8.12         | API 37, ARM64, 16 KB pages | 10/10 | Pass; namespace `androidx.work.systemjobscheduler`, job `0`, two forced runs each after platform rescheduling |
+| Experimental target 37 / AGP 9.1.1 | API 37, ARM64, 16 KB pages | 10/10 | Pass in a fresh final series; namespaced job `0`, two forced runs each                                        |
 
 Every counted run:
 
@@ -306,18 +327,18 @@ This pass proves only the narrow package-neutral React Native/native persistence
 
 ## 6. Gate status and owner decisions
 
-| Gate | Current state | What unblocks it |
-| --- | --- | --- |
-| Distribution | Evidence narrowed to Play Device automation or fully managed Intune/AMAPI; neither is proven | Owner channel direction plus written/physical proof |
-| Approval model | Accepted in the authoritative product contract and implemented in the candidate; signed-artifact/physical behavior remains unproven | Release evidence for immutable recipient/number/message/SIM/window and no live generation at send |
-| Identity | Accepted in the authoritative product contract and implemented behind native SDK boundaries; real tier integration remains unproven | Provisioned OAuth/Firebase/People/App Check tiers plus Android and iOS integration evidence |
-| Firebase | Historical config inspected; live console state unknown | Package/tier choice, certificate inventory, console access and verification |
-| Coordination | Independently design-audited and implemented as a locally tested Firebase Functions/Firestore candidate; no deployed tier or production App Check/integration proof exists | Provisioned Firebase environments, production HMAC secrets, emulator/deployed integration evidence, and cloud-control inspection |
-| Background/SMS | Stock target-36 boundary passes 10/10 on API 29/4 KB and API 37/16 KB; experimental target-37 also passes 10/10 on API 37/16 KB. Intermediate emulators and all physical SMS evidence are absent | Named channel, remaining API/OEM matrix, physical devices/SIMs, nine-day soak |
-| Gemini provider | Not verified | Vertex location/model/billing/quota/monitoring console evidence |
-| Legal/carrier | No launch country or carrier certification accepted | Launch-country choice and counsel/carrier matrix |
-| Storage/account/UX | Production candidate storage, lifecycle, deletion, setup, and UX paths now have automated source/JVM/Jest/static evidence; direct-boot, accessibility, and end-to-end release behavior still need the prescribed physical/configured matrix | Signed configured builds, destructive-race and device matrix, accessibility evidence, performance/soak runs, and release review |
-| iOS Companion | Native protected-store, reminder, auth/People boundary, MessageUI, reset, deletion, and cross-platform coordination candidates now exist and pass Swift parsing plus automated contract tests; a full Xcode build and configured physical-iPhone integration remain unavailable | Full Xcode 26.5/CocoaPods build, tier config, signing, Google/Firebase/App Attest/MessageUI device matrix, accessibility/privacy metadata, login-services review, and App Store evidence |
+| Gate               | Current state                                                                                                                                                                                                                                                                                                              | What unblocks it                                                                                                                                                                         |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Distribution       | Evidence narrowed to Play Device automation or fully managed Intune/AMAPI; neither is proven                                                                                                                                                                                                                               | Owner channel direction plus written/physical proof                                                                                                                                      |
+| Approval model     | Accepted in the authoritative product contract and implemented in the candidate; signed-artifact/physical behavior remains unproven                                                                                                                                                                                        | Release evidence for immutable recipient/number/message/SIM/window and no live generation at send                                                                                        |
+| Identity           | Accepted in the authoritative product contract and implemented behind native SDK boundaries; real tier integration remains unproven                                                                                                                                                                                        | Provisioned OAuth/Firebase/People/App Check tiers plus Android and iOS integration evidence                                                                                              |
+| Firebase           | Historical config inspected; live console state unknown                                                                                                                                                                                                                                                                    | Package/tier choice, certificate inventory, console access and verification                                                                                                              |
+| Coordination       | Independently design-audited and implemented as a locally tested Firebase Functions/Firestore candidate; no deployed tier or production App Check/integration proof exists                                                                                                                                                 | Provisioned Firebase environments, production HMAC secrets, emulator/deployed integration evidence, and cloud-control inspection                                                         |
+| Background/SMS     | Historical disposable target-36 and target-37 boundary runs passed their recorded 10/10 matrices, and an earlier candidate recorded 59-test API 36/API 37 emulator runs. The current source passed 92/92 only on the API 29 ARM64 emulator; its expanded suite has not been rerun on API 36 or API 37/16 KB. API 30–37 current-source coverage, installer allowlisting, and all physical SMS/carrier/soak evidence remain absent. | Current CI API 36/API 37 reruns plus the named channel, remaining API/OEM matrix, physical devices/SIMs, and nine-day soak |
+| Gemini provider    | Not verified                                                                                                                                                                                                                                                                                                               | Vertex location/model/billing/quota/monitoring console evidence                                                                                                                          |
+| Legal/carrier      | No launch country or carrier certification accepted                                                                                                                                                                                                                                                                        | Launch-country choice and counsel/carrier matrix                                                                                                                                         |
+| Storage/account/UX | Production candidate storage, lifecycle, deletion, setup, and UX paths now have automated source/JVM/Jest/static evidence; direct-boot, accessibility, and end-to-end release behavior still need the prescribed physical/configured matrix                                                                                | Signed configured builds, destructive-race and device matrix, accessibility evidence, performance/soak runs, and release review                                                          |
+| iOS Companion      | Native protected-store, reminder, auth/People boundary, MessageUI, reset, deletion, and cross-platform coordination candidates now exist and pass Swift parsing plus automated contract tests; a full Xcode build and configured physical-iPhone integration remain unavailable                                            | Full Xcode 26.5/CocoaPods build, tier config, signing, Google/Firebase/App Attest/MessageUI device matrix, accessibility/privacy metadata, login-services review, and App Store evidence |
 
 Recorded decisions and remaining release recommendations:
 

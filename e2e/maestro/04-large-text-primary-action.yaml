@@ -1,0 +1,26 @@
+appId: ${E2E_APP_ID}
+name: Large text keeps the fresh-setup primary action reachable
+tags:
+  - large-text
+---
+- launchApp:
+    clearState: true
+    arguments:
+      e2eLanguage: en
+      e2eSetupComplete: false
+- assertVisible:
+    id: setup-step-1
+- scrollUntilVisible:
+    element:
+      id: setup-welcome-continue
+    direction: DOWN
+- assertVisible:
+    id: setup-welcome-continue
+- tapOn:
+    id: setup-welcome-continue
+- scrollUntilVisible:
+    element:
+      id: setup-connect-fixture
+    direction: DOWN
+- assertVisible:
+    id: setup-connect-fixture

@@ -1,6 +1,7 @@
 package com.yashsomani.birthdayautopilot.auth
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,8 +15,10 @@ import kotlinx.coroutines.withContext
 
 internal enum class TelephonyPermissionResult {
   GRANTED,
-  DENIED,
-  PERMANENTLY_DENIED,
+  PHONE_STATE_DENIED,
+  PHONE_STATE_PERMANENTLY_DENIED,
+  SMS_DENIED,
+  SMS_PERMANENTLY_DENIED,
   UNAVAILABLE,
 }
 
@@ -33,31 +36,40 @@ internal class TelephonyPermissionActivityResultOwner(
   private val gate = SingleResolutionRequestGate()
   private var pendingContinuation:
     kotlinx.coroutines.CancellableContinuation<TelephonyPermissionResult>? = null
-  private val permissions = arrayOf(
-    Manifest.permission.SEND_SMS,
-    Manifest.permission.READ_PHONE_STATE,
-  )
-  private val launcher = activity.registerForActivityResult(
-    ActivityResultContracts.RequestMultiplePermissions(),
-  ) { grants ->
-    val continuation = pendingContinuation ?: return@registerForActivityResult
-    pendingContinuation = null
-    if (!gate.finish() || !continuation.isActive) return@registerForActivityResult
-    val granted = permissions.all { permission -> grants[permission] == true }
-    val permanentlyDenied = !granted && permissions
-      .filter { permission -> grants[permission] != true }
-      .all { permission -> !ActivityCompat.shouldShowRequestPermissionRationale(activity, permission) }
-    continuation.resume(
-      when {
-        granted -> TelephonyPermissionResult.GRANTED
-        permanentlyDenied -> TelephonyPermissionResult.PERMANENTLY_DENIED
-        else -> TelephonyPermissionResult.DENIED
-      },
+  private var pendingStage: PermissionStage? = null
+  private var requestWasPreviouslyAttempted = false
+  // Activity-result launchers must be registered during Activity construction,
+  // but Android has not attached the ContextWrapper base at that point. Read
+  // app storage only when a resumed foreground request actually starts.
+  private val requestHistory by lazy(LazyThreadSafetyMode.NONE) {
+    activity.getSharedPreferences(
+      REQUEST_HISTORY_PREFERENCES,
+      Context.MODE_PRIVATE,
     )
   }
+  private val denialState by lazy(LazyThreadSafetyMode.NONE) {
+    TelephonyPermissionDenialStore(activity.applicationContext)
+  }
+  private val phoneStateLauncher = activity.registerForActivityResult(
+    ActivityResultContracts.RequestPermission(),
+  ) { granted -> handleResult(PermissionStage.PHONE_STATE, granted) }
+  private val smsLauncher = activity.registerForActivityResult(
+    ActivityResultContracts.RequestPermission(),
+  ) { granted -> handleResult(PermissionStage.SMS, granted) }
 
   override suspend fun request(): TelephonyPermissionResult = withContext(Dispatchers.Main.immediate) {
-    if (permissions.all(::isGranted)) return@withContext TelephonyPermissionResult.GRANTED
+    val phoneStateGranted = isGranted(Manifest.permission.READ_PHONE_STATE)
+    val smsGranted = isGranted(Manifest.permission.SEND_SMS)
+    val permanentDenial = denialState.reconcile(phoneStateGranted, smsGranted)
+    if (phoneStateGranted && smsGranted) {
+      return@withContext TelephonyPermissionResult.GRANTED
+    }
+    if (!phoneStateGranted && permanentDenial.blocksPhoneState()) {
+      return@withContext TelephonyPermissionResult.PHONE_STATE_PERMANENTLY_DENIED
+    }
+    if (!smsGranted && permanentDenial.blocksSms()) {
+      return@withContext TelephonyPermissionResult.SMS_PERMANENTLY_DENIED
+    }
     if (
       activity.isFinishing ||
       activity.isDestroyed ||
@@ -70,18 +82,15 @@ internal class TelephonyPermissionActivityResultOwner(
         activity.runOnUiThread {
           if (pendingContinuation === continuation) {
             pendingContinuation = null
+            pendingStage = null
             gate.finish()
           }
         }
       }
       try {
-        launcher.launch(permissions)
+        launchNextPermission()
       } catch (_: RuntimeException) {
-        if (pendingContinuation === continuation) {
-          pendingContinuation = null
-          gate.finish()
-          if (continuation.isActive) continuation.resume(TelephonyPermissionResult.UNAVAILABLE)
-        }
+        finish(TelephonyPermissionResult.UNAVAILABLE)
       }
     }
   }
@@ -89,10 +98,87 @@ internal class TelephonyPermissionActivityResultOwner(
   fun onDestroy() {
     val continuation = pendingContinuation
     pendingContinuation = null
+    pendingStage = null
     gate.destroy()
     if (continuation?.isActive == true) continuation.resume(TelephonyPermissionResult.UNAVAILABLE)
   }
 
+  private fun launchNextPermission() {
+    when {
+      !isGranted(Manifest.permission.READ_PHONE_STATE) -> launch(PermissionStage.PHONE_STATE)
+      !isGranted(Manifest.permission.SEND_SMS) -> launch(PermissionStage.SMS)
+      else -> finish(TelephonyPermissionResult.GRANTED)
+    }
+  }
+
+  private fun launch(stage: PermissionStage) {
+    val permission = stage.permission
+    requestWasPreviouslyAttempted = requestHistory.getBoolean(permission, false)
+    // The prior-attempt bit is part of the permanent-denial classifier. Commit it before the
+    // platform dialog so a process death between the result and the next launch cannot erase that
+    // distinction.
+    requestHistory.edit().putBoolean(permission, true).commit()
+    pendingStage = stage
+    when (stage) {
+      PermissionStage.PHONE_STATE -> phoneStateLauncher.launch(permission)
+      PermissionStage.SMS -> smsLauncher.launch(permission)
+    }
+  }
+
+  private fun handleResult(stage: PermissionStage, granted: Boolean) {
+    if (pendingContinuation == null || pendingStage != stage) return
+    pendingStage = null
+    if (granted) {
+      denialState.reconcile(
+        isGranted(Manifest.permission.READ_PHONE_STATE),
+        isGranted(Manifest.permission.SEND_SMS),
+      )
+      try {
+        launchNextPermission()
+      } catch (_: RuntimeException) {
+        finish(TelephonyPermissionResult.UNAVAILABLE)
+      }
+      return
+    }
+    val permanentlyDenied = requestWasPreviouslyAttempted &&
+      !ActivityCompat.shouldShowRequestPermissionRationale(activity, stage.permission)
+    val result = when (stage) {
+      PermissionStage.PHONE_STATE -> if (permanentlyDenied) {
+        TelephonyPermissionResult.PHONE_STATE_PERMANENTLY_DENIED
+      } else {
+        TelephonyPermissionResult.PHONE_STATE_DENIED
+      }
+      PermissionStage.SMS -> if (permanentlyDenied) {
+        TelephonyPermissionResult.SMS_PERMANENTLY_DENIED
+      } else {
+        TelephonyPermissionResult.SMS_DENIED
+      }
+    }
+    if (result == TelephonyPermissionResult.PHONE_STATE_PERMANENTLY_DENIED) {
+      denialState.markPhoneStatePermanent()
+    } else if (result == TelephonyPermissionResult.SMS_PERMANENTLY_DENIED) {
+      denialState.markSmsPermanent()
+    }
+    finish(result)
+  }
+
+  private fun finish(result: TelephonyPermissionResult) {
+    val continuation = pendingContinuation ?: return
+    pendingContinuation = null
+    pendingStage = null
+    if (!gate.finish() || !continuation.isActive) return
+    continuation.resume(result)
+  }
+
   private fun isGranted(permission: String): Boolean =
     ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
+
+  private enum class PermissionStage(val permission: String) {
+    PHONE_STATE(Manifest.permission.READ_PHONE_STATE),
+    SMS(Manifest.permission.SEND_SMS),
+  }
+
+  private companion object {
+    const val REQUEST_HISTORY_PREFERENCES = "telephony-permission-request-history-v1"
+  }
 }

@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">Birthday Autopilot</string>
+    <string name="attention_notification_title">Birthday Autopilot पर ध्यान दें</string>
+    <string name="attention_notification_body">सुरक्षा या सेटअप से जुड़ी जानकारी देखने के लिए ऐप खोलें।</string>
+    <string name="attention_channel_name">ध्यान देने योग्य सूचनाएँ</string>
+    <string name="attention_channel_description">सुरक्षा और सेटअप रिमाइंडर</string>
+    <string name="birthday_incomplete">जन्मदिन की जानकारी अधूरी है</string>
+    <string name="birthday_selected">जन्मदिन चुना गया</string>
+    <string name="configuration_not_configured">कॉन्फ़िगर नहीं किया गया</string>
+    <string name="configuration_grace_to"> · ग्रेस समय %1$s तक</string>
+    <string name="configuration_default_sms_sim">डिफ़ॉल्ट SMS सिम</string>
+    <string name="configuration_default_sim_slot">डिफ़ॉल्ट सिम · स्लॉट %1$d</string>
+    <string name="phone_source_fallback">फ़ोन</string>
+    <string name="outcome_delivered">डिलीवर हुआ</string>
+    <string name="outcome_sent_from_device">इस डिवाइस से भेजा गया</string>
+    <string name="outcome_missed">छूट गया</string>
+    <string name="outcome_skipped">छोड़ा गया</string>
+    <string name="outcome_unknown">नतीजा अज्ञात</string>
+    <string name="sender_local_device">यह डिवाइस</string>
+    <string name="sender_other_verified_android_device">दूसरा सत्यापित Android डिवाइस</string>
+</resources>

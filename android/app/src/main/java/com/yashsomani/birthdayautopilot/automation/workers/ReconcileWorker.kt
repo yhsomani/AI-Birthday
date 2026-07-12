@@ -10,6 +10,9 @@ import com.yashsomani.birthdayautopilot.core.crypto.StorageKeyUnavailableExcepti
 import com.yashsomani.birthdayautopilot.attention.AndroidAttentionNotifier
 import com.yashsomani.birthdayautopilot.lifecycle.LifecycleJournalStatus
 import com.yashsomani.birthdayautopilot.lifecycle.LifecycleStateStore
+import com.yashsomani.birthdayautopilot.storage.database.ReconcileHeartbeatLease
+import com.yashsomani.birthdayautopilot.storage.database.ReconcileHeartbeatPolicy
+import com.yashsomani.birthdayautopilot.storage.database.ReconcileHeartbeatStatus
 
 class ReconcileWorker(
   appContext: Context,
@@ -17,6 +20,15 @@ class ReconcileWorker(
   private val appGraph: AppGraph,
 ) : CoroutineWorker(appContext, workerParameters) {
   override suspend fun doWork(): Result {
+    AutomationScheduler.consumeNetworkAttempt(applicationContext, inputData)
+    return try {
+      reconcileOnce()
+    } finally {
+      AutomationScheduler.completeNetworkAttempt(applicationContext, inputData)
+    }
+  }
+
+  private suspend fun reconcileOnce(): Result {
     val lifecycle = LifecycleStateStore(applicationContext)
     if (lifecycle.journalStatus() == LifecycleJournalStatus.UNREADABLE) {
       return terminalFailure("LIFECYCLE_JOURNAL_UNREADABLE")
@@ -32,10 +44,19 @@ class ReconcileWorker(
       notify(WorkerAttentionPolicy.successful(code))
       return Result.success(safeData(code))
     }
+    var heartbeatLease: ReconcileHeartbeatLease? = null
+    var heartbeatStatus = ReconcileHeartbeatStatus.FAILED
+    var heartbeatSafeCode = ReconcileHeartbeatPolicy.INTERRUPTED_SAFE_CODE
     return try {
       // Accessing the graph opens and initializes the encrypted database with the durable,
       // backup-excluded callback generation before any orchestration query runs.
       appGraph.database
+      heartbeatLease = appGraph.peopleSyncDao.activeAccount()?.let { account ->
+        appGraph.safetyLedgerDao.beginReconcileHeartbeat(
+          accountId = account.accountId,
+          atMillis = System.currentTimeMillis(),
+        )
+      }
       val trigger = inputData.getString(AutomationScheduler.INPUT_TRIGGER)
         ?.let { runCatching { ReconciliationTrigger.valueOf(it) }.getOrNull() }
         ?: ReconciliationTrigger.PERIODIC
@@ -68,16 +89,41 @@ class ReconcileWorker(
           },
         )
       }
+      heartbeatStatus = if (result.retryRecommended) {
+        ReconcileHeartbeatStatus.RETRYING
+      } else {
+        ReconcileHeartbeatStatus.SUCCEEDED
+      }
+      heartbeatSafeCode = result.safeCode
       // Retry is represented by one uniquely named successor, not a second anonymous WorkManager
       // retry chain that could race the exact operation worker.
       Result.success(safeData(result.safeCode))
     } catch (error: StorageKeyUnavailableException) {
+      heartbeatStatus = ReconcileHeartbeatStatus.FAILED
+      heartbeatSafeCode = error.safeCode
       terminalFailure(error.safeCode)
     } catch (_: Exception) {
       if (runAttemptCount < MAX_TRANSIENT_ATTEMPTS) {
+        heartbeatStatus = ReconcileHeartbeatStatus.RETRYING
+        heartbeatSafeCode = ReconcileHeartbeatPolicy.RETRY_SAFE_CODE
         Result.retry()
       } else {
+        heartbeatStatus = ReconcileHeartbeatStatus.FAILED
+        heartbeatSafeCode = "RECONCILE_ATTEMPTS_EXHAUSTED"
         terminalFailure("RECONCILE_ATTEMPTS_EXHAUSTED")
+      }
+    } finally {
+      heartbeatLease?.let { lease ->
+        try {
+          appGraph.safetyLedgerDao.finishReconcileHeartbeat(
+            lease = lease,
+            status = heartbeatStatus,
+            safeCode = heartbeatSafeCode,
+            atMillis = System.currentTimeMillis(),
+          )
+        } catch (_: Exception) {
+          // Heartbeat is diagnostic evidence only and must never change the worker's send result.
+        }
       }
     }
   }

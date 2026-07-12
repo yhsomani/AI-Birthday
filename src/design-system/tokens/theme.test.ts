@@ -22,10 +22,13 @@ const contrast = (foreground: string, background: string): number => {
 };
 
 describe.each([
-  ['light', false],
-  ['dark', true],
-] as const)('%s theme contrast', (_name, isDark) => {
-  const colors = createTheme(isDark, false).colors;
+  ['light', false, false],
+  ['light high contrast', false, true],
+  ['dark', true, false],
+  ['dark high contrast', true, true],
+] as const)('%s theme contrast', (_name, isDark, isHighContrast) => {
+  const theme = createTheme(isDark, isHighContrast);
+  const colors = theme.colors;
 
   it.each([
     ['primary text', colors.text, colors.background],
@@ -37,5 +40,15 @@ describe.each([
     ['informational status', colors.info, colors.infoSurface],
   ])('keeps %s at WCAG AA text contrast', (_label, foreground, background) => {
     expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('projects the requested contrast preference without reducing legibility', () => {
+    expect(theme.isHighContrast).toBe(isHighContrast);
+    if (isHighContrast) {
+      expect(colors.textMuted).toBe(colors.text);
+      expect(contrast(colors.border, colors.background)).toBeGreaterThanOrEqual(
+        4.5,
+      );
+    }
   });
 });

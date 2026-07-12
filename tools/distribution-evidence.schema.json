@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://birthday-autopilot.invalid/schemas/distribution-evidence-v1.json",
-  "title": "Birthday Autopilot restricted SMS distribution evidence",
+  "$id": "https://birthday-autopilot.invalid/schemas/distribution-evidence-v4.json",
+  "title": "Birthday Autopilot authority-signed restricted SMS distribution evidence",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "approvals"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 4 },
     "approvals": {
       "type": "array",
       "minItems": 1,
@@ -19,6 +19,8 @@
           "status",
           "applicationId",
           "versionCode",
+          "versionName",
+          "sourceRevision",
           "channel",
           "installerPackage",
           "signingCertificateSha256",
@@ -27,13 +29,26 @@
           "smsPermissionPolicyApproved",
           "installerAllowlistVerified",
           "physicalSmsMatrixPassed",
+          "performanceBudgetsPassed",
+          "accessibilityMatrixPassed",
+          "nativeSupplyChainReviewed",
           "telephonyStatePermissionApproved",
           "appCheckEnforced",
           "privacyMaterialsApproved",
-          "approvalReference",
+          "policyApprovalReference",
+          "policyApprovalSha256",
           "certifiedDeviceMatrixReference",
+          "certifiedDeviceMatrixSha256",
           "carrierMatrixReference",
+          "carrierMatrixSha256",
+          "performanceEvidenceReference",
+          "performanceEvidenceSha256",
+          "accessibilityEvidenceReference",
+          "accessibilityEvidenceSha256",
+          "supplyChainEvidenceReference",
+          "supplyChainEvidenceSha256",
           "legalReviewReference",
+          "legalReviewSha256",
           "approvedAt",
           "validUntil",
           "launchCountries"
@@ -47,7 +62,17 @@
               "com.yashsomani.birthdayautopilot"
             ]
           },
-          "versionCode": { "const": 1 },
+          "versionCode": { "type": "integer", "minimum": 1 },
+          "versionName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$"
+          },
+          "sourceRevision": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
           "channel": {
             "enum": ["google-play", "managed-enterprise", "controlled-direct"]
           },
@@ -59,9 +84,11 @@
             "type": "string",
             "pattern": "^(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$|^[0-9A-Fa-f]{64}$"
           },
-          "minimumCertifiedApi": {
-            "const": 29
+          "uploadSigningCertificateSha256": {
+            "type": "string",
+            "pattern": "^(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$|^[0-9A-Fa-f]{64}$"
           },
+          "minimumCertifiedApi": { "const": 29 },
           "maximumCertifiedApi": {
             "type": "integer",
             "minimum": 36,
@@ -70,34 +97,29 @@
           "smsPermissionPolicyApproved": { "const": true },
           "installerAllowlistVerified": { "const": true },
           "physicalSmsMatrixPassed": { "const": true },
+          "performanceBudgetsPassed": { "const": true },
+          "accessibilityMatrixPassed": { "const": true },
+          "nativeSupplyChainReviewed": { "const": true },
           "telephonyStatePermissionApproved": { "const": true },
           "appCheckEnforced": { "const": true },
           "privacyMaterialsApproved": { "const": true },
           "playUploadApproved": { "type": "boolean" },
-          "approvalReference": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{0,255}$"
-          },
-          "certifiedDeviceMatrixReference": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{0,255}$"
-          },
-          "carrierMatrixReference": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{0,255}$"
-          },
-          "legalReviewReference": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 256,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{0,255}$"
-          },
+          "policyApprovalReference": { "$ref": "#/$defs/reference" },
+          "policyApprovalSha256": { "$ref": "#/$defs/sha256" },
+          "certifiedDeviceMatrixReference": { "$ref": "#/$defs/reference" },
+          "certifiedDeviceMatrixSha256": { "$ref": "#/$defs/sha256" },
+          "carrierMatrixReference": { "$ref": "#/$defs/reference" },
+          "carrierMatrixSha256": { "$ref": "#/$defs/sha256" },
+          "performanceEvidenceReference": { "$ref": "#/$defs/reference" },
+          "performanceEvidenceSha256": { "$ref": "#/$defs/sha256" },
+          "accessibilityEvidenceReference": { "$ref": "#/$defs/reference" },
+          "accessibilityEvidenceSha256": { "$ref": "#/$defs/sha256" },
+          "supplyChainEvidenceReference": { "$ref": "#/$defs/reference" },
+          "supplyChainEvidenceSha256": { "$ref": "#/$defs/sha256" },
+          "legalReviewReference": { "$ref": "#/$defs/reference" },
+          "legalReviewSha256": { "$ref": "#/$defs/sha256" },
+          "artifactApkSha256": { "$ref": "#/$defs/sha256" },
+          "artifactAabSha256": { "$ref": "#/$defs/sha256" },
           "approvedAt": { "type": "string", "format": "date-time" },
           "validUntil": { "type": "string", "format": "date-time" },
           "launchCountries": {
@@ -110,17 +132,64 @@
         },
         "allOf": [
           {
+            "if": {
+              "required": ["tier"],
+              "properties": { "tier": { "const": "lab" } }
+            },
+            "then": {
+              "properties": {
+                "applicationId": {
+                  "const": "com.yashsomani.birthdayautopilot.lab"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "required": ["tier"],
+              "properties": { "tier": { "const": "prod" } }
+            },
+            "then": {
+              "properties": {
+                "applicationId": {
+                  "const": "com.yashsomani.birthdayautopilot"
+                }
+              }
+            }
+          },
+          {
             "if": { "properties": { "channel": { "const": "google-play" } } },
             "then": {
-              "required": ["playUploadApproved"],
+              "required": [
+                "playUploadApproved",
+                "uploadSigningCertificateSha256"
+              ],
               "properties": {
                 "playUploadApproved": { "const": true },
                 "installerPackage": { "const": "com.android.vending" }
+              }
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  { "required": ["playUploadApproved"] },
+                  { "required": ["uploadSigningCertificateSha256"] },
+                  { "required": ["artifactAabSha256"] }
+                ]
               }
             }
           }
         ]
       }
     }
+  },
+  "$defs": {
+    "reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{0,255}$"
+    },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
   }
 }

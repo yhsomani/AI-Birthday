@@ -10,9 +10,11 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.SocketTimeoutException
-import javax.net.ssl.HttpsURLConnection
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
@@ -48,6 +50,20 @@ internal fun interface PeopleTransport {
   suspend fun execute(request: PeopleRequest, accessToken: EphemeralToken): PeopleTransportResult
 }
 
+/**
+ * Keeps the production URL opener replaceable in local contract tests without weakening the
+ * request boundary. [PeopleHttpTransport] validates the original request URI before this factory
+ * is called; the production implementation then opens that exact, validated HTTPS URI.
+ */
+internal fun interface PeopleHttpConnectionFactory {
+  fun open(uri: URI): HttpURLConnection?
+}
+
+private object PlatformPeopleHttpConnectionFactory : PeopleHttpConnectionFactory {
+  override fun open(uri: URI): HttpURLConnection? =
+    uri.toURL().openConnection() as? HttpURLConnection
+}
+
 internal class AndroidNetworkAvailability(context: Context) : NetworkAvailability {
   private val connectivityManager = context.applicationContext
     .getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
@@ -66,6 +82,7 @@ internal class PeopleHttpTransport(
   private val maxPageBytes: Int,
   private val connectTimeoutMillis: Int = 10_000,
   private val readTimeoutMillis: Int = 15_000,
+  private val connectionFactory: PeopleHttpConnectionFactory = PlatformPeopleHttpConnectionFactory,
 ) : PeopleTransport {
   init {
     require(maxPageBytes > 0)
@@ -79,17 +96,13 @@ internal class PeopleHttpTransport(
   ): PeopleTransportResult = withContext(Dispatchers.IO) {
     ensureActive()
     if (!networkAvailability.isOnline()) return@withContext PeopleTransportResult.Offline
-    val connection = runCatching { request.uri.toURL().openConnection() as? HttpsURLConnection }
+    if (!isAllowedPeopleRequest(request.uri)) {
+      return@withContext PeopleTransportResult.NetworkFailure
+    }
+    val connection = runCatching { connectionFactory.open(request.uri) }
       .getOrNull()
       ?: return@withContext PeopleTransportResult.NetworkFailure
     try {
-      if (
-        connection.url.protocol != "https" ||
-        connection.url.host != "people.googleapis.com" ||
-        connection.url.path != "/v1/people/me/connections"
-      ) {
-        return@withContext PeopleTransportResult.NetworkFailure
-      }
       connection.requestMethod = "GET"
       connection.instanceFollowRedirects = false
       connection.useCaches = false
@@ -120,6 +133,8 @@ internal class PeopleHttpTransport(
         }
         else -> PeopleTransportResult.HttpFailure(status)
       }
+    } catch (cancelled: CancellationException) {
+      throw cancelled
     } catch (_: SocketTimeoutException) {
       PeopleTransportResult.Timeout
     } catch (_: IOException) {
@@ -135,7 +150,7 @@ internal class PeopleHttpTransport(
     }
   }
 
-  private fun readSuccess(connection: HttpsURLConnection): PeopleTransportResult {
+  private suspend fun readSuccess(connection: HttpURLConnection): PeopleTransportResult {
     if (!PeopleHttpResponsePolicy.isJsonMediaType(connection.contentType)) {
       return PeopleTransportResult.UnexpectedContentType
     }
@@ -149,8 +164,10 @@ internal class PeopleHttpTransport(
       val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
       var total = 0
       while (true) {
+        currentCoroutineContext().ensureActive()
         val read = input.read(buffer)
         if (read < 0) break
+        currentCoroutineContext().ensureActive()
         total += read
         if (total > maxPageBytes) return PeopleTransportResult.PageTooLarge
         output.write(buffer, 0, read)
@@ -159,15 +176,17 @@ internal class PeopleHttpTransport(
     }
   }
 
-  private fun readBounded(stream: InputStream?, maxBytes: Int): ByteArray? {
+  private suspend fun readBounded(stream: InputStream?, maxBytes: Int): ByteArray? {
     if (stream == null) return null
     stream.use { input ->
       val output = ByteArrayOutputStream(minOf(maxBytes, 8_192))
       val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
       var total = 0
       while (true) {
+        currentCoroutineContext().ensureActive()
         val read = input.read(buffer)
         if (read < 0) break
+        currentCoroutineContext().ensureActive()
         total += read
         if (total > maxBytes) return null
         output.write(buffer, 0, read)
@@ -175,6 +194,14 @@ internal class PeopleHttpTransport(
       return output.toByteArray()
     }
   }
+
+  private fun isAllowedPeopleRequest(uri: URI): Boolean =
+    uri.scheme == "https" &&
+      uri.host == "people.googleapis.com" &&
+      uri.port == -1 &&
+      uri.userInfo == null &&
+      uri.fragment == null &&
+      uri.path == "/v1/people/me/connections"
 
   private companion object {
     const val MAX_ERROR_BYTES = 64 * 1024

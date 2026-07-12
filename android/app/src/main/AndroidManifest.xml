@@ -10,6 +10,14 @@
       android:name="android.hardware.telephony.messaging"
       android:required="true" />
 
+    <!-- Required for a fail-closed resolveActivity preflight on Android package-visibility APIs. -->
+    <queries>
+      <intent>
+        <action android:name="android.intent.action.SENDTO" />
+        <data android:scheme="smsto" />
+      </intent>
+    </queries>
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -63,6 +71,7 @@
           <action android:name="android.intent.action.DATE_CHANGED" />
           <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
           <action android:name="android.intent.action.LOCALE_CHANGED" />
+          <action android:name="android.telephony.action.DEFAULT_SMS_SUBSCRIPTION_CHANGED" />
         </intent-filter>
       </receiver>
     </application>

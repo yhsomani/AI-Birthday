@@ -157,6 +157,7 @@ const USER_INTENTS = {
   confirmPrivacyAction: 'confirm-privacy-action',
   confirmTodayOccurrence: 'confirm-today-occurrence',
   beginSenderTransfer: 'begin-sender-transfer',
+  blockRecipientDestination: 'block-recipient-destination',
   checkAccountDeletionStatus: 'check-account-deletion-status',
   continueWithGoogle: 'continue-with-google',
   excludeRecipient: 'exclude-recipient',
@@ -188,6 +189,7 @@ const USER_INTENTS = {
   shareDiagnostics: 'share-diagnostics',
   startTest: 'start-test',
   syncContacts: 'sync-contacts',
+  unblockRecipientDestination: 'unblock-recipient-destination',
 } as const;
 
 type ExpectedRevision =
@@ -418,6 +420,21 @@ export class BirthdayNativeAdapter
     input: Parameters<PeoplePort['excludeRecipient']>[0],
   ): Promise<NativeResult<PeopleMutationProjection>> {
     return this.recipientIntent(USER_INTENTS.excludeRecipient, input);
+  }
+
+  public blockRecipientDestination(
+    input: Parameters<PeoplePort['blockRecipientDestination']>[0],
+  ): Promise<NativeResult<PeopleMutationProjection>> {
+    return this.recipientIntent(USER_INTENTS.blockRecipientDestination, input);
+  }
+
+  public unblockRecipientDestination(
+    input: Parameters<PeoplePort['unblockRecipientDestination']>[0],
+  ): Promise<NativeResult<PeopleMutationProjection>> {
+    return this.recipientIntent(
+      USER_INTENTS.unblockRecipientDestination,
+      input,
+    );
   }
 
   public restoreRecipient(
@@ -814,6 +831,8 @@ export class BirthdayNativeAdapter
     intent:
       | typeof USER_INTENTS.pauseRecipient
       | typeof USER_INTENTS.excludeRecipient
+      | typeof USER_INTENTS.blockRecipientDestination
+      | typeof USER_INTENTS.unblockRecipientDestination
       | typeof USER_INTENTS.restoreRecipient,
     input: Parameters<PeoplePort['pauseRecipient']>[0],
   ): Promise<NativeResult<PeopleMutationProjection>> {

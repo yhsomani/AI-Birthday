@@ -62,12 +62,6 @@ final class IOSPeopleAuthorizationGateway {
     }
   }
 
-  func clear(_ token: IOSEphemeralGoogleAccessToken) {
-    // GoogleSignIn-iOS has no per-access-token eviction API. Release the app-owned
-    // token immediately, then bounded reacquisition calls refreshTokensIfNeeded.
-    token.clear()
-  }
-
   private func appCheckPasses() async -> Bool {
     await withCheckedContinuation { continuation in
       identity.appCheckGate { continuation.resume(returning: $0) }

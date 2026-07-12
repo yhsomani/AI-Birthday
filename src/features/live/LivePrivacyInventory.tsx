@@ -10,6 +10,7 @@ import {
 } from '../../design-system/components/Primitives';
 import { formatLiveInstant } from '../../localization/formatLive';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
+import { LiveCloudPrivacyBoundary } from './LiveCloudPrivacyBoundary';
 
 export function LivePrivacyInventory({
   inventory,
@@ -25,56 +26,59 @@ export function LivePrivacyInventory({
       : inventory.consentVersions.join(', ');
 
   return (
-    <Card accessibilityLabel={t('live.settings.inventory')}>
-      <KeyValue
-        label={t('live.settings.localContacts')}
-        value={String(inventory.localContactCount)}
-      />
-      <KeyValue
-        label={t('live.settings.enabledRecipients')}
-        value={String(inventory.enabledRecipientCount)}
-      />
-      <KeyValue
-        label={t('live.settings.approvals')}
-        value={String(inventory.approvalCount)}
-      />
-      <KeyValue
-        label={t('live.settings.activityRecords')}
-        value={String(inventory.activityCount)}
-      />
-      <KeyValue
-        label={t('live.settings.templates')}
-        value={String(inventory.templateCount)}
-      />
-      <KeyValue
-        label={t('live.settings.localStorage')}
-        value={t('live.settings.bytes', {
-          count: inventory.localStorageBytes,
-        })}
-      />
-      <KeyValue
-        label={t('live.settings.lastContactsSync')}
-        value={
-          inventory.lastContactsSyncAt
-            ? formatLiveInstant(inventory.lastContactsSyncAt, language)
-            : t('live.settings.neverSynced')
-        }
-      />
-      <KeyValue
-        label={t('live.settings.consentVersions')}
-        value={consentVersions}
-      />
-      <SectionHeading title={t('live.settings.retention')} />
-      <AppText color="muted">{t('live.settings.activityRetention')}</AppText>
-      <AppText color="muted">
-        {t(
-          platform === 'android'
-            ? 'live.settings.androidSafetyRetention'
-            : 'live.settings.iosSafetyRetention',
-        )}
-      </AppText>
-      <SectionHeading title={t('live.settings.externalBoundary')} />
-      <AppText color="muted">{t('live.settings.externalCopies')}</AppText>
-    </Card>
+    <>
+      <Card>
+        <KeyValue
+          label={t('live.settings.localContacts')}
+          value={String(inventory.localContactCount)}
+        />
+        <KeyValue
+          label={t('live.settings.enabledRecipients')}
+          value={String(inventory.enabledRecipientCount)}
+        />
+        <KeyValue
+          label={t('live.settings.approvals')}
+          value={String(inventory.approvalCount)}
+        />
+        <KeyValue
+          label={t('live.settings.activityRecords')}
+          value={String(inventory.activityCount)}
+        />
+        <KeyValue
+          label={t('live.settings.templates')}
+          value={String(inventory.templateCount)}
+        />
+        <KeyValue
+          label={t('live.settings.localStorage')}
+          value={t('live.settings.bytes', {
+            count: inventory.localStorageBytes,
+          })}
+        />
+        <KeyValue
+          label={t('live.settings.lastContactsSync')}
+          value={
+            inventory.lastContactsSyncAt
+              ? formatLiveInstant(inventory.lastContactsSyncAt, language)
+              : t('live.settings.neverSynced')
+          }
+        />
+        <KeyValue
+          label={t('live.settings.consentVersions')}
+          value={consentVersions}
+        />
+        <SectionHeading title={t('live.settings.retention')} />
+        <AppText color="muted">{t('live.settings.activityRetention')}</AppText>
+        <AppText color="muted">
+          {t(
+            platform === 'android'
+              ? 'live.settings.androidSafetyRetention'
+              : 'live.settings.iosSafetyRetention',
+          )}
+        </AppText>
+        <SectionHeading title={t('live.settings.externalBoundary')} />
+        <AppText color="muted">{t('live.settings.externalCopies')}</AppText>
+      </Card>
+      <LiveCloudPrivacyBoundary platform={platform} />
+    </>
   );
 }

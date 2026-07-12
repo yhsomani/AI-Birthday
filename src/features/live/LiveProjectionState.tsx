@@ -1,5 +1,11 @@
-import React, { PropsWithChildren } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import React, { PropsWithChildren, useEffect, useRef } from 'react';
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Platform,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import type { NativeProblem } from '../../domain/shared/result';
 import { AppText } from '../../design-system/components/AppText';
@@ -17,13 +23,70 @@ import {
   nativeProblemReference,
 } from './nativeProblem';
 
+type AnnouncementPriority = 'assertive' | 'polite';
+
+const joinAnnouncement = (...parts: readonly string[]): string =>
+  parts
+    .map(part => part.trim())
+    .filter(Boolean)
+    .reduce(
+      (announcement, part) =>
+        announcement
+          ? `${announcement}${/[.!?…]$/u.test(announcement) ? '' : '.'} ${part}`
+          : part,
+      '',
+    );
+
+function useIosVoiceOverAnnouncement(
+  announcement: string | undefined,
+  priority: AnnouncementPriority,
+) {
+  const lastAnnounced = useRef<string | undefined>(undefined);
+  const requestGeneration = useRef(0);
+
+  useEffect(() => {
+    const generation = requestGeneration.current + 1;
+    requestGeneration.current = generation;
+    if (!announcement) {
+      lastAnnounced.current = undefined;
+      return;
+    }
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+
+    let isCurrent = true;
+    AccessibilityInfo.isScreenReaderEnabled()
+      .then(enabled => {
+        if (
+          !isCurrent ||
+          requestGeneration.current !== generation ||
+          !enabled ||
+          lastAnnounced.current === announcement
+        ) {
+          return;
+        }
+        AccessibilityInfo.announceForAccessibilityWithOptions(announcement, {
+          queue: priority === 'polite',
+        });
+        lastAnnounced.current = announcement;
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [announcement, priority]);
+}
+
 export function LiveLoading({ label }: { label: string }) {
   const { colors } = useAppTheme();
+  useIosVoiceOverAnnouncement(label, 'polite');
   return (
     <View
       accessible
       accessibilityLabel={label}
-      accessibilityLiveRegion="polite"
+      accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
       accessibilityRole="progressbar"
       style={styles.centered}
       testID="live-projection-loading"
@@ -54,21 +117,25 @@ export function LiveError({
 }) {
   const { t } = useAppLocalization();
   const reference = nativeProblemReference(problem);
+  const detail = t(nativeProblemMessageKey(problem));
+  const referenceLabel = t('live.common.reference', { reference });
+  useIosVoiceOverAnnouncement(
+    joinAnnouncement(title, detail, referenceLabel),
+    'assertive',
+  );
   return (
     <View
-      accessibilityLiveRegion="assertive"
-      accessibilityRole="alert"
+      accessibilityLiveRegion={
+        Platform.OS === 'android' ? 'assertive' : undefined
+      }
+      accessibilityRole={Platform.OS === 'android' ? 'alert' : undefined}
       style={styles.stack}
       testID={testID}
     >
-      <ReadinessBanner
-        title={title}
-        detail={t(nativeProblemMessageKey(problem))}
-        tone="critical"
-      />
+      <ReadinessBanner title={title} detail={detail} tone="critical" />
       <Card>
         <AppText color="muted" variant="caption">
-          {t('live.common.reference', { reference })}
+          {referenceLabel}
         </AppText>
       </Card>
       <Button
@@ -82,14 +149,17 @@ export function LiveError({
 
 export function LiveRefreshProblem({ problem }: { problem: NativeProblem }) {
   const { t } = useAppLocalization();
+  const title = t('live.error.refreshTitle');
+  const detail = t('live.error.refreshBody', {
+    message: t(nativeProblemMessageKey(problem)),
+  });
+  useIosVoiceOverAnnouncement(joinAnnouncement(title, detail), 'polite');
   return (
-    <ReadinessBanner
-      title={t('live.error.refreshTitle')}
-      detail={t('live.error.refreshBody', {
-        message: t(nativeProblemMessageKey(problem)),
-      })}
-      tone="warning"
-    />
+    <View
+      accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
+    >
+      <ReadinessBanner title={title} detail={detail} tone="warning" />
+    </View>
   );
 }
 
@@ -101,29 +171,39 @@ export function LiveActionFeedback({
   message?: string | undefined;
 }) {
   const { t } = useAppLocalization();
+  const title = problem
+    ? t('live.error.actionTitle')
+    : t('live.action.responseTitle');
+  const detail = problem
+    ? t('live.error.actionBody', {
+        message: t(nativeProblemMessageKey(problem)),
+        reference: t('live.common.reference', {
+          reference: nativeProblemReference(problem),
+        }),
+      })
+    : message;
+  useIosVoiceOverAnnouncement(
+    detail ? joinAnnouncement(title, detail) : undefined,
+    problem ? 'assertive' : 'polite',
+  );
   if (problem) {
     return (
-      <View accessibilityLiveRegion="assertive" accessibilityRole="alert">
-        <ReadinessBanner
-          title={t('live.error.actionTitle')}
-          detail={t('live.error.actionBody', {
-            message: t(nativeProblemMessageKey(problem)),
-            reference: t('live.common.reference', {
-              reference: nativeProblemReference(problem),
-            }),
-          })}
-          tone="critical"
-        />
+      <View
+        accessibilityLiveRegion={
+          Platform.OS === 'android' ? 'assertive' : undefined
+        }
+        accessibilityRole={Platform.OS === 'android' ? 'alert' : undefined}
+      >
+        <ReadinessBanner title={title} detail={detail!} tone="critical" />
       </View>
     );
   }
   return message ? (
-    <View accessibilityLiveRegion="polite">
-      <ReadinessBanner
-        title={t('live.action.responseTitle')}
-        detail={message}
-        tone="info"
-      />
+    <View
+      accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
+      testID="live-action-feedback-success"
+    >
+      <ReadinessBanner title={title} detail={message} tone="info" />
     </View>
   ) : null;
 }
@@ -135,10 +215,13 @@ export function LiveValidationError({
   message: string;
   testID?: string;
 }) {
+  useIosVoiceOverAnnouncement(message, 'assertive');
   return (
     <View
-      accessibilityLiveRegion="assertive"
-      accessibilityRole="alert"
+      accessibilityLiveRegion={
+        Platform.OS === 'android' ? 'assertive' : undefined
+      }
+      accessibilityRole={Platform.OS === 'android' ? 'alert' : undefined}
       testID={testID}
     >
       <StatusRow title={message} tone="warning" />

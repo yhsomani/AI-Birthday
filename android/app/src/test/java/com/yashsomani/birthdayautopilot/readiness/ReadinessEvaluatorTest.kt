@@ -19,6 +19,15 @@ class ReadinessEvaluatorTest {
   }
 
   @Test
+  fun `failed scheduler startup blocks every send gate`() {
+    val decision = evaluator.evaluate(readyInputs().copy(schedulerReady = false))
+
+    assertTrue(SafeReasonCode.SCHEDULER_UNAVAILABLE in decision.testBlockers)
+    assertTrue(SafeReasonCode.SCHEDULER_UNAVAILABLE in decision.activationBlockers)
+    assertTrue(SafeReasonCode.SCHEDULER_UNAVAILABLE in decision.birthdayBlockers)
+  }
+
+  @Test
   fun `foreground test excludes background predicates`() {
     val decision = evaluator.evaluate(
       readyInputs().copy(
@@ -33,6 +42,16 @@ class ReadinessEvaluatorTest {
     assertTrue(decision.isReady(ReadinessGate.TEST))
     assertFalse(decision.isReady(ReadinessGate.ACTIVATION))
     assertFalse(decision.isReady(ReadinessGate.BIRTHDAY))
+  }
+
+  @Test
+  fun `foreground test can repair reset safety while activation remains blocked`() {
+    val decision = evaluator.evaluate(readyInputs().copy(resetSafetyClear = false))
+
+    assertTrue(decision.isReady(ReadinessGate.TEST))
+    assertFalse(decision.isReady(ReadinessGate.ACTIVATION))
+    assertFalse(decision.isReady(ReadinessGate.BIRTHDAY))
+    assertTrue(SafeReasonCode.RESET_SAFETY_BLOCKED in decision.activationBlockers)
   }
 
   @Test
@@ -52,6 +71,7 @@ class ReadinessEvaluatorTest {
     passingTestReceipt = true,
     networkAvailable = true,
     coordinationAvailable = true,
+    schedulerReady = true,
     smsPermissionGranted = true,
     simReady = true,
     backgroundRestricted = false,

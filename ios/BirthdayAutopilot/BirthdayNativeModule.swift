@@ -44,6 +44,7 @@ public final class BirthdayNativeService: NSObject {
   private static let userIntents: Set<String> = [
     "activate",
     "authorize-contacts",
+    "block-recipient-destination",
     "choose-birthday",
     "choose-phone",
     "check-account-deletion-status",
@@ -76,6 +77,7 @@ public final class BirthdayNativeService: NSObject {
     "share-diagnostics",
     "start-test",
     "sync-contacts",
+    "unblock-recipient-destination",
   ]
   private static let revisionPattern = try! NSRegularExpression(
     pattern: "^(0|[1-9][0-9]{0,18})$"
@@ -93,6 +95,7 @@ public final class BirthdayNativeService: NSObject {
   private let peopleSync = IOSPeopleSyncCoordinator.shared
   private let workflow = IOSCompanionWorkflowEngine.shared
   private var diagnosticsShareInProgress = false
+  private var lifecycleMutationInProgress = false
 
   @objc public override init() {
     super.init()
@@ -260,10 +263,31 @@ public final class BirthdayNativeService: NSObject {
                 ))
               return
             }
-            self.executeGoogleDeletionRecovery(completion: resolve)
+            guard let lifecycleCompletion = self.beginLifecycleMutation(
+              revision: status.revision,
+              completion: resolve
+            ) else { return }
+            self.executeGoogleDeletionRecovery(completion: lifecycleCompletion)
             return
           }
-          self.executeGoogleIdentity(completion: resolve)
+          if status.workflow?.privacyOperations.contains(where: {
+            !["complete", "failed"].contains($0.phase)
+          }) == true {
+            resolve(
+              self.response(
+                revision: status.revision,
+                kind: "error",
+                payload: Self.temporarilyUnavailableProblem(
+                  "coordination-unavailable"
+                )
+              ))
+            return
+          }
+          guard let lifecycleCompletion = self.beginLifecycleMutation(
+            revision: status.revision,
+            completion: resolve
+          ) else { return }
+          self.executeGoogleIdentity(completion: lifecycleCompletion)
           return
         }
 
@@ -296,7 +320,64 @@ public final class BirthdayNativeService: NSObject {
               ))
             return
           }
-          self.executePeopleSync(completion: resolve)
+          if status.workflow?.privacyOperations.contains(where: {
+            !["complete", "failed"].contains($0.phase)
+          }) == true {
+            resolve(
+              self.response(
+                revision: status.revision,
+                kind: "error",
+                payload: Self.temporarilyUnavailableProblem(
+                  "coordination-unavailable"
+                )
+              ))
+            return
+          }
+          if intent == "sync-contacts" {
+            guard let binding = self.identity.exactSessionBinding() else {
+              resolve(
+                self.response(
+                  revision: status.revision,
+                  kind: "error",
+                  payload: Self.temporarilyUnavailableProblem(
+                    "account-reconnect-required"
+                  )
+                ))
+              return
+            }
+            guard let workflow = status.workflow, workflow.account.matches(binding) else {
+              resolve(
+                self.response(
+                  revision: status.revision,
+                  kind: "error",
+                  payload: Self.temporarilyUnavailableProblem(
+                    "account-reconnect-required"
+                  )
+                ))
+              return
+            }
+            guard
+              IOSCompanionConsentLedgerPolicy.hasCurrentContactsDisclosure(
+                workflow.consentReceipts
+              )
+            else {
+              resolve(
+                self.response(
+                  revision: status.revision,
+                  kind: "ok",
+                  payload: Self.contactsAuthorizationRequired()
+                ))
+              return
+            }
+          }
+          guard let lifecycleCompletion = self.beginLifecycleMutation(
+            revision: status.revision,
+            completion: resolve
+          ) else { return }
+          self.executePeopleSync(
+            disclosureAcknowledged: intent == "authorize-contacts",
+            completion: lifecycleCompletion
+          )
           return
         }
 
@@ -342,6 +423,7 @@ public final class BirthdayNativeService: NSObject {
         let workflowIntents: Set<String> = [
           "activate", "choose-birthday", "choose-phone", "confirm-approvals",
           "confirm-enrollment", "confirm-privacy-action", "exclude-recipient",
+          "block-recipient-destination", "unblock-recipient-destination",
           "generate-suggestions", "pause-all", "pause-recipient",
           "prepare-activation", "prepare-approvals", "prepare-enrollment-review",
           "prepare-privacy-action", "prepare-resume", "preview-message",
@@ -356,6 +438,16 @@ public final class BirthdayNativeService: NSObject {
           let binding =
             self.identity.exactSessionBinding()
             ?? (privacyIntent ? self.peopleStore.currentBinding() : nil)
+            ?? (intent == "resume-lifecycle-operation"
+              ? status.workflow.map { workflow in
+                IOSNativeGoogleAccountBinding(
+                  googleSubject: workflow.account.googleSubject,
+                  firebaseUID: workflow.account.firebaseUID,
+                  displayEmail: "",
+                  displayName: nil,
+                  accountGeneration: workflow.account.accountGeneration
+                )
+              } : nil)
           guard let binding else {
             resolve(
               self.response(
@@ -366,6 +458,19 @@ public final class BirthdayNativeService: NSObject {
             return
           }
           let currentReadiness = self.readiness(status: status, context: Self.runtimeContext())
+          let requiresLifecycleExclusion =
+            intent == "confirm-privacy-action"
+            || intent == "resume-lifecycle-operation"
+          let workflowCompletion: (NSDictionary) -> Void
+          if requiresLifecycleExclusion {
+            guard let lifecycleCompletion = self.beginLifecycleMutation(
+              revision: status.revision,
+              completion: resolve
+            ) else { return }
+            workflowCompletion = lifecycleCompletion
+          } else {
+            workflowCompletion = resolve
+          }
           self.workflow.execute(
             intent: intent,
             payload: payload,
@@ -374,7 +479,7 @@ public final class BirthdayNativeService: NSObject {
             status: status,
             readiness: currentReadiness
           ) { [weak self] result in
-            self?.finishWorkflowIntent(result, completion: resolve)
+            self?.finishWorkflowIntent(result, completion: workflowCompletion)
           }
           return
         }
@@ -525,6 +630,7 @@ public final class BirthdayNativeService: NSObject {
     case "activate", "confirm-approvals", "confirm-enrollment",
       "confirm-privacy-action", "confirm-today-occurrence", "choose-birthday",
       "choose-phone", "exclude-recipient", "pause-all", "pause-recipient",
+      "block-recipient-destination", "unblock-recipient-destination",
       "perform-native-action", "prepare-activation", "prepare-approvals",
       "prepare-enrollment-review", "prepare-privacy-action", "prepare-resume",
       "prepare-today-occurrence", "preview-diagnostics", "preview-message",
@@ -559,9 +665,12 @@ public final class BirthdayNativeService: NSObject {
       "step": setupStep(context: context, people: people, status: status),
       "eligibility": eligibility(context: context),
       "account": account(status: status),
-      "contacts": contactsSyncPayload(people.sync),
+      "contacts": contactsSyncPayload(people.sync, trustedNow: status.trustedNow),
       "readiness": currentReadiness,
       "automation": workflow.automationPayload(status: status, readiness: currentReadiness),
+      "initialActivationCompleted": status.workflow.map {
+        $0.hasEverActivatedReminders == true
+      } ?? false,
     ]
   }
 
@@ -577,7 +686,7 @@ public final class BirthdayNativeService: NSObject {
     var value: BirthdayJSON = [
       "automation": workflow.automationPayload(status: status, readiness: currentReadiness),
       "counts": counts,
-      "contactsSync": contactsSyncPayload(people.sync),
+      "contactsSync": contactsSyncPayload(people.sync, trustedNow: status.trustedNow),
     ]
     if let next { value["next"] = next }
     if let reconciledAt = status.lastReminderReconciledAt {
@@ -622,9 +731,8 @@ public final class BirthdayNativeService: NSObject {
         ))
       return readinessPayload(status: status, context: context, issues: issues)
     }
-    switch peopleStore.projection().sync {
-    case .fresh:
-      break
+    let peopleSync = peopleStore.projection().sync
+    switch peopleSync {
     case .authorizationRequired:
       issues.append(
         Self.issue(
@@ -632,6 +740,11 @@ public final class BirthdayNativeService: NSObject {
           code: "contacts-authorization-required"
         ))
     default:
+      let assessment = contactsFreshnessAssessment(
+        peopleSync,
+        trustedNow: status.trustedNow
+      )
+      if assessment.allowsCompanionAction { break }
       issues.append(Self.issue(id: "readiness-contacts-stale", code: "contacts-stale"))
     }
 
@@ -1030,8 +1143,43 @@ public final class BirthdayNativeService: NSObject {
   }
 
   private func executePeopleSync(
+    disclosureAcknowledged: Bool,
     completion: @escaping (NSDictionary) -> Void
   ) {
+    // Re-read immediately before lifting the durable privacy suspension. The
+    // original bridge snapshot may have gone stale while another main-actor
+    // lifecycle intent committed its reviewed operation.
+    store.readProjectionStatus { [weak self] result in
+      guard let self else {
+        completion(Self.fallbackInternalResponse(code: "NATIVE_BRIDGE_UNAVAILABLE"))
+        return
+      }
+      guard case .success(let status) = result,
+        status.workflow?.privacyOperations.contains(where: {
+          !["complete", "failed"].contains($0.phase)
+        }) != true
+      else {
+        self.finishAsyncIntent(
+          kind: "error",
+          payload: Self.temporarilyUnavailableProblem("coordination-unavailable"),
+          completion: completion
+        )
+        return
+      }
+      self.executePeopleSyncAfterPrivacyRecheck(
+        disclosureAcknowledged: disclosureAcknowledged,
+        trustedNow: status.trustedNow,
+        completion: completion
+      )
+    }
+  }
+
+  private func executePeopleSyncAfterPrivacyRecheck(
+    disclosureAcknowledged: Bool,
+    trustedNow: Date?,
+    completion: @escaping (NSDictionary) -> Void
+  ) {
+    IOSPeopleBackgroundRefreshCoordinator.shared.resumeAfterExplicitContactsAction()
     peopleSync.sync(interactiveAuthorization: true) { [weak self] outcome in
       guard let self else {
         completion(Self.fallbackInternalResponse(code: "NATIVE_BRIDGE_UNAVAILABLE"))
@@ -1047,12 +1195,29 @@ public final class BirthdayNativeService: NSObject {
           )
           return
         }
-        self.workflow.reconcileAfterPeopleSync(binding: binding) {
-          self.finishAsyncIntent(
-            kind: "ok",
-            payload: self.contactsSyncPayload(self.peopleStore.projection().sync),
-            completion: completion
-          )
+        self.workflow.recordContactsConsent(
+          binding: binding,
+          disclosureAcknowledged: disclosureAcknowledged
+        ) { recorded in
+          guard recorded else {
+            self.finishAsyncIntent(
+              kind: "error",
+              payload: Self.internalProblem("COMPANION_STORAGE_UNAVAILABLE"),
+              completion: completion
+            )
+            return
+          }
+          self.workflow.reconcileAfterPeopleSync(binding: binding) {
+            self.finishAsyncIntent(
+              kind: "ok",
+              payload: self.contactsSyncPayload(
+                self.peopleStore.projection().sync,
+                trustedNow: nil,
+                freshSyncJustCompleted: true
+              ),
+              completion: completion
+            )
+          }
         }
       case .failed(let failure):
         switch failure {
@@ -1075,7 +1240,10 @@ public final class BirthdayNativeService: NSObject {
         default:
           self.finishAsyncIntent(
             kind: "ok",
-            payload: self.contactsSyncPayload(self.peopleStore.projection().sync),
+            payload: self.contactsSyncPayload(
+              self.peopleStore.projection().sync,
+              trustedNow: trustedNow
+            ),
             completion: completion
           )
         }
@@ -1262,6 +1430,29 @@ public final class BirthdayNativeService: NSObject {
     }
   }
 
+  /// Serializes account selection, foreground Contacts mutation, and reviewed
+  /// privacy execution. Store reads are asynchronous, so this main-actor lease
+  /// closes the stale-snapshot window between their final gate and SDK work.
+  private func beginLifecycleMutation(
+    revision: String,
+    completion: @escaping (NSDictionary) -> Void
+  ) -> ((NSDictionary) -> Void)? {
+    guard !lifecycleMutationInProgress else {
+      completion(
+        response(
+          revision: revision,
+          kind: "error",
+          payload: Self.temporarilyUnavailableProblem("coordination-unavailable")
+        ))
+      return nil
+    }
+    lifecycleMutationInProgress = true
+    return { [weak self] response in
+      self?.lifecycleMutationInProgress = false
+      completion(response)
+    }
+  }
+
   private func finishWorkflowIntent(
     _ result: IOSCompanionWorkflowEngineResult,
     completion: @escaping (NSDictionary) -> Void
@@ -1354,7 +1545,11 @@ public final class BirthdayNativeService: NSObject {
     }
   }
 
-  private func contactsSyncPayload(_ state: IOSPeopleSafeSyncState) -> BirthdayJSON {
+  private func contactsSyncPayload(
+    _ state: IOSPeopleSafeSyncState,
+    trustedNow: Date?,
+    freshSyncJustCompleted: Bool = false
+  ) -> BirthdayJSON {
     switch state {
     case .authorizationRequired:
       return Self.contactsAuthorizationRequired()
@@ -1365,19 +1560,71 @@ public final class BirthdayNativeService: NSObject {
         "kind": "syncing", "mode": mode.rawValue,
         "retainedGeneration": retained,
       ]
-    case .fresh(let completedAt, let count):
+    case .fresh(let completedAt, let count) where freshSyncJustCompleted:
       return [
         "kind": "fresh", "completedAt": Self.dateString(completedAt),
         "contactCount": count,
       ]
-    case .failedRetained(let lastSuccess, let reason):
-      var value: BirthdayJSON = [
+    case .fresh(_, _), .failedRetained(_, _):
+      let assessment = contactsFreshnessAssessment(state, trustedNow: trustedNow)
+      if assessment.band == .normal {
+        switch state {
+        case .fresh(let completedAt, let count):
+          return [
+            "kind": "fresh", "completedAt": Self.dateString(completedAt),
+            "contactCount": count,
+          ]
+        case .failedRetained(let lastSuccess, let reason):
+          var value: BirthdayJSON = [
+            "kind": "failed-retained",
+            "reason": Self.safeSyncReason(reason),
+          ]
+          if let lastSuccess { value["lastSuccessAt"] = Self.dateString(lastSuccess) }
+          return value
+        default:
+          return ["kind": "failed-retained", "reason": "contacts-stale"]
+        }
+      }
+      if let lastSuccess = assessment.lastSuccessAt {
+        return [
+          "kind": "stale",
+          "lastSuccessAt": Self.dateString(lastSuccess),
+          "reason": state.failureReason.map(Self.safeSyncReason) ?? "contacts-stale",
+        ]
+      }
+      let value: BirthdayJSON = [
         "kind": "failed-retained",
-        "reason": Self.safeSyncReason(reason),
+        "reason": state.failureReason.map(Self.safeSyncReason) ?? "contacts-stale",
       ]
-      if let lastSuccess { value["lastSuccessAt"] = Self.dateString(lastSuccess) }
       return value
     }
+  }
+
+  private func contactsFreshnessAssessment(
+    _ state: IOSPeopleSafeSyncState,
+    trustedNow: Date?
+  ) -> IOSContactsFreshnessAssessment {
+    let source: IOSContactsFreshnessSourceState
+    let lastSuccess: Date?
+    switch state {
+    case .fresh(let completedAt, _):
+      source = .verified
+      lastSuccess = completedAt
+    case .failedRetained(let retainedAt, _):
+      source = .retainedAfterFailure
+      lastSuccess = retainedAt
+    case .authorizationRequired:
+      source = .authorizationRequired
+      lastSuccess = nil
+    case .neverSynced, .syncing(_, _):
+      source = .unavailable
+      lastSuccess = nil
+    }
+    return IOSContactsFreshnessPolicy.assess(
+      sourceState: source,
+      lastSuccessAt: lastSuccess,
+      trustedNow: trustedNow
+    )
   }
 
   private static func safeSyncReason(_ reason: String) -> String {

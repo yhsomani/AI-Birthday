@@ -14,7 +14,7 @@ const supportedLanguage = (languageCode?: string): AppLanguage => {
   return 'en';
 };
 
-const resolveInitialLanguage = (): AppLanguage => {
+export const resolveDeviceLanguage = (): AppLanguage => {
   try {
     return supportedLanguage(getLocales()[0]?.languageCode);
   } catch {
@@ -26,7 +26,7 @@ export const appI18n = i18next.createInstance();
 
 export const appI18nReady = appI18n.use(initReactI18next).init({
   resources: productionResources,
-  lng: resolveInitialLanguage(),
+  lng: resolveDeviceLanguage(),
   fallbackLng: 'en',
   supportedLngs: ['en', 'hi', 'ar-XB'],
   interpolation: { escapeValue: false },
@@ -42,6 +42,16 @@ export const normalizeLanguage = (language?: string): AppLanguage => {
     return 'ar-XB';
   }
   return 'en';
+};
+
+export const refreshDeviceLanguage = async (): Promise<AppLanguage> => {
+  const language = resolveDeviceLanguage();
+  if (
+    normalizeLanguage(appI18n.resolvedLanguage ?? appI18n.language) !== language
+  ) {
+    await appI18n.changeLanguage(language);
+  }
+  return language;
 };
 
 export const formatFixtureDate = (isoDate: string, language: AppLanguage) => {

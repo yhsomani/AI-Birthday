@@ -28,6 +28,8 @@ internal data class LifecycleTodayOccurrenceRow(
   val occurrenceId: String,
   val accountId: String,
   val recipient: String,
+  val canonicalRecipient: String,
+  val maskedDestination: String,
   val exactText: String,
   val localDate: String,
   val timeZoneId: String,
@@ -36,7 +38,10 @@ internal data class LifecycleTodayOccurrenceRow(
   val state: String,
   val occurrenceRevision: Long,
   val updatedAtMillis: Long,
-)
+) {
+  override fun toString(): String =
+    "LifecycleTodayOccurrenceRow(state=$state, revision=$occurrenceRevision, values=<redacted>)"
+}
 
 @Dao
 internal interface LifecycleProjectionDao {
@@ -88,6 +93,8 @@ internal interface LifecycleProjectionDao {
     SELECT occurrence.occurrenceId AS occurrenceId,
       occurrence.accountId AS accountId,
       contact.displayName AS recipient,
+      approval.normalizedPhoneE164 AS canonicalRecipient,
+      approval.maskedPhoneDisplay AS maskedDestination,
       approval.exactMessage AS exactText,
       occurrence.localDate AS localDate,
       occurrence.timeZoneId AS timeZoneId,
@@ -103,12 +110,15 @@ internal interface LifecycleProjectionDao {
     JOIN approval_snapshots_v2 approval ON approval.approvalId = occurrence.approvalId
     JOIN contact_phones_v2 phone ON phone.phoneId = approval.phoneId
     JOIN automation_policies_v2 policy ON policy.policyId = occurrence.policyId
+    JOIN local_destination_guards_v2 destinationGuard
+      ON destinationGuard.occurrenceId = occurrence.occurrenceId
     WHERE occurrence.occurrenceId = :occurrenceId
       AND account.activeSlot = 1
       AND account.state = 'ACTIVE'
       AND contact.accountId = occurrence.accountId
       AND contact.state = 'ACTIVE'
       AND recipient.state = 'ENABLED'
+      AND recipient.chosenPhoneId = approval.phoneId
       AND recipient.approvalId = occurrence.approvalId
       AND approval.accountId = occurrence.accountId
       AND approval.contactId = occurrence.contactId
@@ -117,15 +127,46 @@ internal interface LifecycleProjectionDao {
       AND approval.contactMaterialRevision = contact.materialRevision
       AND approval.phoneMaterialRevision = phone.materialRevision
       AND phone.state = 'READY'
+      AND phone.normalizedE164 = approval.normalizedPhoneE164
       AND phone.destinationFingerprint = occurrence.destinationFingerprint
       AND policy.accountId = occurrence.accountId
       AND policy.state = 'ACTIVE'
       AND policy.revision = approval.policyRevision
-      AND occurrence.state IN ('PLANNED', 'PREPARED', 'SCHEDULED', 'COORDINATION_BLOCKED')
+      AND destinationGuard.accountId = occurrence.accountId
+      AND destinationGuard.destinationFingerprint = occurrence.destinationFingerprint
+      AND destinationGuard.localDate = occurrence.localDate
+      AND destinationGuard.channel = occurrence.channel
+      AND destinationGuard.armedOrLater = 0
+      AND NOT EXISTS (
+        SELECT 1 FROM destination_blocks_v2 destinationBlock
+        WHERE destinationBlock.accountId = occurrence.accountId
+          AND destinationBlock.destinationFingerprint = occurrence.destinationFingerprint
+          AND destinationBlock.active = 1
+      )
+      AND (
+        occurrence.state IN ('PLANNED', 'PREPARED', 'SCHEDULED', 'COORDINATION_BLOCKED')
+        OR (occurrence.state = 'MISSED' AND occurrence.safeOutcomeCode = 'WINDOW_CLOSED')
+      )
     LIMIT 1
     """,
   )
   suspend fun todayOccurrence(occurrenceId: String): LifecycleTodayOccurrenceRow?
+
+  /** Missing, blocked, overflowed, or repair-required reset state can never enable automation. */
+  @Query(
+    """
+    SELECT COUNT(*) FROM reset_safety_v2 reset
+    WHERE reset.accountId = :accountId
+      AND reset.status = 'CLEAR'
+      AND reset.overflowBlocked = 0
+      AND NOT EXISTS (
+        SELECT 1 FROM reset_blocked_dates_v2 blocked
+        WHERE blocked.resetSafetyId = reset.resetSafetyId
+          AND blocked.civilDate = :civilDate
+      )
+    """,
+  )
+  suspend fun resetSafetyAllowsBirthday(accountId: String, civilDate: String): Int
 
   @Query("SELECT * FROM birthday_occurrences_v2 WHERE occurrenceId = :occurrenceId")
   suspend fun occurrence(occurrenceId: String): BirthdayOccurrenceRecordEntity?

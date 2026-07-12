@@ -20,6 +20,20 @@
                ReferencedContainer = "container:BirthdayAutopilot.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A2A000082F10000100000008"
+               BuildableName = "BirthdayAutopilotTests.xctest"
+               BlueprintName = "BirthdayAutopilotTests"
+               ReferencedContainer = "container:BirthdayAutopilot.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -28,6 +42,17 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A2A000082F10000100000008"
+               BuildableName = "BirthdayAutopilotTests.xctest"
+               BlueprintName = "BirthdayAutopilotTests"
+               ReferencedContainer = "container:BirthdayAutopilot.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

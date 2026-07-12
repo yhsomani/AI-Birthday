@@ -40,7 +40,7 @@ export function SettingsScreen({ navigation }: Props) {
     resetFixture,
   } = useFixture();
   const { preference, setPreference } = useAppTheme();
-  const { language, setLanguage, t } = useAppLocalization();
+  const { t } = useAppLocalization();
 
   const rootNavigation = navigation.getParent();
 
@@ -88,34 +88,6 @@ export function SettingsScreen({ navigation }: Props) {
         />
       </View>
 
-      <SectionHeading title={t('settings.language')} />
-      <View accessibilityRole="radiogroup" style={styles.chips}>
-        <ChoiceChip
-          label={t('settings.english')}
-          selected={language === 'en'}
-          onPress={() => setLanguage('en')}
-          testID="language-en"
-        />
-        <ChoiceChip
-          label={t('settings.hindi')}
-          selected={language === 'hi'}
-          onPress={() => setLanguage('hi')}
-          testID="language-hi"
-        />
-        <ChoiceChip
-          label={t('settings.pseudo')}
-          selected={language === 'ar-XB'}
-          onPress={() => setLanguage('ar-XB')}
-          testID="language-pseudo"
-        />
-      </View>
-      {language === 'hi' ? (
-        <StatusRow title={t('settings.hindiCaveat')} tone="info" />
-      ) : null}
-      {language === 'ar-XB' ? (
-        <StatusRow title={t('settings.pseudoCaveat')} tone="warning" />
-      ) : null}
-
       <Card>
         {platform === 'ios' ? (
           <LabeledSwitch
@@ -155,6 +127,13 @@ export function SettingsScreen({ navigation }: Props) {
           onPress={() => rootNavigation?.navigate('DataBoundary')}
           testID="settings-open-privacy"
           icon="lock"
+        />
+        <SettingRow
+          title={t('live.settings.openHelpLegal')}
+          detail={t('live.help.body')}
+          onPress={() => rootNavigation?.navigate('HelpLegal')}
+          testID="settings-open-help-legal"
+          icon="info"
         />
       </Card>
 

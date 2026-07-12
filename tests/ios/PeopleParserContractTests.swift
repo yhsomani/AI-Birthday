@@ -3,6 +3,30 @@ import Foundation
 @main
 enum PeopleParserContractTests {
   static func main() throws {
+    let firstGeneration = IOSPeopleSyncFencePolicy.freshGeneration()
+    let secondGeneration = IOSPeopleSyncFencePolicy.freshGeneration()
+    guard IOSPeopleSyncFencePolicy.isValidGeneration(firstGeneration),
+      IOSPeopleSyncFencePolicy.isValidGeneration(secondGeneration),
+      firstGeneration != secondGeneration,
+      IOSPeopleSyncFencePolicy.permitsCommit(
+        capturedGeneration: firstGeneration,
+        durableGeneration: firstGeneration,
+        exactAccountGenerationMatches: true
+      ),
+      !IOSPeopleSyncFencePolicy.permitsCommit(
+        capturedGeneration: firstGeneration,
+        durableGeneration: secondGeneration,
+        exactAccountGenerationMatches: true
+      ),
+      !IOSPeopleSyncFencePolicy.permitsCommit(
+        capturedGeneration: firstGeneration,
+        durableGeneration: firstGeneration,
+        exactAccountGenerationMatches: false
+      )
+    else {
+      fatalError("People sync cancellation fence accepted stale or wrong-account work")
+    }
+
     let parser = IOSPeopleJSONParser(maximumPagePeople: 1_000)
     let source = ["type": "CONTACT", "id": "source-1"]
     let fieldMetadata = ["source": source]

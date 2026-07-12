@@ -183,6 +183,7 @@ export const contactDetailSchema = strictObject({
   phoneChoices: z.array(contactPhoneChoiceSchema).max(20),
   birthdayChoices: z.array(birthdayChoiceSchema).max(20),
   selectedPhoneId: phoneChoiceIdSchema.optional(),
+  selectedDestinationBlocked: z.boolean(),
   selectedBirthdayId: birthdayChoiceIdSchema.optional(),
   nextOccurrenceLabel: boundedShortLabel.optional(),
   lastOutcomeLabel: boundedLabel.optional(),
@@ -322,8 +323,12 @@ export const policyPreviewSchema = z.discriminatedUnion('kind', [
     handle: policyReviewHandleSchema,
     summary: boundedLabel,
     simulatedDays: z.literal(400),
-    maximumPlannedInLocalDay: z.number().int().nonnegative().max(20),
-    maximumPlannedInRolling24Hours: z.number().int().nonnegative().max(20),
+    maximumPlannedInLocalDay: z.number().int().nonnegative().max(1_000_000),
+    maximumPlannedInRolling24Hours: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(1_000_000),
   }),
   strictObject({
     kind: z.literal('invalid'),
@@ -432,13 +437,20 @@ export const upcomingGreetingSchema = strictObject({
   localDate: localDateSchema,
   windowLabel: boundedShortLabel,
   maskedPhone: maskedPhoneSchema,
+  exactText: privateMessageTextSchema.optional(),
 });
 
 export const todayOccurrenceReviewSchema = strictObject({
   handle: todayOccurrenceReviewHandleSchema,
   recipient: privateDisplayNameSchema,
+  maskedDestination: maskedPhoneSchema,
   exactText: privateMessageTextSchema,
-  choice: z.enum(['send-through-normal-path', 'start-next-year']),
+  choice: z.enum([
+    'send-through-normal-path',
+    'open-system-composer',
+    'start-next-year',
+  ]),
+  alternativeChoice: z.literal('start-next-year').optional(),
   limitationsDisclosure: boundedDisclosure,
 });
 
@@ -446,6 +458,7 @@ export const homeProjectionSchema = strictObject({
   automation: automationProjectionSchema,
   next: upcomingGreetingSchema.optional(),
   counts: strictObject({
+    configured: boundedCount.optional(),
     enabled: boundedCount,
     needsAttention: boundedCount,
     unavailable: boundedCount,
@@ -466,6 +479,7 @@ export const bootstrapProjectionSchema = strictObject({
 
 export const setupProjectionSchema = strictObject({
   step: setupStepSchema,
+  initialActivationCompleted: z.boolean(),
   eligibility: deviceEligibilitySchema,
   account: accountProjectionSchema,
   contacts: syncProjectionSchema,
@@ -491,6 +505,7 @@ export const diagnosticsPreviewSchema = strictObject({
   androidOrIosVersionLabel: boundedShortLabel,
   capabilityCodes: z.array(safeReasonCodeSchema).max(64),
   transitionCount: boundedCount,
+  schedulerHeartbeatAt: utcInstantSchema.optional(),
   earliestEventAt: utcInstantSchema.optional(),
   latestEventAt: utcInstantSchema.optional(),
   excludesPrivateContent: z.literal(true),
@@ -721,4 +736,14 @@ export const sharedActionResultSchema = strictObject({
 
 export const nativeActionResultSchema = strictObject({
   kind: z.enum(['opened', 'cancelled']),
+  permissionResult: z
+    .enum([
+      'granted',
+      'phone-state-denied',
+      'phone-state-permanently-denied',
+      'sms-denied',
+      'sms-permanently-denied',
+      'unavailable',
+    ])
+    .optional(),
 });

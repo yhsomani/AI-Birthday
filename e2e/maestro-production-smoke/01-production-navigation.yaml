@@ -1,0 +1,23 @@
+appId: ${PRODUCTION_SMOKE_APP_ID}
+name: Production entry, native decoding and primary navigation
+tags:
+  - production-smoke
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: live-app-shell
+- assertVisible:
+    id: live-home-screen
+- tapOn:
+    id: live-tab-people
+- assertVisible:
+    id: live-people-screen
+- tapOn:
+    id: live-tab-settings
+- assertVisible:
+    id: live-settings-screen
+- tapOn:
+    id: live-tab-home
+- assertVisible:
+    id: live-home-screen

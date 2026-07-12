@@ -9,6 +9,7 @@ internal enum class ArmRecoveryAction {
   DISPATCH_ONCE,
   QUERY_EXACT_STATUS,
   QUERY_EXACT_STATUS_THEN_CLOSE,
+  QUERY_EXACT_STATUS_FOR_REFINEMENT,
   CLOSE_UNKNOWN,
   NONE,
 }
@@ -49,6 +50,13 @@ internal object ArmRecoveryPolicy {
       } else {
         ArmRecoveryAction.QUERY_EXACT_STATUS_THEN_CLOSE
       }
+    }
+    CoordinationPermitState.COORDINATION_UNKNOWN -> if (
+      permit.armDispatched && permit.armRequestId != null
+    ) {
+      ArmRecoveryAction.QUERY_EXACT_STATUS_FOR_REFINEMENT
+    } else {
+      ArmRecoveryAction.NONE
     }
     else -> ArmRecoveryAction.NONE
     }

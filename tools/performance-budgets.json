@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "minimumSamples": {
+    "latencyP95": 30,
+    "claimArmLatency": 100,
+    "boundedOperation": 10,
+    "battery": 10
+  },
+  "shared": {
+    "coldStartHomeP95Ms": 2500,
+    "warmHomeP95Ms": 1000,
+    "search10000P95Ms": 150,
+    "normalizeCommit10000MaximumWallMs": 5000,
+    "normalizeCommit10000MaximumPeakRssMiB": 250,
+    "maximumCrashAnrOomCount": 0
+  },
+  "android": {
+    "minimumRamMiB": 6144,
+    "noDueReconcileMaximumCpuMs": 2000,
+    "claimArmP95Ms": 2500,
+    "claimArmP99Ms": 5000,
+    "batteryBenchmarkHours": 24,
+    "maximumBatteryDeltaPercentagePoints": 0.1
+  },
+  "ios": {
+    "reminderNoChangeMaximumCpuMs": 2000,
+    "reminderReplaceMaximumWallMs": 2000,
+    "composerReadyP95Ms": 1000
+  }
+}

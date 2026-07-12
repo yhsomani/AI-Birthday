@@ -18,6 +18,7 @@ import {
 import { useAppLocalization } from '../../localization/LocalizationProvider';
 import type { TranslationKey } from '../../localization/resources';
 import type { LiveAppPort } from './LiveAppPort';
+import { LiveCloudPrivacyBoundary } from './LiveCloudPrivacyBoundary';
 import { LiveError, LiveLoading } from './LiveProjectionState';
 import { useLiveProjection } from './useLiveProjection';
 
@@ -106,6 +107,7 @@ export function LiveHelpLegalScreen({
         detail={t('live.help.externalCopiesBody')}
         tone="warning"
       />
+      <LiveCloudPrivacyBoundary platform={platform} />
       {openFailed ? (
         <ReadinessBanner
           title={t('live.help.openFailed')}

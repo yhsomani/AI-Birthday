@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools">
+  <application>
+    <!-- Build-type manifests outrank flavor manifests. Keep this debug-only
+         permission-test Activity out of the isolated fixture variant. -->
+    <activity
+      android:name="com.yashsomani.birthdayautopilot.auth.NotificationPermissionTestActivity"
+      tools:node="remove" />
+    <receiver
+      android:name="androidx.profileinstaller.ProfileInstallReceiver"
+      tools:ignore="MissingClass"
+      tools:node="remove" />
+  </application>
+</manifest>

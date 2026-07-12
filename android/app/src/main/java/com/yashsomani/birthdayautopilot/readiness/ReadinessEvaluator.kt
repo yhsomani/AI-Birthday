@@ -22,6 +22,7 @@ data class ReadinessInputs(
   val passingTestReceipt: Boolean?,
   val networkAvailable: Boolean?,
   val coordinationAvailable: Boolean?,
+  val schedulerReady: Boolean?,
   val smsPermissionGranted: Boolean?,
   val simReady: Boolean?,
   val backgroundRestricted: Boolean?,
@@ -80,6 +81,11 @@ class ReadinessEvaluator {
         ReadinessGate.entries.toSet(),
       )
       requireTrue(
+        input.schedulerReady,
+        SafeReasonCode.SCHEDULER_UNAVAILABLE,
+        ReadinessGate.entries.toSet(),
+      )
+      requireTrue(
         input.smsPermissionGranted,
         SafeReasonCode.SMS_PERMISSION_MISSING,
         ReadinessGate.entries.toSet(),
@@ -122,7 +128,7 @@ class ReadinessEvaluator {
       requireTrue(
         input.resetSafetyClear,
         SafeReasonCode.RESET_SAFETY_BLOCKED,
-        ReadinessGate.entries.toSet(),
+        setOf(ReadinessGate.ACTIVATION, ReadinessGate.BIRTHDAY),
       )
     }
 

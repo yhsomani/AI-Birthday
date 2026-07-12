@@ -22,21 +22,28 @@ import com.yashsomani.birthdayautopilot.automation.orchestration.FirebaseAutomat
 import com.yashsomani.birthdayautopilot.automation.orchestration.NoBackupInstallationIdentityStore
 import com.yashsomani.birthdayautopilot.automation.sms.AndroidSmsGateway
 import com.yashsomani.birthdayautopilot.automation.sms.SubmissionGate
+import com.yashsomani.birthdayautopilot.automation.sms.SubscriptionChangeObserver
+import com.yashsomani.birthdayautopilot.automation.sms.SubscriptionChangeSignalStore
 import com.yashsomani.birthdayautopilot.automation.workers.BirthdayWorkerFactory
 import com.yashsomani.birthdayautopilot.coordination.ActiveRoomAccountBindingPredicate
 import com.yashsomani.birthdayautopilot.coordination.FirebaseCoordinationRuntime
 import com.yashsomani.birthdayautopilot.core.crypto.StorageKeyUnavailableException
 import com.yashsomani.birthdayautopilot.core.crypto.DatabaseKeyManager
+import com.yashsomani.birthdayautopilot.core.model.AccountMode
 import com.yashsomani.birthdayautopilot.lifecycle.LifecycleStateStore
 import com.yashsomani.birthdayautopilot.lifecycle.DeletionRecoveryIdentitySessionGuard
 import com.yashsomani.birthdayautopilot.lifecycle.DeletionRecoveryStartupPolicy
 import com.yashsomani.birthdayautopilot.lifecycle.LifecycleJournalStatus
 import com.yashsomani.birthdayautopilot.lifecycle.LifecycleRepairIdentityPolicy
+import com.yashsomani.birthdayautopilot.lifecycle.SenderReleaseRecoveryStartupPolicy
+import com.yashsomani.birthdayautopilot.gemini.AndroidGeminiOperationalGate
 import com.yashsomani.birthdayautopilot.gemini.AndroidGeminiSuggestionGateway
+import com.yashsomani.birthdayautopilot.localization.AndroidNativeLocaleProvider
 import com.yashsomani.birthdayautopilot.people.AndroidNetworkAvailability
 import com.yashsomani.birthdayautopilot.people.AndroidPeopleSyncService
 import com.yashsomani.birthdayautopilot.people.PeopleHttpTransport
 import com.yashsomani.birthdayautopilot.people.PeopleSyncLimits
+import com.yashsomani.birthdayautopilot.people.RoomContactsConsentRecorder
 import com.yashsomani.birthdayautopilot.people.StablePrivateId
 import com.yashsomani.birthdayautopilot.planning.RecurrencePlanner
 import com.yashsomani.birthdayautopilot.readiness.AndroidReadinessProbe
@@ -92,6 +99,7 @@ class AppGraph private constructor(context: Context) {
   internal val peopleSyncDao by lazy { database.peopleSyncDao() }
   internal val automationOrchestrationDao by lazy { database.automationOrchestrationDao() }
   internal val safetyLedgerDao by lazy { database.safetyLedgerDao() }
+  internal val nativeLocaleProvider by lazy { AndroidNativeLocaleProvider(appContext) }
   private val identityAccountStore by lazy { RoomIdentityAccountStore(peopleSyncDao) }
   internal val googleIdentityCoordinator by lazy {
     AndroidGoogleIdentityCoordinator(
@@ -122,12 +130,31 @@ class AppGraph private constructor(context: Context) {
         maxPageBytes = peopleLimits.maxPageBytes,
       ),
       limits = peopleLimits,
+      accountModeProvider = {
+        database.birthdayDao().getControl()?.accountMode
+          ?.let { raw -> runCatching { AccountMode.valueOf(raw) }.getOrNull() }
+      },
+      consentRecorder = RoomContactsConsentRecorder(database),
+      nativeLocaleProvider = nativeLocaleProvider,
     )
   }
+  internal val geminiOperationalGate by lazy {
+    AndroidGeminiOperationalGate(appContext)
+  }
+  internal fun configureGeminiOperationalGate() {
+    geminiOperationalGate.configureAfterFirebaseLaunch()
+  }
+  internal fun refreshGeminiOperationalGate() {
+    geminiOperationalGate.refreshInBackground()
+  }
   internal val geminiSuggestionGateway by lazy {
-    AndroidGeminiSuggestionGateway(appContext) {
-      runBlocking { peopleSyncDao.activeAccount()?.let(::identitySessionMatches) == true }
-    }
+    AndroidGeminiSuggestionGateway(
+      context = appContext,
+      exactAccountSessionMatches = {
+        runBlocking { peopleSyncDao.activeAccount()?.let(::identitySessionMatches) == true }
+      },
+      operationalGate = geminiOperationalGate,
+    )
   }
   internal val coordinationRuntime by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
     FirebaseCoordinationRuntime.resolve(
@@ -285,6 +312,13 @@ class AppGraph private constructor(context: Context) {
   val androidReadinessProbe by lazy { AndroidReadinessProbe(appContext) }
   private val automationTimeSource by lazy { AndroidAutomationTimeSource(appContext) }
   internal val submissionGate by lazy { SubmissionGate(appContext) }
+  internal val subscriptionChangeSignalStore by lazy { SubscriptionChangeSignalStore(appContext) }
+  private val subscriptionChangeObserver by lazy {
+    SubscriptionChangeObserver(appContext, subscriptionChangeSignalStore)
+  }
+  internal fun startSubscriptionChangeObservation() {
+    subscriptionChangeObserver.start()
+  }
   internal val automationCoordinationPort by lazy {
     FirebaseAutomationCoordinationPort(coordinationRuntime)
   }
@@ -295,6 +329,7 @@ class AppGraph private constructor(context: Context) {
       birthdayDao = database.birthdayDao(),
       submissionGate = submissionGate,
       readinessProbe = androidReadinessProbe,
+      subscriptionChangeSignalStore = subscriptionChangeSignalStore,
     )
   }
   private val finalExternalGateSource by lazy {
@@ -309,11 +344,13 @@ class AppGraph private constructor(context: Context) {
           ?.let(::identitySessionMatches) == true
       },
       timeSource = automationTimeSource,
+      subscriptionChangeSignalStore = subscriptionChangeSignalStore,
     )
   }
   internal val automationOrchestrator by lazy {
     AndroidAutomationOrchestrator(
       context = appContext,
+      database = database,
       dao = automationOrchestrationDao,
       ledger = safetyLedgerDao,
       coordination = automationCoordinationPort,
@@ -329,6 +366,7 @@ class AppGraph private constructor(context: Context) {
       finalGateSource = finalExternalGateSource,
       timeSource = automationTimeSource,
       installationIdentityStore = installationIdentityStore,
+      subscriptionChangeSignalStore = subscriptionChangeSignalStore,
     )
   }
 
@@ -393,6 +431,8 @@ class AppGraph private constructor(context: Context) {
       ),
       journalStatus = lifecycleStateStore.journalStatus(),
       operation = lifecycleStateStore.latestOperation(),
+    ) || SenderReleaseRecoveryStartupPolicy.requiresIdentitySessionClear(
+      lifecycleStateStore.latestOperation(),
     )
 
   /** Retries the fail-closed cleanup without changing or consuming the durable recovery receipt. */

@@ -41,6 +41,7 @@ import org.json.JSONObject
 internal class AndroidGeminiSuggestionGateway internal constructor(
   private val client: GeminiNativeClient,
   private val rateGuard: GeminiUxRateGuard,
+  private val operationalGate: GeminiOperationalGate,
   private val provenanceRegistry: GeminiCandidateProvenanceRegistry =
     GeminiCandidateProvenanceRegistry(),
   private val wallClockMillis: () -> Long = System::currentTimeMillis,
@@ -48,15 +49,25 @@ internal class AndroidGeminiSuggestionGateway internal constructor(
 ) {
   private val requestInFlight = AtomicBoolean(false)
 
-  constructor(context: Context, exactAccountSessionMatches: () -> Boolean) : this(
+  constructor(
+    context: Context,
+    exactAccountSessionMatches: () -> Boolean,
+    operationalGate: GeminiOperationalGate = AndroidGeminiOperationalGate(context),
+  ) : this(
     client = AndroidFirebaseGeminiClient(context, exactAccountSessionMatches),
     rateGuard = GeminiUxRateGuard(AndroidGeminiRateStore(context)),
+    operationalGate = operationalGate,
   )
 
   suspend fun generate(requestJson: JSONObject): JSONObject {
     val request = GeminiSuggestionPolicy.parseRequest(requestJson) ?: run {
       provenanceRegistry.clear()
       return failedProjection()
+    }
+    operationalGate.refreshInBackground()
+    if (!operationalGate.foregroundSuggestionsEnabled()) {
+      provenanceRegistry.clear()
+      return fallbackProjection("policy-suspended")
     }
     if (!requestInFlight.compareAndSet(false, true)) return fallbackProjection("policy-suspended")
     return try {
@@ -335,7 +346,6 @@ internal object GeminiSuggestionPolicy {
   private fun safeCandidate(text: String, request: GeminiSuggestionRequest): Boolean {
     if (text.isBlank() || text.length > 1_000) return false
     if (UnicodeTextSafety.containsUnsafeMessageCodePoint(text)) return false
-    if (HARMFUL_CONTENT.containsMatchIn(text)) return false
     val language = if (request.language == "hi") MessageLanguage.HINDI else MessageLanguage.ENGLISH
     val placeholder = if (request.placeholderMode == "given-name") {
       TemplatePlaceholderMode.PERSONALIZED_FIRST_NAME
@@ -357,11 +367,6 @@ internal object GeminiSuggestionPolicy {
     ).valid
   }
 
-  private val HARMFUL_CONTENT = Regex(
-    "\\b(?:hate|kill|murder|suicide|self[- ]?harm|sexual|nude|weapon|attack|scam|" +
-      "guaranteed prize|lie to)\\b|(?:नफरत|मार डाल|हत्या|आत्महत्या|यौन|नग्न|हथियार|हमला|धोखा)",
-    RegexOption.IGNORE_CASE,
-  )
   private const val MAX_RESPONSE_BYTES = 16_384
   private const val MAX_CANDIDATE_UTF16_UNITS = 2_000
 }

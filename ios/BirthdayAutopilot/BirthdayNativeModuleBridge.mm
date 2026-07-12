@@ -1,3 +1,5 @@
+#if !defined(BIRTHDAY_E2E) && !defined(BIRTHDAY_SMOKE)
+
 #import <BirthdayNativeSpec/BirthdayNativeSpec.h>
 #import <React/RCTEventEmitter.h>
 #import <UIKit/UIKit.h>
@@ -205,3 +207,5 @@ RCT_EXPORT_METHOD(executeUserIntent:(NSString *)intent
 }
 
 @end
+
+#endif  // !BIRTHDAY_E2E && !BIRTHDAY_SMOKE

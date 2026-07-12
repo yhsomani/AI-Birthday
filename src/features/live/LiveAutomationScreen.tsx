@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AppState, StyleSheet, TextInput } from 'react-native';
+import { AppState, StyleSheet } from 'react-native';
 
 import type {
   ActivationReview,
@@ -9,6 +9,7 @@ import type {
 import type { NativeProblem } from '../../domain/shared/result';
 import type { PlatformCapability } from '../../domain/shared/platform';
 import { validateEphemeralPhoneInput } from '../../domain/validation/ephemeralPhone';
+import { AccessibleTextInput } from '../../design-system/components/AccessibleTextInput';
 import { AppText } from '../../design-system/components/AppText';
 import {
   Button,
@@ -115,6 +116,20 @@ const iosStateKeys: Record<string, TranslationKey> = {
   'action-required': 'live.companion.state.actionRequired',
   paused: 'live.companion.state.paused',
 };
+
+const composerErrorKeys: Partial<Record<string, TranslationKey>> = {
+  COMPOSER_CONTACTS_FRESHNESS_UNAVAILABLE:
+    'live.companion.contactsFreshnessUnavailable',
+  COMPOSER_CONTACTS_RECONNECT_REQUIRED:
+    'live.companion.contactsReconnectRequired',
+};
+
+const isCurrentOrNewerRevision = (
+  candidate: string,
+  current: string,
+): boolean =>
+  candidate.length > current.length ||
+  (candidate.length === current.length && candidate >= current);
 
 function LiveAndroidAutomation({
   onBack,
@@ -374,11 +389,9 @@ function LiveAndroidAutomation({
           <LivePolicyEditor platform="android" port={port} />
 
           <SectionHeading title={t('live.automation.testTitle')} />
-          <TextInput
+          <AccessibleTextInput
             accessibilityLabel={t('live.automation.testPhone')}
             accessibilityHint={t('live.automation.testPhoneHint')}
-            allowFontScaling
-            maxFontSizeMultiplier={2}
             keyboardType="phone-pad"
             maxLength={32}
             onChangeText={setTestPhone}
@@ -441,26 +454,36 @@ function LiveAndroidAutomation({
           ) : null}
 
           <SectionHeading title={t('live.automation.activationTitle')} />
-          <Button
-            label={t('live.automation.reviewActivation')}
-            disabled={pending !== undefined}
-            onPress={() => prepareActivationReview('activate')}
-            testID="live-review-activation"
-          />
-          <Button
-            label={t('live.automation.reviewResume')}
-            disabled={pending !== undefined}
-            onPress={() => prepareActivationReview('resume')}
-            variant="secondary"
-            testID="live-review-resume"
-          />
-          <Button
-            label={t('live.automation.pause')}
-            disabled={pending !== undefined}
-            onPress={() => setConfirmPause(true)}
-            variant="secondary"
-            testID="live-review-pause"
-          />
+          {home.state.result.envelope.value.automation.effective ===
+          'test-only' ? (
+            <Button
+              label={t('live.automation.reviewActivation')}
+              disabled={pending !== undefined}
+              onPress={() => prepareActivationReview('activate')}
+              testID="live-review-activation"
+            />
+          ) : null}
+          {home.state.result.envelope.value.automation.effective ===
+          'paused-repair' ? (
+            <Button
+              label={t('live.automation.reviewResume')}
+              disabled={pending !== undefined}
+              onPress={() => prepareActivationReview('resume')}
+              testID="live-review-resume"
+            />
+          ) : null}
+          {home.state.result.envelope.value.automation.desired === 'on' &&
+          (home.state.result.envelope.value.automation.effective === 'active' ||
+            home.state.result.envelope.value.automation.effective ===
+              'action-required') ? (
+            <Button
+              label={t('live.automation.pause')}
+              disabled={pending !== undefined}
+              onPress={() => setConfirmPause(true)}
+              variant="secondary"
+              testID="live-review-pause"
+            />
+          ) : null}
 
           {review?.kind === 'test' ? (
             <Card>
@@ -480,9 +503,20 @@ function LiveAndroidAutomation({
                 value={String(review.review.segmentCount)}
               />
               <AppText>{review.review.exactText}</AppText>
-              <AppText color="muted">{review.review.chargeDisclosure}</AppText>
               <AppText color="muted">
-                {t('live.automation.testDisclosure')}
+                {t('live.automation.testChargeDisclosure')}
+              </AppText>
+              <AppText variant="heading">
+                {t('live.automation.permissionTitle')}
+              </AppText>
+              <AppText>
+                {t('live.automation.sendSmsPermissionDisclosure')}
+              </AppText>
+              <AppText>
+                {t('live.automation.phoneStatePermissionDisclosure')}
+              </AppText>
+              <AppText color="critical">
+                {t('live.automation.permissionDenialDisclosure')}
               </AppText>
               <Button
                 label={t('live.automation.startTest')}
@@ -528,7 +562,7 @@ function LiveAndroidAutomation({
               />
               <AppText>{review.review.templatePreview}</AppText>
               <AppText color="muted">
-                {review.review.limitationsDisclosure}
+                {t('live.automation.activationLimitations')}
               </AppText>
               <Button
                 label={t(
@@ -618,6 +652,7 @@ function LiveIosCompanion({
     | 'activate'
     | 'resume'
     | 'pause'
+    | 'contacts-repair'
   >();
   const [message, setMessage] = useState<string>();
 
@@ -670,7 +705,7 @@ function LiveIosCompanion({
     const envelope = proposal.state.result.envelope;
     if (
       envelope.value.kind !== 'ready' ||
-      envelope.revision !== review.revision ||
+      !isCurrentOrNewerRevision(review.revision, envelope.revision) ||
       envelope.value.proposalId !== review.proposalId
     ) {
       setReview(undefined);
@@ -863,7 +898,7 @@ function LiveIosCompanion({
     }
     const matches =
       result.value.proposalId === proposalValue.proposalId &&
-      result.value.revision === envelope.revision &&
+      isCurrentOrNewerRevision(result.value.revision, envelope.revision) &&
       result.value.expiresAtEpochMilliseconds > Date.now();
     if (!matches) {
       setComposerError('COMPOSER_REVIEW_MISMATCH');
@@ -871,6 +906,35 @@ function LiveIosCompanion({
       return;
     }
     setReview(result.value);
+    setPending(undefined);
+  };
+
+  const repairComposerContacts = async () => {
+    if (
+      composerError !== 'COMPOSER_CONTACTS_RECONNECT_REQUIRED' &&
+      composerError !== 'COMPOSER_CONTACTS_FRESHNESS_UNAVAILABLE'
+    ) {
+      return;
+    }
+    setPending('contacts-repair');
+    setActionProblem(undefined);
+    setMessage(undefined);
+    try {
+      const result =
+        composerError === 'COMPOSER_CONTACTS_RECONNECT_REQUIRED'
+          ? await port.continueWithGoogle()
+          : await port.syncContacts('user');
+      if (result.kind === 'error') {
+        setActionProblem(result.problem);
+        setPending(undefined);
+        return;
+      }
+      await Promise.all([home.reload(), proposal.reload()]);
+      setComposerError(undefined);
+      setMessage(t('live.companion.contactsRepairAccepted'));
+    } catch {
+      setActionProblem(nativeBridgeProblem);
+    }
     setPending(undefined);
   };
 
@@ -931,6 +995,9 @@ function LiveIosCompanion({
           unknown: 'live.companion.unknown',
         } as const
       )[composerOutcome]
+    : undefined;
+  const composerErrorKey = composerError
+    ? composerErrorKeys[composerError]
     : undefined;
   const iosAutomation =
     home.state.kind === 'ready' &&
@@ -1077,9 +1144,6 @@ function LiveIosCompanion({
                 label={t('live.companion.reminderRecipients')}
                 value={String(activationReview.review.reminderRecipientCount)}
               />
-              <AppText color="muted">
-                {activationReview.review.limitationsDisclosure}
-              </AppText>
               <ReadinessBanner
                 title={t('live.common.iosEdition')}
                 detail={t('live.companion.activationDisclosure')}
@@ -1269,6 +1333,7 @@ function LiveIosCompanion({
           <ReadinessBanner
             title={t('live.common.iosEdition')}
             detail={t('live.companion.editableWarning')}
+            testID="live-composer-final-disclosure"
             tone="info"
           />
           <Button
@@ -1287,6 +1352,23 @@ function LiveIosCompanion({
       {composerError ? (
         <Card>
           <StatusRow title={t('live.companion.error')} tone="critical" />
+          {composerErrorKey ? <AppText>{t(composerErrorKey)}</AppText> : null}
+          {composerErrorKey ? (
+            <Button
+              label={
+                pending === 'contacts-repair'
+                  ? t('live.common.checking')
+                  : t(
+                      composerError === 'COMPOSER_CONTACTS_RECONNECT_REQUIRED'
+                        ? 'live.companion.reconnectContacts'
+                        : 'live.people.syncNow',
+                    )
+              }
+              disabled={pending !== undefined}
+              onPress={repairComposerContacts}
+              testID="live-composer-repair-contacts"
+            />
+          ) : null}
           <AppText color="muted" variant="caption">
             {t('live.common.code', { value: composerError })}
           </AppText>

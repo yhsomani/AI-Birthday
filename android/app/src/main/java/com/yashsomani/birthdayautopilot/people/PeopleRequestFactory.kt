@@ -4,6 +4,7 @@ import java.net.URI
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.util.Locale
 
 internal const val PEOPLE_PERSON_FIELDS = "names,birthdays,phoneNumbers,metadata"
 internal const val PEOPLE_CONTACT_SOURCE = "READ_SOURCE_TYPE_CONTACT"
@@ -22,7 +23,10 @@ internal sealed interface PeopleRequestBuildResult {
 
 internal class PeopleRequestFactory(
   private val pageSize: Int,
+  phoneNormalizationRegion: String? = null,
 ) {
+  private val normalizedPhoneRegion = phoneNormalizationRegion?.uppercase(Locale.ROOT)
+
   val parameterFingerprint: String = fingerprint(
     listOf(
       "endpoint=$ENDPOINT",
@@ -31,11 +35,16 @@ internal class PeopleRequestFactory(
       "pageSize=$pageSize",
       "requestSyncToken=true",
       "sortOrder=LAST_MODIFIED_ASCENDING",
+      "phoneNormalizationRegion=${normalizedPhoneRegion ?: "NONE"}",
     ).joinToString("&"),
   )
 
   init {
     require(pageSize in 1..1_000)
+    require(
+      normalizedPhoneRegion == null ||
+        normalizedPhoneRegion in ISO_REGIONS,
+    )
   }
 
   fun build(mode: PeopleSyncMode, pageToken: String?): PeopleRequestBuildResult {
@@ -84,6 +93,7 @@ internal class PeopleRequestFactory(
     .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
   private companion object {
+    val ISO_REGIONS = Locale.getISOCountries().toSet()
     const val PATH = "/v1/people/me/connections"
     const val ENDPOINT = "https://people.googleapis.com$PATH"
   }

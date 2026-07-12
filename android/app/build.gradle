@@ -112,6 +112,16 @@ if (!configuredFirebaseProjects.isEmpty()) {
     // The Google Services plugin itself then fails a requested flavor that lacks its own exact
     // file; it cannot fall back to another flavor because no shared location is permitted above.
     apply plugin: "com.google.gms.google-services"
+
+    // The synthetic fixture is intentionally Firebase-free even on developer machines where a
+    // real tier is provisioned. Match only the one generated variant task; every real tier keeps
+    // the plugin's normal fail-closed missing/mismatched-config behavior.
+    tasks.configureEach { task ->
+        if (task.name == "processE2eDebugGoogleServices" ||
+            task.name == "processSmokeDebugGoogleServices") {
+            task.enabled = false
+        }
+    }
 }
 
 ksp {
@@ -142,6 +152,8 @@ react {
     debuggableVariants = [
         "devDebug",
         "devDebugOptimized",
+        "e2eDebug",
+        "smokeDebug",
         "stagingDebug",
         "stagingDebugOptimized",
     ]
@@ -250,171 +262,101 @@ if (!releaseSigningValues.every { value -> value != null && !value.isBlank() }) 
     }
 }
 def hasReleaseSigning = releaseSigningErrors.isEmpty()
+def releaseVersionCode = 1
+def releaseBaseVersionName = "1.0"
+def restrictedVersionNames = [
+    lab: "${releaseBaseVersionName}-lab",
+    prod: releaseBaseVersionName,
+]
 def distributionEvidencePath = System.getenv("BIRTHDAY_DISTRIBUTION_EVIDENCE_FILE")
-def distributionEvidenceFile = distributionEvidencePath == null || distributionEvidencePath.isBlank()
-    ? null
-    : file(distributionEvidencePath)
-def distributionEvidenceDocument = null
-if (distributionEvidenceFile?.isFile() &&
-    distributionEvidenceFile.length() in 1..(64 * 1024)) {
-    try {
-        distributionEvidenceDocument = new JsonSlurper().parse(distributionEvidenceFile)
-    } catch (Exception ignored) {
-        distributionEvidenceDocument = null
-    }
-}
+def distributionEvidenceSignaturePath =
+    System.getenv("BIRTHDAY_DISTRIBUTION_EVIDENCE_SIGNATURE_FILE")
+def distributionAuthorityPublicKeyPath =
+    System.getenv("BIRTHDAY_DISTRIBUTION_AUTHORITY_PUBLIC_KEY_FILE")
 def expectedApplicationIds = [
     lab: "com.yashsomani.birthdayautopilot.lab",
     prod: "com.yashsomani.birthdayautopilot",
 ]
-def evidenceTopLevelKeys = ["schemaVersion", "approvals"] as Set
-def evidenceApprovalKeys = [
-    "tier",
-    "status",
-    "applicationId",
-    "versionCode",
-    "channel",
-    "installerPackage",
-    "signingCertificateSha256",
-    "minimumCertifiedApi",
-    "maximumCertifiedApi",
-    "smsPermissionPolicyApproved",
-    "installerAllowlistVerified",
-    "physicalSmsMatrixPassed",
-    "telephonyStatePermissionApproved",
-    "appCheckEnforced",
-    "privacyMaterialsApproved",
-    "playUploadApproved",
-    "approvalReference",
-    "certifiedDeviceMatrixReference",
-    "carrierMatrixReference",
-    "legalReviewReference",
-    "approvedAt",
-    "validUntil",
-    "launchCountries",
-] as Set
-def safeEvidenceReference = { value ->
-    value instanceof String &&
-        value == value.trim() &&
-        value ==~ /[A-Za-z0-9][A-Za-z0-9 ._:\/#-]{0,255}/
-}
+
+// This is intentionally the same authority and semantic validator used by the standalone APK
+// verifier. The JSON is never trusted merely because it exists: the exact file bytes need a raw
+// detached Ed25519 signature whose public key matches the clean, tracked repository pin.
 def validateDistributionEvidence = { String tier ->
-    def errors = []
-    def document = distributionEvidenceDocument
-    if (!(document instanceof Map)) {
-        return [approval: null, errors: ["evidence JSON is missing or malformed"]]
+    def authorityInputs = [
+        evidence: distributionEvidencePath,
+        signature: distributionEvidenceSignaturePath,
+        publicKey: distributionAuthorityPublicKeyPath,
+    ]
+    def missingInputs = authorityInputs.findAll { ignored, value ->
+        value == null || value.isBlank() || !file(value).isFile()
+    }.keySet()
+    if (!missingInputs.isEmpty()) {
+        return [
+            approval: null,
+            errors: ["${tier} signed evidence inputs are missing: ${missingInputs.join(', ')}"],
+        ]
     }
-    if (document.schemaVersion != 1) {
-        errors.add("schemaVersion must be 1")
+    if (actualSigningCertificateSha256 == null) {
+        return [
+            approval: null,
+            errors: ["${tier} release certificate is unavailable for evidence validation"],
+        ]
     }
-    def unknownTopLevelKeys = document.keySet().findAll { !evidenceTopLevelKeys.contains(it) }
-    if (!unknownTopLevelKeys.isEmpty()) errors.add("evidence contains unsupported fields")
-    def approvals = document.approvals
-    if (!(approvals instanceof Collection) || approvals.size() !in 1..2) {
-        return [approval: null, errors: errors + ["approvals must contain one or two entries"]]
-    }
-    if (!approvals.every { it instanceof Map }) {
-        return [approval: null, errors: errors + ["every approval must be an object"]]
-    }
-    def approvalTiers = approvals.collect { it.tier }
-    if (approvalTiers.toSet().size() != approvalTiers.size()) {
-        errors.add("approval tiers must be unique")
-    }
-    def matchingApprovals = approvals.findAll { it.tier == tier }
-    def approval = matchingApprovals.size() == 1 ? matchingApprovals.single() : null
-    if (!(approval instanceof Map)) {
-        return [approval: null, errors: errors + ["${tier} approval is missing"]]
-    }
-    def unknownApprovalKeys = approval.keySet().findAll { !evidenceApprovalKeys.contains(it) }
-    if (!unknownApprovalKeys.isEmpty()) errors.add("${tier} approval contains unsupported fields")
 
-    if (approval.tier != tier) errors.add("${tier} tier does not match")
-    if (approval.status != "approved") errors.add("${tier} status is not approved")
-    if (approval.applicationId != expectedApplicationIds[tier]) {
-        errors.add("${tier} applicationId does not match")
-    }
-    if (approval.versionCode != 1) errors.add("${tier} versionCode does not match")
-    if (!(approval.channel in ["google-play", "managed-enterprise", "controlled-direct"])) {
-        errors.add("${tier} channel is unsupported")
-    }
-    if (!(approval.installerPackage instanceof String) ||
-        !(approval.installerPackage ==~ /[A-Za-z0-9_.]{3,255}/)) {
-        errors.add("${tier} installer package is invalid")
-    }
-    if (approval.channel == "google-play" && approval.installerPackage != "com.android.vending") {
-        errors.add("${tier} Google Play installer is invalid")
-    }
-    def evidenceCertificate = approval.signingCertificateSha256 instanceof String
-        ? approval.signingCertificateSha256.replace(":", "").toLowerCase(Locale.ROOT)
-        : ""
-    if (!(evidenceCertificate ==~ /[0-9a-f]{64}/) ||
-        evidenceCertificate != actualSigningCertificateSha256) {
-        errors.add("${tier} signing certificate does not match")
-    }
-    if (!(approval.minimumCertifiedApi instanceof Number) ||
-        !(approval.maximumCertifiedApi instanceof Number) ||
-        approval.minimumCertifiedApi != 29 ||
-        approval.maximumCertifiedApi < rootProject.ext.targetSdkVersion ||
-        approval.maximumCertifiedApi > 37 ||
-        approval.maximumCertifiedApi < approval.minimumCertifiedApi) {
-        errors.add("${tier} certified API range is invalid")
-    }
-    [
-        "smsPermissionPolicyApproved",
-        "installerAllowlistVerified",
-        "physicalSmsMatrixPassed",
-        "telephonyStatePermissionApproved",
-        "appCheckEnforced",
-        "privacyMaterialsApproved",
-    ].each { field ->
-        if (approval[field] != true) errors.add("${tier} ${field} is not verified")
-    }
-    if (approval.channel == "google-play" && approval.playUploadApproved != true) {
-        errors.add("${tier} Play upload approval is not verified")
-    }
-    if (approval.containsKey("playUploadApproved") &&
-        !(approval.playUploadApproved instanceof Boolean)) {
-        errors.add("${tier} Play upload approval has an invalid type")
-    }
-    if (!safeEvidenceReference(approval.approvalReference)) {
-        errors.add("${tier} approval reference is missing")
-    }
-    [
-        "certifiedDeviceMatrixReference",
-        "carrierMatrixReference",
-        "legalReviewReference",
-    ].each { field ->
-        if (!safeEvidenceReference(approval[field])) {
-            errors.add("${tier} ${field} is missing")
-        }
-    }
-    if (!(approval.launchCountries instanceof Collection) ||
-        !approval.launchCountries.contains("IN") ||
-        approval.launchCountries.toSet().size() != approval.launchCountries.size() ||
-        !approval.launchCountries.every { it instanceof String && it ==~ /[A-Z]{2}/ }) {
-        errors.add("${tier} launch countries are invalid or do not include IN")
-    }
     try {
-        if (!(approval.approvedAt instanceof String) || !approval.approvedAt.endsWith("Z") ||
-            !(approval.validUntil instanceof String) || !approval.validUntil.endsWith("Z")) {
-            throw new IllegalArgumentException("timestamps must be UTC")
+        def validation = providers.exec {
+            commandLine(
+                "node",
+                rootProject.file("../tools/validate-distribution-evidence.mjs").absolutePath,
+                "--file",
+                file(distributionEvidencePath).absolutePath,
+                "--signature",
+                file(distributionEvidenceSignaturePath).absolutePath,
+                "--public-key",
+                file(distributionAuthorityPublicKeyPath).absolutePath,
+                "--tier",
+                tier,
+                "--package",
+                expectedApplicationIds[tier],
+                "--version-code",
+                releaseVersionCode.toString(),
+                "--version-name",
+                restrictedVersionNames[tier],
+                "--artifact-mode",
+                "prepackage",
+                "--artifact-signing-certificate",
+                actualSigningCertificateSha256,
+                "--output",
+                "json",
+            )
+            ignoreExitValue = true
         }
-        def approvedAt = Instant.parse(approval.approvedAt as String)
-        def validUntil = Instant.parse(approval.validUntil as String)
-        def now = Instant.now()
-        if (approvedAt.isAfter(now.plusSeconds(300))) {
-            errors.add("${tier} approval timestamp is in the future")
+        def result = validation.result.get()
+        if (result.exitValue != 0) {
+            def diagnostic = validation.standardError.asText.get().readLines()
+                .collect { it.replaceFirst(/^FAIL /, "") }
+                .findAll { !it.isBlank() }
+            return [
+                approval: null,
+                errors: diagnostic.isEmpty()
+                    ? ["${tier} signed evidence validation failed"]
+                    : diagnostic.collect { "${tier}: ${it}" },
+            ]
         }
-        if (!validUntil.isAfter(now)) errors.add("${tier} approval is expired")
-        if (!validUntil.isAfter(approvedAt)) errors.add("${tier} approval validity is inverted")
-        if (validUntil.isAfter(approvedAt.plusSeconds(366L * 24 * 60 * 60))) {
-            errors.add("${tier} approval validity exceeds one year")
+        def verified = new JsonSlurper().parseText(validation.standardOutput.asText.get())
+        if (!(verified instanceof Map) || !(verified.approval instanceof Map)) {
+            return [
+                approval: null,
+                errors: ["${tier} signed evidence validator returned invalid output"],
+            ]
         }
+        return [approval: verified.approval, errors: []]
     } catch (Exception ignored) {
-        errors.add("${tier} approval timestamps are invalid")
+        return [
+            approval: null,
+            errors: ["${tier} signed evidence validator could not run"],
+        ]
     }
-
-    [approval: errors.isEmpty() ? approval : null, errors: errors]
 }
 def labEvidence = validateDistributionEvidence("lab")
 def prodEvidence = validateDistributionEvidence("prod")
@@ -428,6 +370,14 @@ gradle.taskGraph.whenReady { graph ->
         lab: ["packagelabrelease", "packagelabreleasebundle", "signlabreleasebundle"],
         prod: ["packageprodrelease", "packageprodreleasebundle", "signprodreleasebundle"],
     ]
+    def apkArtifactTaskByTier = [
+        lab: "packagelabrelease",
+        prod: "packageprodrelease",
+    ]
+    def bundleArtifactTasksByTier = [
+        lab: ["packagelabreleasebundle", "signlabreleasebundle"],
+        prod: ["packageprodreleasebundle", "signprodreleasebundle"],
+    ]
     def requestedRestrictedTiers = artifactTasksByTier.findAll { tier, artifactTaskNames ->
         graph.allTasks.any { task ->
             task.project == project && artifactTaskNames.contains(task.name.toLowerCase())
@@ -439,18 +389,35 @@ gradle.taskGraph.whenReady { graph ->
     def evidenceErrors = requestedRestrictedTiers.collectMany { tier ->
         distributionEvidenceByTier[tier].errors
     }
+    def artifactChannelErrors = requestedRestrictedTiers.collectMany { tier ->
+        def approval = distributionEvidenceByTier[tier].approval
+        if (approval == null) return []
+        def taskNames = graph.allTasks.findAll { task -> task.project == project }
+            .collect { task -> task.name.toLowerCase() }
+        def buildsApk = taskNames.contains(apkArtifactTaskByTier[tier])
+        def buildsBundle = bundleArtifactTasksByTier[tier].any { taskNames.contains(it) }
+        if (approval.channel == "google-play" && buildsApk) {
+            return ["${tier}: Google Play approval authorizes only an upload-key-signed AAB, never an upload-key-signed APK"]
+        }
+        if (approval.channel != "google-play" && buildsBundle) {
+            return ["${tier}: direct or managed approval authorizes only an APK signed by the installed-app key"]
+        }
+        return []
+    }
     def gateErrors = []
     if (!hasReleaseSigning) gateErrors.addAll(releaseSigningErrors)
     missingFirebaseTiers.each { tier ->
         gateErrors.add("${tier} Firebase configuration is missing")
     }
     gateErrors.addAll(evidenceErrors)
+    gateErrors.addAll(artifactChannelErrors)
 
     if (!requestedRestrictedTiers.isEmpty() &&
         !gateErrors.isEmpty()) {
         throw new GradleException(
             "Restricted SMS release gates are incomplete. Configure certificate-bound signing, " +
-            "valid structured distribution evidence, and the requested tier Firebase config. " +
+            "authority-signed structured distribution evidence, its detached signature and " +
+            "pinned authority public key, plus the requested tier Firebase config. " +
             "Checks: ${gateErrors.unique().join('; ')}"
         )
     }
@@ -470,8 +437,8 @@ android {
         applicationId "com.yashsomani.birthdayautopilot"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode releaseVersionCode
+        versionName releaseBaseVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "boolean", "RESTRICTED_SMS_CAPABLE", "false"
         buildConfigField "String", "APPROVED_DISTRIBUTION_CHANNEL", '""'
@@ -484,6 +451,18 @@ android {
 
     flavorDimensions "environment"
     productFlavors {
+        e2e {
+            dimension "environment"
+            applicationIdSuffix ".e2e"
+            versionNameSuffix "-e2e"
+            buildConfigField "String", "APP_ENV", '"e2e-fixture"'
+        }
+        smoke {
+            dimension "environment"
+            applicationIdSuffix ".smoke"
+            versionNameSuffix "-smoke"
+            buildConfigField "String", "APP_ENV", '"production-path-smoke"'
+        }
         dev {
             dimension "environment"
             applicationIdSuffix ".dev"
@@ -510,7 +489,7 @@ android {
                 : '"' + labEvidence.approval.installerPackage + '"'
             buildConfigField "String", "APPROVED_SIGNING_CERTIFICATE_SHA256", labEvidence.approval == null
                 ? '""'
-                : '"' + actualSigningCertificateSha256 + '"'
+                : '"' + labEvidence.approval.signingCertificateSha256 + '"'
             buildConfigField "int", "MINIMUM_CERTIFIED_API", labEvidence.approval == null
                 ? "0"
                 : labEvidence.approval.minimumCertifiedApi.toString()
@@ -533,7 +512,7 @@ android {
                 : '"' + prodEvidence.approval.installerPackage + '"'
             buildConfigField "String", "APPROVED_SIGNING_CERTIFICATE_SHA256", prodEvidence.approval == null
                 ? '""'
-                : '"' + actualSigningCertificateSha256 + '"'
+                : '"' + prodEvidence.approval.signingCertificateSha256 + '"'
             buildConfigField "int", "MINIMUM_CERTIFIED_API", prodEvidence.approval == null
                 ? "0"
                 : prodEvidence.approval.minimumCertifiedApi.toString()
@@ -565,6 +544,9 @@ android {
 
     sourceSets {
         androidTest.assets.srcDirs += files("$projectDir/schemas")
+        // Both mobile smoke hosts consume the same reviewed, content-free
+        // projection document. It is never included by a product flavor.
+        smoke.assets.srcDirs += files("$rootDir/../e2e/production-smoke")
     }
 
     signingConfigs {
@@ -605,9 +587,32 @@ androidComponents {
         def environment = variantBuilder.productFlavors.find { flavor ->
             flavor.first == "environment"
         }?.second
-        if ((environment == "lab" || environment == "prod") &&
+        if ((environment == "e2e" || environment == "smoke") &&
+            variantBuilder.buildType != "debug") {
+            variantBuilder.enable = false
+        } else if ((environment == "lab" || environment == "prod") &&
             variantBuilder.buildType != "release") {
             variantBuilder.enable = false
+        }
+    }
+}
+
+def requestedReactEntryFile = System.getenv("ENTRY_FILE")
+    ?.replace('\\', '/')
+    ?.replaceFirst(/^\.\//, '')
+if (requestedReactEntryFile == "e2e/index.js") {
+    // ENTRY_FILE is a process-wide React Native Gradle input. Never let an
+    // aggregate, restricted, or release graph reuse the fixture entry.
+    gradle.taskGraph.whenReady { graph ->
+        def forbiddenFixtureBundleGraph = graph.allTasks.any { task ->
+            if (task.project != project) return false
+            def taskName = task.name.toLowerCase(Locale.ROOT)
+            taskName.contains("lab") || taskName.contains("prod") || taskName.contains("release")
+        }
+        if (forbiddenFixtureBundleGraph) {
+            throw new GradleException(
+                "The E2E React Native entry is authorized only for the e2eDebug fixture variant."
+            )
         }
     }
 }
@@ -632,15 +637,22 @@ dependencies {
     implementation("com.google.firebase:firebase-auth:24.0.1")
     implementation("com.google.firebase:firebase-appcheck-playintegrity:19.2.0")
     implementation("com.google.firebase:firebase-ai:17.13.0")
+    implementation("com.google.firebase:firebase-config:23.1.0")
     implementation("com.google.firebase:firebase-functions:22.1.1")
     implementation("com.google.code.gson:gson:2.14.0")
     implementation("com.googlecode.libphonenumber:libphonenumber:9.0.34")
+    // Room 2.8.4 migration/test serializers require the Java-default-method ABI introduced by
+    // kotlinx.serialization 1.8.x. Firebase AI otherwise resolves 1.7.3, which compiles but
+    // crashes when Room reads an exported schema on-device.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     implementation("net.zetetic:sqlcipher-android:4.17.0")
     implementation("androidx.sqlite:sqlite:2.6.2")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     testImplementation("androidx.room:room-testing:2.8.4")
+    // Match the OkHttp 4.12.0 runtime line already selected by the application graph.
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     // Android's framework org.json methods are stubs in local JVM tests.
     testImplementation("org.json:json:20250517")
 

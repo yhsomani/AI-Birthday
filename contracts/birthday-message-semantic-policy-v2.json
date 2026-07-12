@@ -1,0 +1,368 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "birthday-message-semantic-v2",
+  "dataClassification": "synthetic-test-only",
+  "description": "Cross-platform, content-free-of-user-data classification fixtures for birthday message safety policy v2.",
+  "cases": [
+    {
+      "id": "allow-en-generic",
+      "language": "en",
+      "text": "Happy birthday! Wishing you a wonderful day.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-many-happy-returns",
+      "language": "en",
+      "text": "Many happy returns! Have a joyful day.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-bday",
+      "language": "en",
+      "text": "Happy b-day! Enjoy every moment.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-hate-near-match",
+      "language": "en",
+      "text": "I hate missing your birthday. Wishing you joy.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-violence-near-match",
+      "language": "en",
+      "text": "Attack the birthday cake with enthusiasm!",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-promotion-negated-near-match",
+      "language": "en",
+      "text": "No sale, just birthday cake and warm wishes.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-sale-idiom-near-match",
+      "language": "en",
+      "text": "May your worries be on sale this birthday.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-private-memory-near-match",
+      "language": "en",
+      "text": "Our secret recipe for a happy birthday is extra cake.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-age-near-match",
+      "language": "en",
+      "text": "Turning 30 pages into a birthday chapter today.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-dotted-technology-near-match",
+      "language": "en",
+      "text": "Happy birthday! Node.js makes a fun cake theme.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-health-wish-near-match",
+      "language": "en",
+      "text": "Happy birthday! Stay happy and healthy.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-memory-reminder-near-match",
+      "language": "en",
+      "text": "Happy birthday! Remember to enjoy your day.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-remember-when-to-near-match",
+      "language": "en",
+      "text": "Remember when to make a birthday wish.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-en-dotted-title-near-match",
+      "language": "en",
+      "text": "Happy birthday! Dr.Strange is a fun cake theme.",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-hi-generic",
+      "language": "hi",
+      "text": "जन्मदिन मुबारक हो! आपका दिन शानदार हो।",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-hi-violence-near-match",
+      "language": "hi",
+      "text": "जन्मदिन के केक पर धावा बोलिए!",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-hi-promotion-negated-near-match",
+      "language": "hi",
+      "text": "कोई सेल नहीं, केवल जन्मदिन का केक।",
+      "expectedCategories": []
+    },
+    {
+      "id": "allow-hi-health-wish-near-match",
+      "language": "hi",
+      "text": "जन्मदिन मुबारक! स्वस्थ और खुश रहें।",
+      "expectedCategories": []
+    },
+    {
+      "id": "reject-en-missing-birthday-intent",
+      "language": "en",
+      "text": "Wishing you a wonderful day!",
+      "expectedCategories": ["birthday-intent-required"]
+    },
+    {
+      "id": "reject-hi-missing-birthday-intent",
+      "language": "hi",
+      "text": "आपका दिन शानदार हो!",
+      "expectedCategories": ["birthday-intent-required"]
+    },
+    {
+      "id": "reject-en-scheme-url",
+      "language": "en",
+      "text": "Happy birthday! Visit https://example.com/wish.",
+      "expectedCategories": ["url"]
+    },
+    {
+      "id": "reject-en-bare-url",
+      "language": "en",
+      "text": "Happy birthday! Visit wishes.example.com today.",
+      "expectedCategories": ["url"]
+    },
+    {
+      "id": "reject-en-new-tld-url",
+      "language": "en",
+      "text": "Happy birthday! Visit wishes.example.photography today.",
+      "expectedCategories": ["url"]
+    },
+    {
+      "id": "reject-en-obfuscated-url",
+      "language": "en",
+      "text": "Happy birthday! Visit example [dot] com.",
+      "expectedCategories": ["url"]
+    },
+    {
+      "id": "reject-en-fullwidth-url",
+      "language": "en",
+      "text": "Happy birthday! Visit ｈｔｔｐｓ：／／example．com.",
+      "expectedCategories": ["url"]
+    },
+    {
+      "id": "reject-en-tracking-parameter",
+      "language": "en",
+      "text": "Happy birthday! utm_source=social",
+      "expectedCategories": ["tracking-or-affiliate"]
+    },
+    {
+      "id": "reject-en-hashtag",
+      "language": "en",
+      "text": "Happy birthday! #birthday",
+      "expectedCategories": ["tracking-or-affiliate"]
+    },
+    {
+      "id": "reject-en-affiliate",
+      "language": "en",
+      "text": "Happy birthday! Use my affiliate code CAKE20.",
+      "expectedCategories": ["tracking-or-affiliate"]
+    },
+    {
+      "id": "reject-hi-affiliate",
+      "language": "hi",
+      "text": "जन्मदिन मुबारक! मेरा रेफरल कोड इस्तेमाल करें।",
+      "expectedCategories": ["tracking-or-affiliate"]
+    },
+    {
+      "id": "reject-en-promotion",
+      "language": "en",
+      "text": "Happy birthday! Claim your limited-time offer now.",
+      "expectedCategories": ["promotion"]
+    },
+    {
+      "id": "reject-en-special-deal-promotion",
+      "language": "en",
+      "text": "Happy birthday! Unlock this special deal.",
+      "expectedCategories": ["promotion"]
+    },
+    {
+      "id": "reject-en-subscribe-promotion",
+      "language": "en",
+      "text": "Happy birthday! Subscribe today.",
+      "expectedCategories": ["promotion"]
+    },
+    {
+      "id": "reject-hi-promotion",
+      "language": "hi",
+      "text": "जन्मदिन मुबारक! अभी खरीदें और विशेष छूट पाएं।",
+      "expectedCategories": ["promotion"]
+    },
+    {
+      "id": "reject-en-phone",
+      "language": "en",
+      "text": "Happy birthday! Call me at +91 98765 43210.",
+      "expectedCategories": ["literal-personal-data"]
+    },
+    {
+      "id": "reject-en-date",
+      "language": "en",
+      "text": "Happy birthday! Your birth date is 12/07/1990.",
+      "expectedCategories": ["literal-personal-data"]
+    },
+    {
+      "id": "reject-hi-date",
+      "language": "hi",
+      "text": "जन्मदिन मुबारक! आपकी जन्म तिथि 12 जुलाई 1990 है।",
+      "expectedCategories": ["literal-personal-data"]
+    },
+    {
+      "id": "reject-en-email",
+      "language": "en",
+      "text": "Happy birthday! Email me at wishes@example.com.",
+      "expectedCategories": ["url", "literal-personal-data"]
+    },
+    {
+      "id": "reject-en-identity-number",
+      "language": "en",
+      "text": "Happy birthday! Your Aadhaar number is 1234 5678 9012.",
+      "expectedCategories": ["literal-personal-data"]
+    },
+    {
+      "id": "reject-en-age",
+      "language": "en",
+      "text": "Happy 30th birthday! Turning 30 today.",
+      "expectedCategories": ["age"]
+    },
+    {
+      "id": "reject-hi-age",
+      "language": "hi",
+      "text": "30वां जन्मदिन मुबारक! आप 30 साल के हो गए।",
+      "expectedCategories": ["age"]
+    },
+    {
+      "id": "reject-en-gender",
+      "language": "en",
+      "text": "Happy birthday, birthday girl!",
+      "expectedCategories": ["gender"]
+    },
+    {
+      "id": "reject-hi-gender",
+      "language": "hi",
+      "text": "जन्मदिन मुबारक! आप एक शानदार महिला हैं।",
+      "expectedCategories": ["gender"]
+    },
+    {
+      "id": "reject-en-religion",
+      "language": "en",
+      "text": "May God bless you on your birthday.",
+      "expectedCategories": ["religion"]
+    },
+    {
+      "id": "reject-hi-religion",
+      "language": "hi",
+      "text": "जन्मदिन पर भगवान आपको आशीर्वाद दें।",
+      "expectedCategories": ["religion"]
+    },
+    {
+      "id": "reject-en-health",
+      "language": "en",
+      "text": "Happy birthday. Wishing recovery from your diagnosis.",
+      "expectedCategories": ["health"]
+    },
+    {
+      "id": "reject-hi-health",
+      "language": "hi",
+      "text": "जन्मदिन मुबारक। आपकी बीमारी जल्दी ठीक हो।",
+      "expectedCategories": ["health"]
+    },
+    {
+      "id": "reject-en-relationship",
+      "language": "en",
+      "text": "Happy birthday to my wife.",
+      "expectedCategories": ["relationship"]
+    },
+    {
+      "id": "reject-hi-relationship",
+      "language": "hi",
+      "text": "मेरी पत्नी को जन्मदिन मुबारक।",
+      "expectedCategories": ["relationship"]
+    },
+    {
+      "id": "reject-en-private-memory",
+      "language": "en",
+      "text": "Remember when we took that secret trip? Happy birthday!",
+      "expectedCategories": ["private-memory"]
+    },
+    {
+      "id": "reject-hi-private-memory",
+      "language": "hi",
+      "text": "याद है जब हम उस गुप्त यात्रा पर गए थे? जन्मदिन मुबारक!",
+      "expectedCategories": ["private-memory"]
+    },
+    {
+      "id": "reject-en-hate",
+      "language": "en",
+      "text": "I hate all women. Happy birthday.",
+      "expectedCategories": ["hate"]
+    },
+    {
+      "id": "reject-hi-hate",
+      "language": "hi",
+      "text": "मुझे सभी महिलाओं से नफरत है। जन्मदिन मुबारक।",
+      "expectedCategories": ["hate"]
+    },
+    {
+      "id": "reject-en-sexual",
+      "language": "en",
+      "text": "Happy birthday! Send me nude photos.",
+      "expectedCategories": ["sexual"]
+    },
+    {
+      "id": "reject-hi-sexual",
+      "language": "hi",
+      "text": "जन्मदिन मुबारक! मुझे अश्लील तस्वीरें भेजें।",
+      "expectedCategories": ["sexual"]
+    },
+    {
+      "id": "reject-en-self-harm",
+      "language": "en",
+      "text": "Happy birthday. Kill yourself.",
+      "expectedCategories": ["self-harm"]
+    },
+    {
+      "id": "reject-hi-self-harm",
+      "language": "hi",
+      "text": "जन्मदिन मुबारक। आत्महत्या कर लो।",
+      "expectedCategories": ["self-harm"]
+    },
+    {
+      "id": "reject-en-violence",
+      "language": "en",
+      "text": "I will attack you on your birthday.",
+      "expectedCategories": ["violence"]
+    },
+    {
+      "id": "reject-hi-violence",
+      "language": "hi",
+      "text": "जन्मदिन पर मैं तुम्हें मार दूंगा।",
+      "expectedCategories": ["violence"]
+    },
+    {
+      "id": "reject-en-deception",
+      "language": "en",
+      "text": "Happy birthday! Your bank account is locked; share your OTP.",
+      "expectedCategories": ["deception"]
+    },
+    {
+      "id": "reject-hi-deception",
+      "language": "hi",
+      "text": "आपका बैंक खाता बंद है; OTP भेजें। जन्मदिन मुबारक।",
+      "expectedCategories": ["deception"]
+    }
+  ]
+}

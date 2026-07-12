@@ -1,6 +1,7 @@
 package com.yashsomani.birthdayautopilot.readiness
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -9,6 +10,7 @@ import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.PowerManager
 import android.os.UserManager
+import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
 import androidx.core.content.PackageManagerCompat
@@ -16,6 +18,10 @@ import androidx.core.content.UnusedAppRestrictionsConstants
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
 import com.yashsomani.birthdayautopilot.BuildConfig
+import com.yashsomani.birthdayautopilot.auth.TelephonyPermissionDenialStore
+import com.yashsomani.birthdayautopilot.auth.TelephonyPermanentDenial
+import com.yashsomani.birthdayautopilot.automation.workers.SchedulerStartupStateStore
+import com.yashsomani.birthdayautopilot.automation.workers.SchedulerStartupStatus
 import com.yashsomani.birthdayautopilot.core.model.AccountMode
 import java.security.MessageDigest
 import java.time.Clock
@@ -26,6 +32,11 @@ data class AndroidReadinessSnapshot(
   val signals: DistributionSignals,
   val eligibility: EligibilityDecision,
   val smsPermissionGranted: Boolean?,
+  val telephonyStatePermissionGranted: Boolean?,
+  val permanentPermissionDenial: TelephonyPermanentDenial,
+  val schedulerStartupReady: Boolean,
+  val evaluatedSubscriptionId: Int?,
+  val activeSubscriptionIds: Set<Int>?,
 ) {
   fun readinessInputs(
     accountMode: AccountMode?,
@@ -44,7 +55,8 @@ data class AndroidReadinessSnapshot(
     passingTestReceipt = passingTestReceipt,
     networkAvailable = signals.networkValidated,
     coordinationAvailable = coordinationAvailable,
-    smsPermissionGranted = smsPermissionGranted,
+    schedulerReady = schedulerStartupReady,
+    smsPermissionGranted = smsPermissionGranted == true && telephonyStatePermissionGranted == true,
     simReady = signals.simReady,
     backgroundRestricted = signals.backgroundRestricted,
     dozeAllowlisted = signals.dozeAllowlisted,
@@ -64,10 +76,19 @@ class AndroidReadinessProbe(
 ) {
   private val appContext = context.applicationContext
 
-  fun read(): AndroidReadinessSnapshot {
+  fun read(resolvedSubscriptionId: Int? = defaultSmsSubscriptionId()): AndroidReadinessSnapshot {
     val telephonyMessagingAvailable = safely {
       appContext.packageManager.hasSystemFeature(TELEPHONY_MESSAGING_FEATURE)
     }
+    val smsPermissionGranted = permissionGranted(Manifest.permission.SEND_SMS)
+    val telephonyStatePermissionGranted = permissionGranted(Manifest.permission.READ_PHONE_STATE)
+    val permanentPermissionDenial = TelephonyPermissionDenialStore(appContext).reconcile(
+      telephonyStatePermissionGranted,
+      smsPermissionGranted,
+    )
+    val activeSubscriptionIds = activeSubscriptionIds(telephonyStatePermissionGranted)
+    val evaluatedSubscriptionId = resolvedSubscriptionId
+      ?.takeIf(SubscriptionManager::isValidSubscriptionId)
     val signals = DistributionSignals(
       apiCertified = certifiedApi(),
       telephonyMessagingAvailable = telephonyMessagingAvailable,
@@ -77,7 +98,12 @@ class AndroidReadinessProbe(
       signingCertificateMatches = signingCertificateMatches(),
       installerMatches = installerMatches(),
       playServicesAvailable = playServicesAvailable(),
-      simReady = simReady(telephonyMessagingAvailable),
+      simReady = simReady(
+        telephonyMessagingAvailable,
+        evaluatedSubscriptionId,
+        telephonyStatePermissionGranted,
+        activeSubscriptionIds,
+      ),
       networkValidated = networkValidated(),
       backgroundRestricted = safely {
         appContext.getSystemService(ActivityManager::class.java).isBackgroundRestricted
@@ -96,11 +122,34 @@ class AndroidReadinessProbe(
     return AndroidReadinessSnapshot(
       signals = signals,
       eligibility = eligibilityEvaluator.evaluate(signals),
-      smsPermissionGranted = safely {
-        ContextCompat.checkSelfPermission(appContext, Manifest.permission.SEND_SMS) ==
-          PackageManager.PERMISSION_GRANTED
-      },
+      smsPermissionGranted = smsPermissionGranted,
+      telephonyStatePermissionGranted = telephonyStatePermissionGranted,
+      permanentPermissionDenial = permanentPermissionDenial,
+      schedulerStartupReady = SchedulerStartupStateStore(appContext).status() ==
+        SchedulerStartupStatus.READY,
+      evaluatedSubscriptionId = evaluatedSubscriptionId,
+      activeSubscriptionIds = activeSubscriptionIds,
     )
+  }
+
+  /**
+   * Lint cannot infer the permission represented by the already-sampled nullable projection.
+   * Keep the suppression on this single guarded read; [safely] also treats a concurrent revoke as
+   * unavailable instead of allowing a SecurityException to escape.
+   */
+  @SuppressLint("MissingPermission")
+  private fun activeSubscriptionIds(permissionGranted: Boolean?): Set<Int>? {
+    if (permissionGranted != true) return null
+    return safely {
+      appContext.getSystemService(SubscriptionManager::class.java)
+        .activeSubscriptionInfoList
+        .orEmpty()
+        .mapTo(linkedSetOf()) { it.subscriptionId }
+    }
+  }
+
+  private fun permissionGranted(permission: String): Boolean? = safely {
+    ContextCompat.checkSelfPermission(appContext, permission) == PackageManager.PERMISSION_GRANTED
   }
 
   private fun certifiedApi(): Boolean =
@@ -158,10 +207,38 @@ class AndroidReadinessProbe(
       .hasUserRestriction(UserManager.DISALLOW_SMS)
   }
 
-  private fun simReady(telephonyMessagingAvailable: Boolean?): Boolean? = safely {
-    if (telephonyMessagingAvailable != true) return@safely false
-    val telephony = appContext.getSystemService(TelephonyManager::class.java)
-    telephony.simState == TelephonyManager.SIM_STATE_READY
+  @SuppressLint("MissingPermission")
+  private fun simReady(
+    telephonyMessagingAvailable: Boolean?,
+    subscriptionId: Int?,
+    phoneStatePermissionGranted: Boolean?,
+    activeSubscriptionIds: Set<Int>?,
+  ): Boolean? {
+    val simState = if (
+      telephonyMessagingAvailable == true &&
+      subscriptionId != null &&
+      (phoneStatePermissionGranted != true || activeSubscriptionIds?.contains(subscriptionId) == true)
+    ) {
+      safely {
+        appContext.getSystemService(TelephonyManager::class.java)
+          .createForSubscriptionId(subscriptionId)
+          .simState
+      }
+    } else {
+      null
+    }
+    return SubscriptionSimReadinessPolicy.evaluate(
+      telephonyMessagingAvailable = telephonyMessagingAvailable,
+      subscriptionId = subscriptionId,
+      phoneStatePermissionGranted = phoneStatePermissionGranted,
+      activeSubscriptionIds = activeSubscriptionIds,
+      selectedSubscriptionSimState = simState,
+    )
+  }
+
+  private fun defaultSmsSubscriptionId(): Int? = safely {
+    SubscriptionManager.getDefaultSmsSubscriptionId()
+      .takeIf(SubscriptionManager::isValidSubscriptionId)
   }
 
   private fun networkValidated(): Boolean? = safely {
@@ -202,5 +279,24 @@ class AndroidReadinessProbe(
     // annotated newer and triggers an incorrect inlined-API warning for the supported min SDK.
     const val TELEPHONY_MESSAGING_FEATURE = "android.hardware.telephony.messaging"
     const val UNUSED_APP_STATUS_TIMEOUT_SECONDS = 3L
+  }
+}
+
+internal object SubscriptionSimReadinessPolicy {
+  fun evaluate(
+    telephonyMessagingAvailable: Boolean?,
+    subscriptionId: Int?,
+    phoneStatePermissionGranted: Boolean?,
+    activeSubscriptionIds: Set<Int>?,
+    selectedSubscriptionSimState: Int?,
+  ): Boolean? {
+    if (telephonyMessagingAvailable != true) return false
+    val selected = subscriptionId?.takeIf { it >= 0 } ?: return false
+    if (phoneStatePermissionGranted == true) {
+      val active = activeSubscriptionIds ?: return null
+      if (selected !in active) return false
+    }
+    val state = selectedSubscriptionSimState ?: return null
+    return state == TelephonyManager.SIM_STATE_READY
   }
 }

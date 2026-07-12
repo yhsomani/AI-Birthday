@@ -7,6 +7,327 @@ enum IOSCompanionWorkflowEngineResult {
   case failure([String: Any])
 }
 
+private enum IOSCompanionPlanRebuildOutcome {
+  case succeeded
+  case failed([String: Any])
+
+  var isSuccessful: Bool {
+    if case .succeeded = self { return true }
+    return false
+  }
+}
+
+enum IOSBirthdayMessageContentCategory: String, CaseIterable {
+  case birthdayIntentRequired = "birthday-intent-required"
+  case url
+  case trackingOrAffiliate = "tracking-or-affiliate"
+  case promotion
+  case literalPersonalData = "literal-personal-data"
+  case age
+  case gender
+  case religion
+  case health
+  case relationship
+  case privateMemory = "private-memory"
+  case hate
+  case sexual
+  case selfHarm = "self-harm"
+  case violence
+  case deception
+}
+
+enum IOSBirthdayMessageContentPolicy {
+  static let policyVersion = "birthday-message-semantic-v2"
+  static let validatorVersion = "sms-template-validator-v2"
+
+  static func issueCodes(text: String, declaredLanguage: String) -> [String] {
+    let normalized = text.precomposedStringWithCanonicalMapping
+    var issues: [String] = []
+    let categories = classify(text: normalized, declaredLanguage: declaredLanguage)
+    if categories.contains(.url) {
+      issues.append("template-url-not-allowed")
+    }
+    if categories.contains(.trackingOrAffiliate) {
+      issues.append("template-tracking-not-allowed")
+    }
+    if categories.contains(.promotion) {
+      issues.append("template-promotional-content")
+    }
+    if !categories.isDisjoint(with: sensitiveCategories) {
+      issues.append("template-sensitive-content")
+    }
+    if categories.contains(.birthdayIntentRequired) {
+      issues.append("template-birthday-intent-required")
+    }
+    let templateOnly = normalized.replacingOccurrences(of: "{firstName}", with: "")
+    let letters = String(
+      templateOnly.unicodeScalars.filter { CharacterSet.letters.contains($0) }
+    )
+    let languagePattern = declaredLanguage == "hi"
+      ? "^\\p{Devanagari}+$" : "^\\p{Latin}+$"
+    if letters.isEmpty
+      || letters.range(of: languagePattern, options: .regularExpression) == nil
+    {
+      issues.append("template-language-mismatch")
+    }
+    if normalized.unicodeScalars.contains(where: isBidiControl) {
+      issues.append("template-bidi-control")
+    }
+    if normalized.unicodeScalars.contains(where: {
+      isUnsafeMessageScalar($0) && !isBidiControl($0)
+    }) {
+      issues.append("template-control-character")
+    }
+    var seen = Set<String>()
+    return issues.filter { seen.insert($0).inserted }
+  }
+
+  static func classify(
+    text: String,
+    declaredLanguage: String?
+  ) -> Set<IOSBirthdayMessageContentCategory> {
+    let value = semanticView(text)
+    var categories = Set<IOSBirthdayMessageContentCategory>()
+    let hasBirthdayIntent: Bool
+    switch declaredLanguage {
+    case "en": hasBirthdayIntent = matches(categoryBirthdayIntentEnglish, in: value)
+    case "hi": hasBirthdayIntent = matches(categoryBirthdayIntentHindi, in: value)
+    default:
+      hasBirthdayIntent = matches(categoryBirthdayIntentEnglish, in: value)
+        || matches(categoryBirthdayIntentHindi, in: value)
+    }
+    if !hasBirthdayIntent { categories.insert(.birthdayIntentRequired) }
+    if matchesAny(categoryURLPatterns, in: value)
+      || containsNonBenignURLDomain(value)
+    {
+      categories.insert(.url)
+    }
+    if matches(categoryTrackingOrAffiliate, in: value) {
+      categories.insert(.trackingOrAffiliate)
+    }
+    if matches(categoryPromotion, in: value) {
+      categories.insert(.promotion)
+    }
+    if matchesAny(categoryLiteralPersonalDataPatterns, in: value) {
+      categories.insert(.literalPersonalData)
+    }
+    if matches(categoryAgeEnglish, in: value) || matches(categoryAgeHindi, in: value) {
+      categories.insert(.age)
+    }
+    if matches(categoryGender, in: value) { categories.insert(.gender) }
+    if matches(categoryReligion, in: value) { categories.insert(.religion) }
+    if matches(categoryHealth, in: value) { categories.insert(.health) }
+    if matches(categoryRelationship, in: value) { categories.insert(.relationship) }
+    if matches(categoryPrivateMemory, in: value) { categories.insert(.privateMemory) }
+    if matches(categoryHate, in: value) { categories.insert(.hate) }
+    if matches(categorySexual, in: value) { categories.insert(.sexual) }
+    if matches(categorySelfHarm, in: value) { categories.insert(.selfHarm) }
+    if matches(categoryViolence, in: value) { categories.insert(.violence) }
+    if matches(categoryDeception, in: value) { categories.insert(.deception) }
+    return categories
+  }
+
+  /// Validates the exact body that the app is about to prefill. The language is
+  /// deliberately inferred only for this final native boundary; authored
+  /// drafts still have to match their explicitly declared language.
+  static func isSafeRenderedBody(_ text: String) -> Bool {
+    issueCodes(text: text, declaredLanguage: "en").isEmpty
+      || issueCodes(text: text, declaredLanguage: "hi").isEmpty
+  }
+
+  /// Renders the exact prefilled body and validates it again after contact-name
+  /// interpolation. A collision never causes a silent salutation replacement:
+  /// the user must explicitly choose and reapprove a generic template instead.
+  /// The returned body is the body shown during approval and later handed to
+  /// MessageUI; edits inside MessageUI remain entirely user-controlled.
+  static func renderedBody(
+    templateText: String,
+    placeholderMode: String,
+    givenName: String?,
+    declaredLanguage: String
+  ) -> String? {
+    guard ["en", "hi"].contains(declaredLanguage),
+      issueCodes(text: templateText, declaredLanguage: declaredLanguage).isEmpty
+    else { return nil }
+
+    guard let personalized = IOSCompanionMessagePlaceholderPolicy.render(
+      text: templateText,
+      placeholderMode: placeholderMode,
+      givenName: givenName
+    ) else { return nil }
+    return issueCodes(text: personalized, declaredLanguage: declaredLanguage).isEmpty
+      ? personalized : nil
+  }
+
+  private static func matches(_ pattern: String, in value: String) -> Bool {
+    value.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+  }
+
+  private static func matchesAny(_ patterns: [String], in value: String) -> Bool {
+    patterns.contains { matches($0, in: value) }
+  }
+
+  private static func semanticView(_ text: String) -> String {
+    text.precomposedStringWithCompatibilityMapping
+      .split(whereSeparator: { $0.isWhitespace })
+      .joined(separator: " ")
+  }
+
+  private static func containsNonBenignURLDomain(_ text: String) -> Bool {
+    guard let expression = try? NSRegularExpression(
+      pattern: categoryURLDomain,
+      options: [.caseInsensitive]
+    ) else { return true }
+    let range = NSRange(text.startIndex..<text.endIndex, in: text)
+    return expression.matches(in: text, range: range).contains { match in
+      guard let swiftRange = Range(match.range, in: text) else { return true }
+      return !benignDottedTerms.contains(String(text[swiftRange]).lowercased())
+    }
+  }
+
+  private static func isBidiControl(_ scalar: Unicode.Scalar) -> Bool {
+    scalar.value == 0x061C || scalar.value == 0x200E || scalar.value == 0x200F
+      || (0x202A...0x202E).contains(scalar.value)
+      || (0x2066...0x2069).contains(scalar.value)
+  }
+
+  private static func isUnsafeMessageScalar(_ scalar: Unicode.Scalar) -> Bool {
+    switch scalar.properties.generalCategory {
+    case .control, .lineSeparator, .paragraphSeparator:
+      return true
+    default:
+      return isBidiControl(scalar) || scalar.value == 0x200B
+        || scalar.value == 0x2060 || scalar.value == 0xFEFF
+    }
+  }
+
+  private static let sensitiveCategories: Set<IOSBirthdayMessageContentCategory> = [
+    .literalPersonalData, .age, .gender, .religion, .health, .relationship,
+    .privateMemory, .hate, .sexual, .selfHarm, .violence, .deception,
+  ]
+
+  private static let categoryBirthdayIntentEnglish =
+    "\\b(?:birthday|b[\\s-]?day|bday)\\b|\\bmany\\s+happy\\s+returns\\b"
+  private static let categoryBirthdayIntentHindi = "(?:जन्म\\s*दिन|जन्मदिवस)"
+  private static let categoryURLDomain =
+    "\\b(?:[\\p{L}\\p{N}](?:[\\p{L}\\p{N}-]{0,62}[\\p{L}\\p{N}])?\\.)+" +
+    "(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})(?:[/?:#]\\S*)?"
+  private static let categoryURLPatterns = [
+    "(?:\\b(?:https?|ftp)\\s*:\\s*/\\s*/|\\b(?:mailto|tel|sms|smsto)\\s*:|\\bwww\\.)\\S+",
+    "\\b[\\p{L}\\p{N}][\\p{L}\\p{N}-]{0,62}\\s*" +
+      "(?:\\[\\s*dot\\s*\\]|\\(\\s*dot\\s*\\)|\\s+dot\\s+)\\s*" +
+      "(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})\\b",
+    "\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b",
+    "\\b[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\\.[a-z0-9-]+)+\\b",
+  ]
+  private static let categoryTrackingOrAffiliate =
+    "(?:\\butm_[a-z0-9_]+\\s*=|\\b(?:gclid|fbclid|msclkid|ref|referrer|" +
+    "affiliate_id|aff_id)\\s*=|#[\\p{L}\\p{N}_]+|" +
+    "\\b(?:affiliate|referral|sponsored)\\s+(?:link|code|post)|" +
+    "\\buse\\s+(?:my|code)\\s+(?:affiliate\\s+)?code\\b|" +
+    "\\bearns?\\s+(?:a\\s+)?commission\\b|" +
+    "(?:रेफरल|एफिलिएट|संबद्ध)\\s*(?:लिंक|कोड)|(?:प्रायोजित|कमीशन))"
+  private static let categoryPromotion =
+    "\\b(?:limited(?:[- ]time)? offer|special offer|special deal|flash sale|" +
+    "birthday sale|discount(?: code)?|coupon(?: code)?|promo(?: code)?|buy now|" +
+    "shop now|order now|free offer|free gift|claim (?:your )?(?:offer|gift|discount)|" +
+    "save [0-9]{1,3}%|[0-9]{1,3}% off|subscribe(?: now| today)?|" +
+    "start (?:a|your) subscription)\\b|" +
+    "(?:सीमित|खास|विशेष)\\s*(?:समय का\\s*)?ऑफर|अभी\\s*(?:खरीदें|ऑर्डर करें)|" +
+    "(?:विशेष\\s*)?छूट|कूपन|प्रोमो\\s*कोड|मुफ़्त\\s*(?:ऑफर|उपहार)|" +
+    "फ्लैश\\s*सेल|सदस्यता\\s*लें"
+  private static let benignDottedTerms: Set<String> = ["node.js", "dr.strange"]
+
+  private static let categoryEmail =
+    "\\b[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\\.[a-z0-9-]+)+\\b"
+  private static let categoryLiteralPersonalDataPatterns = [
+    "(?<![\\p{L}\\p{N}])(?:\\+?[0-9०-९][\\s().-]*){10,15}(?![\\p{L}\\p{N}])",
+    "\\b(?:[0-9]{4}[-/.][0-9]{1,2}[-/.][0-9]{1,2}|" +
+      "[0-9]{1,2}[-/.][0-9]{1,2}[-/.][0-9]{2,4})\\b",
+    "\\b(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|" +
+      "aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+" +
+      "[0-9]{1,2}(?:st|nd|rd|th)?(?:,?\\s+[0-9]{4})?|" +
+      "[0-9]{1,2}(?:st|nd|rd|th)?\\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|" +
+      "apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|" +
+      "nov(?:ember)?|dec(?:ember)?)(?:\\s+[0-9]{4})?)\\b",
+    "[0-9०-९]{1,2}\\s*(?:जनवरी|फरवरी|मार्च|अप्रैल|मई|जून|जुलाई|अगस्त|" +
+      "सितंबर|अक्टूबर|नवंबर|दिसंबर)(?:\\s*[0-9०-९]{2,4})?",
+    "\\b(?:your|my)\\s+(?:full name|phone number|mobile number|email address|" +
+      "home address|aadhaar(?: number)?|passport(?: number)?|social security number|" +
+      "ssn|date of birth|birth date)\\b|(?:आपका|आपकी|मेरा|मेरी)\\s*" +
+      "(?:पूरा नाम|फोन नंबर|मोबाइल नंबर|ईमेल|घर का पता|आधार नंबर|पासपोर्ट नंबर|जन्म तिथि)",
+    categoryEmail,
+  ]
+  private static let categoryAgeEnglish =
+    "\\b(?:turning\\s+[0-9]{1,3}\\b(?!\\s+(?:pages?|chapters?|books?|degrees?|" +
+    "minutes?|seconds?|ideas?|recipes?))|[0-9]{1,3}(?:st|nd|rd|th)\\s+birthday|" +
+    "[0-9]{1,3}\\s+years?\\s+old|(?:age|aged)\\s+[0-9]{1,3}|" +
+    "[0-9]{1,3}\\s+candles?)\\b"
+  private static let categoryAgeHindi =
+    "[0-9०-९]{1,3}\\s*(?:वां|वाँ|वीं)?\\s*जन्मदिन|" +
+    "[0-9०-९]{1,3}\\s*साल\\s*के\\s*हो\\s*गए|उम्र\\s*[0-9०-९]{1,3}|" +
+    "[0-9०-९]{1,3}\\s*मोमबत्त"
+  private static let categoryGender =
+    "\\b(?:birthday\\s+(?:girl|boy|woman|man)|you\\s+are\\s+(?:a\\s+)?" +
+    "(?:woman|man|girl|boy|female|male)|as\\s+(?:a|the)\\s+" +
+    "(?:woman|man|girl|boy))\\b|(?:आप|तुम)\\s*(?:एक\\s*)?(?:शानदार\\s+)?" +
+    "(?:महिला|पुरुष|लड़की|लड़का)\\s*(?:हैं|हो)|" +
+    "जन्मदिन\\s+(?:की\\s+लड़की|का\\s+लड़का)"
+  private static let categoryReligion =
+    "\\b(?:god|jesus|allah|christ|lord)\\s+(?:bless|protect|guide)s?\\s+you\\b|" +
+    "\\b(?:as\\s+(?:a|your)\\s+|you\\s+are\\s+(?:a\\s+)?)" +
+    "(?:hindu|muslim|christian|jewish|sikh|buddhist)\\b|" +
+    "(?:भगवान|ईश्वर|अल्लाह|यीशु|वाहेगुरु)\\s*(?:आपको|तुम्हें)?\\s*आशीर्वाद|" +
+    "(?:आप|तुम)\\s*(?:हिंदू|मुसलमान|ईसाई|सिख|बौद्ध)\\s*(?:हैं|हो)"
+  private static let categoryHealth =
+    "\\b(?:your\\s+(?:illness|diagnosis|disease|disability|medical condition|" +
+    "cancer|diabetes)|recover(?:y|ing)?\\s+from\\s+(?:your\\s+)?" +
+    "(?:illness|diagnosis|surgery|cancer|disease)|get well soon|" +
+    "beat(?:ing)?\\s+(?:cancer|your illness|the disease))\\b|" +
+    "(?:आपकी|तुम्हारी)\\s*(?:बीमारी|निदान|विकलांगता|चिकित्सा स्थिति|कैंसर|मधुमेह)|" +
+    "(?:बीमारी|ऑपरेशन|कैंसर)\\s*से\\s*जल्द\\s*ठीक"
+  private static let categoryRelationship =
+    "\\b(?:(?:my|your)\\s+(?:wife|husband|girlfriend|boyfriend|partner|daughter|" +
+    "son|mother|father|sister|brother|best friend)|as\\s+your\\s+" +
+    "(?:wife|husband|girlfriend|boyfriend|partner)|our\\s+" +
+    "(?:marriage|relationship|friendship))\\b|(?:मेरी|आपकी|तुम्हारी)\\s*" +
+    "(?:पत्नी|पति|प्रेमिका|प्रेमी|बेटी|बेटा|माँ|पिता|बहन|भाई)|" +
+    "हमारा\\s*(?:विवाह|रिश्ता)"
+  private static let categoryPrivateMemory =
+    "\\b(?:remember\\s+(?:when(?!\\s+to\\b)|our|the time)|" +
+    "our\\s+secret\\b(?!\\s+recipe)|inside\\s+joke|the\\s+trip\\s+we\\s+took|" +
+    "that\\s+night\\s+we)\\b|(?:याद\\s+है\\s+जब|हमारा\\s+राज़|" +
+    "हमारी\\s+गुप्त\\s+(?:यात्रा|बात)|हम\\s+जब\\s+साथ)"
+  private static let categoryHate =
+    "\\b(?:hate|despise)\\s+(?:all\\s+)?(?:women|men|muslims?|hindus?|" +
+    "christians?|jews?|sikhs?|gays?|lesbians?|transgender\\s+people|" +
+    "disabled\\s+people|people\\s+of\\s+(?:a\\s+)?(?:race|caste|religion))\\b|" +
+    "\\b(?:inferior|disgusting)\\s+(?:race|caste|religion)\\b|" +
+    "(?:महिलाओं|पुरुषों|मुसलमानों|हिंदुओं|ईसाइयों|सिखों|समलैंगिकों|विकलांगों)" +
+    "\\s*से\\s*नफरत|(?:जाति|धर्म)\\s*(?:नीच|घटिया)"
+  private static let categorySexual =
+    "\\b(?:sex(?:ual)?|sexy|nude|naked|porn(?:ography)?|sleep\\s+with\\s+me|" +
+    "explicit\\s+photos?)\\b|(?:यौन|सेक्सी|नग्न|अश्लील|पोर्न)"
+  private static let categorySelfHarm =
+    "\\b(?:kill\\s+yourself|end\\s+your\\s+(?:life|pain)|commit\\s+suicide|" +
+    "suicide|self[- ]?harm|hurt\\s+yourself)\\b|" +
+    "(?:आत्महत्या|खुद\\s+को\\s+मार|अपनी\\s+जान\\s+ले|खुद\\s+को\\s+नुकसान)"
+  private static let categoryViolence =
+    "\\b(?:kill|murder|hurt|attack|shoot|stab|beat)\\s+" +
+    "(?:you|him|her|them|someone|people)\\b|\\b(?:death|bomb)\\s+threat\\b|" +
+    "(?:आपको|तुम्हें|उसे|उन्हें)\\s*(?:मार\\s*(?:दूँगा|दूंगा|डालूँगा|डालूंगा)|" +
+    "गोली\\s+मार|चाकू\\s+मार|पीट)|(?:जान\\s+से\\s+मारने|बम)\\s+की\\s+धमकी"
+  private static let categoryDeception =
+    "\\b(?:you(?:'ve| have)\\s+won\\s+(?:a\\s+)?(?:prize|lottery)|" +
+    "share\\s+your\\s+(?:otp|pin|password)|send\\s+(?:money|payment|your\\s+otp)|" +
+    "your\\s+(?:bank\\s+)?account\\s+is\\s+(?:locked|suspended)|" +
+    "i\\s+am\\s+from\\s+your\\s+bank|guaranteed\\s+(?:prize|returns?)|" +
+    "urgent\\s+payment)\\b|(?:आपका|तुम्हारा)\\s*बैंक\\s*खाता\\s*(?:बंद|निलंबित)|" +
+    "(?:otp|पिन|पासवर्ड)\\s*(?:भेजें|बताएं|साझा करें)|" +
+    "आप\\s*(?:इनाम|लॉटरी)\\s*जीत"
+
+}
+
 private struct IOSCompanionEffectiveContact {
   let safe: IOSPeopleSafeContact
   let privateValue: IOSPeoplePrivateContact
@@ -14,11 +335,118 @@ private struct IOSCompanionEffectiveContact {
   let selectedPhoneId: String?
   let selectedBirthdayId: String?
   let selectedPhone: IOSPeoplePrivatePhone?
+  let selectedDestinationBlocked: Bool
   let selectedBirthday: IOSPeoplePrivateBirthday?
   let readinessKind: String
   let readinessReasons: [String]
   let approvalKind: String
   let approvalReasons: [String]
+}
+
+/// Pure civil-date planner shared by iOS projections, simulation, and reminder materialization.
+/// Google birthday month/day values are Gregorian even when the user selects another display
+/// calendar. Scheduling still follows the device's autoupdating timezone.
+enum IOSCompanionRecurrencePlanner {
+  static let planningDays = 400
+
+  static func occurrenceDates(
+    birthday: IOSPeoplePrivateBirthday?,
+    leapPolicy: String?,
+    from now: Date,
+    schedulingCalendar: Calendar
+  ) -> [Date] {
+    guard let birthday,
+      leapPolicy.map({ ["feb-28", "mar-01", "skip"].contains($0) }) ?? true
+    else { return [] }
+    let calendar = gregorianCalendar(in: schedulingCalendar.timeZone)
+    let start = calendar.startOfDay(for: now)
+    guard
+      let horizon = calendar.date(
+        byAdding: .day, value: planningDays - 1, to: start
+      )
+    else { return [] }
+    let currentYear = calendar.component(.year, from: start)
+    var values: [Date] = []
+    for year in currentYear...(currentYear + 2) {
+      guard
+        let value = occurrenceDate(
+          in: year,
+          birthday: birthday,
+          leapPolicy: leapPolicy,
+          schedulingCalendar: calendar
+        ),
+        value >= start,
+        value <= horizon
+      else { continue }
+      values.append(value)
+    }
+    return values.sorted()
+  }
+
+  static func occurrenceDate(
+    in year: Int,
+    birthday: IOSPeoplePrivateBirthday,
+    leapPolicy: String?,
+    schedulingCalendar: Calendar
+  ) -> Date? {
+    guard leapPolicy.map({ ["feb-28", "mar-01", "skip"].contains($0) }) ?? true else {
+      return nil
+    }
+    let calendar = gregorianCalendar(in: schedulingCalendar.timeZone)
+    var month = birthday.month
+    var day = birthday.day
+    if month == 2 && day == 29 {
+      guard let leapPolicy, ["feb-28", "mar-01", "skip"].contains(leapPolicy) else {
+        return nil
+      }
+      if !isGregorianLeapYear(year) {
+        switch leapPolicy {
+        case "feb-28": day = 28
+        case "mar-01":
+          month = 3
+          day = 1
+        case "skip": return nil
+        default: return nil
+        }
+      }
+    }
+    return exactCivilDate(year: year, month: month, day: day, calendar: calendar)
+  }
+
+  private static func gregorianCalendar(in timeZone: TimeZone) -> Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+    return calendar
+  }
+
+  private static func exactCivilDate(
+    year: Int,
+    month: Int,
+    day: Int,
+    calendar: Calendar
+  ) -> Date? {
+    guard (1...12).contains(month), (1...31).contains(day),
+      let value = calendar.date(
+        from: DateComponents(
+          calendar: calendar,
+          timeZone: calendar.timeZone,
+          year: year,
+          month: month,
+          day: day
+        )
+      )
+    else { return nil }
+    let resolved = calendar.dateComponents([.year, .month, .day], from: value)
+    guard resolved.year == year, resolved.month == month, resolved.day == day else {
+      return nil
+    }
+    return value
+  }
+
+  private static func isGregorianLeapYear(_ year: Int) -> Bool {
+    year.isMultiple(of: 4)
+      && (!year.isMultiple(of: 100) || year.isMultiple(of: 400))
+  }
 }
 
 @MainActor
@@ -27,7 +455,7 @@ final class IOSCompanionWorkflowEngine {
 
   private static let maximumReviewCount = 32
   private static let reviewLifetime: TimeInterval = 5 * 60
-  private static let planningDays = 400
+  private static let planningDays = IOSCompanionRecurrencePlanner.planningDays
   private static let maximumBatch = 50
   private static let deletionLocalWipeRecoveryReason =
     "deletion-local-wipe-recovery"
@@ -57,7 +485,11 @@ final class IOSCompanionWorkflowEngine {
   private let deletionReceiptStore = IOSAccountDeletionReceiptStore.shared
   private let deletionRecoveryStore = IOSAccountDeletionRecoveryStore.shared
   private let deletionCleanup = IOSAccountDeletionLocalCleanupCoordinator.shared
-  private var calendar: Calendar { Calendar.autoupdatingCurrent }
+  private var calendar: Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .autoupdatingCurrent
+    return calendar
+  }
 
   private init() {}
 
@@ -207,7 +639,9 @@ final class IOSCompanionWorkflowEngine {
         "primaryStart": policy.primaryStart,
         "primaryEnd": policy.primaryEnd,
         "latePolicy": latePolicy,
-        "dailyCap": policy.dailyCap,
+        // Wire compatibility only. The React Native editor shares this shape
+        // with Android, but iOS never applies this value as a send limit.
+        "dailyCap": policy.legacyAndroidDailyCap,
       ],
     ])
   }
@@ -269,19 +703,18 @@ final class IOSCompanionWorkflowEngine {
       } ?? []
     let activityCutoff = status.workflow?.activityClearedAt
     records.append(
-      contentsOf: status.composerRecords.filter { record in
-        guard let activityCutoff else { return true }
-        return (record.resolvedAt ?? record.openedAt) > activityCutoff
-      }.flatMap { record -> [[String: Any]] in
-        var values = [
-          Self.activityPayload(
-            id: "composer.\(record.operationId).opened",
-            kind: "composer-opened",
-            reason: nil,
-            occurredAt: record.openedAt,
-            actionable: false
-          )
-        ]
+      contentsOf: status.composerRecords.flatMap { record -> [[String: Any]] in
+        var values: [[String: Any]] = []
+        if activityCutoff.map({ record.openedAt > $0 }) ?? true {
+          values.append(
+            Self.activityPayload(
+              id: "composer.\(record.operationId).opened",
+              kind: "composer-opened",
+              reason: nil,
+              occurredAt: record.openedAt,
+              actionable: false
+            ))
+        }
         let terminalKind: String?
         switch record.outcome {
         case .openCommitted, .presented: terminalKind = nil
@@ -290,13 +723,16 @@ final class IOSCompanionWorkflowEngine {
         case .outcomeUnknown: terminalKind = "composer-outcome-unknown"
         case .reportedSent: terminalKind = "composer-reported-sent"
         }
-        if let terminalKind {
+        let terminalAt = record.resolvedAt ?? record.openedAt
+        if let terminalKind,
+          activityCutoff.map({ terminalAt > $0 }) ?? true
+        {
           values.append(
             Self.activityPayload(
               id: "composer.\(record.operationId).outcome",
               kind: terminalKind,
               reason: nil,
-              occurredAt: record.resolvedAt ?? record.openedAt,
+              occurredAt: terminalAt,
               actionable: record.outcome == .cancelled || record.outcome == .failed
             ))
         }
@@ -318,22 +754,27 @@ final class IOSCompanionWorkflowEngine {
     let people = peopleStore.projection()
     let effective = effectiveContacts(status: status)
     let workflow = status.workflow
+    let activityCutoff = workflow?.activityClearedAt
+    let visibleComposerActivityCount = status.composerRecords.reduce(0) {
+      count, record in
+      let openedVisible = activityCutoff.map { record.openedAt > $0 } ?? true
+      let terminalAt = record.resolvedAt ?? record.openedAt
+      let terminalVisible = record.outcome != .openCommitted && record.outcome != .presented
+        && (activityCutoff.map { terminalAt > $0 } ?? true)
+      return count + (openedVisible ? 1 : 0) + (terminalVisible ? 1 : 0)
+    }
     var result: [String: Any] = [
       "localContactCount": people.contacts.count,
       "enabledRecipientCount": effective.filter {
         $0.configuration?.enrollment == .enabled
       }.count,
       "approvalCount": effective.filter { $0.approvalKind == "valid" }.count,
-      "activityCount": (workflow?.activity.count ?? 0)
-        + status.composerRecords.filter {
-          guard let cutoff = workflow?.activityClearedAt else { return true }
-          return ($0.resolvedAt ?? $0.openedAt) > cutoff
-        }.reduce(0) { count, record in
-          count + (record.outcome == .openCommitted || record.outcome == .presented ? 1 : 2)
-        },
+      "activityCount": (workflow?.activity.count ?? 0) + visibleComposerActivityCount,
       "templateCount": workflow?.messageDraft == nil ? 0 : 1,
       "localStorageBytes": people.localStorageBytes + status.localStorageBytes,
-      "consentVersions": [],
+      "consentVersions": IOSCompanionConsentLedgerPolicy.versions(
+        workflow?.consentReceipts
+      ),
       "externalSmsCopiesNotControlled": true,
     ]
     if case .fresh(let completedAt, _) = people.sync {
@@ -368,13 +809,26 @@ final class IOSCompanionWorkflowEngine {
         $0.localId == contact.selectedPhoneId
       })?.maskedDisplay
     {
-      result["next"] = [
+      var nextPayload: [String: Any] = [
         "occurrenceId": next.occurrenceId,
         "recipient": contact.safe.displayName,
         "localDate": next.civilDate,
-        "windowLabel": status.workflow?.policy.map(Self.windowLabel) ?? "Reminder window",
+        "windowLabel": status.workflow?.policy.map(Self.windowLabel)
+          ?? IOSNativePresentationFormatter.reminderWindowLabel(),
         "maskedPhone": masked,
       ]
+      if contact.configuration?.enrollment == .enabled,
+        contact.approvalKind == "valid",
+        let draft = status.workflow?.messageDraft,
+        let rendered = Self.render(draft: draft, contact: contact.privateValue),
+        Self.smsEstimate(rendered).segments <= draft.requestedSegmentCap,
+        status.proposals.contains(where: {
+          $0.occurrenceId == next.occurrenceId && $0.state == .ready && $0.body == rendered
+        })
+      {
+        nextPayload["exactText"] = rendered
+      }
+      result["next"] = nextPayload
     }
     return result
   }
@@ -416,6 +870,11 @@ final class IOSCompanionWorkflowEngine {
   private func effectiveContacts(
     status: CompanionProjectionStatus
   ) -> [IOSCompanionEffectiveContact] {
+    let blockedDestinations = Set(
+      IOSCompanionDestinationBlocklistPolicy.normalized(
+        status.workflow?.blockedDestinations
+      ) ?? []
+    )
     let privateById = Dictionary(
       uniqueKeysWithValues: peopleStore.privateContacts().map { ($0.localId, $0) }
     )
@@ -435,12 +894,26 @@ final class IOSCompanionWorkflowEngine {
           privateValue.birthdays.contains(where: { $0.localId == selected }) ? selected : nil
         } ?? (privateValue.birthdays.count == 1 ? privateValue.birthdays[0].localId : nil)
       let selectedPhone = selectablePhones.first { $0.localId == selectedPhoneId }
+      let selectedDestinationBlocked = selectedPhone?.e164.map {
+        blockedDestinations.contains($0)
+      } ?? false
       let selectedBirthday = privateValue.birthdays.first { $0.localId == selectedBirthdayId }
       var reasons = Set(safe.readinessReasons)
       // A missing safe given name is material only for a personalized draft.
       // Enrollment remains possible before a draft is chosen and generic
       // templates never require a name substitution.
-      if status.workflow?.messageDraft?.placeholderMode != "given-name" {
+      if let draft = status.workflow?.messageDraft,
+        draft.placeholderMode == "given-name"
+      {
+        if IOSBirthdayMessageContentPolicy.renderedBody(
+          templateText: draft.text,
+          placeholderMode: draft.placeholderMode,
+          givenName: privateValue.givenName,
+          declaredLanguage: draft.language
+        ) == nil {
+          reasons.insert("safe-given-name-missing")
+        }
+      } else {
         reasons.remove("safe-given-name-missing")
       }
       if selectedPhone != nil {
@@ -448,6 +921,7 @@ final class IOSCompanionWorkflowEngine {
         reasons.remove("phone-ambiguous-region")
         reasons.remove("phone-invalid")
       }
+      if selectedDestinationBlocked { reasons.insert("phone-blocked-form") }
       if selectedBirthday != nil {
         reasons.remove("birthday-choice-required")
         reasons.remove("birthday-conflict")
@@ -458,19 +932,20 @@ final class IOSCompanionWorkflowEngine {
         reasons.insert("leap-policy-required")
       }
       let materialMatches = configuration?.materialRevision == privateValue.materialRevision
-      let approvalHash = configuration.flatMap { config in
-        Self.approvalHash(
+      let approvalMatches = configuration.map { config in
+        Self.approvalMatches(
+          config.approvalHash,
           contact: privateValue,
           configuration: config,
           message: status.workflow?.messageDraft,
           policy: status.workflow?.policy
         )
-      }
+      } ?? false
       let approvalKind: String
       var approvalReasons = configuration?.approvalInvalidationReasons ?? []
       if configuration?.approvalHash == nil || configuration?.approvedAt == nil {
         approvalKind = "missing"
-      } else if !materialMatches || configuration?.approvalHash != approvalHash {
+      } else if !materialMatches || !approvalMatches {
         approvalKind = "invalidated"
         if approvalReasons.isEmpty { approvalReasons = ["name-changed"] }
       } else if !approvalReasons.isEmpty {
@@ -495,6 +970,7 @@ final class IOSCompanionWorkflowEngine {
         selectedPhoneId: selectedPhoneId,
         selectedBirthdayId: selectedBirthdayId,
         selectedPhone: selectedPhone,
+        selectedDestinationBlocked: selectedDestinationBlocked,
         selectedBirthday: selectedBirthday,
         readinessKind: kind,
         readinessReasons: Array(reasons).sorted(),
@@ -521,6 +997,7 @@ final class IOSCompanionWorkflowEngine {
         selectedPhoneId: value.selectedPhoneId,
         selectedBirthdayId: value.selectedBirthdayId,
         selectedPhone: value.selectedPhone,
+        selectedDestinationBlocked: value.selectedDestinationBlocked,
         selectedBirthday: value.selectedBirthday,
         readinessKind: value.privateValue.deleted ? "unavailable" : "needs-attention",
         readinessReasons: Array(reasons).sorted(),
@@ -537,6 +1014,7 @@ final class IOSCompanionWorkflowEngine {
   private func contactDetail(_ contact: IOSCompanionEffectiveContact) -> [String: Any] {
     var result: [String: Any] = [
       "summary": Self.contactSummary(contact),
+      "selectedDestinationBlocked": contact.selectedDestinationBlocked,
       "phoneChoices": contact.safe.phoneChoices.map { choice in
         var value: [String: Any] = [
           "id": choice.localId, "maskedDisplay": choice.maskedDisplay,
@@ -561,7 +1039,10 @@ final class IOSCompanionWorkflowEngine {
       leapPolicy: contact.configuration?.leapPolicy,
       from: Date()
     ) {
-      result["nextOccurrenceLabel"] = "Next: \(Self.localDate(next, calendar: calendar))"
+      result["nextOccurrenceLabel"] = IOSNativePresentationFormatter.nextOccurrenceLabel(
+        next,
+        calendar: calendar
+      )
     }
     if let label = contact.configuration?.lastOutcomeLabel {
       result["lastOutcomeLabel"] = label
@@ -601,7 +1082,13 @@ final class IOSCompanionWorkflowEngine {
     }) {
       result["maskedPhone"] = selected.maskedDisplay
     }
-    if contact.selectedBirthday != nil { result["birthdayLabel"] = "Birthday selected" }
+    if let birthday = contact.selectedBirthday {
+      result["birthdayLabel"] = IOSNativePresentationFormatter.selectedBirthdayLabel(
+        year: birthday.year,
+        month: birthday.month,
+        day: birthday.day
+      )
+    }
     return result
   }
 
@@ -663,6 +1150,11 @@ final class IOSCompanionWorkflowEngine {
       )
     case "pause-recipient", "exclude-recipient", "restore-recipient":
       mutateRecipient(
+        intent: intent, payload: payload, binding: binding,
+        expectedRevision: expectedRevision, completion: completion
+      )
+    case "block-recipient-destination", "unblock-recipient-destination":
+      mutateSelectedDestinationBlock(
         intent: intent, payload: payload, binding: binding,
         expectedRevision: expectedRevision, completion: completion
       )
@@ -1040,6 +1532,80 @@ final class IOSCompanionWorkflowEngine {
     )
   }
 
+  private func mutateSelectedDestinationBlock(
+    intent: String,
+    payload: [String: Any],
+    binding: IOSNativeGoogleAccountBinding,
+    expectedRevision: String?,
+    completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
+  ) {
+    guard Set(payload.keys) == ["contactId", "expectedRevision"],
+      let contactId = payload["contactId"] as? String, Self.validOpaque(contactId),
+      let revision = Self.payloadRevision(payload, expected: expectedRevision),
+      let contact = peopleStore.privateContact(localId: contactId),
+      intent == "block-recipient-destination"
+        || intent == "unblock-recipient-destination"
+    else { return completion(.failure(Self.internalProblem("NATIVE_REQUEST_INVALID"))) }
+    let shouldBlock = intent == "block-recipient-destination"
+    store.mutateWorkflow(
+      expectedRevision: revision, binding: binding,
+      body: { [peopleStore] workflow, _ in
+        guard let phoneId = Self.effectivePhoneId(contact, workflow: workflow),
+          let destination = contact.phones.first(where: {
+            $0.localId == phoneId
+          })?.e164,
+          let updated = IOSCompanionDestinationBlocklistPolicy.updated(
+            blocked: shouldBlock,
+            destination: destination,
+            current: workflow.blockedDestinations
+          )
+        else { throw CompanionStoreError.invalidWorkflowState }
+        let current = IOSCompanionDestinationBlocklistPolicy.normalized(
+          workflow.blockedDestinations
+        ) ?? []
+        guard current != updated else { return 0 }
+        workflow.blockedDestinations = updated
+        var invalidated = 0
+        if shouldBlock {
+          let contacts = peopleStore.privateContacts()
+          var affectedIds = Set<String>()
+          for affected in contacts {
+            guard let selectedId = Self.effectivePhoneId(affected, workflow: workflow),
+              affected.phones.first(where: { $0.localId == selectedId })?.e164
+                == destination
+            else { continue }
+            affectedIds.insert(affected.localId)
+            var configuration = Self.contactConfiguration(affected, in: workflow)
+            if configuration.approvalHash != nil || configuration.approvedAt != nil {
+              invalidated += 1
+            }
+            Self.invalidateApproval(&configuration, reason: "phone-changed")
+            configuration.updatedAt = Date()
+            Self.upsert(configuration, in: &workflow)
+          }
+          workflow.occurrences.removeAll { affectedIds.contains($0.contactId) }
+        }
+        Self.bumpConfiguration(&workflow, activityKind: "settings-changed")
+        return invalidated
+      },
+      completion: { [weak self] result in
+        guard let self else {
+          return completion(.failure(Self.internalProblem("NATIVE_BRIDGE_UNAVAILABLE")))
+        }
+        self.finishMutation(
+          result, binding: binding, rebuild: true,
+          payload: { _, invalidated in
+            [
+              "changedContactIds": [contactId],
+              "invalidatedApprovalCount": invalidated,
+            ]
+          },
+          completion: completion
+        )
+      }
+    )
+  }
+
   private func previewMessage(
     payload: [String: Any],
     binding: IOSNativeGoogleAccountBinding,
@@ -1155,6 +1721,17 @@ final class IOSCompanionWorkflowEngine {
         ), let reviewedDraft = reviewedWorkflow.reviews[reviewedIndex].messageDraft
       else { return completion(.failure(Self.storeProblem(.invalidReview))) }
 
+      let currentContentIssues = IOSBirthdayMessageContentPolicy.issueCodes(
+        text: reviewedDraft.text,
+        declaredLanguage: reviewedDraft.language
+      )
+      guard currentContentIssues.isEmpty else {
+        return completion(
+          .failure(
+            Self.validation(
+              currentContentIssues.map { ["field": "template", "code": $0] }
+            )))
+      }
       let draftForCommit = Self.revalidatedDraftForSave(reviewedDraft)
       self.store.mutateWorkflow(
         expectedRevision: revision, binding: binding,
@@ -1231,14 +1808,6 @@ final class IOSCompanionWorkflowEngine {
         ]))
     }
     let simulation = simulate(policy: policy, status: status)
-    if let conflict = simulation.firstConflictDate {
-      return completion(
-        .success([
-          "kind": "invalid",
-          "issues": [["field": "dailyCap", "code": "window-capacity-conflict"]],
-          "firstConflictDate": conflict,
-        ]))
-    }
     let blocker = Self.policyReviewHash(
       policy: policy, workflow: status.workflow!, contacts: peopleStore.privateContacts()
     )
@@ -1365,14 +1934,21 @@ final class IOSCompanionWorkflowEngine {
       guard let text = Self.render(draft: draft, contact: contact.privateValue),
         let masked = contact.safe.phoneChoices.first(where: {
           $0.localId == contact.selectedPhoneId
-        })?.maskedDisplay
+        })?.maskedDisplay,
+        let birthday = contact.selectedBirthday
       else { return nil }
       return [
         "platform": "ios", "contactId": contact.safe.localId,
         "recipient": contact.safe.displayName, "maskedPhone": masked,
-        "birthdayLabel": "Selected birthday", "exactText": text,
+        "birthdayLabel": IOSNativePresentationFormatter.selectedBirthdayLabel(
+          year: birthday.year,
+          month: birthday.month,
+          day: birthday.day
+        ),
+        "exactText": text,
         "deliveryMode": "user-controlled-composer",
-        "consentDisclosure": "You choose whether to send each message in the iOS composer.",
+        "consentDisclosure":
+          "You decide whether to tap Send after reviewing the recipient and text. Messages and iOS control the available sender line and final transport; this app cannot select or guarantee either.",
       ]
     }
     store.mutateWorkflow(
@@ -1507,7 +2083,7 @@ final class IOSCompanionWorkflowEngine {
               "reminderRecipientCount": eligible.count,
               "deliveryMode": "user-controlled-composer",
               "limitationsDisclosure":
-                "iOS will only remind you. You review the editable system composer and tap Send yourself.",
+                "iOS only reminds you. You review the recipient and text and decide whether to tap Send. Messages and iOS control the available sender line and final transport; this app cannot select or guarantee either.",
             ]))
         }
       }
@@ -1776,11 +2352,11 @@ final class IOSCompanionWorkflowEngine {
               // detail. Account-global reset and deletion actions therefore use the
               // conservative truthful disclosure.
               "preissuedPermitMayFinish": [
-                  "delete-account", "disconnect-contacts", "revoke-google-access",
+                  "delete-account", "revoke-google-access",
                   prepared.isDeletionRecovery ? action : "",
                 ].contains(action),
               "remoteConnectionRequired": [
-                "delete-account", "disconnect-contacts", "revoke-google-access",
+                "delete-account", "revoke-google-access",
               ].contains(action) && !prepared.isDeletionRecovery,
               "externalSmsCopiesNotErased": true,
             ]))
@@ -1869,17 +2445,18 @@ final class IOSCompanionWorkflowEngine {
             Self.bumpConfiguration(&workflow, activityKind: "approval-invalidated")
           }
         case "clear-activity":
-          workflow.activity = []
-          workflow.activityClearedAt = Date()
-        case "disconnect-contacts":
+          // The activity feed, terminal proposal detail, retryable display
+          // records, and operation completion are cleared atomically by
+          // CompanionProtectedStore.completeClearActivity after this reviewed
+          // operation has committed.
+          break
+        case "disconnect-contacts", "sign-out-retain", "sign-out-wipe",
+          "wipe-local-data", "revoke-google-access", "delete-account":
           workflow.desired = .paused
-          Self.bumpConfiguration(&workflow, activityKind: nil)
-        case "sign-out-retain":
-          workflow.desired = .paused
-          Self.bumpConfiguration(&workflow, activityKind: "paused")
-        case "delete-account":
-          workflow.desired = .paused
-          Self.bumpConfiguration(&workflow, activityKind: "paused")
+          Self.bumpConfiguration(
+            &workflow,
+            activityKind: action == "disconnect-contacts" ? nil : "paused"
+          )
         default:
           break
         }
@@ -1918,34 +2495,93 @@ final class IOSCompanionWorkflowEngine {
     binding: IOSNativeGoogleAccountBinding,
     completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
   ) {
-    if [
+    let clearsGeminiProvenance = [
       "clear-gemini-templates", "disconnect-contacts", "sign-out-retain",
       "sign-out-wipe", "wipe-local-data", "revoke-google-access", "delete-account",
-    ].contains(operation.action) {
+    ].contains(operation.action)
+    let requiresPeopleSyncFence = [
+      "disconnect-contacts", "sign-out-retain", "sign-out-wipe",
+      "wipe-local-data", "revoke-google-access", "delete-account",
+    ].contains(operation.action)
+    if clearsGeminiProvenance {
       IOSGeminiSuggestionGateway.shared.clearProvenance()
     }
+    guard requiresPeopleSyncFence else {
+      performPrivacyActionAfterPeopleSyncFence(
+        operation: operation,
+        binding: binding,
+        completion: completion
+      )
+      return
+    }
+    IOSPeopleSyncCoordinator.shared.invalidateOutstandingSync { [weak self] fenced in
+      guard let self else { return }
+      guard fenced else {
+        self.updatePrivacyOperation(
+          operation,
+          binding: binding,
+          phase: "remote-pending",
+          reason: "coordination-unavailable",
+          completion: completion
+        )
+        return
+      }
+      Task { @MainActor in
+        IOSPeopleBackgroundRefreshCoordinator.shared.suspendForPrivacyOperation()
+        self.performPrivacyActionAfterPeopleSyncFence(
+          operation: operation,
+          binding: binding,
+          completion: completion
+        )
+      }
+    }
+  }
+
+  private func performPrivacyActionAfterPeopleSyncFence(
+    operation: CompanionWorkflowPrivacyOperation,
+    binding: IOSNativeGoogleAccountBinding,
+    completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
+  ) {
     switch operation.action {
     case "clear-gemini-templates":
-      rebuildPlan(binding: binding) { [weak self] _ in
-        self?.updatePrivacyOperation(
-          operation, binding: binding, phase: "complete", reason: nil,
+      rebuildPlan(binding: binding) { [weak self] outcome in
+        guard let self else { return }
+        self.updatePrivacyOperation(
+          operation, binding: binding,
+          phase: outcome.isSuccessful ? "complete" : "remote-pending",
+          reason: outcome.isSuccessful ? nil : "coordination-unavailable",
           completion: completion
         )
       }
     case "clear-activity":
-      updatePrivacyOperation(
-        operation, binding: binding, phase: "complete", reason: nil,
-        completion: completion
-      )
+      store.completeClearActivity(
+        operationId: operation.id,
+        binding: binding
+      ) { result in
+        switch result {
+        case .success(let completed):
+          completion(.success(Self.privacyOperationPayload(completed)))
+        case .failure(let error):
+          completion(.failure(Self.storeProblem(error)))
+        }
+      }
     case "disconnect-contacts":
-      performContactDerivedReset(
-        operation: operation, binding: binding, revokeGoogleAccess: false,
+      performLocalContactsDisconnect(
+        operation: operation, binding: binding, continueWithGoogleRevocation: false,
         completion: completion
       )
     case "sign-out-retain":
       rebuildPlan(binding: binding) { [weak self] _ in
         guard let self else { return }
-        self.reminderCoordinator.cancelPlansAndNotifications { _ in
+        self.reminderCoordinator.cancelPlansAndNotifications { result in
+          guard result["kind"] as? String == "ok" else {
+            self.updatePrivacyOperation(
+              operation, binding: binding,
+              phase: "failed", reason: "coordination-unavailable",
+              completion: completion
+            )
+            return
+          }
           Task { @MainActor in
             let success = await IOSGoogleIdentityCoordinator.shared
               .completeSignOutAfterSafetyShutdown(retainData: true)
@@ -1959,27 +2595,42 @@ final class IOSCompanionWorkflowEngine {
         }
       }
     case "sign-out-wipe":
-      // CompanionReminderCoordinator removes pending and delivered app-owned
-      // reminders before deleting the protected file/key generation.
-      reminderCoordinator.wipeCompanionData { [weak self] result in
+      // Remove reminders first, then attempt SDK sign-out and People file/key
+      // deletion independently. A Firebase sign-out exception cannot retain
+      // Contacts; the still-durable operation reports cleanup pending and the
+      // identity interlock blocks ordinary account use until a safe retry.
+      reminderCoordinator.cancelPlansAndNotifications { [weak self] result in
         guard let self else { return }
         guard result["kind"] as? String == "ok" else {
-          return completion(
-            .success(
-              Self.privacyOperationPayload(
-                operation, phase: "failed", reason: "coordination-unavailable"
-              )))
+          return self.updatePrivacyOperation(
+            operation, binding: binding, phase: "remote-pending",
+            reason: "coordination-unavailable", completion: completion
+          )
         }
         Task { @MainActor in
           let success = await IOSGoogleIdentityCoordinator.shared
             .completeSignOutAfterSafetyShutdown(retainData: false)
-          completion(
-            .success(
-              Self.privacyOperationPayload(
-                operation,
-                phase: success ? "complete" : "failed",
-                reason: success ? nil : "coordination-unavailable"
-              )))
+          guard success else {
+            self.updatePrivacyOperation(
+              operation, binding: binding, phase: "remote-pending",
+              reason: "coordination-unavailable", completion: completion
+            )
+            return
+          }
+          self.reminderCoordinator.wipeCompanionData { wipeResult in
+            guard wipeResult["kind"] as? String == "ok" else {
+              self.updatePrivacyOperation(
+                operation, binding: binding, phase: "remote-pending",
+                reason: "coordination-unavailable", completion: completion
+              )
+              return
+            }
+            completion(
+              .success(
+                Self.privacyOperationPayload(
+                  operation, phase: "complete", reason: nil
+                )))
+          }
         }
       }
     case "wipe-local-data":
@@ -2004,10 +2655,18 @@ final class IOSCompanionWorkflowEngine {
         }
       }
     case "revoke-google-access":
-      performContactDerivedReset(
-        operation: operation, binding: binding, revokeGoogleAccess: true,
-        completion: completion
-      )
+      if ["local-cleared", "verifying", "remote-draining", "provider-revoked"]
+        .contains(operation.phase)
+      {
+        performContactDerivedReset(
+          operation: operation, binding: binding, completion: completion
+        )
+      } else {
+        performLocalContactsDisconnect(
+          operation: operation, binding: binding, continueWithGoogleRevocation: true,
+          completion: completion
+        )
+      }
     case "delete-account":
       performAccountDeletion(
         operation: operation, binding: binding, completion: completion
@@ -2088,16 +2747,117 @@ final class IOSCompanionWorkflowEngine {
     }
   }
 
+  private func performLocalContactsDisconnect(
+    operation: CompanionWorkflowPrivacyOperation,
+    binding: IOSNativeGoogleAccountBinding,
+    continueWithGoogleRevocation: Bool,
+    completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
+  ) {
+    updatePrivacyOperation(
+      operation, binding: binding, phase: "local-wiping", reason: nil
+    ) { [weak self] transitionResult in
+      guard let self else { return }
+      guard case .success(let rawPayload) = transitionResult,
+        let payload = rawPayload as? [String: Any],
+        payload["kind"] as? String == "local-wiping"
+      else {
+        completion(transitionResult)
+        return
+      }
+      self.reminderCoordinator.cancelPlansAndNotifications { result in
+        guard result["kind"] as? String == "ok" else {
+          return self.updatePrivacyOperation(
+            operation, binding: binding, phase: "local-wiping",
+            reason: "coordination-unavailable", completion: completion
+          )
+        }
+        self.peopleStore.clearContactsRetainingBinding(
+          expectedBinding: binding
+        ) { cleared in
+          guard cleared else {
+            return self.updatePrivacyOperation(
+              operation, binding: binding, phase: "local-wiping",
+              reason: "coordination-unavailable", completion: completion
+            )
+          }
+          self.store.clearContactDerivedState(
+            operationId: operation.id,
+            action: operation.action,
+            completionPhase: continueWithGoogleRevocation
+              ? "local-cleared" : "complete",
+            binding: binding
+          ) { workflowResult in
+            guard case .success(let updatedOperation) = workflowResult else {
+              self.updatePrivacyOperation(
+                operation, binding: binding, phase: "local-wiping",
+                reason: "coordination-unavailable", completion: completion
+              )
+              return
+            }
+            guard continueWithGoogleRevocation else {
+              completion(.success(Self.privacyOperationPayload(updatedOperation)))
+              return
+            }
+            self.performContactDerivedReset(
+              operation: updatedOperation,
+              binding: binding,
+              completion: completion
+            )
+          }
+        }
+      }
+    }
+  }
+
   private func performContactDerivedReset(
     operation: CompanionWorkflowPrivacyOperation,
     binding: IOSNativeGoogleAccountBinding,
-    revokeGoogleAccess: Bool,
+    completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
+  ) {
+    store.readProjectionStatus { [weak self] statusResult in
+      guard let self, case .success(let status) = statusResult,
+        let workflow = status.workflow, workflow.account.matches(binding)
+      else {
+        self?.updatePrivacyOperation(
+          operation, binding: binding,
+          phase: operation.phase == "provider-revoked"
+            ? "provider-revoked" : "local-cleared",
+          reason: "coordination-unavailable", completion: completion
+        )
+        return
+      }
+      if operation.phase == "provider-revoked"
+        || IOSCompanionConsentLedgerPolicy.hasCurrentContactsScopeRevoked(
+          workflow.consentReceipts
+        )
+      {
+        self.finishProviderRevocationCleanup(
+          operation: operation, binding: binding, completion: completion
+        )
+        return
+      }
+      self.performContactDerivedRemoteReset(
+        operation: operation, binding: binding, completion: completion
+      )
+    }
+  }
+
+  private func performContactDerivedRemoteReset(
+    operation: CompanionWorkflowPrivacyOperation,
+    binding: IOSNativeGoogleAccountBinding,
     completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
   ) {
     updatePrivacyOperation(
       operation, binding: binding, phase: "verifying", reason: nil
-    ) { [weak self] _ in
+    ) { [weak self] transitionResult in
       guard let self else { return }
+      guard case .success(let rawPayload) = transitionResult,
+        let payload = rawPayload as? [String: Any],
+        payload["kind"] as? String == "verifying"
+      else {
+        completion(transitionResult)
+        return
+      }
       Task { @MainActor in
         let reauthentication = await IOSGoogleIdentityCoordinator.shared
           .ensureRecentExactGoogleAuthentication(binding: binding)
@@ -2109,7 +2869,7 @@ final class IOSCompanionWorkflowEngine {
             reason = "account-reconnect-required"
           }
           self.updatePrivacyOperation(
-            operation, binding: binding, phase: "remote-pending", reason: reason,
+            operation, binding: binding, phase: "local-cleared", reason: reason,
             completion: completion
           )
           return
@@ -2122,7 +2882,7 @@ final class IOSCompanionWorkflowEngine {
           switch result {
           case .failure(let failure):
             self.updatePrivacyOperation(
-              operation, binding: binding, phase: "remote-pending",
+              operation, binding: binding, phase: "local-cleared",
               reason: Self.contactResetFailureReason(failure),
               completion: completion
             )
@@ -2133,9 +2893,8 @@ final class IOSCompanionWorkflowEngine {
               reason: nil, completion: completion
             )
           case .success(.completed):
-            self.finishContactDerivedLocalCleanup(
-              operation: operation, binding: binding,
-              revokeGoogleAccess: revokeGoogleAccess, completion: completion
+            self.disconnectGoogleProviderAfterRemoteReset(
+              operation: operation, binding: binding, completion: completion
             )
           }
         }
@@ -2143,92 +2902,76 @@ final class IOSCompanionWorkflowEngine {
     }
   }
 
-  private func finishContactDerivedLocalCleanup(
+  private func disconnectGoogleProviderAfterRemoteReset(
     operation: CompanionWorkflowPrivacyOperation,
     binding: IOSNativeGoogleAccountBinding,
-    revokeGoogleAccess: Bool,
     completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
   ) {
-    rebuildPlan(binding: binding) { [weak self] rebuilt in
-      guard let self else { return }
-      guard rebuilt else {
-        return self.updatePrivacyOperation(
-          operation, binding: binding, phase: "remote-pending",
+    Task { @MainActor in
+      let providerDisconnected = await IOSGoogleIdentityCoordinator.shared
+        .disconnectGoogleProviderAfterLocalCleanup()
+      guard providerDisconnected else {
+        self.updatePrivacyOperation(
+          operation, binding: binding, phase: "local-cleared",
           reason: "coordination-unavailable", completion: completion
         )
+        return
       }
-      self.reminderCoordinator.cancelPlansAndNotifications { result in
-        guard result["kind"] as? String == "ok" else {
-          return self.updatePrivacyOperation(
-            operation, binding: binding, phase: "remote-pending",
+      self.markProviderRevoked(
+        operation: operation,
+        binding: binding
+      ) { markedOperation in
+        guard let markedOperation else {
+          self.updatePrivacyOperation(
+            operation, binding: binding, phase: "local-cleared",
             reason: "coordination-unavailable", completion: completion
           )
+          return
         }
-        self.peopleStore.clearContactsRetainingBinding { cleared in
-          guard cleared else {
-            return self.updatePrivacyOperation(
-              operation, binding: binding, phase: "remote-pending",
-              reason: "coordination-unavailable", completion: completion
-            )
-          }
-          self.clearContactDerivedWorkflow(
-            operation: operation, binding: binding
-          ) { workflowCleared in
-            guard workflowCleared else {
-              return self.updatePrivacyOperation(
-                operation, binding: binding, phase: "remote-pending",
-                reason: "coordination-unavailable", completion: completion
-              )
-            }
-            guard revokeGoogleAccess else {
-              return self.updatePrivacyOperation(
-                operation, binding: binding, phase: "complete", reason: nil,
-                completion: completion
-              )
-            }
-            Task { @MainActor in
-              let revoked = await IOSGoogleIdentityCoordinator.shared
-                .revokeGoogleAccessAfterSafetyShutdown()
-              self.updatePrivacyOperation(
-                operation, binding: binding,
-                phase: revoked ? "complete" : "remote-pending",
-                reason: revoked ? nil : "coordination-unavailable",
-                completion: completion
-              )
-            }
-          }
-        }
+        self.finishProviderRevocationCleanup(
+          operation: markedOperation, binding: binding, completion: completion
+        )
       }
     }
   }
 
-  private func clearContactDerivedWorkflow(
+  private func markProviderRevoked(
     operation: CompanionWorkflowPrivacyOperation,
     binding: IOSNativeGoogleAccountBinding,
-    completion: @escaping (Bool) -> Void
+    completion: @escaping (CompanionWorkflowPrivacyOperation?) -> Void
   ) {
-    store.readProjectionStatus { [weak self] result in
-      guard let self, case .success(let status) = result else {
-        return completion(false)
+    store.markContactsProviderRevoked(
+      operationId: operation.id,
+      binding: binding
+    ) { result in
+      completion(try? result.get())
+    }
+  }
+
+  private func finishProviderRevocationCleanup(
+    operation: CompanionWorkflowPrivacyOperation,
+    binding: IOSNativeGoogleAccountBinding,
+    completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
+  ) {
+    recordContactsScopeRevoked(binding: binding) { [weak self] recorded in
+      guard let self else { return }
+      guard recorded else {
+        self.updatePrivacyOperation(
+          operation, binding: binding, phase: "provider-revoked",
+          reason: "coordination-unavailable", completion: completion
+        )
+        return
       }
-      self.store.mutateWorkflow(
-        expectedRevision: status.revision, binding: binding,
-        body: { workflow, _ in
-          guard
-            workflow.privacyOperations.contains(where: {
-              $0.id == operation.id && $0.action == operation.action
-            })
-          else { throw CompanionStoreError.invalidWorkflowState }
-          workflow.contacts = []
-          workflow.occurrences = []
-          workflow.reviews = []
-          workflow.desired = .paused
-          Self.bumpConfiguration(&workflow, activityKind: "settings-changed")
-        },
-        completion: { result in
-          completion((try? result.get()) != nil)
-        }
-      )
+      Task { @MainActor in
+        let sdkCleanupComplete = await IOSGoogleIdentityCoordinator.shared
+          .finishRevokedGoogleSDKCleanupAfterLocalCleanup()
+        self.updatePrivacyOperation(
+          operation, binding: binding,
+          phase: sdkCleanupComplete ? "complete" : "provider-revoked",
+          reason: sdkCleanupComplete ? nil : "coordination-unavailable",
+          completion: completion
+        )
+      }
     }
   }
 
@@ -2301,7 +3044,14 @@ final class IOSCompanionWorkflowEngine {
             }
             self.updatePrivacyOperation(
               operation, binding: binding, phase: "remote-draining", reason: nil
-            ) { _ in
+            ) { transitionResult in
+              guard case .success(let rawPayload) = transitionResult,
+                let payload = rawPayload as? [String: Any],
+                payload["kind"] as? String == "remote-draining"
+              else {
+                completion(transitionResult)
+                return
+              }
               self.deletionCleanup.finishLocalCleanup(operationId: operation.id) {
                 receipt in
                 guard let receipt else {
@@ -2329,40 +3079,66 @@ final class IOSCompanionWorkflowEngine {
     reason: String?,
     completion: @escaping (IOSCompanionWorkflowEngineResult) -> Void
   ) {
-    store.readProjectionStatus { [weak self] statusResult in
-      guard let self else { return }
-      guard case .success(let status) = statusResult else {
-        return completion(
-          .success(
-            Self.privacyOperationPayload(
-              operation, phase: phase, reason: reason
-            )))
+    store.transitionPrivacyOperation(
+      operationId: operation.id,
+      action: operation.action,
+      phase: phase,
+      reason: reason,
+      binding: binding
+    ) { result in
+      switch result {
+      case .success(let updated):
+        completion(.success(Self.privacyOperationPayload(updated)))
+      case .failure(let error):
+        completion(.failure(Self.storeProblem(error)))
+      }
+    }
+  }
+
+  func recordContactsConsent(
+    binding: IOSNativeGoogleAccountBinding,
+    disclosureAcknowledged: Bool,
+    completion: @escaping (Bool) -> Void
+  ) {
+    store.readProjectionStatus { [weak self] result in
+      guard let self, case .success(let status) = result else {
+        completion(false)
+        return
       }
       self.store.mutateWorkflow(
-        expectedRevision: status.revision, binding: binding,
+        expectedRevision: status.revision,
+        binding: binding,
         body: { workflow, _ in
-          guard
-            let index = workflow.privacyOperations.firstIndex(where: {
-              $0.id == operation.id
-            })
-          else { throw CompanionStoreError.invalidWorkflowState }
-          workflow.privacyOperations[index].phase = phase
-          workflow.privacyOperations[index].reason = reason
-          workflow.privacyOperations[index].updatedAt = Date()
-          return workflow.privacyOperations[index]
+          guard IOSCompanionConsentLedgerPolicy.recordContactsGrant(
+            receipts: &workflow.consentReceipts,
+            disclosureAcknowledged: disclosureAcknowledged,
+            at: Date()
+          ) else { throw CompanionStoreError.invalidWorkflowState }
         },
-        completion: { result in
-          switch result {
-          case .success(let updated):
-            completion(.success(Self.privacyOperationPayload(updated)))
-          case .failure:
-            completion(
-              .success(
-                Self.privacyOperationPayload(
-                  operation, phase: phase, reason: reason
-                )))
-          }
-        }
+        completion: { result in completion((try? result.get()) != nil) }
+      )
+    }
+  }
+
+  private func recordContactsScopeRevoked(
+    binding: IOSNativeGoogleAccountBinding,
+    completion: @escaping (Bool) -> Void
+  ) {
+    store.readProjectionStatus { [weak self] result in
+      guard let self, case .success(let status) = result else {
+        completion(false)
+        return
+      }
+      self.store.mutateWorkflow(
+        expectedRevision: status.revision,
+        binding: binding,
+        body: { workflow, _ in
+          guard IOSCompanionConsentLedgerPolicy.recordScopeRevoked(
+            receipts: &workflow.consentReceipts,
+            at: Date()
+          ) else { throw CompanionStoreError.invalidWorkflowState }
+        },
+        completion: { result in completion((try? result.get()) != nil) }
       )
     }
   }
@@ -2407,17 +3183,40 @@ final class IOSCompanionWorkflowEngine {
     }
   }
 
+  func reconcileReminderPlanForLifecycle(
+    binding: IOSNativeGoogleAccountBinding,
+    completion: (() -> Void)? = nil
+  ) {
+    rebuildPlan(binding: binding) { _ in completion?() }
+  }
+
   private func rebuildPlan(
     binding: IOSNativeGoogleAccountBinding,
-    completion: @escaping (Bool) -> Void
+    completion: @escaping (IOSCompanionPlanRebuildOutcome) -> Void
   ) {
     store.readWorkflowSnapshot { [weak self] result in
-      guard let self, case .success(let snapshot) = result,
-        let workflow = snapshot.workflow, workflow.account.matches(binding)
-      else { return completion(false) }
+      guard let self else {
+        return completion(.failed(Self.internalProblem("NATIVE_BRIDGE_UNAVAILABLE")))
+      }
+      guard case .success(let snapshot) = result else {
+        if case .failure(let error) = result {
+          return completion(.failed(Self.storeProblem(error)))
+        }
+        return completion(.failed(Self.internalProblem("COMPANION_STORAGE_UNAVAILABLE")))
+      }
+      guard let workflow = snapshot.workflow, workflow.account.matches(binding) else {
+        return completion(.failed(Self.temporarilyUnavailable("account-reconnect-required")))
+      }
 
       guard workflow.desired == .remindersOn,
         let draft = workflow.messageDraft,
+        IOSCompanionMessagePlaceholderPolicy.isValid(
+          text: draft.text,
+          placeholderMode: draft.placeholderMode
+        ),
+        IOSBirthdayMessageContentPolicy.issueCodes(
+          text: draft.text, declaredLanguage: draft.language
+        ).isEmpty,
         let policy = workflow.policy,
         let time = Self.timeComponents(policy.primaryStart)
       else {
@@ -2426,9 +3225,18 @@ final class IOSCompanionWorkflowEngine {
           expectedConfigurationGeneration: workflow.configurationGeneration,
           occurrences: [], proposals: [], plans: []
         ) { replaceResult in
-          guard case .success = replaceResult else { return completion(false) }
+          guard case .success = replaceResult else {
+            if case .failure(let error) = replaceResult {
+              return completion(.failed(Self.storeProblem(error)))
+            }
+            return completion(.failed(Self.internalProblem("COMPANION_STORAGE_UNAVAILABLE")))
+          }
           self.reminderCoordinator.reconcilePersisted { response in
-            completion(response["kind"] as? String == "ok")
+            completion(
+              Self.planRebuildOutcome(
+                from: response,
+                remindersDesired: workflow.desired == .remindersOn
+              ))
           }
         }
         return
@@ -2436,6 +3244,11 @@ final class IOSCompanionWorkflowEngine {
 
       let privateById = Dictionary(
         uniqueKeysWithValues: peopleStore.privateContacts().map { ($0.localId, $0) }
+      )
+      let blockedDestinations = Set(
+        IOSCompanionDestinationBlocklistPolicy.normalized(
+          workflow.blockedDestinations
+        ) ?? []
       )
       let existingByKey = Dictionary(
         uniqueKeysWithValues: workflow.occurrences.map {
@@ -2458,14 +3271,16 @@ final class IOSCompanionWorkflowEngine {
         guard let contact = privateById[configuration.contactId], !contact.deleted,
           configuration.materialRevision == contact.materialRevision,
           configuration.approvalInvalidationReasons.isEmpty,
-          let expectedApproval = Self.approvalHash(
+          Self.approvalMatches(
+            configuration.approvalHash,
             contact: contact, configuration: configuration,
             message: draft, policy: policy
-          ), configuration.approvalHash == expectedApproval,
+          ),
           let phoneId = configuration.selectedPhoneId,
           let destination = contact.phones.first(where: {
             $0.localId == phoneId
           })?.e164,
+          !blockedDestinations.contains(destination),
           destinationCounts[destination] == 1,
           let birthdayId = configuration.selectedBirthdayId,
           let birthday = contact.birthdays.first(where: { $0.localId == birthdayId })
@@ -2480,35 +3295,18 @@ final class IOSCompanionWorkflowEngine {
         if $0.date != $1.date { return $0.date < $1.date }
         return $0.contact.localId < $1.contact.localId
       }
-      var countByDate: [String: Int] = [:]
       var occurrences: [CompanionWorkflowOccurrence] = []
       var proposals: [CompanionApprovedProposal] = []
       var plans: [CompanionReminderPlan] = []
-      var rollingInstants: [Date] = []
       let today = Self.localDate(Date(), calendar: calendar)
       for candidate in candidates {
         let civilDate = Self.localDate(candidate.date, calendar: calendar)
-        let count = countByDate[civilDate] ?? 0
         guard
-          let plannedInstant = calendar.date(
-            bySettingHour: time.hour,
-            minute: time.minute,
-            second: 0,
-            of: candidate.date
-          )
-        else { continue }
-        rollingInstants.removeAll {
-          plannedInstant.timeIntervalSince($0) >= 86_400
-        }
-        guard count < policy.dailyCap,
-          rollingInstants.count < 20,
           let phoneId = candidate.config.selectedPhoneId,
           let phone = candidate.contact.phones.first(where: { $0.localId == phoneId })?.e164,
           let body = Self.render(draft: draft, contact: candidate.contact),
           Self.smsEstimate(body).segments <= draft.requestedSegmentCap
         else { continue }
-        countByDate[civilDate] = count + 1
-        rollingInstants.append(plannedInstant)
         let key = "\(candidate.contact.localId)|\(civilDate)"
         let existing = existingByKey[key]
         let occurrenceId = existing?.occurrenceId ?? UUID().uuidString.lowercased()
@@ -2544,12 +3342,70 @@ final class IOSCompanionWorkflowEngine {
         expectedConfigurationGeneration: workflow.configurationGeneration,
         occurrences: occurrences, proposals: proposals, plans: plans
       ) { replaceResult in
-        guard case .success = replaceResult else { return completion(false) }
+        guard case .success = replaceResult else {
+          if case .failure(let error) = replaceResult {
+            return completion(.failed(Self.storeProblem(error)))
+          }
+          return completion(.failed(Self.internalProblem("COMPANION_STORAGE_UNAVAILABLE")))
+        }
         self.reminderCoordinator.reconcilePersisted { response in
-          completion(response["kind"] as? String == "ok")
+          let outcome = Self.planRebuildOutcome(from: response, remindersDesired: true)
+          guard case .succeeded = outcome else { return completion(outcome) }
+          self.store.markReminderActivationCompleted(
+            binding: binding,
+            expectedConfigurationGeneration: workflow.configurationGeneration
+          ) { markerResult in
+            switch markerResult {
+            case .success:
+              completion(.succeeded)
+            case .failure(let error):
+              completion(.failed(Self.storeProblem(error)))
+            }
+          }
         }
       }
     }
+  }
+
+  private static func planRebuildOutcome(
+    from response: [String: Any],
+    remindersDesired: Bool
+  ) -> IOSCompanionPlanRebuildOutcome {
+    let kind = response["kind"] as? String
+    let authorization = response["authorization"] as? String
+    if remindersDesired {
+      if authorization == "denied" {
+        return .failed(actionRequired(["notification-permission-missing"]))
+      }
+      if authorization == "not-determined" || authorization == "unknown" {
+        return .failed(actionRequired(["notification-permission-missing"]))
+      }
+    }
+    guard kind == "ok" else {
+      let code = response["code"] as? String
+      if code == "REMINDER_SETTINGS_REQUIRED" {
+        return .failed(actionRequired(["notification-permission-missing"]))
+      }
+      if code == "REMINDER_HORIZON_PARTIAL"
+        || code == "REMINDER_RECONCILIATION_SUPERSEDED"
+      {
+        return .failed(temporarilyUnavailable("scheduler-delayed"))
+      }
+      let supportCode = code?.range(
+        of: "^[A-Z][A-Z0-9_]{2,63}$", options: .regularExpression
+      ) != nil ? code! : "REMINDER_RECONCILIATION_FAILED"
+      return .failed(internalProblem(supportCode))
+    }
+    guard remindersDesired else { return .succeeded }
+    let planned = response["plannedDateCount"] as? Int ?? 0
+    let scheduled = response["scheduledCount"] as? Int ?? 0
+    let failed = response["failedCount"] as? Int ?? Int.max
+    guard ["authorized", "ephemeral", "provisional"].contains(authorization ?? ""),
+      planned > 0, scheduled > 0, failed == 0
+    else {
+      return .failed(actionRequired(["ios-configuration-incomplete"]))
+    }
+    return .succeeded
   }
 
   private func finishMutation<Value>(
@@ -2575,7 +3431,14 @@ final class IOSCompanionWorkflowEngine {
       }
     }
     if rebuild {
-      rebuildPlan(binding: binding) { _ in finish() }
+      rebuildPlan(binding: binding) { outcome in
+        switch outcome {
+        case .succeeded:
+          finish()
+        case .failed(let problem):
+          completion(.failure(problem))
+        }
+      }
     } else {
       finish()
     }
@@ -2711,24 +3574,62 @@ final class IOSCompanionWorkflowEngine {
     contact: IOSPeoplePrivateContact,
     configuration: CompanionWorkflowContact,
     message: CompanionWorkflowMessageDraft?,
-    policy: CompanionWorkflowPolicy?
+    policy: CompanionWorkflowPolicy?,
+    includeLegacyAndroidDailyCap: Bool = false
   ) -> String? {
     guard let message, let policy,
-      let phone = configuration.selectedPhoneId,
+      let destination = IOSCompanionApprovalDestinationBinding.resolve(
+        selectedPhoneId: configuration.selectedPhoneId,
+        phones: contact.phones
+      ),
       let birthday = configuration.selectedBirthdayId
     else { return nil }
-    return canonicalHash([
-      "approval", contact.localId, String(contact.materialRevision), phone,
+    var parts = [
+      "approval", contact.localId, String(contact.materialRevision),
+    ] + destination.hashComponents + [
       birthday, configuration.leapPolicy ?? "none", message.language,
       message.tone, message.placeholderMode, message.text,
       String(message.requestedSegmentCap), policy.primaryStart,
-      policy.primaryEnd, policy.graceEnd ?? "none", String(policy.dailyCap),
+      policy.primaryEnd, policy.graceEnd ?? "none",
+    ]
+    if includeLegacyAndroidDailyCap {
+      parts.append(String(policy.legacyAndroidDailyCap))
+    }
+    parts.append(contentsOf: [
       message.provenance?.source ?? "USER",
       message.provenance?.modelIdentifier ?? "none",
       message.provenance?.promptPolicyVersion ?? "none",
       message.provenance?.validatorVersion ?? "legacy-user-v1",
       "user-controlled-composer-v1",
     ])
+    return canonicalHash(parts)
+  }
+
+  private static func approvalMatches(
+    _ storedHash: String?,
+    contact: IOSPeoplePrivateContact,
+    configuration: CompanionWorkflowContact,
+    message: CompanionWorkflowMessageDraft?,
+    policy: CompanionWorkflowPolicy?
+  ) -> Bool {
+    guard let storedHash,
+      let current = approvalHash(
+        contact: contact, configuration: configuration,
+        message: message, policy: policy
+      )
+    else { return false }
+    if storedHash == current { return true }
+    // A one-way compatibility check prevents an app update from invalidating
+    // every durable per-person approval solely because iOS stopped hashing the
+    // non-effective Android cap. Newly confirmed approvals use only `current`.
+    guard
+      let legacy = approvalHash(
+        contact: contact, configuration: configuration,
+        message: message, policy: policy,
+        includeLegacyAndroidDailyCap: true
+      )
+    else { return false }
+    return storedHash == legacy
   }
 
   private static func reviewHash(
@@ -2744,9 +3645,16 @@ final class IOSCompanionWorkflowEngine {
     for id in contactIds.sorted() {
       let contact = byId[id]
       let configuration = workflow.contacts.first { $0.contactId == id }
+      let destination = IOSCompanionApprovalDestinationBinding.resolve(
+        selectedPhoneId: configuration?.selectedPhoneId,
+        phones: contact?.phones ?? []
+      )
       parts.append(contentsOf: [
         id, String(contact?.materialRevision ?? 0),
-        configuration?.selectedPhoneId ?? "none",
+        destination?.phoneId ?? configuration?.selectedPhoneId ?? "none",
+        destination?.e164 ?? "none",
+        destination?.metadataRelease ?? IOSPhoneNumberNormalizer.metadataRelease,
+        IOSCompanionApprovalDestinationBinding.version,
         configuration?.selectedBirthdayId ?? "none",
         configuration?.leapPolicy ?? "none",
         configuration?.enrollment.rawValue ?? "off",
@@ -2766,7 +3674,6 @@ final class IOSCompanionWorkflowEngine {
     if let policy = workflow.policy {
       parts.append(contentsOf: [
         policy.primaryStart, policy.primaryEnd, policy.graceEnd ?? "none",
-        String(policy.dailyCap),
       ])
     }
     return canonicalHash(parts)
@@ -2800,7 +3707,6 @@ final class IOSCompanionWorkflowEngine {
         kind: "policy", contactIds: workflow.contacts.map(\.contactId),
         workflow: workflow, contacts: contacts
       ), policy.primaryStart, policy.primaryEnd, policy.graceEnd ?? "none",
-      String(policy.dailyCap),
     ])
   }
 
@@ -2830,6 +3736,7 @@ final class IOSCompanionWorkflowEngine {
       ["warm", "simple", "cheerful"].contains(tone),
       [1, 2].contains(cap)
     else { return (nil, [["field": "template", "code": "internal-contract-invalid"]]) }
+    let normalizedText = text.precomposedStringWithCanonicalMapping
     let modeKind: String
     if Set(mode.keys) == ["kind", "requiredCount"],
       mode["kind"] as? String == "given-name",
@@ -2845,52 +3752,35 @@ final class IOSCompanionWorkflowEngine {
       return (nil, [["field": "template", "code": "template-placeholder-count"]])
     }
     var issues: [[String: Any]] = []
-    if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      || text.count > 1_000 || text.utf8.count > 4_096
+    if normalizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      || normalizedText.count > 1_000 || normalizedText.utf8.count > 4_096
     {
       issues.append(["field": "template", "code": "template-empty"])
     }
-    let expression = try! NSRegularExpression(pattern: "\\{[^{}]+\\}")
-    let fullRange = NSRange(text.startIndex..<text.endIndex, in: text)
-    let placeholders = expression.matches(in: text, range: fullRange).compactMap {
-      Range($0.range, in: text).map { String(text[$0]) }
+    if let placeholderIssue = IOSCompanionMessagePlaceholderPolicy.issue(
+      text: normalizedText,
+      placeholderMode: modeKind
+    ) {
+      issues.append([
+        "field": "template",
+        "code": placeholderIssue == .unsupportedPlaceholder
+          ? "template-unsupported-placeholder"
+          : "template-placeholder-count",
+      ])
     }
-    let firstNameCount = placeholders.filter { $0 == "{firstName}" }.count
-    if placeholders.contains(where: { $0 != "{firstName}" })
-      || text.replacingOccurrences(
-        of: "\\{[^{}]+\\}", with: "", options: .regularExpression
-      ).contains(where: { $0 == "{" || $0 == "}" })
-    {
-      issues.append(["field": "template", "code": "template-unsupported-placeholder"])
-    }
-    if firstNameCount != (modeKind == "given-name" ? 1 : 0) {
-      issues.append(["field": "template", "code": "template-placeholder-count"])
-    }
-    if text.range(of: "(?:https?://|www\\.)\\S+", options: [.regularExpression, .caseInsensitive])
-      != nil
-    {
-      issues.append(["field": "template", "code": "template-url-not-allowed"])
-    }
-    let bidi = CharacterSet(
-      charactersIn:
-        "\u{061C}\u{200E}\u{200F}\u{202A}\u{202B}\u{202C}\u{202D}\u{202E}"
-        + "\u{2066}\u{2067}\u{2068}\u{2069}")
-    if text.unicodeScalars.contains(where: { bidi.contains($0) }) {
-      issues.append(["field": "template", "code": "template-bidi-control"])
-    }
-    if text.unicodeScalars.contains(where: {
-      ($0.value <= 0x1F && ![9, 10, 13].contains(Int($0.value))) || $0.value == 0x7F
-    }) {
-      issues.append(["field": "template", "code": "template-control-character"])
+    for code in IOSBirthdayMessageContentPolicy.issueCodes(
+      text: normalizedText, declaredLanguage: language
+    ) {
+      issues.append(["field": "template", "code": code])
     }
     guard issues.isEmpty else { return (nil, issues) }
     return (
       CompanionWorkflowMessageDraft(
         language: language, tone: tone, placeholderMode: modeKind,
-        text: text, requestedSegmentCap: cap,
+        text: normalizedText, requestedSegmentCap: cap,
         provenance: CompanionWorkflowMessageProvenance(
           source: "USER", modelIdentifier: nil, promptPolicyVersion: nil,
-          validatorVersion: "birthday-template-validator-v1"
+          validatorVersion: IOSBirthdayMessageContentPolicy.validatorVersion
         )
       ),
       []
@@ -2901,8 +3791,8 @@ final class IOSCompanionWorkflowEngine {
     guard Set(raw.keys) == ["dailyCap", "latePolicy", "primaryEnd", "primaryStart"],
       let start = raw["primaryStart"] as? String,
       let end = raw["primaryEnd"] as? String,
-      let cap = strictInteger(raw["dailyCap"], range: 1...20),
-      (1...20).contains(cap), let startMinutes = minutes(start),
+      let compatibilityCap = strictInteger(raw["dailyCap"], range: 1...1_000_000),
+      let startMinutes = minutes(start),
       let endMinutes = minutes(end), startMinutes < endMinutes,
       (30...240).contains(endMinutes - startMinutes),
       let late = raw["latePolicy"] as? [String: Any]
@@ -2921,14 +3811,17 @@ final class IOSCompanionWorkflowEngine {
       return nil
     }
     return CompanionWorkflowPolicy(
-      primaryStart: start, primaryEnd: end, graceEnd: grace, dailyCap: cap
+      primaryStart: start, primaryEnd: end, graceEnd: grace,
+      // Canonicalized only to keep older protected-state decoders readable.
+      // It is not consulted by any iOS planning or review decision.
+      legacyAndroidDailyCap: min(compatibilityCap, 20)
     )
   }
 
   private func simulate(
     policy: CompanionWorkflowPolicy,
     status: CompanionProjectionStatus
-  ) -> (maximumDaily: Int, maximumRolling: Int, firstConflictDate: String?) {
+  ) -> (maximumDaily: Int, maximumRolling: Int) {
     var counts: [String: Int] = [:]
     var instants: [Date] = []
     let time = Self.timeComponents(policy.primaryStart)
@@ -2956,23 +3849,14 @@ final class IOSCompanionWorkflowEngine {
     instants.sort()
     var start = 0
     var maximumRolling = 0
-    var rollingConflict: String?
     for end in instants.indices {
       while start < end, instants[end].timeIntervalSince(instants[start]) >= 86_400 {
         start += 1
       }
       let count = end - start + 1
       maximumRolling = max(maximumRolling, count)
-      if count > 20, rollingConflict == nil {
-        rollingConflict = Self.localDate(instants[end], calendar: calendar)
-      }
     }
-    let dailyConflict = counts.filter { $0.value > policy.dailyCap }.keys.sorted().first
-    return (
-      counts.values.max() ?? 0,
-      maximumRolling,
-      dailyConflict ?? rollingConflict
-    )
+    return (counts.values.max() ?? 0, maximumRolling)
   }
 
   private func nextOccurrence(
@@ -2990,48 +3874,24 @@ final class IOSCompanionWorkflowEngine {
     leapPolicy: String?,
     from now: Date
   ) -> [Date] {
-    guard let birthday else { return [] }
-    let start = calendar.startOfDay(for: now)
-    guard
-      let horizon = calendar.date(
-        byAdding: .day, value: Self.planningDays, to: start
-      )
-    else { return [] }
-    let currentYear = calendar.component(.year, from: start)
-    var values: [Date] = []
-    for year in currentYear...(currentYear + 2) {
-      var month = birthday.month
-      var day = birthday.day
-      if month == 2 && day == 29,
-        calendar.date(from: DateComponents(year: year, month: 2, day: 29)) == nil
-      {
-        switch leapPolicy {
-        case "feb-28": day = 28
-        case "mar-01":
-          month = 3
-          day = 1
-        case "skip": continue
-        default: return []
-        }
-      }
-      guard let value = calendar.date(from: DateComponents(year: year, month: month, day: day)),
-        value >= start,
-        value <= horizon
-      else { continue }
-      values.append(value)
-    }
-    return values.sorted()
+    IOSCompanionRecurrencePlanner.occurrenceDates(
+      birthday: birthday,
+      leapPolicy: leapPolicy,
+      from: now,
+      schedulingCalendar: calendar
+    )
   }
 
   private static func render(
     draft: CompanionWorkflowMessageDraft,
     contact: IOSPeoplePrivateContact
   ) -> String? {
-    if draft.placeholderMode == "given-name" {
-      guard let givenName = contact.givenName else { return nil }
-      return draft.text.replacingOccurrences(of: "{firstName}", with: givenName)
-    }
-    return draft.text
+    IOSBirthdayMessageContentPolicy.renderedBody(
+      templateText: draft.text,
+      placeholderMode: draft.placeholderMode,
+      givenName: contact.givenName,
+      declaredLanguage: draft.language
+    )
   }
 
   private static func smsEstimate(_ text: String) -> (encoding: String, segments: Int) {
@@ -3140,7 +4000,7 @@ final class IOSCompanionWorkflowEngine {
         requestedSegmentCap: draft.requestedSegmentCap,
         provenance: CompanionWorkflowMessageProvenance(
           source: "USER", modelIdentifier: nil, promptPolicyVersion: nil,
-          validatorVersion: "birthday-template-validator-v1"
+          validatorVersion: IOSBirthdayMessageContentPolicy.validatorVersion
         )
       )
     }
@@ -3148,9 +4008,11 @@ final class IOSCompanionWorkflowEngine {
   }
 
   private static func windowLabel(_ policy: CompanionWorkflowPolicy) -> String {
-    var label = "\(policy.primaryStart)–\(policy.primaryEnd) · up to \(policy.dailyCap)/day"
-    if let grace = policy.graceEnd { label += " · grace until \(grace)" }
-    return label
+    IOSNativePresentationFormatter.windowLabel(
+      primaryStart: policy.primaryStart,
+      primaryEnd: policy.primaryEnd,
+      graceEnd: policy.graceEnd
+    )
   }
 
   private static func recoverableDeletionOperationIndex(
@@ -3190,19 +4052,19 @@ final class IOSCompanionWorkflowEngine {
     case "complete":
       return [
         "kind": "complete", "id": projectionId, "action": operation.action,
-        "completedAt": dateString(Date()), "externalSmsCopiesNotErased": true,
+        "completedAt": dateString(operation.updatedAt), "externalSmsCopiesNotErased": true,
       ]
-    case "remote-pending":
+    case "remote-pending", "local-cleared", "provider-revoked":
       return [
         "kind": "remote-pending", "id": projectionId, "action": operation.action,
         "reason": reason ?? "coordination-unavailable",
-        "updatedAt": dateString(Date()),
+        "updatedAt": dateString(operation.updatedAt),
       ]
     case "failed":
       return [
         "kind": "failed", "id": projectionId, "action": operation.action,
         "reason": reason ?? "coordination-unavailable",
-        "updatedAt": dateString(Date()),
+        "updatedAt": dateString(operation.updatedAt),
       ]
     case "queued", "pausing", "remote-draining", "local-wiping", "verifying":
       return [
@@ -3212,7 +4074,7 @@ final class IOSCompanionWorkflowEngine {
     default:
       return [
         "kind": "failed", "id": projectionId, "action": operation.action,
-        "reason": "internal-contract-invalid", "updatedAt": dateString(Date()),
+        "reason": "internal-contract-invalid", "updatedAt": dateString(operation.updatedAt),
       ]
     }
   }

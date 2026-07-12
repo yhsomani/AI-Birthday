@@ -405,6 +405,154 @@ class SafetyLedgerDaoInstrumentationTest {
     )
   }
 
+  @Test
+  fun lateArmedStatusRefinesUnknownTestToSuppressedWithoutMintingCapability() = runBlocking {
+    assertTrue(
+      database.automationOrchestrationDao().markCoordinationUnknown(
+        PERMIT_ID,
+        expectedRevision = 1,
+        safeCode = "ARM_COORDINATION_UNKNOWN",
+        nowMillis = 2_100,
+      ),
+    )
+    val unknown = checkNotNull(dao.getCoordinationPermit(PERMIT_ID))
+
+    assertTrue(
+      dao.refineCoordinationUnknownAsArmedSuppressed(
+        permitId = PERMIT_ID,
+        expectedPermitRevision = unknown.revision,
+        evidence = AuthoritativeArmedEvidence(
+          armRequestId = ARM_REQUEST_ID,
+          serverNowMillis = 2_000,
+          serverSubmitNotAfterMillis = 3_000,
+        ),
+        recordedAtMillis = 2_200,
+      ),
+    )
+
+    assertEquals(
+      CoordinationPermitState.ARMED_SUPPRESSED,
+      dao.getCoordinationPermit(PERMIT_ID)?.state,
+    )
+    assertEquals(TestJobState.ARMED_SUPPRESSED, dao.getTestJob(TEST_JOB_ID)?.state)
+    assertEquals(0, dao.countSendAttempts(OperationPurpose.TEST, TEST_JOB_ID))
+    assertTrue(database.smsOutcomeDao().testReceipt(TEST_JOB_ID) == null)
+  }
+
+  @Test
+  fun lateNoWriteStatusRefinesUnknownTestToFailedWithoutSending() = runBlocking {
+    assertTrue(
+      database.automationOrchestrationDao().markCoordinationUnknown(
+        PERMIT_ID,
+        expectedRevision = 1,
+        safeCode = "ARM_COORDINATION_UNKNOWN",
+        nowMillis = 2_100,
+      ),
+    )
+    val unknown = checkNotNull(dao.getCoordinationPermit(PERMIT_ID))
+
+    assertTrue(
+      dao.refineTestCoordinationUnknownAsNoWrite(
+        permitId = PERMIT_ID,
+        expectedPermitRevision = unknown.revision,
+        armRequestId = ARM_REQUEST_ID,
+        typedReason = "EXPIRED",
+        recordedAtMillis = 2_200,
+      ),
+    )
+
+    assertEquals(CoordinationPermitState.NO_WRITE, dao.getCoordinationPermit(PERMIT_ID)?.state)
+    assertEquals(TestJobState.FAILED, dao.getTestJob(TEST_JOB_ID)?.state)
+    assertEquals("NO_WRITE_EXPIRED", dao.getTestJob(TEST_JOB_ID)?.invalidationReason)
+    assertEquals(0, dao.countSendAttempts(OperationPurpose.TEST, TEST_JOB_ID))
+    assertTrue(database.smsOutcomeDao().testReceipt(TEST_JOB_ID) == null)
+  }
+
+  @Test
+  fun ninthLiveResetDateFailsClosedWithoutEvictingAnyOfTheEightGuards() = runBlocking {
+    val resetSafetyId = "reset-safety-matrix"
+    dao.insertResetSafety(
+      ResetSafetyEntity(
+        resetSafetyId = resetSafetyId,
+        accountId = ACCOUNT_ID,
+        resetGeneration = 2,
+        resetAtMillis = 10_000,
+        resetLocalDate = "2026-01-01",
+        resetTimeZoneId = "Pacific/Kiritimati",
+        birthdayAutomationNotBeforeMillis = 100_000,
+        status = ResetSafetyStatus.BLOCKED,
+        overflowBlocked = false,
+        revision = 0,
+        updatedAtMillis = 10_000,
+      ),
+    )
+
+    repeat(8) { index ->
+      val day = index + 1
+      assertTrue(
+        dao.addResetBlockedDate(
+          accountId = ACCOUNT_ID,
+          blockedDate = ResetBlockedDateEntity(
+            blockedDateId = "reset-date-$day",
+            resetSafetyId = resetSafetyId,
+            civilDate = "2026-01-${day.toString().padStart(2, '0')}",
+            releaseAfterTrustedServerMillis = 200_000L + day,
+            observedAtMillis = 10_000L + day,
+          ),
+          expectedControlRevision = 0,
+          observedAtMillis = 10_000L + day,
+        ),
+      )
+    }
+
+    assertFalse(
+      dao.addResetBlockedDate(
+        accountId = ACCOUNT_ID,
+        blockedDate = ResetBlockedDateEntity(
+          blockedDateId = "reset-date-9",
+          resetSafetyId = resetSafetyId,
+          civilDate = "2026-01-09",
+          releaseAfterTrustedServerMillis = 200_009,
+          observedAtMillis = 10_009,
+        ),
+        expectedControlRevision = 0,
+        observedAtMillis = 10_009,
+      ),
+    )
+
+    val overflowed = checkNotNull(database.configurationDao().resetSafety(ACCOUNT_ID))
+    assertEquals(ResetSafetyStatus.OVERFLOW_BLOCKED, overflowed.status)
+    assertTrue(overflowed.overflowBlocked)
+    val control = checkNotNull(database.birthdayDao().getControl())
+    assertEquals(1L, control.revision)
+    assertEquals(1L, control.blockerRevision)
+    val count = database.openHelper.readableDatabase.query(
+      "SELECT COUNT(*) FROM reset_blocked_dates_v2 WHERE resetSafetyId = ?",
+      arrayOf(resetSafetyId),
+    ).use { cursor ->
+      assertTrue(cursor.moveToFirst())
+      cursor.getInt(0)
+    }
+    assertEquals(8, count)
+
+    // Overflow is sticky: further churn cannot replace a guard or repeatedly mutate blockers.
+    assertFalse(
+      dao.addResetBlockedDate(
+        accountId = ACCOUNT_ID,
+        blockedDate = ResetBlockedDateEntity(
+          blockedDateId = "reset-date-10",
+          resetSafetyId = resetSafetyId,
+          civilDate = "2026-01-10",
+          releaseAfterTrustedServerMillis = 200_010,
+          observedAtMillis = 10_010,
+        ),
+        expectedControlRevision = control.revision,
+        observedAtMillis = 10_010,
+      ),
+    )
+    assertEquals(control, database.birthdayDao().getControl())
+  }
+
   private fun rawAttempt(
     sql: androidx.sqlite.db.SupportSQLiteDatabase,
     suffix: String,

@@ -120,6 +120,7 @@ interface BirthdayDao {
         blockerRevision = 0,
         accountMode = "PAUSED_REPAIR",
         automationDesired = false,
+        initialActivationCompleted = false,
         activeInstallationEpoch = null,
         lastTrustedServerMillis = null,
         lastTrustedElapsedMillis = null,

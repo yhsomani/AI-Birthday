@@ -45,6 +45,15 @@ data class BirthdayPlanningSeed(
   val graceEndMinute: Int?,
 )
 
+data class SystemComposerRetirementReceipt(
+  val occurrenceId: String,
+  val retiredState: BirthdayJobState,
+  val retiredRevision: Long,
+  val priorState: BirthdayJobState,
+  val priorSafeOutcomeCode: String?,
+  val priorTerminalAtMillis: Long?,
+)
+
 /** Private claim material. This value must never be bridged or logged. */
 data class BirthdayClaimMaterial(
   val occurrenceId: String,
@@ -241,6 +250,18 @@ abstract class AutomationOrchestrationDao {
     """,
   )
   abstract suspend fun recoverablePermits(limit: Int): List<CoordinationPermitEntity>
+
+  @Query(
+    """
+    SELECT * FROM coordination_permits_v2
+    WHERE state = 'COORDINATION_UNKNOWN'
+      AND armDispatched = 1
+      AND armRequestId IS NOT NULL
+    ORDER BY updatedAtMillis, permitId
+    LIMIT :limit
+    """,
+  )
+  abstract suspend fun coordinationUnknownPermits(limit: Int): List<CoordinationPermitEntity>
 
   @Query(
     """
@@ -555,6 +576,54 @@ abstract class AutomationOrchestrationDao {
     updatedAtMillis: Long,
     terminalAtMillis: Long?,
     safeCode: String?,
+  ): Int
+
+  @Query(
+    """
+    UPDATE birthday_occurrences_v2
+    SET revision = revision + 1,
+        updatedAtMillis = :updatedAtMillis,
+        safeOutcomeCode = :safeCode
+    WHERE occurrenceId = :occurrenceId
+      AND state = 'MISSED'
+      AND safeOutcomeCode = 'WINDOW_CLOSED'
+      AND revision = :expectedRevision
+    """,
+  )
+  protected abstract suspend fun recordReviewedMissedChoice(
+    occurrenceId: String,
+    expectedRevision: Long,
+    updatedAtMillis: Long,
+    safeCode: String,
+  ): Int
+
+  @Query(
+    """
+    UPDATE birthday_occurrences_v2
+    SET state = :priorState,
+        revision = revision + 1,
+        updatedAtMillis = :updatedAtMillis,
+        terminalAtMillis = :priorTerminalAtMillis,
+        safeOutcomeCode = :priorSafeOutcomeCode
+    WHERE occurrenceId = :occurrenceId
+      AND state = :retiredState
+      AND revision = :retiredRevision
+      AND safeOutcomeCode = 'USER_OPENED_SYSTEM_COMPOSER'
+      AND EXISTS (
+        SELECT 1 FROM local_destination_guards_v2 destinationGuard
+        WHERE destinationGuard.occurrenceId = birthday_occurrences_v2.occurrenceId
+          AND destinationGuard.armedOrLater = 0
+      )
+    """,
+  )
+  protected abstract suspend fun restoreKnownFailedComposerRetirementRow(
+    occurrenceId: String,
+    retiredState: BirthdayJobState,
+    retiredRevision: Long,
+    priorState: BirthdayJobState,
+    priorSafeOutcomeCode: String?,
+    priorTerminalAtMillis: Long?,
+    updatedAtMillis: Long,
   ): Int
 
   @Query(
@@ -1111,8 +1180,20 @@ abstract class AutomationOrchestrationDao {
     nowMillis: Long,
   ): Boolean {
     val row = getBirthdayOccurrence(occurrenceId) ?: return false
+    if (row.revision != expectedOccurrenceRevision) return false
+    if (row.state == BirthdayJobState.MISSED) {
+      if (
+        recordReviewedMissedChoice(
+          occurrenceId,
+          row.revision,
+          nowMillis,
+          "USER_CHOSE_NEXT_YEAR",
+        ) != 1
+      ) return false
+      check(touchProjection() == 1) { "deferred-missed-projection-touch-failed" }
+      return true
+    }
     if (
-      row.revision != expectedOccurrenceRevision ||
       row.state !in setOf(
         BirthdayJobState.PLANNED,
         BirthdayJobState.PREPARED,
@@ -1132,6 +1213,105 @@ abstract class AutomationOrchestrationDao {
       ) != 1
     ) return false
     check(touchProjection() == 1) { "deferred-occurrence-projection-touch-failed" }
+    return true
+  }
+
+  /**
+   * Retires today's still-unarmed occurrence before the app opens an external system composer.
+   * The composer result is unknowable, so this terminal local transition prevents a later
+   * unattended send from duplicating a message the user may choose to send there.
+   */
+  @Transaction
+  open suspend fun retireReviewedOccurrenceForSystemComposer(
+    occurrenceId: String,
+    expectedOccurrenceRevision: Long,
+    nowMillis: Long,
+  ): SystemComposerRetirementReceipt? {
+    val row = getBirthdayOccurrence(occurrenceId) ?: return null
+    if (row.revision != expectedOccurrenceRevision) return null
+    val retiredRevision = try {
+      Math.addExact(row.revision, 1L)
+    } catch (_: ArithmeticException) {
+      return null
+    }
+    if (row.state == BirthdayJobState.MISSED) {
+      if (
+        recordReviewedMissedChoice(
+          occurrenceId,
+          row.revision,
+          nowMillis,
+          "USER_OPENED_SYSTEM_COMPOSER",
+        ) != 1
+      ) return null
+      check(touchProjection() == 1) { "composer-missed-projection-touch-failed" }
+      return SystemComposerRetirementReceipt(
+        occurrenceId,
+        BirthdayJobState.MISSED,
+        retiredRevision,
+        row.state,
+        row.safeOutcomeCode,
+        row.terminalAtMillis,
+      )
+    }
+    if (
+      row.state !in setOf(
+        BirthdayJobState.PLANNED,
+        BirthdayJobState.PREPARED,
+        BirthdayJobState.SCHEDULED,
+        BirthdayJobState.COORDINATION_BLOCKED,
+      )
+    ) return null
+    if (
+      casBirthdayState(
+        occurrenceId,
+        row.state,
+        row.revision,
+        BirthdayJobState.CANCELLED,
+        nowMillis,
+        nowMillis,
+        "USER_OPENED_SYSTEM_COMPOSER",
+      ) != 1
+    ) return null
+    check(touchProjection() == 1) { "composer-occurrence-projection-touch-failed" }
+    return SystemComposerRetirementReceipt(
+      occurrenceId,
+      BirthdayJobState.CANCELLED,
+      retiredRevision,
+      row.state,
+      row.safeOutcomeCode,
+      row.terminalAtMillis,
+    )
+  }
+
+  /** Restores a known non-launch only while the exact unarmed retirement still matches. */
+  @Transaction
+  open suspend fun restoreKnownFailedSystemComposerRetirement(
+    receipt: SystemComposerRetirementReceipt,
+    nowMillis: Long,
+  ): Boolean {
+    if (
+      receipt.priorState !in setOf(
+        BirthdayJobState.PLANNED,
+        BirthdayJobState.PREPARED,
+        BirthdayJobState.SCHEDULED,
+        BirthdayJobState.COORDINATION_BLOCKED,
+        BirthdayJobState.MISSED,
+      ) ||
+      (receipt.priorState == BirthdayJobState.MISSED &&
+        receipt.priorSafeOutcomeCode != "WINDOW_CLOSED")
+    ) return false
+    if (
+      restoreKnownFailedComposerRetirementRow(
+        receipt.occurrenceId,
+        receipt.retiredState,
+        receipt.retiredRevision,
+        receipt.priorState,
+        receipt.priorSafeOutcomeCode,
+        receipt.priorTerminalAtMillis,
+        nowMillis,
+      ) != 1
+    ) return false
+    check(touchProjection() == 1) { "composer-known-failure-restore-projection-failed" }
     return true
   }
 

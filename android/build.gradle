@@ -13,11 +13,123 @@ buildscript {
     }
     dependencies {
         classpath("com.android.tools.build:gradle")
+        classpath("com.android.tools.build:bundletool:1.18.1")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin:2.1.20-2.0.1")
         classpath("com.google.gms:google-services:4.5.0")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
     }
+
+    configurations.classpath {
+        resolutionStrategy.activateDependencyLocking()
+        // Bundletool/AGP currently request older transitive build-time libraries.
+        // Keep the compatible 4.1 Netty line and other binary-compatible patch/minor
+        // replacements above every active OSV affected range. These are still strict-
+        // locked and checksum verified; the native advisory gate scans this complete
+        // classpath separately from the shipped prod runtime.
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == "io.netty") {
+                details.useVersion("4.1.135.Final")
+                details.because("resolve active OSV advisories in the build classpath")
+            } else if (details.requested.group == "org.apache.commons" &&
+                details.requested.name == "commons-compress") {
+                details.useVersion("1.28.0")
+                details.because("resolve active OSV advisories in the build classpath")
+            } else if (details.requested.group == "org.bitbucket.b_c" &&
+                details.requested.name == "jose4j") {
+                details.useVersion("0.9.6")
+                details.because("resolve active OSV advisories in the build classpath")
+            } else if (details.requested.group == "org.bouncycastle" &&
+                details.requested.name in ["bcpkix-jdk18on", "bcprov-jdk18on", "bcutil-jdk18on"]) {
+                details.useVersion("1.84")
+                details.because("resolve active OSV advisories in the build classpath")
+            } else if (details.requested.group == "org.jdom" &&
+                details.requested.name == "jdom2") {
+                details.useVersion("2.0.6.1")
+                details.because("resolve active OSV advisories in the build classpath")
+            }
+        }
+    }
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// `apkanalyzer` cannot decode an Android App Bundle's protobuf manifest. Keep
+// the post-build release verifier on the exact bundletool implementation that
+// AGP already resolves through the strict buildscript lock and artifact
+// verification metadata. The task emits only bundletool's canonical base
+// manifest; the standalone verifier owns the closed release-policy checks.
+tasks.register("dumpBirthdayAabManifest", JavaExec) {
+    group = "verification"
+    description = "Prints the canonical base manifest from one externally supplied AAB."
+    classpath = buildscript.configurations.classpath
+    mainClass = "com.android.tools.build.bundletool.BundleToolMain"
+    outputs.upToDateWhen { false }
+
+    doFirst {
+        def bundletoolArtifacts = buildscript.configurations.classpath.resolvedConfiguration.resolvedArtifacts.findAll { artifact ->
+            artifact.moduleVersion.id.group == "com.android.tools.build" &&
+                artifact.name == "bundletool"
+        }.toList()
+        if (bundletoolArtifacts.size() != 1 ||
+            bundletoolArtifacts[0].moduleVersion.id.version != "1.18.1") {
+            throw new GradleException("The AAB inspector requires exactly bundletool 1.18.1 from the locked buildscript graph.")
+        }
+        def requestedPath = providers.gradleProperty("birthdayAabPath").orNull
+        if (requestedPath == null || requestedPath.trim().isEmpty()) {
+            throw new GradleException("-PbirthdayAabPath=<absolute-aab-path> is required.")
+        }
+        def requestedBundle = file(requestedPath).absoluteFile
+        def bundle = requestedBundle.canonicalFile
+        if (requestedBundle.toPath().normalize() != bundle.toPath() ||
+            java.nio.file.Files.isSymbolicLink(requestedBundle.toPath()) ||
+            !java.nio.file.Files.isRegularFile(requestedBundle.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS) ||
+            bundle.length() <= 0) {
+            throw new GradleException("birthdayAabPath must name a canonical, non-symlinked, non-empty regular file.")
+        }
+        args = [
+            "dump",
+            "manifest",
+            "--bundle=${bundle.absolutePath}",
+            "--module=base",
+        ]
+    }
+}
+
+// Keep every direct and transitive Maven coordinate reproducible. Lock files are
+// refreshed by running the normal build/test/lint matrix with `--write-locks`;
+// artifact bytes are independently pinned by Gradle verification metadata.
+allprojects {
+    dependencyLocking {
+        lockAllConfigurations()
+        // Repository-owned application configurations must never resolve outside the reviewed
+        // lock. Autolinked projects live under npm's immutable lock and cannot keep generated
+        // Gradle lockfiles inside node_modules, so their artifacts remain byte-pinned by
+        // verification-metadata.xml and by the app's transitive runtime lock instead.
+        if (project == rootProject || project.path == ":app") {
+            lockMode = LockMode.STRICT
+        }
+    }
+
+    configurations.configureEach { configuration ->
+        configuration.resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == "io.netty") {
+                details.useVersion("4.1.135.Final")
+                details.because("resolve active OSV advisories in Android test tooling")
+            } else if (details.requested.group == "com.google.protobuf" &&
+                details.requested.name in ["protobuf-java", "protobuf-kotlin"]) {
+                details.useVersion("3.25.5")
+                details.because("resolve active OSV advisories in Android test tooling")
+            } else if (details.requested.group == "org.jsoup" &&
+                details.requested.name == "jsoup") {
+                details.useVersion("1.21.2")
+                details.because("resolve active OSV advisories in Android instrumentation tooling")
+            } else if (details.requested.group == "com.google.guava" &&
+                details.requested.name == "guava" &&
+                configuration.name in ["devDebugAndroidTestRuntimeClasspath", "e2eDebugAndroidTestRuntimeClasspath", "stagingDebugAndroidTestRuntimeClasspath"]) {
+                details.useVersion("33.4.8-android")
+                details.because("resolve active OSV advisories in the Android test APK")
+            }
+        }
+    }
+}

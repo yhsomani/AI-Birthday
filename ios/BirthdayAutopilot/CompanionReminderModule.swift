@@ -60,6 +60,19 @@ private struct QueuedReminderReconciliation {
   let completion: (([String: Any]) -> Void)?
 }
 
+private final class CompanionReminderDrainGate: @unchecked Sendable {
+  private let lock = NSLock()
+  private var completed = false
+
+  func claim() -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    guard !completed else { return false }
+    completed = true
+    return true
+  }
+}
+
 final class CompanionReminderCoordinator {
   static let shared = CompanionReminderCoordinator()
 
@@ -79,6 +92,8 @@ final class CompanionReminderCoordinator {
   private var activeReconciliationGeneration: UInt64?
   private var queuedReconciliation: QueuedReminderReconciliation?
   private var wipeInProgress = false
+  private var inFlightNotificationAdds = 0
+  private var addDrainWaiters: [() -> Void] = []
 
   private init(
     center: UNUserNotificationCenter = .current(),
@@ -247,26 +262,29 @@ final class CompanionReminderCoordinator {
     }
   }
 
-  func cancelAppOwnedNotifications(completion: (() -> Void)? = nil) {
-    center.getPendingNotificationRequests { [weak self] pending in
+  func cancelAppOwnedNotifications(completion: ((Bool) -> Void)? = nil) {
+    invalidateActiveReconciliationForCancellation()
+    waitForNotificationAddsToDrain { [weak self] drained in
       guard let self else {
-        DispatchQueue.main.async { completion?() }
+        DispatchQueue.main.async { completion?(false) }
         return
       }
-      let identifiers =
-        pending
-        .map(\.identifier)
-        .filter { $0.hasPrefix(Self.identifierPrefix) }
-      self.center.removePendingNotificationRequests(withIdentifiers: identifiers)
-      self.center.getDeliveredNotifications { delivered in
-        let deliveredIdentifiers =
-          delivered
-          .map { $0.request.identifier }
-          .filter { $0.hasPrefix(Self.identifierPrefix) }
-        self.center.removeDeliveredNotifications(
-          withIdentifiers: deliveredIdentifiers
-        )
-        DispatchQueue.main.async { completion?() }
+      guard drained else {
+        DispatchQueue.main.async { completion?(false) }
+        return
+      }
+      let attentionNotifier = IOSCompanionAttentionNotifier.shared
+      attentionNotifier.beginCancellationDrain { attentionDrained in
+        guard attentionDrained else {
+          attentionNotifier.endCancellationDrain()
+          DispatchQueue.main.async { completion?(false) }
+          return
+        }
+        self.removeAndVerifyAppOwnedNotifications(attemptsRemaining: 3) {
+          verified in
+          attentionNotifier.endCancellationDrain()
+          DispatchQueue.main.async { completion?(verified) }
+        }
       }
     }
   }
@@ -285,22 +303,24 @@ final class CompanionReminderCoordinator {
       case .failure(let error):
         completion(["code": error.safeCode, "kind": "error"])
       case .success:
-        self.cancelAppOwnedNotifications {
-          self.cancelAppOwnedNotifications {
-            let horizon = CompanionReminderHorizon(
-              generation: UUID().uuidString.lowercased(),
-              state: .denied,
-              observedRequestIds: [],
-              earliestUnscheduledCivilDate: nil,
-              reconciledAt: Date()
-            )
-            self.store.recordReminderHorizon(horizon) { horizonResult in
-              switch horizonResult {
-              case .success:
-                completion(["kind": "ok"])
-              case .failure(let error):
-                completion(["code": error.safeCode, "kind": "error"])
-              }
+        self.cancelAppOwnedNotifications { verified in
+          guard verified else {
+            completion(["code": "REMINDER_CANCELLATION_UNVERIFIED", "kind": "error"])
+            return
+          }
+          let horizon = CompanionReminderHorizon(
+            generation: UUID().uuidString.lowercased(),
+            state: .denied,
+            observedRequestIds: [],
+            earliestUnscheduledCivilDate: nil,
+            reconciledAt: Date()
+          )
+          self.store.recordReminderHorizon(horizon) { horizonResult in
+            switch horizonResult {
+            case .success:
+              completion(["kind": "ok"])
+            case .failure(let error):
+              completion(["code": error.safeCode, "kind": "error"])
             }
           }
         }
@@ -313,10 +333,19 @@ final class CompanionReminderCoordinator {
       completion(["code": "COMPANION_WIPE_IN_PROGRESS", "kind": "error"])
       return
     }
-    cancelAppOwnedNotifications { [store] in
+    cancelAppOwnedNotifications { [store] cancelled in
+      guard cancelled else {
+        self.endWipe()
+        completion(["code": "REMINDER_CANCELLATION_UNVERIFIED", "kind": "error"])
+        return
+      }
       store.wipeAndInstallResetSafety { result in
-        self.cancelAppOwnedNotifications {
+        self.cancelAppOwnedNotifications { verified in
           self.endWipe()
+          guard verified else {
+            completion(["code": "REMINDER_CANCELLATION_UNVERIFIED", "kind": "error"])
+            return
+          }
           switch result {
           case .success:
             completion(["kind": "ok"])
@@ -339,10 +368,19 @@ final class CompanionReminderCoordinator {
       completion(["code": "COMPANION_WIPE_IN_PROGRESS", "kind": "error"])
       return
     }
-    cancelAppOwnedNotifications { [store] in
+    cancelAppOwnedNotifications { [store] cancelled in
+      guard cancelled else {
+        self.endWipe()
+        completion(["code": "REMINDER_CANCELLATION_UNVERIFIED", "kind": "error"])
+        return
+      }
       store.destroyAfterRemoteAccountDeletion { result in
-        self.cancelAppOwnedNotifications {
+        self.cancelAppOwnedNotifications { verified in
           self.endWipe()
+          guard verified else {
+            completion(["code": "REMINDER_CANCELLATION_UNVERIFIED", "kind": "error"])
+            return
+          }
           switch result {
           case .success:
             completion(["kind": "ok"])
@@ -496,7 +534,7 @@ final class CompanionReminderCoordinator {
         let failureLock = NSLock()
         var addFailureCount = 0
         for request in requests {
-          guard self.isCurrentReconciliation(generation) else { break }
+          guard self.registerNotificationAdd(generation: generation) else { break }
           group.enter()
           self.center.add(request) { error in
             if error != nil {
@@ -504,6 +542,15 @@ final class CompanionReminderCoordinator {
               addFailureCount += 1
               failureLock.unlock()
             }
+            if !self.isCurrentReconciliation(generation) {
+              self.center.removePendingNotificationRequests(
+                withIdentifiers: [request.identifier]
+              )
+              self.center.removeDeliveredNotifications(
+                withIdentifiers: [request.identifier]
+              )
+            }
+            self.finishNotificationAdd()
             group.leave()
           }
         }
@@ -601,6 +648,9 @@ final class CompanionReminderCoordinator {
                   earliestUnscheduledCivilDate: earliestUnscheduled
                 )
                 let successful = full && !persistenceFailed
+                if !successful {
+                  IOSCompanionAttentionNotifier.shared.notify(.reminders)
+                }
                 self.finishReconciliation(
                   completion,
                   generation: generation,
@@ -631,6 +681,107 @@ final class CompanionReminderCoordinator {
         .filter { $0.hasPrefix(Self.identifierPrefix) }
       self.center.removePendingNotificationRequests(withIdentifiers: identifiers)
       completion()
+    }
+  }
+
+  private func invalidateActiveReconciliationForCancellation() {
+    var queuedCompletion: (([String: Any]) -> Void)?
+    stateLock.lock()
+    reconciliationGeneration &+= 1
+    activeReconciliationGeneration = nil
+    queuedCompletion = queuedReconciliation?.completion
+    queuedReconciliation = nil
+    stateLock.unlock()
+    if let queuedCompletion {
+      completeOnMain(
+        queuedCompletion,
+        result: Self.errorDictionary(code: "REMINDER_RECONCILIATION_SUPERSEDED")
+      )
+    }
+  }
+
+  private func registerNotificationAdd(generation: UInt64) -> Bool {
+    stateLock.lock()
+    defer { stateLock.unlock() }
+    guard !wipeInProgress, activeReconciliationGeneration == generation else {
+      return false
+    }
+    inFlightNotificationAdds += 1
+    return true
+  }
+
+  private func finishNotificationAdd() {
+    var waiters: [() -> Void] = []
+    stateLock.lock()
+    if inFlightNotificationAdds > 0 { inFlightNotificationAdds -= 1 }
+    if inFlightNotificationAdds == 0 {
+      waiters = addDrainWaiters
+      addDrainWaiters.removeAll()
+    }
+    stateLock.unlock()
+    waiters.forEach { waiter in DispatchQueue.main.async(execute: waiter) }
+  }
+
+  private func waitForNotificationAddsToDrain(
+    _ completion: @escaping (Bool) -> Void
+  ) {
+    let gate = CompanionReminderDrainGate()
+    let finish: (Bool) -> Void = { drained in
+      guard gate.claim() else { return }
+      completion(drained)
+    }
+    stateLock.lock()
+    if inFlightNotificationAdds == 0 {
+      stateLock.unlock()
+      DispatchQueue.main.async { finish(true) }
+      return
+    }
+    addDrainWaiters.append { finish(true) }
+    stateLock.unlock()
+    DispatchQueue.main.asyncAfter(deadline: .now() + 5) { finish(false) }
+  }
+
+  private func removeAndVerifyAppOwnedNotifications(
+    attemptsRemaining: Int,
+    completion: @escaping (Bool) -> Void
+  ) {
+    center.getPendingNotificationRequests { [weak self] pending in
+      guard let self else { return completion(false) }
+      let pendingIds = pending.map(\.identifier).filter {
+        $0.hasPrefix(Self.identifierPrefix)
+          || IOSCompanionAttentionNotifier.isAttentionIdentifier($0)
+      }
+      self.center.removePendingNotificationRequests(withIdentifiers: pendingIds)
+      self.center.getDeliveredNotifications { delivered in
+        let deliveredIds = delivered.map { $0.request.identifier }.filter {
+          $0.hasPrefix(Self.identifierPrefix)
+            || IOSCompanionAttentionNotifier.isAttentionIdentifier($0)
+        }
+        self.center.removeDeliveredNotifications(withIdentifiers: deliveredIds)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+          self.center.getPendingNotificationRequests { observedPending in
+            self.center.getDeliveredNotifications { observedDelivered in
+              let remaining = observedPending.contains {
+                $0.identifier.hasPrefix(Self.identifierPrefix)
+                  || IOSCompanionAttentionNotifier.isAttentionIdentifier($0.identifier)
+              } || observedDelivered.contains {
+                $0.request.identifier.hasPrefix(Self.identifierPrefix)
+                  || IOSCompanionAttentionNotifier.isAttentionIdentifier(
+                    $0.request.identifier
+                  )
+              }
+              guard remaining, attemptsRemaining > 1 else {
+                completion(!remaining)
+                return
+              }
+              self.removeAndVerifyAppOwnedNotifications(
+                attemptsRemaining: attemptsRemaining - 1,
+                completion: completion
+              )
+            }
+          }
+        }
+      }
     }
   }
 
@@ -738,7 +889,7 @@ final class CompanionReminderCoordinator {
     from schedule: CompanionReminderSchedule,
     now: Date
   ) -> [(civilDate: String, fireDate: Date, requestId: String)] {
-    let calendar = Calendar.autoupdatingCurrent
+    let calendar = schedulingCalendar()
     var earliestByCivilDate: [String: Date] = [:]
     for plan in schedule.plans {
       guard let fireDate = fireDate(for: plan, calendar: calendar),
@@ -834,7 +985,7 @@ final class CompanionReminderCoordinator {
     content.threadIdentifier = "birthday-autopilot-reminders"
     content.userInfo = ["requestId": candidate.requestId]
 
-    let calendar = Calendar.autoupdatingCurrent
+    let calendar = schedulingCalendar()
     var components = calendar.dateComponents(
       [.year, .month, .day, .hour, .minute],
       from: candidate.fireDate
@@ -882,6 +1033,12 @@ final class CompanionReminderCoordinator {
     ).dictionary(kind: "error", code: code)
   }
 
+  private static func schedulingCalendar() -> Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .autoupdatingCurrent
+    return calendar
+  }
+
   static func validatePlans(
     _ rawPlans: NSArray,
     now: Date = Date()
@@ -891,12 +1048,12 @@ final class CompanionReminderCoordinator {
     else {
       throw CompanionReminderInputError.invalid
     }
-    let calendar = Calendar.autoupdatingCurrent
+    let calendar = schedulingCalendar()
     let today = calendar.startOfDay(for: now)
     guard
       let maximumDate = calendar.date(
         byAdding: .day,
-        value: maximumPlanningDays,
+        value: maximumPlanningDays - 1,
         to: today
       )
     else {
@@ -1045,6 +1202,7 @@ final class CompanionLifecycleCoordinator {
     let notificationCenter = NotificationCenter.default
     let names: [Notification.Name] = [
       UIApplication.didBecomeActiveNotification,
+      UIApplication.protectedDataDidBecomeAvailableNotification,
       UIApplication.significantTimeChangeNotification,
       .NSSystemTimeZoneDidChange,
     ]
@@ -1060,7 +1218,7 @@ final class CompanionLifecycleCoordinator {
         {
           IOSAccountDeletionLocalCleanupCoordinator.shared.resumeIfNeeded()
         } else {
-          CompanionReminderCoordinator.shared.reconcilePersisted()
+          self.replenishPlanBeforeReconciliation()
         }
       }
     }
@@ -1071,7 +1229,19 @@ final class CompanionLifecycleCoordinator {
       IOSAccountDeletionLocalCleanupCoordinator.shared.resumeIfNeeded()
     } else {
       CompanionProtectedStore.shared.reconcileComposerOnCleanLaunch()
-      CompanionReminderCoordinator.shared.reconcilePersisted()
+      replenishPlanBeforeReconciliation()
+    }
+  }
+
+  private func replenishPlanBeforeReconciliation() {
+    Task { @MainActor in
+      guard let binding = IOSGoogleIdentityCoordinator.shared.exactSessionBinding() else {
+        CompanionReminderCoordinator.shared.reconcilePersisted()
+        return
+      }
+      IOSCompanionWorkflowEngine.shared.reconcileReminderPlanForLifecycle(
+        binding: binding
+      )
     }
   }
 }

@@ -78,7 +78,11 @@ internal class NotificationPermissionActivityResultOwner(
   private val permissionGranted: (Context) -> Boolean = Companion::isGranted,
 ) : NotificationPermissionLauncher {
   private val gate = SingleResolutionRequestGate()
-  private val state = NotificationPermissionStateStore(activity.applicationContext)
+  // Keep constructor work limited to Activity Result registration. Android
+  // attaches the Activity's base context only after the instance is created.
+  private val state by lazy(LazyThreadSafetyMode.NONE) {
+    NotificationPermissionStateStore(activity.applicationContext)
+  }
   private var pending:
     kotlinx.coroutines.CancellableContinuation<NotificationPermissionResult>? = null
   private val launcher = activity.registerForActivityResult(

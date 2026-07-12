@@ -1,0 +1,35 @@
+appId: ${E2E_APP_ID}
+name: Fresh setup and visible primary action
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+    arguments:
+      e2eLanguage: en
+      e2eSetupComplete: false
+- assertVisible:
+    id: setup-step-1
+- assertVisible:
+    id: setup-welcome-continue
+- tapOn:
+    id: setup-welcome-continue
+- assertVisible:
+    id: setup-connect-fixture
+- tapOn:
+    id: setup-connect-fixture
+- assertVisible:
+    id: setup-person-person-asha
+- tapOn:
+    id: setup-person-person-asha
+- assertVisible:
+    id: setup-review-selection
+- tapOn:
+    id: setup-review-selection
+- assertVisible:
+    id: setup-finish
+- tapOn:
+    id: setup-finish
+- assertVisible:
+    id: home-screen
+- assertVisible: Birthday Autopilot

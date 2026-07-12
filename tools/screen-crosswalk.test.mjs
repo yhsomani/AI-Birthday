@@ -1,0 +1,123 @@
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import test from 'node:test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const projectRoot = fileURLToPath(new URL('../', import.meta.url));
+const read = file => readFileSync(path.join(projectRoot, file), 'utf8');
+const exists = file => existsSync(path.join(projectRoot, file));
+
+const resolveProductionImport = (sourceFile, specifier) => {
+  const base = path.normalize(path.join(path.dirname(sourceFile), specifier));
+  return [
+    `${base}.ts`,
+    `${base}.tsx`,
+    path.join(base, 'index.ts'),
+    path.join(base, 'index.tsx'),
+  ].find(exists);
+};
+
+const reachableProductionModules = root => {
+  const reachable = new Set();
+  const pending = [root];
+  while (pending.length > 0) {
+    const file = pending.pop();
+    if (!file || reachable.has(file)) continue;
+    reachable.add(file);
+    const source = read(file);
+    const specifiers = [
+      ...source.matchAll(/\bfrom\s+['"](\.[^'"]+)['"]/gu),
+      ...source.matchAll(/\bimport\s+['"](\.[^'"]+)['"]/gu),
+    ].map(match => match[1]);
+    for (const specifier of specifiers) {
+      const dependency = resolveProductionImport(file, specifier);
+      if (dependency && !reachable.has(dependency)) pending.push(dependency);
+    }
+  }
+  return reachable;
+};
+
+test('every Stitch screen ID maps exactly once to production ownership and nearby contracts', () => {
+  const manifestIds = [
+    ...read('stitch/SCREEN_MANIFEST.md').matchAll(/^\| ([A-Z][0-9]{2}) \|/gmu),
+  ].map(match => match[1]);
+  const crosswalk = JSON.parse(read('stitch/IMPLEMENTATION_CROSSWALK.json'));
+  const entries = crosswalk.entries;
+  const mappedIds = entries.map(entry => entry.id);
+
+  assert.equal(crosswalk.schemaVersion, 2);
+  assert.equal(manifestIds.length, 63);
+  assert.deepEqual(new Set(mappedIds).size, mappedIds.length);
+  assert.deepEqual([...mappedIds].sort(), [...manifestIds].sort());
+
+  for (const entry of entries) {
+    assert.deepEqual(Object.keys(entry).sort(), [
+      'id',
+      'implementation',
+      'nearestContractFiles',
+      'platforms',
+    ]);
+    assert.match(entry.id, /^[A-Z][0-9]{2}$/u);
+    assert.ok(entry.platforms.length > 0);
+    assert.equal(new Set(entry.platforms).size, entry.platforms.length);
+    assert.equal(
+      entry.platforms.every(platform =>
+        ['android', 'ios', 'web'].includes(platform),
+      ),
+      true,
+    );
+    assert.ok(entry.implementation.length > 0);
+    assert.ok(entry.nearestContractFiles.length > 0);
+    for (const file of [
+      ...entry.implementation,
+      ...entry.nearestContractFiles,
+    ]) {
+      assert.equal(exists(file), true, `${entry.id} missing ${file}`);
+    }
+    for (const file of entry.implementation) {
+      assert.doesNotMatch(file, /fixtures?|Fixture/u);
+      assert.match(file, /^(?:src|backend\/hosting\/src)\//u);
+      assert.match(file, /\.(?:css|ts|tsx)$/u);
+    }
+    for (const file of entry.nearestContractFiles) {
+      assert.match(file, /(?:\.test\.(?:mjs|ts|tsx)|\/test\/[^/]+\.mjs)$/u);
+    }
+  }
+
+  for (const id of ['S16', 'L01', 'L02', 'L03']) {
+    const entry = entries.find(candidate => candidate.id === id);
+    assert.deepEqual(entry?.platforms, ['android'], id);
+  }
+});
+
+test('crosswalk stays explicitly subordinate to physical and release evidence', () => {
+  const crosswalk = JSON.parse(read('stitch/IMPLEMENTATION_CROSSWALK.json'));
+  assert.equal(crosswalk.authority, 'PROJECT_ABOUT.md');
+  assert.match(crosswalk.scope, /does not prove/iu);
+  assert.match(crosswalk.scope, /not a test locator/iu);
+  assert.match(crosswalk.scope, /physical-device UX/iu);
+  assert.match(crosswalk.scope, /provider configuration/iu);
+  assert.match(crosswalk.scope, /store approval/iu);
+});
+
+test('every mobile Stitch owner is reachable from the production app root', () => {
+  const crosswalk = JSON.parse(read('stitch/IMPLEMENTATION_CROSSWALK.json'));
+  const reachable = reachableProductionModules('src/app/AppRoot.tsx');
+  const mobileOwners = new Set(
+    crosswalk.entries
+      .filter(entry =>
+        entry.platforms.some(platform => ['android', 'ios'].includes(platform)),
+      )
+      .flatMap(entry => entry.implementation)
+      .filter(file => file.startsWith('src/')),
+  );
+
+  for (const file of mobileOwners) {
+    assert.equal(
+      reachable.has(file),
+      true,
+      `${file} is mapped from Stitch but unreachable from AppRoot`,
+    );
+  }
+});

@@ -15,6 +15,9 @@ class BirthdayWorkerFactory(
     workerParameters: WorkerParameters,
   ): ListenableWorker? = when (workerClassName) {
     ReconcileWorker::class.java.name -> ReconcileWorker(appContext, workerParameters, appGraph)
+    DataRetentionWorker::class.java.name ->
+      DataRetentionWorker(appContext, workerParameters, appGraph)
+    PeopleSyncWorker::class.java.name -> PeopleSyncWorker(appContext, workerParameters, appGraph)
     SmsEvidenceWorker::class.java.name -> SmsEvidenceWorker(appContext, workerParameters, appGraph)
     SmsOutcomeReportWorker::class.java.name ->
       SmsOutcomeReportWorker(appContext, workerParameters, appGraph)

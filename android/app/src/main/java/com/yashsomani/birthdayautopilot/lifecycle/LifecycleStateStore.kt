@@ -36,6 +36,10 @@ internal data class DurablePrivacyOperation(
   val recoveryGoogleSubjectHash: String? = null,
   val deletionRetryAllowed: Boolean = false,
   val deletionInProgressObserved: Boolean = false,
+  val remoteAccessRevoked: Boolean = false,
+  val senderReleaseRecoverySalt: String? = null,
+  val senderReleaseRecoveryFirebaseUidHash: String? = null,
+  val senderReleaseRecoveryGoogleSubjectHash: String? = null,
 )
 
 internal data class PendingLocalWipe(
@@ -208,8 +212,8 @@ internal class LifecycleStateStore(context: Context) {
   fun pendingLocalWipe(): PendingLocalWipe? = synchronized(FILE_LOCK) {
     read()?.second?.takeIf { operation ->
       operation.localWipeStarted &&
-        !(operation.action == "delete-account" && operation.localDataErased) &&
-        !(operation.action != "delete-account" && operation.state == "complete")
+        !operation.localDataErased &&
+        operation.state != "complete"
     }?.let { operation ->
       PendingLocalWipe(
         operation.id,
@@ -250,12 +254,31 @@ internal class LifecycleStateStore(context: Context) {
         localDataErased = true,
         remoteDeletionComplete = false,
       )
-    } else {
+    } else if (current.authoritativeRecoveryKind == "sender-release") {
       current.copy(
         state = "complete",
         reason = null,
         updatedAtMillis = completedAtMillis,
         completedAtMillis = completedAtMillis,
+        localDataErased = true,
+        localWipeStarted = false,
+        wipeInstallationId = null,
+        wipeCallbackGeneration = null,
+        remoteRequestInstallationId = null,
+        remoteRequestSenderEpoch = null,
+        remoteRequestResetGeneration = null,
+        authoritativeRecoveryKind = null,
+      )
+    } else {
+      current.copy(
+        state = "remote-pending",
+        reason = "coordination-unavailable",
+        updatedAtMillis = completedAtMillis,
+        completedAtMillis = null,
+        localDataErased = true,
+        localWipeStarted = false,
+        wipeInstallationId = null,
+        wipeCallbackGeneration = null,
       )
     }
     if (completed.action == "delete-account" && !deletionReceiptStore.capture(completed)) {
@@ -337,6 +360,7 @@ internal class LifecycleStateStore(context: Context) {
       if (lines.firstOrNull() == "2") return readVersionTwo(lines)
       if (lines.firstOrNull() == "3") return readVersionThree(lines)
       if (lines.firstOrNull() == "6") return readVersionSix(lines)
+      if (lines.firstOrNull() == "7") return readVersionSeven(lines)
       val hasAuthoritativeRecovery = lines.firstOrNull() == "5"
       if (
         (!hasAuthoritativeRecovery && lines.firstOrNull() != "4") ||
@@ -356,7 +380,7 @@ internal class LifecycleStateStore(context: Context) {
         "1" -> true
         else -> return null
       }
-      val operation = DurablePrivacyOperation(
+      val decoded = DurablePrivacyOperation(
         id = lines[2],
         action = lines[3],
         state = lines[4],
@@ -386,6 +410,19 @@ internal class LifecycleStateStore(context: Context) {
           null
         },
       )
+      val operation = if (
+        !hasAuthoritativeRecovery &&
+        decoded.action in setOf("sign-out-wipe", "wipe-local-data") &&
+        decoded.state == "local-wiping" &&
+        decoded.localWipeStarted
+      ) {
+        decoded.copy(
+          requestId = null,
+          authoritativeRecoveryKind = "sender-release",
+        )
+      } else {
+        decoded
+      }
       if (!valid(operation)) null else cutoff to operation
     } catch (_: Exception) {
       null
@@ -403,7 +440,7 @@ internal class LifecycleStateStore(context: Context) {
     // that after reconciling the authoritative server lifecycle.
     if (!allowUnreadableReplacement && atomicExists() && read() == null) return false
     val bytes = buildString {
-      append("6\n")
+      append("7\n")
       append(cutoff).append('\n')
       append(operation?.id.orEmpty()).append('\n')
       append(operation?.action.orEmpty()).append('\n')
@@ -439,6 +476,10 @@ internal class LifecycleStateStore(context: Context) {
       append(
         operation?.deletionInProgressObserved?.let { if (it) "1" else "0" }.orEmpty(),
       ).append('\n')
+      append(operation?.remoteAccessRevoked?.let { if (it) "1" else "0" }.orEmpty()).append('\n')
+      append(operation?.senderReleaseRecoverySalt.orEmpty()).append('\n')
+      append(operation?.senderReleaseRecoveryFirebaseUidHash.orEmpty()).append('\n')
+      append(operation?.senderReleaseRecoveryGoogleSubjectHash.orEmpty()).append('\n')
     }.toByteArray(StandardCharsets.US_ASCII)
     val stream = try {
       file.startWrite()
@@ -477,7 +518,9 @@ internal class LifecycleStateStore(context: Context) {
       validRemoteRequestBinding(operation) &&
       validLocalWipe(operation) &&
       validAuthoritativeRecovery(operation) &&
-      validDeletionRecovery(operation)
+      validDeletionRecovery(operation) &&
+      validRemoteAccessRevocation(operation) &&
+      validSenderReleaseRecovery(operation)
 
   private fun validAcceptedDrain(operation: DurablePrivacyOperation): Boolean {
     val values = listOf(
@@ -546,13 +589,30 @@ internal class LifecycleStateStore(context: Context) {
     } else {
       validRemoteRequestBinding(operation) &&
         operation.remoteRequestInstallationId != null &&
-        operation.state in setOf("local-wiping", "complete")
+        operation.state == "local-wiping" &&
+        !operation.localDataErased
     }
   }
 
   private fun validDeletionState(operation: DurablePrivacyOperation): Boolean {
     if (operation.action != "delete-account") {
-      return !operation.localDataErased && operation.remoteDeletionComplete == null
+      if (operation.remoteDeletionComplete != null) return false
+      return when (operation.action) {
+        "disconnect-contacts", "revoke-google-access" ->
+          !operation.localDataErased || operation.state in setOf(
+            "local-wiping",
+            "remote-pending",
+            "remote-draining",
+            "verifying",
+            "complete",
+          )
+        "sign-out-wipe", "wipe-local-data" ->
+          !operation.localDataErased || (
+            !operation.localWipeStarted &&
+              operation.state in setOf("remote-pending", "remote-draining", "complete")
+            )
+        else -> !operation.localDataErased
+      }
     }
     return when (operation.remoteDeletionComplete) {
       null -> !operation.localDataErased && operation.state != "complete"
@@ -597,6 +657,34 @@ internal class LifecycleStateStore(context: Context) {
       (!operation.deletionInProgressObserved || operation.localDataErased)
   }
 
+  private fun validRemoteAccessRevocation(operation: DurablePrivacyOperation): Boolean =
+    !operation.remoteAccessRevoked || (
+      operation.action == "revoke-google-access" &&
+        operation.localDataErased &&
+        operation.state in setOf("verifying", "complete")
+      )
+
+  private fun validSenderReleaseRecovery(operation: DurablePrivacyOperation): Boolean {
+    val salt = operation.senderReleaseRecoverySalt
+    val firebaseUidHash = operation.senderReleaseRecoveryFirebaseUidHash
+    val googleSubjectHash = operation.senderReleaseRecoveryGoogleSubjectHash
+    val allAbsent = salt == null && firebaseUidHash == null && googleSubjectHash == null
+    if (operation.action !in setOf("sign-out-wipe", "wipe-local-data")) return allAbsent
+    val proof = if (allAbsent) {
+      null
+    } else {
+      SenderReleaseRecoveryBindingProof(
+        salt = salt ?: return false,
+        firebaseUidHash = firebaseUidHash ?: return false,
+        googleSubjectHash = googleSubjectHash ?: return false,
+      ).takeIf(SenderReleaseRecoveryBindingPolicy::valid) ?: return false
+    }
+    if (operation.state == "complete") return proof == null
+    if (operation.authoritativeRecoveryKind == "sender-release") return proof == null
+    if (operation.localDataErased || operation.localWipeStarted) return proof != null
+    return true
+  }
+
   private fun validAuthoritativeRecovery(operation: DurablePrivacyOperation): Boolean = when (
     operation.authoritativeRecoveryKind
   ) {
@@ -618,6 +706,71 @@ internal class LifecycleStateStore(context: Context) {
 
   private fun readVersionSix(lines: List<String>): Pair<Long, DurablePrivacyOperation?>? {
     if (lines.size != 33) return null
+    val cutoff = lines[1].toLongOrNull()?.takeIf { it >= 0 } ?: return null
+    if (lines[2].isEmpty()) return (cutoff to null).takeIf {
+      lines.subList(3, lines.lastIndex).all(String::isEmpty)
+    }
+    for (index in listOf(7, 9, 10, 11, 17, 18, 20, 21)) {
+      if (lines[index].isNotEmpty() && lines[index].toLongOrNull() == null) return null
+    }
+    if (lines[12].isNotEmpty() && lines[12].toIntOrNull() == null) return null
+    val remoteDeletionComplete = when (lines[14]) {
+      "" -> null
+      "0" -> false
+      "1" -> true
+      else -> return null
+    }
+    val decoded = DurablePrivacyOperation(
+      id = lines[2],
+      action = lines[3],
+      state = lines[4],
+      reason = lines[5].ifEmpty { null },
+      updatedAtMillis = lines[6].toLongOrNull() ?: return null,
+      completedAtMillis = lines[7].ifEmpty { null }?.toLongOrNull(),
+      requestId = lines[8].ifEmpty { null },
+      remoteDrainUntilMillis = lines[9].ifEmpty { null }?.toLongOrNull(),
+      serverObservedAtMillis = lines[10].ifEmpty { null }?.toLongOrNull(),
+      acceptedAtElapsedMillis = lines[11].ifEmpty { null }?.toLongOrNull(),
+      acceptedBootCount = lines[12].ifEmpty { null }?.toIntOrNull(),
+      localDataErased = lines[13].decodeBoolean() ?: return null,
+      remoteDeletionComplete = remoteDeletionComplete,
+      transferActiveInstallationId = lines[15].ifEmpty { null },
+      transferTargetInstallationId = lines[16].ifEmpty { null },
+      transferSenderEpoch = lines[17].ifEmpty { null }?.toLongOrNull(),
+      transferResetGeneration = lines[18].ifEmpty { null }?.toLongOrNull(),
+      remoteRequestInstallationId = lines[19].ifEmpty { null },
+      remoteRequestSenderEpoch = lines[20].ifEmpty { null }?.toLongOrNull(),
+      remoteRequestResetGeneration = lines[21].ifEmpty { null }?.toLongOrNull(),
+      localWipeStarted = lines[22].decodeBoolean() ?: return null,
+      wipeInstallationId = lines[23].ifEmpty { null },
+      wipeCallbackGeneration = lines[24].ifEmpty { null },
+      authoritativeRecoveryKind = lines[25].ifEmpty { null },
+      deletionLocalWipeFallback = lines[26].decodeBoolean() ?: return null,
+      recoveryBindingSalt = lines[27].ifEmpty { null },
+      recoveryFirebaseUidHash = lines[28].ifEmpty { null },
+      recoveryGoogleSubjectHash = lines[29].ifEmpty { null },
+      deletionRetryAllowed = lines[30].decodeBoolean() ?: return null,
+      deletionInProgressObserved = lines[31].decodeBoolean() ?: return null,
+    )
+    // Version six could create a destructive-wipe marker only after authoritative sender release
+    // completed. Preserve that stronger legacy fact while removing its obsolete bearer request.
+    val operation = if (
+      decoded.action in setOf("sign-out-wipe", "wipe-local-data") &&
+      decoded.state == "local-wiping" &&
+      decoded.localWipeStarted
+    ) {
+      decoded.copy(
+        requestId = null,
+        authoritativeRecoveryKind = "sender-release",
+      )
+    } else {
+      decoded
+    }
+    return (cutoff to operation).takeIf { valid(operation) }
+  }
+
+  private fun readVersionSeven(lines: List<String>): Pair<Long, DurablePrivacyOperation?>? {
+    if (lines.size != 37) return null
     val cutoff = lines[1].toLongOrNull()?.takeIf { it >= 0 } ?: return null
     if (lines[2].isEmpty()) return (cutoff to null).takeIf {
       lines.subList(3, lines.lastIndex).all(String::isEmpty)
@@ -663,6 +816,10 @@ internal class LifecycleStateStore(context: Context) {
       recoveryGoogleSubjectHash = lines[29].ifEmpty { null },
       deletionRetryAllowed = lines[30].decodeBoolean() ?: return null,
       deletionInProgressObserved = lines[31].decodeBoolean() ?: return null,
+      remoteAccessRevoked = lines[32].decodeBoolean() ?: return null,
+      senderReleaseRecoverySalt = lines[33].ifEmpty { null },
+      senderReleaseRecoveryFirebaseUidHash = lines[34].ifEmpty { null },
+      senderReleaseRecoveryGoogleSubjectHash = lines[35].ifEmpty { null },
     )
     return (cutoff to operation).takeIf { valid(operation) }
   }

@@ -53,8 +53,12 @@ final class IOSGoogleIdentityCoordinator {
   private(set) var state: IOSGoogleSafeIdentityState = .connecting
   private var configuration: IOSGoogleRuntimeConfiguration?
   private var configured = false
+  private var protectedDataRaceRetryUsed = false
   private var googleIdentityAppCheckReady = false
+  private var pendingOpenURL: URL?
+  private var rejectedAmbiguousPendingOpenURL = false
   private var identityOperationInFlight: IOSGoogleIdentityOperation?
+  private var identitySafetyInterlock = false
   private var deletionRecoverySignInRunning: Bool {
     identityOperationInFlight == .deletionRecovery
   }
@@ -69,11 +73,28 @@ final class IOSGoogleIdentityCoordinator {
   func configureAtLaunch() {
     guard !configured else { return }
     configured = true
-    peopleStore.prepareAtLaunch { [weak self] storeReady in
+    peopleStore.prepareAtLaunch { [weak self] preparation in
       guard let self else { return }
-      guard storeReady else {
+      switch preparation {
+      case .protectedDataUnavailable:
+        // A complete-protection/keychain lock is temporary and is not a
+        // configuration verdict. Permit the protected-data lifecycle callback
+        // to retry without ever touching the encrypted People store.
+        self.configured = false
+        if UIApplication.shared.isProtectedDataAvailable,
+          !self.protectedDataRaceRetryUsed
+        {
+          // Covers unlock racing the asynchronous store read before the system
+          // notification reaches AppDelegate. Bound to one self-retry.
+          self.protectedDataRaceRetryUsed = true
+          DispatchQueue.main.async { [weak self] in self?.configureAtLaunch() }
+        }
+        return
+      case .unavailable:
         self.transition(.unavailable)
         return
+      case .ready:
+        self.protectedDataRaceRetryUsed = false
       }
       guard case .ready(let configuration) = IOSGoogleConfigurationResolver.resolve() else {
         self.transition(
@@ -81,9 +102,18 @@ final class IOSGoogleIdentityCoordinator {
         )
         return
       }
-      self.configuration = configuration
+      // This coordinator is the sole default-Firebase owner. Reusing an
+      // unexpectedly preconfigured app could cross tiers; calling configure a
+      // second time can also raise an Objective-C exception, so fail closed.
+      guard FirebaseApp.app() == nil else {
+        self.transition(.unavailable)
+        return
+      }
       AppCheck.setAppCheckProviderFactory(BirthdayAppAttestProviderFactory())
       FirebaseApp.configure(options: configuration.firebaseOptions)
+      self.configuration = configuration
+      IOSGeminiSuggestionGateway.shared
+        .configureOperationalGateAfterFirebaseLaunch()
       GIDSignIn.sharedInstance.configuration = GIDConfiguration(
         clientID: configuration.googleClientID
       )
@@ -95,32 +125,67 @@ final class IOSGoogleIdentityCoordinator {
           return
         }
         if self.accountDeletionStateBlocksOrdinaryIdentity() {
-          if IOSAccountDeletionReceiptStore.shared.current()?.localDataErased == true {
-            try? Auth.auth().signOut()
-            GIDSignIn.sharedInstance.signOut()
-            IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountDeletion()
-            self.transition(.signedOut(retainedSetup: false))
-          } else {
-            IOSAccountDeletionLocalCleanupCoordinator.shared.resumeIfNeeded()
-            try? Auth.auth().signOut()
-            GIDSignIn.sharedInstance.signOut()
-            self.transition(.reconnectRequired)
+          self.clearPendingOpenURL()
+          let localDataErased = IOSAccountDeletionReceiptStore.shared.current()?
+            .localDataErased == true
+          guard self.signOutDeletionRecoverySession() else {
+            self.transition(.unavailable)
+            return
           }
+          self.transition(
+            localDataErased ? .signedOut(retainedSetup: false) : .reconnectRequired
+          )
+          // Lifecycle startup may have observed the receipt before Firebase was
+          // configured. Resume only after both SDKs are ready and signed out.
+          IOSAccountDeletionLocalCleanupCoordinator.shared.resumeIfNeeded()
           return
         }
+        _ = self.consumePendingOpenURL(expectedScheme: configuration.reversedClientID)
         Task { @MainActor in await self.restorePreviousSession() }
       }
     }
   }
 
+  func retryConfigurationAfterProtectedDataBecomesAvailable() {
+    protectedDataRaceRetryUsed = false
+    configureAtLaunch()
+  }
+
   func handleOpenURL(_ url: URL) -> Bool {
-    guard configuration != nil, !deletionReceiptLookupInFlight else { return false }
+    guard isExpectedCallbackURL(url), !deletionReceiptLookupInFlight else {
+      clearPendingOpenURL()
+      return false
+    }
     if accountDeletionStateBlocksOrdinaryIdentity() {
       guard deletionRecoverySignInRunning,
-        IOSAccountDeletionRecoveryStore.shared.retryAuthorizedOperationId() != nil
-      else { return false }
+        IOSAccountDeletionRecoveryStore.shared.retryAuthorizedOperationId() != nil,
+        configuration != nil
+      else {
+        clearPendingOpenURL()
+        return false
+      }
+    }
+    guard configuration != nil, googleIdentityAppCheckReady else {
+      guard case .connecting = state, !rejectedAmbiguousPendingOpenURL else {
+        clearPendingOpenURL()
+        return false
+      }
+      guard pendingOpenURL == nil else {
+        // More than one cold callback is ambiguous. Drop both and refuse any
+        // later replay during this launch rather than guessing which is valid.
+        pendingOpenURL = nil
+        rejectedAmbiguousPendingOpenURL = true
+        return false
+      }
+      pendingOpenURL = url
+      return true
     }
     return GIDSignIn.sharedInstance.handle(url)
+  }
+
+  func rejectAmbiguousOpenURLs() {
+    pendingOpenURL = nil
+    rejectedAmbiguousPendingOpenURL = true
   }
 
   func continueWithGoogle(
@@ -457,6 +522,35 @@ final class IOSGoogleIdentityCoordinator {
     Task { @MainActor in completion(await firebaseAppCheckGate()) }
   }
 
+  /// A People 401 cannot be repaired by replaying `refreshTokensIfNeeded`
+  /// because GoogleSignIn-iOS has no supported forced refresh for an otherwise
+  /// unexpired access token. Retire the official Google session, invalidate all
+  /// protected review capability, and require a new foreground Google flow.
+  func requirePeopleReconnectAfterUnauthorized(
+    expectedBinding: IOSNativeGoogleAccountBinding
+  ) {
+    guard peopleStore.currentBinding().map({
+      $0.hasSameOwner(as: expectedBinding)
+        && $0.accountGeneration == expectedBinding.accountGeneration
+    }) == true else { return }
+    identitySafetyInterlock = true
+    IOSGeminiSuggestionGateway.shared.clearProvenance()
+    GIDSignIn.sharedInstance.signOut()
+    transition(.reconnectRequired)
+    companionStore.invalidateAccountSession { [weak self] result in
+      guard let self else { return }
+      guard case .success = result else {
+        self.transition(.unavailable)
+        return
+      }
+      self.companionStore.verifyAccountSessionInvalidated { [weak self] verified in
+        guard let self else { return }
+        self.identitySafetyInterlock = !verified
+        if !verified { self.transition(.unavailable) }
+      }
+    }
+  }
+
   func foregroundViewController() -> UIViewController? {
     Self.foregroundPresenter()
   }
@@ -465,6 +559,9 @@ final class IOSGoogleIdentityCoordinator {
   /// permitted only after both official identity SDKs prove that no account
   /// session remains; failure stays unavailable and cannot authorize replay.
   func beginSignedOutDeletionReceiptLookup() -> Bool {
+    guard configuration != nil, googleIdentityAppCheckReady,
+      FirebaseApp.app() != nil
+    else { return false }
     guard acquireIdentityOperation(.deletionReceiptLookup) else {
       return false
     }
@@ -483,52 +580,102 @@ final class IOSGoogleIdentityCoordinator {
   }
 
   func deletionSDKSessionIsAbsent() -> Bool {
-    Auth.auth().currentUser == nil
+    guard FirebaseApp.app() != nil else { return false }
+    return Auth.auth().currentUser == nil
       && GIDSignIn.sharedInstance.currentUser == nil
   }
 
   func completeSignOutAfterSafetyShutdown(retainData: Bool) async -> Bool {
+    IOSGeminiSuggestionGateway.shared.clearProvenance()
+    let firebaseSignOutSucceeded: Bool
+    if FirebaseApp.app() == nil {
+      // With no configured Firebase app there cannot be an Auth session to
+      // retain. Local People and companion cleanup still has to run.
+      firebaseSignOutSucceeded = true
+    } else {
+      do {
+        try Auth.auth().signOut()
+        firebaseSignOutSucceeded = true
+      } catch {
+        // Local deletion must not depend on SDK sign-out success. The failure is
+        // retained below and forces the identity interlock after every local
+        // cleanup attempt has run.
+        firebaseSignOutSucceeded = false
+      }
+    }
+    GIDSignIn.sharedInstance.signOut()
+
+    let peopleCleanupSucceeded: Bool
+    if retainData {
+      peopleStore.signOutRetainingData()
+      peopleCleanupSucceeded = true
+    } else {
+      peopleCleanupSucceeded = await withCheckedContinuation { continuation in
+        peopleStore.wipe { continuation.resume(returning: $0) }
+      }
+    }
+    let companionSessionInvalidated = await invalidateCompanionAccountSession()
+    let firebaseSessionAbsent = FirebaseApp.app() == nil
+      || Auth.auth().currentUser == nil
+    let sdkSessionsAbsent = firebaseSessionAbsent
+      && GIDSignIn.sharedInstance.currentUser == nil
+    guard firebaseSignOutSucceeded, sdkSessionsAbsent,
+      peopleCleanupSucceeded, companionSessionInvalidated
+    else {
+      enterIdentitySafetyInterlock()
+      return false
+    }
+    identitySafetyInterlock = false
+    transition(.signedOut(retainedSetup: retainData))
+    return true
+  }
+
+  /// Performs only the official Google provider revocation. Contact payloads
+  /// and reminders are already gone before this method is called. Keeping this
+  /// boundary separate lets the workflow durably record provider success
+  /// before attempting fallible Firebase/SDK session cleanup.
+  func disconnectGoogleProviderAfterLocalCleanup() async -> Bool {
     guard configuration != nil else { return false }
     IOSGeminiSuggestionGateway.shared.clearProvenance()
     do {
-      try Auth.auth().signOut()
-      GIDSignIn.sharedInstance.signOut()
-      if retainData {
-        peopleStore.signOutRetainingData()
-      } else {
-        let wiped = await withCheckedContinuation { continuation in
-          peopleStore.wipe { continuation.resume(returning: $0) }
-        }
-        guard wiped else { return false }
-      }
-      await withCheckedContinuation { continuation in
-        companionStore.invalidateAccountSession { _ in continuation.resume() }
-      }
-      transition(.signedOut(retainedSetup: retainData))
+      try await GIDSignIn.sharedInstance.disconnect()
       return true
     } catch {
       return false
     }
   }
 
-  func revokeGoogleAccessAfterSafetyShutdown() async -> Bool {
-    guard configuration != nil else { return false }
+  /// Finishes local SDK cleanup only after the workflow has durably marked the
+  /// provider disconnect and appended CONTACTS_READONLY/REVOKED. It is safe to
+  /// retry after restart and never touches the already-cleared People payload.
+  func finishRevokedGoogleSDKCleanupAfterLocalCleanup() async -> Bool {
     IOSGeminiSuggestionGateway.shared.clearProvenance()
-    do {
-      try await GIDSignIn.sharedInstance.disconnect()
-      try Auth.auth().signOut()
-      let wiped = await withCheckedContinuation { continuation in
-        peopleStore.wipe { continuation.resume(returning: $0) }
+    let firebaseSignOutSucceeded: Bool
+    if FirebaseApp.app() == nil {
+      firebaseSignOutSucceeded = true
+    } else {
+      do {
+        try Auth.auth().signOut()
+        firebaseSignOutSucceeded = true
+      } catch {
+        firebaseSignOutSucceeded = false
       }
-      guard wiped else { return false }
-      await withCheckedContinuation { continuation in
-        companionStore.invalidateAccountSession { _ in continuation.resume() }
-      }
-      transition(.signedOut(retainedSetup: false))
-      return true
-    } catch {
+    }
+    GIDSignIn.sharedInstance.signOut()
+    let companionSessionInvalidated = await invalidateCompanionAccountSession()
+    let firebaseSessionAbsent = FirebaseApp.app() == nil
+      || Auth.auth().currentUser == nil
+    let sdkSessionsAbsent = firebaseSessionAbsent
+      && GIDSignIn.sharedInstance.currentUser == nil
+    guard firebaseSignOutSucceeded, sdkSessionsAbsent,
+      companionSessionInvalidated
+    else {
+      enterIdentitySafetyInterlock()
       return false
     }
+    identitySafetyInterlock = false
+    transition(.signedOut(retainedSetup: true))
+    return true
   }
 
   /// Clears official provider state and destroys the People database/key after
@@ -536,6 +683,7 @@ final class IOSGoogleIdentityCoordinator {
   /// wipe. The companion store is destroyed after notification/composer shutdown.
   func completeAccountDeletionLocalShutdown() async -> Bool {
     guard configuration != nil else { return false }
+    guard await invalidatePeopleSyncFence() else { return false }
     IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountDeletion()
     do {
       try Auth.auth().signOut()
@@ -565,6 +713,10 @@ final class IOSGoogleIdentityCoordinator {
     binding: IOSNativeGoogleAccountBinding
   ) async -> Bool {
     guard exactSessionBinding() == binding else { return false }
+    guard await invalidatePeopleSyncFence() else {
+      transition(.reconnectRequired)
+      return false
+    }
     IOSGeminiSuggestionGateway.shared.clearProvenance()
     let peopleWiped = await withCheckedContinuation { continuation in
       peopleStore.wipe { continuation.resume(returning: $0) }
@@ -767,7 +919,43 @@ final class IOSGoogleIdentityCoordinator {
   private func transition(_ next: IOSGoogleSafeIdentityState) {
     guard state != next else { return }
     state = next
+    switch next {
+    case .connected:
+      _ = IOSPeopleBackgroundRefreshCoordinator.shared
+        .scheduleForConnectedSession()
+    case .connecting:
+      break
+    case .reconnectRequired, .signedOut, .unavailable:
+      clearPendingOpenURL()
+      IOSPeopleBackgroundRefreshCoordinator.shared
+        .cancelForDisconnectedSession()
+    }
     companionStore.markExternalProjectionChanged()
+  }
+
+  private func isExpectedCallbackURL(_ url: URL) -> Bool {
+    guard let scheme = url.scheme,
+      let expected = configuration?.reversedClientID
+        ?? IOSGoogleConfigurationResolver.declaredCallbackScheme()
+    else { return false }
+    return scheme.caseInsensitiveCompare(expected) == .orderedSame
+  }
+
+  private func consumePendingOpenURL(expectedScheme: String) -> Bool {
+    guard !rejectedAmbiguousPendingOpenURL, let url = pendingOpenURL else {
+      clearPendingOpenURL()
+      return false
+    }
+    clearPendingOpenURL()
+    guard url.scheme?.caseInsensitiveCompare(expectedScheme) == .orderedSame,
+      !deletionReceiptLookupInFlight,
+      !accountDeletionStateBlocksOrdinaryIdentity()
+    else { return false }
+    return GIDSignIn.sharedInstance.handle(url)
+  }
+
+  private func clearPendingOpenURL() {
+    pendingOpenURL = nil
   }
 
   private func acquireIdentityOperation(_ operation: IOSGoogleIdentityOperation) -> Bool {
@@ -792,6 +980,7 @@ final class IOSGoogleIdentityCoordinator {
   /// safe order before Firebase Auth is called. Every other pending or
   /// unreadable deletion state blocks even account selection.
   private func canBeginOrdinaryGoogleSelection() -> Bool {
+    guard !identitySafetyInterlock else { return false }
     let receiptStore = IOSAccountDeletionReceiptStore.shared
     guard !receiptStore.hasPendingOrUnreadableReceipt() else { return false }
     guard IOSAccountDeletionRecoveryStore.shared.hasPendingOrUnreadableJournal() else {
@@ -802,6 +991,10 @@ final class IOSGoogleIdentityCoordinator {
 
   private func signOutDeletionRecoverySession() -> Bool {
     IOSGeminiSuggestionGateway.shared.clearLocalDataForAccountDeletion()
+    guard FirebaseApp.app() != nil else {
+      GIDSignIn.sharedInstance.signOut()
+      return false
+    }
     do {
       try Auth.auth().signOut()
       GIDSignIn.sharedInstance.signOut()
@@ -811,6 +1004,33 @@ final class IOSGoogleIdentityCoordinator {
       GIDSignIn.sharedInstance.signOut()
       return false
     }
+  }
+
+  private func invalidatePeopleSyncFence() async -> Bool {
+    await withCheckedContinuation { continuation in
+      peopleStore.invalidateOutstandingSync {
+        continuation.resume(returning: $0)
+      }
+    }
+  }
+
+  private func invalidateCompanionAccountSession() async -> Bool {
+    let invalidated = await withCheckedContinuation { continuation in
+      companionStore.invalidateAccountSession { result in
+        continuation.resume(returning: (try? result.get()) != nil)
+      }
+    }
+    guard invalidated else { return false }
+    return await withCheckedContinuation { continuation in
+      companionStore.verifyAccountSessionInvalidated {
+        continuation.resume(returning: $0)
+      }
+    }
+  }
+
+  private func enterIdentitySafetyInterlock() {
+    identitySafetyInterlock = true
+    transition(.unavailable)
   }
 
   /// Ends a failed ordinary identity exchange. Automatic Auth deletion is

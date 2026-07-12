@@ -12,7 +12,7 @@ export type TextVariant =
   | 'caption';
 
 type AppTextProps = PropsWithChildren<
-  TextProps & {
+  Omit<TextProps, 'allowFontScaling' | 'maxFontSizeMultiplier'> & {
     variant?: TextVariant;
     color?: 'default' | 'muted' | 'accent' | 'critical';
     style?: StyleProp<TextStyle>;
@@ -47,9 +47,9 @@ export function AppText({
 
   return (
     <Text
+      {...textProps}
       allowFontScaling
       maxFontSizeMultiplier={2}
-      {...textProps}
       style={[variants[variant], { color: resolvedColor }, style]}
     >
       {children}

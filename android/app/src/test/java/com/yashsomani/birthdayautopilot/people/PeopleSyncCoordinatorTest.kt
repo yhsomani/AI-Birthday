@@ -4,6 +4,7 @@ import com.yashsomani.birthdayautopilot.auth.EphemeralToken
 import java.util.ArrayDeque
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -12,6 +13,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class PeopleSyncCoordinatorTest {
   @Test
   fun `successful and malformed raw response buffers are wiped after parsing`() = runTest {

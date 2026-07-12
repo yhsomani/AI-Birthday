@@ -4,6 +4,7 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -63,6 +64,20 @@ class PeopleRequestFactoryTest {
       (factory.build(PeopleSyncMode.Full, "bad token") as PeopleRequestBuildResult.Failure).reason,
     )
     assertTrue(factory.parameterFingerprint.matches(Regex("^[0-9a-f]{64}$")))
+  }
+
+  @Test
+  fun `local phone region changes the sync fingerprint but is never sent to People`() {
+    val india = PeopleRequestFactory(pageSize = 1_000, phoneNormalizationRegion = "IN")
+    val indiaLowercase = PeopleRequestFactory(pageSize = 1_000, phoneNormalizationRegion = "in")
+    val france = PeopleRequestFactory(pageSize = 1_000, phoneNormalizationRegion = "FR")
+
+    assertEquals(india.parameterFingerprint, indiaLowercase.parameterFingerprint)
+    assertNotEquals(india.parameterFingerprint, france.parameterFingerprint)
+    val request = india.build(PeopleSyncMode.Full, null) as PeopleRequestBuildResult.Success
+    val providerQuery = query(request.request.uri.rawQuery)
+    assertFalse(providerQuery.containsKey("phoneNormalizationRegion"))
+    assertFalse(providerQuery.values.contains("IN"))
   }
 
   private fun query(rawQuery: String): Map<String, String> = rawQuery

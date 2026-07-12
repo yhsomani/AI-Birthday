@@ -1,11 +1,14 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 
+import type { ProjectionEnvelope } from '../domain/shared/result';
+import type { BootstrapProjection } from '../domain/setup/model';
 import { Screen } from '../design-system/components/Primitives';
 import type {
   LiveAppPort,
   LiveCompanionPort,
 } from '../features/live/LiveAppPort';
 import { LiveAppShell } from '../features/live/LiveAppShell';
+import { LiveProductSetupJourney } from '../features/live/LiveProductSetupJourney';
 import {
   LiveError,
   LiveLoading,
@@ -13,6 +16,70 @@ import {
 import { LiveSetupScreen } from '../features/live/LiveSetupScreen';
 import { useLiveProjection } from '../features/live/useLiveProjection';
 import { useAppLocalization } from '../localization/LocalizationProvider';
+
+function CompletedIdentityBoundary({
+  bootstrap,
+  companionPort,
+  port,
+}: {
+  bootstrap: ProjectionEnvelope<BootstrapProjection>;
+  companionPort: LiveCompanionPort;
+  port: LiveAppPort;
+}) {
+  const { t } = useAppLocalization();
+  const [journeyDeferred, setJourneyDeferred] = useState(false);
+  const loadSetup = useCallback(() => port.getSetup(), [port]);
+  const setup = useLiveProjection(loadSetup, port, [
+    'setup',
+    'contacts',
+    'messages',
+    'automation',
+  ]);
+
+  if (setup.state.kind === 'loading') {
+    return (
+      <Screen includeTopInset testID="native-product-setup-boundary">
+        <LiveLoading label={t('live.guidedSetup.checking')} />
+      </Screen>
+    );
+  }
+  if (setup.state.kind === 'error') {
+    return (
+      <Screen includeTopInset testID="native-product-setup-boundary">
+        <LiveError
+          title={t('live.guidedSetup.progressUnavailable')}
+          problem={setup.state.problem}
+          onRetry={() => setup.reload()}
+          testID="native-product-setup-unavailable"
+        />
+      </Screen>
+    );
+  }
+
+  const productSetupRequired =
+    !setup.state.result.envelope.value.initialActivationCompleted;
+
+  if (productSetupRequired && !journeyDeferred) {
+    return (
+      <LiveProductSetupJourney
+        capability={bootstrap.value.capability}
+        companionPort={companionPort}
+        onDefer={() => setJourneyDeferred(true)}
+        onRefreshSetup={setup.reload}
+        port={port}
+      />
+    );
+  }
+
+  return (
+    <LiveAppShell
+      account={bootstrap.value.account}
+      capability={bootstrap.value.capability}
+      companionPort={companionPort}
+      port={port}
+    />
+  );
+}
 
 export function NativeAppBoundary({
   companionPort,
@@ -62,8 +129,8 @@ export function NativeAppBoundary({
   }
 
   return (
-    <LiveAppShell
-      capability={envelope.value.capability}
+    <CompletedIdentityBoundary
+      bootstrap={envelope}
       companionPort={companionPort}
       port={port}
     />

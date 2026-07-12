@@ -1,3 +1,21 @@
 <resources>
     <string name="app_name">Birthday Autopilot</string>
+    <string name="attention_notification_title">Birthday Autopilot needs attention</string>
+    <string name="attention_notification_body">Open the app to review a safety or setup item.</string>
+    <string name="attention_channel_name">Attention needed</string>
+    <string name="attention_channel_description">Content-free safety and setup reminders</string>
+    <string name="birthday_incomplete">Incomplete birthday</string>
+    <string name="birthday_selected">Birthday selected</string>
+    <string name="configuration_not_configured">Not configured</string>
+    <string name="configuration_grace_to"> · grace to %1$s</string>
+    <string name="configuration_default_sms_sim">Default SMS SIM</string>
+    <string name="configuration_default_sim_slot">Default SIM · slot %1$d</string>
+    <string name="phone_source_fallback">Phone</string>
+    <string name="outcome_delivered">Delivered</string>
+    <string name="outcome_sent_from_device">Sent from this device</string>
+    <string name="outcome_missed">Missed</string>
+    <string name="outcome_skipped">Skipped</string>
+    <string name="outcome_unknown">Outcome unknown</string>
+    <string name="sender_local_device">This device</string>
+    <string name="sender_other_verified_android_device">Another verified Android device</string>
 </resources>

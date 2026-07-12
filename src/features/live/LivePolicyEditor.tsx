@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import type {
   PolicyEditorProjection,
@@ -13,6 +13,7 @@ import type {
 } from '../../domain/shared/result';
 import type { PlatformCapability } from '../../domain/shared/platform';
 import { validateWindowDraft } from '../../domain/validation/windowDraft';
+import { AccessibleTextInput } from '../../design-system/components/AccessibleTextInput';
 import { AppText } from '../../design-system/components/AppText';
 import {
   Button,
@@ -264,10 +265,8 @@ export function LivePolicyEditor({
           <Card>
             <AppText variant="label">{t('live.policy.primaryWindow')}</AppText>
             <View style={styles.row}>
-              <TextInput
+              <AccessibleTextInput
                 accessibilityLabel={t('live.policy.start')}
-                allowFontScaling
-                maxFontSizeMultiplier={2}
                 maxLength={5}
                 onChangeText={value => {
                   setPrimaryStart(value);
@@ -286,10 +285,8 @@ export function LivePolicyEditor({
                 testID="live-policy-start"
                 value={primaryStart}
               />
-              <TextInput
+              <AccessibleTextInput
                 accessibilityLabel={t('live.policy.end')}
-                allowFontScaling
-                maxFontSizeMultiplier={2}
                 maxLength={5}
                 onChangeText={value => {
                   setPrimaryEnd(value);
@@ -340,10 +337,8 @@ export function LivePolicyEditor({
               />
             </View>
             {graceMode === 'same-day-grace' ? (
-              <TextInput
+              <AccessibleTextInput
                 accessibilityLabel={t('live.policy.graceEnd')}
-                allowFontScaling
-                maxFontSizeMultiplier={2}
                 maxLength={5}
                 onChangeText={value => {
                   setGraceEnd(value);
@@ -367,11 +362,9 @@ export function LivePolicyEditor({
             {platform === 'android' ? (
               <>
                 <AppText variant="label">{t('live.policy.dailyCap')}</AppText>
-                <TextInput
+                <AccessibleTextInput
                   accessibilityLabel={t('live.policy.dailyCap')}
-                  allowFontScaling
                   keyboardType="number-pad"
-                  maxFontSizeMultiplier={2}
                   maxLength={2}
                   onChangeText={value => {
                     setDailyCap(value);

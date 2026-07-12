@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import type {
   GeminiSuggestionsProjection,
@@ -13,11 +13,13 @@ import type { NativeRevision } from '../../domain/shared/brand';
 import type { NativeProblem } from '../../domain/shared/result';
 import type { ProjectionEnvelope } from '../../domain/shared/result';
 import { validateTemplateDraft } from '../../domain/validation/templateDraft';
+import { AccessibleTextInput } from '../../design-system/components/AccessibleTextInput';
 import { AppText } from '../../design-system/components/AppText';
 import {
   Button,
   Card,
   ChoiceChip,
+  ReadinessBanner,
   Screen,
   SectionHeading,
   StatusRow,
@@ -404,11 +406,9 @@ export function LiveMessageScreen({
           </View>
 
           <SectionHeading title={t('live.message.text')} />
-          <TextInput
+          <AccessibleTextInput
             accessibilityLabel={t('live.message.text')}
             accessibilityHint={t('live.message.textHint')}
-            allowFontScaling
-            maxFontSizeMultiplier={2}
             maxLength={1_000}
             multiline
             onChangeText={value => {
@@ -432,6 +432,12 @@ export function LiveMessageScreen({
               testID="live-message-validation"
             />
           ) : null}
+          <ReadinessBanner
+            title={t('live.message.geminiPrivacyTitle')}
+            detail={t('live.message.geminiPrivacyBody')}
+            tone="info"
+            testID="live-message-gemini-privacy"
+          />
           <Button
             label={
               pending === 'suggest'
@@ -492,7 +498,7 @@ export function LiveMessageScreen({
             </Card>
           ) : null}
           {preview?.preview.kind === 'valid' ? (
-            <Card accessibilityLabel={t('live.message.previewTitle')}>
+            <Card>
               <AppText variant="heading">
                 {t('live.message.previewTitle')}
               </AppText>

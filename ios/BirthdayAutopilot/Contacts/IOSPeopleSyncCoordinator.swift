@@ -45,37 +45,71 @@ final class IOSPeopleSyncCoordinator {
       return
     }
     running = true
-    let initialMode = store.syncMode(
-      parameterFingerprint: requestFactory.parameterFingerprint
-    )
     Task { @MainActor in
+      let syncStart = await withCheckedContinuation { continuation in
+        store.beginSync(
+          expectedBinding: expectedBinding,
+          parameterFingerprint: requestFactory.parameterFingerprint
+        ) { continuation.resume(returning: $0) }
+      }
+      guard let syncStart else {
+        running = false
+        completion(.failed(.storage))
+        return
+      }
       let outcome = await perform(
-        initialMode: initialMode,
+        initialMode: syncStart.mode,
         expectedBinding: expectedBinding,
+        syncGeneration: syncStart.generation,
         interactiveAuthorization: interactiveAuthorization
       )
-      running = false
+      var shouldPublishProjectionChange: Bool
+      if case .completed = outcome {
+        shouldPublishProjectionChange = true
+      } else {
+        shouldPublishProjectionChange = false
+      }
       if case .failed(let failure) = outcome, failure != .cancelled {
         let storageReason = Self.safeStorageReason(failure)
-        _ = await withCheckedContinuation { continuation in
+        shouldPublishProjectionChange = await withCheckedContinuation { continuation in
           store.recordSyncFailure(
             storageReason,
+            expectedSyncGeneration: syncStart.generation,
             authorizationRequired: failure == .authorizationRequired || failure == .forbidden
           ) { continuation.resume(returning: $0) }
         }
+      } else if case .failed(.cancelled) = outcome {
+        shouldPublishProjectionChange = await withCheckedContinuation { continuation in
+          store.finishSyncWithoutMutation(
+            expectedSyncGeneration: syncStart.generation
+          ) { continuation.resume(returning: $0) }
+        }
       }
-      CompanionProtectedStore.shared.markExternalProjectionChanged()
+      running = false
+      if shouldPublishProjectionChange {
+        CompanionProtectedStore.shared.markExternalProjectionChanged()
+      }
+      if case .completed = outcome {
+        _ = IOSPeopleBackgroundRefreshCoordinator.shared
+          .scheduleForConnectedSession()
+      }
       completion(outcome)
     }
+  }
+
+  /// Invalidates the durable generation captured by any current request. The
+  /// request itself may finish, but its response can no longer mutate storage.
+  func invalidateOutstandingSync(completion: @escaping (Bool) -> Void) {
+    store.invalidateOutstandingSync(completion: completion)
   }
 
   private func perform(
     initialMode: IOSPeopleSyncMode,
     expectedBinding: IOSNativeGoogleAccountBinding,
+    syncGeneration: String,
     interactiveAuthorization: Bool
   ) async -> IOSPeopleSyncOutcome {
     var mode = initialMode
-    var unauthorizedRecoveryUsed = false
     var expiredTokenRecoveryUsed = false
     while true {
       let acquisition = await authorization.acquire(interactive: interactiveAuthorization)
@@ -86,16 +120,20 @@ final class IOSPeopleSyncCoordinator {
       let attempt = await runOnce(
         mode: mode,
         expectedBinding: expectedBinding,
+        syncGeneration: syncGeneration,
         accessToken: accessToken
       )
       accessToken.clear()
       switch attempt {
       case .unauthorized:
-        guard !unauthorizedRecoveryUsed else {
-          return .failed(.repeatedUnauthorized)
-        }
-        unauthorizedRecoveryUsed = true
-        authorization.clear(accessToken)
+        // GoogleSignIn-iOS exposes no supported forced refresh for an
+        // unexpired rejected bearer. Never replay it. End only the Google SDK
+        // session and require one new foreground account reconnect while the
+        // Firebase session remains unusable through exact-session checks.
+        identity.requirePeopleReconnectAfterUnauthorized(
+          expectedBinding: expectedBinding
+        )
+        return .failed(.authorizationRequired)
       case .expiredSyncToken:
         guard case .incremental = mode, !expiredTokenRecoveryUsed else {
           return .failed(.malformed)
@@ -103,6 +141,12 @@ final class IOSPeopleSyncCoordinator {
         expiredTokenRecoveryUsed = true
         mode = .full
       case .terminal(let outcome):
+        if case .failed(.forbidden) = outcome {
+          identity.requirePeopleReconnectAfterUnauthorized(
+            expectedBinding: expectedBinding
+          )
+          return .failed(.authorizationRequired)
+        }
         if expiredTokenRecoveryUsed,
           case .completed(let count, let completedMode, _) = outcome
         {
@@ -120,11 +164,10 @@ final class IOSPeopleSyncCoordinator {
   private func runOnce(
     mode: IOSPeopleSyncMode,
     expectedBinding: IOSNativeGoogleAccountBinding,
+    syncGeneration: String,
     accessToken: IOSEphemeralGoogleAccessToken
   ) async -> AttemptResult {
     let completedMode: IOSPeopleCompletedMode = mode == .full ? .full : .incremental
-    store.beginSync(mode: completedMode)
-    CompanionProtectedStore.shared.markExternalProjectionChanged()
     let startedAt = ProcessInfo.processInfo.systemUptime
     var pageToken: String?
     var pageCount = 0
@@ -217,6 +260,7 @@ final class IOSPeopleSyncCoordinator {
         let committed = await withCheckedContinuation { continuation in
           store.commit(
             expectedBinding: expectedBinding,
+            expectedSyncGeneration: syncGeneration,
             mode: completedMode,
             deltas: deltas,
             nextSyncToken: nextSyncToken,

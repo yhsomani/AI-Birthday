@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.yashsomani.birthdayautopilot.automation.state.TestJobState
 import com.yashsomani.birthdayautopilot.core.model.AccountMode
+import com.yashsomani.birthdayautopilot.messages.TemplatePlaceholderMode
 import com.yashsomani.birthdayautopilot.people.PeopleBirthday
 import com.yashsomani.birthdayautopilot.people.PeopleContactDelta
 import com.yashsomani.birthdayautopilot.people.PeopleName
@@ -29,7 +30,7 @@ class PeopleSyncDaoInstrumentationTest {
   private lateinit var database: BirthdayDatabase
   private lateinit var dao: PeopleSyncDao
   private var now = 10_000L
-  private val fingerprint = PeopleRequestFactory(1_000).parameterFingerprint
+  private val fingerprint = PeopleRequestFactory(1_000, "IN").parameterFingerprint
 
   @Before
   fun setUp() = runBlocking {
@@ -130,10 +131,50 @@ class PeopleSyncDaoInstrumentationTest {
     assertNotNull(dao.contactSyncState(ACCOUNT_ID)?.stagingGeneration)
   }
 
+  @Test
+  fun genericTemplateMakesNamelessContactReadyInBothPageAndCountQueries() = runBlocking {
+    val full = store().begin(PeopleSyncMode.Full)!!
+    assertTrue(full.stagePage(0, listOf(namelessDelta())))
+    assertTrue(full.commit(completion("full-token", changedPeople = 1)))
+
+    assertTrue(dao.contactPage(ACCOUNT_ID, "ready", "%", 50, 0).isEmpty())
+    assertEquals(0, dao.contactCount(ACCOUNT_ID, "ready", "%"))
+    assertEquals(1, dao.contactCount(ACCOUNT_ID, "needs-attention", "%"))
+
+    database.safetyLedgerDao().insertMessageTemplate(
+      MessageTemplateEntity(
+        templateId = "template-generic",
+        accountId = ACCOUNT_ID,
+        source = TemplateSource.BUILT_IN,
+        exactTemplateText = "Happy birthday! Wishing you a wonderful day.",
+        languageTag = "en",
+        tone = "warm",
+        placeholderMode = TemplatePlaceholderMode.GENERIC_NO_NAME.name,
+        templateVersion = "birthday-defaults-v1-en-generic",
+        promptPolicyVersion = null,
+        validatorVersion = "birthday-template-validator-v1",
+        modelIdentifier = null,
+        contentHash = "9".repeat(64),
+        validationState = TemplateValidationState.VALID,
+        revision = 1,
+        createdAtMillis = now,
+        updatedAtMillis = now,
+      ),
+    )
+
+    assertEquals(
+      "Nameless Friend",
+      dao.contactPage(ACCOUNT_ID, "ready", "%", 50, 0).single().displayName,
+    )
+    assertEquals(1, dao.contactCount(ACCOUNT_ID, "ready", "%"))
+    assertTrue(dao.contactPage(ACCOUNT_ID, "needs-attention", "%", 50, 0).isEmpty())
+    assertEquals(0, dao.contactCount(ACCOUNT_ID, "needs-attention", "%"))
+  }
+
   private fun store() = RoomPeopleSyncStagingStore(
     dao = dao,
     accountId = ACCOUNT_ID,
-    accountLocaleTag = "en-IN",
+    homeRegion = "IN",
     parameterFingerprint = fingerprint,
     clock = PeopleWallClock { now++ },
   )
@@ -152,6 +193,15 @@ class PeopleSyncDaoInstrumentationTest {
     names = listOf(PeopleName("Ada Lovelace", "Ada")),
     birthdays = listOf(PeopleBirthday(1815, 12, 12)),
     phoneNumbers = listOf(PeoplePhone("+919876543210", "mobile")),
+  )
+
+  private fun namelessDelta() = PeopleContactDelta(
+    resourceName = "people/nameless",
+    contactSourceId = "contacts/nameless",
+    deleted = false,
+    names = listOf(PeopleName("Nameless Friend", null)),
+    birthdays = listOf(PeopleBirthday(null, 6, 15)),
+    phoneNumbers = listOf(PeoplePhone("+919876543211", "mobile")),
   )
 
   private fun deletedDelta() = PeopleContactDelta(

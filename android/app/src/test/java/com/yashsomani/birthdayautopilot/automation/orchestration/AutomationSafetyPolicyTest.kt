@@ -62,6 +62,20 @@ class AutomationSafetyPolicyTest {
   }
 
   @Test
+  fun `closed coordination ambiguity is exact-status refinement only`() {
+    val unknown = armReconciling().copy(state = CoordinationPermitState.COORDINATION_UNKNOWN)
+
+    assertEquals(
+      ArmRecoveryAction.QUERY_EXACT_STATUS_FOR_REFINEMENT,
+      ArmRecoveryPolicy.decide(unknown, BOOT + 1, 0),
+    )
+    assertNotEquals(
+      ArmRecoveryAction.DISPATCH_ONCE,
+      ArmRecoveryPolicy.decide(unknown, BOOT, 2_000),
+    )
+  }
+
+  @Test
   fun `trusted time advances only on the same boot and monotonic elapsed clock`() {
     val trust = ClockTrustEntity(
       accountId = "account",
@@ -81,6 +95,61 @@ class AutomationSafetyPolicyTest {
       TrustedTimeEstimator.estimate(
         trust.copy(status = ClockTrustStatus.DRIFTED),
         2_500,
+        BOOT,
+      ),
+    )
+  }
+
+  @Test
+  fun `clock rollback forward and reboot matrix never reconstructs unsafe trusted time`() {
+    val dayMillis = 24L * 60L * 60L * 1_000L
+    val anchor = 500L * dayMillis
+    val serverAtAnchor = 1_700_000_000_000L
+    val trust = ClockTrustEntity(
+      accountId = "account",
+      status = ClockTrustStatus.TRUSTED,
+      greatestTrustedServerMillis = serverAtAnchor,
+      lastDeviceWallMillis = serverAtAnchor,
+      lastElapsedRealtimeMillis = anchor,
+      trustedBootCount = BOOT,
+      lastVerificationMillis = serverAtAnchor,
+      observedDriftMillis = 0,
+      revision = 0,
+    )
+
+    for (forward in listOf(0L, 1L, 5L * 60L * 1_000L, 401L * dayMillis)) {
+      assertEquals(
+        serverAtAnchor + forward,
+        TrustedTimeEstimator.estimate(trust, anchor + forward, BOOT),
+      )
+    }
+    assertNull(TrustedTimeEstimator.estimate(trust, anchor - 1, BOOT))
+    assertNull(TrustedTimeEstimator.estimate(trust, anchor - 401L * dayMillis, BOOT))
+    assertNull(TrustedTimeEstimator.estimate(trust, anchor, null))
+    assertNull(TrustedTimeEstimator.estimate(trust, anchor, BOOT + 1))
+
+    // Wall-clock values are never extrapolation anchors. Forward/rollback auditing happens
+    // against the monotonic server estimate at the orchestration boundary.
+    assertEquals(
+      serverAtAnchor,
+      TrustedTimeEstimator.estimate(
+        trust.copy(lastDeviceWallMillis = Long.MIN_VALUE),
+        anchor,
+        BOOT,
+      ),
+    )
+    assertEquals(
+      serverAtAnchor,
+      TrustedTimeEstimator.estimate(
+        trust.copy(lastDeviceWallMillis = Long.MAX_VALUE),
+        anchor,
+        BOOT,
+      ),
+    )
+    assertNull(
+      TrustedTimeEstimator.estimate(
+        trust.copy(greatestTrustedServerMillis = Long.MAX_VALUE),
+        anchor + 1,
         BOOT,
       ),
     )

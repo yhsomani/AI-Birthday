@@ -1,6 +1,7 @@
 package com.yashsomani.birthdayautopilot.people
 
 import com.yashsomani.birthdayautopilot.auth.ContactsAuthorizationFailure
+import com.yashsomani.birthdayautopilot.core.model.AccountMode
 
 sealed interface PeopleSyncOutcome {
   data class Completed(
@@ -31,6 +32,29 @@ sealed interface PeopleSyncOutcome {
   data object StorageFailure : PeopleSyncOutcome
 
   data object Cancelled : PeopleSyncOutcome
+
+  /** Sender ownership must be resolved before this installation reads raw Contacts. */
+  data class OwnershipBlocked(val reason: PeopleSyncOwnershipBlock) : PeopleSyncOutcome
+}
+
+enum class PeopleSyncOwnershipBlock(val wireCode: String) {
+  ACTIVE_SENDER_OTHER_DEVICE("active-sender-other-device"),
+  TRANSFER_PENDING("transfer-pending"),
+  ACCOUNT_DELETING("firebase-account-deleting"),
+  OWNERSHIP_UNVERIFIED("coordination-unavailable"),
+}
+
+internal object PeopleSyncOwnershipPolicy {
+  fun blockedReason(mode: AccountMode?): PeopleSyncOwnershipBlock? = when (mode) {
+    AccountMode.STANDBY -> PeopleSyncOwnershipBlock.ACTIVE_SENDER_OTHER_DEVICE
+    AccountMode.TRANSFER_PENDING -> PeopleSyncOwnershipBlock.TRANSFER_PENDING
+    AccountMode.DELETING -> PeopleSyncOwnershipBlock.ACCOUNT_DELETING
+    AccountMode.TEST_ONLY,
+    AccountMode.PAUSED_REPAIR,
+    AccountMode.AUTOMATION_ACTIVE,
+    -> null
+    null -> PeopleSyncOwnershipBlock.OWNERSHIP_UNVERIFIED
+  }
 }
 
 enum class CompletedSyncMode {
@@ -40,6 +64,7 @@ enum class CompletedSyncMode {
 
 enum class PeopleAuthorizationReason {
   CONFIGURATION,
+  CONTACTS_DISCLOSURE,
   APP_CHECK,
   FIREBASE_SESSION,
   ACTIVITY,

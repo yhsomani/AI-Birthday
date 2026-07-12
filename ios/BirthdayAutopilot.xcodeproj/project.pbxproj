@@ -11,6 +11,8 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		A2A000012F10000100000001 /* BirthdayAutopilotNativeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A000032F10000100000003 /* BirthdayAutopilotNativeTests.swift */; };
+		A2A000022F10000100000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2A000052F10000100000005 /* XCTest.framework */; };
 		B1A000012F00000100000001 /* CompanionMessageModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A000032F00000100000003 /* CompanionMessageModule.swift */; };
 		B1A000022F00000100000002 /* CompanionMessageModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = B1A000042F00000100000004 /* CompanionMessageModuleBridge.m */; };
 		B1A000052F00000100000005 /* CompanionProtectedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A000082F00000100000008 /* CompanionProtectedStore.swift */; };
@@ -19,6 +21,9 @@
 		B1A0000B2F0000010000000B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		B1A0000C2F0000010000000C /* BirthdayNativeModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000E2F0000010000000E /* BirthdayNativeModule.swift */; };
 		B1A0000D2F0000010000000D /* BirthdayNativeModuleBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = B1A0000F2F0000010000000F /* BirthdayNativeModuleBridge.mm */; };
+		B2A000012F10000100000001 /* IOSPeopleBackgroundRefreshPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A000022F10000100000002 /* IOSPeopleBackgroundRefreshPolicyTests.swift */; };
+		B2A000032F10000100000003 /* IOSPhoneNumberNormalizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A000042F10000100000004 /* IOSPhoneNumberNormalizerTests.swift */; };
+		B2A000052F10000100000005 /* IOSCompanionRetentionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A000062F10000100000006 /* IOSCompanionRetentionPolicyTests.swift */; };
 		C1A000012F00000100000001 /* PeopleContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A000112F00000100000011 /* PeopleContracts.swift */; };
 		C1A000022F00000100000002 /* PeopleJSONParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A000122F00000100000012 /* PeopleJSONParser.swift */; };
 		C1A000032F00000100000003 /* PeopleAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A000132F00000100000013 /* PeopleAPIClient.swift */; };
@@ -27,12 +32,23 @@
 		C1A000062F00000100000006 /* CompanionPeopleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A000162F00000100000016 /* CompanionPeopleStore.swift */; };
 		C1A000072F00000100000007 /* IOSGoogleConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A000172F00000100000017 /* IOSGoogleConfiguration.swift */; };
 		C1A000082F00000100000008 /* IOSGoogleIdentityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A000182F00000100000018 /* IOSGoogleIdentityCoordinator.swift */; };
+		C1A000092F00000100000009 /* IOSPeopleSyncFencePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0001A2F0000010000001A /* IOSPeopleSyncFencePolicy.swift */; };
+		C1A0000A2F0000010000000A /* IOSNativePresentationFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0001B2F0000010000001B /* IOSNativePresentationFormatter.swift */; };
+		C1A0000B2F0000010000000B /* IOSPeopleBackgroundRefreshPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0001C2F0000010000001C /* IOSPeopleBackgroundRefreshPolicy.swift */; };
+		C1A0000C2F0000010000000C /* IOSPeopleBackgroundRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0001D2F0000010000001D /* IOSPeopleBackgroundRefreshCoordinator.swift */; };
+		C1A0000D2F0000010000000D /* IOSPhoneNumberNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0001E2F0000010000001E /* IOSPhoneNumberNormalizer.swift */; };
+		C1A0000E2F0000010000000E /* IOSCompanionRetentionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A0001F2F0000010000001F /* IOSCompanionRetentionPolicy.swift */; };
+		C1A0000F2F0000010000000F /* IOSCompanionAttentionNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A000222F00000100000022 /* IOSCompanionAttentionNotifier.swift */; };
+		C1A000302F00000100000030 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A000312F00000100000031 /* SceneDelegate.swift */; };
 		D1A000012F00000100000001 /* IOSCompanionWorkflowModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000112F00000100000011 /* IOSCompanionWorkflowModels.swift */; };
 		D1A000022F00000100000002 /* IOSCompanionWorkflowEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000122F00000100000012 /* IOSCompanionWorkflowEngine.swift */; };
 		D1A000032F00000100000003 /* IOSCompanionStatusClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000132F00000100000013 /* IOSCompanionStatusClient.swift */; };
+		D1A000042F00000100000004 /* IOSCompanionMessagePlaceholderPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A000142F00000100000014 /* IOSCompanionMessagePlaceholderPolicy.swift */; };
 		E1A000012F00000100000001 /* GeminiSuggestionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A000112F00000100000011 /* GeminiSuggestionPolicy.swift */; };
 		E1A000022F00000100000002 /* IOSGeminiSuggestionGateway.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A000122F00000100000012 /* IOSGeminiSuggestionGateway.swift */; };
 		E1A000032F00000100000003 /* GeminiCandidateProvenanceRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A000132F00000100000013 /* GeminiCandidateProvenanceRegistry.swift */; };
+		E1A000042F00000100000004 /* IOSGeminiOperationalPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A000142F00000100000014 /* IOSGeminiOperationalPolicy.swift */; };
+		E1A000052F00000100000005 /* IOSGeminiOperationalGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A000152F00000100000015 /* IOSGeminiOperationalGate.swift */; };
 		F1A000012F00000100000001 /* IOSAccountDeletionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000112F00000100000011 /* IOSAccountDeletionClient.swift */; };
 		F1A000022F00000100000002 /* IOSAccountDeletionReceiptStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000122F00000100000012 /* IOSAccountDeletionReceiptStore.swift */; };
 		F1A000032F00000100000003 /* IOSAccountDeletionLocalCleanupCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000132F00000100000013 /* IOSAccountDeletionLocalCleanupCoordinator.swift */; };
@@ -40,7 +56,18 @@
 		F1A000052F00000100000005 /* IOSContactDerivedResetClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000152F00000100000015 /* IOSContactDerivedResetClient.swift */; };
 		F1A000062F00000100000006 /* IOSAccountDeletionReceiptClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000162F00000100000016 /* IOSAccountDeletionReceiptClient.swift */; };
 		F1A000072F00000100000007 /* IOSAccountDeletionRecoveryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A000172F00000100000017 /* IOSAccountDeletionRecoveryStore.swift */; };
+		SMK000012F30000100000001 /* BirthdayNativeSmokeModuleBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = SMK000022F30000100000002 /* BirthdayNativeSmokeModuleBridge.mm */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A2A0000B2F1000010000000B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 13B07F861A680F5B00A75B9A;
+			remoteInfo = BirthdayAutopilot;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* BirthdayAutopilot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BirthdayAutopilot.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -52,6 +79,9 @@
 		5DCACB8F33CDC322A6C60F78 /* libPods-BirthdayAutopilot.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-BirthdayAutopilot.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = BirthdayAutopilot/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = BirthdayAutopilot/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		A2A000032F10000100000003 /* BirthdayAutopilotNativeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BirthdayAutopilotNativeTests.swift; path = BirthdayAutopilotTests/BirthdayAutopilotNativeTests.swift; sourceTree = "<group>"; };
+		A2A000042F10000100000004 /* BirthdayAutopilotTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BirthdayAutopilotTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2A000052F10000100000005 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		B1A000032F00000100000003 /* CompanionMessageModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CompanionMessageModule.swift; path = BirthdayAutopilot/CompanionMessageModule.swift; sourceTree = "<group>"; };
 		B1A000042F00000100000004 /* CompanionMessageModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = CompanionMessageModuleBridge.m; path = BirthdayAutopilot/CompanionMessageModuleBridge.m; sourceTree = "<group>"; };
 		B1A000082F00000100000008 /* CompanionProtectedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CompanionProtectedStore.swift; path = BirthdayAutopilot/CompanionProtectedStore.swift; sourceTree = "<group>"; };
@@ -59,6 +89,9 @@
 		B1A0000A2F0000010000000A /* CompanionReminderModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = CompanionReminderModuleBridge.m; path = BirthdayAutopilot/CompanionReminderModuleBridge.m; sourceTree = "<group>"; };
 		B1A0000E2F0000010000000E /* BirthdayNativeModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BirthdayNativeModule.swift; path = BirthdayAutopilot/BirthdayNativeModule.swift; sourceTree = "<group>"; };
 		B1A0000F2F0000010000000F /* BirthdayNativeModuleBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = BirthdayNativeModuleBridge.mm; path = BirthdayAutopilot/BirthdayNativeModuleBridge.mm; sourceTree = "<group>"; };
+		B2A000022F10000100000002 /* IOSPeopleBackgroundRefreshPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSPeopleBackgroundRefreshPolicyTests.swift; path = BirthdayAutopilotTests/IOSPeopleBackgroundRefreshPolicyTests.swift; sourceTree = "<group>"; };
+		B2A000042F10000100000004 /* IOSPhoneNumberNormalizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSPhoneNumberNormalizerTests.swift; path = BirthdayAutopilotTests/IOSPhoneNumberNormalizerTests.swift; sourceTree = "<group>"; };
+		B2A000062F10000100000006 /* IOSCompanionRetentionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionRetentionPolicyTests.swift; path = BirthdayAutopilotTests/IOSCompanionRetentionPolicyTests.swift; sourceTree = "<group>"; };
 		C1A000112F00000100000011 /* PeopleContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PeopleContracts.swift; path = BirthdayAutopilot/Contacts/PeopleContracts.swift; sourceTree = "<group>"; };
 		C1A000122F00000100000012 /* PeopleJSONParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PeopleJSONParser.swift; path = BirthdayAutopilot/Contacts/PeopleJSONParser.swift; sourceTree = "<group>"; };
 		C1A000132F00000100000013 /* PeopleAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PeopleAPIClient.swift; path = BirthdayAutopilot/Contacts/PeopleAPIClient.swift; sourceTree = "<group>"; };
@@ -68,13 +101,24 @@
 		C1A000172F00000100000017 /* IOSGoogleConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSGoogleConfiguration.swift; path = BirthdayAutopilot/Identity/IOSGoogleConfiguration.swift; sourceTree = "<group>"; };
 		C1A000182F00000100000018 /* IOSGoogleIdentityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSGoogleIdentityCoordinator.swift; path = BirthdayAutopilot/Identity/IOSGoogleIdentityCoordinator.swift; sourceTree = "<group>"; };
 		C1A000192F00000100000019 /* BirthdayAutopilot.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = BirthdayAutopilot.entitlements; path = BirthdayAutopilot/BirthdayAutopilot.entitlements; sourceTree = "<group>"; };
+		C1A0001A2F0000010000001A /* IOSPeopleSyncFencePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSPeopleSyncFencePolicy.swift; path = BirthdayAutopilot/Contacts/IOSPeopleSyncFencePolicy.swift; sourceTree = "<group>"; };
+		C1A0001B2F0000010000001B /* IOSNativePresentationFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSNativePresentationFormatter.swift; path = BirthdayAutopilot/Contacts/IOSNativePresentationFormatter.swift; sourceTree = "<group>"; };
+		C1A0001C2F0000010000001C /* IOSPeopleBackgroundRefreshPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSPeopleBackgroundRefreshPolicy.swift; path = BirthdayAutopilot/Contacts/IOSPeopleBackgroundRefreshPolicy.swift; sourceTree = "<group>"; };
+		C1A0001D2F0000010000001D /* IOSPeopleBackgroundRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSPeopleBackgroundRefreshCoordinator.swift; path = BirthdayAutopilot/Contacts/IOSPeopleBackgroundRefreshCoordinator.swift; sourceTree = "<group>"; };
+		C1A0001E2F0000010000001E /* IOSPhoneNumberNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSPhoneNumberNormalizer.swift; path = BirthdayAutopilot/Contacts/IOSPhoneNumberNormalizer.swift; sourceTree = "<group>"; };
+		C1A0001F2F0000010000001F /* IOSCompanionRetentionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionRetentionPolicy.swift; path = BirthdayAutopilot/Privacy/IOSCompanionRetentionPolicy.swift; sourceTree = "<group>"; };
 		C1A000212F00000100000021 /* Info-Debug.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "Info-Debug.plist"; path = "BirthdayAutopilot/Info-Debug.plist"; sourceTree = "<group>"; };
+		C1A000222F00000100000022 /* IOSCompanionAttentionNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionAttentionNotifier.swift; path = BirthdayAutopilot/Notifications/IOSCompanionAttentionNotifier.swift; sourceTree = "<group>"; };
+		C1A000312F00000100000031 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneDelegate.swift; path = BirthdayAutopilot/SceneDelegate.swift; sourceTree = "<group>"; };
 		D1A000112F00000100000011 /* IOSCompanionWorkflowModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionWorkflowModels.swift; path = BirthdayAutopilot/Automation/IOSCompanionWorkflowModels.swift; sourceTree = "<group>"; };
 		D1A000122F00000100000012 /* IOSCompanionWorkflowEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionWorkflowEngine.swift; path = BirthdayAutopilot/Automation/IOSCompanionWorkflowEngine.swift; sourceTree = "<group>"; };
 		D1A000132F00000100000013 /* IOSCompanionStatusClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionStatusClient.swift; path = BirthdayAutopilot/Automation/IOSCompanionStatusClient.swift; sourceTree = "<group>"; };
+		D1A000142F00000100000014 /* IOSCompanionMessagePlaceholderPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSCompanionMessagePlaceholderPolicy.swift; path = BirthdayAutopilot/Automation/IOSCompanionMessagePlaceholderPolicy.swift; sourceTree = "<group>"; };
 		E1A000112F00000100000011 /* GeminiSuggestionPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GeminiSuggestionPolicy.swift; path = BirthdayAutopilot/Gemini/GeminiSuggestionPolicy.swift; sourceTree = "<group>"; };
 		E1A000122F00000100000012 /* IOSGeminiSuggestionGateway.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSGeminiSuggestionGateway.swift; path = BirthdayAutopilot/Gemini/IOSGeminiSuggestionGateway.swift; sourceTree = "<group>"; };
 		E1A000132F00000100000013 /* GeminiCandidateProvenanceRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GeminiCandidateProvenanceRegistry.swift; path = BirthdayAutopilot/Gemini/GeminiCandidateProvenanceRegistry.swift; sourceTree = "<group>"; };
+		E1A000142F00000100000014 /* IOSGeminiOperationalPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSGeminiOperationalPolicy.swift; path = BirthdayAutopilot/Gemini/IOSGeminiOperationalPolicy.swift; sourceTree = "<group>"; };
+		E1A000152F00000100000015 /* IOSGeminiOperationalGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSGeminiOperationalGate.swift; path = BirthdayAutopilot/Gemini/IOSGeminiOperationalGate.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F1A000112F00000100000011 /* IOSAccountDeletionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSAccountDeletionClient.swift; path = BirthdayAutopilot/Automation/IOSAccountDeletionClient.swift; sourceTree = "<group>"; };
 		F1A000122F00000100000012 /* IOSAccountDeletionReceiptStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSAccountDeletionReceiptStore.swift; path = BirthdayAutopilot/Privacy/IOSAccountDeletionReceiptStore.swift; sourceTree = "<group>"; };
@@ -83,6 +127,12 @@
 		F1A000152F00000100000015 /* IOSContactDerivedResetClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSContactDerivedResetClient.swift; path = BirthdayAutopilot/Automation/IOSContactDerivedResetClient.swift; sourceTree = "<group>"; };
 		F1A000162F00000100000016 /* IOSAccountDeletionReceiptClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSAccountDeletionReceiptClient.swift; path = BirthdayAutopilot/Automation/IOSAccountDeletionReceiptClient.swift; sourceTree = "<group>"; };
 		F1A000172F00000100000017 /* IOSAccountDeletionRecoveryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IOSAccountDeletionRecoveryStore.swift; path = BirthdayAutopilot/Privacy/IOSAccountDeletionRecoveryStore.swift; sourceTree = "<group>"; };
+		E2E000012F20000100000001 /* Info-E2E.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info-E2E.plist"; path = "BirthdayAutopilot/Info-E2E.plist"; sourceTree = "<group>"; };
+		E2E000022F20000100000002 /* BirthdayAutopilot-Debug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = "BirthdayAutopilot-Debug.entitlements"; path = "BirthdayAutopilot/BirthdayAutopilot-Debug.entitlements"; sourceTree = "<group>"; };
+		E2E000032F20000100000003 /* BirthdayAutopilot-E2E.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = "BirthdayAutopilot-E2E.entitlements"; path = "BirthdayAutopilot/BirthdayAutopilot-E2E.entitlements"; sourceTree = "<group>"; };
+		SMK000022F30000100000002 /* BirthdayNativeSmokeModuleBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = BirthdayNativeSmokeModuleBridge.mm; path = BirthdayAutopilot/BirthdayNativeSmokeModuleBridge.mm; sourceTree = "<group>"; };
+		SMK000032F30000100000003 /* Info-Smoke.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info-Smoke.plist"; path = "BirthdayAutopilot/Info-Smoke.plist"; sourceTree = "<group>"; };
+		SMK000042F30000100000004 /* BirthdayAutopilot-Smoke.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = "BirthdayAutopilot-Smoke.entitlements"; path = "BirthdayAutopilot/BirthdayAutopilot-Smoke.entitlements"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -94,6 +144,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A2A000062F10000100000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A2A000022F10000100000002 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -102,6 +160,7 @@
 			children = (
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
+				C1A000312F00000100000031 /* SceneDelegate.swift */,
 				B1A000032F00000100000003 /* CompanionMessageModule.swift */,
 				B1A000042F00000100000004 /* CompanionMessageModuleBridge.m */,
 				B1A000082F00000100000008 /* CompanionProtectedStore.swift */,
@@ -109,6 +168,7 @@
 				B1A0000A2F0000010000000A /* CompanionReminderModuleBridge.m */,
 				B1A0000E2F0000010000000E /* BirthdayNativeModule.swift */,
 				B1A0000F2F0000010000000F /* BirthdayNativeModuleBridge.mm */,
+				SMK000022F30000100000002 /* BirthdayNativeSmokeModuleBridge.mm */,
 				C1A000112F00000100000011 /* PeopleContracts.swift */,
 				C1A000122F00000100000012 /* PeopleJSONParser.swift */,
 				C1A000132F00000100000013 /* PeopleAPIClient.swift */,
@@ -117,12 +177,22 @@
 				C1A000162F00000100000016 /* CompanionPeopleStore.swift */,
 				C1A000172F00000100000017 /* IOSGoogleConfiguration.swift */,
 				C1A000182F00000100000018 /* IOSGoogleIdentityCoordinator.swift */,
+				C1A0001A2F0000010000001A /* IOSPeopleSyncFencePolicy.swift */,
+				C1A0001B2F0000010000001B /* IOSNativePresentationFormatter.swift */,
+				C1A0001C2F0000010000001C /* IOSPeopleBackgroundRefreshPolicy.swift */,
+				C1A0001D2F0000010000001D /* IOSPeopleBackgroundRefreshCoordinator.swift */,
+				C1A0001E2F0000010000001E /* IOSPhoneNumberNormalizer.swift */,
+				C1A0001F2F0000010000001F /* IOSCompanionRetentionPolicy.swift */,
+				C1A000222F00000100000022 /* IOSCompanionAttentionNotifier.swift */,
 				D1A000112F00000100000011 /* IOSCompanionWorkflowModels.swift */,
 				D1A000122F00000100000012 /* IOSCompanionWorkflowEngine.swift */,
 				D1A000132F00000100000013 /* IOSCompanionStatusClient.swift */,
+				D1A000142F00000100000014 /* IOSCompanionMessagePlaceholderPolicy.swift */,
 				E1A000112F00000100000011 /* GeminiSuggestionPolicy.swift */,
 				E1A000122F00000100000012 /* IOSGeminiSuggestionGateway.swift */,
 				E1A000132F00000100000013 /* GeminiCandidateProvenanceRegistry.swift */,
+				E1A000142F00000100000014 /* IOSGeminiOperationalPolicy.swift */,
+				E1A000152F00000100000015 /* IOSGeminiOperationalGate.swift */,
 				F1A000112F00000100000011 /* IOSAccountDeletionClient.swift */,
 				F1A000122F00000100000012 /* IOSAccountDeletionReceiptStore.swift */,
 				F1A000132F00000100000013 /* IOSAccountDeletionLocalCleanupCoordinator.swift */,
@@ -131,8 +201,13 @@
 				F1A000162F00000100000016 /* IOSAccountDeletionReceiptClient.swift */,
 				F1A000172F00000100000017 /* IOSAccountDeletionRecoveryStore.swift */,
 				C1A000192F00000100000019 /* BirthdayAutopilot.entitlements */,
+				E2E000022F20000100000002 /* BirthdayAutopilot-Debug.entitlements */,
+				E2E000032F20000100000003 /* BirthdayAutopilot-E2E.entitlements */,
+				SMK000042F30000100000004 /* BirthdayAutopilot-Smoke.entitlements */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				C1A000212F00000100000021 /* Info-Debug.plist */,
+				E2E000012F20000100000001 /* Info-E2E.plist */,
+				SMK000032F30000100000003 /* Info-Smoke.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 			);
@@ -142,6 +217,7 @@
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				A2A000052F10000100000005 /* XCTest.framework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-BirthdayAutopilot.a */,
 			);
@@ -159,6 +235,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07FAE1A68108700A75B9A /* BirthdayAutopilot */,
+				A2A000072F10000100000007 /* BirthdayAutopilotTests */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
@@ -173,8 +250,20 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* BirthdayAutopilot.app */,
+				A2A000042F10000100000004 /* BirthdayAutopilotTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A2A000072F10000100000007 /* BirthdayAutopilotTests */ = {
+			isa = PBXGroup;
+			children = (
+				A2A000032F10000100000003 /* BirthdayAutopilotNativeTests.swift */,
+				B2A000022F10000100000002 /* IOSPeopleBackgroundRefreshPolicyTests.swift */,
+				B2A000042F10000100000004 /* IOSPhoneNumberNormalizerTests.swift */,
+				B2A000062F10000100000006 /* IOSCompanionRetentionPolicyTests.swift */,
+			);
+			name = BirthdayAutopilotTests;
 			sourceTree = "<group>";
 		};
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
@@ -195,6 +284,7 @@
 			buildPhases = (
 				C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */,
 				C1A000202F00000100000020 /* Validate and Copy Google Configuration */,
+				SMK000052F30000100000005 /* Copy Production Smoke Projection Fixture */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
@@ -211,6 +301,23 @@
 			productReference = 13B07F961A680F5B00A75B9A /* BirthdayAutopilot.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A2A000082F10000100000008 /* BirthdayAutopilotTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A2A0000D2F1000010000000D /* Build configuration list for PBXNativeTarget "BirthdayAutopilotTests" */;
+			buildPhases = (
+				A2A000092F10000100000009 /* Sources */,
+				A2A000062F10000100000006 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A2A0000A2F1000010000000A /* PBXTargetDependency */,
+			);
+			name = BirthdayAutopilotTests;
+			productName = BirthdayAutopilotTests;
+			productReference = A2A000042F10000100000004 /* BirthdayAutopilotTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -221,6 +328,10 @@
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1120;
+					};
+					A2A000082F10000100000008 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = 13B07F861A680F5B00A75B9A;
 					};
 				};
 			};
@@ -238,6 +349,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* BirthdayAutopilot */,
+				A2A000082F10000100000008 /* BirthdayAutopilotTests */,
 			);
 		};
 /* End PBXProject section */
@@ -309,6 +421,27 @@
 			shellScript = "\"${SRCROOT}/scripts/copy-google-config.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		SMK000052F30000100000005 /* Copy Production Smoke Projection Fixture */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../e2e/production-smoke/production-smoke-projections.json",
+				"$(SRCROOT)/../tools/validate-production-smoke-fixture.mjs",
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/scripts/copy-production-smoke-fixture.sh",
+			);
+			name = "Copy Production Smoke Projection Fixture";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/production-smoke-projections.json",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/copy-production-smoke-fixture.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 		C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -356,6 +489,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				C1A000302F00000100000030 /* SceneDelegate.swift in Sources */,
 				B1A000012F00000100000001 /* CompanionMessageModule.swift in Sources */,
 				B1A000022F00000100000002 /* CompanionMessageModuleBridge.m in Sources */,
 				B1A000052F00000100000005 /* CompanionProtectedStore.swift in Sources */,
@@ -363,6 +497,7 @@
 				B1A000072F00000100000007 /* CompanionReminderModuleBridge.m in Sources */,
 				B1A0000C2F0000010000000C /* BirthdayNativeModule.swift in Sources */,
 				B1A0000D2F0000010000000D /* BirthdayNativeModuleBridge.mm in Sources */,
+				SMK000012F30000100000001 /* BirthdayNativeSmokeModuleBridge.mm in Sources */,
 				C1A000012F00000100000001 /* PeopleContracts.swift in Sources */,
 				C1A000022F00000100000002 /* PeopleJSONParser.swift in Sources */,
 				C1A000032F00000100000003 /* PeopleAPIClient.swift in Sources */,
@@ -371,12 +506,22 @@
 				C1A000062F00000100000006 /* CompanionPeopleStore.swift in Sources */,
 				C1A000072F00000100000007 /* IOSGoogleConfiguration.swift in Sources */,
 				C1A000082F00000100000008 /* IOSGoogleIdentityCoordinator.swift in Sources */,
+				C1A000092F00000100000009 /* IOSPeopleSyncFencePolicy.swift in Sources */,
+				C1A0000A2F0000010000000A /* IOSNativePresentationFormatter.swift in Sources */,
+				C1A0000B2F0000010000000B /* IOSPeopleBackgroundRefreshPolicy.swift in Sources */,
+				C1A0000C2F0000010000000C /* IOSPeopleBackgroundRefreshCoordinator.swift in Sources */,
+				C1A0000D2F0000010000000D /* IOSPhoneNumberNormalizer.swift in Sources */,
+				C1A0000E2F0000010000000E /* IOSCompanionRetentionPolicy.swift in Sources */,
+				C1A0000F2F0000010000000F /* IOSCompanionAttentionNotifier.swift in Sources */,
 				D1A000012F00000100000001 /* IOSCompanionWorkflowModels.swift in Sources */,
 				D1A000022F00000100000002 /* IOSCompanionWorkflowEngine.swift in Sources */,
 				D1A000032F00000100000003 /* IOSCompanionStatusClient.swift in Sources */,
+				D1A000042F00000100000004 /* IOSCompanionMessagePlaceholderPolicy.swift in Sources */,
 				E1A000012F00000100000001 /* GeminiSuggestionPolicy.swift in Sources */,
 				E1A000022F00000100000002 /* IOSGeminiSuggestionGateway.swift in Sources */,
 				E1A000032F00000100000003 /* GeminiCandidateProvenanceRegistry.swift in Sources */,
+				E1A000042F00000100000004 /* IOSGeminiOperationalPolicy.swift in Sources */,
+				E1A000052F00000100000005 /* IOSGeminiOperationalGate.swift in Sources */,
 				F1A000012F00000100000001 /* IOSAccountDeletionClient.swift in Sources */,
 				F1A000022F00000100000002 /* IOSAccountDeletionReceiptStore.swift in Sources */,
 				F1A000032F00000100000003 /* IOSAccountDeletionLocalCleanupCoordinator.swift in Sources */,
@@ -387,7 +532,26 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A2A000092F10000100000009 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A2A000012F10000100000001 /* BirthdayAutopilotNativeTests.swift in Sources */,
+				B2A000012F10000100000001 /* IOSPeopleBackgroundRefreshPolicyTests.swift in Sources */,
+				B2A000032F10000100000003 /* IOSPhoneNumberNormalizerTests.swift in Sources */,
+				B2A000052F10000100000005 /* IOSCompanionRetentionPolicyTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A2A0000A2F1000010000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 13B07F861A680F5B00A75B9A /* BirthdayAutopilot */;
+			targetProxy = A2A0000B2F1000010000000B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
@@ -395,14 +559,14 @@
 			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-BirthdayAutopilot.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				BIRTHDAY_FIREBASE_CONFIG_REQUIRED = NO;
 				BIRTHDAY_FIREBASE_ENV = dev;
 				BIRTHDAY_FIREBASE_PROJECT_ID = "";
 				BIRTHDAY_GOOGLE_REVERSED_CLIENT_ID = "";
 				BIRTHDAY_LEDGER_GENERATION = "birthday-ledger-v1";
 				BIRTHDAY_PRIVACY_REVIEW_APPROVED = NO;
+				BIRTHDAY_SOURCE_REVISION = "";
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = BirthdayAutopilot/BirthdayAutopilot.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "BirthdayAutopilot/BirthdayAutopilot-Debug.entitlements";
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = "BirthdayAutopilot/Info-Debug.plist";
@@ -432,12 +596,12 @@
 			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-BirthdayAutopilot.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				BIRTHDAY_FIREBASE_CONFIG_REQUIRED = YES;
 				BIRTHDAY_FIREBASE_ENV = prod;
 				BIRTHDAY_FIREBASE_PROJECT_ID = "";
 				BIRTHDAY_GOOGLE_REVERSED_CLIENT_ID = "";
 				BIRTHDAY_LEDGER_GENERATION = "birthday-ledger-v1";
 				BIRTHDAY_PRIVACY_REVIEW_APPROVED = NO;
+				BIRTHDAY_SOURCE_REVISION = "";
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = BirthdayAutopilot/BirthdayAutopilot.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
@@ -461,6 +625,106 @@
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
+		};
+		E2E000042F20000100000004 /* E2E */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-BirthdayAutopilot.debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				BIRTHDAY_E2E_FIXTURE = YES;
+				BIRTHDAY_FIREBASE_ENV = "e2e-fixture";
+				BIRTHDAY_FIREBASE_PROJECT_ID = "";
+				BIRTHDAY_GOOGLE_REVERSED_CLIENT_ID = "";
+				BIRTHDAY_LEDGER_GENERATION = "";
+				BIRTHDAY_PRIVACY_REVIEW_APPROVED = NO;
+				BIRTHDAY_SOURCE_REVISION = "";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "BirthdayAutopilot/BirthdayAutopilot-E2E.entitlements";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"BIRTHDAY_E2E=1",
+				);
+				INFOPLIST_FILE = "BirthdayAutopilot/Info-E2E.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DBIRTHDAY_E2E=1",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yashsomani.birthdayautopilot.e2e;
+				PRODUCT_NAME = BirthdayAutopilot;
+				SDKROOT = iphonesimulator;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG BIRTHDAY_E2E";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = E2E;
+		};
+		SMK000062F30000100000006 /* Smoke */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-BirthdayAutopilot.debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				BIRTHDAY_FIREBASE_ENV = "production-path-smoke";
+				BIRTHDAY_FIREBASE_PROJECT_ID = "";
+				BIRTHDAY_GOOGLE_REVERSED_CLIENT_ID = "";
+				BIRTHDAY_LEDGER_GENERATION = "";
+				BIRTHDAY_PRIVACY_REVIEW_APPROVED = NO;
+				BIRTHDAY_PRODUCTION_SMOKE = YES;
+				BIRTHDAY_SOURCE_REVISION = "";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "BirthdayAutopilot/BirthdayAutopilot-Smoke.entitlements";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"BIRTHDAY_SMOKE=1",
+				);
+				INFOPLIST_FILE = "BirthdayAutopilot/Info-Smoke.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DBIRTHDAY_SMOKE=1",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yashsomani.birthdayautopilot.smoke;
+				PRODUCT_NAME = BirthdayAutopilot;
+				SDKROOT = iphonesimulator;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG BIRTHDAY_SMOKE";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Smoke;
 		};
 		83CBBA201A601CBA00E9B192 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -620,6 +884,134 @@
 			};
 			name = Release;
 		};
+		E2E000052F20000100000005 /* E2E */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"BIRTHDAY_E2E=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+					"-DBIRTHDAY_E2E=1",
+				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-DFOLLY_NO_CONFIG",
+					"-DFOLLY_MOBILE=1",
+					"-DFOLLY_USE_LIBCPP=1",
+					"-DFOLLY_CFG_NO_COROUTINES=1",
+					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
+				PODFILE_DIR = "$(SRCROOT)";
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
+				SDKROOT = iphonesimulator;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG BIRTHDAY_E2E";
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				USE_HERMES = true;
+			};
+			name = E2E;
+		};
+		SMK000072F30000100000007 /* Smoke */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = "";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"BIRTHDAY_SMOKE=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+					"-DBIRTHDAY_SMOKE=1",
+				);
+				OTHER_CPLUSPLUSFLAGS = (
+					"$(OTHER_CFLAGS)",
+					"-DFOLLY_NO_CONFIG",
+					"-DFOLLY_MOBILE=1",
+					"-DFOLLY_USE_LIBCPP=1",
+					"-DFOLLY_CFG_NO_COROUTINES=1",
+					"-DFOLLY_HAVE_CLOCK_GETTIME=1",
+					"-DRCT_REMOVE_LEGACY_ARCH=1",
+				);
+				PODFILE_DIR = "$(SRCROOT)";
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
+				SDKROOT = iphonesimulator;
+				SUPPORTED_PLATFORMS = iphonesimulator;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG BIRTHDAY_SMOKE";
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+				USE_HERMES = true;
+			};
+			name = Smoke;
+		};
+		A2A0000C2F1000010000000C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yashsomani.birthdayautopilot.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BirthdayAutopilot.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BirthdayAutopilot";
+			};
+			name = Debug;
+		};
+		A2A0000E2F1000010000000E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yashsomani.birthdayautopilot.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BirthdayAutopilot.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BirthdayAutopilot";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -627,6 +1019,8 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
+				E2E000042F20000100000004 /* E2E */,
+				SMK000062F30000100000006 /* Smoke */,
 				13B07F951A680F5B00A75B9A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
@@ -636,7 +1030,18 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
+				E2E000052F20000100000005 /* E2E */,
+				SMK000072F30000100000007 /* Smoke */,
 				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A2A0000D2F1000010000000D /* Build configuration list for PBXNativeTarget "BirthdayAutopilotTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A2A0000C2F1000010000000C /* Debug */,
+				A2A0000E2F1000010000000E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

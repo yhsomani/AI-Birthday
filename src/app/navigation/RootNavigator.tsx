@@ -20,6 +20,7 @@ import { HomeScreen } from '../../features/home/HomeScreen';
 import { PeopleScreen } from '../../features/people/PeopleScreen';
 import { PersonDetailScreen } from '../../features/people/PersonDetailScreen';
 import { DataBoundaryScreen } from '../../features/settings/DataBoundaryScreen';
+import { FixtureHelpLegalScreen } from '../../features/settings/FixtureHelpLegalScreen';
 import { SettingsScreen } from '../../features/settings/SettingsScreen';
 import { SetupJourneyScreen } from '../../features/setup/SetupJourneyScreen';
 import { MainTabParamList, RootStackParamList } from './types';
@@ -42,6 +43,8 @@ function MainTabs() {
   const { t } = useAppLocalization();
   return (
     <Tabs.Navigator
+      backBehavior="initialRoute"
+      initialRouteName="Home"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.accent,
@@ -93,7 +96,7 @@ function MainTabs() {
 export function RootNavigator() {
   const { setupComplete } = useFixture();
   const theme = useAppTheme();
-  const { t } = useAppLocalization();
+  const { language, t } = useAppLocalization();
   const navigationTheme = {
     ...(theme.isDark ? DarkTheme : DefaultTheme),
     colors: {
@@ -112,9 +115,13 @@ export function RootNavigator() {
   }
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer
+      direction={language === 'ar-XB' ? 'rtl' : 'ltr'}
+      theme={navigationTheme}
+    >
       <Stack.Navigator
         screenOptions={{
+          gestureEnabled: true,
           headerBackTitle: t('common.back'),
           headerShadowVisible: false,
           headerStyle: { backgroundColor: theme.colors.surface },
@@ -156,6 +163,11 @@ export function RootNavigator() {
           name="DataBoundary"
           component={DataBoundaryScreen}
           options={{ title: t('privacy.title') }}
+        />
+        <Stack.Screen
+          name="HelpLegal"
+          component={FixtureHelpLegalScreen}
+          options={{ headerShown: false }}
         />
       </Stack.Navigator>
     </NavigationContainer>

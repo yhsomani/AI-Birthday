@@ -40,6 +40,7 @@ object TestTransitionPolicy {
     ),
     TestJobState.COORDINATION_UNKNOWN to setOf(
       TestJobState.ARMED_SUPPRESSED,
+      TestJobState.FAILED,
       TestJobState.CLEANUP_CANCELLED,
     ),
     TestJobState.CLOUD_ARMED to setOf(

@@ -78,7 +78,7 @@ class ImmutableApprovalSnapshotTest {
     val original = baseMaterial()
     val snapshot = create(original)
     val alternatePhone = CanonicalPhoneNumber.parse("+919999999999")!!
-    val changedText = "b" + original.message.exactText.drop(1)
+    val changedText = original.message.exactText.dropLast(1) + "b"
     val changedMessage = approvedGeneric(changedText, "template-v1")
     val changedPlan = plan(changedText, splitAt = 153)
     val personalizedSameText = approvedPersonalizedSameText(original.message.exactText, "template-v1")
@@ -205,7 +205,8 @@ class ImmutableApprovalSnapshotTest {
     val differentBoundary = plan(text, 152)
     assertNotEquals(first.orderedPartsHash, differentBoundary.orderedPartsHash)
 
-    val mismatchedMaterial = baseMaterial().copy(message = approvedGeneric("b".repeat(161), "template-v1"))
+    val mismatchedText = "Happy birthday! " + "b".repeat(145)
+    val mismatchedMaterial = baseMaterial().copy(message = approvedGeneric(mismatchedText, "template-v1"))
     val rejected = ImmutableApprovalSnapshotFactory.create(mismatchedMaterial, 1_720_000_000_000)
       as ApprovalBuildResult.Rejected
     assertTrue(ApprovalBuildError.SEGMENT_PLAN_INVALID in rejected.errors)
@@ -247,7 +248,7 @@ class ImmutableApprovalSnapshotTest {
   }
 
   private fun baseMaterial(): ApprovalMaterial {
-    val exactText = "a".repeat(161)
+    val exactText = "Happy birthday! " + "a".repeat(145)
     return ApprovalMaterial(
       recipientId = "recipient-1",
       normalizedPhone = CanonicalPhoneNumber.parse("+919876543210")!!,

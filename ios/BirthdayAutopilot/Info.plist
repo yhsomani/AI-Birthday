@@ -6,12 +6,16 @@
 	<string>$(BIRTHDAY_FIREBASE_PROJECT_ID)</string>
 	<key>BirthdayFirebaseEnvironment</key>
 	<string>$(BIRTHDAY_FIREBASE_ENV)</string>
-	<key>BirthdayGoogleConfigurationRequired</key>
-	<string>$(BIRTHDAY_FIREBASE_CONFIG_REQUIRED)</string>
 	<key>BirthdayGoogleReversedClientID</key>
 	<string>$(BIRTHDAY_GOOGLE_REVERSED_CLIENT_ID)</string>
 	<key>BirthdayLedgerGeneration</key>
 	<string>$(BIRTHDAY_LEDGER_GENERATION)</string>
+	<key>BirthdaySourceRevision</key>
+	<string>$(BIRTHDAY_SOURCE_REVISION)</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.yashsomani.birthdayautopilot.people-refresh</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -64,10 +68,31 @@
 	<array>
 		<string>arm64</string>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
 </dict>

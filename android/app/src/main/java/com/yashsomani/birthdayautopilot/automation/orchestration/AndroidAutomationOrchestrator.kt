@@ -1,13 +1,20 @@
 package com.yashsomani.birthdayautopilot.automation.orchestration
 
 import android.content.Context
+import androidx.room.withTransaction
 import com.yashsomani.birthdayautopilot.BuildConfig
 import com.yashsomani.birthdayautopilot.automation.sms.AndroidSmsGateway
 import com.yashsomani.birthdayautopilot.automation.sms.SmsSubmissionResult
+import com.yashsomani.birthdayautopilot.automation.sms.SubscriptionBindingPolicy
+import com.yashsomani.birthdayautopilot.automation.sms.SubscriptionChangeSignalStore
+import com.yashsomani.birthdayautopilot.automation.sms.SubscriptionChangeFingerprint
 import com.yashsomani.birthdayautopilot.automation.sms.SubmissionGate
+import com.yashsomani.birthdayautopilot.automation.sms.currentDefaultSmsSubscriptionIdOrNull
 import com.yashsomani.birthdayautopilot.automation.state.BirthdayJobState
 import com.yashsomani.birthdayautopilot.coordination.ArmDecisionOutcome
 import com.yashsomani.birthdayautopilot.coordination.ArmStatusOutcome
+import com.yashsomani.birthdayautopilot.coordination.AccountModeAction
+import com.yashsomani.birthdayautopilot.coordination.AccountModeOutcome
 import com.yashsomani.birthdayautopilot.coordination.AuthoritativeArmOutcome
 import com.yashsomani.birthdayautopilot.coordination.ClaimOutcome
 import com.yashsomani.birthdayautopilot.coordination.CoordinationPurpose
@@ -25,6 +32,8 @@ import com.yashsomani.birthdayautopilot.planning.RecurrencePlanner
 import com.yashsomani.birthdayautopilot.readiness.AndroidReadinessProbe
 import com.yashsomani.birthdayautopilot.readiness.EligibilityKind
 import com.yashsomani.birthdayautopilot.storage.database.AuthoritativeArmedEvidence
+import com.yashsomani.birthdayautopilot.storage.database.ActivityEntity
+import com.yashsomani.birthdayautopilot.storage.database.BirthdayDatabase
 import com.yashsomani.birthdayautopilot.storage.database.BirthdayOccurrenceRecordEntity
 import com.yashsomani.birthdayautopilot.storage.database.ClockTrustEntity
 import com.yashsomani.birthdayautopilot.storage.database.ClockTrustStatus
@@ -36,11 +45,11 @@ import com.yashsomani.birthdayautopilot.storage.database.InstallationRecordState
 import com.yashsomani.birthdayautopilot.storage.database.LocalDestinationGuardEntity
 import com.yashsomani.birthdayautopilot.storage.database.OperationPurpose
 import com.yashsomani.birthdayautopilot.storage.database.PermitIssueResult
+import com.yashsomani.birthdayautopilot.storage.database.PeopleDataFreshnessPolicy
 import com.yashsomani.birthdayautopilot.storage.database.ResetBlockedDateEntity
 import com.yashsomani.birthdayautopilot.storage.database.ResetSafetyEntity
 import com.yashsomani.birthdayautopilot.storage.database.ResetSafetyStatus
 import com.yashsomani.birthdayautopilot.storage.database.SafetyLedgerDao
-import com.yashsomani.birthdayautopilot.storage.database.SyncFreshness
 import java.time.DateTimeException
 import java.time.Duration
 import java.time.Instant
@@ -63,6 +72,9 @@ internal enum class ReconciliationTrigger {
   APP_REPLACED,
   FOREGROUND,
   CALLBACK,
+  SIM_CHANGED,
+  ACCOUNT_CHANGED,
+  CONTACTS_CHANGED,
 }
 
 internal data class AutomationReconcileResult(
@@ -76,12 +88,19 @@ internal data class AutomationReconcileResult(
     "AutomationReconcileResult(code=$safeCode,retry=$retryRecommended,hasNext=${nextWakeAtMillis != null})"
 }
 
+private data class RuntimeSafetyAction(
+  val binding: InstallationBindingEntity?,
+  val safeCode: String,
+  val serverPauseRequired: Boolean,
+)
+
 /**
  * Native-only durable automation coordinator. Every network wait occurs outside SubmissionGate;
  * every Arm request is committed once before dispatch and is subsequently status-query-only.
  */
 internal class AndroidAutomationOrchestrator(
   context: Context,
+  private val database: BirthdayDatabase,
   private val dao: AutomationOrchestrationDao,
   private val ledger: SafetyLedgerDao,
   private val coordination: AutomationCoordinationPort,
@@ -93,8 +112,10 @@ internal class AndroidAutomationOrchestrator(
   private val finalGateSource: AndroidFinalExternalGateSource,
   private val timeSource: AutomationTimeSource,
   private val installationIdentityStore: NoBackupInstallationIdentityStore,
+  private val subscriptionChangeSignalStore: SubscriptionChangeSignalStore,
 ) {
   private val appContext = context.applicationContext
+  private val configurationDao = database.configurationDao()
 
   suspend fun reconcile(trigger: ReconciliationTrigger): AutomationReconcileResult =
     globalOrchestrationMutex.withLock {
@@ -143,6 +164,13 @@ internal class AndroidAutomationOrchestrator(
     if (localRecovery > 0) {
       return@withLock result("SUBMISSION_OUTCOME_UNKNOWN", false)
     }
+    enforceRuntimeSafetyPause(readinessProbe.read())?.let { action ->
+      return@withLock if (action.serverPauseRequired) {
+        convergeRuntimeSafetyPause(action)
+      } else {
+        result(action.safeCode, false)
+      }
+    }
     val binding = ensureRegisteredBinding()
       ?: return@withLock result("SENDER_REGISTRATION_UNAVAILABLE", true)
     if (!ensureLease(binding, CoordinationPurpose.TEST)) {
@@ -155,6 +183,14 @@ internal class AndroidAutomationOrchestrator(
       test.senderEpoch != binding.senderEpoch ||
       test.foregroundConfirmationNonceHash != foregroundConfirmationNonceHash
     ) return@withLock result("TEST_BINDING_INVALID", false)
+    val trustedNow = TrustedTimeEstimator.estimate(
+      dao.clockTrust(test.accountId),
+      timeSource.elapsedRealtimeMillis(),
+      timeSource.bootCount(),
+    ) ?: return@withLock result("CLOCK_TRUST_UNAVAILABLE", false)
+    armSpacingWake(test.accountId, trustedNow)?.let { wake ->
+      return@withLock result("ARM_SPACING_ACTIVE", false, wake)
+    }
     val existing = findPermit(OperationPurpose.TEST, testJobId)
     val permit = existing ?: claimTest(binding, testJobId)
       ?: return@withLock result("TEST_CLAIM_UNAVAILABLE", true)
@@ -171,7 +207,20 @@ internal class AndroidAutomationOrchestrator(
     if (reconstructed > 0) return result("SUBMISSION_OUTCOME_UNKNOWN", false)
 
     closeBootLostArmReconciling()
-    val account = dao.activeAccount() ?: return result("ACCOUNT_NOT_CONNECTED", false)
+    val account = dao.activeAccount()
+    if (account == null) {
+      subscriptionChangeSignalStore.pendingGeneration()
+        ?.let(subscriptionChangeSignalStore::markConsumed)
+      return result("ACCOUNT_NOT_CONNECTED", false)
+    }
+    val runtimeSafetyAction = enforceRuntimeSafetyPause(readinessProbe.read())
+    if (runtimeSafetyAction != null) {
+      return if (runtimeSafetyAction.serverPauseRequired) {
+        convergeRuntimeSafetyPause(runtimeSafetyAction)
+      } else {
+        result(runtimeSafetyAction.safeCode, false)
+      }
+    }
     val binding = ensureRegisteredBinding()
     auditWallClock(account.accountId)
     val trustedNow = TrustedTimeEstimator.estimate(
@@ -194,8 +243,23 @@ internal class AndroidAutomationOrchestrator(
     val recoverable = dao.recoverablePermits(1).firstOrNull()
     if (recoverable != null) {
       if (binding == null) return withAttention(result("SENDER_REGISTRATION_UNAVAILABLE", true))
+      val spacingWake = trustedNow?.let { armSpacingWake(account.accountId, it) }
+      if (
+        recoverable.state == CoordinationPermitState.CLOUD_CLAIMED &&
+        spacingWake != null
+      ) {
+        return withAttention(
+          result("ARM_SPACING_ACTIVE", false, spacingWake, recoverable.permitId),
+        )
+      }
       ensureLease(binding, recoverable.purpose.toCoordinationPurpose())
       return withAttention(advancePermit(recoverable, null))
+    }
+
+    if (networkValidated()) {
+      dao.coordinationUnknownPermits(1).firstOrNull()?.let { unknown ->
+        refineCoordinationUnknown(unknown)
+      }
     }
 
     if (trustedNow == null) return withAttention(result("CLOCK_TRUST_UNAVAILABLE", true))
@@ -212,11 +276,188 @@ internal class AndroidAutomationOrchestrator(
     if (!ensureLease(binding, CoordinationPurpose.BIRTHDAY)) {
       return withAttention(result("BIRTHDAY_LEASE_UNAVAILABLE", true, nextWake(trustedNow)))
     }
+    armSpacingWake(account.accountId, trustedNow)?.let { wake ->
+      return withAttention(result("ARM_SPACING_ACTIVE", false, wake))
+    }
     val due = dao.nextDueBirthday(trustedNow)
       ?: return withAttention(result("RECONCILE_IDLE", false, nextWake(trustedNow)))
     val permit = claimBirthday(binding, due, trustedNow)
       ?: return withAttention(result("BIRTHDAY_CLAIM_PENDING", true))
     return withAttention(advancePermit(permit, null))
+  }
+
+  /**
+   * A permission/hibernation reset or default-SIM drift is a material safety invalidation, not a
+   * transient worker failure. The local pause wins before any network call; server convergence can
+   * be retried without restoring automation.
+   */
+  private suspend fun enforceRuntimeSafetyPause(
+    snapshot: com.yashsomani.birthdayautopilot.readiness.AndroidReadinessSnapshot,
+  ): RuntimeSafetyAction? {
+    val account = dao.activeAccount() ?: return null
+    val control = configurationDao.control() ?: return null
+    val installation = dao.localInstallation()
+    val coordinationState = dao.coordinationState(account.accountId)
+    subscriptionChangeSignalStore.observe(SubscriptionChangeFingerprint.read(appContext))
+    val pendingSignalGeneration = subscriptionChangeSignalStore.pendingGeneration()
+    val pendingReason = coordinationState?.lastSafeCode
+      ?.takeIf { it.startsWith(SAFETY_PAUSE_PREFIX) }
+    if (
+      control.accountMode == AccountMode.PAUSED_REPAIR.name &&
+      installation?.accountMode == AccountMode.PAUSED_REPAIR &&
+      pendingReason != null &&
+      pendingSignalGeneration == null
+    ) {
+      return RuntimeSafetyAction(installation, pendingReason, serverPauseRequired = true)
+    }
+
+    val policy = configurationDao.activeAutomationPolicy(account.accountId)
+    val defaultSimChanged = policy?.simPolicyKind == SubscriptionBindingPolicy.SYSTEM_DEFAULT &&
+      !SubscriptionBindingPolicy.matches(
+        policyKind = policy.simPolicyKind,
+        approvedSubscriptionId = policy.resolvedSubscriptionId,
+        currentDefaultSubscriptionId = currentDefaultSmsSubscriptionIdOrNull(),
+        approvedSubscriptionActive =
+          snapshot.activeSubscriptionIds?.contains(policy.resolvedSubscriptionId) == true,
+      )
+    val activeSystemDefaultApprovals =
+      configurationDao.activeSystemDefaultApprovalCount(account.accountId)
+    val validSystemDefaultReceipts =
+      configurationDao.validSystemDefaultTestReceiptCount(account.accountId)
+    val hasSystemDefaultMaterial = activeSystemDefaultApprovals > 0 || validSystemDefaultReceipts > 0
+    val automationActive =
+      control.accountMode == AccountMode.AUTOMATION_ACTIVE.name &&
+        installation?.accountMode == AccountMode.AUTOMATION_ACTIVE &&
+        installation.senderEpoch != null &&
+        coordinationState != null
+    if (pendingSignalGeneration != null && !hasSystemDefaultMaterial && !automationActive) {
+      subscriptionChangeSignalStore.markConsumed(pendingSignalGeneration)
+      return pendingReason?.let {
+        RuntimeSafetyAction(installation, it, serverPauseRequired = true)
+      }
+    }
+    val simBindingInvalidated =
+      (automationActive || hasSystemDefaultMaterial) &&
+        (pendingSignalGeneration != null || defaultSimChanged)
+    val permissionEvidenceMustBeRechecked = automationActive || validSystemDefaultReceipts > 0
+    val reason = when {
+      simBindingInvalidated -> "${SAFETY_PAUSE_PREFIX}DEFAULT_SIM_CHANGED"
+      permissionEvidenceMustBeRechecked && snapshot.smsPermissionGranted != true ->
+        "${SAFETY_PAUSE_PREFIX}SMS_PERMISSION_RESET"
+      permissionEvidenceMustBeRechecked && snapshot.telephonyStatePermissionGranted != true ->
+        "${SAFETY_PAUSE_PREFIX}PHONE_STATE_PERMISSION_RESET"
+      permissionEvidenceMustBeRechecked &&
+        snapshot.signals.unusedAppRestrictionsDisabled != true ->
+        "${SAFETY_PAUSE_PREFIX}UNUSED_APP_RESTRICTIONS"
+      else -> return null
+    }
+    val invalidateApprovals = reason.endsWith("DEFAULT_SIM_CHANGED")
+    val at = timeSource.wallMillis()
+    val action = submissionGate.withExclusiveBoundary {
+      database.withTransaction {
+        val currentControl = configurationDao.control() ?: return@withTransaction null
+        val currentInstallation = dao.localInstallation()
+        if (invalidateApprovals) {
+          configurationDao.markSystemDefaultRecipientsForReview(account.accountId, at, reason)
+          configurationDao.invalidateSystemDefaultApprovals(account.accountId, at, reason)
+          configurationDao.invalidateSystemDefaultTestReceipts(account.accountId, at, reason)
+        } else {
+          configurationDao.invalidateTestReceipts(account.accountId, at, reason)
+        }
+        val shouldPauseServer =
+          currentControl.accountMode == AccountMode.AUTOMATION_ACTIVE.name &&
+            currentInstallation?.accountMode == AccountMode.AUTOMATION_ACTIVE &&
+            currentInstallation.senderEpoch != null
+        if (shouldPauseServer) {
+          val epoch = checkNotNull(currentInstallation.senderEpoch)
+          check(
+            configurationDao.updateAutomationControl(
+              currentControl.revision,
+              currentControl.blockerRevision,
+              false,
+              AccountMode.PAUSED_REPAIR,
+            ) == 1,
+          ) { "runtime-safety-control-pause-failed" }
+          check(
+            configurationDao.updateInstallationMode(
+              currentInstallation.installationId,
+              epoch,
+              AccountMode.PAUSED_REPAIR,
+              null,
+              at,
+            ) == 1,
+          ) { "runtime-safety-installation-pause-failed" }
+          check(
+            configurationDao.updateCoordinationMode(
+              account.accountId,
+              currentInstallation.installationId,
+              epoch,
+              AccountMode.PAUSED_REPAIR,
+              null,
+              reason,
+              at,
+            ) == 1,
+          ) { "runtime-safety-coordination-pause-failed" }
+        } else {
+          check(
+            configurationDao.bumpControlBlocker(
+              currentControl.revision,
+              currentControl.blockerRevision,
+            ) == 1,
+          ) { "runtime-safety-invalidation-revision-failed" }
+        }
+        database.birthdayDao().insertActivity(
+          ActivityEntity(
+            activityId = "activity_${java.util.UUID.randomUUID().toString().replace("-", "")}",
+            category = if (shouldPauseServer) "PAUSED" else "CONFIGURATION_INVALIDATED",
+            safeCode = reason,
+            recordedAtMillis = at,
+            relatedOccurrenceId = null,
+          ),
+        )
+        RuntimeSafetyAction(
+          binding = dao.localInstallation(),
+          safeCode = reason,
+          serverPauseRequired = shouldPauseServer,
+        )
+      }
+    }
+    if (action != null && pendingSignalGeneration != null) {
+      subscriptionChangeSignalStore.markConsumed(pendingSignalGeneration)
+    }
+    return action
+  }
+
+  private suspend fun convergeRuntimeSafetyPause(
+    pause: RuntimeSafetyAction,
+  ): AutomationReconcileResult {
+    val binding = pause.binding ?: return result(pause.safeCode, false)
+    val epoch = binding.senderEpoch
+      ?: return result(pause.safeCode, false)
+    if (!networkValidated()) return result(pause.safeCode, false)
+    val call = coordination.changeAccountMode(
+      AccountModeSpec(
+        binding = bindingSpec(binding),
+        action = AccountModeAction.PAUSE_FOR_REPAIR,
+      ),
+    )
+    val converged = (call as? OrchestrationCall.Authoritative)?.value
+      ?.let { it as? AccountModeOutcome.Changed }
+      ?.mode == ServerAccountMode.PAUSED_REPAIR
+    if (converged) {
+      database.withTransaction {
+        configurationDao.updateCoordinationMode(
+          binding.accountId,
+          binding.installationId,
+          epoch,
+          AccountMode.PAUSED_REPAIR,
+          null,
+          null,
+          timeSource.wallMillis(),
+        )
+      }
+    }
+    return result(pause.safeCode, false)
   }
 
   private suspend fun ensureRegisteredBinding(
@@ -537,7 +778,18 @@ internal class AndroidAutomationOrchestrator(
     val sync = dao.contactSyncState(account.accountId)
     val reset = dao.resetSafety(account.accountId)
     val clock = dao.clockTrust(account.accountId)
-    val base = snapshot.eligibility.kind == EligibilityKind.SUPPORTED &&
+    val trustedNowMillis = TrustedTimeEstimator.estimate(
+      clock,
+      timeSource.elapsedRealtimeMillis(),
+      timeSource.bootCount(),
+    )
+    val eligibilityReady = if (purpose == CoordinationPurpose.TEST) {
+      snapshot.eligibility.allowsForegroundTest()
+    } else {
+      snapshot.eligibility.kind == EligibilityKind.SUPPORTED
+    }
+    val base = eligibilityReady &&
+      snapshot.schedulerStartupReady &&
       snapshot.smsPermissionGranted == true &&
       snapshot.signals.simReady == true &&
       snapshot.signals.networkValidated == true &&
@@ -548,7 +800,7 @@ internal class AndroidAutomationOrchestrator(
       return binding.accountMode in setOf(AccountMode.TEST_ONLY, AccountMode.PAUSED_REPAIR)
     }
     return binding.accountMode == AccountMode.AUTOMATION_ACTIVE &&
-      sync?.freshness in setOf(SyncFreshness.FRESH, SyncFreshness.STALE_WARNING) &&
+      PeopleDataFreshnessPolicy.allowsUnattendedAutomation(sync, trustedNowMillis) &&
       reset?.status == ResetSafetyStatus.CLEAR &&
       !reset.overflowBlocked &&
       snapshot.signals.backgroundRestricted == false &&
@@ -954,6 +1206,7 @@ internal class AndroidAutomationOrchestrator(
         "ArmRequest.v1",
         permit.permitId,
         permit.attemptNumber.toString(),
+        permit.revision.toString(),
       )
       val dispatch = submissionGate.withExclusiveBoundary {
         ledger.beginArmDispatch(
@@ -1062,6 +1315,61 @@ internal class AndroidAutomationOrchestrator(
     }
   }
 
+  /** Status-only recovery for a terminal local ambiguity. This path cannot call consumeArmed. */
+  private suspend fun refineCoordinationUnknown(
+    permit: CoordinationPermitEntity,
+  ) {
+    if (
+      ArmRecoveryPolicy.decide(
+        permit,
+        timeSource.bootCount(),
+        timeSource.elapsedRealtimeMillis(),
+      ) != ArmRecoveryAction.QUERY_EXACT_STATUS_FOR_REFINEMENT
+    ) return
+    val call = coordination.getArmStatus(armSpec(permit))
+    val status = (call as? OrchestrationCall.Authoritative)?.value ?: return
+    val outcome = when (status) {
+      is ArmStatusOutcome.Replayed -> status.outcome
+      is ArmStatusOutcome.NoWrite -> status.outcome
+      ArmStatusOutcome.Unknown,
+      is ArmStatusOutcome.Suppressed,
+      -> return
+    }
+    if (!outcome.matches(permit)) return
+    submissionGate.withExclusiveBoundary {
+      when (outcome) {
+        is AuthoritativeArmOutcome.Armed ->
+          ledger.refineCoordinationUnknownAsArmedSuppressed(
+            permit.permitId,
+            permit.revision,
+            AuthoritativeArmedEvidence(
+              outcome.armRequestId,
+              outcome.resolvedAtMillis,
+              outcome.serverSubmitNotAfterMillis,
+            ),
+            timeSource.wallMillis(),
+          )
+        is AuthoritativeArmOutcome.NoWrite -> if (permit.purpose == OperationPurpose.TEST) {
+          ledger.refineTestCoordinationUnknownAsNoWrite(
+            permit.permitId,
+            permit.revision,
+            outcome.armRequestId,
+            outcome.reason.toLocalNoWriteReason(),
+            timeSource.wallMillis(),
+          )
+        } else {
+          ledger.refineBirthdayCoordinationUnknownAsNoWrite(
+            permit.permitId,
+            permit.revision,
+            outcome.armRequestId,
+            outcome.reason.toLocalNoWriteReason(),
+            timeSource.wallMillis(),
+          )
+        }
+      }
+    }
+  }
+
   private suspend fun recordNoWrite(
     permit: CoordinationPermitEntity,
     outcome: AuthoritativeArmOutcome.NoWrite,
@@ -1069,6 +1377,33 @@ internal class AndroidAutomationOrchestrator(
     if (!outcome.matches(permit)) {
       closeUnknown(permit, "ARM_NO_WRITE_BINDING_INVALID")
       return result("ARM_COORDINATION_UNKNOWN", false, operationKey = permit.permitId)
+    }
+    if (
+      outcome.reason == CoordinationServerReason.TOO_EARLY &&
+      permit.purpose == OperationPurpose.BIRTHDAY
+    ) {
+      val recorded = submissionGate.withExclusiveBoundary {
+        observeServerTime(permit.accountId, outcome.resolvedAtMillis)
+        ledger.recordRetryableTooEarlyNoWrite(
+          permit.permitId,
+          permit.revision,
+          outcome.armRequestId,
+          outcome.resolvedAtMillis,
+          timeSource.wallMillis(),
+        )
+      }
+      val trustedNow = TrustedTimeEstimator.estimate(
+        dao.clockTrust(permit.accountId),
+        timeSource.elapsedRealtimeMillis(),
+        timeSource.bootCount(),
+      )
+      val wake = trustedNow?.let { armSpacingWake(permit.accountId, it) }
+      return result(
+        if (recorded) "ARM_TOO_EARLY_RETRY_SCHEDULED" else "ARM_TOO_EARLY_RETRY_REJECTED",
+        false,
+        wake,
+        permit.permitId,
+      )
     }
     val recorded = submissionGate.withExclusiveBoundary {
       observeServerTime(permit.accountId, outcome.resolvedAtMillis)
@@ -1085,6 +1420,11 @@ internal class AndroidAutomationOrchestrator(
       false,
       operationKey = permit.permitId,
     )
+  }
+
+  private suspend fun armSpacingWake(accountId: String, trustedNowMillis: Long): Long? {
+    val next = dao.coordinationState(accountId)?.nextArmNotBeforeMillis ?: return null
+    return next.takeIf { it > trustedNowMillis }
   }
 
   private suspend fun consumeArmed(
@@ -1161,10 +1501,26 @@ internal class AndroidAutomationOrchestrator(
         operationKey = permit.permitId,
       )
       is SmsSubmissionResult.Refused -> {
-        submissionGate.withExclusiveBoundary {
-          dao.reconstructConsumedBarriers(timeSource.wallMillis())
+        val refusalBound = submissionGate.withExclusiveBoundary {
+          ledger.recordSynchronousSubmissionRefusal(
+            permit = issue.permit,
+            safeCode = submitted.safeCode,
+            failedAtMillis = timeSource.wallMillis(),
+          )
         }
-        result(submitted.safeCode, false, operationKey = permit.permitId)
+        if (!refusalBound) {
+          // A concurrent API-boundary commit would make a synchronous-refusal classification
+          // unsafe. Reconstruct only the still-consumed barrier and report uncertainty instead
+          // of falsely persisting a proven no-call failure.
+          submissionGate.withExclusiveBoundary {
+            dao.reconstructConsumedBarriers(timeSource.wallMillis())
+          }
+        }
+        result(
+          if (refusalBound) submitted.safeCode else "SMS_REFUSAL_STATE_UNCERTAIN",
+          false,
+          operationKey = permit.permitId,
+        )
       }
     }
   }
@@ -1397,6 +1753,7 @@ internal class AndroidAutomationOrchestrator(
     const val LEASE_RENEW_MARGIN_MILLIS = 2 * 60 * 1_000L
     const val SENT_WATCHDOG_MILLIS = 15 * 60 * 1_000L
     const val ARM_SPACING_MILLIS = 5 * 60 * 1_000L
+    const val SAFETY_PAUSE_PREFIX = "SAFETY_PAUSE_"
     val globalOrchestrationMutex = Mutex()
   }
 }

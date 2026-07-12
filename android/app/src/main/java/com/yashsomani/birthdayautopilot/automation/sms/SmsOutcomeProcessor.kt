@@ -289,7 +289,7 @@ internal class SmsOutcomeProcessor(
           attempt,
           occurrence,
           SendAttemptState.PARTIAL_UNKNOWN,
-          BirthdayJobState.PARTIAL_DELIVERY_UNKNOWN,
+          BirthdayJobState.PARTIAL_UNKNOWN,
           null,
           observedAtMillis,
           "SENT_CALLBACK_PARTIAL_UNKNOWN",

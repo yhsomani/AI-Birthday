@@ -6,7 +6,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { AccessibilityInfo, useColorScheme } from 'react-native';
+import { AccessibilityInfo, Platform, useColorScheme } from 'react-native';
 
 import {
   AppTheme,
@@ -38,8 +38,9 @@ export function ThemeProvider({
 
   useEffect(() => {
     let isMounted = true;
+    const isIos = Platform.OS === 'ios';
     const contrastSubscription = AccessibilityInfo.addEventListener(
-      'highTextContrastChanged',
+      isIos ? 'darkerSystemColorsChanged' : 'highTextContrastChanged',
       enabled => {
         if (isMounted) {
           setIsHighContrast(enabled);
@@ -56,7 +57,9 @@ export function ThemeProvider({
     );
     const readHighContrast = async () => {
       try {
-        const enabled = await AccessibilityInfo.isHighTextContrastEnabled();
+        const enabled = isIos
+          ? await AccessibilityInfo.isDarkerSystemColorsEnabled()
+          : await AccessibilityInfo.isHighTextContrastEnabled();
         if (isMounted) {
           setIsHighContrast(enabled);
         }

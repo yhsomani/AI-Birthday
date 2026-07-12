@@ -1,0 +1,597 @@
+{
+  "schemaVersion": 1,
+  "revision": "1",
+  "generatedAt": "2026-07-12T00:00:00.000Z",
+  "platforms": {
+    "android": {
+      "account": {
+        "kind": "connected",
+        "displayEmail": "smoke@invalid.example",
+        "sender": {
+          "platform": "android",
+          "kind": "test-only",
+          "epochLabel": "Read-only smoke"
+        }
+      },
+      "activity:issues": [
+        {
+          "id": "smoke.android.restricted",
+          "code": "distribution-channel-unapproved",
+          "severity": "blocking",
+          "blocks": ["test", "activation", "birthday"]
+        }
+      ],
+      "activity:list": {
+        "items": []
+      },
+      "automation:approval": {
+        "kind": "missing"
+      },
+      "automation:latest-test": {
+        "platform": "android",
+        "phase": "failed",
+        "updatedAt": "2026-07-12T00:00:00.000Z",
+        "reason": "distribution-channel-unapproved"
+      },
+      "automation:policy-editor": {
+        "kind": "not-configured"
+      },
+      "automation:sender-transfer-operation": {
+        "kind": "none"
+      },
+      "bootstrap": {
+        "capability": {
+          "platform": "android",
+          "deliveryMode": "unattended-device-sms",
+          "minimumApiLevel": 29,
+          "unattendedSms": "release-gated",
+          "userComposer": "available-as-explicit-alternative"
+        },
+        "eligibility": {
+          "kind": "limited",
+          "capability": {
+            "platform": "android",
+            "deliveryMode": "unattended-device-sms",
+            "minimumApiLevel": 29,
+            "unattendedSms": "release-gated",
+            "userComposer": "available-as-explicit-alternative"
+          },
+          "primaryIssue": {
+            "id": "smoke.android.restricted",
+            "code": "distribution-channel-unapproved",
+            "severity": "blocking",
+            "blocks": ["test", "activation", "birthday"]
+          },
+          "otherIssues": []
+        },
+        "account": {
+          "kind": "connected",
+          "displayEmail": "smoke@invalid.example",
+          "sender": {
+            "platform": "android",
+            "kind": "test-only",
+            "epochLabel": "Read-only smoke"
+          }
+        },
+        "setupStep": "complete"
+      },
+      "contacts:list": {
+        "items": [],
+        "totalCount": 0
+      },
+      "eligibility": {
+        "kind": "limited",
+        "capability": {
+          "platform": "android",
+          "deliveryMode": "unattended-device-sms",
+          "minimumApiLevel": 29,
+          "unattendedSms": "release-gated",
+          "userComposer": "available-as-explicit-alternative"
+        },
+        "primaryIssue": {
+          "id": "smoke.android.restricted",
+          "code": "distribution-channel-unapproved",
+          "severity": "blocking",
+          "blocks": ["test", "activation", "birthday"]
+        },
+        "otherIssues": []
+      },
+      "home": {
+        "automation": {
+          "platform": "android",
+          "desired": "paused",
+          "effective": "action-required",
+          "readiness": {
+            "platform": "android",
+            "test": {
+              "kind": "blocked",
+              "issues": [
+                {
+                  "id": "smoke.android.restricted",
+                  "code": "distribution-channel-unapproved",
+                  "severity": "blocking",
+                  "blocks": ["test", "activation", "birthday"]
+                }
+              ]
+            },
+            "activation": {
+              "kind": "blocked",
+              "issues": [
+                {
+                  "id": "smoke.android.restricted",
+                  "code": "distribution-channel-unapproved",
+                  "severity": "blocking",
+                  "blocks": ["test", "activation", "birthday"]
+                }
+              ]
+            },
+            "birthday": {
+              "kind": "blocked",
+              "issues": [
+                {
+                  "id": "smoke.android.restricted",
+                  "code": "distribution-channel-unapproved",
+                  "severity": "blocking",
+                  "blocks": ["test", "activation", "birthday"]
+                }
+              ]
+            },
+            "lastCheckedAt": "2026-07-12T00:00:00.000Z"
+          }
+        },
+        "counts": {
+          "configured": 0,
+          "enabled": 0,
+          "needsAttention": 0,
+          "unavailable": 0,
+          "today": 0,
+          "nextSevenDays": 0
+        },
+        "contactsSync": {
+          "kind": "never-synced"
+        }
+      },
+      "messages:editor": {
+        "kind": "not-configured"
+      },
+      "messages:next-composer-proposal": {
+        "kind": "none"
+      },
+      "notifications": {
+        "kind": "not-requested"
+      },
+      "privacy:current-operation": {
+        "kind": "none"
+      },
+      "privacy:inventory": {
+        "localContactCount": 0,
+        "enabledRecipientCount": 0,
+        "approvalCount": 0,
+        "activityCount": 0,
+        "templateCount": 0,
+        "localStorageBytes": 0,
+        "consentVersions": [],
+        "externalSmsCopiesNotControlled": true
+      },
+      "privacy:latest-deletion-receipt": {
+        "kind": "none"
+      },
+      "privacy:public-resources": {
+        "kind": "unavailable",
+        "buildLabel": "Birthday Autopilot read-only smoke"
+      },
+      "readiness": {
+        "platform": "android",
+        "test": {
+          "kind": "blocked",
+          "issues": [
+            {
+              "id": "smoke.android.restricted",
+              "code": "distribution-channel-unapproved",
+              "severity": "blocking",
+              "blocks": ["test", "activation", "birthday"]
+            }
+          ]
+        },
+        "activation": {
+          "kind": "blocked",
+          "issues": [
+            {
+              "id": "smoke.android.restricted",
+              "code": "distribution-channel-unapproved",
+              "severity": "blocking",
+              "blocks": ["test", "activation", "birthday"]
+            }
+          ]
+        },
+        "birthday": {
+          "kind": "blocked",
+          "issues": [
+            {
+              "id": "smoke.android.restricted",
+              "code": "distribution-channel-unapproved",
+              "severity": "blocking",
+              "blocks": ["test", "activation", "birthday"]
+            }
+          ]
+        },
+        "lastCheckedAt": "2026-07-12T00:00:00.000Z"
+      },
+      "route": {
+        "kind": "none"
+      },
+      "setup": {
+        "step": "complete",
+        "initialActivationCompleted": true,
+        "eligibility": {
+          "kind": "limited",
+          "capability": {
+            "platform": "android",
+            "deliveryMode": "unattended-device-sms",
+            "minimumApiLevel": 29,
+            "unattendedSms": "release-gated",
+            "userComposer": "available-as-explicit-alternative"
+          },
+          "primaryIssue": {
+            "id": "smoke.android.restricted",
+            "code": "distribution-channel-unapproved",
+            "severity": "blocking",
+            "blocks": ["test", "activation", "birthday"]
+          },
+          "otherIssues": []
+        },
+        "account": {
+          "kind": "connected",
+          "displayEmail": "smoke@invalid.example",
+          "sender": {
+            "platform": "android",
+            "kind": "test-only",
+            "epochLabel": "Read-only smoke"
+          }
+        },
+        "contacts": {
+          "kind": "never-synced"
+        },
+        "readiness": {
+          "platform": "android",
+          "test": {
+            "kind": "blocked",
+            "issues": [
+              {
+                "id": "smoke.android.restricted",
+                "code": "distribution-channel-unapproved",
+                "severity": "blocking",
+                "blocks": ["test", "activation", "birthday"]
+              }
+            ]
+          },
+          "activation": {
+            "kind": "blocked",
+            "issues": [
+              {
+                "id": "smoke.android.restricted",
+                "code": "distribution-channel-unapproved",
+                "severity": "blocking",
+                "blocks": ["test", "activation", "birthday"]
+              }
+            ]
+          },
+          "birthday": {
+            "kind": "blocked",
+            "issues": [
+              {
+                "id": "smoke.android.restricted",
+                "code": "distribution-channel-unapproved",
+                "severity": "blocking",
+                "blocks": ["test", "activation", "birthday"]
+              }
+            ]
+          },
+          "lastCheckedAt": "2026-07-12T00:00:00.000Z"
+        },
+        "automation": {
+          "platform": "android",
+          "desired": "paused",
+          "effective": "action-required",
+          "readiness": {
+            "platform": "android",
+            "test": {
+              "kind": "blocked",
+              "issues": [
+                {
+                  "id": "smoke.android.restricted",
+                  "code": "distribution-channel-unapproved",
+                  "severity": "blocking",
+                  "blocks": ["test", "activation", "birthday"]
+                }
+              ]
+            },
+            "activation": {
+              "kind": "blocked",
+              "issues": [
+                {
+                  "id": "smoke.android.restricted",
+                  "code": "distribution-channel-unapproved",
+                  "severity": "blocking",
+                  "blocks": ["test", "activation", "birthday"]
+                }
+              ]
+            },
+            "birthday": {
+              "kind": "blocked",
+              "issues": [
+                {
+                  "id": "smoke.android.restricted",
+                  "code": "distribution-channel-unapproved",
+                  "severity": "blocking",
+                  "blocks": ["test", "activation", "birthday"]
+                }
+              ]
+            },
+            "lastCheckedAt": "2026-07-12T00:00:00.000Z"
+          }
+        }
+      }
+    },
+    "ios": {
+      "account": {
+        "kind": "connected",
+        "displayEmail": "smoke@invalid.example",
+        "sender": {
+          "platform": "ios",
+          "kind": "companion",
+          "unattendedAutomation": "unavailable",
+          "composer": "available"
+        }
+      },
+      "activity:issues": [
+        {
+          "id": "smoke.ios.readonly",
+          "code": "native-bridge-unavailable",
+          "severity": "blocking",
+          "blocks": ["composer"]
+        }
+      ],
+      "activity:list": {
+        "items": []
+      },
+      "automation:approval": {
+        "kind": "missing"
+      },
+      "automation:latest-test": {
+        "platform": "ios",
+        "kind": "unavailable",
+        "reason": "platform-composer-only"
+      },
+      "automation:policy-editor": {
+        "kind": "not-configured"
+      },
+      "automation:sender-transfer-operation": {
+        "kind": "none"
+      },
+      "bootstrap": {
+        "capability": {
+          "platform": "ios",
+          "deliveryMode": "user-controlled-composer",
+          "unattendedSms": "unavailable",
+          "userComposer": "required"
+        },
+        "eligibility": {
+          "kind": "limited",
+          "capability": {
+            "platform": "ios",
+            "deliveryMode": "user-controlled-composer",
+            "unattendedSms": "unavailable",
+            "userComposer": "required"
+          },
+          "primaryIssue": {
+            "id": "smoke.ios.readonly",
+            "code": "native-bridge-unavailable",
+            "severity": "blocking",
+            "blocks": ["composer"]
+          },
+          "otherIssues": []
+        },
+        "account": {
+          "kind": "connected",
+          "displayEmail": "smoke@invalid.example",
+          "sender": {
+            "platform": "ios",
+            "kind": "companion",
+            "unattendedAutomation": "unavailable",
+            "composer": "available"
+          }
+        },
+        "setupStep": "complete"
+      },
+      "contacts:list": {
+        "items": [],
+        "totalCount": 0
+      },
+      "eligibility": {
+        "kind": "limited",
+        "capability": {
+          "platform": "ios",
+          "deliveryMode": "user-controlled-composer",
+          "unattendedSms": "unavailable",
+          "userComposer": "required"
+        },
+        "primaryIssue": {
+          "id": "smoke.ios.readonly",
+          "code": "native-bridge-unavailable",
+          "severity": "blocking",
+          "blocks": ["composer"]
+        },
+        "otherIssues": []
+      },
+      "home": {
+        "automation": {
+          "platform": "ios",
+          "desired": "paused",
+          "effective": "action-required",
+          "readiness": {
+            "platform": "ios",
+            "composer": {
+              "kind": "blocked",
+              "issues": [
+                {
+                  "id": "smoke.ios.readonly",
+                  "code": "native-bridge-unavailable",
+                  "severity": "blocking",
+                  "blocks": ["composer"]
+                }
+              ]
+            },
+            "unattendedAutomation": {
+              "kind": "unavailable",
+              "reason": "platform-composer-only"
+            },
+            "lastCheckedAt": "2026-07-12T00:00:00.000Z"
+          }
+        },
+        "counts": {
+          "configured": 0,
+          "enabled": 0,
+          "needsAttention": 0,
+          "unavailable": 0,
+          "today": 0,
+          "nextSevenDays": 0
+        },
+        "contactsSync": {
+          "kind": "never-synced"
+        }
+      },
+      "messages:editor": {
+        "kind": "not-configured"
+      },
+      "messages:next-composer-proposal": {
+        "kind": "none"
+      },
+      "notifications": {
+        "kind": "not-requested"
+      },
+      "privacy:current-operation": {
+        "kind": "none"
+      },
+      "privacy:inventory": {
+        "localContactCount": 0,
+        "enabledRecipientCount": 0,
+        "approvalCount": 0,
+        "activityCount": 0,
+        "templateCount": 0,
+        "localStorageBytes": 0,
+        "consentVersions": [],
+        "externalSmsCopiesNotControlled": true
+      },
+      "privacy:latest-deletion-receipt": {
+        "kind": "none"
+      },
+      "privacy:public-resources": {
+        "kind": "unavailable",
+        "buildLabel": "Birthday Autopilot read-only smoke"
+      },
+      "readiness": {
+        "platform": "ios",
+        "composer": {
+          "kind": "blocked",
+          "issues": [
+            {
+              "id": "smoke.ios.readonly",
+              "code": "native-bridge-unavailable",
+              "severity": "blocking",
+              "blocks": ["composer"]
+            }
+          ]
+        },
+        "unattendedAutomation": {
+          "kind": "unavailable",
+          "reason": "platform-composer-only"
+        },
+        "lastCheckedAt": "2026-07-12T00:00:00.000Z"
+      },
+      "route": {
+        "kind": "none"
+      },
+      "setup": {
+        "step": "complete",
+        "initialActivationCompleted": true,
+        "eligibility": {
+          "kind": "limited",
+          "capability": {
+            "platform": "ios",
+            "deliveryMode": "user-controlled-composer",
+            "unattendedSms": "unavailable",
+            "userComposer": "required"
+          },
+          "primaryIssue": {
+            "id": "smoke.ios.readonly",
+            "code": "native-bridge-unavailable",
+            "severity": "blocking",
+            "blocks": ["composer"]
+          },
+          "otherIssues": []
+        },
+        "account": {
+          "kind": "connected",
+          "displayEmail": "smoke@invalid.example",
+          "sender": {
+            "platform": "ios",
+            "kind": "companion",
+            "unattendedAutomation": "unavailable",
+            "composer": "available"
+          }
+        },
+        "contacts": {
+          "kind": "never-synced"
+        },
+        "readiness": {
+          "platform": "ios",
+          "composer": {
+            "kind": "blocked",
+            "issues": [
+              {
+                "id": "smoke.ios.readonly",
+                "code": "native-bridge-unavailable",
+                "severity": "blocking",
+                "blocks": ["composer"]
+              }
+            ]
+          },
+          "unattendedAutomation": {
+            "kind": "unavailable",
+            "reason": "platform-composer-only"
+          },
+          "lastCheckedAt": "2026-07-12T00:00:00.000Z"
+        },
+        "automation": {
+          "platform": "ios",
+          "desired": "paused",
+          "effective": "action-required",
+          "readiness": {
+            "platform": "ios",
+            "composer": {
+              "kind": "blocked",
+              "issues": [
+                {
+                  "id": "smoke.ios.readonly",
+                  "code": "native-bridge-unavailable",
+                  "severity": "blocking",
+                  "blocks": ["composer"]
+                }
+              ]
+            },
+            "unattendedAutomation": {
+              "kind": "unavailable",
+              "reason": "platform-composer-only"
+            },
+            "lastCheckedAt": "2026-07-12T00:00:00.000Z"
+          }
+        }
+      }
+    }
+  },
+  "intentProblem": {
+    "kind": "unsupported",
+    "code": "distribution-channel-unapproved"
+  }
+}

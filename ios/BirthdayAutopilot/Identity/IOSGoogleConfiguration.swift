@@ -116,6 +116,22 @@ enum IOSGoogleConfigurationResolver {
     )
   }
 
+  /// Returns the single statically declared callback scheme before the tier
+  /// Firebase plist has finished loading. The full resolver later proves that
+  /// this value exactly matches the configured OAuth client.
+  static func declaredCallbackScheme(bundle: Bundle = .main) -> String? {
+    guard let value = bundle.object(
+      forInfoDictionaryKey: "BirthdayGoogleReversedClientID"
+    ) as? String,
+      value.range(
+        of: "^com\\.googleusercontent\\.apps\\.[0-9]+-[A-Za-z0-9_-]+$",
+        options: .regularExpression
+      ) != nil,
+      bundleURLSchemes(bundle).filter({ $0 == value }).count == 1
+    else { return nil }
+    return value
+  }
+
   private static func validProjectID(_ value: String) -> Bool {
     value.range(
       of: "^[a-z][a-z0-9-]{4,28}[a-z0-9]$",

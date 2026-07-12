@@ -1,0 +1,48 @@
+appId: ${E2E_APP_ID}
+name: Navigation, help, legal, privacy and dark appearance
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+    arguments:
+      e2eLanguage: en
+      e2eSetupComplete: true
+- assertVisible:
+    id: home-screen
+- tapOn:
+    id: tab-people
+- assertVisible:
+    id: people-screen
+- tapOn:
+    id: tab-settings
+- assertVisible:
+    id: settings-screen
+- tapOn:
+    id: appearance-dark
+- assertVisible:
+    id: appearance-dark
+- scrollUntilVisible:
+    element:
+      id: settings-open-help-legal
+    direction: DOWN
+- tapOn:
+    id: settings-open-help-legal
+- assertVisible:
+    id: fixture-help-legal-screen
+- assertVisible: Help, legal and about
+- tapOn:
+    id: fixture-help-legal-back
+- scrollUntilVisible:
+    element:
+      id: settings-open-privacy
+    direction: DOWN
+- tapOn:
+    id: settings-open-privacy
+- assertVisible:
+    id: data-boundary-screen
+- pressKey: Home
+- launchApp:
+    stopApp: false
+- assertVisible:
+    id: data-boundary-screen

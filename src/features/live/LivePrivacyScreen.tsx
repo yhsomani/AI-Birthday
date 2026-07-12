@@ -461,6 +461,12 @@ export function LivePrivacyScreen({
         {t('live.privacy.title')}
       </AppText>
       <AppText color="muted">{t('live.privacy.body')}</AppText>
+      <Card>
+        <AppText variant="heading">
+          {t('live.privacy.screenCaptureTitle')}
+        </AppText>
+        <AppText color="muted">{t('live.privacy.screenCaptureBody')}</AppText>
+      </Card>
       <LiveActionFeedback problem={problem} message={message} />
       {deletionReceipt.state.kind === 'ready' &&
       deletionReceipt.state.result.envelope.value.kind === 'remote-draining' ? (
@@ -531,7 +537,7 @@ export function LivePrivacyScreen({
         />
       ) : null}
       {lifecycleRepairRequired ? (
-        <Card accessibilityLabel={t('live.privacy.repairTitle')}>
+        <Card>
           <AppText variant="heading">{t('live.privacy.repairTitle')}</AppText>
           <StatusRow title={t('live.privacy.repairBody')} tone="critical" />
           {lifecycleRepairActions.map(action => (
@@ -596,7 +602,7 @@ export function LivePrivacyScreen({
             </>
           ) : null}
           {pendingDeletionNeedsLocalWipe ? (
-            <Card accessibilityLabel={t('live.privacy.pendingWipeTitle')}>
+            <Card>
               <AppText variant="heading">
                 {t('live.privacy.pendingWipeTitle')}
               </AppText>
@@ -619,7 +625,7 @@ export function LivePrivacyScreen({
             </Card>
           ) : null}
           {review ? (
-            <Card accessibilityLabel={t('live.privacy.reviewTitle')}>
+            <Card>
               <AppText variant="heading">
                 {review.source === 'pending-deletion-local-wipe'
                   ? t('live.privacy.pendingWipeReviewTitle')

@@ -1,6 +1,8 @@
 package com.yashsomani.birthdayautopilot.messages
 
+import java.io.File
 import java.text.Normalizer
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -128,7 +130,7 @@ class MessageTemplateTest {
 
   @Test
   fun `segment cap is never silently exceeded and preview retains exact metrics`() {
-    val template = personalized("${"a".repeat(155)} {firstName}")
+    val template = personalized("Happy birthday! ${"a".repeat(140)} {firstName}")
     val result = validator.validateAndRender(template, "Birthday")
     assertNotNull(result.preview)
     assertEquals(2, result.preview?.metrics?.segmentCount)
@@ -211,6 +213,179 @@ class MessageTemplateTest {
       TemplateValidationError.LANGUAGE_MISMATCH in
         validator.validateAndRender(japaneseDeclaredAsEnglish, "Ada").errors,
     )
+  }
+
+  @Test
+  fun `shared semantic corpus classifies every synthetic English and Hindi case exactly`() {
+    val corpusFile = findRepositoryFile("contracts/birthday-message-semantic-policy-v2.json")
+    val corpus = JSONObject(corpusFile.readText())
+    assertEquals(1, corpus.getInt("schemaVersion"))
+    assertEquals(MessageContentPolicy.POLICY_VERSION, corpus.getString("policyVersion"))
+    assertEquals("synthetic-test-only", corpus.getString("dataClassification"))
+
+    val cases = corpus.getJSONArray("cases")
+    val ids = linkedSetOf<String>()
+    val coveredCategories = linkedSetOf<String>()
+    for (index in 0 until cases.length()) {
+      val case = cases.getJSONObject(index)
+      val id = case.getString("id")
+      assertTrue("duplicate fixture id: $id", ids.add(id))
+      val language = when (case.getString("language")) {
+        "en" -> MessageLanguage.ENGLISH
+        "hi" -> MessageLanguage.HINDI
+        else -> error("unsupported fixture language in $id")
+      }
+      val expectedArray = case.getJSONArray("expectedCategories")
+      val expected = buildSet {
+        for (categoryIndex in 0 until expectedArray.length()) {
+          add(expectedArray.getString(categoryIndex))
+        }
+      }
+      coveredCategories += expected
+      val actual = MessageContentPolicy.classify(case.getString("text"), language)
+        .mapTo(linkedSetOf(), MessageContentCategory::fixtureId)
+      assertEquals(id, expected, actual)
+    }
+
+    assertEquals(
+      MessageContentCategory.entries.mapTo(linkedSetOf(), MessageContentCategory::fixtureId),
+      coveredCategories,
+    )
+  }
+
+  @Test
+  fun `URI schemes and click identifiers are rejected without widening dotted prose matches`() {
+    listOf(
+      "sms:+919876543210",
+      "smsto:+919876543210",
+      "tel:+919876543210",
+      "mailto:wishes@example.com",
+    ).forEach { target ->
+      val categories = MessageContentPolicy.classify(
+        "Happy birthday! Open $target",
+        MessageLanguage.ENGLISH,
+      )
+      assertTrue("target=$target categories=$categories", MessageContentCategory.URL in categories)
+    }
+    listOf("gclid=synthetic", "fbclid=synthetic").forEach { parameter ->
+      val categories = MessageContentPolicy.classify(
+        "Happy birthday! $parameter",
+        MessageLanguage.ENGLISH,
+      )
+      assertTrue(
+        "parameter=$parameter categories=$categories",
+        MessageContentCategory.TRACKING_OR_AFFILIATE in categories,
+      )
+    }
+    assertTrue(
+      MessageContentPolicy.classify(
+        "Happy birthday! Node.js makes a fun cake theme.",
+        MessageLanguage.ENGLISH,
+      ).isEmpty(),
+    )
+    assertTrue(
+      MessageContentPolicy.classify(
+        "Happy birthday! Dr.Strange makes a fun cake theme.",
+        MessageLanguage.ENGLISH,
+      ).isEmpty(),
+    )
+    assertTrue(
+      MessageContentCategory.URL in MessageContentPolicy.classify(
+        "Happy birthday! Visit example.photography/party.",
+        MessageLanguage.ENGLISH,
+      ),
+    )
+  }
+
+  @Test
+  fun `promotion and memory rules retain benign phrase context`() {
+    listOf(
+      "May your worries be on sale this birthday.",
+      "Remember when to make a birthday wish.",
+    ).forEach { text ->
+      assertTrue("text=$text", MessageContentPolicy.classify(text, MessageLanguage.ENGLISH).isEmpty())
+    }
+    listOf(
+      "Happy birthday! Unlock this special deal.",
+      "Happy birthday! Subscribe today.",
+    ).forEach { text ->
+      assertTrue(
+        "text=$text",
+        MessageContentCategory.PROMOTION in
+          MessageContentPolicy.classify(text, MessageLanguage.ENGLISH),
+      )
+    }
+  }
+
+  @Test
+  fun `semantic name injection requires explicit generic approval instead of mutating personalized text`() {
+    val template = personalized("Happy birthday, {firstName}! Wishing you a wonderful day.")
+    listOf(
+      "example.com",
+      "Limited offer",
+      "God bless you",
+      "Kill yourself",
+      "+91 98765 43210",
+    ).forEachIndexed { index, injectedName ->
+      val result = validator.validateAndRender(template.copy(version = "name-injection-$index"), injectedName)
+      assertEquals("name=$injectedName errors=${result.errors}", null, result.preview)
+      assertTrue(
+        "name=$injectedName errors=${result.errors}",
+        TemplateValidationError.GIVEN_NAME_REQUIRED_OR_UNSAFE in result.errors,
+      )
+      assertFalse(result.valid)
+    }
+
+    val explicitGeneric = validator.validateAndRender(
+      BuiltInMessageTemplates.generic(MessageLanguage.ENGLISH),
+      givenName = null,
+    )
+    assertTrue(explicitGeneric.valid)
+    assertEquals(TemplatePlaceholderMode.GENERIC_NO_NAME, explicitGeneric.preview?.placeholderMode)
+  }
+
+  @Test
+  fun `compatibility Unicode is classified but exact approved payload stays NFC`() {
+    val fullwidth = generic("Happy birthday! Visit ｈｔｔｐｓ：／／example．com.")
+    val rejected = validator.validateAndRender(fullwidth, null)
+    assertTrue(TemplateValidationError.URL_NOT_ALLOWED in rejected.errors)
+    assertFalse(rejected.valid)
+
+    val safe = validator.validateAndRender(
+      personalized("Happy birthday, {firstName}!"),
+      "Jose\u0301",
+    )
+    assertTrue(safe.valid)
+    assertEquals("Happy birthday, José!", safe.preview?.exactText)
+    assertEquals("sms-template-validator-v2", safe.preview?.validatorVersion)
+  }
+
+  @Test
+  fun `positive birthday intent is language specific and mandatory`() {
+    val english = validator.validateAndRender(generic("Wishing you a wonderful day."), null)
+    assertTrue(TemplateValidationError.BIRTHDAY_INTENT_REQUIRED in english.errors)
+    assertFalse(english.valid)
+
+    val hindi = MessageTemplate(
+      version = "missing-hi-birthday",
+      language = MessageLanguage.HINDI,
+      placeholderMode = TemplatePlaceholderMode.GENERIC_NO_NAME,
+      source = TemplateSource.USER_EDITED,
+      text = "आपका दिन शानदार हो।",
+    )
+    val hindiResult = validator.validateAndRender(hindi, null)
+    assertTrue(TemplateValidationError.BIRTHDAY_INTENT_REQUIRED in hindiResult.errors)
+    assertFalse(hindiResult.valid)
+  }
+
+  private fun findRepositoryFile(relativePath: String): File {
+    var current: File? = File(requireNotNull(System.getProperty("user.dir"))).absoluteFile
+    while (current != null) {
+      val candidate = File(current, relativePath)
+      if (candidate.isFile) return candidate
+      current = current.parentFile
+    }
+    error("Repository fixture not found: $relativePath")
   }
 
   private fun personalized(text: String, version: String = "test-v1") = MessageTemplate(

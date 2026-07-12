@@ -10,6 +10,7 @@ import {
   ReadinessBanner,
   Screen,
 } from '../../design-system/components/Primitives';
+import { formatLiveInstant } from '../../localization/formatLive';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
 import type { LiveAppPort } from './LiveAppPort';
 import { LiveActionFeedback } from './LiveProjectionState';
@@ -27,7 +28,7 @@ export function LiveDiagnosticsScreen({
   onBack: () => void;
   port: LiveAppPort;
 }) {
-  const { t } = useAppLocalization();
+  const { language, t } = useAppLocalization();
   const [preview, setPreview] = useState<PreviewState>();
   const [pending, setPending] = useState<'preview' | 'share'>();
   const [problem, setProblem] = useState<NativeProblem>();
@@ -123,6 +124,39 @@ export function LiveDiagnosticsScreen({
             label={t('live.diagnostics.transitions')}
             value={String(preview.preview.transitionCount)}
           />
+          <KeyValue
+            label={t('live.diagnostics.health')}
+            value={t(
+              preview.preview.capabilityCodes.length === 0
+                ? 'live.diagnostics.healthClear'
+                : 'live.diagnostics.healthReported',
+              { count: preview.preview.capabilityCodes.length },
+            )}
+          />
+          {preview.preview.schedulerHeartbeatAt ? (
+            <KeyValue
+              label={t('live.diagnostics.schedulerHeartbeat')}
+              value={formatLiveInstant(
+                preview.preview.schedulerHeartbeatAt,
+                language,
+              )}
+            />
+          ) : null}
+          {preview.preview.earliestEventAt ? (
+            <KeyValue
+              label={t('live.diagnostics.earliestEvent')}
+              value={formatLiveInstant(
+                preview.preview.earliestEventAt,
+                language,
+              )}
+            />
+          ) : null}
+          {preview.preview.latestEventAt ? (
+            <KeyValue
+              label={t('live.diagnostics.latestEvent')}
+              value={formatLiveInstant(preview.preview.latestEventAt, language)}
+            />
+          ) : null}
           <KeyValue
             label={t('live.diagnostics.capabilities')}
             value={

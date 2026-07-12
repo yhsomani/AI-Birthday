@@ -14,11 +14,11 @@ enum IOSGeminiSuggestionPolicy {
   static let modelName = "gemini-3.5-flash"
   static let modelLocation = "global"
   static let modelIdentifier = "vertex-ai/global/gemini-3.5-flash"
-  static let promptPolicyVersion = "birthday-greeting-prompt-v1"
-  static let validatorVersion = "sms-template-validator-v1"
+  static let promptPolicyVersion = "birthday-greeting-prompt-v2"
+  static let validatorVersion = IOSBirthdayMessageContentPolicy.validatorVersion
 
   static let systemInstruction =
-    "Create generic personal birthday greeting templates only. Never include or request a " +
+    "Create clearly positive, generic personal birthday greeting templates only. Never include or request a " +
     "person's name, phone number, birthday, age, gender, relationship, religion, health, " +
     "private history, contact data, secret, URL, hashtag, marketing, promotion, invented " +
     "memory, sensitive attribute, hateful, sexual, self-harm, violent, or deceptive content. " +
@@ -105,12 +105,11 @@ enum IOSGeminiSuggestionPolicy {
     _ text: String,
     request: IOSGeminiSuggestionRequest
   ) -> Bool {
-    guard !text.isEmpty, text.count <= 1_000, !hasUnsafeScalar(text),
-      !matches(harmfulPattern, in: text),
-      !matches(urlPattern, in: text),
-      !matches(hashtagOrTrackingPattern, in: text),
-      !matches(promotionalPattern, in: text),
-      !matches(sensitiveOrInventedPattern, in: text)
+    guard !text.isEmpty, text.count <= 1_000,
+      IOSBirthdayMessageContentPolicy.issueCodes(
+        text: text,
+        declaredLanguage: request.language
+      ).isEmpty
     else {
       return false
     }
@@ -127,30 +126,13 @@ enum IOSGeminiSuggestionPolicy {
       return false
     }
     let representativeName = request.language == "hi" ? "मित्र" : "Friend"
-    let rendered = request.placeholderMode == "given-name"
-      ? text.replacingOccurrences(of: "{firstName}", with: representativeName)
-      : text
+    guard let rendered = IOSBirthdayMessageContentPolicy.renderedBody(
+      templateText: text,
+      placeholderMode: request.placeholderMode,
+      givenName: request.placeholderMode == "given-name" ? representativeName : nil,
+      declaredLanguage: request.language
+    ) else { return false }
     return segmentCount(rendered) <= request.requestedSegmentCap
-  }
-
-  private static func hasUnsafeScalar(_ value: String) -> Bool {
-    value.unicodeScalars.contains { scalar in
-      let code = scalar.value
-      switch scalar.properties.generalCategory {
-      case .control, .lineSeparator, .paragraphSeparator: return true
-      default: break
-      }
-      return code == 0x061C || code == 0x200E || code == 0x200F ||
-        (0x202A...0x202E).contains(code) || (0x2066...0x2069).contains(code) ||
-        code == 0x200B || code == 0x2060 || code == 0xFEFF
-    }
-  }
-
-  private static func languageMatches(_ value: String, language: String) -> Bool {
-    let letters = String(value.unicodeScalars.filter { CharacterSet.letters.contains($0) })
-    guard !letters.isEmpty else { return false }
-    let pattern = language == "hi" ? "^\\p{Devanagari}+$" : "^\\p{Latin}+$"
-    return letters.range(of: pattern, options: .regularExpression) != nil
   }
 
   private static func segmentCount(_ value: String) -> Int {
@@ -164,10 +146,6 @@ enum IOSGeminiSuggestionPolicy {
     guard units > 0 else { return 0 }
     if isGSM { return units <= 160 ? 1 : (units + 152) / 153 }
     return units <= 70 ? 1 : (units + 66) / 67
-  }
-
-  private static func matches(_ pattern: String, in value: String) -> Bool {
-    value.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
   }
 
   private static func strictString(_ value: Any?) -> String? {
@@ -193,24 +171,4 @@ enum IOSGeminiSuggestionPolicy {
     "ÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡" +
     "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà"
   private static let gsmExtension = "^{}\\[~]|€"
-  private static let harmfulPattern =
-    "\\b(?:hate|kill|murder|suicide|self[- ]?harm|sexual|nude|weapon|attack|scam|" +
-    "guaranteed prize|lie to)\\b|(?:नफरत|मार डाल|हत्या|आत्महत्या|यौन|नग्न|हथियार|हमला|धोखा)"
-  private static let urlPattern =
-    "(?:\\b(?:https?|ftp)://|\\bwww\\.)\\S+|" +
-    "\\b(?:[\\p{L}\\p{N}](?:[\\p{L}\\p{N}-]{0,62}[\\p{L}\\p{N}])?\\.)+" +
-    "(?:[A-Za-z]{2,63}|xn--[A-Za-z0-9-]{2,59})(?:[/?:#]\\S*)?|" +
-    "\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b"
-  private static let hashtagOrTrackingPattern =
-    "(?:\\butm_[a-z]+\\s*=|\\bref\\s*=|#[\\p{L}\\p{N}_]+)"
-  private static let promotionalPattern =
-    "\\b(?:sale|discount|coupon|promo|buy now|limited offer|free offer)\\b|" +
-    "(?:छूट|ऑफर|कूपन|अभी खरीदें|मुफ़्त ऑफर)"
-  private static let sensitiveOrInventedPattern =
-    "\\b(?:turning\\s+[0-9]{1,3}|[0-9]{1,3}(?:st|nd|rd|th)?\\s+birthday|" +
-    "[0-9]{1,3}\\s+years old|remember (?:when|our)|our secret|" +
-    "as your (?:wife|husband|girlfriend|boyfriend)|" +
-    "your (?:illness|diagnosis|religion|caste|race|disability|politics))\\b|" +
-    "(?:[0-9०-९]{1,3}\\s*(?:वां|वाँ)?\\s*जन्मदिन|साल के हो गए|हमारा राज़|" +
-    "आपकी बीमारी|आपका धर्म)"
 }

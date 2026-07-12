@@ -69,8 +69,11 @@ URL, and the separately protected disabled/lost-account admin workflow. See
 
 The package is in `functions/` and uses exact dependency versions and an npm
 lockfile. `firebase.json` pins the deployed Functions runtime to Node.js 22.
-Local verification accepts Node.js 22 through 24 so the repository's Node
-24.18.0 toolchain can run it; the deployed runtime is still Node 22.
+`functions/.nvmrc` pins the runtime-compatibility lane to Node 22.23.1, the
+package compiles against Node 22 type definitions, and CI runs the full build,
+coverage, and emulator suite on that exact runtime. Local orchestration also
+accepts Node.js 24 so the repository's mobile toolchain can run the same checks;
+that convenience does not replace the Node 22 proof.
 
 Firebase currently documents Node.js 22 and 20 as supported Functions runtimes,
 and says the `firebase.json` runtime takes precedence over the package engine:
@@ -78,10 +81,11 @@ and says the `firebase.json` runtime takes precedence over the package engine:
 
 ```sh
 cd backend/functions
-PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" npm ci
-PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" npm run check
-PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" npm run build
-PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" npm run test:coverage
+source "$HOME/.nvm/nvm.sh"
+nvm install
+npm install --global npm@11.6.0
+npm ci
+npm run check
 ```
 
 The emulator requires Java 21. On this workstation, the corporate CA must also
@@ -91,7 +95,7 @@ be supplied to Node for the first official emulator download:
 cd backend/functions
 JAVA_HOME=/opt/homebrew/opt/openjdk@21 \
 NODE_EXTRA_CA_CERTS=/opt/homebrew/etc/openssl@3/cert.pem \
-PATH="/opt/homebrew/opt/openjdk@21:$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" \
+PATH="/opt/homebrew/opt/openjdk@21:$HOME/.nvm/versions/node/v22.23.1/bin:$PATH" \
 npm run test:emulator
 ```
 
@@ -508,6 +512,15 @@ deletion instead of leaving a permanent tombstone.
     production index validation, recursive-deletion absence checks, and SLO/cost
     evidence. Do not enable request-body logging.
 
+These items are now represented by the fail-closed
+[production cloud evidence contract](../docs/CLOUD_RELEASE_EVIDENCE.md). Its
+template is not an approval: all external coordinates and decisions are null,
+the shared Ed25519 release-authority pin is still `UNPROVISIONED`, and the manual
+workflow only observes list/describe/get-policy/GET state through a distinct
+keyless audit identity. It cannot deploy, enable, update, delete, restore, read a
+Secret Manager value, run a state-changing smoke test, or substitute for IAM,
+privacy, signed-channel, deletion, continuity, SLO, and human approval evidence.
+
 ## Retention model
 
 - never-Armed authorization: ten minutes; physical cleanup eligible after 24
@@ -532,21 +545,26 @@ still mandatory.
 
 ## Dependency audit status
 
-As of 2026-07-12, `npm audit` reports no high or critical findings and 12 moderate
-findings overall; `npm audit --omit=dev` reports eight moderate runtime findings.
-The runtime findings are the `uuid` bounds-check advisory in the Firebase Admin
-13.x Firestore/Storage chain;
-the advisory service proposes Firebase Admin 14.1.0, but Firebase Functions 7.2.5
-currently declares official peer support only through Admin 13.x. The remaining
-findings include an OpenTelemetry baggage-allocation advisory in Firebase CLI
-development tooling. This package intentionally does
-not use `--force`, `--legacy-peer-deps`, or unsupported major overrides. Production
-release remains blocked until upstream publishes a compatible patched set or a
-reviewed supported migration removes the findings.
+As of 2026-07-12, `npm audit --omit=dev --audit-level=moderate` reports zero
+runtime findings, and the complete graph reports no high or critical findings.
+Firebase Admin 13.x still declares old `uuid` ranges through Firestore and
+Storage, while Firebase Functions 7.2.5 does not yet declare peer compatibility
+with Firebase Admin 14.x. The package therefore applies a narrow override to
+`uuid` 11.1.1 only beneath `gaxios`, `google-gax`, and `teeny-request`. A test
+locks that version and fails unless every affected runtime retains its reviewed
+zero-argument UUID-v4 call; the reported bounds defect applies to buffer-taking
+v3/v5/v6 calls. Any usage change requires removing or re-reviewing the override.
+No force or legacy-peer installation is used.
+
+The remaining three moderate findings are confined to OpenTelemetry baggage
+handling inside Firebase CLI development/emulator tooling and are absent from
+the deployed dependency set. Recheck the override and remove it when the
+official Firebase Functions/Admin graph supports the patched chain; production
+release still requires a fresh advisory report.
 
 Run both views during every update:
 
 ```sh
 npm audit --audit-level=high
-npm audit --omit=dev
+npm audit --omit=dev --audit-level=moderate
 ```

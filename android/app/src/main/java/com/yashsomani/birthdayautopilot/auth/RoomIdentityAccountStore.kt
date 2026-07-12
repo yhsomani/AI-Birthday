@@ -11,6 +11,7 @@ import java.util.Locale
 internal class RoomIdentityAccountStore(
   private val dao: PeopleSyncDao,
   private val nowMillis: () -> Long = System::currentTimeMillis,
+  // Captured only as attachment-time metadata. Runtime presentation/normalization must not read it.
   private val localeTag: () -> String = { Locale.getDefault().toLanguageTag() },
 ) : NativeIdentityAccountStore {
   private val parameterFingerprint = PeopleRequestFactory(DEFAULT_PEOPLE_PAGE_SIZE)

@@ -34,6 +34,13 @@ enum IOSPeopleSafeSyncState: Equatable {
   case syncing(mode: IOSPeopleCompletedMode, retainedGeneration: Bool)
 }
 
+extension IOSPeopleSafeSyncState {
+  var failureReason: String? {
+    if case .failedRetained(_, let reason) = self { return reason }
+    return nil
+  }
+}
+
 struct IOSPeopleSafeContact: Equatable {
   let localId: String
   let displayName: String
@@ -68,6 +75,11 @@ struct IOSPeopleSafeProjection: Equatable {
   let storageResetDetected: Bool
 }
 
+struct IOSPeopleSyncStart {
+  let generation: String
+  let mode: IOSPeopleSyncMode
+}
+
 /// Native-only contact material used to validate configuration reviews and to
 /// build foreground MessageUI proposals. None of these values are returned by
 /// the React Native bridge.
@@ -99,11 +111,32 @@ private struct IOSStoredPhone: Codable, Equatable {
   let type: String?
 }
 
+private struct IOSResolvedStoredPhone {
+  let source: IOSStoredPhone
+  let normalized: IOSNormalizedPhoneNumber
+}
+
+private struct IOSRejectedStoredPhone {
+  let source: IOSStoredPhone
+  let rejection: IOSRejectedPhoneNumber
+}
+
+private struct IOSStoredPhoneResolution {
+  let accepted: [IOSResolvedStoredPhone]
+  let rejected: [IOSRejectedStoredPhone]
+}
+
 private struct IOSStoredBirthday: Codable, Equatable {
   let localId: String
   let year: Int?
   let month: Int?
   let day: Int?
+}
+
+private struct IOSResolvedBirthday: Hashable {
+  let year: Int?
+  let month: Int
+  let day: Int
 }
 
 private struct IOSStoredPeopleContact: Codable, Equatable {
@@ -121,6 +154,9 @@ private struct IOSStoredPeopleContact: Codable, Equatable {
 }
 
 private struct IOSStoredPeopleSync: Codable, Equatable {
+  // Optional only to decode schema-v1 stores written before the durable
+  // cancellation fence. The first sync/privacy transition installs a value.
+  var generation: String?
   var nextSyncToken: String?
   var parameterFingerprint: String?
   var lastSuccessAt: Date?
@@ -142,6 +178,7 @@ private struct IOSCompanionPeopleSnapshot: Codable {
       binding: nil,
       contacts: [],
       sync: IOSStoredPeopleSync(
+        generation: IOSPeopleSyncFencePolicy.freshGeneration(),
         nextSyncToken: nil,
         parameterFingerprint: nil,
         lastSuccessAt: nil,
@@ -152,8 +189,16 @@ private struct IOSCompanionPeopleSnapshot: Codable {
   }
 }
 
+enum IOSPeopleStorePreparationResult: Equatable {
+  case ready
+  case protectedDataUnavailable
+  case unavailable
+}
+
 private enum IOSPeopleStoreError: Error {
+  case corruptSnapshot
   case keyMissing
+  case protectedDataUnavailable
   case storageUnavailable
 }
 
@@ -162,8 +207,8 @@ private enum IOSPeopleStoreError: Error {
 final class CompanionPeopleStore {
   static let shared = CompanionPeopleStore()
 
-  private static let maximumFileBytes = 64 * 1_024 * 1_024
-  private static let maximumContacts = 100_000
+  private static let maximumFileBytes = IOSPeopleCapacityPolicy.maximumEncryptedSnapshotBytes
+  private static let maximumContacts = IOSPeopleCapacityPolicy.maximumPeople
   private static let keychainService =
     "com.yashsomani.birthdayautopilot.people-store"
   private static let keychainAccount = "database-key-v1"
@@ -190,16 +235,25 @@ final class CompanionPeopleStore {
     self.fileManager = fileManager
   }
 
-  func prepareAtLaunch(completion: @escaping (Bool) -> Void) {
+  func prepareAtLaunch(
+    completion: @escaping (IOSPeopleStorePreparationResult) -> Void
+  ) {
     queue.async {
-      let result: Bool
+      let result: IOSPeopleStorePreparationResult
       do {
         let loaded = try self.loadOrCreate()
         self.refreshCache(snapshot: loaded.snapshot, storageResetDetected: loaded.didReset)
-        result = true
+        result = .ready
+      } catch IOSPeopleStoreError.protectedDataUnavailable {
+        // Complete-protection files and WhenUnlockedThisDeviceOnly keys are
+        // intentionally unavailable while locked. Preserve both durable state
+        // and the last in-memory projection; unlock will retry preparation.
+        result = .protectedDataUnavailable
       } catch {
-        self.refreshCache(snapshot: .empty, storageResetDetected: true)
-        result = false
+        // An unavailable store is not proof of corruption. Never replace the
+        // durable binding or working set unless loadOrCreate positively
+        // classified and repaired a corrupt snapshot or missing key.
+        result = .unavailable
       }
       DispatchQueue.main.async { completion(result) }
     }
@@ -257,20 +311,6 @@ final class CompanionPeopleStore {
     }
   }
 
-  func syncMode(parameterFingerprint: String) -> IOSPeopleSyncMode {
-    queue.sync {
-      guard let loaded = try? loadOrCreate().snapshot,
-        let token = loaded.sync.nextSyncToken,
-        let fingerprint = loaded.sync.parameterFingerprint,
-        fingerprint == parameterFingerprint,
-        IOSPeopleValuePolicy.token(token) == token
-      else {
-        return .full
-      }
-      return .incremental(syncToken: token, parameterFingerprint: fingerprint)
-    }
-  }
-
   func attach(
     _ binding: IOSNativeGoogleAccountBinding,
     retainedCompanionSetupExists: Bool,
@@ -307,24 +347,72 @@ final class CompanionPeopleStore {
     }
   }
 
-  func beginSync(mode: IOSPeopleCompletedMode) {
-    cacheLock.lock()
-    syncInProgress = mode
-    cachedProjection = IOSPeopleSafeProjection(
-      binding: cachedProjection.binding,
-      sync: .syncing(
-        mode: mode,
-        retainedGeneration: !cachedProjection.contacts.isEmpty
-      ),
-      contacts: cachedProjection.contacts,
-      localStorageBytes: cachedProjection.localStorageBytes,
-      storageResetDetected: cachedProjection.storageResetDetected
-    )
-    cacheLock.unlock()
+  /// Persists a fresh operation generation before any token/network work.
+  func beginSync(
+    expectedBinding: IOSNativeGoogleAccountBinding,
+    parameterFingerprint: String,
+    completion: @escaping (IOSPeopleSyncStart?) -> Void
+  ) {
+    queue.async {
+      do {
+        guard var snapshot = try self.readExistingSnapshotWithoutRepair() else {
+          throw IOSPeopleStoreError.storageUnavailable
+        }
+        guard let activeBinding = snapshot.binding,
+          Self.matchesSyncAccount(activeBinding, expectedBinding)
+        else { throw IOSPeopleStoreError.storageUnavailable }
+        let mode: IOSPeopleSyncMode
+        if let token = snapshot.sync.nextSyncToken,
+          let fingerprint = snapshot.sync.parameterFingerprint,
+          fingerprint == parameterFingerprint,
+          IOSPeopleValuePolicy.token(token) == token
+        {
+          mode = .incremental(
+            syncToken: token,
+            parameterFingerprint: fingerprint
+          )
+        } else {
+          mode = .full
+        }
+        let completedMode: IOSPeopleCompletedMode = mode == .full ? .full : .incremental
+        let generation = IOSPeopleSyncFencePolicy.freshGeneration()
+        snapshot.sync.generation = generation
+        try self.persist(snapshot)
+        self.cacheLock.lock()
+        self.syncInProgress = completedMode
+        self.cacheLock.unlock()
+        self.refreshCache(snapshot: snapshot, storageResetDetected: false)
+        let start = IOSPeopleSyncStart(generation: generation, mode: mode)
+        DispatchQueue.main.async { completion(start) }
+      } catch {
+        DispatchQueue.main.async { completion(nil) }
+      }
+    }
+  }
+
+  /// Advances the durable fence before a privacy or identity shutdown. The
+  /// previous network request may finish, but its captured generation can no
+  /// longer commit or record a failure over the newer state.
+  func invalidateOutstandingSync(completion: @escaping (Bool) -> Void) {
+    queue.async {
+      do {
+        var snapshot = try self.loadOrCreate().snapshot
+        snapshot.sync.generation = IOSPeopleSyncFencePolicy.freshGeneration()
+        try self.persist(snapshot)
+        self.cacheLock.lock()
+        self.syncInProgress = nil
+        self.cacheLock.unlock()
+        self.refreshCache(snapshot: snapshot, storageResetDetected: false)
+        DispatchQueue.main.async { completion(true) }
+      } catch {
+        DispatchQueue.main.async { completion(false) }
+      }
+    }
   }
 
   func commit(
     expectedBinding: IOSNativeGoogleAccountBinding,
+    expectedSyncGeneration: String,
     mode: IOSPeopleCompletedMode,
     deltas: [IOSPeopleContactDelta],
     nextSyncToken: String,
@@ -337,9 +425,18 @@ final class CompanionPeopleStore {
         guard IOSPeopleValuePolicy.token(nextSyncToken) == nextSyncToken else {
           throw IOSPeopleStoreError.storageUnavailable
         }
-        var snapshot = try self.loadOrCreate().snapshot
+        guard var snapshot = try self.readExistingSnapshotWithoutRepair() else {
+          throw IOSPeopleStoreError.storageUnavailable
+        }
         guard let activeBinding = snapshot.binding,
-          activeBinding.hasSameOwner(as: expectedBinding),
+          IOSPeopleSyncFencePolicy.permitsCommit(
+            capturedGeneration: expectedSyncGeneration,
+            durableGeneration: snapshot.sync.generation,
+            exactAccountGenerationMatches: Self.matchesSyncAccount(
+              activeBinding,
+              expectedBinding
+            )
+          ),
           Set(deltas.map(\.resourceName)).count == deltas.count,
           Set(deltas.map(\.contactSourceId)).count == deltas.count
         else {
@@ -438,11 +535,16 @@ final class CompanionPeopleStore {
 
   func recordSyncFailure(
     _ reason: String,
+    expectedSyncGeneration: String,
     authorizationRequired: Bool = false,
     completion: ((Bool) -> Void)? = nil
   ) {
     queue.async {
-      guard var snapshot = try? self.loadOrCreate().snapshot else {
+      guard var snapshot = try? self.readExistingSnapshotWithoutRepair() else {
+        DispatchQueue.main.async { completion?(false) }
+        return
+      }
+      guard snapshot.sync.generation == expectedSyncGeneration else {
         DispatchQueue.main.async { completion?(false) }
         return
       }
@@ -462,6 +564,27 @@ final class CompanionPeopleStore {
     }
   }
 
+  /// Clears only the in-memory syncing marker for a user-cancelled grant. The
+  /// durable People snapshot is left unchanged and a newer generation wins.
+  func finishSyncWithoutMutation(
+    expectedSyncGeneration: String,
+    completion: @escaping (Bool) -> Void
+  ) {
+    queue.async {
+      guard let snapshot = try? self.readExistingSnapshotWithoutRepair(),
+        snapshot.sync.generation == expectedSyncGeneration
+      else {
+        DispatchQueue.main.async { completion(false) }
+        return
+      }
+      self.cacheLock.lock()
+      self.syncInProgress = nil
+      self.cacheLock.unlock()
+      self.refreshCache(snapshot: snapshot, storageResetDetected: false)
+      DispatchQueue.main.async { completion(true) }
+    }
+  }
+
   func signOutRetainingData() {
     // The encrypted binding and working set remain. Presentation is blocked by the
     // identity coordinator until the exact subject and Firebase UID reauthenticate.
@@ -474,16 +597,20 @@ final class CompanionPeopleStore {
   /// binding. This is intentionally separate from a full privacy wipe so an
   /// active Firebase/Google session cannot become silently rebound to another
   /// account generation.
-  func clearContactsRetainingBinding(completion: @escaping (Bool) -> Void) {
+  func clearContactsRetainingBinding(
+    expectedBinding: IOSNativeGoogleAccountBinding,
+    completion: @escaping (Bool) -> Void
+  ) {
     queue.async {
       do {
         var snapshot = try self.loadOrCreate().snapshot
-        guard snapshot.binding != nil else {
+        guard snapshot.binding == expectedBinding else {
           DispatchQueue.main.async { completion(false) }
           return
         }
         snapshot.contacts = []
         snapshot.sync = IOSStoredPeopleSync(
+          generation: IOSPeopleSyncFencePolicy.freshGeneration(),
           nextSyncToken: nil,
           parameterFingerprint: nil,
           lastSuccessAt: nil,
@@ -491,7 +618,16 @@ final class CompanionPeopleStore {
           lastFailureReason: nil
         )
         try self.persist(snapshot)
-        self.refreshCache(snapshot: snapshot, storageResetDetected: false)
+        let verified = try self.readExistingSnapshotWithoutRepair()
+        guard verified.binding == expectedBinding,
+          verified.contacts.isEmpty,
+          verified.sync.nextSyncToken == nil,
+          verified.sync.parameterFingerprint == nil,
+          verified.sync.lastSuccessAt == nil,
+          verified.sync.lastCompletedMode == nil,
+          verified.sync.lastFailureReason == nil
+        else { throw IOSPeopleStoreError.storageUnavailable }
+        self.refreshCache(snapshot: verified, storageResetDetected: false)
         DispatchQueue.main.async { completion(true) }
       } catch {
         DispatchQueue.main.async { completion(false) }
@@ -509,7 +645,15 @@ final class CompanionPeopleStore {
         try self.deleteKey(allowMissing: true)
         let snapshot = IOSCompanionPeopleSnapshot.empty
         try self.persist(snapshot)
-        self.refreshCache(snapshot: snapshot, storageResetDetected: true)
+        let verified = try self.readExistingSnapshotWithoutRepair()
+        guard verified.binding == nil, verified.contacts.isEmpty,
+          verified.sync.nextSyncToken == nil,
+          verified.sync.parameterFingerprint == nil,
+          verified.sync.lastSuccessAt == nil,
+          verified.sync.lastCompletedMode == nil,
+          verified.sync.lastFailureReason == nil
+        else { throw IOSPeopleStoreError.storageUnavailable }
+        self.refreshCache(snapshot: verified, storageResetDetected: true)
         DispatchQueue.main.async { completion(true) }
       } catch {
         DispatchQueue.main.async { completion(false) }
@@ -588,31 +732,46 @@ final class CompanionPeopleStore {
   private static func safeContact(_ stored: IOSStoredPeopleContact) -> IOSPeopleSafeContact {
     let displayName = IOSPeopleValuePolicy.safeDisplayName(stored.displayName)
       ?? "Unnamed contact"
-    let birthdayValues = Array(Set(stored.birthdays.compactMap { birthday -> IOSPeopleBirthday? in
+    let birthdayValues = Array(Set(stored.birthdays.compactMap { birthday -> IOSResolvedBirthday? in
       guard let month = birthday.month, let day = birthday.day else { return nil }
-      return IOSPeopleBirthday(year: birthday.year, month: month, day: day)
+      return IOSResolvedBirthday(year: birthday.year, month: month, day: day)
     })).sorted {
       if $0.month != $1.month { return $0.month < $1.month }
       if $0.day != $1.day { return $0.day < $1.day }
       return ($0.year ?? 0) < ($1.year ?? 0)
     }
-    let phoneChoices = stored.phones.compactMap { phone -> IOSPeopleSafePhoneChoice? in
-      guard let analysis = analyzePhone(phone.rawValue) else { return nil }
-      return IOSPeopleSafePhoneChoice(
-        localId: phone.localId,
-        maskedDisplay: analysis.masked,
-        sourceLabel: safePhoneType(phone.type),
-        selectable: analysis.issue == nil,
-        issue: analysis.issue
+    let phoneResolution = resolvePhones(stored.phones)
+    let acceptedPhoneChoices = phoneResolution.accepted.map { value in
+      IOSPeopleSafePhoneChoice(
+        localId: value.source.localId,
+        maskedDisplay: value.normalized.maskedDisplay,
+        sourceLabel: safePhoneType(value.source.type),
+        selectable: true,
+        issue: nil
       )
     }
-    let birthdayChoices = birthdayValues.enumerated().map { index, birthday in
+    let rejectedPhoneChoices = phoneResolution.rejected.map { value in
+      IOSPeopleSafePhoneChoice(
+        localId: value.source.localId,
+        maskedDisplay: value.rejection.maskedDisplay,
+        sourceLabel: safePhoneType(value.source.type),
+        selectable: false,
+        issue: value.rejection.issue.publicReasonCode
+      )
+    }
+    let phoneChoices = acceptedPhoneChoices + rejectedPhoneChoices
+    let birthdayChoices = birthdayValues.map { birthday in
       IOSPeopleSafeBirthdayChoice(
         localId: stored.birthdays.first(where: {
           $0.year == birthday.year && $0.month == birthday.month && $0.day == birthday.day
         })?.localId ?? UUID().uuidString.lowercased(),
-        // Exact birthdays remain native-only at this boundary.
-        displayLabel: "Birthday option \(index + 1)",
+        // The provider record stays native-owned; only the locale-formatted
+        // choice needed for the user's explicit selection crosses the bridge.
+        displayLabel: IOSNativePresentationFormatter.selectedBirthdayLabel(
+          year: birthday.year,
+          month: birthday.month,
+          day: birthday.day
+        ),
         hasYear: birthday.year != nil,
         // A contact can legitimately contain multiple birthdays. Every valid
         // choice must remain selectable; readiness is resolved only after the
@@ -626,9 +785,14 @@ final class CompanionPeopleStore {
     if birthdayValues.isEmpty { reasons.append("birthday-missing") }
     if birthdayValues.count > 1 { reasons.append("birthday-choice-required") }
     if stored.phones.isEmpty { reasons.append("phone-missing") }
-    if !stored.phones.isEmpty && phoneChoices.isEmpty { reasons.append("phone-invalid") }
-    if phoneChoices.count > 1 { reasons.append("phone-choice-required") }
-    if phoneChoices.count == 1, let issue = phoneChoices[0].issue { reasons.append(issue) }
+    if !stored.phones.isEmpty && acceptedPhoneChoices.isEmpty {
+      let issues = Set(phoneResolution.rejected.map(\.rejection.issue))
+      let onlyRegionIssues = !issues.isEmpty && issues.allSatisfy {
+        [.ambiguous, .regionInvalid, .regionRequired].contains($0)
+      }
+      reasons.append(onlyRegionIssues ? "phone-ambiguous-region" : "phone-invalid")
+    }
+    if acceptedPhoneChoices.count > 1 { reasons.append("phone-choice-required") }
     if safeTemplateGivenName(stored.givenName) == nil {
       reasons.append("safe-given-name-missing")
     }
@@ -637,48 +801,13 @@ final class CompanionPeopleStore {
     return IOSPeopleSafeContact(
       localId: stored.localId,
       displayName: displayName,
-      maskedPhone: phoneChoices.count == 1 ? phoneChoices[0].maskedDisplay : nil,
+      maskedPhone: acceptedPhoneChoices.count == 1
+        ? acceptedPhoneChoices[0].maskedDisplay : nil,
       readinessKind: readinessKind,
       readinessReasons: reasons,
       phoneChoices: phoneChoices,
       birthdayChoices: birthdayChoices
     )
-  }
-
-  private static func analyzePhone(_ raw: String) -> (masked: String, issue: String?)? {
-    let digits = raw.unicodeScalars
-      .filter { (0x30...0x39).contains($0.value) }
-      .map(String.init)
-      .joined()
-    guard !digits.isEmpty else { return nil }
-    let visible = String(digits.suffix(min(2, digits.count)))
-    let masked = visible.isEmpty ? "••••" : "•••• \(visible)"
-    guard raw.unicodeScalars.allSatisfy({ scalar in
-      CharacterSet(charactersIn: "+0123456789 ()-.\u{00A0}").contains(scalar)
-    }), (7...15).contains(digits.count)
-    else {
-      return (masked, "phone-invalid")
-    }
-    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard trimmed.hasPrefix("+") else {
-      return (masked, "phone-ambiguous-region")
-    }
-    guard !trimmed.dropFirst().contains("+") else {
-      return (masked, "phone-invalid")
-    }
-    return (masked, nil)
-  }
-
-  private static func normalizedE164(_ raw: String) -> String? {
-    guard analyzePhone(raw)?.issue == nil else { return nil }
-    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard trimmed.first == "+", !trimmed.dropFirst().contains("+") else { return nil }
-    let digits = raw.unicodeScalars
-      .filter { (0x30...0x39).contains($0.value) }
-      .map(String.init)
-      .joined()
-    guard (7...15).contains(digits.count), digits.first != "0" else { return nil }
-    return "+\(digits)"
   }
 
   private static func privateContact(
@@ -703,10 +832,50 @@ final class CompanionPeopleStore {
       givenName: safeTemplateGivenName(stored.givenName),
       deleted: stored.deleted,
       materialRevision: stored.materialRevision,
-      phones: stored.phones.map {
-        IOSPeoplePrivatePhone(localId: $0.localId, e164: normalizedE164($0.rawValue))
+      phones: resolvePhones(stored.phones).accepted.map {
+        IOSPeoplePrivatePhone(
+          localId: $0.source.localId,
+          e164: $0.normalized.e164
+        )
       },
       birthdays: birthdays
+    )
+  }
+
+  /// Produces one stable candidate per canonical destination. Formatting
+  /// variants in one Google contact must not force a meaningless second phone
+  /// choice or create two proposal destinations. Source records rejected by
+  /// metadata remain visible only as masked, nonselectable repair choices.
+  private static func resolvePhones(
+    _ phones: [IOSStoredPhone]
+  ) -> IOSStoredPhoneResolution {
+    let region = IOSPhoneNumberNormalizer.currentDeviceRegion()
+    var acceptedByDestination: [String: [IOSResolvedStoredPhone]] = [:]
+    var rejected: [IOSRejectedStoredPhone] = []
+    for phone in phones {
+      switch IOSPhoneNumberNormalizer.shared.normalize(
+        phone.rawValue,
+        homeRegion: region
+      ) {
+      case .accepted(let value):
+        acceptedByDestination[value.e164, default: []].append(
+          IOSResolvedStoredPhone(source: phone, normalized: value)
+        )
+      case .rejected(let value):
+        rejected.append(IOSRejectedStoredPhone(source: phone, rejection: value))
+      }
+    }
+    let accepted = acceptedByDestination.keys.sorted().compactMap { destination in
+      acceptedByDestination[destination]?.sorted { left, right in
+        let leftMobile = left.source.type?.lowercased() == "mobile"
+        let rightMobile = right.source.type?.lowercased() == "mobile"
+        if leftMobile != rightMobile { return leftMobile }
+        return left.source.localId < right.source.localId
+      }.first
+    }
+    return IOSStoredPhoneResolution(
+      accepted: accepted,
+      rejected: rejected.sorted { $0.source.localId < $1.source.localId }
     )
   }
 
@@ -776,49 +945,90 @@ final class CompanionPeopleStore {
         return (empty, false)
       }
       return (existing, false)
-    } catch {
+    } catch let error as IOSPeopleStoreError {
+      switch error {
+      case .protectedDataUnavailable, .storageUnavailable:
+        throw error
+      case .corruptSnapshot, .keyMissing:
+        break
+      }
       let url = try storeFileURL()
       // A lost key or corrupt snapshot can never be attached to an unproven
       // account. Ordinary load is allowed to repair; ambiguous attach
       // resolution above deliberately uses the non-repairing reader.
-      try? fileManager.removeItem(at: url)
-      try? deleteKey(allowMissing: true)
+      if fileManager.fileExists(atPath: url.path) {
+        try fileManager.removeItem(at: url)
+      }
+      try deleteKey(allowMissing: true)
       let empty = IOSCompanionPeopleSnapshot.empty
       try persist(empty)
       return (empty, true)
+    } catch {
+      throw Self.isProtectedDataUnavailable(error)
+        ? IOSPeopleStoreError.protectedDataUnavailable
+        : IOSPeopleStoreError.storageUnavailable
     }
   }
 
   private func readExistingSnapshotWithoutRepair() throws
     -> IOSCompanionPeopleSnapshot?
   {
-    let url = try storeFileURL()
-    guard fileManager.fileExists(atPath: url.path) else { return nil }
-    let attributes = try fileManager.attributesOfItem(atPath: url.path)
-    guard (attributes[.size] as? NSNumber)?.intValue ?? 0 <= Self.maximumFileBytes else {
-      throw IOSPeopleStoreError.storageUnavailable
+    let url: URL
+    do {
+      url = try storeFileURL()
+    } catch {
+      throw Self.storageReadError(error)
     }
-    var sealed = try Data(contentsOf: url, options: [.mappedIfSafe])
+    guard fileManager.fileExists(atPath: url.path) else { return nil }
+    let attributes: [FileAttributeKey: Any]
+    do {
+      attributes = try fileManager.attributesOfItem(atPath: url.path)
+    } catch {
+      throw Self.storageReadError(error)
+    }
+    guard (attributes[.size] as? NSNumber)?.intValue ?? 0 <= Self.maximumFileBytes else {
+      throw IOSPeopleStoreError.corruptSnapshot
+    }
+    var sealed: Data
+    do {
+      sealed = try Data(contentsOf: url, options: [.mappedIfSafe])
+    } catch {
+      throw Self.storageReadError(error)
+    }
     defer { sealed.resetBytes(in: 0..<sealed.count) }
     let key = try readKey()
-    let box = try AES.GCM.SealedBox(combined: sealed)
-    var plaintext = try AES.GCM.open(
-      box,
-      using: key,
-      authenticating: Self.authenticatedContext
-    )
+    var plaintext: Data
+    do {
+      let box = try AES.GCM.SealedBox(combined: sealed)
+      plaintext = try AES.GCM.open(
+        box,
+        using: key,
+        authenticating: Self.authenticatedContext
+      )
+    } catch {
+      throw IOSPeopleStoreError.corruptSnapshot
+    }
     defer { plaintext.resetBytes(in: 0..<plaintext.count) }
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .millisecondsSince1970
-    let snapshot = try decoder.decode(IOSCompanionPeopleSnapshot.self, from: plaintext)
+    let snapshot: IOSCompanionPeopleSnapshot
+    do {
+      snapshot = try decoder.decode(IOSCompanionPeopleSnapshot.self, from: plaintext)
+    } catch {
+      throw IOSPeopleStoreError.corruptSnapshot
+    }
+    let syncGenerationIsValid = snapshot.sync.generation.map {
+      IOSPeopleSyncFencePolicy.isValidGeneration($0)
+    } ?? true
     guard snapshot.schemaVersion == IOSCompanionPeopleSnapshot.currentSchemaVersion,
+      syncGenerationIsValid,
       snapshot.contacts.count <= Self.maximumContacts,
       Set(snapshot.contacts.map(\.localId)).count == snapshot.contacts.count,
       Set(snapshot.contacts.map(\.contactSourceId)).count == snapshot.contacts.count,
       snapshot.contacts.allSatisfy(Self.validateStoredContact),
       snapshot.binding.map(Self.validateBinding) ?? true
     else {
-      throw IOSPeopleStoreError.storageUnavailable
+      throw IOSPeopleStoreError.corruptSnapshot
     }
     return snapshot
   }
@@ -893,6 +1103,9 @@ final class CompanionPeopleStore {
     var result: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &result)
     if status == errSecItemNotFound { throw IOSPeopleStoreError.keyMissing }
+    if status == errSecInteractionNotAllowed || status == errSecNotAvailable {
+      throw IOSPeopleStoreError.protectedDataUnavailable
+    }
     guard status == errSecSuccess, var data = result as? Data, data.count == 32 else {
       throw IOSPeopleStoreError.storageUnavailable
     }
@@ -918,6 +1131,9 @@ final class CompanionPeopleStore {
     ]
     let addStatus = SecItemAdd(add as CFDictionary, nil)
     if addStatus == errSecDuplicateItem { return try readKey() }
+    if addStatus == errSecInteractionNotAllowed || addStatus == errSecNotAvailable {
+      throw IOSPeopleStoreError.protectedDataUnavailable
+    }
     guard addStatus == errSecSuccess else { throw IOSPeopleStoreError.storageUnavailable }
     return SymmetricKey(data: data)
   }
@@ -931,9 +1147,27 @@ final class CompanionPeopleStore {
       kSecUseDataProtectionKeychain as String: kCFBooleanTrue as Any,
     ]
     let status = SecItemDelete(query as CFDictionary)
+    if status == errSecInteractionNotAllowed || status == errSecNotAvailable {
+      throw IOSPeopleStoreError.protectedDataUnavailable
+    }
     guard status == errSecSuccess || (allowMissing && status == errSecItemNotFound) else {
       throw IOSPeopleStoreError.storageUnavailable
     }
+  }
+
+  private static func storageReadError(_ error: Error) -> IOSPeopleStoreError {
+    isProtectedDataUnavailable(error) ? .protectedDataUnavailable : .storageUnavailable
+  }
+
+  private static func isProtectedDataUnavailable(_ error: Error) -> Bool {
+    if let storeError = error as? IOSPeopleStoreError,
+      case .protectedDataUnavailable = storeError
+    {
+      return true
+    }
+    let cocoa = error as NSError
+    return cocoa.domain == NSCocoaErrorDomain
+      && [NSFileReadNoPermissionError, NSFileWriteNoPermissionError].contains(cocoa.code)
   }
 
   private static func validateBinding(_ binding: IOSNativeGoogleAccountBinding) -> Bool {
@@ -944,6 +1178,14 @@ final class CompanionPeopleStore {
         of: "^[a-f0-9-]{36}$",
         options: .regularExpression
       ) != nil
+  }
+
+  private static func matchesSyncAccount(
+    _ active: IOSNativeGoogleAccountBinding,
+    _ expected: IOSNativeGoogleAccountBinding
+  ) -> Bool {
+    active.hasSameOwner(as: expected)
+      && active.accountGeneration == expected.accountGeneration
   }
 
   private static func validateStoredContact(_ contact: IOSStoredPeopleContact) -> Bool {

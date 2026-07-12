@@ -43,6 +43,12 @@ export interface PeoplePort {
   excludeRecipient(
     input: RevisionedContactCommand,
   ): Promise<NativeResult<PeopleMutationProjection>>;
+  blockRecipientDestination(
+    input: RevisionedContactCommand,
+  ): Promise<NativeResult<PeopleMutationProjection>>;
+  unblockRecipientDestination(
+    input: RevisionedContactCommand,
+  ): Promise<NativeResult<PeopleMutationProjection>>;
   restoreRecipient(
     input: RevisionedContactCommand,
   ): Promise<NativeResult<PeopleMutationProjection>>;

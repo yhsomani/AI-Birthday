@@ -1,11 +1,39 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { BackHandler, Pressable, StyleSheet, View } from 'react-native';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import {
+  DarkTheme,
+  DefaultTheme,
+  NavigationContainer,
+  type NavigatorScreenParams,
+  type NavigationProp,
+  useIsFocused,
+  useNavigation,
+  useNavigationContainerRef,
+} from '@react-navigation/native';
+import {
+  createBottomTabNavigator,
+  type BottomTabBarProps,
+  type BottomTabNavigationProp,
+} from '@react-navigation/bottom-tabs';
+import {
+  createNativeStackNavigator,
+  type NativeStackScreenProps,
+} from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import type { AccountProjection } from '../../domain/account/model';
 import type { ActivityId, ContactId } from '../../domain/shared/brand';
 import type { PlatformCapability } from '../../domain/shared/platform';
 import { AppText } from '../../design-system/components/AppText';
 import { Icon, type IconName } from '../../design-system/components/Icon';
+import { RouteAccessibilityFocus } from '../../design-system/components/RouteAccessibilityFocus';
 import { minimumTargetSize, spacing } from '../../design-system/tokens/theme';
 import { useAppTheme } from '../../app/providers/ThemeProvider';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
@@ -25,28 +53,364 @@ import { LivePersonDetailScreen } from './LivePersonDetailScreen';
 import { LivePrivacyScreen } from './LivePrivacyScreen';
 import { LiveSettingsScreen } from './LiveSettingsScreen';
 
-type LiveTab = 'home' | 'people' | 'settings';
-type LiveRoute =
-  | Readonly<{ kind: 'tab'; tab: LiveTab }>
-  | Readonly<{ kind: 'person'; contactId: ContactId }>
-  | Readonly<{ kind: 'activity' }>
-  | Readonly<{ kind: 'activity-detail'; activityId: ActivityId }>
-  | Readonly<{ kind: 'attention' }>
-  | Readonly<{ kind: 'automation' }>
-  | Readonly<{ kind: 'diagnostics' }>
-  | Readonly<{ kind: 'help-legal' }>
-  | Readonly<{ kind: 'message' }>
-  | Readonly<{ kind: 'privacy' }>;
+type LiveMainTabParamList = {
+  Home: undefined;
+  People: undefined;
+  Settings: undefined;
+};
+
+type LiveRootStackParamList = {
+  Main: NavigatorScreenParams<LiveMainTabParamList> | undefined;
+  Person: Readonly<{ contactId: ContactId }>;
+  Activity: undefined;
+  ActivityDetail: Readonly<{ activityId: ActivityId }>;
+  Attention: undefined;
+  Automation: undefined;
+  Diagnostics: undefined;
+  HelpLegal: undefined;
+  Message: undefined;
+  Privacy: undefined;
+};
+
+type LiveRootLeaf =
+  | 'Activity'
+  | 'Attention'
+  | 'Automation'
+  | 'Diagnostics'
+  | 'HelpLegal'
+  | 'Message'
+  | 'Privacy';
+type LiveRootNavigation = NavigationProp<LiveRootStackParamList>;
+
+const Tabs = createBottomTabNavigator<LiveMainTabParamList>();
+const Stack = createNativeStackNavigator<LiveRootStackParamList>();
+
+type LiveNavigationDependencies = Readonly<{
+  account: AccountProjection;
+  capability: PlatformCapability;
+  companionPort: LiveCompanionPort;
+  port: LiveAppPort;
+}>;
+
+const LiveNavigationContext = createContext<
+  LiveNavigationDependencies | undefined
+>(undefined);
+
+function useLiveNavigationDependencies(): LiveNavigationDependencies {
+  const value = useContext(LiveNavigationContext);
+  if (!value) {
+    throw new Error(
+      'Live navigation screens must render inside LiveNavigationContext',
+    );
+  }
+  return value;
+}
+
+function navigateToTab(
+  navigation: Pick<LiveRootNavigation, 'navigate'>,
+  tab: keyof LiveMainTabParamList,
+) {
+  navigation.navigate('Main', { screen: tab });
+}
+
+/**
+ * Every non-detail live route historically sat above Home. Keeping that stack
+ * shape preserves Android system-back behavior while allowing native iOS
+ * swipe-to-go-back gestures to be handled by the native stack.
+ */
+function navigateToLeafFromHome(
+  navigation: Pick<LiveRootNavigation, 'navigate'>,
+  leaf: LiveRootLeaf,
+) {
+  navigation.navigate('Main', { screen: 'Home' });
+  navigation.navigate(leaf);
+}
+
+function navigateToPerson(
+  navigation: Pick<LiveRootNavigation, 'navigate'>,
+  contactId: ContactId,
+) {
+  navigation.navigate('Main', { screen: 'People' });
+  navigation.navigate('Person', { contactId });
+}
+
+function useRootNavigation(): LiveRootNavigation {
+  const tabNavigation =
+    useNavigation<BottomTabNavigationProp<LiveMainTabParamList>>();
+  const rootNavigation = tabNavigation.getParent<LiveRootNavigation>();
+  if (!rootNavigation) {
+    throw new Error('Live tabs require the live root stack');
+  }
+  return rootNavigation;
+}
+
+function LiveRouteFrame({
+  announcement,
+  children,
+  routeKey,
+}: React.PropsWithChildren<{
+  announcement: string;
+  routeKey: string;
+}>) {
+  const isFocused = useIsFocused();
+  return (
+    <View style={styles.content}>
+      {isFocused ? (
+        <RouteAccessibilityFocus
+          announcement={announcement}
+          routeKey={routeKey}
+        />
+      ) : null}
+      <View style={styles.content}>{children}</View>
+    </View>
+  );
+}
+
+function LiveHomeRoute() {
+  const { account, capability, companionPort, port } =
+    useLiveNavigationDependencies();
+  const navigation = useRootNavigation();
+  const { t } = useAppLocalization();
+  const sender = account.kind === 'connected' ? account.sender : undefined;
+
+  return (
+    <LiveRouteFrame announcement={t('tabs.home')} routeKey="tab:home">
+      <LiveHomeScreen
+        capability={capability}
+        companionPort={companionPort}
+        onOpenActivity={() => navigateToLeafFromHome(navigation, 'Activity')}
+        onOpenAttention={() => navigateToLeafFromHome(navigation, 'Attention')}
+        onOpenAutomation={() =>
+          navigateToLeafFromHome(navigation, 'Automation')
+        }
+        onOpenMessage={() => navigateToLeafFromHome(navigation, 'Message')}
+        onOpenPeople={() => navigateToTab(navigation, 'People')}
+        port={port}
+        sender={sender}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LivePeopleRoute() {
+  const { port } = useLiveNavigationDependencies();
+  const navigation = useRootNavigation();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame announcement={t('tabs.people')} routeKey="tab:people">
+      <LivePeopleScreen
+        onOpenPerson={contactId => navigateToPerson(navigation, contactId)}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LiveSettingsRoute() {
+  const { capability, port } = useLiveNavigationDependencies();
+  const navigation = useRootNavigation();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame announcement={t('tabs.settings')} routeKey="tab:settings">
+      <LiveSettingsScreen
+        capability={capability}
+        onOpenActivity={() => navigateToLeafFromHome(navigation, 'Activity')}
+        onOpenAttention={() => navigateToLeafFromHome(navigation, 'Attention')}
+        onOpenAutomation={() =>
+          navigateToLeafFromHome(navigation, 'Automation')
+        }
+        onOpenDiagnostics={() =>
+          navigateToLeafFromHome(navigation, 'Diagnostics')
+        }
+        onOpenHelpLegal={() => navigateToLeafFromHome(navigation, 'HelpLegal')}
+        onOpenPrivacy={() => navigateToLeafFromHome(navigation, 'Privacy')}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LivePersonRoute({
+  navigation,
+  route,
+}: NativeStackScreenProps<LiveRootStackParamList, 'Person'>) {
+  const { capability, port } = useLiveNavigationDependencies();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame
+      announcement={t('live.person.detailsTitle')}
+      routeKey={`person:${route.params.contactId}`}
+    >
+      <LivePersonDetailScreen
+        capability={capability}
+        contactId={route.params.contactId}
+        onBack={() => navigateToTab(navigation, 'People')}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LiveActivityRoute({
+  navigation,
+}: NativeStackScreenProps<LiveRootStackParamList, 'Activity'>) {
+  const { port } = useLiveNavigationDependencies();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame announcement={t('live.activity.title')} routeKey="activity">
+      <LiveActivityScreen
+        onBack={() => navigateToTab(navigation, 'Home')}
+        onOpenAttention={() => navigateToLeafFromHome(navigation, 'Attention')}
+        onOpenDetail={record =>
+          navigation.navigate('ActivityDetail', { activityId: record.id })
+        }
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LiveActivityDetailRoute({
+  navigation,
+  route,
+}: NativeStackScreenProps<LiveRootStackParamList, 'ActivityDetail'>) {
+  const { port } = useLiveNavigationDependencies();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame
+      announcement={t('live.activity.detailTitle')}
+      routeKey={`activity:${route.params.activityId}`}
+    >
+      <LiveActivityDetailScreen
+        activityId={route.params.activityId}
+        onBack={() => navigation.goBack()}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LiveAttentionRoute({
+  navigation,
+}: NativeStackScreenProps<LiveRootStackParamList, 'Attention'>) {
+  const { port } = useLiveNavigationDependencies();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame
+      announcement={t('live.attention.title')}
+      routeKey="attention"
+    >
+      <LiveAttentionScreen
+        onBack={() => navigateToTab(navigation, 'Home')}
+        onOpenAutomation={() =>
+          navigateToLeafFromHome(navigation, 'Automation')
+        }
+        onOpenMessage={() => navigateToLeafFromHome(navigation, 'Message')}
+        onOpenPeople={() => navigateToTab(navigation, 'People')}
+        onOpenSettings={() => navigateToTab(navigation, 'Settings')}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LiveAutomationRoute({
+  navigation,
+}: NativeStackScreenProps<LiveRootStackParamList, 'Automation'>) {
+  const { capability, companionPort, port } = useLiveNavigationDependencies();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame
+      announcement={t('live.automation.title')}
+      routeKey="automation"
+    >
+      <LiveAutomationScreen
+        capability={capability}
+        companionPort={companionPort}
+        onBack={() => navigateToTab(navigation, 'Home')}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LiveDiagnosticsRoute({
+  navigation,
+}: NativeStackScreenProps<LiveRootStackParamList, 'Diagnostics'>) {
+  const { port } = useLiveNavigationDependencies();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame
+      announcement={t('live.diagnostics.title')}
+      routeKey="diagnostics"
+    >
+      <LiveDiagnosticsScreen
+        onBack={() => navigateToTab(navigation, 'Settings')}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LiveHelpLegalRoute({
+  navigation,
+}: NativeStackScreenProps<LiveRootStackParamList, 'HelpLegal'>) {
+  const { capability, port } = useLiveNavigationDependencies();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame announcement={t('live.help.title')} routeKey="help-legal">
+      <LiveHelpLegalScreen
+        onBack={() => navigateToTab(navigation, 'Settings')}
+        platform={capability.platform}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LiveMessageRoute({
+  navigation,
+}: NativeStackScreenProps<LiveRootStackParamList, 'Message'>) {
+  const { port } = useLiveNavigationDependencies();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame announcement={t('live.message.title')} routeKey="message">
+      <LiveMessageScreen
+        onBack={() => navigateToTab(navigation, 'Home')}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
+
+function LivePrivacyRoute({
+  navigation,
+}: NativeStackScreenProps<LiveRootStackParamList, 'Privacy'>) {
+  const { capability, port } = useLiveNavigationDependencies();
+  const { t } = useAppLocalization();
+  return (
+    <LiveRouteFrame announcement={t('live.privacy.title')} routeKey="privacy">
+      <LivePrivacyScreen
+        onBack={() => navigateToTab(navigation, 'Settings')}
+        onOpenHelpLegal={() => navigateToLeafFromHome(navigation, 'HelpLegal')}
+        platform={capability.platform}
+        port={port}
+      />
+    </LiveRouteFrame>
+  );
+}
 
 function LiveTabButton({
   icon,
   label,
+  onLongPress,
   onPress,
   selected,
   testID,
 }: {
   icon: IconName;
   label: string;
+  onLongPress: () => void;
   onPress: () => void;
   selected: boolean;
   testID: string;
@@ -58,6 +422,7 @@ function LiveTabButton({
       accessibilityRole="tab"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
+      onLongPress={onLongPress}
       onPress={onPress}
       testID={testID}
       style={({ pressed }) => [
@@ -76,47 +441,127 @@ function LiveTabButton({
   );
 }
 
+const tabPresentation = {
+  Home: { icon: 'home', testID: 'live-tab-home' },
+  People: { icon: 'people', testID: 'live-tab-people' },
+  Settings: { icon: 'settings', testID: 'live-tab-settings' },
+} as const satisfies Record<
+  keyof LiveMainTabParamList,
+  Readonly<{ icon: IconName; testID: string }>
+>;
+
+function LiveTabBar({ navigation, state }: BottomTabBarProps) {
+  const { colors } = useAppTheme();
+  const { t } = useAppLocalization();
+  const labels: Record<keyof LiveMainTabParamList, string> = {
+    Home: t('tabs.home'),
+    People: t('tabs.people'),
+    Settings: t('tabs.settings'),
+  };
+
+  return (
+    <SafeAreaView
+      accessibilityRole="tablist"
+      edges={['left', 'right', 'bottom']}
+      testID="live-tab-list"
+      style={[
+        styles.tabBar,
+        { backgroundColor: colors.surface, borderTopColor: colors.border },
+      ]}
+    >
+      {state.routes.map((route, index) => {
+        const name = route.name as keyof LiveMainTabParamList;
+        const presentation = tabPresentation[name];
+        const selected = state.index === index;
+        return (
+          <LiveTabButton
+            icon={presentation.icon}
+            key={route.key}
+            label={labels[name]}
+            onLongPress={() => {
+              navigation.emit({ type: 'tabLongPress', target: route.key });
+            }}
+            onPress={() => {
+              const event = navigation.emit({
+                canPreventDefault: true,
+                target: route.key,
+                type: 'tabPress',
+              });
+              if (!selected && !event.defaultPrevented) {
+                navigation.navigate(route.name, route.params);
+              }
+            }}
+            selected={selected}
+            testID={presentation.testID}
+          />
+        );
+      })}
+    </SafeAreaView>
+  );
+}
+
+const renderLiveTabBar = (props: BottomTabBarProps) => (
+  <LiveTabBar {...props} />
+);
+
+function LiveMainTabs() {
+  const { colors } = useAppTheme();
+  return (
+    <Tabs.Navigator
+      backBehavior="initialRoute"
+      initialRouteName="Home"
+      screenOptions={{
+        animation: 'none',
+        headerShown: false,
+        sceneStyle: { backgroundColor: colors.background },
+      }}
+      tabBar={renderLiveTabBar}
+    >
+      <Tabs.Screen name="Home" component={LiveHomeRoute} />
+      <Tabs.Screen name="People" component={LivePeopleRoute} />
+      <Tabs.Screen name="Settings" component={LiveSettingsRoute} />
+    </Tabs.Navigator>
+  );
+}
+
 export function LiveAppShell({
+  account,
   capability,
   companionPort,
   port,
-}: {
-  capability: PlatformCapability;
-  companionPort: LiveCompanionPort;
-  port: LiveAppPort;
-}) {
-  const { colors } = useAppTheme();
-  const { t } = useAppLocalization();
-  const [route, setRoute] = useState<LiveRoute>({ kind: 'tab', tab: 'home' });
+}: LiveNavigationDependencies) {
+  const theme = useAppTheme();
+  const { language } = useAppLocalization();
+  const navigationRef = useNavigationContainerRef<LiveRootStackParamList>();
   const coldRouteQueriedRef = useRef(false);
+  const pendingLeafRef = useRef<LiveRootLeaf | undefined>(undefined);
   const routeQueryInFlightRef = useRef(false);
   const routeQueryQueuedRef = useRef(false);
-
-  useEffect(() => {
-    const subscription = BackHandler.addEventListener(
-      'hardwareBackPress',
-      () => {
-        if (route.kind === 'activity-detail') {
-          setRoute({ kind: 'activity' });
-          return true;
-        }
-        if (route.kind === 'person') {
-          setRoute({ kind: 'tab', tab: 'people' });
-          return true;
-        }
-        if (route.kind !== 'tab') {
-          setRoute({ kind: 'tab', tab: 'home' });
-          return true;
-        }
-        if (route.tab !== 'home') {
-          setRoute({ kind: 'tab', tab: 'home' });
-          return true;
-        }
-        return false;
+  const dependencies = useMemo(
+    () => ({ account, capability, companionPort, port }),
+    [account, capability, companionPort, port],
+  );
+  const navigationTheme = useMemo(
+    () => ({
+      ...(theme.isDark ? DarkTheme : DefaultTheme),
+      colors: {
+        ...(theme.isDark ? DarkTheme.colors : DefaultTheme.colors),
+        background: theme.colors.background,
+        border: theme.colors.border,
+        card: theme.colors.surface,
+        notification: theme.colors.critical,
+        primary: theme.colors.accent,
+        text: theme.colors.text,
       },
-    );
-    return () => subscription.remove();
-  }, [route]);
+    }),
+    [theme.colors, theme.isDark],
+  );
+  const flushPendingLeaf = useCallback(() => {
+    const leaf = pendingLeafRef.current;
+    if (!leaf || !navigationRef.isReady()) return;
+    pendingLeafRef.current = undefined;
+    navigateToLeafFromHome(navigationRef, leaf);
+  }, [navigationRef]);
 
   useEffect(() => {
     let active = true;
@@ -130,21 +575,17 @@ export function LiveAppShell({
         routeQueryQueuedRef.current = false;
         try {
           const result = await port.getPendingRoute();
-          if (
-            active &&
-            result.kind === 'ok' &&
-            result.envelope.value.kind === 'automation-review'
-          ) {
-            setRoute({ kind: 'automation' });
-          } else if (
-            active &&
-            result.kind === 'ok' &&
-            result.envelope.value.kind === 'attention'
-          ) {
-            setRoute({ kind: 'attention' });
+          if (active && result.kind === 'ok') {
+            if (result.envelope.value.kind === 'automation-review') {
+              pendingLeafRef.current = 'Automation';
+              flushPendingLeaf();
+            } else if (result.envelope.value.kind === 'attention') {
+              pendingLeafRef.current = 'Attention';
+              flushPendingLeaf();
+            }
           }
         } catch {
-          // A route is advisory. Fail closed on the current screen.
+          // A native route is advisory. Keep the current route on any failure.
         }
       } while (active && routeQueryQueuedRef.current);
       routeQueryInFlightRef.current = false;
@@ -159,163 +600,46 @@ export function LiveAppShell({
     }
     return () => {
       active = false;
+      pendingLeafRef.current = undefined;
       routeQueryQueuedRef.current = false;
       routeQueryInFlightRef.current = false;
       unsubscribe();
     };
-  }, [port]);
-
-  let content: React.ReactNode;
-  if (route.kind === 'person') {
-    content = (
-      <LivePersonDetailScreen
-        capability={capability}
-        contactId={route.contactId}
-        onBack={() => setRoute({ kind: 'tab', tab: 'people' })}
-        port={port}
-      />
-    );
-  } else if (route.kind === 'activity') {
-    content = (
-      <LiveActivityScreen
-        onBack={() => setRoute({ kind: 'tab', tab: 'home' })}
-        onOpenAttention={() => setRoute({ kind: 'attention' })}
-        onOpenDetail={record =>
-          setRoute({ kind: 'activity-detail', activityId: record.id })
-        }
-        port={port}
-      />
-    );
-  } else if (route.kind === 'activity-detail') {
-    content = (
-      <LiveActivityDetailScreen
-        activityId={route.activityId}
-        onBack={() => setRoute({ kind: 'activity' })}
-        port={port}
-      />
-    );
-  } else if (route.kind === 'attention') {
-    content = (
-      <LiveAttentionScreen
-        onBack={() => setRoute({ kind: 'tab', tab: 'home' })}
-        port={port}
-      />
-    );
-  } else if (route.kind === 'automation') {
-    content = (
-      <LiveAutomationScreen
-        capability={capability}
-        companionPort={companionPort}
-        onBack={() => setRoute({ kind: 'tab', tab: 'home' })}
-        port={port}
-      />
-    );
-  } else if (route.kind === 'diagnostics') {
-    content = (
-      <LiveDiagnosticsScreen
-        onBack={() => setRoute({ kind: 'tab', tab: 'settings' })}
-        port={port}
-      />
-    );
-  } else if (route.kind === 'help-legal') {
-    content = (
-      <LiveHelpLegalScreen
-        onBack={() => setRoute({ kind: 'tab', tab: 'settings' })}
-        platform={capability.platform}
-        port={port}
-      />
-    );
-  } else if (route.kind === 'message') {
-    content = (
-      <LiveMessageScreen
-        onBack={() => setRoute({ kind: 'tab', tab: 'home' })}
-        port={port}
-      />
-    );
-  } else if (route.kind === 'privacy') {
-    content = (
-      <LivePrivacyScreen
-        onBack={() => setRoute({ kind: 'tab', tab: 'settings' })}
-        onOpenHelpLegal={() => setRoute({ kind: 'help-legal' })}
-        platform={capability.platform}
-        port={port}
-      />
-    );
-  } else {
-    switch (route.tab) {
-      case 'home':
-        content = (
-          <LiveHomeScreen
-            capability={capability}
-            onOpenActivity={() => setRoute({ kind: 'activity' })}
-            onOpenAttention={() => setRoute({ kind: 'attention' })}
-            onOpenAutomation={() => setRoute({ kind: 'automation' })}
-            onOpenMessage={() => setRoute({ kind: 'message' })}
-            onOpenPeople={() => setRoute({ kind: 'tab', tab: 'people' })}
-            port={port}
-          />
-        );
-        break;
-      case 'people':
-        content = (
-          <LivePeopleScreen
-            onOpenPerson={contactId => setRoute({ kind: 'person', contactId })}
-            port={port}
-          />
-        );
-        break;
-      case 'settings':
-        content = (
-          <LiveSettingsScreen
-            capability={capability}
-            onOpenActivity={() => setRoute({ kind: 'activity' })}
-            onOpenAttention={() => setRoute({ kind: 'attention' })}
-            onOpenAutomation={() => setRoute({ kind: 'automation' })}
-            onOpenDiagnostics={() => setRoute({ kind: 'diagnostics' })}
-            onOpenHelpLegal={() => setRoute({ kind: 'help-legal' })}
-            onOpenPrivacy={() => setRoute({ kind: 'privacy' })}
-            port={port}
-          />
-        );
-        break;
-    }
-  }
+  }, [flushPendingLeaf, port]);
 
   return (
     <View style={styles.shell} testID="live-app-shell">
-      <View style={styles.content}>{content}</View>
-      {route.kind === 'tab' ? (
-        <SafeAreaView
-          accessibilityRole="tablist"
-          edges={['left', 'right', 'bottom']}
-          style={[
-            styles.tabBar,
-            { backgroundColor: colors.surface, borderTopColor: colors.border },
-          ]}
+      <LiveNavigationContext.Provider value={dependencies}>
+        <NavigationContainer
+          direction={language === 'ar-XB' ? 'rtl' : 'ltr'}
+          onReady={flushPendingLeaf}
+          ref={navigationRef}
+          theme={navigationTheme}
         >
-          <LiveTabButton
-            icon="home"
-            label={t('tabs.home')}
-            selected={route.tab === 'home'}
-            onPress={() => setRoute({ kind: 'tab', tab: 'home' })}
-            testID="live-tab-home"
-          />
-          <LiveTabButton
-            icon="people"
-            label={t('tabs.people')}
-            selected={route.tab === 'people'}
-            onPress={() => setRoute({ kind: 'tab', tab: 'people' })}
-            testID="live-tab-people"
-          />
-          <LiveTabButton
-            icon="settings"
-            label={t('tabs.settings')}
-            selected={route.tab === 'settings'}
-            onPress={() => setRoute({ kind: 'tab', tab: 'settings' })}
-            testID="live-tab-settings"
-          />
-        </SafeAreaView>
-      ) : null}
+          <Stack.Navigator
+            initialRouteName="Main"
+            screenOptions={{
+              contentStyle: { backgroundColor: theme.colors.background },
+              gestureEnabled: true,
+              headerShown: false,
+            }}
+          >
+            <Stack.Screen name="Main" component={LiveMainTabs} />
+            <Stack.Screen name="Person" component={LivePersonRoute} />
+            <Stack.Screen name="Activity" component={LiveActivityRoute} />
+            <Stack.Screen
+              name="ActivityDetail"
+              component={LiveActivityDetailRoute}
+            />
+            <Stack.Screen name="Attention" component={LiveAttentionRoute} />
+            <Stack.Screen name="Automation" component={LiveAutomationRoute} />
+            <Stack.Screen name="Diagnostics" component={LiveDiagnosticsRoute} />
+            <Stack.Screen name="HelpLegal" component={LiveHelpLegalRoute} />
+            <Stack.Screen name="Message" component={LiveMessageRoute} />
+            <Stack.Screen name="Privacy" component={LivePrivacyRoute} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </LiveNavigationContext.Provider>
     </View>
   );
 }

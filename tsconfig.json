@@ -2,11 +2,14 @@
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
     "types": ["jest"],
+    "resolveJsonModule": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true
   },
   "include": [
     "App.tsx",
+    "e2e/**/*.ts",
+    "e2e/**/*.tsx",
     "src/**/*.ts",
     "src/**/*.tsx",
     "specs/**/*.ts",

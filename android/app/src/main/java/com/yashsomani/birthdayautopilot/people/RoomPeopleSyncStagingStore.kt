@@ -159,9 +159,6 @@ internal class PeopleDeltaStageMapper(
       runCatching { LeapDayPolicy.valueOf(value) }.getOrNull()
     }
     val selectedPhoneId = previous?.policy?.chosenPhoneId
-    val previousRegion = selectedPhoneId?.let { selected ->
-      previous.phones.singleOrNull { it.phoneId == selected }?.regionCode
-    }
     val raw = RawGoogleContact(
       localId = contactId,
       resourceName = delta.resourceName,
@@ -184,7 +181,7 @@ internal class PeopleDeltaStageMapper(
         birthday = priorBirthday,
         leapDayPolicy = priorLeapPolicy,
         phoneId = selectedPhoneId,
-        homeRegion = previousRegion ?: homeRegion,
+        homeRegion = homeRegion,
       ),
     )
     // ContactNormalizer intentionally exposes only domain issues. PhoneNormalizer is repeated here
@@ -192,7 +189,7 @@ internal class PeopleDeltaStageMapper(
     val phoneResolution = phoneNormalizer.resolve(
       raw.phones,
       selectedPhoneId,
-      previousRegion ?: homeRegion,
+      homeRegion,
     )
     val rejected = phoneResolution.rejected.associate { it.phoneId to it.reason }
     val normalizedCandidates = phoneResolution.candidates
@@ -217,7 +214,7 @@ internal class PeopleDeltaStageMapper(
         },
         maskedDisplay = candidate?.maskedDisplay ?: maskInvalidSource(source.source.value),
         typeLabel = source.source.type,
-        regionCode = (previousRegion ?: homeRegion)
+        regionCode = homeRegion
           ?.takeUnless { source.source.value.trim().startsWith('+') },
         isSmsCapableType = candidate != null,
         state = state,
@@ -390,15 +387,10 @@ internal class PeopleDeltaStageMapper(
 internal class RoomPeopleSyncStagingStore(
   private val dao: PeopleSyncDao,
   private val accountId: String,
-  accountLocaleTag: String,
+  private val homeRegion: String?,
   private val parameterFingerprint: String,
   private val clock: PeopleWallClock = PeopleWallClock(System::currentTimeMillis),
 ) : PeopleSyncStagingStore {
-  private val homeRegion = Locale.forLanguageTag(accountLocaleTag)
-    .country
-    .uppercase(Locale.ROOT)
-    .takeIf { it.matches(Regex("^[A-Z]{2}$")) }
-
   override suspend fun begin(mode: PeopleSyncMode): PeopleStagingTransaction? {
     val now = clock.nowMillis().takeIf { it >= 0 } ?: return null
     val staleCutoff = now.subtractExactOrNull(STAGING_RETENTION_MILLIS) ?: 0L

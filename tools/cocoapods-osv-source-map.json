@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 1,
+  "scope": "Exact CocoaPods trunk components in ios/Podfile.lock mapped from their checksum-bound podspec source repositories to OSV SwiftURL package identities. Local node_modules pods are mapped to their exact npm owners by the gate.",
+  "mappings": [
+    {
+      "sourceRepository": "github.com/openid/AppAuth-iOS",
+      "sourceTag": "2.1.0",
+      "queryPurl": "pkg:swift/github.com/openid/AppAuth-iOS@2.1.0",
+      "pods": [
+        {
+          "name": "AppAuth",
+          "version": "2.1.0",
+          "podspecSha1": "ef4da5a3fc2e10b90c09a0a94a9baeaedc0341d5"
+        }
+      ]
+    },
+    {
+      "sourceRepository": "github.com/google/app-check",
+      "sourceTag": "CocoaPods-11.3.1",
+      "queryPurl": "pkg:swift/github.com/google/app-check@11.3.1",
+      "pods": [
+        {
+          "name": "AppCheckCore",
+          "version": "11.3.1",
+          "podspecSha1": "e215d35177a9cf469927863e69c13e220df32a8b"
+        }
+      ]
+    },
+    {
+      "sourceRepository": "github.com/firebase/firebase-ios-sdk",
+      "sourceTag": "CocoaPods-12.15.0",
+      "queryPurl": "pkg:swift/github.com/firebase/firebase-ios-sdk@12.15.0",
+      "pods": [
+        {
+          "name": "FirebaseABTesting",
+          "version": "12.15.0",
+          "podspecSha1": "04cab3e6db77b86af50b6cf7c825a13e04beca52"
+        },
+        {
+          "name": "FirebaseAILogic",
+          "version": "12.15.0",
+          "podspecSha1": "bf7c82354126ffc2bd1a0300e479b8a049cda203"
+        },
+        {
+          "name": "FirebaseAppCheck",
+          "version": "12.15.0",
+          "podspecSha1": "29d81a8b4a1bf0273c04a1ffe1532aceabc9e7a8"
+        },
+        {
+          "name": "FirebaseAppCheckInterop",
+          "version": "12.15.0",
+          "podspecSha1": "5083c9acf65f206832fe659e1c676b7bc3d55e8a"
+        },
+        {
+          "name": "FirebaseAuth",
+          "version": "12.15.0",
+          "podspecSha1": "6d1d4e5875d93f82e669bee6b05a70a642025b58"
+        },
+        {
+          "name": "FirebaseAuthInterop",
+          "version": "12.15.0",
+          "podspecSha1": "0778f5f24d6cccd6d67ef45832fe9c67a0b944ea"
+        },
+        {
+          "name": "FirebaseCore",
+          "version": "12.15.0",
+          "podspecSha1": "2e86a4ea1684d4381707069e4a6d89ac808e901e"
+        },
+        {
+          "name": "FirebaseCoreExtension",
+          "version": "12.15.0",
+          "podspecSha1": "10d2a627977b39418759ad88ada80fbbd34f1c4f"
+        },
+        {
+          "name": "FirebaseCoreInternal",
+          "version": "12.15.0",
+          "podspecSha1": "6ab6a02c94446c026d2cf35cf5383842ebaa4992"
+        },
+        {
+          "name": "FirebaseFunctions",
+          "version": "12.15.0",
+          "podspecSha1": "207bd3636bf538a5852a1ae34737fa15581e6f7a"
+        },
+        {
+          "name": "FirebaseInstallations",
+          "version": "12.15.0",
+          "podspecSha1": "eb29ccbf64eaedf86fd5b2ccc7fabde567660b52"
+        },
+        {
+          "name": "FirebaseMessagingInterop",
+          "version": "12.15.0",
+          "podspecSha1": "23d50835a19ee3ffae1e5058b9dfea8b651ff298"
+        },
+        {
+          "name": "FirebaseRemoteConfig",
+          "version": "12.15.0",
+          "podspecSha1": "d8b57e994277aabef7cca708e671ce676eefed7a"
+        },
+        {
+          "name": "FirebaseRemoteConfigInterop",
+          "version": "12.15.0",
+          "podspecSha1": "7e3d57ce4b1e958bb1d15403faa7178f46bbb5b7"
+        },
+        {
+          "name": "FirebaseSharedSwift",
+          "version": "12.15.0",
+          "podspecSha1": "3f5c2758484d32099d693f269f110d3249c3f7e3"
+        }
+      ]
+    },
+    {
+      "sourceRepository": "github.com/google/GoogleSignIn-iOS",
+      "sourceTag": "9.1.0",
+      "queryPurl": "pkg:swift/github.com/google/GoogleSignIn-iOS@9.1.0",
+      "pods": [
+        {
+          "name": "GoogleSignIn",
+          "version": "9.1.0",
+          "podspecSha1": "fcee2257188d5eda57a5e2b6a715550ffff9206d"
+        }
+      ]
+    },
+    {
+      "sourceRepository": "github.com/google/GoogleUtilities",
+      "sourceTag": "CocoaPods-8.1.2",
+      "queryPurl": "pkg:swift/github.com/google/GoogleUtilities@8.1.2",
+      "pods": [
+        {
+          "name": "GoogleUtilities",
+          "version": "8.1.2",
+          "podspecSha1": "766ace00c6b10d8148408f329d10c4f051931850"
+        }
+      ]
+    },
+    {
+      "sourceRepository": "github.com/google/GTMAppAuth",
+      "sourceTag": "5.0.0",
+      "queryPurl": "pkg:swift/github.com/google/GTMAppAuth@5.0.0",
+      "pods": [
+        {
+          "name": "GTMAppAuth",
+          "version": "5.0.0",
+          "podspecSha1": "217a876b249c3c585a54fd6f73e6b58c4f5c4238"
+        }
+      ]
+    },
+    {
+      "sourceRepository": "github.com/google/gtm-session-fetcher",
+      "sourceTag": "v3.5.0",
+      "queryPurl": "pkg:swift/github.com/google/gtm-session-fetcher@3.5.0",
+      "pods": [
+        {
+          "name": "GTMSessionFetcher",
+          "version": "3.5.0",
+          "podspecSha1": "5aea5ba6bd522a239e236100971f10cb71b96ab6"
+        }
+      ]
+    },
+    {
+      "sourceRepository": "github.com/iziz/libPhoneNumber-iOS",
+      "sourceTag": "1.7.3",
+      "queryPurl": "pkg:swift/github.com/iziz/libPhoneNumber-iOS@1.7.3",
+      "pods": [
+        {
+          "name": "libPhoneNumber-iOS-SwiftCore",
+          "version": "1.7.3",
+          "podspecSha1": "5081e7617a3461edc34901f0d05e142a2f8863ee"
+        },
+        {
+          "name": "libPhoneNumber-iOS-SwiftShortNumber",
+          "version": "1.7.3",
+          "podspecSha1": "2cf795aea3231e53b20a3cbf9b68661638f8d187"
+        },
+        {
+          "name": "libPhoneNumber-iOS",
+          "version": "1.7.3",
+          "podspecSha1": "1d777bc3cf1961b809ae541765f308d65bac53c7"
+        },
+        {
+          "name": "libPhoneNumberShortNumber",
+          "version": "1.7.3",
+          "podspecSha1": "2d278ee38795f5407f0177a292e4e9965edaf836"
+        }
+      ]
+    },
+    {
+      "sourceRepository": "github.com/google/promises",
+      "sourceTag": "2.4.1",
+      "queryPurl": "pkg:swift/github.com/google/promises@2.4.1",
+      "pods": [
+        {
+          "name": "PromisesObjC",
+          "version": "2.4.1",
+          "podspecSha1": "752c3227f599e3467650e47ea36f433eeb10c273"
+        },
+        {
+          "name": "PromisesSwift",
+          "version": "2.4.1",
+          "podspecSha1": "217dea0fd5d2ad65222a109c48698add13cc1c5b"
+        }
+      ]
+    },
+    {
+      "sourceRepository": "github.com/google/interop-ios-for-google-sdks",
+      "sourceTag": "CocoaPods-101.0.0",
+      "queryPurl": "pkg:swift/github.com/google/interop-ios-for-google-sdks@101.0.0",
+      "pods": [
+        {
+          "name": "RecaptchaInterop",
+          "version": "101.0.0",
+          "podspecSha1": "11e0b637842dfb48308d242afc3f448062325aba"
+        }
+      ]
+    }
+  ]
+}

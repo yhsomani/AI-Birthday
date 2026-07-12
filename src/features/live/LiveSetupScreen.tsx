@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { BackHandler, StyleSheet, View } from 'react-native';
 
 import type { BootstrapProjection, SetupStep } from '../../domain/setup/model';
 import type { NativeProblem, NativeResult } from '../../domain/shared/result';
@@ -17,6 +17,7 @@ import {
   SectionHeading,
   StatusRow,
 } from '../../design-system/components/Primitives';
+import { RouteAccessibilityFocus } from '../../design-system/components/RouteAccessibilityFocus';
 import { spacing } from '../../design-system/tokens/theme';
 import { useAppLocalization } from '../../localization/LocalizationProvider';
 import { safeReasonMessageKey } from '../../localization/reasonCopy';
@@ -34,6 +35,7 @@ import {
   nativePlatformMismatchProblem,
 } from './nativeProblem';
 import { useLiveProjection } from './useLiveProjection';
+import { LiveAndroidDeviceControls } from './LiveAndroidDeviceControls';
 
 const stepActionKey = (step: SetupStep): TranslationKey | undefined => {
   switch (step) {
@@ -94,13 +96,31 @@ export function LiveSetupScreen({
   const [lifecycleRepairIdentityReady, setLifecycleRepairIdentityReady] =
     useState(false);
 
+  useEffect(() => {
+    if (!showHelpLegal) return undefined;
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        setShowHelpLegal(false);
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [showHelpLegal]);
+
   if (showHelpLegal) {
     return (
-      <LiveHelpLegalScreen
-        onBack={() => setShowHelpLegal(false)}
-        platform={bootstrap.value.capability.platform}
-        port={port}
-      />
+      <View style={styles.root} testID="live-setup-help-route">
+        <RouteAccessibilityFocus
+          announcement={t('live.help.title')}
+          routeKey="setup:help-legal"
+        />
+        <LiveHelpLegalScreen
+          onBack={() => setShowHelpLegal(false)}
+          platform={bootstrap.value.capability.platform}
+          port={port}
+        />
+      </View>
     );
   }
 
@@ -310,6 +330,16 @@ export function LiveSetupScreen({
     platform === 'android' &&
     projection.account.kind === 'cleanup-pending' &&
     projection.account.operation === 'repair';
+  const androidSenderGate =
+    platform === 'android' &&
+    projection.account.kind === 'connected' &&
+    projection.account.sender.platform === 'android' &&
+    (projection.account.sender.kind === 'standby' ||
+      projection.account.sender.kind === 'transfer-pending');
+  const accountEnvelope: ProjectionEnvelope<AccountProjection> = {
+    ...setup.state.result.envelope,
+    value: projection.account,
+  };
   const eligibilityTone =
     projection.eligibility.kind === 'supported' ? 'positive' : 'warning';
   const eligibilityKeys: Record<
@@ -341,7 +371,11 @@ export function LiveSetupScreen({
       case 'never-synced':
         return t('live.setup.notSynced');
       case 'syncing':
-        return t('live.setup.syncing', { mode: contacts.mode });
+        return t(
+          contacts.mode === 'full'
+            ? 'live.setup.syncingFull'
+            : 'live.setup.syncingIncremental',
+        );
       case 'fresh':
         return t('live.setup.contactsVerified', {
           count: contacts.contactCount,
@@ -382,6 +416,12 @@ export function LiveSetupScreen({
 
   return (
     <Screen includeTopInset testID="live-setup-screen">
+      <RouteAccessibilityFocus
+        announcement={t('live.setup.currentStep', {
+          step: t(stepKeys[projection.step]),
+        })}
+        routeKey={`setup:${projection.step}`}
+      />
       <View style={styles.heading}>
         <AppText variant="title" accessibilityRole="header">
           {t('live.setup.title')}
@@ -405,6 +445,16 @@ export function LiveSetupScreen({
             : t('live.setup.iosBody')
         }
         tone="info"
+      />
+      <ReadinessBanner
+        title={t('live.setup.costTitle')}
+        detail={t(
+          platform === 'android'
+            ? 'live.setup.androidConsent'
+            : 'live.setup.iosConsent',
+        )}
+        tone="warning"
+        testID="live-setup-cost-consent"
       />
       {deletionCleanupPending ? (
         <>
@@ -436,7 +486,7 @@ export function LiveSetupScreen({
         </>
       ) : null}
       {lifecycleRepairPending ? (
-        <Card accessibilityLabel={t('live.privacy.repairTitle')}>
+        <Card>
           <AppText variant="heading">{t('live.privacy.repairTitle')}</AppText>
           <ReadinessBanner
             title={t('live.privacy.recoveryUnavailable')}
@@ -479,7 +529,59 @@ export function LiveSetupScreen({
       ) : null}
       <LiveActionFeedback problem={actionProblem} message={actionMessage} />
 
-      <Card accessibilityLabel={t('live.setup.checksLabel')}>
+      {androidSenderGate ? (
+        <Card>
+          <ReadinessBanner
+            title={t('live.setup.senderGateTitle')}
+            detail={t(
+              projection.account.kind === 'connected' &&
+                projection.account.sender.platform === 'android' &&
+                projection.account.sender.kind === 'transfer-pending'
+                ? 'live.setup.senderGatePendingBody'
+                : 'live.setup.senderGateBody',
+            )}
+            tone="warning"
+            testID="live-setup-sender-gate"
+          />
+          <LiveAndroidDeviceControls
+            account={accountEnvelope}
+            onAccountReload={async () => {
+              await setup.reload();
+              await refreshBootstrap();
+            }}
+            onOpenAutomation={() => {
+              setup.reload().catch(() => undefined);
+              refreshBootstrap().catch(() => undefined);
+            }}
+            port={port}
+            showNotifications={false}
+          />
+        </Card>
+      ) : deletionCleanupPending ||
+        lifecycleRepairPending ? null : actionKey ? (
+        <>
+          {projection.step === 'contacts-disclosure' ? (
+            <ReadinessBanner
+              title={t('live.setup.contactsPrivacyTitle')}
+              detail={t(
+                platform === 'android'
+                  ? 'live.setup.contactsPrivacyAndroid'
+                  : 'live.setup.contactsPrivacyIos',
+              )}
+              tone="warning"
+              testID="live-setup-contacts-privacy"
+            />
+          ) : null}
+          <Button
+            label={actionPending ? t('live.common.checking') : t(actionKey)}
+            disabled={actionPending}
+            onPress={() => runStepAction(projection.step)}
+            testID="live-setup-action"
+          />
+        </>
+      ) : null}
+
+      <Card>
         <StatusRow
           title={t('live.setup.eligibility')}
           detail={t(eligibilityKeys[projection.eligibility.kind])}
@@ -534,14 +636,10 @@ export function LiveSetupScreen({
         )}
       </Card>
 
-      {deletionCleanupPending || lifecycleRepairPending ? null : actionKey ? (
-        <Button
-          label={actionPending ? t('live.common.checking') : t(actionKey)}
-          disabled={actionPending}
-          onPress={() => runStepAction(projection.step)}
-          testID="live-setup-action"
-        />
-      ) : (
+      {androidSenderGate ||
+      deletionCleanupPending ||
+      lifecycleRepairPending ||
+      actionKey ? null : (
         <ReadinessBanner
           title={t('live.setup.reviewRequired')}
           detail={t('live.setup.reviewRequiredBody')}
@@ -579,4 +677,5 @@ export function LiveSetupScreen({
 
 const styles = StyleSheet.create({
   heading: { gap: spacing.xs },
+  root: { flex: 1 },
 });

@@ -26,7 +26,7 @@ const maximumTextBytes = 2 * 1024 * 1024;
 const approvedTemplateDebugKeystoreSha256 =
   '221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58';
 
-const secretRules = [
+export const secretRules = [
   {
     label: 'private key material',
     pattern: new RegExp('-{5}BEGIN (?:RSA |EC |OPENSSH )?PRIVATE' + ' KEY-{5}'),
@@ -80,7 +80,7 @@ function isApprovedFirebaseClientConfig(relativePath) {
   );
 }
 
-function isForbiddenCredentialPath(relativePath) {
+export function isForbiddenCredentialPath(relativePath) {
   const normalized = relativePath.split(path.sep).join('/');
   const basename = path.basename(normalized);
   if (forbiddenSuffixes.has(path.extname(basename).toLowerCase())) return true;
@@ -98,6 +98,15 @@ function isForbiddenCredentialPath(relativePath) {
     return true;
   }
   return false;
+}
+
+export function secretLabelsInText(content, relativePath = null) {
+  const labels = [];
+  for (const rule of secretRules) {
+    if (relativePath !== null && rule.allow?.(relativePath)) continue;
+    if (rule.pattern.test(content)) labels.push(rule.label);
+  }
+  return labels;
 }
 
 async function collectFiles(root, current = root, output = []) {
@@ -132,11 +141,8 @@ async function inspectTextFile(root, absolutePath, findings) {
   if (buffer.includes(0)) return;
   const relativePath = path.relative(root, absolutePath);
   const content = buffer.toString('utf8');
-  for (const rule of secretRules) {
-    if (rule.allow?.(relativePath)) continue;
-    if (rule.pattern.test(content)) {
-      findings.push(`${relativePath}: ${rule.label}`);
-    }
+  for (const label of secretLabelsInText(content, relativePath)) {
+    findings.push(`${relativePath}: ${label}`);
   }
 }
 

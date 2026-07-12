@@ -64,6 +64,67 @@ class SmsOutcomeReducerTest {
   }
 
   @Test
+  fun `partial sent evidence and partial delivery evidence remain distinct phases`() {
+    val partialSent = reduce(
+      sent(0, DeliveryEvidenceClass.SENT_SUCCESS),
+      now = SENT_DEADLINE,
+    )
+    assertEquals(SentEvidenceDecision.PARTIAL_UNKNOWN, partialSent.timelySent)
+    assertEquals(DeliveryEvidenceDecision.NOT_APPLICABLE, partialSent.delivery)
+
+    val partialDelivery = reduce(
+      sent(0, DeliveryEvidenceClass.SENT_SUCCESS),
+      sent(1, DeliveryEvidenceClass.SENT_SUCCESS),
+      delivery(0, DeliveryEvidenceClass.DELIVERY_COMPLETE),
+      now = DELIVERY_DEADLINE,
+      deliveryDeadline = DELIVERY_DEADLINE,
+    )
+    assertEquals(SentEvidenceDecision.ALL_SENT, partialDelivery.timelySent)
+    assertEquals(
+      DeliveryEvidenceDecision.PARTIAL_DELIVERY_UNKNOWN,
+      partialDelivery.delivery,
+    )
+  }
+
+  @Test
+  fun `sent watchdog decision table covers every terminal class`() {
+    val cases = listOf(
+      emptyList<SmsPartEvidence>() to SentEvidenceDecision.SUBMISSION_UNKNOWN,
+      listOf(sent(0, DeliveryEvidenceClass.SENT_SUCCESS)) to
+        SentEvidenceDecision.PARTIAL_UNKNOWN,
+      listOf(
+        sent(0, DeliveryEvidenceClass.SENT_SUCCESS),
+        sent(1, DeliveryEvidenceClass.SENT_SUCCESS),
+      ) to SentEvidenceDecision.ALL_SENT,
+      listOf(
+        sent(0, DeliveryEvidenceClass.SENT_ZERO_ACCEPTANCE_RADIO_OFF),
+        sent(1, DeliveryEvidenceClass.SENT_ZERO_ACCEPTANCE_RADIO_OFF),
+      ) to SentEvidenceDecision.ALL_RADIO_OFF,
+      listOf(
+        sent(0, DeliveryEvidenceClass.SENT_ZERO_ACCEPTANCE_NO_SERVICE),
+        sent(1, DeliveryEvidenceClass.SENT_ZERO_ACCEPTANCE_NO_SERVICE),
+      ) to SentEvidenceDecision.ALL_NO_SERVICE,
+      listOf(
+        sent(0, DeliveryEvidenceClass.SENT_FAILURE),
+        sent(1, DeliveryEvidenceClass.SENT_FAILURE),
+      ) to SentEvidenceDecision.COMPLETE_FAILURE,
+    )
+
+    cases.forEach { (evidence, expected) ->
+      assertEquals(
+        expected,
+        SmsOutcomeReducer.reduce(
+          expectedPartCount = 2,
+          sentDeadlineMillis = SENT_DEADLINE,
+          deliveryDeadlineMillis = null,
+          observedAtMillis = SENT_DEADLINE,
+          evidence = evidence,
+        ).timelySent,
+      )
+    }
+  }
+
+  @Test
   fun `evidence at deadline is late and cannot establish timely success`() {
     val decision = reduce(
       sent(0, DeliveryEvidenceClass.SENT_SUCCESS, at = SENT_DEADLINE),
@@ -204,5 +265,6 @@ class SmsOutcomeReducerTest {
 
   private companion object {
     const val SENT_DEADLINE = 1_000L
+    const val DELIVERY_DEADLINE = 2_000L
   }
 }

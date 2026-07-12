@@ -85,6 +85,8 @@ yarn-error.log
 # testing
 /coverage
 /backend/functions/coverage/
+/release-evidence/
+gha-creds-*.json
 
 # Firebase Functions build and emulator output; deploy and CI rebuild from TypeScript source.
 /backend/functions/lib/

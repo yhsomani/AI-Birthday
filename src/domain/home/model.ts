@@ -9,6 +9,8 @@ export type HomeProjection = Readonly<{
   automation: AutomationProjection;
   next?: UpcomingGreeting | undefined;
   counts: Readonly<{
+    /** Enrolled recipients, including those waiting for an exact approval. */
+    configured?: number | undefined;
     enabled: number;
     needsAttention: number;
     unavailable: number;

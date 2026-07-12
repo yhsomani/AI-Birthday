@@ -1,0 +1,44 @@
+# Default maintainer. Branch protection must require this review and an
+# independent release/privacy/security reviewer for protected production paths.
+* @yhsomani
+
+# Product authority and public/privacy surfaces.
+/PROJECT_ABOUT.md @yhsomani
+/SECURITY.md @yhsomani
+/backend/hosting/ @yhsomani
+/backend/firestore.rules @yhsomani
+/backend/ttl-policies.json @yhsomani
+/docs/OPERATIONS_RUNBOOK.md @yhsomani
+
+# Safety-critical Android, iOS, and control-plane code.
+/android/app/src/main/java/com/yashsomani/birthdayautopilot/automation/ @yhsomani
+/android/app/src/main/java/com/yashsomani/birthdayautopilot/coordination/ @yhsomani
+/android/app/src/main/java/com/yashsomani/birthdayautopilot/lifecycle/ @yhsomani
+/android/app/src/main/java/com/yashsomani/birthdayautopilot/storage/ @yhsomani
+/ios/BirthdayAutopilot/Automation/ @yhsomani
+/ios/BirthdayAutopilot/Privacy/ @yhsomani
+/ios/BirthdayAutopilot/CompanionProtectedStore.swift @yhsomani
+/ios/BirthdayAutopilot/CompanionMessageModule.swift @yhsomani
+/backend/functions/src/ @yhsomani
+
+# Release authority, signing, evidence, CI, and dependency controls.
+/.github/ @yhsomani
+/android/app/build.gradle @yhsomani
+/android/build.gradle @yhsomani
+/android/gradle/verification-metadata.xml @yhsomani
+/ios/Podfile @yhsomani
+/ios/Podfile.lock @yhsomani
+/tools/distribution-authority-pin.json @yhsomani
+/tools/distribution-evidence.schema.json @yhsomani
+/tools/store-submission-evidence.schema.json @yhsomani
+/tools/store-submission-evidence.template.json @yhsomani
+/tools/validate-store-submission-evidence.mjs @yhsomani
+/tools/cloud-release-evidence.schema.json @yhsomani
+/tools/cloud-release-evidence.template.json @yhsomani
+/tools/validate-cloud-release-evidence.mjs @yhsomani
+/tools/scan-git-history-secrets.mjs @yhsomani
+/tools/scan-repository-secrets.mjs @yhsomani
+/tools/validate-distribution-evidence.mjs @yhsomani
+/tools/inspect-android-aab-manifest.mjs @yhsomani
+/tools/verify-android-aab.sh @yhsomani
+/tools/verify-android-apk.sh @yhsomani

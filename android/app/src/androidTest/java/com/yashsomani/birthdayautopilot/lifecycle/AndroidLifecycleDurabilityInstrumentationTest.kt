@@ -6,7 +6,16 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.yashsomani.birthdayautopilot.attention.AndroidAttentionRouteStore
 import com.yashsomani.birthdayautopilot.auth.NotificationPermissionStateStore
+import com.yashsomani.birthdayautopilot.people.StablePrivateId
+import com.yashsomani.birthdayautopilot.storage.database.AccountRecordEntity
+import com.yashsomani.birthdayautopilot.storage.database.AccountRecordState
 import com.yashsomani.birthdayautopilot.storage.database.BirthdayDatabase
+import com.yashsomani.birthdayautopilot.storage.database.ContactSnapshotEntity
+import com.yashsomani.birthdayautopilot.storage.database.ContactSnapshotState
+import com.yashsomani.birthdayautopilot.storage.database.ContactSyncStateEntity
+import com.yashsomani.birthdayautopilot.storage.database.ConsentDecision
+import com.yashsomani.birthdayautopilot.storage.database.ConsentKind
+import com.yashsomani.birthdayautopilot.storage.database.SyncFreshness
 import java.io.File
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -759,6 +768,9 @@ class AndroidLifecycleDurabilityInstrumentationTest {
       localWipeStarted = true,
       wipeInstallationId = ACTIVE_INSTALLATION_ID,
       wipeCallbackGeneration = TARGET_INSTALLATION_ID,
+      senderReleaseRecoverySalt = SENDER_RECOVERY_SALT,
+      senderReleaseRecoveryFirebaseUidHash = SENDER_RECOVERY_UID_HASH,
+      senderReleaseRecoveryGoogleSubjectHash = SENDER_RECOVERY_SUBJECT_HASH,
     )
     assertTrue(LifecycleStateStore(context).putOperation(valid))
     assertNotNull(LifecycleStateStore(context).pendingLocalWipe())
@@ -825,6 +837,7 @@ class AndroidLifecycleDurabilityInstrumentationTest {
       assertNotNull(
         controller.persistReleaseRequestBinding(
           plan,
+          account(),
           ACTIVE_INSTALLATION_ID,
           11,
           4,
@@ -833,6 +846,7 @@ class AndroidLifecycleDurabilityInstrumentationTest {
       assertNull(
         controller.persistReleaseRequestBinding(
           plan,
+          account(),
           ACTIVE_INSTALLATION_ID,
           12,
           4,
@@ -866,6 +880,155 @@ class AndroidLifecycleDurabilityInstrumentationTest {
       database.close()
     }
   }
+
+  @Test
+  fun localFirstSenderWipeRecoveryStaysRemotePendingAndDropsOldCallbackCapability() {
+    val marker = DurablePrivacyOperation(
+      id = PRIVACY_ID,
+      action = "sign-out-wipe",
+      state = "local-wiping",
+      reason = null,
+      updatedAtMillis = 2_000,
+      completedAtMillis = null,
+      requestId = REQUEST_ID,
+      remoteRequestInstallationId = ACTIVE_INSTALLATION_ID,
+      remoteRequestSenderEpoch = 11,
+      remoteRequestResetGeneration = 4,
+      localWipeStarted = true,
+      wipeInstallationId = ACTIVE_INSTALLATION_ID,
+      wipeCallbackGeneration = TARGET_INSTALLATION_ID,
+      senderReleaseRecoverySalt = SENDER_RECOVERY_SALT,
+      senderReleaseRecoveryFirebaseUidHash = SENDER_RECOVERY_UID_HASH,
+      senderReleaseRecoveryGoogleSubjectHash = SENDER_RECOVERY_SUBJECT_HASH,
+    )
+    assertTrue(LifecycleStateStore(context).putOperation(marker))
+    val proof = checkNotNull(LifecycleStateStore(context).pendingLocalWipe())
+
+    val pending = checkNotNull(
+      LifecycleStateStore(context).completeRecoveredLocalWipe(proof, 3_000),
+    )
+    assertEquals("remote-pending", pending.state)
+    assertTrue(pending.localDataErased)
+    assertFalse(pending.localWipeStarted)
+    assertNull(pending.wipeInstallationId)
+    assertNull(pending.wipeCallbackGeneration)
+    assertNull(LifecycleStateStore(context).pendingLocalWipe())
+    assertFalse(lifecycleFile().readText(Charsets.US_ASCII).contains(TARGET_INSTALLATION_ID))
+
+    val database = Room.inMemoryDatabaseBuilder(context, BirthdayDatabase::class.java).build()
+    try {
+      val controller = AndroidLifecycleController(context, database, wallClockMillis = { 4_000 })
+      val projection = controller.currentOperationPayload()
+      assertEquals("remote-pending", projection.getString("kind"))
+      assertFalse(projection.toString().contains(REQUEST_ID))
+      assertFalse(projection.toString().contains(SENDER_RECOVERY_SALT))
+
+      val completed = checkNotNull(
+        controller.completeSenderReleaseRemoteCleanup(
+          PrivacyActionPlan(PRIVACY_ID, "sign-out-wipe", true, true),
+        ),
+      )
+      assertEquals("complete", completed.state)
+      assertTrue(completed.localDataErased)
+      assertNull(completed.requestId)
+      assertNull(completed.remoteRequestInstallationId)
+      assertNull(completed.senderReleaseRecoverySalt)
+      assertNull(completed.senderReleaseRecoveryFirebaseUidHash)
+      assertNull(completed.senderReleaseRecoveryGoogleSubjectHash)
+    } finally {
+      database.close()
+    }
+  }
+
+  @Test
+  fun contactPayloadIsPurgedBeforeRemoteResetAndCompletionRemainsTruthful() =
+    kotlinx.coroutines.runBlocking {
+      val database = Room.inMemoryDatabaseBuilder(context, BirthdayDatabase::class.java).build()
+      try {
+        database.birthdayDao().initializeIfAbsent("callback-generation")
+        val ledger = database.safetyLedgerDao()
+        ledger.insertAccount(account())
+        ledger.putContactSyncState(
+          ContactSyncStateEntity(
+            accountId = ACCOUNT_ID,
+            activeGeneration = "generation",
+            stagingGeneration = null,
+            syncToken = "private-token",
+            parametersHash = "parameters",
+            freshness = SyncFreshness.FRESH,
+            lastFullSuccessMillis = 1_000,
+            lastIncrementalSuccessMillis = null,
+            lastAttemptMillis = 1_000,
+            lastErrorCode = null,
+            revision = 1,
+          ),
+        )
+        ledger.insertContactSnapshot(
+          ContactSnapshotEntity(
+            contactId = "c_${"b".repeat(64)}",
+            accountId = ACCOUNT_ID,
+            peopleResourceName = "people/private",
+            sourceFingerprint = "source",
+            sourceEtag = "private-etag",
+            displayName = "Private Person",
+            safeGivenName = "Private",
+            birthdayMonth = 7,
+            birthdayDay = 12,
+            birthdayYear = null,
+            leapDayPolicy = null,
+            state = ContactSnapshotState.ACTIVE,
+            syncGeneration = "generation",
+            materialRevision = 1,
+            sourceUpdatedAtMillis = 1_000,
+            syncedAtMillis = 1_000,
+            deletedAtMillis = null,
+          ),
+        )
+        assertTrue(
+          LifecycleStateStore(context).putOperation(
+            DurablePrivacyOperation(
+              id = PRIVACY_ID,
+              action = "disconnect-contacts",
+              state = "pausing",
+              reason = null,
+              updatedAtMillis = 2_000,
+              completedAtMillis = null,
+              requestId = REQUEST_ID,
+            ),
+          ),
+        )
+        val controller = AndroidLifecycleController(context, database, wallClockMillis = { 3_000 })
+        val plan = PrivacyActionPlan(PRIVACY_ID, "disconnect-contacts", true, true)
+
+        val local = controller.purgeContactDerivedState(plan, ACCOUNT_ID)
+        assertTrue(local.localDataErased)
+        assertEquals("remote-pending", local.state)
+        database.openHelper.readableDatabase.query(
+          "SELECT COUNT(*) FROM contact_snapshots_v2 WHERE accountId = ?",
+          arrayOf(ACCOUNT_ID),
+        ).use { cursor ->
+          assertTrue(cursor.moveToFirst())
+          assertEquals(0, cursor.getInt(0))
+        }
+        assertEquals(
+          SyncFreshness.AUTH_ACTION_REQUIRED,
+          database.peopleSyncDao().contactSyncState(ACCOUNT_ID)?.freshness,
+        )
+        val disclosure = checkNotNull(
+          database.configurationDao().latestConsentReceipt(
+            ACCOUNT_ID,
+            ConsentKind.CONTACTS_DISCLOSURE,
+          ),
+        )
+        assertEquals(ConsentDecision.REVOKED, disclosure.decision)
+
+        val completed = checkNotNull(controller.markContactResetRemoteCompleted(plan))
+        assertEquals("complete", completed.state)
+        assertTrue(completed.localDataErased)
+      } finally {
+        database.close()
+      }
+    }
 
   @Test
   fun localDeletionFallbackSurvivesWipeAndProjectsRemoteUnknownWithoutPrivateBinding() {
@@ -1117,6 +1280,19 @@ class AndroidLifecycleDurabilityInstrumentationTest {
     deletionRetryAllowed = false,
   )
 
+  private fun account() = AccountRecordEntity(
+    accountId = ACCOUNT_ID,
+    activeSlot = 1,
+    googleSubjectHash = StablePrivateId.hash("GoogleSubject.v1", GOOGLE_SUBJECT),
+    firebaseUid = FIREBASE_UID,
+    displayEmail = "private@example.invalid",
+    localeTag = "en-IN",
+    state = AccountRecordState.ACTIVE,
+    revision = 1,
+    createdAtMillis = 1_000,
+    updatedAtMillis = 1_000,
+  )
+
   private fun files(): List<File> = listOf(
     lifecycleFile(),
     File(lifecycleFile().path + ".bak"),
@@ -1148,9 +1324,15 @@ class AndroidLifecycleDurabilityInstrumentationTest {
     const val OTHER_PRIVACY_ID = "privacy_fedcba9876543210fedcba9876543210"
     const val ACTIVE_INSTALLATION_ID = "0123456789abcdef0123456789abcdef"
     const val TARGET_INSTALLATION_ID = "fedcba9876543210fedcba9876543210"
+    const val ACCOUNT_ID = "a_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    const val FIREBASE_UID = "firebase-uid-0123456789"
+    const val GOOGLE_SUBJECT = "123456789012345678901"
     val RECOVERY_SALT = "1".repeat(64)
     val RECOVERY_UID_HASH = "2".repeat(64)
     val RECOVERY_SUBJECT_HASH = "3".repeat(64)
+    val SENDER_RECOVERY_SALT = "4".repeat(64)
+    val SENDER_RECOVERY_UID_HASH = "5".repeat(64)
+    val SENDER_RECOVERY_SUBJECT_HASH = "6".repeat(64)
     val UUID = Regex(
       "^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
     )

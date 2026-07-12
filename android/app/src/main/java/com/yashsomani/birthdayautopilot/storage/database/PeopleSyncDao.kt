@@ -78,12 +78,72 @@ abstract class PeopleSyncDao {
         ))
         OR (:filter = 'ready' AND c.state = 'ACTIVE'
           AND c.birthdayMonth IS NOT NULL AND c.birthdayDay IS NOT NULL
-          AND EXISTS(SELECT 1 FROM contact_phones_v2 ph
-            WHERE ph.contactId = c.contactId AND ph.state = 'READY'))
-        OR (:filter = 'needs-attention' AND (
-          c.state != 'ACTIVE' OR c.birthdayMonth IS NULL OR c.birthdayDay IS NULL
-          OR NOT EXISTS(SELECT 1 FROM contact_phones_v2 ph
-            WHERE ph.contactId = c.contactId AND ph.state = 'READY')
+          AND (c.safeGivenName IS NOT NULL OR EXISTS(
+            SELECT 1 FROM message_templates_v2 template
+            WHERE template.accountId = c.accountId AND template.validationState = 'VALID'
+              AND template.placeholderMode = 'GENERIC_NO_NAME'
+          ))
+          AND (
+            1 = (SELECT COUNT(*) FROM contact_phones_v2 ready_phone
+              WHERE ready_phone.contactId = c.contactId AND ready_phone.state = 'READY')
+            OR EXISTS(
+              SELECT 1 FROM recipient_policies_v2 selected_policy
+              JOIN contact_phones_v2 selected_phone
+                ON selected_phone.phoneId = selected_policy.chosenPhoneId
+              WHERE selected_policy.contactId = c.contactId
+                AND selected_phone.contactId = c.contactId
+                AND selected_phone.state = 'READY'
+            )
+          )
+          AND NOT EXISTS(
+            SELECT 1 FROM recipient_policies_v2 attention_policy
+            WHERE attention_policy.contactId = c.contactId
+              AND (
+                attention_policy.state IN ('BLOCKED', 'NEEDS_REVIEW')
+                OR (attention_policy.state = 'PAUSED' AND (
+                  attention_policy.approvalId IS NULL OR NOT EXISTS(
+                    SELECT 1 FROM approval_snapshots_v2 active_approval
+                    WHERE active_approval.approvalId = attention_policy.approvalId
+                      AND active_approval.state = 'ACTIVE'
+                      AND active_approval.invalidatedAtMillis IS NULL
+                  )
+                ))
+              )
+          ))
+        OR (:filter = 'needs-attention' AND c.state = 'ACTIVE' AND NOT (
+          c.birthdayMonth IS NOT NULL AND c.birthdayDay IS NOT NULL
+          AND (c.safeGivenName IS NOT NULL OR EXISTS(
+            SELECT 1 FROM message_templates_v2 template
+            WHERE template.accountId = c.accountId AND template.validationState = 'VALID'
+              AND template.placeholderMode = 'GENERIC_NO_NAME'
+          ))
+          AND (
+            1 = (SELECT COUNT(*) FROM contact_phones_v2 ready_phone
+              WHERE ready_phone.contactId = c.contactId AND ready_phone.state = 'READY')
+            OR EXISTS(
+              SELECT 1 FROM recipient_policies_v2 selected_policy
+              JOIN contact_phones_v2 selected_phone
+                ON selected_phone.phoneId = selected_policy.chosenPhoneId
+              WHERE selected_policy.contactId = c.contactId
+                AND selected_phone.contactId = c.contactId
+                AND selected_phone.state = 'READY'
+            )
+          )
+          AND NOT EXISTS(
+            SELECT 1 FROM recipient_policies_v2 attention_policy
+            WHERE attention_policy.contactId = c.contactId
+              AND (
+                attention_policy.state IN ('BLOCKED', 'NEEDS_REVIEW')
+                OR (attention_policy.state = 'PAUSED' AND (
+                  attention_policy.approvalId IS NULL OR NOT EXISTS(
+                    SELECT 1 FROM approval_snapshots_v2 active_approval
+                    WHERE active_approval.approvalId = attention_policy.approvalId
+                      AND active_approval.state = 'ACTIVE'
+                      AND active_approval.invalidatedAtMillis IS NULL
+                  )
+                ))
+              )
+          )
         ))
       )
     ORDER BY c.displayName COLLATE NOCASE, c.contactId
@@ -119,12 +179,72 @@ abstract class PeopleSyncDao {
         ))
         OR (:filter = 'ready' AND c.state = 'ACTIVE'
           AND c.birthdayMonth IS NOT NULL AND c.birthdayDay IS NOT NULL
-          AND EXISTS(SELECT 1 FROM contact_phones_v2 ph
-            WHERE ph.contactId = c.contactId AND ph.state = 'READY'))
-        OR (:filter = 'needs-attention' AND (
-          c.state != 'ACTIVE' OR c.birthdayMonth IS NULL OR c.birthdayDay IS NULL
-          OR NOT EXISTS(SELECT 1 FROM contact_phones_v2 ph
-            WHERE ph.contactId = c.contactId AND ph.state = 'READY')
+          AND (c.safeGivenName IS NOT NULL OR EXISTS(
+            SELECT 1 FROM message_templates_v2 template
+            WHERE template.accountId = c.accountId AND template.validationState = 'VALID'
+              AND template.placeholderMode = 'GENERIC_NO_NAME'
+          ))
+          AND (
+            1 = (SELECT COUNT(*) FROM contact_phones_v2 ready_phone
+              WHERE ready_phone.contactId = c.contactId AND ready_phone.state = 'READY')
+            OR EXISTS(
+              SELECT 1 FROM recipient_policies_v2 selected_policy
+              JOIN contact_phones_v2 selected_phone
+                ON selected_phone.phoneId = selected_policy.chosenPhoneId
+              WHERE selected_policy.contactId = c.contactId
+                AND selected_phone.contactId = c.contactId
+                AND selected_phone.state = 'READY'
+            )
+          )
+          AND NOT EXISTS(
+            SELECT 1 FROM recipient_policies_v2 attention_policy
+            WHERE attention_policy.contactId = c.contactId
+              AND (
+                attention_policy.state IN ('BLOCKED', 'NEEDS_REVIEW')
+                OR (attention_policy.state = 'PAUSED' AND (
+                  attention_policy.approvalId IS NULL OR NOT EXISTS(
+                    SELECT 1 FROM approval_snapshots_v2 active_approval
+                    WHERE active_approval.approvalId = attention_policy.approvalId
+                      AND active_approval.state = 'ACTIVE'
+                      AND active_approval.invalidatedAtMillis IS NULL
+                  )
+                ))
+              )
+          ))
+        OR (:filter = 'needs-attention' AND c.state = 'ACTIVE' AND NOT (
+          c.birthdayMonth IS NOT NULL AND c.birthdayDay IS NOT NULL
+          AND (c.safeGivenName IS NOT NULL OR EXISTS(
+            SELECT 1 FROM message_templates_v2 template
+            WHERE template.accountId = c.accountId AND template.validationState = 'VALID'
+              AND template.placeholderMode = 'GENERIC_NO_NAME'
+          ))
+          AND (
+            1 = (SELECT COUNT(*) FROM contact_phones_v2 ready_phone
+              WHERE ready_phone.contactId = c.contactId AND ready_phone.state = 'READY')
+            OR EXISTS(
+              SELECT 1 FROM recipient_policies_v2 selected_policy
+              JOIN contact_phones_v2 selected_phone
+                ON selected_phone.phoneId = selected_policy.chosenPhoneId
+              WHERE selected_policy.contactId = c.contactId
+                AND selected_phone.contactId = c.contactId
+                AND selected_phone.state = 'READY'
+            )
+          )
+          AND NOT EXISTS(
+            SELECT 1 FROM recipient_policies_v2 attention_policy
+            WHERE attention_policy.contactId = c.contactId
+              AND (
+                attention_policy.state IN ('BLOCKED', 'NEEDS_REVIEW')
+                OR (attention_policy.state = 'PAUSED' AND (
+                  attention_policy.approvalId IS NULL OR NOT EXISTS(
+                    SELECT 1 FROM approval_snapshots_v2 active_approval
+                    WHERE active_approval.approvalId = attention_policy.approvalId
+                      AND active_approval.state = 'ACTIVE'
+                      AND active_approval.invalidatedAtMillis IS NULL
+                  )
+                ))
+              )
+          )
         ))
       )
     """,

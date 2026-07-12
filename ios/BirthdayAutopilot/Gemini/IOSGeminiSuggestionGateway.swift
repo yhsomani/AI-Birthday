@@ -13,6 +13,7 @@ final class IOSGeminiSuggestionGateway {
 
   private let identity: IOSGoogleIdentityCoordinator
   private let defaults: UserDefaults
+  private let operationalGate: IOSGeminiOperationalGate
   private let provenanceRegistry: IOSGeminiCandidateProvenanceRegistry
   private var requestInFlight = false
   private var lastAcceptedUptime: TimeInterval?
@@ -20,18 +21,35 @@ final class IOSGeminiSuggestionGateway {
   init(
     identity: IOSGoogleIdentityCoordinator = .shared,
     defaults: UserDefaults = .standard,
+    operationalGate: IOSGeminiOperationalGate = .shared,
     provenanceRegistry: IOSGeminiCandidateProvenanceRegistry =
       IOSGeminiCandidateProvenanceRegistry()
   ) {
     self.identity = identity
     self.defaults = defaults
+    self.operationalGate = operationalGate
     self.provenanceRegistry = provenanceRegistry
+  }
+
+  func configureOperationalGateAfterFirebaseLaunch() {
+    operationalGate.configureAfterFirebaseLaunch()
+  }
+
+  func refreshOperationalGateInBackground() {
+    operationalGate.refreshInBackground()
   }
 
   func generate(request payload: [String: Any]) async -> [String: Any] {
     guard let request = IOSGeminiSuggestionPolicy.parseRequest(payload) else {
       provenanceRegistry.clear()
       return ["kind": "failed", "reason": "internal-contract-invalid"]
+    }
+    operationalGate.refreshInBackground()
+    guard operationalGate.foregroundSuggestionsEnabled() else {
+      provenanceRegistry.clear()
+      // Reliable built-in templates remain visible in the editor. Keep the
+      // provider path truthful and disabled instead of presenting them as AI.
+      return fallback("policy-suspended")
     }
     guard !requestInFlight else { return fallback("policy-suspended") }
     requestInFlight = true

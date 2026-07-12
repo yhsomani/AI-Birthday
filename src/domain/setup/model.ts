@@ -32,6 +32,8 @@ export type BootstrapProjection = Readonly<{
 
 export type SetupProjection = Readonly<{
   step: SetupStep;
+  /** Durable native fact: the first explicit activation was once committed. */
+  initialActivationCompleted: boolean;
   eligibility: DeviceEligibility;
   account: AccountProjection;
   contacts: SyncProjection;

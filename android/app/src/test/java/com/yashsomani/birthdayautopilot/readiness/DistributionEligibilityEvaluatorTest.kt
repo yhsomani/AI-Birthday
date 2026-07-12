@@ -65,6 +65,29 @@ class DistributionEligibilityEvaluatorTest {
   }
 
   @Test
+  fun `foreground test allows only background execution limitations`() {
+    val backgroundOnly = evaluator.evaluate(
+      healthySignals().copy(
+        backgroundRestricted = true,
+        dozeAllowlisted = false,
+        unusedAppRestrictionsDisabled = false,
+        dataSaverAllowsBackground = false,
+        lowPowerStandbySafe = false,
+      ),
+    )
+    val missingSim = evaluator.evaluate(healthySignals().copy(simReady = false))
+    val offline = evaluator.evaluate(healthySignals().copy(networkValidated = false))
+    val missingPlayServices = evaluator.evaluate(
+      healthySignals().copy(playServicesAvailable = false),
+    )
+
+    assertTrue(backgroundOnly.allowsForegroundTest())
+    assertFalse(missingSim.allowsForegroundTest())
+    assertFalse(offline.allowsForegroundTest())
+    assertFalse(missingPlayServices.allowsForegroundTest())
+  }
+
+  @Test
   fun `unknown restricted profile is unsupported`() {
     val decision = evaluator.evaluate(healthySignals().copy(restrictedProfile = null))
 

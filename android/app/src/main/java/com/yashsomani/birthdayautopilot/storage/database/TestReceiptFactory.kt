@@ -53,8 +53,14 @@ object TestReceiptBindingValidator {
     test: TestJobEntity,
     installation: InstallationBindingEntity,
     receipt: TestReceiptEntity,
+    nowMillis: Long = System.currentTimeMillis().coerceAtLeast(0),
   ): Boolean {
+    val retainedDetail = TestJobRetainedDetail.classify(test)
     if (
+      nowMillis < 0 ||
+      retainedDetail == TestJobRetainedDetail.State.INVALID ||
+      (retainedDetail == TestJobRetainedDetail.State.REDACTED &&
+        test.retentionUntilMillis > nowMillis) ||
       test.state != TestJobState.PASSED ||
       test.terminalAtMillis != receipt.passedAtMillis ||
       test.invalidationReason != null ||
@@ -70,8 +76,10 @@ object TestReceiptBindingValidator {
       test.senderEpoch != installation.senderEpoch ||
       receipt.configHash != test.configHash ||
       receipt.destinationBindingHash != test.destinationPrehash ||
-      receipt.maskedDestination != test.maskedDestination ||
-      receipt.exactTextHash != TestReceiptCanonicalHash.sha256Text(test.exactMessage) ||
+      (retainedDetail == TestJobRetainedDetail.State.FULL &&
+        receipt.maskedDestination != test.maskedDestination) ||
+      (retainedDetail == TestJobRetainedDetail.State.FULL &&
+        receipt.exactTextHash != TestReceiptCanonicalHash.sha256Text(test.exactMessage)) ||
       receipt.segmentPlanHash != test.orderedPartsHash ||
       receipt.resolvedSubscriptionId != test.resolvedSubscriptionId ||
       receipt.buildBindingHash != test.buildBindingHash ||
@@ -84,6 +92,30 @@ object TestReceiptBindingValidator {
       TestReceiptCanonicalHash.bindingHash(test, installation, receipt),
       receipt.bindingHash,
     )
+  }
+}
+
+/**
+ * After 30 days, the TestReceipt owns the minimum masked destination and exact-text hash. The
+ * duplicate raw TEST number/message and foreground nonce in TestJob are atomically blanked. A
+ * partially blank row is treated as corrupt and can never satisfy activation readiness.
+ */
+internal object TestJobRetainedDetail {
+  enum class State { FULL, REDACTED, INVALID }
+
+  fun classify(test: TestJobEntity): State {
+    val full = test.normalizedDestination.isNotBlank() &&
+      test.maskedDestination.isNotBlank() &&
+      test.exactMessage.isNotBlank() &&
+      test.foregroundConfirmationNonceHash.isNotBlank() &&
+      test.foregroundConfirmedAtMillis > 0
+    if (full) return State.FULL
+    val redacted = test.normalizedDestination.isEmpty() &&
+      test.maskedDestination.isEmpty() &&
+      test.exactMessage.isEmpty() &&
+      test.foregroundConfirmationNonceHash.isEmpty() &&
+      test.foregroundConfirmedAtMillis == 0L
+    return if (redacted) State.REDACTED else State.INVALID
   }
 }
 

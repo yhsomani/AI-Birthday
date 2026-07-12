@@ -3,6 +3,7 @@ import type {
   AutomationProjection,
   TestProjection,
   TestReview,
+  TodayOccurrenceChoice,
   TodayOccurrenceReview,
 } from '../../domain/automation/model';
 import type { ApprovalBatchReview } from '../../domain/approvals/model';
@@ -69,6 +70,7 @@ export interface AutomationPort {
   }): Promise<NativeResult<TodayOccurrenceReview>>;
   confirmTodayOccurrence(input: {
     handle: TodayOccurrenceReviewHandle;
+    choice: TodayOccurrenceChoice;
     expectedRevision: NativeRevision;
   }): Promise<NativeResult<AutomationProjection>>;
 }

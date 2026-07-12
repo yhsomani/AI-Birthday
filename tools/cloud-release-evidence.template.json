@@ -1,0 +1,819 @@
+{
+  "$schema": "./cloud-release-evidence.schema.json",
+  "schemaVersion": 1,
+  "product": "birthday-autopilot",
+  "status": "pending",
+  "source": {
+    "revision": null,
+    "repository": "https://github.com/yhsomani/AI-Birthday.git",
+    "clean": null,
+    "projectAboutSha256": null,
+    "firebaseJsonSha256": null,
+    "functionsSourceTreeSha256": null,
+    "functionsLockSha256": null,
+    "firestoreRulesSha256": null,
+    "firestoreIndexesSha256": null,
+    "ttlPoliciesSha256": null,
+    "hostingSourceTreeSha256": null,
+    "deploymentProvenanceEvidenceId": "source-deployment-provenance"
+  },
+  "validity": {
+    "generatedAt": null,
+    "validUntil": null,
+    "maximumAgeDays": 30
+  },
+  "project": {
+    "tier": "production",
+    "projectId": null,
+    "projectNumber": null,
+    "androidAppId": null,
+    "iosAppId": null,
+    "webAppId": null,
+    "androidPackage": "com.yashsomani.birthdayautopilot",
+    "iosBundle": "com.yashsomani.birthdayautopilot",
+    "functionsRegion": "asia-south1",
+    "firestoreLocation": "asia-south1",
+    "retainedProjectId": "relateai-birthday-ysomani",
+    "retainedProjectAssignment": null,
+    "noCrossTierSharing": null,
+    "evidenceIds": [
+      "cloud-project-inventory",
+      "data-residency",
+      "tier-isolation"
+    ]
+  },
+  "identityAndApis": {
+    "firebaseGoogleProviderEnabled": null,
+    "peopleApiEnabled": null,
+    "peopleScope": "https://www.googleapis.com/auth/contacts.readonly",
+    "webOauthClientId": null,
+    "androidOauthClients": [
+      {
+        "channel": null,
+        "clientId": null,
+        "applicationId": "com.yashsomani.birthdayautopilot",
+        "signingCertificateSha1": null
+      }
+    ],
+    "iosOauthClient": {
+      "clientId": null,
+      "bundleId": "com.yashsomani.birthdayautopilot",
+      "teamId": null,
+      "reversedClientId": null
+    },
+    "oneVisibleGoogleChoice": null,
+    "noOauthClientSecretInApps": null,
+    "accountLifecycleTestsPassed": null,
+    "peopleConsentTestsPassed": null,
+    "publicApiKeysRestricted": null,
+    "firebaseClientConfigsRefreshed": null,
+    "evidenceIds": [
+      "api-key-restrictions",
+      "firebase-auth-deletion",
+      "oauth-client-inventory",
+      "people-consent"
+    ]
+  },
+  "aiLogic": {
+    "provider": "vertex-ai",
+    "sdkSurface": "firebase-ai-logic",
+    "model": "gemini-3.5-flash",
+    "location": "global",
+    "apiService": "firebasevertexai.googleapis.com",
+    "authenticatedUsersOnly": null,
+    "remoteConfigKey": "gemini_suggestions_enabled",
+    "defaultOff": null,
+    "activatedCanonicalTrueOnly": null,
+    "monitoring": null,
+    "generativeLanguageApiAllowedOnMobileKeys": null,
+    "billingEnabled": null,
+    "providerQuotasConfigured": null,
+    "perUserRateLimitConfigured": null,
+    "budgetAlertsConfigured": null,
+    "killSwitchTested": null,
+    "providerTermsApproved": null,
+    "dataGovernanceApproved": null,
+    "modelAvailabilityCheckedAt": null,
+    "evidenceIds": ["firebase-ai-vertex", "quota-budget", "remote-config"]
+  },
+  "appCheck": {
+    "androidRegistrations": [
+      {
+        "firebaseAppId": null,
+        "channel": null,
+        "distributionScope": null,
+        "signingCertificateSha256": null,
+        "provider": "play-integrity",
+        "playRecognizedRequired": null,
+        "licensedRequired": null,
+        "deviceIntegrityRequired": null,
+        "debugProvider": null
+      }
+    ],
+    "iosRegistrations": [
+      {
+        "firebaseAppId": null,
+        "provider": null,
+        "teamId": null,
+        "productionEnvironment": null,
+        "fallbackPolicyApproved": null,
+        "debugProvider": null
+      }
+    ],
+    "webRegistration": {
+      "firebaseAppId": null,
+      "provider": "recaptcha-enterprise",
+      "siteKeySha256": null,
+      "debugProvider": null
+    },
+    "aiLogicEnforced": null,
+    "callableBaselineEnforced": null,
+    "limitedUseReplayForStateChanges": null,
+    "limitedUseReplayForCompanionStatus": null,
+    "signedChannelsTested": null,
+    "evidenceIds": [
+      "app-check-android",
+      "app-check-ios",
+      "app-check-replay",
+      "app-check-web",
+      "signed-channel-smoke"
+    ]
+  },
+  "functions": {
+    "generation": 2,
+    "region": "asia-south1",
+    "runtime": "nodejs22",
+    "runtimeServiceAccount": null,
+    "deployedSourceRevision": null,
+    "callableNames": [
+      "accountDeletionReceipt",
+      "armAttempt",
+      "authorizeSafeRetry",
+      "beginSenderTransfer",
+      "changeAccountMode",
+      "claimOccurrence",
+      "claimTest",
+      "companionStatus",
+      "completeSenderTransfer",
+      "coordinationLifecycleStatus",
+      "getArmStatus",
+      "registerAndroidInstallation",
+      "releaseAndroidSender",
+      "renewSenderLease",
+      "reportTestOutcome",
+      "requestAccountDeletion",
+      "resetContactDerivedState"
+    ],
+    "scheduledNames": ["sweepCoordinationOperations", "sweepDeletionDrains"],
+    "commonOptions": {
+      "enforceAppCheck": null,
+      "consumeAppCheckToken": null,
+      "timeoutSeconds": 30,
+      "memory": "256MiB",
+      "minInstances": 0,
+      "maxInstances": 20,
+      "concurrency": 20
+    },
+    "scheduledOptions": {
+      "schedule": "every 1 minutes",
+      "timeZone": "Etc/UTC",
+      "timeoutSeconds": 300,
+      "memory": "256MiB",
+      "maxInstances": 1
+    },
+    "requestBodiesLogged": null,
+    "rawExceptionsLogged": null,
+    "deploymentEvidenceId": "functions-deployment",
+    "liveSmokeEvidenceId": "functions-live-smoke"
+  },
+  "firestore": {
+    "databaseId": "(default)",
+    "databaseType": "FIRESTORE_NATIVE",
+    "location": "asia-south1",
+    "directClientRules": "deny-all",
+    "deployedRulesSha256": null,
+    "deployedIndexesSha256": null,
+    "deployedTtlPolicySha256": null,
+    "ttlCollectionGroups": [
+      "armBudgets",
+      "armOutcomes",
+      "claimRequests",
+      "coordinationLatestReceipts",
+      "coordinationOperationReceipts",
+      "deletionReceipts",
+      "deletionTombstones",
+      "destinationGuards",
+      "installations",
+      "occurrenceClaims",
+      "occurrenceKeys",
+      "testClaims"
+    ],
+    "logicalExpiryEnforcedTransactionally": null,
+    "pointInTimeRecovery": null,
+    "backupScheduleCount": null,
+    "recursiveDeletionVerified": null,
+    "authDeletionAbsenceVerified": null,
+    "continuityState": null,
+    "ledgerGeneration": null,
+    "emptyLedgerTreatedAsNoSendProof": null,
+    "evidenceIds": [
+      "continuity-dr",
+      "firestore-backup-pitr",
+      "firestore-index-contention",
+      "firestore-rules-live",
+      "firestore-ttl"
+    ]
+  },
+  "secrets": {
+    "secretName": "COORDINATION_HMAC_KEYRING",
+    "secretValueIncluded": null,
+    "currentSecretManagerVersionId": null,
+    "previousSecretManagerVersionId": null,
+    "currentKeyLabel": null,
+    "previousKeyLabel": null,
+    "currentCreatedAt": null,
+    "previousLastWriteAt": null,
+    "previousRetainUntil": null,
+    "longestAliasRetentionDays": 400,
+    "rotationCadenceDays": null,
+    "replicationPolicyApproved": null,
+    "runtimeAccessorOnly": null,
+    "repositoryAndCiValueAbsent": null,
+    "metadataEvidenceId": "secret-keyring-metadata",
+    "rotationEvidenceId": "secret-rotation"
+  },
+  "iam": {
+    "runtimeServiceAccount": null,
+    "auditServiceAccount": null,
+    "workloadIdentityFederation": null,
+    "serviceAccountKeyFilesUsed": null,
+    "runtimeUserManagedKeyCount": null,
+    "auditUserManagedKeyCount": null,
+    "broadPrimitiveRolesAbsent": null,
+    "wildcardPermissionsAbsent": null,
+    "capabilities": {
+      "firestoreCoordination": null,
+      "firebaseAuthDeletion": null,
+      "secretVersionAccessForKeyringOnly": null,
+      "appCheckTokenVerification": null,
+      "schedulerInvocation": null
+    },
+    "reviewedAt": null,
+    "policyEvidenceId": "iam-policy",
+    "effectivePermissionsEvidenceId": "iam-effective-permissions"
+  },
+  "observability": {
+    "requestBodiesExcluded": null,
+    "rawExceptionsExcluded": null,
+    "contactMessagePromptContentExcluded": null,
+    "aiMonitoring": null,
+    "aiPromptResponseExcluded": null,
+    "defaultLoggingExclusionName": null,
+    "applicationLogRetentionDays": null,
+    "dataAccessAuditRetentionDays": null,
+    "deletionCorrelationAccessRestricted": null,
+    "logSinksReviewed": null,
+    "unapprovedCrashAndAnalyticsAbsent": null,
+    "evidenceId": "logging-privacy"
+  },
+  "costControls": {
+    "billingAccountId": null,
+    "billingEnabled": null,
+    "monthlyBudget": {
+      "currencyCode": null,
+      "units": null
+    },
+    "budgetAlertsNotHardCap": null,
+    "providerHardQuotasConfigured": null,
+    "quotas": [
+      {
+        "name": "firebase-ai-user-requests",
+        "limit": null,
+        "unit": "requests/day/user"
+      },
+      {
+        "name": "firestore-writes",
+        "limit": null,
+        "unit": "writes/day/project"
+      },
+      {
+        "name": "functions-max-instances",
+        "limit": 20,
+        "unit": "instances/function"
+      }
+    ],
+    "quotaOwnerEmails": [],
+    "incidentContactEmails": [],
+    "evidenceId": "quota-budget"
+  },
+  "hosting": {
+    "siteId": null,
+    "deployedVersionId": null,
+    "publicBaseUrl": null,
+    "privacyUrl": null,
+    "termsUrl": null,
+    "supportUrl": null,
+    "deletionUrl": null,
+    "identityVerifiedSupportUrl": null,
+    "firebaseConfigSha256": null,
+    "releaseConfigSha256": null,
+    "deployedArtifactSha256": null,
+    "recaptchaEnterpriseAppCheckRegistered": null,
+    "securityHeadersVerified": null,
+    "legalCopyApproved": null,
+    "hindiCopyApproved": null,
+    "deletionSagaTested": null,
+    "evidenceId": "hosting-release"
+  },
+  "prohibitedServices": {
+    "realtimeDatabaseEnabled": null,
+    "cloudStorageEnabled": null,
+    "fcmEnabled": null,
+    "analyticsEnabled": null,
+    "adSdkEnabled": null,
+    "crashlyticsEnabled": null,
+    "performanceMonitoringEnabled": null,
+    "directMobileFirestorePathPresent": null,
+    "rawContactOrMessageCloudStorePresent": null,
+    "evidenceId": "prohibited-services"
+  },
+  "verification": {
+    "firebaseAuthLifecyclePassed": null,
+    "peopleConsentAndRevocationPassed": null,
+    "androidSignedAttestationPassed": null,
+    "iosSignedAttestationPassed": null,
+    "androidAiLogicCallPassed": null,
+    "iosAiLogicCallPassed": null,
+    "stateChangingCallableProbePassed": null,
+    "companionStatusProbePassed": null,
+    "replayedLimitedUseTokenRejected": null,
+    "directFirestoreAnonymousDenied": null,
+    "directFirestoreAuthenticatedDenied": null,
+    "ttlPoliciesObserved": null,
+    "recursiveDeletionAbsencePassed": null,
+    "signedOutReceiptPassed": null,
+    "contentLeakScanFindingCount": null,
+    "debugProviderFindingCount": null,
+    "liveAuditEvidenceId": "live-readonly-audit",
+    "signedChannelEvidenceId": "signed-channel-smoke",
+    "deletionEvidenceId": "deletion-live-smoke"
+  },
+  "operations": {
+    "globalControlState": null,
+    "ledgerGeneration": null,
+    "emptyLedgerNeverUsedAsNoSendProof": null,
+    "disasterCreatesReviewedNewGeneration": null,
+    "reRegistrationAndReapprovalRequiredAfterDisaster": null,
+    "sameDateAutomationBlockedAfterDisaster": null,
+    "userLedgerBackupsNeverRestored": null,
+    "rtoMinutes": null,
+    "availabilityTargetPercent": null,
+    "p95CallableLatencyMs": null,
+    "errorBudgetWindowDays": null,
+    "deletionSlaHours": null,
+    "loadContentionTestPassed": null,
+    "regionalFailureTestPassed": null,
+    "incidentRollbackReady": null,
+    "continuityEvidenceId": "continuity-dr",
+    "sloEvidenceId": "slo-load-cost",
+    "incidentEvidenceId": "incident-rollback"
+  },
+  "evidenceReferences": [
+    {
+      "id": "api-key-restrictions",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "app-check-android",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "app-check-ios",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "app-check-replay",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "app-check-web",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "cloud-project-inventory",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "continuity-dr",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "data-residency",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "deletion-live-smoke",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "firebase-ai-vertex",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "firebase-auth-deletion",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "firestore-backup-pitr",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "firestore-index-contention",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "firestore-rules-live",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "firestore-ttl",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "functions-deployment",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "functions-live-smoke",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "hosting-release",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "iam-effective-permissions",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "iam-policy",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "incident-rollback",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "live-readonly-audit",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "logging-privacy",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "oauth-client-inventory",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "people-consent",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "prohibited-services",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "project-ownership-billing",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "quota-budget",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "remote-config",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "secret-keyring-metadata",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "secret-rotation",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "signed-channel-smoke",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "slo-load-cost",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "source-deployment-provenance",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "tier-isolation",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": null
+    },
+    {
+      "id": "approval-backend",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": "approval"
+    },
+    {
+      "id": "approval-cloud-owner",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": "approval"
+    },
+    {
+      "id": "approval-finance",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": "approval"
+    },
+    {
+      "id": "approval-privacy",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": "approval"
+    },
+    {
+      "id": "approval-release",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": "approval"
+    },
+    {
+      "id": "approval-security",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": "approval"
+    },
+    {
+      "id": "approval-sre",
+      "path": null,
+      "sha256": null,
+      "capturedAt": null,
+      "validUntil": null,
+      "issuer": null,
+      "kind": "approval"
+    }
+  ],
+  "approvals": [
+    {
+      "role": "backend",
+      "approver": null,
+      "decision": "pending",
+      "approvedAt": null,
+      "validUntil": null,
+      "evidenceId": "approval-backend"
+    },
+    {
+      "role": "cloud-owner",
+      "approver": null,
+      "decision": "pending",
+      "approvedAt": null,
+      "validUntil": null,
+      "evidenceId": "approval-cloud-owner"
+    },
+    {
+      "role": "finance",
+      "approver": null,
+      "decision": "pending",
+      "approvedAt": null,
+      "validUntil": null,
+      "evidenceId": "approval-finance"
+    },
+    {
+      "role": "privacy",
+      "approver": null,
+      "decision": "pending",
+      "approvedAt": null,
+      "validUntil": null,
+      "evidenceId": "approval-privacy"
+    },
+    {
+      "role": "release",
+      "approver": null,
+      "decision": "pending",
+      "approvedAt": null,
+      "validUntil": null,
+      "evidenceId": "approval-release"
+    },
+    {
+      "role": "security",
+      "approver": null,
+      "decision": "pending",
+      "approvedAt": null,
+      "validUntil": null,
+      "evidenceId": "approval-security"
+    },
+    {
+      "role": "sre",
+      "approver": null,
+      "decision": "pending",
+      "approvedAt": null,
+      "validUntil": null,
+      "evidenceId": "approval-sre"
+    }
+  ]
+}

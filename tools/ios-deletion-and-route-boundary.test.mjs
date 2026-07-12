@@ -118,6 +118,11 @@ test('signed-out deletion completion requires a strict App Check receipt proof',
     receiptClient,
     /HTTPSCallableOptions\(requireLimitedUseAppCheckTokens: true\)/u,
   );
+  assert.match(receiptClient, /guard FirebaseApp\.app\(\) != nil/u);
+  assert.match(
+    identity,
+    /func beginSignedOutDeletionReceiptLookup[\s\S]*?configuration != nil, googleIdentityAppCheckReady[\s\S]*?FirebaseApp\.app\(\) != nil/u,
+  );
   assert.match(receiptClient, /"receiptId": receiptId/u);
   assert.match(
     receiptClient,
@@ -162,7 +167,7 @@ test('deletion remains remote-draining until completion proof and blocks ordinar
   );
   assert.match(
     workflow,
-    /"preissuedPermitMayFinish": \[[\s\S]*?"delete-account", "disconnect-contacts", "revoke-google-access"[\s\S]*?\]\.contains\(action\)/u,
+    /"preissuedPermitMayFinish": \[[\s\S]*?"delete-account", "revoke-google-access"[\s\S]*?\]\.contains\(action\)/u,
   );
 });
 

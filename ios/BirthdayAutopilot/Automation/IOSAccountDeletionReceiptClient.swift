@@ -1,4 +1,5 @@
 import CoreFoundation
+import FirebaseCore
 import FirebaseFunctions
 import Foundation
 
@@ -37,7 +38,7 @@ final class IOSAccountDeletionReceiptClient {
         Result<IOSAccountDeletionReceiptStatus, IOSAccountDeletionReceiptFailure>
       ) -> Void
   ) {
-    guard Self.isCanonicalUUID(receiptId) else {
+    guard FirebaseApp.app() != nil, Self.isCanonicalUUID(receiptId) else {
       completion(.failure(.configuration))
       return
     }

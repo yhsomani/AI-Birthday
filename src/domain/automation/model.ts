@@ -165,12 +165,21 @@ export type UpcomingGreeting = Readonly<{
   localDate: LocalDate;
   windowLabel: string;
   maskedPhone: string;
+  /** Present only when native binds the next occurrence to a current valid approval. */
+  exactText?: PrivateMessageText | undefined;
 }>;
+
+export type TodayOccurrenceChoice =
+  | 'send-through-normal-path'
+  | 'open-system-composer'
+  | 'start-next-year';
 
 export type TodayOccurrenceReview = Readonly<{
   handle: TodayOccurrenceReviewHandle;
   recipient: PrivateDisplayName;
+  maskedDestination: string;
   exactText: PrivateMessageText;
-  choice: 'send-through-normal-path' | 'start-next-year';
+  choice: TodayOccurrenceChoice;
+  alternativeChoice?: 'start-next-year' | undefined;
   limitationsDisclosure: string;
 }>;

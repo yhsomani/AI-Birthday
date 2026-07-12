@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.yashsomani.birthdayautopilot.core.model.AccountMode
+import com.yashsomani.birthdayautopilot.messages.MessageTemplateValidator
 
 data class EnabledContactPlanRow(
   val contactId: String,
@@ -15,6 +16,7 @@ data class EnabledContactPlanRow(
   val leapDayPolicy: String?,
   val maskedDisplay: String,
   val destinationFingerprint: String,
+  val exactMessage: String,
 )
 
 data class ConfiguredBirthdayRow(
@@ -59,9 +61,18 @@ abstract class ConfigurationDao {
 
   @Query(
     "SELECT * FROM message_templates_v2 WHERE accountId = :accountId " +
-      "AND validationState = 'VALID' ORDER BY revision DESC LIMIT 1",
+      "AND validationState = 'VALID' AND validatorVersion = :validatorVersion " +
+      "ORDER BY revision DESC LIMIT 1",
   )
-  abstract suspend fun activeTemplate(accountId: String): MessageTemplateEntity?
+  protected abstract suspend fun activeTemplateForValidator(
+    accountId: String,
+    validatorVersion: String,
+  ): MessageTemplateEntity?
+
+  suspend fun activeTemplate(accountId: String): MessageTemplateEntity? = activeTemplateForValidator(
+    accountId,
+    MessageTemplateValidator.VALIDATOR_VERSION,
+  )
 
   @Query(
     "SELECT * FROM automation_policies_v2 WHERE accountId = :accountId " +
@@ -157,6 +168,26 @@ abstract class ConfigurationDao {
   ): List<ConfiguredBirthdayRow>
 
   @Query(
+    """
+    SELECT c.contactId AS contactId,
+           c.birthdayMonth AS birthdayMonth,
+           c.birthdayDay AS birthdayDay,
+           c.leapDayPolicy AS leapDayPolicy
+    FROM contact_snapshots_v2 c
+    JOIN recipient_policies_v2 p ON p.contactId = c.contactId
+    WHERE c.accountId = :accountId
+      AND c.state = 'ACTIVE'
+      AND p.state IN ('ENABLED', 'BLOCKED', 'NEEDS_REVIEW')
+      AND c.birthdayMonth IS NOT NULL
+      AND c.birthdayDay IS NOT NULL
+    ORDER BY c.contactId
+    """,
+  )
+  abstract suspend fun configuredBirthdayRowsForCapacity(
+    accountId: String,
+  ): List<ConfiguredBirthdayRow>
+
+  @Query(
     "SELECT COUNT(*) FROM recipient_policies_v2 p " +
       "JOIN contact_snapshots_v2 c ON c.contactId = p.contactId " +
       "WHERE c.accountId = :accountId AND p.state IN ('PAUSED', 'BLOCKED', 'NEEDS_REVIEW')",
@@ -205,7 +236,8 @@ abstract class ConfigurationDao {
            c.birthdayDay AS birthdayDay,
            c.leapDayPolicy AS leapDayPolicy,
            ph.maskedDisplay AS maskedDisplay,
-           ph.destinationFingerprint AS destinationFingerprint
+           ph.destinationFingerprint AS destinationFingerprint,
+           a.exactMessage AS exactMessage
     FROM contact_snapshots_v2 c
     JOIN recipient_policies_v2 p ON p.contactId = c.contactId
     JOIN contact_phones_v2 ph ON ph.phoneId = p.chosenPhoneId
@@ -231,6 +263,12 @@ abstract class ConfigurationDao {
       AND current_template.accountId = c.accountId
       AND current_template.validationState = 'VALID'
       AND current_template.templateVersion = a.sourceTemplateVersion
+      AND NOT EXISTS(
+        SELECT 1 FROM destination_blocks_v2 destination_block
+        WHERE destination_block.accountId = c.accountId
+          AND destination_block.destinationFingerprint = ph.destinationFingerprint
+          AND destination_block.active = 1
+      )
     ORDER BY c.contactId
     LIMIT :limit
     """,
@@ -261,11 +299,12 @@ abstract class ConfigurationDao {
 
   @Query(
     "SELECT occurrenceId FROM birthday_occurrences_v2 WHERE contactId = :contactId " +
-      "AND localDate = :localDate AND state IN " +
+      "AND localDate = :localDate AND (state IN " +
       "('PLANNED', 'PREPARED', 'SCHEDULED', 'COORDINATION_BLOCKED') " +
+      "OR (state = 'MISSED' AND safeOutcomeCode = 'WINDOW_CLOSED')) " +
       "ORDER BY updatedAtMillis DESC, occurrenceId LIMIT 1",
   )
-  abstract suspend fun unarmedOccurrenceId(contactId: String, localDate: String): String?
+  abstract suspend fun reviewableOccurrenceId(contactId: String, localDate: String): String?
 
   @Query("SELECT * FROM coordination_state_v2 WHERE accountId = :accountId")
   abstract suspend fun coordinationState(accountId: String): CoordinationStateEntity?
@@ -323,6 +362,82 @@ abstract class ConfigurationDao {
       "WHERE accountId = :accountId AND destinationFingerprint = :fingerprint AND active = 1",
   )
   abstract suspend fun activeDestinationBlockCount(accountId: String, fingerprint: String): Int
+
+  @Query(
+    "SELECT * FROM destination_blocks_v2 WHERE accountId = :accountId " +
+      "AND destinationFingerprint = :fingerprint LIMIT 1",
+  )
+  abstract suspend fun destinationBlock(
+    accountId: String,
+    fingerprint: String,
+  ): DestinationBlockEntity?
+
+  @Insert(onConflict = OnConflictStrategy.ABORT)
+  abstract suspend fun insertDestinationBlock(block: DestinationBlockEntity)
+
+  @Update
+  abstract suspend fun updateDestinationBlock(block: DestinationBlockEntity): Int
+
+  @Query(
+    "UPDATE approval_snapshots_v2 SET state = 'REVOKED', " +
+      "invalidatedAtMillis = COALESCE(invalidatedAtMillis, :atMillis), " +
+      "invalidationReason = COALESCE(invalidationReason, :reason) " +
+      "WHERE accountId = :accountId AND destinationFingerprint = :fingerprint " +
+      "AND state = 'ACTIVE'",
+  )
+  abstract suspend fun revokeApprovalsForDestination(
+    accountId: String,
+    fingerprint: String,
+    atMillis: Long,
+    reason: String,
+  ): Int
+
+  @Query(
+    "UPDATE recipient_policies_v2 SET state = 'NEEDS_REVIEW', approvalId = NULL, " +
+      "blockReason = :reason, revision = revision + 1, enabledAtMillis = NULL, " +
+      "updatedAtMillis = :atMillis WHERE state = 'ENABLED' AND chosenPhoneId IN (" +
+      "SELECT phone.phoneId FROM contact_phones_v2 phone " +
+      "JOIN contact_snapshots_v2 contact ON contact.contactId = phone.contactId " +
+      "WHERE contact.accountId = :accountId AND phone.destinationFingerprint = :fingerprint" +
+      ") AND revision < 9223372036854775807",
+  )
+  abstract suspend fun markEnabledRecipientsForDestinationReview(
+    accountId: String,
+    fingerprint: String,
+    atMillis: Long,
+    reason: String,
+  ): Int
+
+  @Query(
+    "UPDATE recipient_policies_v2 SET blockReason = 'APPROVAL_REQUIRED', " +
+      "revision = revision + 1, updatedAtMillis = :atMillis " +
+      "WHERE state = 'NEEDS_REVIEW' AND blockReason = :blockedReason " +
+      "AND chosenPhoneId IN (SELECT phone.phoneId FROM contact_phones_v2 phone " +
+      "JOIN contact_snapshots_v2 contact ON contact.contactId = phone.contactId " +
+      "WHERE contact.accountId = :accountId AND phone.destinationFingerprint = :fingerprint" +
+      ") AND revision < 9223372036854775807",
+  )
+  abstract suspend fun clearDestinationBlockReasonForReview(
+    accountId: String,
+    fingerprint: String,
+    atMillis: Long,
+    blockedReason: String,
+  ): Int
+
+  @Query(
+    "UPDATE birthday_occurrences_v2 SET state = 'CANCELLED', revision = revision + 1, " +
+      "updatedAtMillis = :atMillis, terminalAtMillis = COALESCE(terminalAtMillis, :atMillis), " +
+      "safeOutcomeCode = COALESCE(safeOutcomeCode, :reason) " +
+      "WHERE accountId = :accountId AND destinationFingerprint = :fingerprint " +
+      "AND state IN ('PLANNED', 'PREPARED', 'SCHEDULED', 'COORDINATION_BLOCKED') " +
+      "AND revision < 9223372036854775807",
+  )
+  abstract suspend fun cancelUnclaimedOccurrencesForDestination(
+    accountId: String,
+    fingerprint: String,
+    atMillis: Long,
+    reason: String,
+  ): Int
 
   @Query(
     """
@@ -415,6 +530,39 @@ abstract class ConfigurationDao {
   ): Int
 
   @Query(
+    "SELECT COUNT(*) FROM approval_snapshots_v2 WHERE accountId = :accountId " +
+      "AND state = 'ACTIVE' AND simPolicyKind = 'SYSTEM_DEFAULT'",
+  )
+  abstract suspend fun activeSystemDefaultApprovalCount(accountId: String): Int
+
+  @Query(
+    "UPDATE recipient_policies_v2 SET state = 'NEEDS_REVIEW', approvalId = NULL, " +
+      "blockReason = :reason, revision = revision + 1, enabledAtMillis = NULL, " +
+      "updatedAtMillis = :atMillis WHERE approvalId IN (" +
+      "SELECT approvalId FROM approval_snapshots_v2 WHERE accountId = :accountId " +
+      "AND state = 'ACTIVE' AND simPolicyKind = 'SYSTEM_DEFAULT'" +
+      ") AND state NOT IN ('OFF', 'EXCLUDED') AND revision < 9223372036854775807",
+  )
+  abstract suspend fun markSystemDefaultRecipientsForReview(
+    accountId: String,
+    atMillis: Long,
+    reason: String,
+  ): Int
+
+  @Query(
+    "UPDATE approval_snapshots_v2 SET state = 'INVALIDATED', " +
+      "invalidatedAtMillis = COALESCE(invalidatedAtMillis, :atMillis), " +
+      "invalidationReason = COALESCE(invalidationReason, :reason) " +
+      "WHERE accountId = :accountId AND state = 'ACTIVE' " +
+      "AND simPolicyKind = 'SYSTEM_DEFAULT'",
+  )
+  abstract suspend fun invalidateSystemDefaultApprovals(
+    accountId: String,
+    atMillis: Long,
+    reason: String,
+  ): Int
+
+  @Query(
     "UPDATE approval_snapshots_v2 SET state = 'REVOKED', " +
       "invalidatedAtMillis = COALESCE(invalidatedAtMillis, :atMillis), " +
       "invalidationReason = COALESCE(invalidationReason, :reason) " +
@@ -429,6 +577,28 @@ abstract class ConfigurationDao {
       "WHERE accountId = :accountId AND state = 'VALID'",
   )
   abstract suspend fun invalidateTestReceipts(
+    accountId: String,
+    atMillis: Long,
+    reason: String,
+  ): Int
+
+  @Query(
+    "SELECT COUNT(*) FROM test_receipts_v2 r INNER JOIN test_jobs_v2 j " +
+      "ON j.testJobId = r.testJobId WHERE r.accountId = :accountId " +
+      "AND r.state = 'VALID' AND j.simPolicyKind = 'SYSTEM_DEFAULT'",
+  )
+  abstract suspend fun validSystemDefaultTestReceiptCount(accountId: String): Int
+
+  @Query(
+    "UPDATE test_receipts_v2 SET state = 'INVALIDATED', " +
+      "invalidatedAtMillis = COALESCE(invalidatedAtMillis, :atMillis), " +
+      "invalidationReason = COALESCE(invalidationReason, :reason) " +
+      "WHERE accountId = :accountId AND state = 'VALID' AND testJobId IN (" +
+      "SELECT testJobId FROM test_jobs_v2 WHERE accountId = :accountId " +
+      "AND simPolicyKind = 'SYSTEM_DEFAULT'" +
+      ")",
+  )
+  abstract suspend fun invalidateSystemDefaultTestReceipts(
     accountId: String,
     atMillis: Long,
     reason: String,
@@ -480,6 +650,15 @@ abstract class ConfigurationDao {
   abstract suspend fun latestConsentSequence(accountId: String, kind: ConsentKind): Long
 
   @Query(
+    "SELECT * FROM consent_receipts_v2 WHERE accountId = :accountId AND kind = :kind " +
+      "ORDER BY sequence DESC LIMIT 1",
+  )
+  abstract suspend fun latestConsentReceipt(
+    accountId: String,
+    kind: ConsentKind,
+  ): ConsentReceiptEntity?
+
+  @Query(
     "UPDATE app_control SET revision = revision + 1, blockerRevision = blockerRevision + 1 " +
       "WHERE singletonId = 1 AND revision = :expectedRevision " +
       "AND blockerRevision = :expectedBlockerRevision " +
@@ -502,6 +681,19 @@ abstract class ConfigurationDao {
     expectedBlockerRevision: Long,
     desired: Boolean,
     mode: AccountMode,
+  ): Int
+
+  @Query(
+    "UPDATE app_control SET revision = revision + 1, blockerRevision = blockerRevision + 1, " +
+      "automationDesired = 1, accountMode = 'AUTOMATION_ACTIVE', " +
+      "initialActivationCompleted = 1 " +
+      "WHERE singletonId = 1 AND revision = :expectedRevision " +
+      "AND blockerRevision = :expectedBlockerRevision " +
+      "AND revision < 9223372036854775807 AND blockerRevision < 9223372036854775807",
+  )
+  abstract suspend fun markAutomationActivated(
+    expectedRevision: Long,
+    expectedBlockerRevision: Long,
   ): Int
 
   @Query(

@@ -6,10 +6,12 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.yashsomani.birthdayautopilot.AppGraph
 import com.yashsomani.birthdayautopilot.BuildConfig
+import com.yashsomani.birthdayautopilot.R
 import com.yashsomani.birthdayautopilot.auth.IdentityFailure
 import com.yashsomani.birthdayautopilot.auth.IdentityOutcome
 import com.yashsomani.birthdayautopilot.auth.ForegroundActivityRegistry
 import com.yashsomani.birthdayautopilot.auth.TelephonyPermissionResult
+import com.yashsomani.birthdayautopilot.auth.TelephonyPermissionRemediationPolicy
 import com.yashsomani.birthdayautopilot.auth.NotificationPermissionActivityResultOwner
 import com.yashsomani.birthdayautopilot.auth.NotificationPermissionResult
 import com.yashsomani.birthdayautopilot.auth.GoogleAccessRevocationOutcome
@@ -37,6 +39,7 @@ import com.yashsomani.birthdayautopilot.automation.orchestration.OrchestrationCa
 import com.yashsomani.birthdayautopilot.automation.orchestration.FirebaseAutomationCoordinationPort
 import com.yashsomani.birthdayautopilot.automation.orchestration.SenderTransferSpec
 import com.yashsomani.birthdayautopilot.automation.orchestration.SenderReleaseSpec
+import com.yashsomani.birthdayautopilot.automation.orchestration.TrustedTimeEstimator
 import com.yashsomani.birthdayautopilot.automation.sms.SmsCallbackCleanup
 import com.yashsomani.birthdayautopilot.automation.sms.SmsCallbackCleanupResult
 import com.yashsomani.birthdayautopilot.automation.workers.AutomationScheduler
@@ -61,6 +64,8 @@ import com.yashsomani.birthdayautopilot.storage.database.ApprovalRecordState
 import com.yashsomani.birthdayautopilot.storage.database.ContactSnapshotEntity
 import com.yashsomani.birthdayautopilot.storage.database.ContactSnapshotState
 import com.yashsomani.birthdayautopilot.storage.database.PhoneRecordState
+import com.yashsomani.birthdayautopilot.storage.database.PeopleDataFreshnessBand
+import com.yashsomani.birthdayautopilot.storage.database.PeopleDataFreshnessPolicy
 import com.yashsomani.birthdayautopilot.storage.database.RecipientEnrollmentState
 import com.yashsomani.birthdayautopilot.storage.database.SyncFreshness
 import java.time.Instant
@@ -96,13 +101,19 @@ class BirthdayNativeModule(
     reactContext,
     appGraph.database,
     appGraph.recurrencePlanner,
+    nativeLocaleProvider = appGraph.nativeLocaleProvider,
     geminiGateway = appGraph.geminiSuggestionGateway,
     accountSessionMatches = appGraph::identitySessionMatches,
+    subscriptionChangePending = {
+      appGraph.subscriptionChangeSignalStore.pendingGeneration() != null
+    },
+    trustedNowProvider = { account -> trustedNowMillis(account.accountId) },
   )
   private val lifecycleController = AndroidLifecycleController(
     reactContext,
     appGraph.database,
     accountSessionMatches = appGraph::identitySessionMatches,
+    submissionGate = appGraph.submissionGate,
   )
   private val deletionRecoveryCoordinationPort by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
     FirebaseAutomationCoordinationPort(
@@ -111,6 +122,17 @@ class BirthdayNativeModule(
         environment = BuildConfig.APP_ENV,
         accountBindingPredicate = NativeAccountBindingPredicate { binding ->
           lifecycleController.matchesDeletionRecoveryBinding(binding)
+        },
+      ),
+    )
+  }
+  private val senderReleaseRecoveryCoordinationPort by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+    FirebaseAutomationCoordinationPort(
+      FirebaseCoordinationRuntime.resolve(
+        context = reactApplicationContext,
+        environment = BuildConfig.APP_ENV,
+        accountBindingPredicate = NativeAccountBindingPredicate { binding ->
+          lifecycleController.matchesSenderReleaseRecoveryBinding(binding)
         },
       ),
     )
@@ -225,7 +247,11 @@ class BirthdayNativeModule(
         "continue-with-google" -> promise.resolve(handleGoogleIdentityIntent())
         "authorize-contacts",
         "sync-contacts",
-        -> promise.resolve(handlePeopleSyncIntent())
+        -> promise.resolve(
+          handlePeopleSyncIntent(
+            disclosureAcknowledged = intent == "authorize-contacts",
+          ),
+        )
         "choose-phone" -> promise.resolve(
           handleConfigurationOutcome(
             expectedRevision.configurationRevisionOrNull()?.let {
@@ -271,6 +297,21 @@ class BirthdayNativeModule(
             ),
           )
         }
+        "block-recipient-destination",
+        "unblock-recipient-destination",
+        -> promise.resolve(
+          handleConfigurationOutcome(
+            expectedRevision.configurationRevisionOrNull()?.let {
+              runBlocking {
+                configurationController.mutateSelectedDestinationBlock(
+                  blocked = intent == "block-recipient-destination",
+                  request = request,
+                  expectedRevision = it,
+                )
+              }
+            } ?: ConfigurationOutcome.InvalidRequest,
+          ),
+        )
         "preview-message" -> promise.resolve(
           handleConfigurationOutcome(
             expectedRevision.configurationRevisionOrNull()?.let {
@@ -450,6 +491,10 @@ class BirthdayNativeModule(
 
   private fun setupPayload(snapshot: AndroidReadinessSnapshot) = JSONObject()
     .put("step", setupStep(snapshot))
+    .put(
+      "initialActivationCompleted",
+      runBlocking { configurationController.initialActivationCompleted() },
+    )
     .put("eligibility", eligibilityPayload(snapshot.eligibility))
     .put("account", accountPayload())
     .put("contacts", contactsSyncPayload())
@@ -505,18 +550,37 @@ class BirthdayNativeModule(
         resetSafetyClear = durable.resetSafetyClear,
       ),
     )
+    val permanentPermissionIssue = snapshot.permanentPermissionDenial.readinessWireCode()
     return JSONObject()
       .put("platform", "android")
-      .put("test", gatePayload("test", decision.testBlockers.map { it.name }))
+      .put(
+        "test",
+        gatePayload("test", decision.testBlockers.map { it.name }, permanentPermissionIssue),
+      )
       .put(
         "activation",
-        gatePayload("activation", decision.activationBlockers.map { it.name }),
+        gatePayload(
+          "activation",
+          decision.activationBlockers.map { it.name },
+          permanentPermissionIssue,
+        ),
       )
-      .put("birthday", gatePayload("birthday", decision.birthdayBlockers.map { it.name }))
+      .put(
+        "birthday",
+        gatePayload(
+          "birthday",
+          decision.birthdayBlockers.map { it.name },
+          permanentPermissionIssue,
+        ),
+      )
       .put("lastCheckedAt", Instant.now().toString())
   }
 
-  private fun gatePayload(gate: String, blockers: List<String>): JSONObject =
+  private fun gatePayload(
+    gate: String,
+    blockers: List<String>,
+    permanentPermissionIssue: String?,
+  ): JSONObject =
     if (blockers.isEmpty()) {
     JSONObject().put("kind", "allowed")
   } else {
@@ -526,7 +590,7 @@ class BirthdayNativeModule(
         "issues",
         org.json.JSONArray().apply {
           blockers.distinct().forEach { blocker ->
-            put(readinessIssuePayload(blocker, gate))
+            put(readinessIssuePayload(blocker, gate, permanentPermissionIssue))
           }
         },
       )
@@ -551,15 +615,24 @@ class BirthdayNativeModule(
     return org.json.JSONArray(gates)
   }
 
-  private fun readinessIssuePayload(internalCode: String, gate: String): JSONObject {
-    val wireCode = READINESS_WIRE_CODES[internalCode] ?: "unknown-native-value"
+  private fun readinessIssuePayload(
+    internalCode: String,
+    gate: String,
+    permanentPermissionIssue: String?,
+  ): JSONObject {
+    val wireCode = if (internalCode == "SMS_PERMISSION_MISSING") {
+      permanentPermissionIssue ?: READINESS_WIRE_CODES.getValue(internalCode)
+    } else {
+      READINESS_WIRE_CODES[internalCode] ?: "unknown-native-value"
+    }
+    val actionCode = TelephonyPermissionRemediationPolicy.actionCode(wireCode)
     return JSONObject()
       .put("id", "readiness-${wireCode}")
       .put("code", wireCode)
       .put("severity", "blocking")
       .put("blocks", org.json.JSONArray(listOf(gate)))
       .apply {
-        lifecycleController.actionPayload(wireCode, currentRevision().toLongOrNull() ?: 0L)
+        lifecycleController.actionPayload(actionCode, currentRevision().toLongOrNull() ?: 0L)
           ?.let { put("action", it) }
       }
   }
@@ -1210,7 +1283,7 @@ class BirthdayNativeModule(
     val current = lifecycleController.latestOperation()
       ?.takeIf { it.id == operationId }
       ?: return errorResponse("NATIVE_REQUEST_INVALID")
-    if (current.state in setOf("complete", "failed") || current.localDataErased) {
+    if (current.state in setOf("complete", "failed")) {
       return successResponse(lifecycleOperationPayload(current))
     }
     if (current.action == "sender-transfer") {
@@ -1275,7 +1348,7 @@ class BirthdayNativeModule(
       return if (plan.action == "delete-account") {
         completeAcceptedAccountDeletionLocalWipe(plan, installation)
       } else {
-        completeLocalWipe(plan, installation)
+        completeMarkedDestructiveWipe(plan, installation)
       }
     }
     if (current.authoritativeRecoveryKind == "contact-reset") {
@@ -1287,7 +1360,7 @@ class BirthdayNativeModule(
             lifecycleController.markLocalCleanupPending(plan, "internal-contract-invalid"),
           ),
         )
-      if (!pauseLifecycleAccount(revision).localPrepared) {
+      if (prepareLifecyclePauseLocally(revision) == null) {
         return successResponse(
           lifecycleController.operationPayload(
             lifecycleController.markLocalCleanupPending(plan, "internal-contract-invalid"),
@@ -1299,7 +1372,7 @@ class BirthdayNativeModule(
     if (current.authoritativeRecoveryKind == "sender-release") {
       val installation = runBlocking { appGraph.automationOrchestrationDao.localInstallation() }
         ?: return privacyPending(plan, "account-reconnect-required")
-      return completeLocalWipe(plan, installation)
+      return completeAuthoritativeSenderReleaseLocalWipe(plan, installation)
     }
     if (
       plan.action == "sign-out-retain" &&
@@ -1342,14 +1415,39 @@ class BirthdayNativeModule(
     if (plan.action in setOf("disconnect-contacts", "revoke-google-access")) {
       val account = runBlocking { appGraph.peopleSyncDao.activeAccount() }
         ?: return privacyPending(plan, "account-reconnect-required")
+      if (!current.localDataErased) {
+        val revision = runBlocking { appGraph.automationOrchestrationDao.control()?.revision }
+          ?: return privacyPending(plan, "internal-contract-invalid")
+        if (prepareLifecyclePauseLocally(revision) == null) {
+          return privacyPending(plan, "internal-contract-invalid")
+        }
+        val local = runBlocking {
+          lifecycleController.purgeContactDerivedState(plan, account.accountId)
+        }
+        if (!local.localDataErased) {
+          return successResponse(lifecycleController.operationPayload(local))
+        }
+      }
+      val afterLocal = lifecycleController.latestOperation()?.takeIf { it.id == plan.operationId }
+        ?: return privacyPending(plan, "internal-contract-invalid")
+      if (afterLocal.state != "verifying") {
+        val revision = runBlocking { appGraph.automationOrchestrationDao.control()?.revision }
+          ?: return privacyPending(plan, "internal-contract-invalid")
+        val pause = pauseLifecycleAccount(revision)
+        if (!pause.localPrepared) return privacyPending(plan, "internal-contract-invalid")
+        if (!pause.serverPaused) return privacyPending(plan, "coordination-unavailable")
+      }
       return startOrReplayContactDerivedReset(plan, account.accountId)
     }
     if (plan.action in setOf("sign-out-wipe", "wipe-local-data")) {
+      if (current.localDataErased) {
+        return successResponse(lifecycleController.operationPayload(current))
+      }
       val account = runBlocking { appGraph.peopleSyncDao.activeAccount() }
         ?: return privacyPending(plan, "account-reconnect-required")
       val installation = runBlocking { appGraph.automationOrchestrationDao.localInstallation() }
         ?: return privacyPending(plan, "account-reconnect-required")
-      return startOrReplaySenderRelease(plan, account.accountId, installation)
+      return completeLocalFirstDestructiveWipe(plan, account, installation)
     }
     if (plan.action == "sign-out-retain") {
       val revision = runBlocking { appGraph.automationOrchestrationDao.control()?.revision }
@@ -1696,8 +1794,8 @@ class BirthdayNativeModule(
           lifecycleController.failExternalPrivacyAction(plan, "account-reconnect-required"),
         ),
       )
-    val pause = pauseLifecycleAccount(revision)
-    if (!pause.localPrepared) {
+    val pauseMaterial = prepareLifecyclePauseLocally(revision)
+    if (pauseMaterial == null) {
       return successResponse(
         lifecycleController.operationPayload(
           lifecycleController.failExternalPrivacyAction(plan, "internal-contract-invalid"),
@@ -1710,20 +1808,29 @@ class BirthdayNativeModule(
     if (plan.action == "clear-gemini-templates") {
       appGraph.geminiSuggestionGateway.clearProvenance()
       val operation = runBlocking { lifecycleController.executeLocalPrivacyAction(plan) }
+      convergeLifecycleServerPause(pauseMaterial)
       return successResponse(lifecycleController.operationPayload(operation))
     }
-    if (!pause.serverPaused) {
-      return privacyPending(plan, "coordination-unavailable")
-    }
-
-    if (plan.action == "delete-account") {
-      return startOrReplayAccountDeletion(plan, account.accountId, installation)
-    }
     if (plan.action in setOf("revoke-google-access", "disconnect-contacts")) {
+      val local = runBlocking {
+        lifecycleController.purgeContactDerivedState(plan, account.accountId)
+      }
+      if (!local.localDataErased) {
+        return successResponse(lifecycleController.operationPayload(local))
+      }
+      if (!convergeLifecycleServerPause(pauseMaterial)) {
+        return privacyPending(plan, "coordination-unavailable")
+      }
       return startOrReplayContactDerivedReset(plan, account.accountId)
     }
     if (plan.action in setOf("sign-out-wipe", "wipe-local-data")) {
-      return startOrReplaySenderRelease(plan, account.accountId, installation)
+      return completeLocalFirstDestructiveWipe(plan, account, installation)
+    }
+    if (!convergeLifecycleServerPause(pauseMaterial)) {
+      return privacyPending(plan, "coordination-unavailable")
+    }
+    if (plan.action == "delete-account") {
+      return startOrReplayAccountDeletion(plan, account.accountId, installation)
     }
     return when (plan.action) {
       "sign-out-retain" -> if (retireLocalCallbacks(installation)) {
@@ -1750,29 +1857,39 @@ class BirthdayNativeModule(
     return successResponse(lifecycleController.operationPayload(operation))
   }
 
-  private fun completeLocalWipe(
+  private fun completeLocalFirstDestructiveWipe(
     plan: PrivacyActionPlan,
+    account: com.yashsomani.birthdayautopilot.storage.database.AccountRecordEntity,
     installation: com.yashsomani.birthdayautopilot.storage.database.InstallationBindingEntity,
   ): Any {
-    if (!retireLocalCallbacks(installation, requireNoUnresolvedPermits = false)) {
-      return successResponse(
-        lifecycleController.operationPayload(
-          lifecycleController.markLocalCleanupPending(plan, "coordination-unavailable"),
-        ),
-      )
-    }
-    appGraph.geminiSuggestionGateway.clearProvenance()
-    val workCancelled = runCatching {
-      WorkManager.getInstance(reactApplicationContext)
-        .cancelAllWork()
-        .result
-        .get(WORK_CANCELLATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-      true
-    }.getOrDefault(false)
-    if (!workCancelled) {
+    val senderEpoch = installation.senderEpoch
+      ?: return privacyPending(plan, "coordination-unavailable")
+    if (
+      lifecycleController.persistReleaseRequestBinding(
+        plan,
+        account,
+        installation.installationId,
+        senderEpoch,
+        installation.resetGeneration,
+      ) == null
+    ) return privacyPending(plan, "internal-contract-invalid")
+    lifecycleController.markLocalWiping(plan)
+    if (!cancelAllLocalWork()) {
       return successResponse(
         lifecycleController.operationPayload(
           lifecycleController.markLocalCleanupPending(plan, "internal-contract-invalid"),
+        ),
+      )
+    }
+    val callbacksRetired = runBlocking {
+      appGraph.submissionGate.withExclusiveBoundary {
+        retireLocalCallbacks(installation, requireNoUnresolvedPermits = false)
+      }
+    }
+    if (!callbacksRetired) {
+      return successResponse(
+        lifecycleController.operationPayload(
+          lifecycleController.markLocalCleanupPending(plan, "coordination-unavailable"),
         ),
       )
     }
@@ -1785,6 +1902,44 @@ class BirthdayNativeModule(
         lifecycleController.markLocalCleanupPending(plan, "internal-contract-invalid"),
       ),
     )
+    return finishMarkedDestructiveWipe(plan, installation, wipeMarker)
+  }
+
+  private fun completeAuthoritativeSenderReleaseLocalWipe(
+    plan: PrivacyActionPlan,
+    installation: com.yashsomani.birthdayautopilot.storage.database.InstallationBindingEntity,
+  ): Any {
+    if (!cancelAllLocalWork()) return privacyPending(plan, "internal-contract-invalid")
+    val callbacksRetired = runBlocking {
+      appGraph.submissionGate.withExclusiveBoundary {
+        retireLocalCallbacks(installation, requireNoUnresolvedPermits = false)
+      }
+    }
+    if (!callbacksRetired) return privacyPending(plan, "coordination-unavailable")
+    val marker = lifecycleController.markLocalWipeStarted(
+      plan,
+      installation.installationId,
+      installation.callbackGeneration,
+    ) ?: return privacyPending(plan, "internal-contract-invalid")
+    return finishMarkedDestructiveWipe(plan, installation, marker)
+  }
+
+  private fun completeMarkedDestructiveWipe(
+    plan: PrivacyActionPlan,
+    installation: com.yashsomani.birthdayautopilot.storage.database.InstallationBindingEntity,
+  ): Any {
+    val marker = lifecycleController.latestOperation()?.takeIf {
+      it.id == plan.operationId && it.localWipeStarted
+    } ?: return privacyPending(plan, "internal-contract-invalid")
+    return finishMarkedDestructiveWipe(plan, installation, marker)
+  }
+
+  private fun finishMarkedDestructiveWipe(
+    plan: PrivacyActionPlan,
+    installation: com.yashsomani.birthdayautopilot.storage.database.InstallationBindingEntity,
+    wipeMarker: com.yashsomani.birthdayautopilot.lifecycle.DurablePrivacyOperation,
+  ): Any {
+    appGraph.geminiSuggestionGateway.clearProvenance()
     if (!runBlocking { appGraph.googleIdentityCoordinator.completeSignOutAfterSafetyShutdown() }) {
       return successResponse(lifecycleController.operationPayload(wipeMarker))
     }
@@ -1796,13 +1951,29 @@ class BirthdayNativeModule(
     } catch (_: RuntimeException) {
       false
     }
-    val operation = if (erased) runCatching {
-      lifecycleController.completeExternalPrivacyAction(plan)
-    }.getOrDefault(wipeMarker) else wipeMarker
+    val operation = if (erased) {
+      runCatching {
+        if (wipeMarker.authoritativeRecoveryKind == "sender-release") {
+          lifecycleController.completeAuthoritativeSenderReleaseLocalErase(plan)
+        } else {
+          lifecycleController.markDestructiveLocalDataErased(plan)
+        }
+      }.getOrNull() ?: wipeMarker
+    } else {
+      wipeMarker
+    }
     emitInvalidation(PROJECTION_AREAS.toList())
     scheduleProcessExitAfterDestructiveWipe()
     return successResponse(lifecycleController.operationPayload(operation))
   }
+
+  private fun cancelAllLocalWork(): Boolean = runCatching {
+    WorkManager.getInstance(reactApplicationContext)
+      .cancelAllWork()
+      .result
+      .get(WORK_CANCELLATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    true
+  }.getOrDefault(false)
 
   private fun retireLocalCallbacks(
     installation: com.yashsomani.birthdayautopilot.storage.database.InstallationBindingEntity,
@@ -1834,27 +2005,20 @@ class BirthdayNativeModule(
   ): Any {
     val current = lifecycleController.latestOperation()?.takeIf { it.id == plan.operationId }
       ?: return errorResponse("NATIVE_INTENT_FAILURE")
-    if (
-      plan.action == "revoke-google-access" &&
-      current.state == "local-wiping" &&
-      current.reason == "account-reconnect-required"
-    ) {
-      return if (runBlocking {
-          appGraph.googleIdentityCoordinator.completeSignOutAfterSafetyShutdown()
-        }
-      ) {
-        val completed = runBlocking {
-          lifecycleController.retainSignedOutAccount(plan, accountId)
-        }
-        emitInvalidation(listOf("bootstrap", "setup", "account", "home", "automation", "privacy"))
-        successResponse(lifecycleController.operationPayload(completed))
-      } else {
-        successResponse(lifecycleController.operationPayload(current))
-      }
-    }
+    if (!current.localDataErased) return privacyPending(plan, "internal-contract-invalid")
     val account = runBlocking { appGraph.peopleSyncDao.activeAccount() }
       ?.takeIf { it.accountId == accountId }
       ?: return privacyPending(plan, "account-reconnect-required")
+    if (plan.action == "revoke-google-access" && current.state == "verifying") {
+      if (!current.remoteAccessRevoked && !recentExactGoogleReauthentication(account)) {
+        val pending = lifecycleController.markGoogleAccessRevocationPending(
+          plan,
+          "account-reconnect-required",
+        ) ?: return privacyPending(plan, "internal-contract-invalid")
+        return successResponse(lifecycleController.operationPayload(pending))
+      }
+      return completeContactDerivedReset(plan, accountId)
+    }
     val requestId = lifecycleController.coordinatedRequestId(plan)
       ?: return privacyPending(plan, "internal-contract-invalid")
     if (!recentExactGoogleReauthentication(account)) {
@@ -1889,7 +2053,9 @@ class BirthdayNativeModule(
           if (outcome.completion !is CoordinationCompletion.ContactDerivedReset) {
             return privacyPending(plan, "internal-contract-invalid")
           }
-          lifecycleController.markCoordinatedOperationCompleted(plan)
+          if (lifecycleController.markContactResetRemoteCompleted(plan) == null) {
+            return privacyPending(plan, "internal-contract-invalid")
+          }
           completeContactDerivedReset(plan, accountId)
         }
       }
@@ -1900,117 +2066,66 @@ class BirthdayNativeModule(
     plan: PrivacyActionPlan,
     accountId: String,
   ): Any {
+    var current = lifecycleController.latestOperation()?.takeIf { it.id == plan.operationId }
+      ?: return errorResponse("NATIVE_INTENT_FAILURE")
+    if (!current.localDataErased) {
+      current = runBlocking {
+        lifecycleController.purgeContactDerivedState(plan, accountId)
+      }
+      if (!current.localDataErased) {
+        return successResponse(lifecycleController.operationPayload(current))
+      }
+    }
+    if (current.state !in setOf("verifying", "complete")) {
+      current = lifecycleController.markContactResetRemoteCompleted(plan)
+        ?: return privacyPending(plan, "internal-contract-invalid")
+    }
     if (plan.action == "disconnect-contacts") {
-      val completed = runBlocking { lifecycleController.disconnectContacts(plan, accountId) }
       emitInvalidation(listOf("contacts", "messages", "automation", "home", "activity", "privacy"))
-      return successResponse(lifecycleController.operationPayload(completed))
+      return successResponse(lifecycleController.operationPayload(current))
     }
     if (plan.action != "revoke-google-access") {
       return privacyPending(plan, "internal-contract-invalid")
     }
-    val purged = runBlocking {
-      lifecycleController.purgeContactDerivedState(plan, accountId)
-    }
-    if (purged.reason != null) {
-      return successResponse(lifecycleController.operationPayload(purged))
+    if (current.remoteAccessRevoked) {
+      if (!runBlocking { appGraph.googleIdentityCoordinator.completeSignOutAfterSafetyShutdown() }) {
+        return successResponse(lifecycleController.operationPayload(current))
+      }
+      val completed = runBlocking { lifecycleController.retainSignedOutAccount(plan, accountId) }
+      emitInvalidation(PROJECTION_AREAS.toList())
+      return successResponse(lifecycleController.operationPayload(completed))
     }
     return when (runBlocking {
       appGraph.googleIdentityCoordinator.revokeAllGoogleAccessAfterSafetyShutdown()
     }) {
       GoogleAccessRevocationOutcome.REVOKED -> {
-        lifecycleController.markLocalCleanupPending(plan, "account-reconnect-required")
+        if (runBlocking { lifecycleController.markGoogleAccessRevoked(plan) } == null) {
+          return privacyPending(plan, "internal-contract-invalid")
+        }
         val completed = runBlocking {
           lifecycleController.retainSignedOutAccount(plan, accountId)
         }
         emitInvalidation(PROJECTION_AREAS.toList())
         successResponse(lifecycleController.operationPayload(completed))
       }
-      GoogleAccessRevocationOutcome.SESSION_CLEANUP_PENDING -> successResponse(
-        lifecycleController.operationPayload(
-          lifecycleController.markLocalCleanupPending(plan, "account-reconnect-required"),
-        ),
-      )
-      GoogleAccessRevocationOutcome.ACCOUNT_CHANGED ->
-        privacyPending(plan, "account-reconnect-required")
-      GoogleAccessRevocationOutcome.AMBIGUOUS ->
-        privacyPending(plan, "coordination-unavailable")
-    }
-  }
-
-  private fun startOrReplaySenderRelease(
-    plan: PrivacyActionPlan,
-    accountId: String,
-    installation: com.yashsomani.birthdayautopilot.storage.database.InstallationBindingEntity,
-  ): Any {
-    val current = lifecycleController.latestOperation()?.takeIf { it.id == plan.operationId }
-      ?: return errorResponse("NATIVE_INTENT_FAILURE")
-    if (current.localWipeStarted) return completeLocalWipe(plan, installation)
-    val account = runBlocking { appGraph.peopleSyncDao.activeAccount() }
-      ?.takeIf { it.accountId == accountId }
-      ?: return privacyPending(plan, "account-reconnect-required")
-    val coordination = runBlocking {
-      appGraph.automationOrchestrationDao.coordinationState(accountId)
-    } ?: return privacyPending(plan, "coordination-unavailable")
-    val requestInstallationId = current.remoteRequestInstallationId ?: installation.installationId
-    val requestSenderEpoch = current.remoteRequestSenderEpoch ?: installation.senderEpoch
-      ?: return privacyPending(plan, "coordination-unavailable")
-    val requestResetGeneration = current.remoteRequestResetGeneration ?: installation.resetGeneration
-    if (current.remoteRequestInstallationId == null && (
-        installation.accountId != accountId ||
-          installation.state != InstallationRecordState.ACTIVE ||
-          coordination.activeInstallationId != installation.installationId ||
-          coordination.senderEpoch != requestSenderEpoch ||
-          coordination.resetGeneration != requestResetGeneration
-      )) return privacyPending(plan, "coordination-unavailable")
-    val persisted = lifecycleController.persistReleaseRequestBinding(
-      plan,
-      requestInstallationId,
-      requestSenderEpoch,
-      requestResetGeneration,
-    ) ?: return privacyPending(plan, "internal-contract-invalid")
-    val requestId = persisted.requestId
-      ?: return privacyPending(plan, "internal-contract-invalid")
-    if (!recentExactGoogleReauthentication(account)) {
-      return privacyPending(plan, "account-reconnect-required")
-    }
-    val spec = SenderReleaseSpec(
-      requestId,
-      requestInstallationId,
-      requestSenderEpoch,
-      requestResetGeneration,
-    )
-    return when (val call = runBlocking {
-      appGraph.automationCoordinationPort.releaseAndroidSender(spec)
-    }) {
-      is OrchestrationCall.Unavailable -> privacyPending(plan, "coordination-unavailable")
-      is OrchestrationCall.Authoritative -> when (val outcome = call.value) {
-        is CoordinationOperationOutcome.InProgress -> {
-          val progress = outcome.progress
-          val operation = lifecycleController.markCoordinatedOperationInProgress(
-            plan,
-            progress.drainUntilMillis,
-            System.currentTimeMillis().coerceAtLeast(0),
-            SystemClock.elapsedRealtime(),
-            currentBootCount(),
-          )
-          progress.drainUntilMillis?.let {
-            AutomationScheduler.scheduleNetworkAttempt(
-              reactApplicationContext,
-              "sender-release-${plan.operationId}",
-              it,
-            )
-          }
-          successResponse(lifecycleController.operationPayload(operation))
-        }
-        is CoordinationOperationOutcome.Refused ->
-          privacyPending(plan, outcome.reason.toLifecycleReason())
-        is CoordinationOperationOutcome.Completed -> {
-          if (outcome.completion !is CoordinationCompletion.SenderRelease) {
-            return privacyPending(plan, "internal-contract-invalid")
-          }
-          lifecycleController.markCoordinatedOperationCompleted(plan)
-          completeLocalWipe(plan, installation)
-        }
+      GoogleAccessRevocationOutcome.SESSION_CLEANUP_PENDING -> {
+        val pending = runBlocking { lifecycleController.markGoogleAccessRevoked(plan) }
+          ?: return privacyPending(plan, "internal-contract-invalid")
+        successResponse(lifecycleController.operationPayload(pending))
+      }
+      GoogleAccessRevocationOutcome.ACCOUNT_CHANGED -> {
+        val pending = lifecycleController.markGoogleAccessRevocationPending(
+          plan,
+          "account-reconnect-required",
+        ) ?: return privacyPending(plan, "internal-contract-invalid")
+        successResponse(lifecycleController.operationPayload(pending))
+      }
+      GoogleAccessRevocationOutcome.AMBIGUOUS -> {
+        val pending = lifecycleController.markGoogleAccessRevocationPending(
+          plan,
+          "coordination-unavailable",
+        ) ?: return privacyPending(plan, "internal-contract-invalid")
+        successResponse(lifecycleController.operationPayload(pending))
       }
     }
   }
@@ -2257,7 +2372,7 @@ class BirthdayNativeModule(
       return
     }
     val eligibility = appGraph.androidReadinessProbe.read().eligibility
-    if (eligibility.kind != EligibilityKind.SUPPORTED) {
+    if (!eligibility.allowsForegroundTest()) {
       promise.resolve(unsupportedResponse("distribution-channel-unapproved"))
       return
     }
@@ -2267,12 +2382,20 @@ class BirthdayNativeModule(
     }
     when (permissionResult) {
       TelephonyPermissionResult.GRANTED -> Unit
-      TelephonyPermissionResult.DENIED -> {
-        promise.resolve(conflictResponse("permission-denied"))
+      TelephonyPermissionResult.PHONE_STATE_DENIED -> {
+        promise.resolve(conflictResponse("phone-state-permission-denied"))
         return
       }
-      TelephonyPermissionResult.PERMANENTLY_DENIED -> {
-        promise.resolve(conflictResponse("permission-permanently-denied"))
+      TelephonyPermissionResult.PHONE_STATE_PERMANENTLY_DENIED -> {
+        promise.resolve(conflictResponse("phone-state-permission-permanently-denied"))
+        return
+      }
+      TelephonyPermissionResult.SMS_DENIED -> {
+        promise.resolve(conflictResponse("sms-permission-denied"))
+        return
+      }
+      TelephonyPermissionResult.SMS_PERMANENTLY_DENIED -> {
+        promise.resolve(conflictResponse("sms-permission-permanently-denied"))
         return
       }
       TelephonyPermissionResult.UNAVAILABLE -> {
@@ -2433,6 +2556,17 @@ class BirthdayNativeModule(
   )
 
   private fun pauseLifecycleAccount(revision: Long): LifecyclePauseAttempt {
+    val material = prepareLifecyclePauseLocally(revision)
+      ?: return LifecyclePauseAttempt(localPrepared = false, serverPaused = false)
+    return LifecyclePauseAttempt(
+      localPrepared = true,
+      serverPaused = convergeLifecycleServerPause(material),
+    )
+  }
+
+  private fun prepareLifecyclePauseLocally(
+    revision: Long,
+  ): AccountModeCoordinationMaterial? {
     val prepared = runBlocking {
       appGraph.submissionGate.withExclusiveBoundary {
         configurationController.pauseAll(
@@ -2441,8 +2575,12 @@ class BirthdayNativeModule(
         )
       }
     }
-    val material = (prepared as? AccountModePreparationOutcome.Ready)?.material
-      ?: return LifecyclePauseAttempt(localPrepared = false, serverPaused = false)
+    return (prepared as? AccountModePreparationOutcome.Ready)?.material
+  }
+
+  private fun convergeLifecycleServerPause(
+    material: AccountModeCoordinationMaterial,
+  ): Boolean {
     val serverPaused = when (val server = runBlocking {
       appGraph.automationCoordinationPort.changeAccountMode(
         accountModeSpec(material, AccountModeAction.PAUSE_FOR_REPAIR),
@@ -2454,7 +2592,7 @@ class BirthdayNativeModule(
     }
     emitInvalidation(listOf("automation", "readiness", "home", "activity", "account", "privacy"))
     AutomationScheduler.enqueueImmediateLocal(reactApplicationContext, "FOREGROUND")
-    return LifecyclePauseAttempt(localPrepared = true, serverPaused = serverPaused)
+    return serverPaused
   }
 
   private fun currentDistributionChannel(): DistributionChannel = when (BuildConfig.APP_ENV) {
@@ -2495,6 +2633,9 @@ class BirthdayNativeModule(
       ) return handleDeletionRecoveryIdentityIntent()
       return conflictResponse(blocker)
     }
+    if (lifecycleController.senderReleaseRecoveryReauthenticationAllowed()) {
+      return handleSenderReleaseRecoveryIdentityIntent()
+    }
     lifecycleController.latestOperation()?.takeIf {
       it.action in setOf(
         "delete-account",
@@ -2526,6 +2667,7 @@ class BirthdayNativeModule(
     }
     return when (outcome) {
       is IdentityOutcome.SignedIn -> {
+        AutomationScheduler.enqueueAccountChange(reactApplicationContext)
         emitInvalidation(listOf("bootstrap", "setup", "account", "home", "readiness"))
         successResponse(accountPayload())
       }
@@ -2660,29 +2802,139 @@ class BirthdayNativeModule(
     return successResponse(accountPayload())
   }
 
+  private fun handleSenderReleaseRecoveryIdentityIntent(): Any {
+    val outcome = try {
+      runBlocking {
+        appGraph.googleIdentityCoordinator.continueWithGoogleForLifecycleRepair(
+          lifecycleController::matchesSenderReleaseRecoveryGoogleSubject,
+          lifecycleController::matchesSenderReleaseRecoveryBinding,
+        )
+      }
+    } catch (_: Exception) {
+      return errorResponse("IDENTITY_NATIVE_FAILURE")
+    }
+    if (outcome is IdentityOutcome.Failed) {
+      return when (outcome.reason) {
+        IdentityFailure.USER_CANCELLED -> cancelledResponse("user")
+        IdentityFailure.NETWORK_UNAVAILABLE -> temporaryResponse("network-offline")
+        IdentityFailure.ACCOUNT_MISMATCH -> conflictResponse("account-mismatch")
+        IdentityFailure.FIREBASE_USER_DISABLED -> conflictResponse("account-disabled")
+        IdentityFailure.PLAY_SERVICES_UNAVAILABLE,
+        IdentityFailure.CREDENTIAL_PROVIDER_UNAVAILABLE,
+        -> unsupportedResponse("google-play-services-missing")
+        IdentityFailure.ACTIVITY_UNAVAILABLE,
+        IdentityFailure.SECURITY_REAUTHENTICATION_REQUIRED,
+        -> temporaryResponse("account-reconnect-required")
+        else -> errorResponse("IDENTITY_CONFIGURATION_UNAVAILABLE")
+      }
+    }
+
+    val operation = lifecycleController.latestOperation()?.takeIf {
+      it.action in setOf("sign-out-wipe", "wipe-local-data") &&
+        it.localDataErased &&
+        it.state in setOf("remote-pending", "remote-draining")
+    }
+    val plan = operation?.let { lifecycleController.privacyPlanForOperation(it.id) }
+    val requestId = operation?.requestId
+    val installationId = operation?.remoteRequestInstallationId
+    val senderEpoch = operation?.remoteRequestSenderEpoch
+    val resetGeneration = operation?.remoteRequestResetGeneration
+    if (
+      plan == null ||
+      requestId == null ||
+      installationId == null ||
+      senderEpoch == null ||
+      resetGeneration == null
+    ) {
+      clearDeletionRecoveryIdentitySession()
+      return conflictResponse("coordination-unavailable")
+    }
+    val replay = try {
+      runBlocking {
+        senderReleaseRecoveryCoordinationPort.releaseAndroidSender(
+          SenderReleaseSpec(requestId, installationId, senderEpoch, resetGeneration),
+        )
+      }
+    } catch (_: Exception) {
+      lifecycleController.markRemotePending(plan, "coordination-unavailable")
+      return if (clearDeletionRecoveryIdentitySession()) {
+        errorResponse("IDENTITY_NATIVE_FAILURE")
+      } else {
+        conflictResponse("account-reconnect-required")
+      }
+    }
+
+    var remoteCompletionObserved = false
+    when (replay) {
+      is OrchestrationCall.Unavailable ->
+        lifecycleController.markRemotePending(plan, "coordination-unavailable")
+      is OrchestrationCall.Authoritative -> when (val remote = replay.value) {
+        is CoordinationOperationOutcome.InProgress -> lifecycleController
+          .markCoordinatedOperationInProgress(
+            plan,
+            remote.progress.drainUntilMillis,
+            System.currentTimeMillis().coerceAtLeast(0),
+            SystemClock.elapsedRealtime(),
+            currentBootCount(),
+          )
+        is CoordinationOperationOutcome.Refused ->
+          lifecycleController.markRemotePending(plan, remote.reason.toLifecycleReason())
+        is CoordinationOperationOutcome.Completed -> {
+          if (remote.completion !is CoordinationCompletion.SenderRelease) {
+            lifecycleController.markRemotePending(plan, "internal-contract-invalid")
+            clearDeletionRecoveryIdentitySession()
+            return conflictResponse("coordination-unavailable")
+          }
+          remoteCompletionObserved = true
+        }
+      }
+    }
+    if (!clearDeletionRecoveryIdentitySession()) {
+      return conflictResponse("account-reconnect-required")
+    }
+    if (
+      remoteCompletionObserved &&
+      lifecycleController.completeSenderReleaseRemoteCleanup(plan) == null
+    ) return conflictResponse("coordination-unavailable")
+    emitInvalidation(listOf("bootstrap", "setup", "account", "privacy", "automation"))
+    return successResponse(accountPayload())
+  }
+
   private fun clearDeletionRecoveryIdentitySession(): Boolean = try {
     runBlocking { appGraph.googleIdentityCoordinator.completeSignOutAfterSafetyShutdown() }
   } catch (_: Exception) {
     false
   }
 
-  private fun handlePeopleSyncIntent(): Any {
+  private fun handlePeopleSyncIntent(disclosureAcknowledged: Boolean): Any {
     val outcome = try {
-      runBlocking { appGraph.peopleSyncService.sync(interactiveAuthorization = true) }
+      runBlocking {
+        appGraph.peopleSyncService.sync(
+          interactiveAuthorization = true,
+          disclosureAcknowledged = disclosureAcknowledged,
+        )
+      }
     } catch (_: Exception) {
       return errorResponse("CONTACTS_SYNC_NATIVE_FAILURE")
     }
-    if (outcome !is PeopleSyncOutcome.Cancelled) {
+    if (
+      outcome !is PeopleSyncOutcome.Cancelled &&
+      outcome !is PeopleSyncOutcome.OwnershipBlocked
+    ) {
       emitInvalidation(
         listOf("bootstrap", "setup", "home", "contacts", "readiness", "automation"),
       )
     }
     return when (outcome) {
-      is PeopleSyncOutcome.Completed -> successResponse(contactsSyncPayload())
+      is PeopleSyncOutcome.Completed -> {
+        AutomationScheduler.enqueueContactChange(reactApplicationContext)
+        successResponse(contactsSyncPayload())
+      }
       is PeopleSyncOutcome.AuthorizationRequired,
       PeopleSyncOutcome.Forbidden,
       -> successResponse(contactsAuthorizationRequiredPayload())
       PeopleSyncOutcome.Cancelled -> cancelledResponse("user")
+      is PeopleSyncOutcome.OwnershipBlocked -> conflictResponse(outcome.reason.wireCode)
       PeopleSyncOutcome.Offline -> temporaryResponse("network-offline")
       is PeopleSyncOutcome.RateLimited -> temporaryResponse(
         code = "contacts-stale",
@@ -2739,18 +2991,30 @@ class BirthdayNativeModule(
       state.lastFullSuccessMillis,
       state.lastIncrementalSuccessMillis,
     ).maxOrNull()
-    when (state.freshness) {
-      SyncFreshness.FRESH -> if (lastSuccess != null) {
+    if (state.freshness == SyncFreshness.NEVER_SYNCED && lastSuccess == null) {
+      return@runBlocking if (state.lastErrorCode == null) {
+        JSONObject().put("kind", "never-synced")
+      } else {
+        failedRetainedSyncPayload(null, state.lastErrorCode.toSafeSyncReason())
+      }
+    }
+    val assessment = PeopleDataFreshnessPolicy.assess(
+      state,
+      trustedNowMillis(account.accountId),
+    )
+    when (assessment.band) {
+      PeopleDataFreshnessBand.NORMAL -> if (lastSuccess != null && state.lastErrorCode == null) {
         JSONObject()
           .put("kind", "fresh")
           .put("completedAt", Instant.ofEpochMilli(lastSuccess).toString())
           .put("contactCount", appGraph.peopleSyncDao.activeContactCount(account.accountId))
       } else {
-        failedRetainedSyncPayload(null, "contacts-stale")
+        failedRetainedSyncPayload(lastSuccess, state.lastErrorCode.toSafeSyncReason())
       }
-      SyncFreshness.STALE_WARNING,
-      SyncFreshness.SAFETY_PAUSED,
-      -> if (lastSuccess != null) {
+      PeopleDataFreshnessBand.STALE_WARNING,
+      PeopleDataFreshnessBand.SAFETY_PAUSED,
+      PeopleDataFreshnessBand.UNTRUSTED,
+      -> if (lastSuccess != null && lastSuccess >= 0) {
         JSONObject()
           .put("kind", "stale")
           .put("lastSuccessAt", Instant.ofEpochMilli(lastSuccess).toString())
@@ -2758,14 +3022,18 @@ class BirthdayNativeModule(
       } else {
         failedRetainedSyncPayload(null, state.lastErrorCode.toSafeSyncReason())
       }
-      SyncFreshness.NEVER_SYNCED -> if (state.lastErrorCode == null) {
-        JSONObject().put("kind", "never-synced")
-      } else {
-        failedRetainedSyncPayload(null, state.lastErrorCode.toSafeSyncReason())
-      }
-      SyncFreshness.AUTH_ACTION_REQUIRED -> contactsAuthorizationRequiredPayload()
     }
   }
+
+  private suspend fun trustedNowMillis(accountId: String): Long? = TrustedTimeEstimator.estimate(
+    appGraph.automationOrchestrationDao.clockTrust(accountId),
+    SystemClock.elapsedRealtime(),
+    trustedBootCount(),
+  )
+
+  private fun trustedBootCount(): Int? = runCatching {
+    Settings.Global.getInt(reactApplicationContext.contentResolver, Settings.Global.BOOT_COUNT)
+  }.getOrNull()?.takeIf { it >= 0 }
 
   private fun peopleListPayload(request: JSONObject): JSONObject? = runBlocking {
     val account = appGraph.peopleSyncDao.activeAccount()
@@ -2794,7 +3062,7 @@ class BirthdayNativeModule(
     contacts.forEach { contact ->
       val summary = configurationController.contactDetail(contact.contactId)
         ?.optJSONObject("summary")
-        ?: contactSummaryPayload(contact, account.localeTag)
+        ?: contactSummaryPayload(contact)
       items.put(summary)
     }
     JSONObject()
@@ -2807,7 +3075,6 @@ class BirthdayNativeModule(
 
   private suspend fun contactSummaryPayload(
     contact: ContactSnapshotEntity,
-    localeTag: String,
   ): JSONObject {
     val policy = appGraph.peopleSyncDao.recipientPolicy(contact.contactId)
     val phones = appGraph.peopleSyncDao.contactPhones(contact.contactId)
@@ -2837,7 +3104,7 @@ class BirthdayNativeModule(
       .put("readiness", readiness)
       .put("enrollment", enrollmentPayload(contact, policy))
       .apply {
-        birthdayLabel(contact, localeTag)?.let { put("birthdayLabel", it) }
+        birthdayLabel(contact)?.let { put("birthdayLabel", it) }
         selectedPhone?.maskedDisplay?.takeIf(::safeMaskedPhone)?.let { put("maskedPhone", it) }
       }
   }
@@ -2885,16 +3152,20 @@ class BirthdayNativeModule(
     } catch (_: Exception) {
       null
     } ?: AccountMode.PAUSED_REPAIR
+    val localDeviceLabel = reactApplicationContext.getString(R.string.sender_local_device)
     return when (mode) {
       AccountMode.TEST_ONLY -> JSONObject()
-        .put("platform", "android").put("kind", "test-only").put("epochLabel", "Local device")
+        .put("platform", "android").put("kind", "test-only").put("epochLabel", localDeviceLabel)
       AccountMode.PAUSED_REPAIR -> JSONObject()
-        .put("platform", "android").put("kind", "paused-repair").put("epochLabel", "Local device")
+        .put("platform", "android").put("kind", "paused-repair").put("epochLabel", localDeviceLabel)
       AccountMode.AUTOMATION_ACTIVE -> JSONObject()
-        .put("platform", "android").put("kind", "automation-active").put("epochLabel", "Local device")
+        .put("platform", "android").put("kind", "automation-active").put("epochLabel", localDeviceLabel)
       AccountMode.STANDBY -> JSONObject()
         .put("platform", "android").put("kind", "standby")
-        .put("activeOtherDeviceLabel", "Another verified Android device")
+        .put(
+          "activeOtherDeviceLabel",
+          reactApplicationContext.getString(R.string.sender_other_verified_android_device),
+        )
       AccountMode.TRANSFER_PENDING -> JSONObject()
         .put("platform", "android").put("kind", "transfer-pending")
         .put("preissuedPermitMayFinish", true)
@@ -2926,7 +3197,11 @@ class BirthdayNativeModule(
    * identity and first contact import safety boundary has completed.
    */
   private fun setupStep(snapshot: AndroidReadinessSnapshot): String {
-    if (snapshot.eligibility.kind != EligibilityKind.SUPPORTED) return "compatibility"
+    // LIMITED means this installation can safely plan, preview, and run a foreground test, but
+    // still has reliability settings to repair before activation. Keeping LIMITED installs on the
+    // compatibility step creates a dead end because those settings are intentionally repaired in
+    // the final reliability step. Only a genuinely unsupported installation is blocked here.
+    if (snapshot.eligibility.kind == EligibilityKind.UNSUPPORTED) return "compatibility"
     return try {
       runBlocking {
         val account = appGraph.peopleSyncDao.activeAccount()
@@ -3034,11 +3309,11 @@ class BirthdayNativeModule(
     if (isEmpty()) add("name-changed")
   }.distinct()
 
-  private fun birthdayLabel(contact: ContactSnapshotEntity, localeTag: String): String? {
+  private fun birthdayLabel(contact: ContactSnapshotEntity): String? {
     val month = contact.birthdayMonth ?: return null
     val day = contact.birthdayDay ?: return null
     if (month !in 1..12 || day !in 1..31) return null
-    val locale = Locale.forLanguageTag(localeTag).takeUnless { it.language.isBlank() } ?: Locale.getDefault()
+    val locale = appGraph.nativeLocaleProvider.current().presentationLocale
     return "${Month.of(month).getDisplayName(TextStyle.SHORT, locale)} $day"
   }
 
@@ -3109,6 +3384,7 @@ class BirthdayNativeModule(
       "AUTOMATION_PAUSED" to "policy-suspended",
       "NETWORK_UNAVAILABLE" to "network-offline",
       "COORDINATION_UNAVAILABLE" to "coordination-unavailable",
+      "SCHEDULER_UNAVAILABLE" to "scheduler-delayed",
       "SMS_PERMISSION_MISSING" to "permission-denied",
       "SIM_UNAVAILABLE" to "no-active-sim",
       "BACKGROUND_RESTRICTED" to "background-restricted",
@@ -3127,6 +3403,9 @@ class BirthdayNativeModule(
       "test-receipt-invalid",
       "transfer-pending",
       "firebase-account-deleting",
+      "permission-permanently-denied",
+      "phone-state-permission-permanently-denied",
+      "sms-permission-permanently-denied",
     )
     val PROJECTION_AREAS = setOf(
       "bootstrap",
@@ -3145,6 +3424,7 @@ class BirthdayNativeModule(
     val USER_INTENTS = setOf(
       "activate",
       "authorize-contacts",
+      "block-recipient-destination",
       "choose-birthday",
       "choose-phone",
       "confirm-approvals",
@@ -3175,6 +3455,7 @@ class BirthdayNativeModule(
       "share-diagnostics",
       "start-test",
       "sync-contacts",
+      "unblock-recipient-destination",
       "request-notification-permission",
       "open-notification-settings",
       "prepare-sender-transfer",

@@ -26,6 +26,7 @@ import com.yashsomani.birthdayautopilot.coordination.DistributionChannel
 import com.yashsomani.birthdayautopilot.gemini.AndroidGeminiSuggestionGateway
 import com.yashsomani.birthdayautopilot.gemini.GeminiCandidateProvenance
 import com.yashsomani.birthdayautopilot.gemini.GeminiProvenanceDraft
+import com.yashsomani.birthdayautopilot.localization.AndroidNativeLocaleProvider
 import com.yashsomani.birthdayautopilot.messages.AndroidSmsManagerPlanSource
 import com.yashsomani.birthdayautopilot.messages.BuiltInMessageTemplates
 import com.yashsomani.birthdayautopilot.messages.MessageLanguage
@@ -49,6 +50,7 @@ import com.yashsomani.birthdayautopilot.storage.database.BirthdayDatabase
 import com.yashsomani.birthdayautopilot.storage.database.ClockTrustStatus
 import com.yashsomani.birthdayautopilot.storage.database.ConfigurationDao
 import com.yashsomani.birthdayautopilot.storage.database.ConfigurationReviewEntity
+import com.yashsomani.birthdayautopilot.storage.database.ConfiguredBirthdayRow
 import com.yashsomani.birthdayautopilot.storage.database.CoordinationPermitEntity
 import com.yashsomani.birthdayautopilot.storage.database.ConsentDecision
 import com.yashsomani.birthdayautopilot.storage.database.ConsentKind
@@ -58,15 +60,17 @@ import com.yashsomani.birthdayautopilot.storage.database.ContactPhoneEntity
 import com.yashsomani.birthdayautopilot.storage.database.ContactSnapshotEntity
 import com.yashsomani.birthdayautopilot.storage.database.ContactSnapshotState
 import com.yashsomani.birthdayautopilot.storage.database.ControlEntity
+import com.yashsomani.birthdayautopilot.storage.database.DestinationBlockEntity
 import com.yashsomani.birthdayautopilot.storage.database.InstallationBindingEntity
 import com.yashsomani.birthdayautopilot.storage.database.InstallationRecordState
 import com.yashsomani.birthdayautopilot.storage.database.MessageTemplateEntity
 import com.yashsomani.birthdayautopilot.storage.database.PhoneRecordState
 import com.yashsomani.birthdayautopilot.storage.database.PolicyRecordState
+import com.yashsomani.birthdayautopilot.storage.database.PeopleDataFreshnessPolicy
 import com.yashsomani.birthdayautopilot.storage.database.RecipientEnrollmentState
 import com.yashsomani.birthdayautopilot.storage.database.RecipientPolicyEntity
+import com.yashsomani.birthdayautopilot.storage.database.ReconcileHeartbeatPolicy
 import com.yashsomani.birthdayautopilot.storage.database.ResetSafetyStatus
-import com.yashsomani.birthdayautopilot.storage.database.SyncFreshness
 import com.yashsomani.birthdayautopilot.storage.database.TemplateSource
 import com.yashsomani.birthdayautopilot.storage.database.TemplateValidationState
 import com.yashsomani.birthdayautopilot.storage.database.TestJobEntity
@@ -137,6 +141,7 @@ internal class AndroidConfigurationController(
   private val recurrencePlanner: RecurrencePlanner,
   private val clock: ConfigurationClock = ConfigurationClock(System::currentTimeMillis),
   private val zoneProvider: ConfigurationZoneProvider = ConfigurationZoneProvider(ZoneId::systemDefault),
+  private val nativeLocaleProvider: AndroidNativeLocaleProvider = AndroidNativeLocaleProvider(context),
   private val subscriptionResolver: ConfigurationSubscriptionResolver =
     AndroidConfigurationSubscriptionResolver(context),
   smsPlanSource: SmsPlatformPlanSource = AndroidSmsManagerPlanSource(context),
@@ -159,7 +164,10 @@ internal class AndroidConfigurationController(
   },
   private val geminiGateway: AndroidGeminiSuggestionGateway? = null,
   private val accountSessionMatches: (AccountRecordEntity) -> Boolean = { true },
+  private val subscriptionChangePending: () -> Boolean = { false },
+  private val trustedNowProvider: suspend (AccountRecordEntity) -> Long? = { null },
 ) {
+  private val appContext = context.applicationContext
   private val dao: ConfigurationDao = database.configurationDao()
   private val ledger: SafetyLedgerDao = database.safetyLedgerDao()
   private val templateValidator = MessageTemplateValidator()
@@ -172,9 +180,13 @@ internal class AndroidConfigurationController(
       ?: return DurableConfigurationReadiness(null, false, false, false, false, false, null)
     val control = dao.control()
     val enabled = dao.enabledRecipientCount(account.accountId)
+    val trustedNowMillis = runCatching { trustedNowProvider(account) }.getOrNull()
     return DurableConfigurationReadiness(
       accountMode = control?.accountMode?.let { runCatching { AccountMode.valueOf(it) }.getOrNull() },
-      contactsFresh = dao.syncState(account.accountId)?.freshness == SyncFreshness.FRESH,
+      contactsFresh = PeopleDataFreshnessPolicy.allowsUnattendedAutomation(
+        dao.syncState(account.accountId),
+        trustedNowMillis,
+      ),
       approvalsReady = enabled > 0 && dao.unreadyConfiguredRecipientCount(account.accountId) == 0,
       passingTestReceipt = passingTestReceipt(account),
       clockTrusted = dao.clockTrust(account.accountId)?.status == ClockTrustStatus.TRUSTED,
@@ -184,11 +196,16 @@ internal class AndroidConfigurationController(
     )
   }
 
+  suspend fun initialActivationCompleted(): Boolean =
+    dao.control()?.initialActivationCompleted == true
+
   suspend fun prepareActivation(resume: Boolean): ConfigurationOutcome {
+    if (subscriptionChangePending()) return conflict("sim-changed")
     val account = dao.activeAccount() ?: return conflict("account-reconnect-required")
     val control = dao.control() ?: return internal("CONFIGURATION_CONTROL_MISSING")
     val mode = control.accountMode.let { runCatching { AccountMode.valueOf(it) }.getOrNull() }
       ?: return internal("CONFIGURATION_CONTROL_INVALID")
+    ConfigurationOwnershipPolicy.blockedReason(mode)?.let { return conflict(it) }
     if (mode !in setOf(AccountMode.TEST_ONLY, AccountMode.PAUSED_REPAIR)) {
       return conflict(if (mode == AccountMode.TRANSFER_PENDING) "transfer-pending" else "policy-suspended")
     }
@@ -197,6 +214,7 @@ internal class AndroidConfigurationController(
       ?: return conflict("test-receipt-invalid")
     val policy = dao.activeAutomationPolicy(account.accountId)
       ?: return validation("window", "invalid-window")
+    capacityIssue(account.accountId, policy = policy)?.let { return it }
     val approval = dao.latestActiveApproval(account.accountId)
       ?: return conflict("approval-missing")
     val subscription = subscriptionResolver.resolveDefault() as? SubscriptionResolution.Ready
@@ -267,6 +285,9 @@ internal class AndroidConfigurationController(
       ?: return AccountModePreparationOutcome.Rejected(conflict("test-receipt-invalid"))
     val policy = dao.activeAutomationPolicy(account.accountId)
       ?: return AccountModePreparationOutcome.Rejected(conflict("approval-invalid"))
+    capacityIssue(account.accountId, policy = policy)?.let {
+      return AccountModePreparationOutcome.Rejected(it)
+    }
     val approval = dao.latestActiveApproval(account.accountId)
       ?: return AccountModePreparationOutcome.Rejected(conflict("approval-missing"))
     val enabled = dao.enabledRecipientCount(account.accountId)
@@ -314,6 +335,7 @@ internal class AndroidConfigurationController(
     val account = dao.activeAccount() ?: return@withTransaction conflict("account-reconnect-required")
     val binding = currentActivationBinding(account)
       ?: return@withTransaction conflict("test-receipt-invalid")
+    capacityIssue(account.accountId)?.let { return@withTransaction it }
     if (dao.unreadyConfiguredRecipientCount(account.accountId) != 0 ||
       dao.enabledRecipientCount(account.accountId) <= 0
     ) return@withTransaction conflict("approval-invalid")
@@ -329,11 +351,9 @@ internal class AndroidConfigurationController(
       ) != 1
     ) return@withTransaction conflict("approval-invalid")
     check(
-      dao.updateAutomationControl(
+      dao.markAutomationActivated(
         control.revision,
         control.blockerRevision,
-        true,
-        AccountMode.AUTOMATION_ACTIVE,
       ) == 1,
     ) { "activation-control-cas-failed" }
     check(
@@ -453,6 +473,7 @@ internal class AndroidConfigurationController(
     request: JSONObject,
     expectedRevision: Long,
   ): ConfigurationOutcome {
+    if (subscriptionChangePending()) return conflict("sim-changed")
     if (
       !revisionEchoMatches(request, expectedRevision) ||
       request.keyNames() != setOf("destination", "expectedRevision")
@@ -468,6 +489,7 @@ internal class AndroidConfigurationController(
     val account = dao.activeAccount() ?: return conflict("account-reconnect-required")
     val control = dao.control() ?: return internal("CONFIGURATION_CONTROL_MISSING")
     if (control.revision != expectedRevision) return stale(control.revision)
+    senderOwnershipProblem(control)?.let { return it }
     if (!testModeAllowed(control.accountMode)) return conflict("policy-suspended")
     val template = dao.activeTemplate(account.accountId)
       ?: return validation("template", "template-empty")
@@ -490,7 +512,10 @@ internal class AndroidConfigurationController(
       return conflict("account-reconnect-required")
     }
 
-    val normalized = normalizeTestDestination(rawDestination, account.localeTag)
+    val normalized = normalizeTestDestination(
+      rawDestination,
+      nativeLocaleProvider.current().phoneRegion,
+    )
       ?: return validation("phone", "phone-invalid")
     val destinationFingerprint = StablePrivateId.hash(
       "Destination.v1",
@@ -573,6 +598,7 @@ internal class AndroidConfigurationController(
     request: JSONObject,
     expectedRevision: Long,
   ): ConfigurationOutcome {
+    if (subscriptionChangePending()) return conflict("sim-changed")
     if (
       !revisionEchoMatches(request, expectedRevision) ||
       request.keyNames() != setOf("handle", "expectedRevision")
@@ -591,6 +617,9 @@ internal class AndroidConfigurationController(
     request: JSONObject,
     expectedRevision: Long,
   ): TestStartOutcome {
+    if (subscriptionChangePending()) {
+      return TestStartOutcome.Rejected(conflict("sim-changed"))
+    }
     if (
       !revisionEchoMatches(request, expectedRevision) ||
       request.keyNames() != setOf("handle", "expectedRevision")
@@ -829,16 +858,12 @@ internal class AndroidConfigurationController(
     return ActivationBinding(installation, test, receipt, permit)
   }
 
-  private fun normalizeTestDestination(raw: String, localeTag: String?):
+  private fun normalizeTestDestination(raw: String, homeRegion: String?):
     com.yashsomani.birthdayautopilot.contacts.NormalizedPhone? {
-    val region = localeTag
-      ?.let(Locale::forLanguageTag)
-      ?.country
-      ?.takeIf(String::isNotBlank)
     return testPhoneNormalizer.resolve(
       phones = listOf(RawContactPhone("test-destination", raw, PhoneLabel.MOBILE)),
       selectedPhoneId = "test-destination",
-      homeRegion = region,
+      homeRegion = homeRegion,
     ).selected
   }
 
@@ -968,7 +993,9 @@ internal class AndroidConfigurationController(
   suspend fun messageEditor(): JSONObject? {
     val account = dao.activeAccount() ?: return null
     val template = dao.activeTemplate(account.accountId)
-    val draft = template?.toDraftPayload() ?: defaultDraftPayload()
+      ?: return JSONObject().put("kind", "not-configured")
+    val draft = template.toDraftPayload()
+      ?: return JSONObject().put("kind", "not-configured")
     return JSONObject().put("kind", "configured").put("draft", draft)
   }
 
@@ -1040,20 +1067,30 @@ internal class AndroidConfigurationController(
       date?.let { row to it }
     }
     val next = plans.minWithOrNull(compareBy({ it.second }, { it.first.contactId }))
+    val reviewableTodayOccurrences = plans
+      .filter { it.second == today }
+      .associate { (row, date) ->
+        row.contactId to dao.reviewableOccurrenceId(row.contactId, date.toString())
+      }
     val requiresName = dao.activeTemplate(account.accountId)?.placeholderMode
       ?.let { it == TemplatePlaceholderMode.PERSONALIZED_FIRST_NAME.name } ?: true
     val counts = JSONObject()
+      .put("configured", dao.configuredRecipientCount(account.accountId))
       .put("enabled", dao.enabledRecipientCount(account.accountId))
       .put("needsAttention", dao.needsAttentionContactCount(account.accountId, requiresName))
       .put("unavailable", dao.unavailableContactCount(account.accountId))
-      .put("today", plans.count { it.second == today })
+      .put("today", reviewableTodayOccurrences.values.count { it != null })
       .put("nextSevenDays", plans.count { !it.second.isAfter(today.plusDays(6)) })
     val payload = JSONObject()
       .put("automation", automation)
       .put("counts", counts)
       .put("contactsSync", contactsSync)
     next?.let { (row, date) ->
-      val realOccurrenceId = dao.unarmedOccurrenceId(row.contactId, date.toString())
+      val realOccurrenceId = if (date == today) {
+        reviewableTodayOccurrences[row.contactId]
+      } else {
+        dao.reviewableOccurrenceId(row.contactId, date.toString())
+      }
       payload.put(
         "next",
         JSONObject()
@@ -1065,9 +1102,14 @@ internal class AndroidConfigurationController(
           .put("recipient", row.displayName)
           .put("localDate", date.toString())
           .put("windowLabel", activeWindowLabel(account.accountId))
-          .put("maskedPhone", row.maskedDisplay),
+          .put("maskedPhone", row.maskedDisplay)
+          .put("exactText", row.exactMessage),
       )
     }
+    ReconcileHeartbeatPolicy.snapshot(ledger.getReadinessState(account.accountId))
+      ?.heartbeatAtMillis
+      ?.takeIf { it > 0 }
+      ?.let { payload.put("schedulerHeartbeatAt", Instant.ofEpochMilli(it).toString()) }
     durableReadiness().lastCoordinationSuccessMillis?.takeIf { it > 0 }?.let {
       payload.put("lastCoordinationSuccessAt", Instant.ofEpochMilli(it).toString())
     }
@@ -1082,6 +1124,7 @@ internal class AndroidConfigurationController(
     val contactId = request.optString("contactId")
     val phoneId = request.optString("phoneId")
     if (!validOpaque(contactId) || !validOpaque(phoneId)) return ConfigurationOutcome.InvalidRequest
+    senderOwnershipProblem()?.let { return it }
     val mutation = database.withTransaction {
       val gate = mutationGate(expectedRevision) ?: return@withTransaction staleOrInternal(expectedRevision)
       val (control, account) = gate
@@ -1098,6 +1141,16 @@ internal class AndroidConfigurationController(
         ?: return@withTransaction internal("CONFIGURATION_REVISION_EXHAUSTED")
       val nextPolicyRevision = policy.revision.incrementOrNull()
         ?: return@withTransaction internal("CONFIGURATION_REVISION_EXHAUSTED")
+      val nextState = policy.state.afterMaterialEdit()
+      val projectedRows = ConfigurationPolicyValidator.projectConfiguredBirthday(
+        dao.configuredBirthdayRowsForCapacity(account.accountId),
+        contact.contactId,
+        contact.birthdayMonth,
+        contact.birthdayDay,
+        contact.leapDayPolicy,
+        nextState in CAPACITY_CONFIGURED_STATES,
+      )
+      capacityIssue(account.accountId, projectedRows)?.let { return@withTransaction it }
       val at = now()
       val invalidated = dao.invalidateApprovals(contactId, at, REASON_PHONE_SELECTION)
       check(dao.updateContact(contact.copy(materialRevision = nextContactRevision)) == 1)
@@ -1105,7 +1158,7 @@ internal class AndroidConfigurationController(
         dao.updateRecipientPolicy(
           policy.copy(
             chosenPhoneId = phoneId,
-            state = policy.state.afterMaterialEdit(),
+            state = nextState,
             blockReason = if (policy.state == RecipientEnrollmentState.OFF) null else REASON_PHONE_SELECTION,
             approvalId = null,
             revision = nextPolicyRevision,
@@ -1135,6 +1188,7 @@ internal class AndroidConfigurationController(
     if (!validOpaque(contactId) || !validOpaque(birthdayId)) return ConfigurationOutcome.InvalidRequest
     val leapPolicy = request.optString("leapPolicy").takeIf(String::isNotEmpty)?.toLeapPolicy()
     if (request.has("leapPolicy") && leapPolicy == null) return ConfigurationOutcome.InvalidRequest
+    senderOwnershipProblem()?.let { return it }
     val mutation = database.withTransaction {
       val gate = mutationGate(expectedRevision) ?: return@withTransaction staleOrInternal(expectedRevision)
       val (control, account) = gate
@@ -1158,6 +1212,16 @@ internal class AndroidConfigurationController(
         ?: return@withTransaction internal("CONFIGURATION_REVISION_EXHAUSTED")
       val nextPolicyRevision = policy.revision.incrementOrNull()
         ?: return@withTransaction internal("CONFIGURATION_REVISION_EXHAUSTED")
+      val nextState = policy.state.afterMaterialEdit()
+      val projectedRows = ConfigurationPolicyValidator.projectConfiguredBirthday(
+        dao.configuredBirthdayRowsForCapacity(account.accountId),
+        contact.contactId,
+        choice.birthdayMonth,
+        choice.birthdayDay,
+        leapPolicy?.name,
+        nextState in CAPACITY_CONFIGURED_STATES,
+      )
+      capacityIssue(account.accountId, projectedRows)?.let { return@withTransaction it }
       val at = now()
       val invalidated = dao.invalidateApprovals(contactId, at, REASON_BIRTHDAY_SELECTION)
       check(
@@ -1175,7 +1239,7 @@ internal class AndroidConfigurationController(
         dao.updateRecipientPolicy(
           policy.copy(
             chosenBirthdayId = birthdayId,
-            state = policy.state.afterMaterialEdit(),
+            state = nextState,
             blockReason = if (policy.state == RecipientEnrollmentState.OFF) null else REASON_BIRTHDAY_SELECTION,
             approvalId = null,
             revision = nextPolicyRevision,
@@ -1205,6 +1269,7 @@ internal class AndroidConfigurationController(
     ) return ConfigurationOutcome.InvalidRequest
     val contactIds = request.optJSONArray("contactIds").opaqueIdsOrNull() ?: return ConfigurationOutcome.InvalidRequest
     if (contactIds.isEmpty() || contactIds.size > MAX_REVIEW_ITEMS) return ConfigurationOutcome.InvalidRequest
+    senderOwnershipProblem()?.let { return it }
     val account = dao.activeAccount() ?: return conflict("account-reconnect-required")
     val control = dao.control() ?: return internal("CONFIGURATION_CONTROL_MISSING")
     if (control.revision != expectedRevision) return stale(control.revision)
@@ -1260,12 +1325,14 @@ internal class AndroidConfigurationController(
     ) return ConfigurationOutcome.InvalidRequest
     val handle = request.optString("handle")
     if (!validHandle(handle, "er")) return ConfigurationOutcome.InvalidRequest
+    senderOwnershipProblem()?.let { return it }
     return database.withTransaction {
       val material = loadReview(handle, REVIEW_ENROLLMENT, expectedRevision)
         ?: return@withTransaction reviewProblem(handle, expectedRevision)
       val (review, payload, control) = material
       val items = payload.optJSONArray("items") ?: return@withTransaction internal("CONFIGURATION_REVIEW_CORRUPT")
       val changes = ArrayList<Pair<RecipientPolicyEntity, RecipientPolicyEntity>>()
+      var projectedRows = dao.configuredBirthdayRowsForCapacity(review.accountId)
       repeat(items.length()) { index ->
         val item = items.optJSONObject(index) ?: return@withTransaction internal("CONFIGURATION_REVIEW_CORRUPT")
         val contactId = item.optString("contactId")
@@ -1285,6 +1352,14 @@ internal class AndroidConfigurationController(
           policy.state == RecipientEnrollmentState.EXCLUDED
         ) return@withTransaction stale(control.revision)
         val at = now()
+        projectedRows = ConfigurationPolicyValidator.projectConfiguredBirthday(
+          projectedRows,
+          contact.contactId,
+          contact.birthdayMonth,
+          contact.birthdayDay,
+          contact.leapDayPolicy,
+          included = true,
+        )
         changes += policy to policy.copy(
           chosenPhoneId = phone.phoneId,
           state = RecipientEnrollmentState.NEEDS_REVIEW,
@@ -1297,6 +1372,7 @@ internal class AndroidConfigurationController(
           updatedAtMillis = at,
         )
       }
+      capacityIssue(review.accountId, projectedRows)?.let { return@withTransaction it }
       check(
         dao.markReviewConsumed(
           handle,
@@ -1330,6 +1406,7 @@ internal class AndroidConfigurationController(
     ) return ConfigurationOutcome.InvalidRequest
     val contactId = request.optString("contactId")
     if (!validOpaque(contactId)) return ConfigurationOutcome.InvalidRequest
+    senderOwnershipProblem()?.let { return it }
     return database.withTransaction {
       val gate = mutationGate(expectedRevision) ?: return@withTransaction staleOrInternal(expectedRevision)
       val (control, account) = gate
@@ -1360,6 +1437,17 @@ internal class AndroidConfigurationController(
         } else {
           RecipientEnrollmentState.NEEDS_REVIEW
         }
+      }
+      if (kind == "restore") {
+        val projectedRows = ConfigurationPolicyValidator.projectConfiguredBirthday(
+          dao.configuredBirthdayRowsForCapacity(account.accountId),
+          contact.contactId,
+          contact.birthdayMonth,
+          contact.birthdayDay,
+          contact.leapDayPolicy,
+          nextState in CAPACITY_CONFIGURED_STATES,
+        )
+        capacityIssue(account.accountId, projectedRows)?.let { return@withTransaction it }
       }
       if (kind == "exclude") invalidated = dao.revokeApprovals(contactId, at, REASON_EXCLUDED)
       val nextRevision = policy.revision.incrementOrNull()
@@ -1392,6 +1480,131 @@ internal class AndroidConfigurationController(
     }
   }
 
+  /**
+   * Applies the account-wide destination block behind the same configuration CAS used by every
+   * recipient mutation. React Native supplies only the opaque contact ID; the canonical number
+   * never leaves native storage and only its keyed destination fingerprint is persisted here.
+   */
+  suspend fun mutateSelectedDestinationBlock(
+    blocked: Boolean,
+    request: JSONObject,
+    expectedRevision: Long,
+  ): ConfigurationOutcome {
+    if (
+      !revisionEchoMatches(request, expectedRevision) ||
+      request.keyNames() != setOf("contactId", "expectedRevision")
+    ) return ConfigurationOutcome.InvalidRequest
+    val contactId = request.optString("contactId")
+    if (!validOpaque(contactId)) return ConfigurationOutcome.InvalidRequest
+    senderOwnershipProblem()?.let { return it }
+    return database.withTransaction {
+      val gate = mutationGate(expectedRevision)
+        ?: return@withTransaction staleOrInternal(expectedRevision)
+      val (control, account) = gate
+      val contact = dao.contact(contactId)?.takeIf { it.accountId == account.accountId }
+        ?: return@withTransaction conflict("source-contact-deleted")
+      val policy = dao.recipientPolicy(contact.contactId)
+        ?: return@withTransaction internal("CONFIGURATION_POLICY_MISSING")
+      val phone = policy.chosenPhoneId
+        ?.let { chosen -> dao.phones(contact.contactId).singleOrNull { it.phoneId == chosen } }
+        ?.takeIf { it.state == PhoneRecordState.READY }
+        ?: return@withTransaction validation("phone", "phone-choice-required")
+      val fingerprint = phone.destinationFingerprint
+        ?: return@withTransaction validation("phone", "phone-invalid")
+      val current = dao.destinationBlock(account.accountId, fingerprint)
+      if (current?.active == blocked) {
+        return@withTransaction ConfigurationOutcome.Success(
+          JSONObject()
+            .put("changedContactIds", JSONArray(listOf(contact.contactId)))
+            .put("invalidatedApprovalCount", 0),
+          CONFIG_INVALIDATIONS,
+        )
+      }
+      val at = now()
+      if (current == null) {
+        if (!blocked) {
+          return@withTransaction ConfigurationOutcome.Success(
+            JSONObject()
+              .put("changedContactIds", JSONArray(listOf(contact.contactId)))
+              .put("invalidatedApprovalCount", 0),
+            CONFIG_INVALIDATIONS,
+          )
+        }
+        dao.insertDestinationBlock(
+          DestinationBlockEntity(
+            blockId = opaqueId(
+              "db",
+              "BirthdayAutopilot.DestinationBlock.v1",
+              account.accountId,
+              fingerprint,
+            ),
+            accountId = account.accountId,
+            destinationFingerprint = fingerprint,
+            reason = REASON_DESTINATION_BLOCKED,
+            active = true,
+            revision = 0,
+            createdAtMillis = at,
+            updatedAtMillis = at,
+          ),
+        )
+      } else {
+        val nextRevision = current.revision.incrementOrNull()
+          ?: return@withTransaction internal("CONFIGURATION_REVISION_EXHAUSTED")
+        check(
+          dao.updateDestinationBlock(
+            current.copy(
+              reason = REASON_DESTINATION_BLOCKED,
+              active = blocked,
+              revision = nextRevision,
+              updatedAtMillis = at,
+            ),
+          ) == 1,
+        )
+      }
+      val invalidated = if (blocked) {
+        dao.revokeApprovalsForDestination(
+          account.accountId,
+          fingerprint,
+          at,
+          REASON_DESTINATION_BLOCKED,
+        ).also {
+          dao.markEnabledRecipientsForDestinationReview(
+            account.accountId,
+            fingerprint,
+            at,
+            REASON_DESTINATION_BLOCKED,
+          )
+          dao.cancelUnclaimedOccurrencesForDestination(
+            account.accountId,
+            fingerprint,
+            at,
+            REASON_DESTINATION_BLOCKED,
+          )
+        }
+      } else {
+        dao.clearDestinationBlockReasonForReview(
+          account.accountId,
+          fingerprint,
+          at,
+          REASON_DESTINATION_BLOCKED,
+        )
+        0
+      }
+      dao.invalidateTestReceipts(
+        account.accountId,
+        at,
+        if (blocked) "DESTINATION_BLOCKED" else "DESTINATION_UNBLOCKED",
+      )
+      check(dao.bumpControlBlocker(control.revision, control.blockerRevision) == 1)
+      ConfigurationOutcome.Success(
+        JSONObject()
+          .put("changedContactIds", JSONArray(listOf(contact.contactId)))
+          .put("invalidatedApprovalCount", invalidated),
+        CONFIG_INVALIDATIONS,
+      )
+    }
+  }
+
   suspend fun previewMessage(
     request: JSONObject,
     expectedRevision: Long,
@@ -1402,6 +1615,7 @@ internal class AndroidConfigurationController(
     ) return ConfigurationOutcome.InvalidRequest
     val draft = parseMessageDraft(request.optJSONObject("draft"))
       ?: return ConfigurationOutcome.InvalidRequest
+    senderOwnershipProblem()?.let { return it }
     val account = dao.activeAccount() ?: return conflict("account-reconnect-required")
     val control = dao.control() ?: return internal("CONFIGURATION_CONTROL_MISSING")
     if (control.revision != expectedRevision) return stale(control.revision)
@@ -1468,6 +1682,7 @@ internal class AndroidConfigurationController(
     ) return ConfigurationOutcome.InvalidRequest
     val handle = request.optString("handle")
     if (!validHandle(handle, "mp")) return ConfigurationOutcome.InvalidRequest
+    senderOwnershipProblem()?.let { return it }
     val preflightMaterial = loadReview(handle, REVIEW_MESSAGE, expectedRevision)
       ?: return reviewProblem(handle, expectedRevision)
     val preflightPayload = parseMessageReviewPayload(preflightMaterial.second)
@@ -1565,11 +1780,13 @@ internal class AndroidConfigurationController(
     request: JSONObject,
     expectedRevision: Long,
   ): ConfigurationOutcome {
+    if (subscriptionChangePending()) return conflict("sim-changed")
     if (
       !revisionEchoMatches(request, expectedRevision) ||
       request.keyNames() != setOf("draft", "expectedRevision")
     ) return ConfigurationOutcome.InvalidRequest
     val draftJson = request.optJSONObject("draft") ?: return ConfigurationOutcome.InvalidRequest
+    senderOwnershipProblem()?.let { return it }
     val (draft, issues) = ConfigurationPolicyValidator.parse(draftJson)
     if (draft == null) {
       return ConfigurationOutcome.Success(JSONObject().put("kind", "invalid").put("issues", issues))
@@ -1589,15 +1806,12 @@ internal class AndroidConfigurationController(
     val zoneId = zoneProvider.zoneId()
     val simulation = ConfigurationPolicyValidator.simulate(
       draft,
-      dao.configuredBirthdayRows(account.accountId, MAX_PLANNED_CONTACTS),
+      dao.configuredBirthdayRowsForCapacity(account.accountId),
       currentLocalDate(zoneId),
       zoneId,
       recurrencePlanner,
     )
-    if (
-      simulation.maximumLocalDay > draft.dailyCap ||
-      simulation.maximumRolling24Hours > draft.dailyCap
-    ) {
+    if (!simulation.isAcceptableFor(draft)) {
       return ConfigurationOutcome.Success(
         JSONObject()
           .put("kind", "invalid")
@@ -1631,12 +1845,14 @@ internal class AndroidConfigurationController(
     request: JSONObject,
     expectedRevision: Long,
   ): ConfigurationOutcome {
+    if (subscriptionChangePending()) return conflict("sim-changed")
     if (
       !revisionEchoMatches(request, expectedRevision) ||
       request.keyNames() != setOf("handle", "expectedRevision")
     ) return ConfigurationOutcome.InvalidRequest
     val handle = request.optString("handle")
     if (!validHandle(handle, "pr")) return ConfigurationOutcome.InvalidRequest
+    senderOwnershipProblem()?.let { return it }
     return database.withTransaction {
       val material = loadReview(handle, REVIEW_POLICY, expectedRevision)
         ?: return@withTransaction reviewProblem(handle, expectedRevision)
@@ -1655,6 +1871,14 @@ internal class AndroidConfigurationController(
       if (start !in 0..1439 || end !in 1..1440 || start >= end || cap !in 1..20) {
         return@withTransaction internal("CONFIGURATION_REVIEW_CORRUPT")
       }
+      val zoneId = runCatching { ZoneId.of(payload.optString("timeZoneId")) }.getOrNull()
+        ?: return@withTransaction internal("CONFIGURATION_REVIEW_CORRUPT")
+      val capacityDraft = ParsedWindowDraft(start, end, grace, cap)
+      capacityIssue(
+        capacityDraft,
+        dao.configuredBirthdayRowsForCapacity(review.accountId),
+        zoneId,
+      )?.let { return@withTransaction it }
       val at = now()
       val policy = AutomationPolicyEntity(
         policyId = opaqueId("pol", "BirthdayAutopilot.PolicyId.v1", review.accountId, revision.toString()),
@@ -1698,6 +1922,7 @@ internal class AndroidConfigurationController(
     request: JSONObject,
     expectedRevision: Long,
   ): ConfigurationOutcome {
+    if (subscriptionChangePending()) return conflict("sim-changed")
     if (
       !revisionEchoMatches(request, expectedRevision) ||
       request.keyNames() != setOf("contactIds", "expectedRevision")
@@ -1707,11 +1932,14 @@ internal class AndroidConfigurationController(
     if (contactIds.isEmpty() || contactIds.size > MAX_REVIEW_ITEMS) {
       return ConfigurationOutcome.InvalidRequest
     }
+    senderOwnershipProblem()?.let { return it }
     val account = dao.activeAccount() ?: return conflict("account-reconnect-required")
     val control = dao.control() ?: return internal("CONFIGURATION_CONTROL_MISSING")
     if (control.revision != expectedRevision) return stale(control.revision)
     val template = dao.activeTemplate(account.accountId)
       ?: return validation("template", "template-empty")
+    val domainTemplate = template.toDomainTemplate()
+      ?: return internal("CONFIGURATION_TEMPLATE_CORRUPT")
     val automationPolicy = dao.activeAutomationPolicy(account.accountId)
       ?: return validation("window", "invalid-window")
     val subscription = subscriptionResolver.resolveDefault()
@@ -1749,7 +1977,7 @@ internal class AndroidConfigurationController(
         return@forEach
       }
       val rendered = templateValidator.validateAndRender(
-        template.toDomainTemplate(),
+        domainTemplate,
         contact.safeGivenName,
         template.requestedSegmentCap,
       )
@@ -1816,7 +2044,11 @@ internal class AndroidConfigurationController(
           .put("contactId", contact.contactId)
           .put("recipient", contact.displayName)
           .put("maskedPhone", phone.maskedDisplay)
-          .put("birthdayLabel", birthdayLabel(contact, account.localeTag) ?: "Birthday selected")
+          .put(
+            "birthdayLabel",
+            birthdayLabel(contact)
+              ?: appContext.getString(com.yashsomani.birthdayautopilot.R.string.birthday_selected),
+          )
           .put("exactText", preview.exactText)
           .put("windowLabel", policyWindowLabel(automationPolicy))
           .put("simLabel", subscription.label)
@@ -1845,18 +2077,22 @@ internal class AndroidConfigurationController(
     request: JSONObject,
     expectedRevision: Long,
   ): ConfigurationOutcome {
+    if (subscriptionChangePending()) return conflict("sim-changed")
     if (
       !revisionEchoMatches(request, expectedRevision) ||
       request.keyNames() != setOf("handle", "expectedRevision")
     ) return ConfigurationOutcome.InvalidRequest
     val handle = request.optString("handle")
     if (!validHandle(handle, "ar")) return ConfigurationOutcome.InvalidRequest
+    senderOwnershipProblem()?.let { return it }
     return database.withTransaction {
       val material = loadReview(handle, REVIEW_APPROVAL, expectedRevision)
         ?: return@withTransaction reviewProblem(handle, expectedRevision)
       val (review, payload, control) = material
       val template = dao.activeTemplate(review.accountId)
         ?: return@withTransaction stale(control.revision)
+      val domainTemplate = template.toDomainTemplate()
+        ?: return@withTransaction internal("CONFIGURATION_TEMPLATE_CORRUPT")
       val automationPolicy = dao.activeAutomationPolicy(review.accountId)
         ?: return@withTransaction stale(control.revision)
       val subscription = subscriptionResolver.resolveDefault()
@@ -1904,7 +2140,7 @@ internal class AndroidConfigurationController(
         val normalizedPhone = phone.normalizedE164?.let(CanonicalPhoneNumber::parse)
           ?: return@withTransaction validation("phone", "phone-invalid")
         val validation = templateValidator.validateAndRender(
-          template.toDomainTemplate(),
+          domainTemplate,
           contact.safeGivenName,
           template.requestedSegmentCap,
         )
@@ -2004,6 +2240,7 @@ internal class AndroidConfigurationController(
           invalidationReason = null,
         )
       }
+      capacityIssue(review.accountId)?.let { return@withTransaction it }
       check(
         dao.markReviewConsumed(
           handle,
@@ -2095,7 +2332,7 @@ internal class AndroidConfigurationController(
       birthdayChoices.put(
         JSONObject()
           .put("id", choice.birthdayId)
-          .put("displayLabel", birthdayChoiceLabel(choice, account.localeTag))
+          .put("displayLabel", birthdayChoiceLabel(choice))
           .put("hasYear", choice.birthdayYear != null)
           .put("selectable", choice.selectable)
           .apply { choice.issueCode?.takeIf(::safeContactIssue)?.let { put("issue", it) } },
@@ -2105,12 +2342,18 @@ internal class AndroidConfigurationController(
       .put("summary", summary)
       .put("phoneChoices", phoneChoices)
       .put("birthdayChoices", birthdayChoices)
+      .put(
+        "selectedDestinationBlocked",
+        selectedPhone(contact, policy, phones)?.destinationFingerprint?.let { fingerprint ->
+          dao.activeDestinationBlockCount(account.accountId, fingerprint) > 0
+        } ?: false,
+      )
       .apply {
         policy?.chosenPhoneId?.takeIf { selected -> phones.any { it.phoneId == selected } }
           ?.let { put("selectedPhoneId", it) }
         policy?.chosenBirthdayId?.takeIf { selected -> birthdays.any { it.birthdayId == selected } }
           ?.let { put("selectedBirthdayId", it) }
-        nextOccurrenceLabel(contact, account.localeTag)?.let { put("nextOccurrenceLabel", it) }
+        nextOccurrenceLabel(contact)?.let { put("nextOccurrenceLabel", it) }
         dao.latestOccurrence(contact.contactId)?.safeOutcomeCode?.toVisibleOutcome()?.let {
           put("lastOutcomeLabel", it)
         }
@@ -2141,9 +2384,19 @@ internal class AndroidConfigurationController(
     if (readyPhones.size > 1 && selectedPhone == null) reasons += "phone-choice-required"
     if (templateRequiresName && contact.safeGivenName == null) reasons += "safe-given-name-missing"
     selectedPhone?.destinationFingerprint?.let { fingerprint ->
+      if (dao.activeDestinationBlockCount(account.accountId, fingerprint) > 0) {
+        reasons += "phone-blocked-form"
+      }
       if (dao.enabledDuplicateDestinationCount(account.accountId, contact.contactId, fingerprint) > 0) {
         reasons += "duplicate-destination"
       }
+    }
+    val enrollment = enrollmentProjection(contact, policy, selectedPhone)
+    if (
+      enrollment.optString("kind") == "paused" &&
+      enrollment.optString("reason") == "approval-invalid"
+    ) {
+      reasons += "approval-invalid"
     }
     val readiness = when {
       contact.state != ContactSnapshotState.ACTIVE -> JSONObject()
@@ -2158,9 +2411,9 @@ internal class AndroidConfigurationController(
       .put("id", contact.contactId)
       .put("displayName", contact.displayName)
       .put("readiness", readiness)
-      .put("enrollment", enrollmentProjection(contact, policy, selectedPhone))
+      .put("enrollment", enrollment)
       .apply {
-        birthdayLabel(contact, account.localeTag)?.let { put("birthdayLabel", it) }
+        birthdayLabel(contact)?.let { put("birthdayLabel", it) }
         selectedPhone?.maskedDisplay?.takeIf(::safeMaskedPhone)?.let { put("maskedPhone", it) }
       }
   }
@@ -2253,15 +2506,20 @@ internal class AndroidConfigurationController(
   }
 
   private suspend fun activeWindowLabel(accountId: String): String =
-    dao.activeAutomationPolicy(accountId)?.let(::policyWindowLabel) ?: "Not configured"
+    dao.activeAutomationPolicy(accountId)?.let(::policyWindowLabel)
+      ?: appContext.getString(com.yashsomani.birthdayautopilot.R.string.configuration_not_configured)
 
   private fun policyWindowLabel(policy: AutomationPolicyEntity): String = buildString {
     append(formatMinute(policy.windowStartMinute))
     append('–')
     append(formatMinute(policy.windowEndMinute))
     policy.graceEndMinute?.let {
-      append(" · grace to ")
-      append(formatMinute(it))
+      append(
+        appContext.getString(
+          com.yashsomani.birthdayautopilot.R.string.configuration_grace_to,
+          formatMinute(it),
+        ),
+      )
     }
   }
 
@@ -2350,8 +2608,23 @@ internal class AndroidConfigurationController(
     val control = dao.control() ?: return null
     val account = dao.activeAccount() ?: return null
     return (control to account).takeIf {
-      control.revision == expectedRevision && accountSessionMatches(account)
+      control.revision == expectedRevision &&
+        accountSessionMatches(account) &&
+        senderOwnershipProblem(control) == null
     }
+  }
+
+  private suspend fun senderOwnershipProblem(): ConfigurationOutcome? =
+    senderOwnershipProblem(dao.control())
+
+  private fun senderOwnershipProblem(
+    control: ControlEntity?,
+  ): ConfigurationOutcome? {
+    val current = control ?: return internal("CONFIGURATION_CONTROL_MISSING")
+    val mode = runCatching { AccountMode.valueOf(current.accountMode) }.getOrNull()
+      ?: return internal("CONFIGURATION_CONTROL_INVALID")
+    val reason = ConfigurationOwnershipPolicy.blockedReason(mode) ?: return null
+    return conflict(reason)
   }
 
   private suspend fun staleOrInternal(expectedRevision: Long): ConfigurationOutcome {
@@ -2426,7 +2699,16 @@ internal class AndroidConfigurationController(
           TemplateValidationError.PLACEHOLDER_NOT_ALLOWED,
           TemplateValidationError.UNRESOLVED_VARIABLE,
           -> "template-unsupported-placeholder"
+          TemplateValidationError.BIRTHDAY_INTENT_REQUIRED ->
+            "template-birthday-intent-required"
           TemplateValidationError.URL_NOT_ALLOWED -> "template-url-not-allowed"
+          TemplateValidationError.TRACKING_OR_HASHTAG_NOT_ALLOWED ->
+            "template-tracking-not-allowed"
+          TemplateValidationError.PROMOTIONAL_CONTENT_NOT_ALLOWED ->
+            "template-promotional-content"
+          TemplateValidationError.SENSITIVE_OR_INVENTED_CLAIM_NOT_ALLOWED ->
+            "template-sensitive-content"
+          TemplateValidationError.LANGUAGE_MISMATCH -> "template-language-mismatch"
           TemplateValidationError.UNSAFE_UNICODE -> "template-control-character"
           else -> "internal-contract-invalid"
         }
@@ -2609,27 +2891,49 @@ internal class AndroidConfigurationController(
     return ParsedMessageDraft(language, tone, placeholderMode, text, cap)
   }
 
-  private fun MessageTemplateEntity.toDraftPayload(): JSONObject = ParsedMessageDraft(
-    language = languageTag,
-    tone = tone,
-    placeholderMode = runCatching { TemplatePlaceholderMode.valueOf(placeholderMode) }
-      .getOrDefault(TemplatePlaceholderMode.PERSONALIZED_FIRST_NAME),
-    text = exactTemplateText,
-    segmentCap = requestedSegmentCap.coerceIn(1, 2),
-  ).toJson()
+  private fun MessageTemplateEntity.toDraftPayload(): JSONObject? {
+    val mode = runCatching { TemplatePlaceholderMode.valueOf(placeholderMode) }.getOrNull()
+      ?: return null
+    if (
+      languageTag !in setOf("en", "hi") ||
+      tone !in setOf("warm", "simple", "cheerful") ||
+      requestedSegmentCap !in 1..2 ||
+      exactTemplateText.length !in 1..MAX_MESSAGE_CHARS
+    ) return null
+    return ParsedMessageDraft(
+      language = languageTag,
+      tone = tone,
+      placeholderMode = mode,
+      text = exactTemplateText,
+      segmentCap = requestedSegmentCap,
+    ).toJson()
+  }
 
-  private fun MessageTemplateEntity.toDomainTemplate(): MessageTemplate = MessageTemplate(
-    version = templateVersion,
-    language = if (languageTag == "hi") MessageLanguage.HINDI else MessageLanguage.ENGLISH,
-    placeholderMode = runCatching { TemplatePlaceholderMode.valueOf(placeholderMode) }
-      .getOrDefault(TemplatePlaceholderMode.PERSONALIZED_FIRST_NAME),
-    source = when (source) {
-      TemplateSource.BUILT_IN -> DomainTemplateSource.BUILT_IN
-      TemplateSource.USER -> DomainTemplateSource.USER_EDITED
-      TemplateSource.GEMINI -> DomainTemplateSource.GEMINI_SELECTED
-    },
-    text = exactTemplateText,
-  )
+  private fun MessageTemplateEntity.toDomainTemplate(): MessageTemplate? {
+    val language = when (languageTag) {
+      "en" -> MessageLanguage.ENGLISH
+      "hi" -> MessageLanguage.HINDI
+      else -> return null
+    }
+    val mode = runCatching { TemplatePlaceholderMode.valueOf(placeholderMode) }.getOrNull()
+      ?: return null
+    if (
+      tone !in setOf("warm", "simple", "cheerful") ||
+      requestedSegmentCap !in 1..2 ||
+      exactTemplateText.length !in 1..MAX_MESSAGE_CHARS
+    ) return null
+    return MessageTemplate(
+      version = templateVersion,
+      language = language,
+      placeholderMode = mode,
+      source = when (source) {
+        TemplateSource.BUILT_IN -> DomainTemplateSource.BUILT_IN
+        TemplateSource.USER -> DomainTemplateSource.USER_EDITED
+        TemplateSource.GEMINI -> DomainTemplateSource.GEMINI_SELECTED
+      },
+      text = exactTemplateText,
+    )
+  }
 
   private fun defaultDraftPayload(): JSONObject = ParsedMessageDraft(
     language = "en",
@@ -2650,7 +2954,7 @@ internal class AndroidConfigurationController(
       ?: ready.singleOrNull()
   }
 
-  private fun nextOccurrenceLabel(contact: ContactSnapshotEntity, localeTag: String): String? {
+  private fun nextOccurrenceLabel(contact: ContactSnapshotEntity): String? {
     val month = contact.birthdayMonth ?: return null
     val day = contact.birthdayDay ?: return null
     val leap = contact.leapDayPolicy.toLeapPolicyOrNull()
@@ -2663,16 +2967,21 @@ internal class AndroidConfigurationController(
       return null
     }
     return DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-      .withLocale(safeLocale(localeTag))
+      .withLocale(nativeLocaleProvider.current().presentationLocale)
       .format(date)
   }
 
-  private fun birthdayLabel(contact: ContactSnapshotEntity, localeTag: String): String? {
+  private fun birthdayLabel(contact: ContactSnapshotEntity): String? {
     val month = contact.birthdayMonth ?: return null
     val day = contact.birthdayDay ?: return null
     if (month !in 1..12 || day !in 1..31) return null
     return buildString {
-      append(Month.of(month).getDisplayName(TextStyle.SHORT, safeLocale(localeTag)))
+      append(
+        Month.of(month).getDisplayName(
+          TextStyle.SHORT,
+          nativeLocaleProvider.current().presentationLocale,
+        ),
+      )
       append(' ')
       append(day)
       contact.birthdayYear?.let { append(", $it") }
@@ -2681,21 +2990,24 @@ internal class AndroidConfigurationController(
 
   private fun birthdayChoiceLabel(
     choice: ContactBirthdayChoiceEntity,
-    localeTag: String,
   ): String {
     val month = choice.birthdayMonth
     val day = choice.birthdayDay
-    if (month == null || day == null || month !in 1..12 || day !in 1..31) return "Incomplete birthday"
+    if (month == null || day == null || month !in 1..12 || day !in 1..31) {
+      return appContext.getString(com.yashsomani.birthdayautopilot.R.string.birthday_incomplete)
+    }
     return buildString {
-      append(Month.of(month).getDisplayName(TextStyle.SHORT, safeLocale(localeTag)))
+      append(
+        Month.of(month).getDisplayName(
+          TextStyle.SHORT,
+          nativeLocaleProvider.current().presentationLocale,
+        ),
+      )
       append(' ')
       append(day)
       choice.birthdayYear?.let { append(", $it") }
     }
   }
-
-  private fun safeLocale(localeTag: String): Locale = Locale.forLanguageTag(localeTag)
-    .takeUnless { it.language.isBlank() } ?: Locale.ENGLISH
 
   private fun phoneIssue(state: PhoneRecordState): String? = when (state) {
     PhoneRecordState.READY -> null
@@ -2711,7 +3023,8 @@ internal class AndroidConfigurationController(
     val candidate = value?.trim()?.takeIf { text ->
       text.length in 1..64 && text.none(::unsafeUiCharacter)
     }
-    return candidate ?: "Phone"
+    return candidate
+      ?: appContext.getString(com.yashsomani.birthdayautopilot.R.string.phone_source_fallback)
   }
 
   private fun safeMaskedPhone(value: String): Boolean =
@@ -2779,11 +3092,13 @@ internal class AndroidConfigurationController(
   }
 
   private fun String?.toVisibleOutcome(): String? = when (this) {
-    "DELIVERED" -> "Delivered"
-    "SENT_FROM_DEVICE" -> "Sent from this device"
-    "MISSED" -> "Missed"
-    "SKIPPED" -> "Skipped"
-    "UNKNOWN", "PARTIAL_UNKNOWN" -> "Outcome unknown"
+    "DELIVERED" -> appContext.getString(com.yashsomani.birthdayautopilot.R.string.outcome_delivered)
+    "SENT_FROM_DEVICE" ->
+      appContext.getString(com.yashsomani.birthdayautopilot.R.string.outcome_sent_from_device)
+    "MISSED" -> appContext.getString(com.yashsomani.birthdayautopilot.R.string.outcome_missed)
+    "SKIPPED" -> appContext.getString(com.yashsomani.birthdayautopilot.R.string.outcome_skipped)
+    "UNKNOWN", "PARTIAL_UNKNOWN" ->
+      appContext.getString(com.yashsomani.birthdayautopilot.R.string.outcome_unknown)
     else -> null
   }
 
@@ -2837,6 +3152,58 @@ internal class AndroidConfigurationController(
 
   private fun now(): Long = clock.nowMillis().coerceAtLeast(1)
 
+  private suspend fun capacityIssue(
+    accountId: String,
+    rows: List<ConfiguredBirthdayRow>? = null,
+    policy: AutomationPolicyEntity? = null,
+  ): ConfigurationOutcome? {
+    val currentPolicy = policy ?: dao.activeAutomationPolicy(accountId) ?: return null
+    val currentRows = rows ?: dao.configuredBirthdayRowsForCapacity(accountId)
+    val draft = currentPolicy.capacityDraftOrNull()
+      ?: return internal("CONFIGURATION_POLICY_CORRUPT")
+    val zoneId = runCatching { ZoneId.of(currentPolicy.timeZoneId) }.getOrNull()
+      ?: return internal("CONFIGURATION_POLICY_CORRUPT")
+    return capacityIssue(draft, currentRows, zoneId)
+  }
+
+  private fun capacityIssue(
+    draft: ParsedWindowDraft,
+    rows: List<ConfiguredBirthdayRow>,
+    zoneId: ZoneId,
+  ): ConfigurationOutcome? {
+    val simulation = ConfigurationPolicyValidator.simulate(
+      draft,
+      rows,
+      currentLocalDate(zoneId),
+      zoneId,
+      recurrencePlanner,
+    )
+    if (simulation.isAcceptableFor(draft)) return null
+    return ConfigurationOutcome.Problem(
+      JSONObject()
+        .put("kind", "validation")
+        .put("issues", JSONArray().put(fieldIssue("window", "window-capacity-conflict")))
+        .apply { simulation.firstConflictDate?.let { put("firstConflictDate", it.toString()) } },
+    )
+  }
+
+  private fun AutomationPolicyEntity.capacityDraftOrNull(): ParsedWindowDraft? {
+    if (
+      state != PolicyRecordState.ACTIVE ||
+      windowStartMinute !in 0..1439 ||
+      windowEndMinute !in 1..1440 ||
+      windowStartMinute >= windowEndMinute ||
+      dailyCap !in 1..20
+    ) return null
+    val expectedLatePolicy = if (graceEndMinute == null) {
+      "SAME_DAY_WINDOW_ONLY"
+    } else {
+      "SAME_DAY_GRACE"
+    }
+    if (latePolicy != expectedLatePolicy) return null
+    return ParsedWindowDraft(windowStartMinute, windowEndMinute, graceEndMinute, dailyCap)
+  }
+
   private fun currentLocalDate(zoneId: ZoneId): LocalDate =
     Instant.ofEpochMilli(now()).atZone(zoneId).toLocalDate()
 
@@ -2851,6 +3218,7 @@ internal class AndroidConfigurationController(
   )
 
   private fun emptyCounts(): JSONObject = JSONObject()
+    .put("configured", 0)
     .put("enabled", 0)
     .put("needsAttention", 0)
     .put("unavailable", 0)
@@ -2906,6 +3274,11 @@ internal class AndroidConfigurationController(
   )
 
   private companion object {
+    val CAPACITY_CONFIGURED_STATES = setOf(
+      RecipientEnrollmentState.ENABLED,
+      RecipientEnrollmentState.BLOCKED,
+      RecipientEnrollmentState.NEEDS_REVIEW,
+    )
     const val REVIEW_ENROLLMENT = "ENROLLMENT"
     const val REVIEW_MESSAGE = "MESSAGE"
     const val REVIEW_POLICY = "POLICY"
@@ -2941,6 +3314,7 @@ internal class AndroidConfigurationController(
     const val REASON_TEMPLATE_CHANGED = "TEMPLATE_CHANGED"
     const val REASON_POLICY_CHANGED = "POLICY_CHANGED"
     const val REASON_EXCLUDED = "RECIPIENT_EXCLUDED"
+    const val REASON_DESTINATION_BLOCKED = "USER_DESTINATION_BLOCKED"
     const val REASON_REAPPROVED = "REAPPROVED"
     const val REASON_ENROLLMENT_CHANGED = "ENROLLMENT_CHANGED"
     const val REASON_APPROVAL_CHANGED = "APPROVAL_CHANGED"

@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Linking, StyleSheet, View } from 'react-native';
 
 import type { ApprovalBatchReview } from '../../domain/approvals/model';
 import type { LeapDayPolicy } from '../../domain/birthdays/model';
 import type {
+  ContactIssueCode,
   EnrollmentReview,
   PeopleMutationProjection,
 } from '../../domain/contacts/model';
@@ -62,6 +63,16 @@ type ChoiceReview =
       leapPolicy?: LeapDayPolicy | undefined;
     }>;
 
+const GOOGLE_CONTACTS_URL = 'https://contacts.google.com/';
+const GOOGLE_CONTACTS_REPAIR_ISSUES = new Set<ContactIssueCode>([
+  'birthday-missing',
+  'phone-missing',
+  'safe-given-name-missing',
+  'source-contact-deleted',
+  'stable-source-missing',
+  'phone-ambiguous-region',
+]);
+
 export function LivePersonDetailScreen({
   capability,
   contactId,
@@ -90,12 +101,18 @@ export function LivePersonDetailScreen({
   const [approvalReview, setApprovalReview] = useState<ApprovalReviewState>();
   const [choiceReview, setChoiceReview] = useState<ChoiceReview>();
   const [confirmExclude, setConfirmExclude] = useState(false);
+  const [destinationBlockReview, setDestinationBlockReview] = useState<
+    'block' | 'unblock'
+  >();
+  const syncAfterGoogleContactsReturn = useRef(false);
 
   useEffect(() => {
+    syncAfterGoogleContactsReturn.current = false;
     setEnrollmentReview(undefined);
     setApprovalReview(undefined);
     setChoiceReview(undefined);
     setConfirmExclude(false);
+    setDestinationBlockReview(undefined);
     setProblem(undefined);
     setMessage(undefined);
   }, [contactId]);
@@ -111,10 +128,60 @@ export function LivePersonDetailScreen({
           setApprovalReview(undefined);
           setChoiceReview(undefined);
           setConfirmExclude(false);
+          setDestinationBlockReview(undefined);
         }
       }),
     [port],
   );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState !== 'active' || !syncAfterGoogleContactsReturn.current) {
+        return;
+      }
+      syncAfterGoogleContactsReturn.current = false;
+      setPending(true);
+      setProblem(undefined);
+      setMessage(undefined);
+      (async () => {
+        try {
+          const synced = await port.syncContacts('user');
+          if (synced.kind === 'error') {
+            setProblem(synced.problem);
+          } else {
+            await detail.reload();
+            setMessage(t('live.person.googleContactsSynced'));
+          }
+        } catch {
+          setProblem(nativeBridgeProblem);
+        }
+        setPending(false);
+      })().catch(() => undefined);
+    });
+    return () => subscription.remove();
+  }, [detail, port, t]);
+
+  const openGoogleContacts = async () => {
+    setPending(true);
+    setProblem(undefined);
+    setMessage(undefined);
+    syncAfterGoogleContactsReturn.current = true;
+    try {
+      const supported = await Linking.canOpenURL(GOOGLE_CONTACTS_URL);
+      if (!supported) {
+        syncAfterGoogleContactsReturn.current = false;
+        setProblem(nativeBridgeProblem);
+        setPending(false);
+        return;
+      }
+      await Linking.openURL(GOOGLE_CONTACTS_URL);
+      setMessage(t('live.person.googleContactsOpened'));
+    } catch {
+      syncAfterGoogleContactsReturn.current = false;
+      setProblem(nativeBridgeProblem);
+    }
+    setPending(false);
+  };
 
   const fail = async (actionProblem: NativeProblem) => {
     if (actionProblem.kind === 'stale-revision') {
@@ -123,6 +190,7 @@ export function LivePersonDetailScreen({
       setApprovalReview(undefined);
       setChoiceReview(undefined);
       setConfirmExclude(false);
+      setDestinationBlockReview(undefined);
     }
     setProblem(actionProblem);
     setPending(false);
@@ -134,6 +202,7 @@ export function LivePersonDetailScreen({
     setApprovalReview(undefined);
     setChoiceReview(undefined);
     setConfirmExclude(false);
+    setDestinationBlockReview(undefined);
     setMessage(
       refreshed.kind === 'ok'
         ? acceptedMessage
@@ -221,6 +290,33 @@ export function LivePersonDetailScreen({
           : kind === 'restore'
           ? 'live.person.restoreAccepted'
           : 'live.person.excludeAccepted',
+      ),
+    );
+  };
+
+  const runDestinationBlockMutation = async (
+    kind: 'block' | 'unblock',
+    revision: NativeRevision,
+  ) => {
+    setPending(true);
+    setProblem(undefined);
+    setMessage(undefined);
+    const input = { contactId, expectedRevision: revision };
+    let result: NativeResult<PeopleMutationProjection>;
+    try {
+      result =
+        kind === 'block'
+          ? await port.blockRecipientDestination(input)
+          : await port.unblockRecipientDestination(input);
+    } catch {
+      result = { kind: 'error', problem: nativeBridgeProblem };
+    }
+    await finishMutation(
+      result,
+      t(
+        kind === 'block'
+          ? 'live.person.destinationBlockAccepted'
+          : 'live.person.destinationUnblockAccepted',
       ),
     );
   };
@@ -355,6 +451,17 @@ export function LivePersonDetailScreen({
   const enrollment = projection.summary.enrollment;
   const canEnroll =
     enrollment.kind === 'off' && projection.summary.readiness.kind === 'ready';
+  const sourceRepairNeeded =
+    (projection.summary.readiness.kind !== 'ready' &&
+      projection.summary.readiness.reasons.some(reason =>
+        GOOGLE_CONTACTS_REPAIR_ISSUES.has(reason),
+      )) ||
+    projection.phoneChoices.some(
+      choice => choice.issue === 'phone-ambiguous-region',
+    );
+  const ambiguousRegionRepairNeeded = projection.phoneChoices.some(
+    choice => choice.issue === 'phone-ambiguous-region',
+  );
   const approval =
     enrollment.kind === 'enabled' || enrollment.kind === 'paused'
       ? enrollment.approval
@@ -400,7 +507,7 @@ export function LivePersonDetailScreen({
       ) : null}
       <LiveActionFeedback problem={problem} message={message} />
 
-      <Card accessibilityLabel={t('live.person.summary')}>
+      <Card>
         <KeyValue
           label={t('live.person.birthday')}
           value={
@@ -445,6 +552,39 @@ export function LivePersonDetailScreen({
         )}
         tone="info"
       />
+
+      {projection.selectedDestinationBlocked ? (
+        <ReadinessBanner
+          title={t('live.person.destinationBlockedTitle')}
+          detail={t('live.person.destinationBlockedBody')}
+          tone="warning"
+          testID="live-person-destination-blocked"
+        />
+      ) : null}
+
+      {sourceRepairNeeded ? (
+        <Card>
+          <ReadinessBanner
+            title={t('live.person.googleContactsRepairTitle')}
+            detail={t(
+              ambiguousRegionRepairNeeded
+                ? 'live.person.googleContactsRegionRepairBody'
+                : 'live.person.googleContactsRepairBody',
+            )}
+            tone="warning"
+          />
+          <Button
+            label={
+              pending
+                ? t('live.common.checking')
+                : t('live.person.openGoogleContacts')
+            }
+            disabled={pending}
+            onPress={openGoogleContacts}
+            testID="live-person-open-google-contacts"
+          />
+        </Card>
+      ) : null}
 
       {projection.phoneChoices.length > 0 ? (
         <>
@@ -577,7 +717,7 @@ export function LivePersonDetailScreen({
       ) : null}
 
       {enrollmentReview ? (
-        <Card accessibilityLabel={t('live.person.confirmEnrollment')}>
+        <Card>
           <AppText variant="heading">
             {t('live.person.confirmEnrollment')}
           </AppText>
@@ -643,7 +783,9 @@ export function LivePersonDetailScreen({
                     label={t('live.home.window')}
                     value={item.windowLabel}
                   />
-                  <AppText color="muted">{item.chargeDisclosure}</AppText>
+                  <AppText color="muted">
+                    {t('live.person.androidChargeDisclosure')}
+                  </AppText>
                 </>
               ) : (
                 <ReadinessBanner
@@ -652,7 +794,13 @@ export function LivePersonDetailScreen({
                   tone="info"
                 />
               )}
-              <AppText color="muted">{item.consentDisclosure}</AppText>
+              <AppText color="muted">
+                {t(
+                  item.platform === 'android'
+                    ? 'live.person.androidConsentDisclosure'
+                    : 'live.person.iosConsentDisclosure',
+                )}
+              </AppText>
             </View>
           ))}
           <Button
@@ -688,7 +836,8 @@ export function LivePersonDetailScreen({
           tone="warning"
         />
       ) : null}
-      {enrollment.kind === 'enabled' || enrollment.kind === 'paused' ? (
+      {(enrollment.kind === 'enabled' || enrollment.kind === 'paused') &&
+      !projection.selectedDestinationBlocked ? (
         <Button
           label={t(
             capability.platform === 'android'
@@ -750,6 +899,73 @@ export function LivePersonDetailScreen({
           onPress={() => setConfirmExclude(true)}
           variant="ghost"
           testID="live-person-exclude"
+        />
+      ) : null}
+      {projection.selectedPhoneId && destinationBlockReview ? (
+        <Card>
+          <AppText variant="heading">
+            {t(
+              destinationBlockReview === 'block'
+                ? 'live.person.destinationBlockTitle'
+                : 'live.person.destinationUnblockTitle',
+            )}
+          </AppText>
+          <AppText>
+            {t(
+              destinationBlockReview === 'block'
+                ? 'live.person.destinationBlockBody'
+                : 'live.person.destinationUnblockBody',
+              { phone: projection.summary.maskedPhone ?? '' },
+            )}
+          </AppText>
+          <Button
+            label={
+              pending
+                ? t('live.common.saving')
+                : t(
+                    destinationBlockReview === 'block'
+                      ? 'live.person.destinationBlockConfirm'
+                      : 'live.person.destinationUnblockConfirm',
+                  )
+            }
+            disabled={pending}
+            onPress={() =>
+              runDestinationBlockMutation(destinationBlockReview, revision)
+            }
+            variant={
+              destinationBlockReview === 'block' ? 'danger' : 'secondary'
+            }
+            testID={`live-person-confirm-destination-${destinationBlockReview}`}
+          />
+          <Button
+            label={t('live.common.cancel')}
+            disabled={pending}
+            onPress={() => setDestinationBlockReview(undefined)}
+            variant="secondary"
+          />
+        </Card>
+      ) : null}
+      {projection.selectedPhoneId && !destinationBlockReview ? (
+        <Button
+          label={t(
+            projection.selectedDestinationBlocked
+              ? 'live.person.destinationUnblock'
+              : 'live.person.destinationBlock',
+          )}
+          disabled={pending}
+          onPress={() =>
+            setDestinationBlockReview(
+              projection.selectedDestinationBlocked ? 'unblock' : 'block',
+            )
+          }
+          variant={
+            projection.selectedDestinationBlocked ? 'secondary' : 'ghost'
+          }
+          testID={
+            projection.selectedDestinationBlocked
+              ? 'live-person-unblock-destination'
+              : 'live-person-block-destination'
+          }
         />
       ) : null}
       <Button

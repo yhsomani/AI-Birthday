@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.yashsomani.birthdayautopilot.messages.NativeSmsPlan
 import com.yashsomani.birthdayautopilot.messages.NativeSmsPlanResult
 import com.yashsomani.birthdayautopilot.messages.SmsEncodingEstimator
+import com.yashsomani.birthdayautopilot.automation.state.BirthdayJobState
 import com.yashsomani.birthdayautopilot.coordination.DistributionChannel
 import com.yashsomani.birthdayautopilot.core.model.AccountMode
 import com.yashsomani.birthdayautopilot.gemini.AndroidGeminiSuggestionGateway
@@ -34,14 +35,21 @@ import com.yashsomani.birthdayautopilot.storage.database.AccountRecordEntity
 import com.yashsomani.birthdayautopilot.storage.database.AccountRecordState
 import com.yashsomani.birthdayautopilot.storage.database.ApprovalRecordState
 import com.yashsomani.birthdayautopilot.storage.database.BirthdayDatabase
+import com.yashsomani.birthdayautopilot.storage.database.BirthdayOccurrenceRecordEntity
 import com.yashsomani.birthdayautopilot.storage.database.CoordinationStateEntity
+import com.yashsomani.birthdayautopilot.storage.database.ConsentDecision
+import com.yashsomani.birthdayautopilot.storage.database.ConsentKind
 import com.yashsomani.birthdayautopilot.storage.database.IdentityAttachDecision
 import com.yashsomani.birthdayautopilot.storage.database.InstallationBindingEntity
 import com.yashsomani.birthdayautopilot.storage.database.InstallationRecordState
+import com.yashsomani.birthdayautopilot.storage.database.LocalDestinationGuardEntity
+import com.yashsomani.birthdayautopilot.storage.database.MessageTemplateEntity
 import com.yashsomani.birthdayautopilot.storage.database.RecipientEnrollmentState
 import com.yashsomani.birthdayautopilot.storage.database.TemplateSource
+import com.yashsomani.birthdayautopilot.storage.database.TemplateValidationState
 import com.yashsomani.birthdayautopilot.storage.database.SyncFreshness
 import java.time.ZoneId
+import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -63,7 +71,7 @@ class AndroidConfigurationControllerInstrumentationTest {
   private lateinit var context: Context
   private var sessionMatches = true
   private var now = 1_800_000_000_000L
-  private val fingerprint = PeopleRequestFactory(1_000).parameterFingerprint
+  private val fingerprint = PeopleRequestFactory(1_000, "IN").parameterFingerprint
 
   @Before
   fun setUp() = runBlocking {
@@ -326,6 +334,103 @@ class AndroidConfigurationControllerInstrumentationTest {
     assertEquals(1, home.getJSONObject("counts").getInt("enabled"))
     assertTrue(home.has("next"))
 
+    val activePolicy = requireNotNull(database.configurationDao().activeAutomationPolicy(ACCOUNT_ID))
+    val occurrenceId = "occ_${"a".repeat(64)}"
+    database.safetyLedgerDao().createPlannedBirthdayOccurrence(
+      BirthdayOccurrenceRecordEntity(
+        occurrenceId = occurrenceId,
+        accountId = ACCOUNT_ID,
+        contactId = contactId,
+        approvalId = approval.approvalId,
+        policyId = activePolicy.policyId,
+        localDate = "2026-12-10",
+        timeZoneId = "Asia/Kolkata",
+        resolvedWindowStartMillis = now + 60_000,
+        resolvedWindowEndMillis = now + 120_000,
+        idempotencyKey = "destination-block-test",
+        destinationFingerprint = approval.destinationFingerprint,
+        channel = "SMS",
+        payloadHash = approval.contentHash,
+        state = BirthdayJobState.PLANNED,
+        attemptNumber = 0,
+        revision = 0,
+        claimedBlockerRevision = null,
+        createdAtMillis = now,
+        updatedAtMillis = now,
+        terminalAtMillis = null,
+        retentionUntilMillis = now + 86_400_000,
+        safeOutcomeCode = null,
+      ),
+      LocalDestinationGuardEntity(
+        guardId = "guard-destination-block-test",
+        accountId = ACCOUNT_ID,
+        occurrenceId = occurrenceId,
+        destinationFingerprint = approval.destinationFingerprint,
+        localDate = "2026-12-10",
+        channel = "SMS",
+        armedOrLater = false,
+        createdAtMillis = now,
+        armedAtMillis = null,
+        retentionUntilMillis = now + 86_400_000,
+      ),
+    )
+    val blockRevision = revision()
+    controller.mutateSelectedDestinationBlock(
+      blocked = true,
+      request = JSONObject()
+        .put("contactId", contactId)
+        .put("expectedRevision", blockRevision.toString()),
+      expectedRevision = blockRevision,
+    ).requireSuccess()
+    assertTrue(requireNotNull(controller.contactDetail(contactId)).getBoolean("selectedDestinationBlocked"))
+    assertEquals(
+      1,
+      database.configurationDao().activeDestinationBlockCount(
+        ACCOUNT_ID,
+        approval.destinationFingerprint,
+      ),
+    )
+    assertEquals(ApprovalRecordState.REVOKED, database.configurationDao().approval(approval.approvalId)?.state)
+    assertEquals(
+      RecipientEnrollmentState.NEEDS_REVIEW,
+      database.configurationDao().recipientPolicy(contactId)?.state,
+    )
+    assertEquals(
+      "USER_DESTINATION_BLOCKED",
+      database.configurationDao().recipientPolicy(contactId)?.blockReason,
+    )
+    assertEquals(
+      BirthdayJobState.CANCELLED,
+      database.safetyLedgerDao().getBirthdayOccurrence(occurrenceId)?.state,
+    )
+    assertTrue(database.configurationDao().enabledPlanRows(ACCOUNT_ID, 10).isEmpty())
+
+    val unblockRevision = revision()
+    controller.mutateSelectedDestinationBlock(
+      blocked = false,
+      request = JSONObject()
+        .put("contactId", contactId)
+        .put("expectedRevision", unblockRevision.toString()),
+      expectedRevision = unblockRevision,
+    ).requireSuccess()
+    assertFalse(requireNotNull(controller.contactDetail(contactId)).getBoolean("selectedDestinationBlocked"))
+    assertEquals(
+      0,
+      database.configurationDao().activeDestinationBlockCount(
+        ACCOUNT_ID,
+        approval.destinationFingerprint,
+      ),
+    )
+    assertEquals(ApprovalRecordState.REVOKED, database.configurationDao().approval(approval.approvalId)?.state)
+    assertEquals(
+      "APPROVAL_REQUIRED",
+      database.configurationDao().recipientPolicy(contactId)?.blockReason,
+    )
+    assertEquals(
+      BirthdayJobState.CANCELLED,
+      database.safetyLedgerDao().getBirthdayOccurrence(occurrenceId)?.state,
+    )
+
     val excludeRevision = revision()
     controller.mutateRecipient(
       "exclude",
@@ -347,6 +452,61 @@ class AndroidConfigurationControllerInstrumentationTest {
       RecipientEnrollmentState.NEEDS_REVIEW,
       database.configurationDao().recipientPolicy(contactId)?.state,
     )
+  }
+
+  @Test
+  fun initialActivationFactSurvivesOrdinaryPauseAndIsNotInferredFromCurrentMode() = runBlocking {
+    val dao = database.configurationDao()
+    assertFalse(controller.initialActivationCompleted())
+    val beforeActivation = checkNotNull(dao.control())
+    assertEquals(
+      1,
+      dao.markAutomationActivated(
+        beforeActivation.revision,
+        beforeActivation.blockerRevision,
+      ),
+    )
+    assertTrue(controller.initialActivationCompleted())
+
+    val active = checkNotNull(dao.control())
+    assertEquals(
+      1,
+      dao.updateAutomationControl(
+        active.revision,
+        active.blockerRevision,
+        false,
+        AccountMode.PAUSED_REPAIR,
+      ),
+    )
+    assertFalse(checkNotNull(dao.control()).automationDesired)
+    assertEquals(AccountMode.PAUSED_REPAIR.name, checkNotNull(dao.control()).accountMode)
+    assertTrue(controller.initialActivationCompleted())
+  }
+
+  @Test
+  fun unknownPersistedTemplateModeFailsClosedInsteadOfBecomingPersonalized() = runBlocking {
+    database.safetyLedgerDao().insertMessageTemplate(
+      MessageTemplateEntity(
+        templateId = "template-corrupt-mode",
+        accountId = ACCOUNT_ID,
+        source = TemplateSource.USER,
+        exactTemplateText = "Happy birthday, {firstName}!",
+        languageTag = "en",
+        tone = "warm",
+        placeholderMode = "UNKNOWN_LEGACY_MODE",
+        templateVersion = "local-template-v1-corrupt",
+        promptPolicyVersion = null,
+        validatorVersion = "birthday-template-validator-v1",
+        modelIdentifier = null,
+        contentHash = "8".repeat(64),
+        validationState = TemplateValidationState.VALID,
+        revision = 1,
+        createdAtMillis = now,
+        updatedAtMillis = now,
+      ),
+    )
+
+    assertEquals("not-configured", controller.messageEditor()?.getString("kind"))
   }
 
   @Test
@@ -428,6 +588,7 @@ class AndroidConfigurationControllerInstrumentationTest {
           }
         },
         rateGuard = GeminiUxRateGuard(MemoryGeminiRateStore(), cooldownMillis = 0),
+        operationalGate = EnabledGeminiOperationalGate,
         wallClockMillis = { 0 },
         elapsedClockMillis = { 0 },
       )
@@ -570,7 +731,8 @@ class AndroidConfigurationControllerInstrumentationTest {
       ACCOUNT_ID,
     )
 
-    assertEquals("complete", operation.state)
+    assertEquals("remote-pending", operation.state)
+    assertTrue(operation.localDataErased)
     assertEquals(ACCOUNT_ID, database.peopleSyncDao().activeAccount()?.accountId)
     assertEquals(INSTALLATION_ID, database.automationOrchestrationDao().localInstallation()?.installationId)
     assertEquals(0, database.peopleSyncDao().activeContactCount(ACCOUNT_ID))
@@ -578,26 +740,123 @@ class AndroidConfigurationControllerInstrumentationTest {
       SyncFreshness.AUTH_ACTION_REQUIRED,
       database.peopleSyncDao().contactSyncState(ACCOUNT_ID)?.freshness,
     )
+    assertEquals(
+      ConsentDecision.REVOKED,
+      database.configurationDao().latestConsentReceipt(
+        ACCOUNT_ID,
+        ConsentKind.CONTACTS_DISCLOSURE,
+      )?.decision,
+    )
     assertEquals(null, database.configurationDao().activeTemplate(ACCOUNT_ID))
     assertEquals(null, database.configurationDao().activeAutomationPolicy(ACCOUNT_ID))
   }
 
+  @Test
+  fun enrollingCapPlusOneSameDayRecipientRollsBackWithFirstConflictDate() = runBlocking {
+    importContacts(
+      listOf(
+        singleContact(),
+        PeopleContactDelta(
+          resourceName = "people/grace-capacity",
+          contactSourceId = "contacts/grace-capacity",
+          deleted = false,
+          names = listOf(PeopleName("Grace Hopper", "Grace")),
+          birthdays = listOf(PeopleBirthday(1906, 12, 10)),
+          phoneNumbers = listOf(PeoplePhone("+919876543211", "mobile")),
+        ),
+      ),
+    )
+    val contacts = database.peopleSyncDao().contactPage(ACCOUNT_ID, "all", "%", 10, 0)
+      .sortedBy { it.displayName }
+    assertEquals(2, contacts.size)
+
+    val policyRevision = revision()
+    val preview = controller.previewPolicy(
+      JSONObject()
+        .put(
+          "draft",
+          JSONObject()
+            .put("primaryStart", "09:00")
+            .put("primaryEnd", "11:00")
+            .put("latePolicy", JSONObject().put("kind", "none"))
+            .put("dailyCap", 1),
+        )
+        .put("expectedRevision", policyRevision.toString()),
+      policyRevision,
+    ).successPayload()
+    controller.savePolicy(handleRequest(preview.getString("handle"), policyRevision), policyRevision)
+      .requireSuccess()
+
+    suspend fun enroll(contactId: String): ConfigurationOutcome {
+      val currentRevision = revision()
+      val review = controller.prepareEnrollment(
+        JSONObject()
+          .put("contactIds", JSONArray(listOf(contactId)))
+          .put("expectedRevision", currentRevision.toString()),
+        currentRevision,
+      ).successPayload()
+      return controller.confirmEnrollment(
+        handleRequest(review.getString("handle"), currentRevision),
+        currentRevision,
+      )
+    }
+
+    enroll(contacts.first().contactId).requireSuccess()
+    val rejected = enroll(contacts.last().contactId) as ConfigurationOutcome.Problem
+    assertEquals("validation", rejected.payload.getString("kind"))
+    assertEquals(
+      "window-capacity-conflict",
+      rejected.payload.getJSONArray("issues").getJSONObject(0).getString("code"),
+    )
+    assertEquals("2027-12-10", rejected.payload.getString("firstConflictDate"))
+    assertEquals(
+      RecipientEnrollmentState.OFF,
+      database.configurationDao().recipientPolicy(contacts.last().contactId)?.state,
+    )
+  }
+
+  @Test
+  fun defaultSimFallbackLabelUsesCurrentEnglishAndHindiResources() {
+    fun localizedContext(locale: Locale): Context {
+      val configuration = android.content.res.Configuration(context.resources.configuration)
+      configuration.setLocale(locale)
+      return context.createConfigurationContext(configuration)
+    }
+
+    assertEquals(
+      "Default SIM · slot 2",
+      ConfigurationDefaultSimLabel.format(localizedContext(Locale.ENGLISH), 2),
+    )
+    assertEquals(
+      "डिफ़ॉल्ट सिम · स्लॉट 2",
+      ConfigurationDefaultSimLabel.format(localizedContext(Locale.forLanguageTag("hi")), 2),
+    )
+    assertEquals(
+      "डिफ़ॉल्ट SMS सिम",
+      ConfigurationDefaultSimLabel.format(localizedContext(Locale.forLanguageTag("hi")), null),
+    )
+  }
+
   private suspend fun importContact(delta: PeopleContactDelta) {
+    importContacts(listOf(delta))
+  }
+
+  private suspend fun importContacts(deltas: List<PeopleContactDelta>) {
     val store = RoomPeopleSyncStagingStore(
       dao = database.peopleSyncDao(),
       accountId = ACCOUNT_ID,
-      accountLocaleTag = "en-IN",
+      homeRegion = "IN",
       parameterFingerprint = fingerprint,
       clock = PeopleWallClock { now++ },
     )
     val transaction = requireNotNull(store.begin(PeopleSyncMode.Full))
-    assertTrue(transaction.stagePage(0, listOf(delta)))
+    assertTrue(transaction.stagePage(0, deltas))
     assertTrue(
       transaction.commit(
         PeopleSyncCompletion(
           nextSyncToken = "sync-token",
           parameterFingerprint = fingerprint,
-          changedPeople = 1,
+          changedPeople = deltas.size,
           pages = 1,
         ),
       ),
@@ -676,6 +935,15 @@ class AndroidConfigurationControllerInstrumentationTest {
 
     override suspend fun generate(systemInstruction: String, prompt: String): String =
       "{\"candidates\":[{\"text\":\"$GEMINI_CANDIDATE\",\"language\":\"en\"}]}"
+  }
+
+  private object EnabledGeminiOperationalGate :
+    com.yashsomani.birthdayautopilot.gemini.GeminiOperationalGate {
+    override fun configureAfterFirebaseLaunch() = Unit
+
+    override fun refreshInBackground() = Unit
+
+    override fun foregroundSuggestionsEnabled(): Boolean = true
   }
 
   private companion object {

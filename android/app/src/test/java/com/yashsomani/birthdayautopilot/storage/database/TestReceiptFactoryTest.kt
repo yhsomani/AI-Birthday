@@ -54,6 +54,60 @@ class TestReceiptFactoryTest {
     )
   }
 
+  @Test
+  fun `minimum receipt binding survives atomic raw test detail redaction`() {
+    val original = testJob()
+    val receipt = TestReceiptFactory.create(
+      test = original,
+      installation = installation(),
+      testReceiptId = "receipt-1",
+      smsPolicyVersion = "sms-policy-v1",
+      passedAtMillis = 2_000,
+    )
+    val redacted = original.copy(
+      normalizedDestination = "",
+      maskedDestination = "",
+      exactMessage = "",
+      foregroundConfirmationNonceHash = "",
+      foregroundConfirmedAtMillis = 0,
+      revision = original.revision + 1,
+    )
+
+    assertEquals(TestJobRetainedDetail.State.REDACTED, TestJobRetainedDetail.classify(redacted))
+    assertTrue(TestReceiptBindingValidator.matches(redacted, installation(), receipt))
+    assertFalse(
+      TestReceiptBindingValidator.matches(
+        redacted.copy(retentionUntilMillis = 20_000),
+        installation(),
+        receipt,
+        nowMillis = 19_999,
+      ),
+    )
+    assertFalse(
+      TestReceiptBindingValidator.matches(
+        redacted.copy(payloadHash = "tampered-payload"),
+        installation(),
+        receipt,
+      ),
+    )
+  }
+
+  @Test
+  fun `partial raw test detail redaction is fail closed`() {
+    val original = testJob()
+    val receipt = TestReceiptFactory.create(
+      test = original,
+      installation = installation(),
+      testReceiptId = "receipt-1",
+      smsPolicyVersion = "sms-policy-v1",
+      passedAtMillis = 2_000,
+    )
+    val partial = original.copy(exactMessage = "")
+
+    assertEquals(TestJobRetainedDetail.State.INVALID, TestJobRetainedDetail.classify(partial))
+    assertFalse(TestReceiptBindingValidator.matches(partial, installation(), receipt))
+  }
+
   private fun testJob() = TestJobEntity(
     testJobId = "test-1",
     accountId = "account-1",

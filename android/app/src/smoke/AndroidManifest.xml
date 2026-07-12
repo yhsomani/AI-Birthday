@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools">
+
+  <!-- Metro through adb-reversed localhost is the only authorized capability. -->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" tools:node="remove" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:node="remove" />
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+  <uses-permission android:name="android.permission.USE_BIOMETRIC" tools:node="remove" />
+  <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
+  <uses-permission android:name="com.google.android.providers.gsf.permission.READ_GSERVICES" tools:node="remove" />
+  <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" tools:node="remove" />
+  <uses-permission android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" tools:node="remove" />
+  <uses-permission android:name="android.permission.SEND_SMS" tools:node="remove" />
+  <uses-permission android:name="android.permission.READ_PHONE_STATE" tools:node="remove" />
+  <uses-feature android:name="android.hardware.telephony" android:required="false" tools:node="remove" />
+  <uses-feature android:name="android.hardware.telephony.messaging" android:required="false" tools:node="remove" />
+  <queries tools:node="remove" />
+  <permission android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" tools:node="remove" />
+
+  <application
+    android:name=".smoke.SmokeMainApplication"
+    android:icon="@drawable/smoke_launcher_icon"
+    android:label="@string/app_name"
+    android:networkSecurityConfig="@xml/smoke_network_security_config"
+    android:roundIcon="@drawable/smoke_launcher_icon"
+    tools:replace="android:icon,android:label,android:name,android:networkSecurityConfig,android:roundIcon">
+    <activity android:name=".MainActivity" tools:node="remove" />
+    <activity android:name="com.yashsomani.birthdayautopilot.auth.NotificationPermissionTestActivity" tools:node="remove" />
+    <activity android:name="com.facebook.react.devsupport.DevSettingsActivity" tools:node="remove" />
+    <activity android:name="com.google.firebase.auth.internal.GenericIdpActivity" tools:node="remove" />
+    <activity android:name="com.google.firebase.auth.internal.RecaptchaActivity" tools:node="remove" />
+    <activity android:name="androidx.credentials.playservices.controllers.identityauth.HiddenActivity" tools:node="remove" />
+    <activity android:name="androidx.credentials.playservices.controllers.identitycredentials.IdentityCredentialApiHiddenActivity" tools:node="remove" />
+    <activity android:name="com.google.android.gms.auth.api.signin.internal.SignInHubActivity" tools:node="remove" />
+    <activity android:name="com.google.android.gms.common.api.GoogleApiActivity" tools:node="remove" />
+    <activity android:name="com.google.android.play.core.common.PlayCoreDialogWrapperActivity" tools:node="remove" />
+    <activity
+      android:name=".smoke.SmokeMainActivity"
+      android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+      android:exported="true"
+      android:launchMode="singleTask"
+      android:windowSoftInputMode="adjustResize">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+    <provider android:name="androidx.startup.InitializationProvider" tools:node="remove" />
+    <provider android:name="com.google.firebase.provider.FirebaseInitProvider" tools:node="remove" />
+    <receiver android:name=".automation.sms.SmsSentCallbackReceiver" tools:node="remove" />
+    <receiver android:name=".automation.sms.SmsDeliveryCallbackReceiver" tools:node="remove" />
+    <receiver android:name=".automation.workers.AutomationReconcileReceiver" tools:node="remove" />
+    <receiver android:name="androidx.work.impl.utils.ForceStopRunnable$BroadcastReceiver" tools:node="remove" />
+    <receiver android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver" tools:node="remove" />
+    <receiver android:name="androidx.work.impl.diagnostics.DiagnosticsReceiver" tools:node="remove" />
+    <service android:name="androidx.work.impl.background.systemjob.SystemJobService" tools:node="remove" />
+    <service android:name="androidx.work.impl.foreground.SystemForegroundService" tools:node="remove" />
+    <service android:name="com.google.firebase.components.ComponentDiscoveryService" tools:node="remove" />
+    <service android:name="androidx.credentials.playservices.CredentialProviderMetadataHolder" tools:node="remove" />
+    <service android:name="com.google.android.gms.auth.api.signin.RevocationBoundService" tools:node="remove" />
+    <service android:name="androidx.room.MultiInstanceInvalidationService" tools:node="remove" />
+    <meta-data android:name="com.google.android.gms.version" tools:node="remove" />
+  </application>
+</manifest>

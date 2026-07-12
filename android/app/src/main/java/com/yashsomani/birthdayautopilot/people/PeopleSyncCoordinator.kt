@@ -43,8 +43,9 @@ internal class PeopleSyncCoordinator(
   private val stagingStore: PeopleSyncStagingStore,
   private val limits: PeopleSyncLimits = PeopleSyncLimits(),
   private val clock: MonotonicClock = MonotonicClock { System.nanoTime() / 1_000_000L },
+  phoneNormalizationRegion: String? = null,
 ) {
-  private val requestFactory = PeopleRequestFactory(limits.pageSize)
+  private val requestFactory = PeopleRequestFactory(limits.pageSize, phoneNormalizationRegion)
   private val parser = PeopleJsonParser(limits.pageSize)
 
   suspend fun sync(

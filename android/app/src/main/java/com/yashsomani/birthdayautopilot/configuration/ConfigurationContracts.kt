@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.telephony.SubscriptionManager
 import androidx.core.content.ContextCompat
+import com.yashsomani.birthdayautopilot.R
 import com.yashsomani.birthdayautopilot.planning.BirthdayRule
+import com.yashsomani.birthdayautopilot.planning.BirthdayCapacityPolicy
 import com.yashsomani.birthdayautopilot.planning.LeapDayPolicy
 import com.yashsomani.birthdayautopilot.planning.RecurrencePlanner
 import com.yashsomani.birthdayautopilot.storage.database.ConfiguredBirthdayRow
@@ -26,7 +28,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.ZonedDateTime
 import java.util.Locale
 import org.json.JSONArray
 import org.json.JSONObject
@@ -59,6 +60,13 @@ internal fun interface ConfigurationSubscriptionResolver {
   fun resolveDefault(): SubscriptionResolution
 }
 
+internal object ConfigurationDefaultSimLabel {
+  fun format(context: Context, slotNumber: Int?): String = slotNumber
+    ?.takeIf { it > 0 }
+    ?.let { context.getString(R.string.configuration_default_sim_slot, it) }
+    ?: context.getString(R.string.configuration_default_sms_sim)
+}
+
 /** Default-SIM resolution used only for foreground configuration and approval. */
 internal class AndroidConfigurationSubscriptionResolver(
   context: Context,
@@ -84,7 +92,10 @@ internal class AndroidConfigurationSubscriptionResolver(
     if (
       ContextCompat.checkSelfPermission(appContext, Manifest.permission.READ_PHONE_STATE) !=
       PackageManager.PERMISSION_GRANTED
-    ) return SubscriptionResolution.Ready(subscriptionId, "Default SMS SIM")
+    ) return SubscriptionResolution.Ready(
+      subscriptionId,
+      ConfigurationDefaultSimLabel.format(appContext, null),
+    )
     val active = try {
       appContext.getSystemService(SubscriptionManager::class.java)
         .activeSubscriptionInfoList
@@ -101,7 +112,7 @@ internal class AndroidConfigurationSubscriptionResolver(
     val slot = selected.simSlotIndex.takeIf { it >= 0 }?.plus(1)
     return SubscriptionResolution.Ready(
       subscriptionId,
-      slot?.let { "Default SIM · slot $it" } ?: "Default SMS SIM",
+      ConfigurationDefaultSimLabel.format(appContext, slot),
     )
   }
 }
@@ -246,12 +257,32 @@ internal data class ParsedWindowDraft(
 }
 
 internal data class PolicySimulation(
+  val simulatedOccurrenceCount: Int,
   val maximumLocalDay: Int,
   val maximumRolling24Hours: Int,
+  /** Number of Arm submissions that can fit before the strict effective window end. */
+  val strictWindowSlotCapacity: Int,
   val firstConflictDate: LocalDate?,
-)
+) {
+  fun isAcceptableFor(draft: ParsedWindowDraft): Boolean =
+    maximumLocalDay <= minOf(draft.dailyCap, strictWindowSlotCapacity) &&
+      maximumRolling24Hours <= ConfigurationPolicyValidator.ROLLING_24_HOUR_CEILING
+}
 
 internal object ConfigurationPolicyValidator {
+  fun projectConfiguredBirthday(
+    contacts: List<ConfiguredBirthdayRow>,
+    contactId: String,
+    birthdayMonth: Int?,
+    birthdayDay: Int?,
+    leapDayPolicy: String?,
+    included: Boolean,
+  ): List<ConfiguredBirthdayRow> = contacts.filterNot { it.contactId == contactId } + buildList {
+    if (included && birthdayMonth != null && birthdayDay != null) {
+      add(ConfiguredBirthdayRow(contactId, birthdayMonth, birthdayDay, leapDayPolicy))
+    }
+  }
+
   fun parse(draft: JSONObject): Pair<ParsedWindowDraft?, JSONArray> {
     val issues = JSONArray()
     if (draft.keyNames() != setOf("primaryStart", "primaryEnd", "latePolicy", "dailyCap")) {
@@ -301,19 +332,19 @@ internal object ConfigurationPolicyValidator {
     zoneId: ZoneId,
     planner: RecurrencePlanner,
   ): PolicySimulation {
+    val strictWindowSlotCapacity = strictWindowSlotCapacity(draft)
     val endDate = today.plusDays(SIMULATED_DAYS - 1L)
-    val occurrences = contacts.mapNotNull { contact ->
+    val occurrences = contacts.flatMap { contact ->
       val leap = contact.leapDayPolicy?.let { runCatching { LeapDayPolicy.valueOf(it) }.getOrNull() }
-      val date = try {
-        planner.nextOccurrence(
-          today,
-          BirthdayRule(contact.birthdayMonth, contact.birthdayDay, leap),
-        )
+      val rule = BirthdayRule(contact.birthdayMonth, contact.birthdayDay, leap)
+      try {
+        (today.year..endDate.year).mapNotNull { year ->
+          planner.occurrenceInYear(year, rule)
+            ?.takeUnless { it.isBefore(today) || it.isAfter(endDate) }
+            ?.let { occurrence -> occurrence to resolveStart(occurrence, draft.startMinute, zoneId) }
+        }
       } catch (_: IllegalArgumentException) {
-        null
-      }
-      date?.takeUnless { it.isAfter(endDate) }?.let { occurrence ->
-        occurrence to resolveStart(occurrence, draft.startMinute, zoneId)
+        emptyList()
       }
     }.sortedBy { it.second }
     val daily = occurrences.groupingBy(Pair<LocalDate, Instant>::first).eachCount()
@@ -325,12 +356,32 @@ internal object ConfigurationPolicyValidator {
       while (left <= right && !occurrences[left].second.isAfter(lowerExclusive)) left++
       rollingMaximum = maxOf(rollingMaximum, right - left + 1)
     }
-    val conflict = occurrences.asSequence()
+    val localDayConflict = occurrences.asSequence()
       .map(Pair<LocalDate, Instant>::first)
       .distinct()
-      .firstOrNull { (daily[it] ?: 0) > draft.dailyCap }
-      ?: rollingConflictDate(occurrences, draft.dailyCap)
-    return PolicySimulation(maxDaily, rollingMaximum, conflict)
+      .firstOrNull {
+        (daily[it] ?: 0) > minOf(draft.dailyCap, strictWindowSlotCapacity)
+      }
+    val rollingConflict = rollingConflictDate(occurrences, ROLLING_24_HOUR_CEILING)
+    val firstConflict = listOfNotNull(localDayConflict, rollingConflict).minOrNull()
+    return PolicySimulation(
+      simulatedOccurrenceCount = occurrences.size,
+      maximumLocalDay = maxDaily,
+      maximumRolling24Hours = rollingMaximum,
+      strictWindowSlotCapacity = strictWindowSlotCapacity,
+      firstConflictDate = firstConflict,
+    )
+  }
+
+  /**
+   * The server enforces five minutes between completed Arm outcomes. A fresh request also needs
+   * ordering/submit headroom, so the product contract budgets one Arm slot per six started
+   * minutes. The end is strict: a partial final six-minute interval contributes one slot.
+   */
+  fun strictWindowSlotCapacity(draft: ParsedWindowDraft): Int {
+    val effectiveEndMinute = draft.graceEndMinute ?: draft.endMinute
+    val totalMinutes = effectiveEndMinute - draft.startMinute
+    return (totalMinutes + ARM_SLOT_MINUTES - 1) / ARM_SLOT_MINUTES
   }
 
   fun summary(draft: ParsedWindowDraft): String {
@@ -352,20 +403,13 @@ internal object ConfigurationPolicyValidator {
     return null
   }
 
-  private fun resolveStart(date: LocalDate, minute: Int, zoneId: ZoneId): Instant {
-    val time = LocalTime.of(minute / 60, minute % 60)
-    val local = date.atTime(time)
-    val rules = zoneId.rules
-    val offsets = rules.getValidOffsets(local)
-    val zoned = when {
-      offsets.size == 1 -> ZonedDateTime.ofLocal(local, zoneId, offsets.single())
-      offsets.size > 1 -> ZonedDateTime.ofLocal(local, zoneId, offsets.first())
-      else -> {
-        val transition = checkNotNull(rules.getTransition(local))
-        ZonedDateTime.ofLocal(transition.dateTimeAfter, zoneId, transition.offsetAfter)
-      }
-    }
-    return zoned.toInstant()
+  /**
+   * Resolves a civil minute using the product's shared DST rule. Kept internal so the
+   * cross-platform acceptance matrix can verify real gap/overlap behavior without duplicating
+   * this security-relevant calendar decision in a test oracle.
+   */
+  internal fun resolveStart(date: LocalDate, minute: Int, zoneId: ZoneId): Instant {
+    return BirthdayCapacityPolicy.resolve(date, minute, zoneId)
   }
 
   private fun parseMinute(raw: String): Int? = try {
@@ -404,6 +448,8 @@ internal object ConfigurationPolicyValidator {
 
   private const val MIN_WINDOW_MINUTES = 30
   private const val MAX_WINDOW_MINUTES = 240
+  private const val ARM_SLOT_MINUTES = 6
   const val SIMULATED_DAYS = 400
+  const val ROLLING_24_HOUR_CEILING = 20
   private const val ROLLING_WINDOW_SECONDS = 24L * 60 * 60
 }
