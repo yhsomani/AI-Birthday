@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- Generated/read reflectively by React Native's debug server integration. -->
+    <issue id="UnusedResources">
+        <ignore regexp="react_native_dev_server_(port|ip)" />
+    </issue>
+
+    <!--
+      Adaptive icons require the v26 resource grammar. The app's minSdk is 29,
+      but moving these XML files to an unqualified folder makes aapt reject the
+      adaptive-icon root element. Keep the platform qualifier and suppress only
+      these two known resources.
+    -->
+    <issue id="ObsoleteSdkInt">
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+
+    <!--
+      Every supported device resolves the adaptive icon above. These opaque
+      bitmap defaults exist solely so aapt has an unqualified fallback; they are
+      never selected on minSdk 29+, so the legacy silhouette rule is inapplicable.
+    -->
+    <issue id="IconLauncherShape">
+        <ignore path="src/main/res/mipmap-mdpi/ic_launcher.png" />
+        <ignore path="src/main/res/mipmap-hdpi/ic_launcher.png" />
+        <ignore path="src/main/res/mipmap-xhdpi/ic_launcher.png" />
+        <ignore path="src/main/res/mipmap-xxhdpi/ic_launcher.png" />
+        <ignore path="src/main/res/mipmap-xxxhdpi/ic_launcher.png" />
+    </issue>
+</lint>

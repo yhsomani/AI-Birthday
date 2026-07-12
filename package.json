@@ -1,0 +1,90 @@
+{
+  "name": "birthday-autopilot",
+  "version": "0.1.0",
+  "description": "Cross-platform, privacy-preserving birthday planning with Android automation and an iOS message companion.",
+  "private": true,
+  "packageManager": "npm@11.6.0",
+  "scripts": {
+    "android": "react-native run-android --mode devDebug --appId com.yashsomani.birthdayautopilot.dev",
+    "android:build": "cd android && ./gradlew :app:assembleDevDebug",
+    "android:test": "cd android && ./gradlew :app:testDevDebugUnitTest",
+    "android:lint": "cd android && ./gradlew :app:lintDevDebug",
+    "android:verify": "tools/verify-android-apk.sh android/app/build/outputs/apk/dev/debug/app-dev-debug.apk com.yashsomani.birthdayautopilot.dev",
+    "backend:check": "npm --prefix backend/functions run check",
+    "backend:test:emulator": "npm --prefix backend/functions run test:emulator",
+    "hosting:check": "npm --prefix backend/hosting run check",
+    "bundle:check": "node tools/verify-react-native-bundles.mjs",
+    "codegen:check": "node tools/patch-react-native-codegen.mjs --check",
+    "ios": "react-native run-ios",
+    "ios:pods": "cd ios && bundle exec pod install --deployment",
+    "doctor": "node tools/doctor.mjs",
+    "doctor:android": "node tools/doctor.mjs --platform=android",
+    "doctor:ios": "node tools/doctor.mjs --platform=ios",
+    "lint": "eslint .",
+    "postinstall": "node tools/patch-react-native-codegen.mjs",
+    "format:check": "prettier --check .",
+    "format:write": "prettier --write .",
+    "start": "react-native start",
+    "test": "jest",
+    "test:ci": "jest --ci --coverage --runInBand",
+    "test:tools": "node --test tools/*.test.mjs",
+    "security:secrets": "node tools/scan-repository-secrets.mjs",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run codegen:check && npm run bundle:check && npm run test:tools && npm run security:secrets && npm run test:ci",
+    "check:all": "npm run check && npm run backend:check && npm run hosting:check"
+  },
+  "dependencies": {
+    "@react-navigation/bottom-tabs": "7.18.8",
+    "@react-navigation/native": "7.3.8",
+    "@react-navigation/native-stack": "7.17.10",
+    "i18next": "26.3.6",
+    "react": "19.2.3",
+    "react-i18next": "17.0.9",
+    "react-native": "0.86.0",
+    "react-native-localize": "3.7.0",
+    "react-native-safe-area-context": "5.8.0",
+    "react-native-screens": "4.26.0",
+    "react-native-svg": "15.15.5",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@babel/core": "7.29.7",
+    "@babel/plugin-transform-export-namespace-from": "7.29.7",
+    "@babel/preset-env": "7.29.7",
+    "@babel/runtime": "7.29.7",
+    "@react-native-community/cli": "20.2.0",
+    "@react-native-community/cli-platform-android": "20.2.0",
+    "@react-native-community/cli-platform-ios": "20.2.0",
+    "@react-native/babel-preset": "0.86.0",
+    "@react-native/eslint-config": "0.86.0",
+    "@react-native/jest-preset": "0.86.0",
+    "@react-native/metro-config": "0.86.0",
+    "@react-native/typescript-config": "0.86.0",
+    "@testing-library/react-native": "14.0.1",
+    "@types/jest": "29.5.14",
+    "@types/react": "19.2.17",
+    "eslint": "8.57.1",
+    "fast-check": "4.3.0",
+    "jest": "29.7.0",
+    "prettier": "2.8.8",
+    "test-renderer": "1.2.0",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": "24.18.0",
+    "npm": "11.6.0"
+  },
+  "codegenConfig": {
+    "name": "BirthdayNativeSpec",
+    "type": "modules",
+    "jsSrcsDir": "specs/native",
+    "android": {
+      "javaPackageName": "com.yashsomani.birthdayautopilot.bridge.codegen"
+    },
+    "ios": {
+      "modulesProvider": {
+        "BirthdayNative": "BirthdayNative"
+      }
+    }
+  }
+}

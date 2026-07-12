@@ -1,0 +1,553 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "14075991686a6e112fc42da83aefbc32",
+    "entities": [
+      {
+        "tableName": "app_control",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`singletonId` INTEGER NOT NULL, `revision` INTEGER NOT NULL, `blockerRevision` INTEGER NOT NULL, `accountMode` TEXT NOT NULL, `automationDesired` INTEGER NOT NULL, `activeInstallationEpoch` INTEGER, `lastTrustedServerMillis` INTEGER, `lastTrustedElapsedMillis` INTEGER, `trustedBootCount` INTEGER, `resetSafetyState` TEXT NOT NULL, PRIMARY KEY(`singletonId`))",
+        "fields": [
+          {
+            "fieldPath": "singletonId",
+            "columnName": "singletonId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "revision",
+            "columnName": "revision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "blockerRevision",
+            "columnName": "blockerRevision",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "accountMode",
+            "columnName": "accountMode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "automationDesired",
+            "columnName": "automationDesired",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activeInstallationEpoch",
+            "columnName": "activeInstallationEpoch",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastTrustedServerMillis",
+            "columnName": "lastTrustedServerMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastTrustedElapsedMillis",
+            "columnName": "lastTrustedElapsedMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "trustedBootCount",
+            "columnName": "trustedBootCount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "resetSafetyState",
+            "columnName": "resetSafetyState",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "singletonId"
+          ]
+        }
+      },
+      {
+        "tableName": "contacts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`localId` TEXT NOT NULL, `sourceFingerprint` TEXT NOT NULL, `displayName` TEXT NOT NULL, `safeGivenName` TEXT, `birthdayMonth` INTEGER, `birthdayDay` INTEGER, `birthdayYear` INTEGER, `leapDayPolicy` TEXT, `phoneE164` TEXT, `normalizedDestinationBasis` TEXT, `maskedPhone` TEXT, `sourceUpdatedAtMillis` INTEGER NOT NULL, `readiness` TEXT NOT NULL, `enrollment` TEXT NOT NULL, `sourceDeleted` INTEGER NOT NULL, PRIMARY KEY(`localId`))",
+        "fields": [
+          {
+            "fieldPath": "localId",
+            "columnName": "localId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceFingerprint",
+            "columnName": "sourceFingerprint",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "safeGivenName",
+            "columnName": "safeGivenName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "birthdayMonth",
+            "columnName": "birthdayMonth",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "birthdayDay",
+            "columnName": "birthdayDay",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "birthdayYear",
+            "columnName": "birthdayYear",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "leapDayPolicy",
+            "columnName": "leapDayPolicy",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "phoneE164",
+            "columnName": "phoneE164",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "normalizedDestinationBasis",
+            "columnName": "normalizedDestinationBasis",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "maskedPhone",
+            "columnName": "maskedPhone",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceUpdatedAtMillis",
+            "columnName": "sourceUpdatedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "readiness",
+            "columnName": "readiness",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "enrollment",
+            "columnName": "enrollment",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceDeleted",
+            "columnName": "sourceDeleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "localId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_contacts_sourceFingerprint",
+            "unique": true,
+            "columnNames": [
+              "sourceFingerprint"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_contacts_sourceFingerprint` ON `${TABLE_NAME}` (`sourceFingerprint`)"
+          },
+          {
+            "name": "index_contacts_normalizedDestinationBasis",
+            "unique": false,
+            "columnNames": [
+              "normalizedDestinationBasis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_contacts_normalizedDestinationBasis` ON `${TABLE_NAME}` (`normalizedDestinationBasis`)"
+          },
+          {
+            "name": "index_contacts_birthdayMonth_birthdayDay",
+            "unique": false,
+            "columnNames": [
+              "birthdayMonth",
+              "birthdayDay"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_contacts_birthdayMonth_birthdayDay` ON `${TABLE_NAME}` (`birthdayMonth`, `birthdayDay`)"
+          }
+        ]
+      },
+      {
+        "tableName": "approvals",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`approvalId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `payloadHash` TEXT NOT NULL, `exactMessage` TEXT NOT NULL, `birthdayRule` TEXT NOT NULL, `windowStartMinutes` INTEGER NOT NULL, `windowEndMinutes` INTEGER NOT NULL, `graceEndMinutes` INTEGER, `simPolicy` TEXT NOT NULL, `segmentCount` INTEGER NOT NULL, `approvedAtMillis` INTEGER NOT NULL, `invalidatedAtMillis` INTEGER, `invalidationReason` TEXT, PRIMARY KEY(`approvalId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`localId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "approvalId",
+            "columnName": "approvalId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payloadHash",
+            "columnName": "payloadHash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "exactMessage",
+            "columnName": "exactMessage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "birthdayRule",
+            "columnName": "birthdayRule",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "windowStartMinutes",
+            "columnName": "windowStartMinutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "windowEndMinutes",
+            "columnName": "windowEndMinutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "graceEndMinutes",
+            "columnName": "graceEndMinutes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "simPolicy",
+            "columnName": "simPolicy",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "segmentCount",
+            "columnName": "segmentCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "approvedAtMillis",
+            "columnName": "approvedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "invalidatedAtMillis",
+            "columnName": "invalidatedAtMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "invalidationReason",
+            "columnName": "invalidationReason",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "approvalId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_approvals_contactId",
+            "unique": true,
+            "columnNames": [
+              "contactId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_approvals_contactId` ON `${TABLE_NAME}` (`contactId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "contacts",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "contactId"
+            ],
+            "referencedColumns": [
+              "localId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "occurrences",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`occurrenceId` TEXT NOT NULL, `contactId` TEXT NOT NULL, `localDate` TEXT NOT NULL, `timeZoneId` TEXT NOT NULL, `approvalPayloadHash` TEXT NOT NULL, `idempotencyKey` TEXT NOT NULL, `state` TEXT NOT NULL, `attempt` INTEGER NOT NULL, `armStartBlockerRevision` INTEGER, `serverSubmitNotAfterMillis` INTEGER, `effectiveSubmitNotAfterMillis` INTEGER, `barrierConsumedAtMillis` INTEGER, `submittedAtMillis` INTEGER, `terminalAtMillis` INTEGER, `safeOutcomeCode` TEXT, PRIMARY KEY(`occurrenceId`), FOREIGN KEY(`contactId`) REFERENCES `contacts`(`localId`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "occurrenceId",
+            "columnName": "occurrenceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contactId",
+            "columnName": "contactId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localDate",
+            "columnName": "localDate",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timeZoneId",
+            "columnName": "timeZoneId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "approvalPayloadHash",
+            "columnName": "approvalPayloadHash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idempotencyKey",
+            "columnName": "idempotencyKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attempt",
+            "columnName": "attempt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "armStartBlockerRevision",
+            "columnName": "armStartBlockerRevision",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "serverSubmitNotAfterMillis",
+            "columnName": "serverSubmitNotAfterMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "effectiveSubmitNotAfterMillis",
+            "columnName": "effectiveSubmitNotAfterMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "barrierConsumedAtMillis",
+            "columnName": "barrierConsumedAtMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "submittedAtMillis",
+            "columnName": "submittedAtMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "terminalAtMillis",
+            "columnName": "terminalAtMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "safeOutcomeCode",
+            "columnName": "safeOutcomeCode",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "occurrenceId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_occurrences_contactId",
+            "unique": false,
+            "columnNames": [
+              "contactId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_occurrences_contactId` ON `${TABLE_NAME}` (`contactId`)"
+          },
+          {
+            "name": "index_occurrences_localDate",
+            "unique": false,
+            "columnNames": [
+              "localDate"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_occurrences_localDate` ON `${TABLE_NAME}` (`localDate`)"
+          },
+          {
+            "name": "index_occurrences_state",
+            "unique": false,
+            "columnNames": [
+              "state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_occurrences_state` ON `${TABLE_NAME}` (`state`)"
+          },
+          {
+            "name": "index_occurrences_idempotencyKey",
+            "unique": true,
+            "columnNames": [
+              "idempotencyKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_occurrences_idempotencyKey` ON `${TABLE_NAME}` (`idempotencyKey`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "contacts",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "contactId"
+            ],
+            "referencedColumns": [
+              "localId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "activity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`activityId` TEXT NOT NULL, `category` TEXT NOT NULL, `safeCode` TEXT NOT NULL, `recordedAtMillis` INTEGER NOT NULL, `relatedOccurrenceId` TEXT, PRIMARY KEY(`activityId`))",
+        "fields": [
+          {
+            "fieldPath": "activityId",
+            "columnName": "activityId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "safeCode",
+            "columnName": "safeCode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordedAtMillis",
+            "columnName": "recordedAtMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "relatedOccurrenceId",
+            "columnName": "relatedOccurrenceId",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "activityId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_activity_recordedAtMillis",
+            "unique": false,
+            "columnNames": [
+              "recordedAtMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_activity_recordedAtMillis` ON `${TABLE_NAME}` (`recordedAtMillis`)"
+          },
+          {
+            "name": "index_activity_category",
+            "unique": false,
+            "columnNames": [
+              "category"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_activity_category` ON `${TABLE_NAME}` (`category`)"
+          }
+        ]
+      },
+      {
+        "tableName": "callback_counter",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`singletonId` INTEGER NOT NULL, `generation` TEXT NOT NULL, `nextPositiveId` INTEGER NOT NULL, PRIMARY KEY(`singletonId`))",
+        "fields": [
+          {
+            "fieldPath": "singletonId",
+            "columnName": "singletonId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "generation",
+            "columnName": "generation",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nextPositiveId",
+            "columnName": "nextPositiveId",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "singletonId"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '14075991686a6e112fc42da83aefbc32')"
+    ]
+  }
+}

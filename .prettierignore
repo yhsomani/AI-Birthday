@@ -1,0 +1,13 @@
+.bundle/
+/vendor/bundle/
+android/
+app/
+backend/
+coverage/
+ios/
+node_modules/
+phase0/
+spikes/
+stitch/
+DESIGN.md
+PROJECT_ABOUT.md

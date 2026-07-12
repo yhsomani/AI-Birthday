@@ -1,0 +1,198 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-android:
+    name: Quality and Android dev artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/functions/package-lock.json
+            backend/hosting/package-lock.json
+
+      - name: Pin npm
+        run: npm install --global npm@11.6.0
+
+      - name: Verify JavaScript toolchain
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.6.0"
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Install server and public-site dependencies
+        run: |
+          npm --prefix backend/functions ci
+          npm --prefix backend/hosting ci
+
+      - name: Run mobile and control-plane checks
+        run: npm run check:all
+
+      - name: Reject committed credentials and misplaced client configs
+        run: npm run security:secrets
+
+      - name: Reject high-severity dependency advisories
+        run: |
+          npm audit --audit-level=high
+          npm audit --prefix backend/functions --audit-level=high
+          npm audit --prefix backend/hosting --audit-level=high
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Install pinned Android SDK components
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager \
+            'platforms;android-36' \
+            'build-tools;36.0.0' \
+            'ndk;27.1.12297006'
+
+      - name: Verify Android toolchain
+        run: npm run doctor:android
+
+      - name: Run backend emulator safety tests
+        run: npm run backend:test:emulator
+
+      - name: Test, lint, and assemble Android dev
+        working-directory: android
+        run: >-
+          ./gradlew
+          :app:testDevDebugUnitTest
+          :app:compileDevDebugAndroidTestKotlin
+          :app:lintDevDebug
+          :app:assembleDevDebug
+          --no-configuration-cache
+
+      - name: Verify the unrestricted Android artifact
+        run: >-
+          tools/verify-android-apk.sh
+          android/app/build/outputs/apk/dev/debug/app-dev-debug.apk
+          com.yashsomani.birthdayautopilot.dev
+
+  ios-build:
+    name: iOS unsigned simulator build
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      BUNDLE_FROZEN: 'true'
+      COCOAPODS_DISABLE_STATS: 'true'
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Pin npm
+        run: npm install --global npm@11.6.0
+
+      - name: Verify JavaScript toolchain
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.6.0"
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Verify the path-safe React Native codegen installation
+        run: npm run codegen:check
+
+      - name: Set up pinned Ruby and Bundler
+        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1 # v1
+        with:
+          bundler-cache: true
+
+      - name: Verify Apple and Ruby toolchains
+        run: |
+          test "$(ruby -e 'print RUBY_VERSION')" = "3.4.10"
+          test "$(bundle --version | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -1)" = "4.0.15"
+          test "$(bundle exec pod --version)" = "1.16.2"
+          test "$(xcodebuild -version | sed -n '1p')" = "Xcode 26.5"
+          test "$(xcrun --sdk iphonesimulator --show-sdk-version)" = "26.5"
+
+      - name: Install deterministic iOS dependencies
+        run: npm run ios:pods
+
+      - name: Verify the complete iOS development environment
+        run: npm run doctor:ios
+
+      - name: Validate JavaScript and iOS security contracts
+        run: |
+          npm run typecheck
+          node --test tools/ios-*.test.mjs tools/gemini-native-contract.test.mjs
+
+      - name: Parse Swift sources
+        run: >-
+          find ios/BirthdayAutopilot tests/ios -name '*.swift' -print0
+          | xargs -0 xcrun swiftc -frontend -parse
+
+      - name: Validate Xcode and plist structure
+        run: |
+          plutil -lint \
+            ios/BirthdayAutopilot/Info.plist \
+            ios/BirthdayAutopilot/Info-Debug.plist \
+            ios/BirthdayAutopilot/PrivacyInfo.xcprivacy \
+            ios/BirthdayAutopilot/BirthdayAutopilot.entitlements \
+            ios/BirthdayAutopilot.xcodeproj/project.pbxproj
+          xcodebuild -workspace ios/BirthdayAutopilot.xcworkspace -list
+          ruby -c ios/Podfile
+          sh -n ios/scripts/copy-google-config.sh
+          sh -n ios/scripts/bundle-react-native.sh
+
+      - name: Run the standalone People parser contract
+        run: |
+          xcrun swiftc \
+            ios/BirthdayAutopilot/Contacts/PeopleContracts.swift \
+            ios/BirthdayAutopilot/Contacts/PeopleJSONParser.swift \
+            tests/ios/PeopleParserContractTests.swift \
+            -o "$RUNNER_TEMP/PeopleParserContractTests"
+          "$RUNNER_TEMP/PeopleParserContractTests"
+
+      - name: Build the unsigned iOS simulator app
+        run: >-
+          xcodebuild
+          -workspace ios/BirthdayAutopilot.xcworkspace
+          -scheme BirthdayAutopilot
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/BirthdayAutopilotDerivedData"
+          CODE_SIGNING_ALLOWED=NO
+          BIRTHDAY_FIREBASE_CONFIG_REQUIRED=NO
+          build

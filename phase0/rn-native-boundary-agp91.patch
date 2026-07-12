@@ -1,0 +1,47 @@
+diff --git a/android/build.gradle b/android/build.gradle
+--- a/android/build.gradle
++++ b/android/build.gradle
+@@ -2,8 +2,8 @@
+     ext {
+         buildToolsVersion = "36.0.0"
+         minSdkVersion = 29
+-        compileSdkVersion = 36
+-        targetSdkVersion = 36
++        compileSdkVersion = 37
++        targetSdkVersion = 37
+         ndkVersion = "27.1.12297006"
+         kotlinVersion = "2.1.20"
+     }
+diff --git a/android/app/build.gradle b/android/app/build.gradle
+--- a/android/app/build.gradle
++++ b/android/app/build.gradle
+@@ -108,7 +108,7 @@ android {
+             debuggable false
+             signingConfig signingConfigs.debug
+             minifyEnabled false
+-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
++            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+             matchingFallbacks = ["release"]
+         }
+     }
+diff --git a/android/gradle.properties b/android/gradle.properties
+--- a/android/gradle.properties
++++ b/android/gradle.properties
+@@ -42,3 +42,7 @@
+ # This allows your app to draw behind system bars for an immersive UI.
+ # Note: Only works with ReactActivity and should not be used with custom Activity.
+ edgeToEdgeEnabled=false
++
++# Disposable API 37/AGP 9.1.1 compatibility experiment only.
++android.builtInKotlin=false
++android.newDsl=false
+diff --git a/node_modules/@react-native/gradle-plugin/gradle/libs.versions.toml b/node_modules/@react-native/gradle-plugin/gradle/libs.versions.toml
+--- a/node_modules/@react-native/gradle-plugin/gradle/libs.versions.toml
++++ b/node_modules/@react-native/gradle-plugin/gradle/libs.versions.toml
+@@ -1,5 +1,5 @@
+ [versions]
+-agp = "8.12.0"
++agp = "9.1.1"
+ gson = "2.8.9"
+ guava = "31.0.1-jre"
+ javapoet = "1.13.0"

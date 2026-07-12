@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The coordination ledger is server-only. Authenticated mobile clients use
+    // callable Functions and never receive direct Firestore capability.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "installations",
+      "fieldPath": "cleanupAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "armBudgets",
+      "fieldPath": "cleanupAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "occurrenceClaims",
+      "fieldPath": "cleanupAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "occurrenceKeys",
+      "fieldPath": "cleanupAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "destinationGuards",
+      "fieldPath": "cleanupAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "testClaims",
+      "fieldPath": "cleanupAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "armOutcomes",
+      "fieldPath": "cleanupAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "claimRequests",
+      "fieldPath": "cleanupAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "deletionTombstones",
+      "fieldPath": "cleanupAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "coordinationOperationReceipts",
+      "fieldPath": "cleanupAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "coordinationLatestReceipts",
+      "fieldPath": "cleanupAt",
+      "indexes": []
+    }
+  ]
+}

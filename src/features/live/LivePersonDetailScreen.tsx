@@ -1,0 +1,773 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+
+import type { ApprovalBatchReview } from '../../domain/approvals/model';
+import type { LeapDayPolicy } from '../../domain/birthdays/model';
+import type {
+  EnrollmentReview,
+  PeopleMutationProjection,
+} from '../../domain/contacts/model';
+import type {
+  BirthdayChoiceId,
+  ContactId,
+  NativeRevision,
+  PhoneChoiceId,
+} from '../../domain/shared/brand';
+import type { NativeProblem, NativeResult } from '../../domain/shared/result';
+import type { PlatformCapability } from '../../domain/shared/platform';
+import { AppText } from '../../design-system/components/AppText';
+import {
+  Button,
+  Card,
+  ChoiceChip,
+  KeyValue,
+  ReadinessBanner,
+  Screen,
+  SectionHeading,
+  StatusRow,
+} from '../../design-system/components/Primitives';
+import { spacing } from '../../design-system/tokens/theme';
+import { useAppLocalization } from '../../localization/LocalizationProvider';
+import { formatLiveInstant } from '../../localization/formatLive';
+import {
+  approvalInvalidationMessageKey,
+  safeReasonMessageKey,
+} from '../../localization/reasonCopy';
+import type { LiveAppPort } from './LiveAppPort';
+import {
+  LiveActionFeedback,
+  LiveError,
+  LiveLoading,
+  LiveRefreshProblem,
+} from './LiveProjectionState';
+import { nativeBridgeProblem } from './nativeProblem';
+import { useLiveProjection } from './useLiveProjection';
+
+type EnrollmentReviewState = Readonly<{
+  review: EnrollmentReview;
+  revision: NativeRevision;
+}>;
+
+type ApprovalReviewState = Readonly<{
+  review: ApprovalBatchReview;
+  revision: NativeRevision;
+}>;
+
+type ChoiceReview =
+  | Readonly<{ kind: 'phone'; id: PhoneChoiceId }>
+  | Readonly<{
+      kind: 'birthday';
+      id: BirthdayChoiceId;
+      leapRequired: boolean;
+      leapPolicy?: LeapDayPolicy | undefined;
+    }>;
+
+export function LivePersonDetailScreen({
+  capability,
+  contactId,
+  onBack,
+  port,
+}: {
+  capability: PlatformCapability;
+  contactId: ContactId;
+  onBack: () => void;
+  port: LiveAppPort;
+}) {
+  const { language, t } = useAppLocalization();
+  const loadDetail = useCallback(
+    () => port.getPerson(contactId),
+    [contactId, port],
+  );
+  const detail = useLiveProjection(loadDetail, port, [
+    'contacts',
+    'automation',
+  ]);
+  const [pending, setPending] = useState(false);
+  const [problem, setProblem] = useState<NativeProblem>();
+  const [message, setMessage] = useState<string>();
+  const [enrollmentReview, setEnrollmentReview] =
+    useState<EnrollmentReviewState>();
+  const [approvalReview, setApprovalReview] = useState<ApprovalReviewState>();
+  const [choiceReview, setChoiceReview] = useState<ChoiceReview>();
+  const [confirmExclude, setConfirmExclude] = useState(false);
+
+  useEffect(() => {
+    setEnrollmentReview(undefined);
+    setApprovalReview(undefined);
+    setChoiceReview(undefined);
+    setConfirmExclude(false);
+    setProblem(undefined);
+    setMessage(undefined);
+  }, [contactId]);
+
+  useEffect(
+    () =>
+      port.subscribeInvalidations(event => {
+        if (
+          event.areas.includes('contacts') ||
+          event.areas.includes('automation')
+        ) {
+          setEnrollmentReview(undefined);
+          setApprovalReview(undefined);
+          setChoiceReview(undefined);
+          setConfirmExclude(false);
+        }
+      }),
+    [port],
+  );
+
+  const fail = async (actionProblem: NativeProblem) => {
+    if (actionProblem.kind === 'stale-revision') {
+      await detail.reload();
+      setEnrollmentReview(undefined);
+      setApprovalReview(undefined);
+      setChoiceReview(undefined);
+      setConfirmExclude(false);
+    }
+    setProblem(actionProblem);
+    setPending(false);
+  };
+
+  const reloadAfterAccepted = async (acceptedMessage: string) => {
+    const refreshed = await detail.reload();
+    setEnrollmentReview(undefined);
+    setApprovalReview(undefined);
+    setChoiceReview(undefined);
+    setConfirmExclude(false);
+    setMessage(
+      refreshed.kind === 'ok'
+        ? acceptedMessage
+        : t('live.person.acceptedUnverified'),
+    );
+    setPending(false);
+  };
+
+  const finishMutation = async (
+    result: NativeResult<PeopleMutationProjection>,
+    acceptedMessage: string,
+  ) => {
+    if (result.kind === 'error') {
+      await fail(result.problem);
+      return;
+    }
+    await reloadAfterAccepted(acceptedMessage);
+  };
+
+  const prepareEnrollment = async (revision: NativeRevision) => {
+    setPending(true);
+    setProblem(undefined);
+    setMessage(undefined);
+    let result: Awaited<ReturnType<LiveAppPort['prepareEnrollmentReview']>>;
+    try {
+      result = await port.prepareEnrollmentReview({
+        contactIds: [contactId],
+        expectedRevision: revision,
+      });
+    } catch {
+      result = { kind: 'error', problem: nativeBridgeProblem };
+    }
+    if (result.kind === 'error') {
+      await fail(result.problem);
+      return;
+    }
+    setEnrollmentReview({
+      review: result.envelope.value,
+      revision: result.envelope.revision,
+    });
+    setPending(false);
+  };
+
+  const confirmEnrollment = async () => {
+    if (!enrollmentReview) {
+      return;
+    }
+    setPending(true);
+    let result: Awaited<ReturnType<LiveAppPort['confirmEnrollment']>>;
+    try {
+      result = await port.confirmEnrollment({
+        handle: enrollmentReview.review.handle,
+        expectedRevision: enrollmentReview.revision,
+      });
+    } catch {
+      result = { kind: 'error', problem: nativeBridgeProblem };
+    }
+    await finishMutation(result, t('live.person.enrollmentAccepted'));
+  };
+
+  const runRecipientMutation = async (
+    kind: 'pause' | 'restore' | 'exclude',
+    revision: NativeRevision,
+  ) => {
+    setPending(true);
+    setProblem(undefined);
+    setMessage(undefined);
+    const input = { contactId, expectedRevision: revision };
+    let result: NativeResult<PeopleMutationProjection>;
+    try {
+      result =
+        kind === 'pause'
+          ? await port.pauseRecipient(input)
+          : kind === 'restore'
+          ? await port.restoreRecipient(input)
+          : await port.excludeRecipient(input);
+    } catch {
+      result = { kind: 'error', problem: nativeBridgeProblem };
+    }
+    await finishMutation(
+      result,
+      t(
+        kind === 'pause'
+          ? 'live.person.pauseAccepted'
+          : kind === 'restore'
+          ? 'live.person.restoreAccepted'
+          : 'live.person.excludeAccepted',
+      ),
+    );
+  };
+
+  const confirmChoice = async (revision: NativeRevision) => {
+    if (!choiceReview) {
+      return;
+    }
+    if (
+      choiceReview.kind === 'birthday' &&
+      choiceReview.leapRequired &&
+      !choiceReview.leapPolicy
+    ) {
+      return;
+    }
+    setPending(true);
+    setProblem(undefined);
+    setMessage(undefined);
+    let result: Awaited<ReturnType<LiveAppPort['getPerson']>>;
+    try {
+      result =
+        choiceReview.kind === 'phone'
+          ? await port.choosePhone({
+              contactId,
+              phoneId: choiceReview.id,
+              expectedRevision: revision,
+            })
+          : await port.chooseBirthday({
+              contactId,
+              birthdayId: choiceReview.id,
+              ...(choiceReview.leapPolicy
+                ? { leapPolicy: choiceReview.leapPolicy }
+                : {}),
+              expectedRevision: revision,
+            });
+    } catch {
+      result = { kind: 'error', problem: nativeBridgeProblem };
+    }
+    if (result.kind === 'error') {
+      await fail(result.problem);
+      return;
+    }
+    await reloadAfterAccepted(t('live.person.choiceAccepted'));
+  };
+
+  const prepareApproval = async (revision: NativeRevision) => {
+    setPending(true);
+    setProblem(undefined);
+    setMessage(undefined);
+    let result: Awaited<ReturnType<LiveAppPort['prepareApprovals']>>;
+    try {
+      result = await port.prepareApprovals({
+        contactIds: [contactId],
+        expectedRevision: revision,
+      });
+    } catch {
+      result = { kind: 'error', problem: nativeBridgeProblem };
+    }
+    if (result.kind === 'error') {
+      await fail(result.problem);
+      return;
+    }
+    const valid =
+      result.envelope.value.items.length === 1 &&
+      result.envelope.value.items.every(
+        item =>
+          item.platform === capability.platform && item.contactId === contactId,
+      );
+    if (!valid) {
+      await fail(nativeBridgeProblem);
+      return;
+    }
+    setApprovalReview({
+      review: result.envelope.value,
+      revision: result.envelope.revision,
+    });
+    setPending(false);
+  };
+
+  const confirmApproval = async () => {
+    if (!approvalReview) {
+      return;
+    }
+    setPending(true);
+    let result: Awaited<ReturnType<LiveAppPort['confirmApprovals']>>;
+    try {
+      result = await port.confirmApprovals({
+        handle: approvalReview.review.handle,
+        expectedRevision: approvalReview.revision,
+      });
+    } catch {
+      result = { kind: 'error', problem: nativeBridgeProblem };
+    }
+    if (result.kind === 'error') {
+      await fail(result.problem);
+      return;
+    }
+    await reloadAfterAccepted(t('live.person.approvalAccepted'));
+  };
+
+  if (detail.state.kind === 'loading') {
+    return (
+      <Screen includeTopInset testID="live-person-detail-screen">
+        <Button
+          label={t('live.person.back')}
+          onPress={onBack}
+          variant="ghost"
+        />
+        <LiveLoading label={t('live.person.loading')} />
+      </Screen>
+    );
+  }
+  if (detail.state.kind === 'error') {
+    return (
+      <Screen includeTopInset testID="live-person-detail-screen">
+        <Button
+          label={t('live.person.back')}
+          onPress={onBack}
+          variant="ghost"
+        />
+        <LiveError
+          title={t('live.person.unavailable')}
+          problem={detail.state.problem}
+          onRetry={() => detail.reload()}
+        />
+      </Screen>
+    );
+  }
+
+  const projection = detail.state.result.envelope.value;
+  const revision = detail.state.result.envelope.revision;
+  const enrollment = projection.summary.enrollment;
+  const canEnroll =
+    enrollment.kind === 'off' && projection.summary.readiness.kind === 'ready';
+  const approval =
+    enrollment.kind === 'enabled' || enrollment.kind === 'paused'
+      ? enrollment.approval
+      : undefined;
+  const approvalText = !approval
+    ? t('live.person.approvalNone')
+    : approval.kind === 'missing'
+    ? t('live.person.approvalMissing')
+    : approval.kind === 'valid'
+    ? t('live.person.approvalValid', {
+        time: formatLiveInstant(approval.approvedAt, language),
+      })
+    : t('live.person.approvalInvalid', {
+        reasons: [
+          ...new Set(
+            approval.reasons.map(reason =>
+              t(approvalInvalidationMessageKey(reason)),
+            ),
+          ),
+        ].join(' '),
+      });
+  const enrollmentText =
+    enrollment.kind === 'paused'
+      ? t('live.people.statusPaused', {
+          reason: t(safeReasonMessageKey(enrollment.reason)),
+        })
+      : t(`live.common.${enrollment.kind}`);
+
+  return (
+    <Screen includeTopInset testID="live-person-detail-screen">
+      <Button
+        label={t('live.person.back')}
+        onPress={onBack}
+        variant="ghost"
+        testID="live-person-back"
+      />
+      <AppText variant="title" accessibilityRole="header">
+        {projection.summary.displayName}
+      </AppText>
+      <AppText color="muted">{t('live.person.privateBody')}</AppText>
+      {detail.state.refreshProblem ? (
+        <LiveRefreshProblem problem={detail.state.refreshProblem} />
+      ) : null}
+      <LiveActionFeedback problem={problem} message={message} />
+
+      <Card accessibilityLabel={t('live.person.summary')}>
+        <KeyValue
+          label={t('live.person.birthday')}
+          value={
+            projection.summary.birthdayLabel ?? t('live.common.needsReview')
+          }
+        />
+        <KeyValue
+          label={t('live.person.phone')}
+          value={projection.summary.maskedPhone ?? t('live.common.needsReview')}
+        />
+        <KeyValue
+          label={t('live.person.nextOccurrence')}
+          value={projection.nextOccurrenceLabel ?? t('live.common.notPlanned')}
+        />
+        <KeyValue
+          label={t('live.person.latestOutcome')}
+          value={projection.lastOutcomeLabel ?? t('live.common.noOutcome')}
+        />
+        <StatusRow
+          title={t('live.person.enrollment')}
+          detail={enrollmentText}
+          tone={enrollment.kind === 'enabled' ? 'positive' : 'neutral'}
+          testID="live-person-enrollment"
+        />
+        <StatusRow
+          title={t('live.person.approval')}
+          detail={approvalText}
+          tone={approval?.kind === 'valid' ? 'positive' : 'warning'}
+        />
+      </Card>
+
+      <ReadinessBanner
+        title={t(
+          capability.platform === 'android'
+            ? 'live.person.androidSafety'
+            : 'live.person.iosSafety',
+        )}
+        detail={t(
+          capability.platform === 'android'
+            ? 'live.person.androidSafetyBody'
+            : 'live.person.iosSafetyBody',
+        )}
+        tone="info"
+      />
+
+      {projection.phoneChoices.length > 0 ? (
+        <>
+          <SectionHeading
+            title={t('live.person.phoneChoices')}
+            supporting={t('live.person.phoneChoicesBody')}
+          />
+          {projection.phoneChoices.map(choice => (
+            <Card key={choice.id}>
+              <StatusRow
+                title={`${choice.maskedDisplay} · ${choice.sourceLabel}`}
+                detail={
+                  choice.id === projection.selectedPhoneId
+                    ? t('live.common.selected')
+                    : choice.issue
+                    ? t(safeReasonMessageKey(choice.issue))
+                    : choice.selectable
+                    ? t('live.common.availableReview')
+                    : t('live.common.unavailable')
+                }
+                tone={
+                  choice.id === projection.selectedPhoneId
+                    ? 'positive'
+                    : 'neutral'
+                }
+              />
+              {choice.selectable && choice.id !== projection.selectedPhoneId ? (
+                <Button
+                  label={t('live.person.choosePhone')}
+                  onPress={() =>
+                    setChoiceReview({ kind: 'phone', id: choice.id })
+                  }
+                  variant="secondary"
+                  testID={`live-choose-phone-${choice.id}`}
+                />
+              ) : null}
+            </Card>
+          ))}
+        </>
+      ) : null}
+
+      {projection.birthdayChoices.length > 0 ? (
+        <>
+          <SectionHeading
+            title={t('live.person.birthdayChoices')}
+            supporting={t('live.person.birthdayChoicesBody')}
+          />
+          {projection.birthdayChoices.map(choice => (
+            <Card key={choice.id}>
+              <StatusRow
+                title={choice.displayLabel}
+                detail={
+                  choice.id === projection.selectedBirthdayId
+                    ? t('live.common.selected')
+                    : choice.issue
+                    ? t(safeReasonMessageKey(choice.issue))
+                    : choice.selectable
+                    ? t('live.common.availableReview')
+                    : t('live.common.unavailable')
+                }
+                tone={
+                  choice.id === projection.selectedBirthdayId
+                    ? 'positive'
+                    : 'neutral'
+                }
+              />
+              {choice.selectable &&
+              choice.id !== projection.selectedBirthdayId ? (
+                <Button
+                  label={t('live.person.chooseBirthday')}
+                  onPress={() =>
+                    setChoiceReview({
+                      kind: 'birthday',
+                      id: choice.id,
+                      leapRequired: choice.issue === 'leap-policy-required',
+                    })
+                  }
+                  variant="secondary"
+                  testID={`live-choose-birthday-${choice.id}`}
+                />
+              ) : null}
+            </Card>
+          ))}
+        </>
+      ) : null}
+
+      {choiceReview ? (
+        <Card>
+          <AppText variant="heading">{t('live.person.confirmChoice')}</AppText>
+          {choiceReview.kind === 'birthday' && choiceReview.leapRequired ? (
+            <>
+              <SectionHeading title={t('live.person.leapPolicy')} />
+              <View style={styles.choices} accessibilityRole="radiogroup">
+                {(
+                  [
+                    ['feb-28', 'live.person.leapFeb28'],
+                    ['mar-01', 'live.person.leapMar01'],
+                    ['skip', 'live.person.leapSkip'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <ChoiceChip
+                    key={value}
+                    label={t(label)}
+                    selected={choiceReview.leapPolicy === value}
+                    onPress={() =>
+                      setChoiceReview({ ...choiceReview, leapPolicy: value })
+                    }
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+          <Button
+            label={t('live.person.confirmChoice')}
+            disabled={
+              pending ||
+              (choiceReview.kind === 'birthday' &&
+                choiceReview.leapRequired &&
+                !choiceReview.leapPolicy)
+            }
+            onPress={() => confirmChoice(revision)}
+            testID="live-confirm-choice"
+          />
+          <Button
+            label={t('live.common.cancel')}
+            onPress={() => setChoiceReview(undefined)}
+            variant="secondary"
+          />
+        </Card>
+      ) : null}
+
+      {enrollmentReview ? (
+        <Card accessibilityLabel={t('live.person.confirmEnrollment')}>
+          <AppText variant="heading">
+            {t('live.person.confirmEnrollment')}
+          </AppText>
+          <AppText>
+            {t('live.person.readyAttention', {
+              ready: enrollmentReview.review.readyCount,
+              attention: enrollmentReview.review.attentionCount,
+            })}
+          </AppText>
+          <AppText color="muted">
+            {t('live.person.confirmEnrollmentBody')}
+          </AppText>
+          <Button
+            label={
+              pending
+                ? t('live.person.confirming')
+                : t('live.person.confirmEnrollment')
+            }
+            disabled={pending}
+            onPress={confirmEnrollment}
+            testID="live-person-confirm-enrollment"
+          />
+          <Button
+            label={t('live.person.cancelReview')}
+            disabled={pending}
+            onPress={() => setEnrollmentReview(undefined)}
+            variant="secondary"
+          />
+        </Card>
+      ) : null}
+
+      {approvalReview ? (
+        <Card>
+          <AppText variant="heading">
+            {t(
+              capability.platform === 'android'
+                ? 'live.person.approvalTitle'
+                : 'live.person.iosApprovalTitle',
+            )}
+          </AppText>
+          {approvalReview.review.items.map(item => (
+            <View key={item.contactId} style={styles.reviewItem}>
+              <AppText variant="label">{item.recipient}</AppText>
+              <KeyValue
+                label={t('live.person.phone')}
+                value={item.maskedPhone}
+              />
+              <KeyValue
+                label={t('live.person.birthday')}
+                value={item.birthdayLabel}
+              />
+              <KeyValue
+                label={t('live.common.message')}
+                value={item.exactText}
+              />
+              {item.platform === 'android' ? (
+                <>
+                  <KeyValue
+                    label={t('live.common.sim')}
+                    value={item.simLabel}
+                  />
+                  <KeyValue
+                    label={t('live.home.window')}
+                    value={item.windowLabel}
+                  />
+                  <AppText color="muted">{item.chargeDisclosure}</AppText>
+                </>
+              ) : (
+                <ReadinessBanner
+                  title={t('live.person.iosApprovalTitle')}
+                  detail={t('live.person.iosApprovalBody')}
+                  tone="info"
+                />
+              )}
+              <AppText color="muted">{item.consentDisclosure}</AppText>
+            </View>
+          ))}
+          <Button
+            label={t('live.person.approvalConfirm')}
+            disabled={pending}
+            onPress={confirmApproval}
+            testID="live-confirm-approval"
+          />
+          <Button
+            label={t('live.common.cancel')}
+            onPress={() => setApprovalReview(undefined)}
+            variant="secondary"
+          />
+        </Card>
+      ) : null}
+
+      {!enrollmentReview && canEnroll ? (
+        <Button
+          label={
+            pending
+              ? t('live.person.preparing')
+              : t('live.person.reviewEnrollment')
+          }
+          disabled={pending}
+          onPress={() => prepareEnrollment(revision)}
+          testID="live-person-review-enrollment"
+        />
+      ) : null}
+      {enrollment.kind === 'off' && !canEnroll ? (
+        <ReadinessBanner
+          title={t('live.person.enrollmentBlocked')}
+          detail={t('live.person.enrollmentBlockedBody')}
+          tone="warning"
+        />
+      ) : null}
+      {enrollment.kind === 'enabled' || enrollment.kind === 'paused' ? (
+        <Button
+          label={t(
+            capability.platform === 'android'
+              ? 'live.person.approvalReview'
+              : 'live.person.iosApprovalReview',
+          )}
+          disabled={pending}
+          onPress={() => prepareApproval(revision)}
+          testID="live-review-approval"
+        />
+      ) : null}
+      {enrollment.kind === 'enabled' ? (
+        <Button
+          label={pending ? t('live.person.pausing') : t('live.person.pause')}
+          disabled={pending}
+          onPress={() => runRecipientMutation('pause', revision)}
+          variant="secondary"
+          testID="live-person-pause"
+        />
+      ) : null}
+      {enrollment.kind === 'paused' || enrollment.kind === 'excluded' ? (
+        <Button
+          label={
+            pending ? t('live.person.restoring') : t('live.person.restore')
+          }
+          disabled={pending}
+          onPress={() => runRecipientMutation('restore', revision)}
+          variant="secondary"
+          testID="live-person-restore"
+        />
+      ) : null}
+      {enrollment.kind !== 'excluded' && confirmExclude ? (
+        <Card>
+          <AppText variant="heading">{t('live.person.excludeTitle')}</AppText>
+          <AppText>{t('live.person.excludeBody')}</AppText>
+          <Button
+            label={
+              pending
+                ? t('live.person.excluding')
+                : t('live.person.excludeConfirm')
+            }
+            disabled={pending}
+            onPress={() => runRecipientMutation('exclude', revision)}
+            variant="danger"
+            testID="live-person-confirm-exclude"
+          />
+          <Button
+            label={t('live.person.excludeKeep')}
+            disabled={pending}
+            onPress={() => setConfirmExclude(false)}
+            variant="secondary"
+          />
+        </Card>
+      ) : null}
+      {enrollment.kind !== 'excluded' && !confirmExclude ? (
+        <Button
+          label={t('live.person.exclude')}
+          disabled={pending}
+          onPress={() => setConfirmExclude(true)}
+          variant="ghost"
+          testID="live-person-exclude"
+        />
+      ) : null}
+      <Button
+        label={
+          detail.state.refreshing
+            ? t('live.common.refreshing')
+            : t('live.person.refresh')
+        }
+        disabled={detail.state.refreshing || pending}
+        onPress={() => detail.reload()}
+        variant="secondary"
+        testID="live-person-refresh"
+      />
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  reviewItem: { gap: spacing.sm, paddingVertical: spacing.sm },
+});

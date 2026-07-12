@@ -1,0 +1,41 @@
+import type {
+  PrivacyActionKind,
+  PrivacyActionReview,
+  PrivacyInventory,
+  LatestDeletionReceiptProjection,
+  CurrentPrivacyOperationProjection,
+  PrivacyOperationProjection,
+} from '../../domain/privacy/model';
+import type {
+  NativeRevision,
+  PrivacyOperationId,
+  PrivacyReviewHandle,
+} from '../../domain/shared/brand';
+import type { NativeResult } from '../../domain/shared/result';
+
+export interface PrivacyPort {
+  getInventory(): Promise<NativeResult<PrivacyInventory>>;
+  getLatestDeletionReceipt(): Promise<
+    NativeResult<LatestDeletionReceiptProjection>
+  >;
+  checkAccountDeletionStatus(): Promise<
+    NativeResult<LatestDeletionReceiptProjection>
+  >;
+  getCurrentOperation(): Promise<
+    NativeResult<CurrentPrivacyOperationProjection>
+  >;
+  prepareAction(input: {
+    kind: PrivacyActionKind;
+    expectedRevision: NativeRevision;
+  }): Promise<NativeResult<PrivacyActionReview>>;
+  confirmAction(input: {
+    handle: PrivacyReviewHandle;
+    expectedRevision: NativeRevision;
+  }): Promise<NativeResult<PrivacyOperationProjection>>;
+  getOperation(
+    operationId: PrivacyOperationId,
+  ): Promise<NativeResult<PrivacyOperationProjection>>;
+  resumeOperation(
+    operationId: PrivacyOperationId,
+  ): Promise<NativeResult<PrivacyOperationProjection>>;
+}

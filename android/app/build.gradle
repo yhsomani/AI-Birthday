@@ -1,0 +1,655 @@
+import groovy.json.JsonSlurper
+import java.security.KeyStore
+import java.security.MessageDigest
+import java.time.Instant
+import java.util.Arrays
+import java.util.Locale
+
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+apply plugin: "com.google.devtools.ksp"
+
+// Firebase configuration is intentionally flavor-local. A generic/main/build-type file could
+// silently connect the wrong application ID to the wrong project and is therefore rejected.
+def firebaseApplicationIds = [
+    dev: "com.yashsomani.birthdayautopilot.dev",
+    staging: "com.yashsomani.birthdayautopilot.staging",
+    lab: "com.yashsomani.birthdayautopilot.lab",
+    prod: "com.yashsomani.birthdayautopilot",
+]
+def allowedFirebaseConfigFiles = firebaseApplicationIds.collectEntries { tier, applicationId ->
+    [(tier): file("src/${tier}/google-services.json")]
+}
+def discoveredFirebaseConfigs = fileTree(projectDir) {
+    include "**/google-services.json"
+}.files
+def unexpectedFirebaseConfigs = discoveredFirebaseConfigs.findAll { candidate ->
+    !allowedFirebaseConfigFiles.values().any { allowed ->
+        candidate.canonicalFile == allowed.canonicalFile
+    }
+}
+if (!unexpectedFirebaseConfigs.isEmpty()) {
+    throw new GradleException(
+        "Firebase configuration must exist only at src/<dev|staging|lab|prod>/google-services.json; " +
+        "generic, main, and build-type files are forbidden."
+    )
+}
+
+def configuredFirebaseProjects = [:]
+allowedFirebaseConfigFiles.each { tier, configFile ->
+    if (!configFile.isFile()) return
+    if (configFile.length() <= 0 || configFile.length() > 1024 * 1024) {
+        throw new GradleException("${tier} Firebase configuration has an invalid size.")
+    }
+    def document
+    try {
+        document = new JsonSlurper().parse(configFile)
+    } catch (Exception ignored) {
+        throw new GradleException("${tier} Firebase configuration is malformed.")
+    }
+    def projectInfo = document instanceof Map ? document.project_info : null
+    def projectNumber = projectInfo instanceof Map ? projectInfo.project_number?.toString() : null
+    def projectId = projectInfo instanceof Map ? projectInfo.project_id?.toString() : null
+    if (!(projectNumber ==~ /[0-9]{6,32}/) ||
+        !(projectId ==~ /[a-z][a-z0-9-]{4,28}[a-z0-9]/)) {
+        throw new GradleException("${tier} Firebase project identity is invalid.")
+    }
+    if (configuredFirebaseProjects.values().any { existing ->
+        existing.projectId == projectId || existing.projectNumber == projectNumber
+    }) {
+        throw new GradleException("Firebase projects and project numbers cannot be shared across tiers.")
+    }
+    configuredFirebaseProjects[tier] = [projectId: projectId, projectNumber: projectNumber]
+
+    def clients = document.client instanceof Collection ? document.client : []
+    def matchingClients = clients.findAll { client ->
+        client instanceof Map &&
+            client.client_info instanceof Map &&
+            client.client_info.android_client_info instanceof Map &&
+            client.client_info.android_client_info.package_name == firebaseApplicationIds[tier]
+    }
+    if (matchingClients.size() != 1) {
+        throw new GradleException(
+            "${tier} Firebase configuration must contain exactly one client for ${firebaseApplicationIds[tier]}."
+        )
+    }
+    def matchingClient = matchingClients.single()
+    def mobileAppId = matchingClient.client_info.mobilesdk_app_id?.toString()
+    if (!(mobileAppId ==~ /1:${projectNumber}:android:[0-9a-fA-F]+/)) {
+        throw new GradleException("${tier} Firebase Android app ID does not match its project number.")
+    }
+    def oauthClients = matchingClient.oauth_client instanceof Collection
+        ? matchingClient.oauth_client
+        : []
+    def webClients = oauthClients.findAll { oauth ->
+        oauth instanceof Map &&
+            oauth.client_type == 3 &&
+            oauth.client_id?.toString() ==~ /[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com/
+    }
+    def androidClients = oauthClients.findAll { oauth ->
+        oauth instanceof Map &&
+            oauth.client_type == 1 &&
+            oauth.android_info instanceof Map &&
+            oauth.android_info.package_name == firebaseApplicationIds[tier] &&
+            oauth.android_info.certificate_hash?.toString() ==~ /[0-9a-fA-F]{40}/
+    }
+    if (webClients.size() != 1 || androidClients.isEmpty()) {
+        throw new GradleException(
+            "${tier} Firebase configuration requires one Web OAuth client and at least one " +
+            "certificate-bound Android OAuth client for its exact application ID."
+        )
+    }
+    def apiKeys = matchingClient.api_key instanceof Collection ? matchingClient.api_key : []
+    if (!apiKeys.any { key ->
+        key instanceof Map && key.current_key?.toString() ==~ /AIza[A-Za-z0-9_-]{20,}/
+    }) {
+        throw new GradleException("${tier} Firebase configuration has no valid public application API key.")
+    }
+}
+
+if (!configuredFirebaseProjects.isEmpty()) {
+    // The Google Services plugin itself then fails a requested flavor that lacks its own exact
+    // file; it cannot fall back to another flavor because no shared location is permitted above.
+    apply plugin: "com.google.gms.google-services"
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
+    arg("room.generateKotlin", "true")
+}
+
+/**
+ * This is the configuration block to customize your React Native Android app.
+ * By default you don't need to apply any configuration, just uncomment the lines you need.
+ */
+react {
+    /* Folders */
+    //   The root of your project, i.e. where "package.json" lives. Default is '../..'
+    // root = file("../../")
+    //   The folder where the react-native NPM package is. Default is ../../node_modules/react-native
+    // reactNativeDir = file("../../node_modules/react-native")
+    //   The folder where the react-native Codegen package is. Default is ../../node_modules/@react-native/codegen
+    // codegenDir = file("../../node_modules/@react-native/codegen")
+    //   The cli.js file which is the React Native CLI entrypoint. Default is ../../node_modules/react-native/cli.js
+    // cliFile = file("../../node_modules/react-native/cli.js")
+
+    /* Variants */
+    //   The list of variants to that are debuggable. For those we're going to
+    //   skip the bundling of the JS bundle and the assets. Default is "debug", "debugOptimized".
+    //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
+    debuggableVariants = [
+        "devDebug",
+        "devDebugOptimized",
+        "stagingDebug",
+        "stagingDebugOptimized",
+    ]
+
+    /* Bundling */
+    //   A list containing the node command and its flags. Default is just 'node'.
+    // nodeExecutableAndArgs = ["node"]
+    //
+    //   The command to run when bundling. By default is 'bundle'
+    // bundleCommand = "ram-bundle"
+    //
+    //   The path to the CLI configuration file. Default is empty.
+    // bundleConfig = file(../rn-cli.config.js)
+    //
+    //   The name of the generated asset file containing your JS bundle
+    // bundleAssetName = "MyApplication.android.bundle"
+    //
+    //   The entry file for bundle generation. Default is 'index.android.js' or 'index.js'
+    // entryFile = file("../js/MyApplication.android.js")
+    //
+    //   A list of extra flags to pass to the 'bundle' commands.
+    //   See https://github.com/react-native-community/cli/blob/main/docs/commands.md#bundle
+    // extraPackagerArgs = []
+
+    /* Hermes Commands */
+    //   The hermes compiler command to run. By default it is 'hermesc'
+    // hermesCommand = "$rootDir/my-custom-hermesc/bin/hermesc"
+    //
+    //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
+    // hermesFlags = ["-O", "-output-source-map"]
+
+    /* Autolinking */
+    autolinkLibrariesWithApp()
+}
+
+/**
+ * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ */
+def enableProguardInReleaseBuilds = true
+
+def releaseStorePath = System.getenv("BIRTHDAY_UPLOAD_STORE_FILE")
+def releaseStorePassword = System.getenv("BIRTHDAY_UPLOAD_STORE_PASSWORD")
+def releaseKeyAlias = System.getenv("BIRTHDAY_UPLOAD_KEY_ALIAS")
+def releaseKeyPassword = System.getenv("BIRTHDAY_UPLOAD_KEY_PASSWORD")
+def releaseSigningCertificateSha256 = System.getenv("BIRTHDAY_SIGNING_CERT_SHA256")
+    ?.replace(":", "")
+    ?.trim()
+    ?.toLowerCase(Locale.ROOT)
+def releaseSigningValues = [
+    releaseStorePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+    releaseSigningCertificateSha256,
+]
+def releaseSigningErrors = []
+def actualSigningCertificateSha256 = null
+if (!releaseSigningValues.every { value -> value != null && !value.isBlank() }) {
+    releaseSigningErrors.add("all release signing variables are required")
+} else if (!(releaseSigningCertificateSha256 ==~ /[0-9a-f]{64}/)) {
+    releaseSigningErrors.add("the expected signing certificate digest is invalid")
+} else {
+    def releaseStoreFile = file(releaseStorePath)
+    if (!releaseStoreFile.isFile() || releaseStoreFile.length() <= 0) {
+        releaseSigningErrors.add("the release keystore is missing")
+    } else {
+        char[] storePasswordChars = releaseStorePassword.toCharArray()
+        char[] keyPasswordChars = releaseKeyPassword.toCharArray()
+        try {
+            KeyStore keyStore = null
+            for (String type : ["PKCS12", "JKS"]) {
+                try {
+                    def candidate = KeyStore.getInstance(type)
+                    new FileInputStream(releaseStoreFile).withCloseable { stream ->
+                        candidate.load(stream, storePasswordChars)
+                    }
+                    keyStore = candidate
+                    break
+                } catch (Exception ignored) {
+                    keyStore = null
+                }
+            }
+            if (keyStore == null || !keyStore.isKeyEntry(releaseKeyAlias)) {
+                releaseSigningErrors.add("the release key entry cannot be verified")
+            } else {
+                def privateKey = keyStore.getKey(releaseKeyAlias, keyPasswordChars)
+                def certificate = keyStore.getCertificate(releaseKeyAlias)
+                if (!(privateKey instanceof java.security.PrivateKey) || certificate == null) {
+                    releaseSigningErrors.add("the release alias is not a private signing-key entry")
+                } else {
+                    actualSigningCertificateSha256 = MessageDigest.getInstance("SHA-256")
+                        .digest(certificate.encoded)
+                        .collect { byte value -> String.format("%02x", value & 0xff) }
+                        .join()
+                    if (actualSigningCertificateSha256 != releaseSigningCertificateSha256) {
+                        releaseSigningErrors.add("the release keystore certificate does not match the declared digest")
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            releaseSigningErrors.add("the release key entry cannot be verified")
+        } finally {
+            Arrays.fill(storePasswordChars, (char) 0)
+            Arrays.fill(keyPasswordChars, (char) 0)
+        }
+    }
+}
+def hasReleaseSigning = releaseSigningErrors.isEmpty()
+def distributionEvidencePath = System.getenv("BIRTHDAY_DISTRIBUTION_EVIDENCE_FILE")
+def distributionEvidenceFile = distributionEvidencePath == null || distributionEvidencePath.isBlank()
+    ? null
+    : file(distributionEvidencePath)
+def distributionEvidenceDocument = null
+if (distributionEvidenceFile?.isFile() &&
+    distributionEvidenceFile.length() in 1..(64 * 1024)) {
+    try {
+        distributionEvidenceDocument = new JsonSlurper().parse(distributionEvidenceFile)
+    } catch (Exception ignored) {
+        distributionEvidenceDocument = null
+    }
+}
+def expectedApplicationIds = [
+    lab: "com.yashsomani.birthdayautopilot.lab",
+    prod: "com.yashsomani.birthdayautopilot",
+]
+def evidenceTopLevelKeys = ["schemaVersion", "approvals"] as Set
+def evidenceApprovalKeys = [
+    "tier",
+    "status",
+    "applicationId",
+    "versionCode",
+    "channel",
+    "installerPackage",
+    "signingCertificateSha256",
+    "minimumCertifiedApi",
+    "maximumCertifiedApi",
+    "smsPermissionPolicyApproved",
+    "installerAllowlistVerified",
+    "physicalSmsMatrixPassed",
+    "telephonyStatePermissionApproved",
+    "appCheckEnforced",
+    "privacyMaterialsApproved",
+    "playUploadApproved",
+    "approvalReference",
+    "certifiedDeviceMatrixReference",
+    "carrierMatrixReference",
+    "legalReviewReference",
+    "approvedAt",
+    "validUntil",
+    "launchCountries",
+] as Set
+def safeEvidenceReference = { value ->
+    value instanceof String &&
+        value == value.trim() &&
+        value ==~ /[A-Za-z0-9][A-Za-z0-9 ._:\/#-]{0,255}/
+}
+def validateDistributionEvidence = { String tier ->
+    def errors = []
+    def document = distributionEvidenceDocument
+    if (!(document instanceof Map)) {
+        return [approval: null, errors: ["evidence JSON is missing or malformed"]]
+    }
+    if (document.schemaVersion != 1) {
+        errors.add("schemaVersion must be 1")
+    }
+    def unknownTopLevelKeys = document.keySet().findAll { !evidenceTopLevelKeys.contains(it) }
+    if (!unknownTopLevelKeys.isEmpty()) errors.add("evidence contains unsupported fields")
+    def approvals = document.approvals
+    if (!(approvals instanceof Collection) || approvals.size() !in 1..2) {
+        return [approval: null, errors: errors + ["approvals must contain one or two entries"]]
+    }
+    if (!approvals.every { it instanceof Map }) {
+        return [approval: null, errors: errors + ["every approval must be an object"]]
+    }
+    def approvalTiers = approvals.collect { it.tier }
+    if (approvalTiers.toSet().size() != approvalTiers.size()) {
+        errors.add("approval tiers must be unique")
+    }
+    def matchingApprovals = approvals.findAll { it.tier == tier }
+    def approval = matchingApprovals.size() == 1 ? matchingApprovals.single() : null
+    if (!(approval instanceof Map)) {
+        return [approval: null, errors: errors + ["${tier} approval is missing"]]
+    }
+    def unknownApprovalKeys = approval.keySet().findAll { !evidenceApprovalKeys.contains(it) }
+    if (!unknownApprovalKeys.isEmpty()) errors.add("${tier} approval contains unsupported fields")
+
+    if (approval.tier != tier) errors.add("${tier} tier does not match")
+    if (approval.status != "approved") errors.add("${tier} status is not approved")
+    if (approval.applicationId != expectedApplicationIds[tier]) {
+        errors.add("${tier} applicationId does not match")
+    }
+    if (approval.versionCode != 1) errors.add("${tier} versionCode does not match")
+    if (!(approval.channel in ["google-play", "managed-enterprise", "controlled-direct"])) {
+        errors.add("${tier} channel is unsupported")
+    }
+    if (!(approval.installerPackage instanceof String) ||
+        !(approval.installerPackage ==~ /[A-Za-z0-9_.]{3,255}/)) {
+        errors.add("${tier} installer package is invalid")
+    }
+    if (approval.channel == "google-play" && approval.installerPackage != "com.android.vending") {
+        errors.add("${tier} Google Play installer is invalid")
+    }
+    def evidenceCertificate = approval.signingCertificateSha256 instanceof String
+        ? approval.signingCertificateSha256.replace(":", "").toLowerCase(Locale.ROOT)
+        : ""
+    if (!(evidenceCertificate ==~ /[0-9a-f]{64}/) ||
+        evidenceCertificate != actualSigningCertificateSha256) {
+        errors.add("${tier} signing certificate does not match")
+    }
+    if (!(approval.minimumCertifiedApi instanceof Number) ||
+        !(approval.maximumCertifiedApi instanceof Number) ||
+        approval.minimumCertifiedApi != 29 ||
+        approval.maximumCertifiedApi < rootProject.ext.targetSdkVersion ||
+        approval.maximumCertifiedApi > 37 ||
+        approval.maximumCertifiedApi < approval.minimumCertifiedApi) {
+        errors.add("${tier} certified API range is invalid")
+    }
+    [
+        "smsPermissionPolicyApproved",
+        "installerAllowlistVerified",
+        "physicalSmsMatrixPassed",
+        "telephonyStatePermissionApproved",
+        "appCheckEnforced",
+        "privacyMaterialsApproved",
+    ].each { field ->
+        if (approval[field] != true) errors.add("${tier} ${field} is not verified")
+    }
+    if (approval.channel == "google-play" && approval.playUploadApproved != true) {
+        errors.add("${tier} Play upload approval is not verified")
+    }
+    if (approval.containsKey("playUploadApproved") &&
+        !(approval.playUploadApproved instanceof Boolean)) {
+        errors.add("${tier} Play upload approval has an invalid type")
+    }
+    if (!safeEvidenceReference(approval.approvalReference)) {
+        errors.add("${tier} approval reference is missing")
+    }
+    [
+        "certifiedDeviceMatrixReference",
+        "carrierMatrixReference",
+        "legalReviewReference",
+    ].each { field ->
+        if (!safeEvidenceReference(approval[field])) {
+            errors.add("${tier} ${field} is missing")
+        }
+    }
+    if (!(approval.launchCountries instanceof Collection) ||
+        !approval.launchCountries.contains("IN") ||
+        approval.launchCountries.toSet().size() != approval.launchCountries.size() ||
+        !approval.launchCountries.every { it instanceof String && it ==~ /[A-Z]{2}/ }) {
+        errors.add("${tier} launch countries are invalid or do not include IN")
+    }
+    try {
+        if (!(approval.approvedAt instanceof String) || !approval.approvedAt.endsWith("Z") ||
+            !(approval.validUntil instanceof String) || !approval.validUntil.endsWith("Z")) {
+            throw new IllegalArgumentException("timestamps must be UTC")
+        }
+        def approvedAt = Instant.parse(approval.approvedAt as String)
+        def validUntil = Instant.parse(approval.validUntil as String)
+        def now = Instant.now()
+        if (approvedAt.isAfter(now.plusSeconds(300))) {
+            errors.add("${tier} approval timestamp is in the future")
+        }
+        if (!validUntil.isAfter(now)) errors.add("${tier} approval is expired")
+        if (!validUntil.isAfter(approvedAt)) errors.add("${tier} approval validity is inverted")
+        if (validUntil.isAfter(approvedAt.plusSeconds(366L * 24 * 60 * 60))) {
+            errors.add("${tier} approval validity exceeds one year")
+        }
+    } catch (Exception ignored) {
+        errors.add("${tier} approval timestamps are invalid")
+    }
+
+    [approval: errors.isEmpty() ? approval : null, errors: errors]
+}
+def labEvidence = validateDistributionEvidence("lab")
+def prodEvidence = validateDistributionEvidence("prod")
+def distributionEvidenceByTier = [lab: labEvidence, prod: prodEvidence]
+
+// Inspect the resolved graph, not only the command line. This prevents aggregate
+// tasks such as `assemble`, `build`, `assembleRelease`, and `bundleRelease` from
+// bypassing the restricted-SMS release gate.
+gradle.taskGraph.whenReady { graph ->
+    def artifactTasksByTier = [
+        lab: ["packagelabrelease", "packagelabreleasebundle", "signlabreleasebundle"],
+        prod: ["packageprodrelease", "packageprodreleasebundle", "signprodreleasebundle"],
+    ]
+    def requestedRestrictedTiers = artifactTasksByTier.findAll { tier, artifactTaskNames ->
+        graph.allTasks.any { task ->
+            task.project == project && artifactTaskNames.contains(task.name.toLowerCase())
+        }
+    }.keySet()
+    def missingFirebaseTiers = requestedRestrictedTiers.findAll { tier ->
+        !file("src/${tier}/google-services.json").isFile()
+    }
+    def evidenceErrors = requestedRestrictedTiers.collectMany { tier ->
+        distributionEvidenceByTier[tier].errors
+    }
+    def gateErrors = []
+    if (!hasReleaseSigning) gateErrors.addAll(releaseSigningErrors)
+    missingFirebaseTiers.each { tier ->
+        gateErrors.add("${tier} Firebase configuration is missing")
+    }
+    gateErrors.addAll(evidenceErrors)
+
+    if (!requestedRestrictedTiers.isEmpty() &&
+        !gateErrors.isEmpty()) {
+        throw new GradleException(
+            "Restricted SMS release gates are incomplete. Configure certificate-bound signing, " +
+            "valid structured distribution evidence, and the requested tier Firebase config. " +
+            "Checks: ${gateErrors.unique().join('; ')}"
+        )
+    }
+}
+
+if (!hermesEnabled.toBoolean()) {
+    throw new GradleException("Hermes is a pinned production invariant; the dynamic JSC fallback is disabled.")
+}
+
+android {
+    ndkVersion = rootProject.ext.ndkVersion
+    buildToolsVersion = rootProject.ext.buildToolsVersion
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    namespace = "com.yashsomani.birthdayautopilot"
+    defaultConfig {
+        applicationId "com.yashsomani.birthdayautopilot"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "boolean", "RESTRICTED_SMS_CAPABLE", "false"
+        buildConfigField "String", "APPROVED_DISTRIBUTION_CHANNEL", '""'
+        buildConfigField "String", "APPROVED_INSTALLER_PACKAGE", '""'
+        buildConfigField "String", "APPROVED_SIGNING_CERTIFICATE_SHA256", '""'
+        buildConfigField "int", "MINIMUM_CERTIFIED_API", "0"
+        buildConfigField "int", "MAXIMUM_CERTIFIED_API", "0"
+        buildConfigField "long", "DISTRIBUTION_EVIDENCE_EXPIRES_AT_SECONDS", "0L"
+    }
+
+    flavorDimensions "environment"
+    productFlavors {
+        dev {
+            dimension "environment"
+            applicationIdSuffix ".dev"
+            versionNameSuffix "-dev"
+            buildConfigField "String", "APP_ENV", '"dev"'
+        }
+        staging {
+            dimension "environment"
+            applicationIdSuffix ".staging"
+            versionNameSuffix "-staging"
+            buildConfigField "String", "APP_ENV", '"staging"'
+        }
+        lab {
+            dimension "environment"
+            applicationIdSuffix ".lab"
+            versionNameSuffix "-lab"
+            buildConfigField "String", "APP_ENV", '"lab"'
+            buildConfigField "boolean", "RESTRICTED_SMS_CAPABLE", labEvidence.approval == null ? "false" : "true"
+            buildConfigField "String", "APPROVED_DISTRIBUTION_CHANNEL", labEvidence.approval == null
+                ? '""'
+                : '"' + labEvidence.approval.channel + '"'
+            buildConfigField "String", "APPROVED_INSTALLER_PACKAGE", labEvidence.approval == null
+                ? '""'
+                : '"' + labEvidence.approval.installerPackage + '"'
+            buildConfigField "String", "APPROVED_SIGNING_CERTIFICATE_SHA256", labEvidence.approval == null
+                ? '""'
+                : '"' + actualSigningCertificateSha256 + '"'
+            buildConfigField "int", "MINIMUM_CERTIFIED_API", labEvidence.approval == null
+                ? "0"
+                : labEvidence.approval.minimumCertifiedApi.toString()
+            buildConfigField "int", "MAXIMUM_CERTIFIED_API", labEvidence.approval == null
+                ? "0"
+                : labEvidence.approval.maximumCertifiedApi.toString()
+            buildConfigField "long", "DISTRIBUTION_EVIDENCE_EXPIRES_AT_SECONDS", labEvidence.approval == null
+                ? "0L"
+                : Instant.parse(labEvidence.approval.validUntil as String).epochSecond + "L"
+        }
+        prod {
+            dimension "environment"
+            buildConfigField "String", "APP_ENV", '"prod"'
+            buildConfigField "boolean", "RESTRICTED_SMS_CAPABLE", prodEvidence.approval == null ? "false" : "true"
+            buildConfigField "String", "APPROVED_DISTRIBUTION_CHANNEL", prodEvidence.approval == null
+                ? '""'
+                : '"' + prodEvidence.approval.channel + '"'
+            buildConfigField "String", "APPROVED_INSTALLER_PACKAGE", prodEvidence.approval == null
+                ? '""'
+                : '"' + prodEvidence.approval.installerPackage + '"'
+            buildConfigField "String", "APPROVED_SIGNING_CERTIFICATE_SHA256", prodEvidence.approval == null
+                ? '""'
+                : '"' + actualSigningCertificateSha256 + '"'
+            buildConfigField "int", "MINIMUM_CERTIFIED_API", prodEvidence.approval == null
+                ? "0"
+                : prodEvidence.approval.minimumCertifiedApi.toString()
+            buildConfigField "int", "MAXIMUM_CERTIFIED_API", prodEvidence.approval == null
+                ? "0"
+                : prodEvidence.approval.maximumCertifiedApi.toString()
+            buildConfigField "long", "DISTRIBUTION_EVIDENCE_EXPIRES_AT_SECONDS", prodEvidence.approval == null
+                ? "0L"
+                : Instant.parse(prodEvidence.approval.validUntil as String).epochSecond + "L"
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    testOptions {
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
+    }
+
+    sourceSets {
+        androidTest.assets.srcDirs += files("$projectDir/schemas")
+    }
+
+    signingConfigs {
+        debug {
+            storeFile = file('debug.keystore')
+            storePassword = 'android'
+            keyAlias = 'androiddebugkey'
+            keyPassword = 'android'
+        }
+        if (hasReleaseSigning) {
+            release {
+                storeFile = file(releaseStorePath)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig = signingConfigs.debug
+            manifestPlaceholders = [usesCleartextTraffic: "true"]
+        }
+        release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.release
+            }
+            manifestPlaceholders = [usesCleartextTraffic: "false"]
+            minifyEnabled = enableProguardInReleaseBuilds
+            shrinkResources = enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+}
+
+androidComponents {
+    beforeVariants(selector().all()) { variantBuilder ->
+        def environment = variantBuilder.productFlavors.find { flavor ->
+            flavor.first == "environment"
+        }?.second
+        if ((environment == "lab" || environment == "prod") &&
+            variantBuilder.buildType != "release") {
+            variantBuilder.enable = false
+        }
+    }
+}
+
+dependencies {
+    // The version of react-native is set by the React Native Gradle Plugin
+    implementation("com.facebook.react:react-android")
+
+    implementation("com.facebook.react:hermes-android")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("androidx.room:room-runtime:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.4")
+    implementation("androidx.work:work-runtime:2.11.2")
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
+    implementation("com.google.android.gms:play-services-auth:21.6.0")
+    // Firebase BoM 34.11.0's compatible pair. Auth 24.1.0 is compiled with Kotlin 2.3
+    // metadata and cannot be consumed by this RN/AGP stack's pinned Kotlin 2.1.20 compiler.
+    implementation("com.google.firebase:firebase-auth:24.0.1")
+    implementation("com.google.firebase:firebase-appcheck-playintegrity:19.2.0")
+    implementation("com.google.firebase:firebase-ai:17.13.0")
+    implementation("com.google.firebase:firebase-functions:22.1.1")
+    implementation("com.google.code.gson:gson:2.14.0")
+    implementation("com.googlecode.libphonenumber:libphonenumber:9.0.34")
+    implementation("net.zetetic:sqlcipher-android:4.17.0")
+    implementation("androidx.sqlite:sqlite:2.6.2")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("androidx.room:room-testing:2.8.4")
+    // Android's framework org.json methods are stubs in local JVM tests.
+    testImplementation("org.json:json:20250517")
+
+    androidTestImplementation("androidx.test:core:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
+    androidTestImplementation("androidx.test.espresso:espresso-accessibility:3.7.0")
+    androidTestImplementation("androidx.room:room-testing:2.8.4")
+    androidTestImplementation("androidx.work:work-testing:2.11.2")
+    androidTestUtil("androidx.test:orchestrator:1.6.1")
+}

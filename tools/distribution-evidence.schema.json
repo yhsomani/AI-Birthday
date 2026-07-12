@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://birthday-autopilot.invalid/schemas/distribution-evidence-v1.json",
+  "title": "Birthday Autopilot restricted SMS distribution evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "approvals"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "approvals": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tier",
+          "status",
+          "applicationId",
+          "versionCode",
+          "channel",
+          "installerPackage",
+          "signingCertificateSha256",
+          "minimumCertifiedApi",
+          "maximumCertifiedApi",
+          "smsPermissionPolicyApproved",
+          "installerAllowlistVerified",
+          "physicalSmsMatrixPassed",
+          "telephonyStatePermissionApproved",
+          "appCheckEnforced",
+          "privacyMaterialsApproved",
+          "approvalReference",
+          "certifiedDeviceMatrixReference",
+          "carrierMatrixReference",
+          "legalReviewReference",
+          "approvedAt",
+          "validUntil",
+          "launchCountries"
+        ],
+        "properties": {
+          "tier": { "enum": ["lab", "prod"] },
+          "status": { "const": "approved" },
+          "applicationId": {
+            "enum": [
+              "com.yashsomani.birthdayautopilot.lab",
+              "com.yashsomani.birthdayautopilot"
+            ]
+          },
+          "versionCode": { "const": 1 },
+          "channel": {
+            "enum": ["google-play", "managed-enterprise", "controlled-direct"]
+          },
+          "installerPackage": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.]{3,255}$"
+          },
+          "signingCertificateSha256": {
+            "type": "string",
+            "pattern": "^(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$|^[0-9A-Fa-f]{64}$"
+          },
+          "minimumCertifiedApi": {
+            "const": 29
+          },
+          "maximumCertifiedApi": {
+            "type": "integer",
+            "minimum": 36,
+            "maximum": 37
+          },
+          "smsPermissionPolicyApproved": { "const": true },
+          "installerAllowlistVerified": { "const": true },
+          "physicalSmsMatrixPassed": { "const": true },
+          "telephonyStatePermissionApproved": { "const": true },
+          "appCheckEnforced": { "const": true },
+          "privacyMaterialsApproved": { "const": true },
+          "playUploadApproved": { "type": "boolean" },
+          "approvalReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{0,255}$"
+          },
+          "certifiedDeviceMatrixReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{0,255}$"
+          },
+          "carrierMatrixReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{0,255}$"
+          },
+          "legalReviewReference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:/#-]{0,255}$"
+          },
+          "approvedAt": { "type": "string", "format": "date-time" },
+          "validUntil": { "type": "string", "format": "date-time" },
+          "launchCountries": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "contains": { "const": "IN" },
+            "items": { "type": "string", "pattern": "^[A-Z]{2}$" }
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "channel": { "const": "google-play" } } },
+            "then": {
+              "required": ["playUploadApproved"],
+              "properties": {
+                "playUploadApproved": { "const": true },
+                "installerPackage": { "const": "com.android.vending" }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

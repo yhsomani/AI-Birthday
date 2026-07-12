@@ -1,0 +1,26 @@
+{
+  "name": "birthday-autopilot-public-site",
+  "version": "0.1.0",
+  "description": "Privacy, help, legal, and authenticated account-deletion surface for Birthday Autopilot.",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.6.0",
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "npm": "11.6.0"
+  },
+  "scripts": {
+    "build": "vite build",
+    "build:release": "vite build && node tools/write-release-config.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "firebase": "12.16.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "8.1.4"
+  }
+}

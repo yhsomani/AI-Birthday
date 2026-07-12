@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "publicBaseUrl": "REQUIRED_PUBLIC_HTTPS_URL",
+  "developerDisplayName": "REQUIRED_APPROVED_PUBLIC_DEVELOPER_IDENTITY",
+  "supportUrl": "REQUIRED_IDENTITY_VERIFIED_SUPPORT_WORKFLOW_URL",
+  "recaptchaEnterpriseSiteKey": "REQUIRED_FIREBASE_APP_CHECK_ENTERPRISE_SITE_KEY",
+  "privacyEffectiveDate": "YYYY-MM-DD",
+  "termsEffectiveDate": "YYYY-MM-DD",
+  "legalApprovalReference": "REQUIRED_PRIVATE_REVIEW_REFERENCE",
+  "privacyApprovalReference": "REQUIRED_PRIVATE_REVIEW_REFERENCE",
+  "hindiCopyApprovalReference": "REQUIRED_PRIVATE_REVIEW_REFERENCE",
+  "adminDeletionRunbookReference": "REQUIRED_PRIVATE_REVIEW_REFERENCE",
+  "verifiedAdminDeletionWorkflowTested": false,
+  "productionFirebaseDeletionSagaTested": false
+}
