@@ -16,7 +16,7 @@ describe('relationship health and classification contract', () => {
 
   it('explains relationship health with actionable non-shaming reasons', () => {
     const state = createTestState();
-    const insight = buildRelationshipHealthInsight(state, 'c-mira', new Date('2026-07-09T10:00:00.000Z'));
+    const insight = buildRelationshipHealthInsight(state, 'c-mira');
 
     assert.equal(insight?.label, 'Needs attention');
     assert.match(insight?.summary ?? '', /needs attention/i);
