@@ -1,7 +1,7 @@
 import { defaultRelationshipGroupDefaults } from '../domain/contactPreferences';
 import type { AppState } from '../domain/types';
 
-const today = new Date();
+const today = new Date('2026-07-09T10:00:00.000Z');
 
 const isoFromNow = (days: number) => {
   const next = new Date(today);
