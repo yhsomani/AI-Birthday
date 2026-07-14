@@ -68,8 +68,10 @@ export const MinimalFunctionalShell = ({
         <Text accessibilityRole="header">{t(locale, 'functionalConsole.command')}</Text>
         <TextInput
           accessibilityLabel={t(locale, 'functionalConsole.commandJson')}
+          accessibilityState={{ disabled: running }}
           autoCapitalize="none"
           autoCorrect={false}
+          editable={!running}
           maxLength={maxCommandLength}
           multiline
           onChangeText={setRawCommand}
@@ -77,8 +79,10 @@ export const MinimalFunctionalShell = ({
         />
         <TextInput
           accessibilityLabel={t(locale, 'functionalConsole.secret')}
+          accessibilityState={{ disabled: running }}
           autoCapitalize="none"
           autoCorrect={false}
+          editable={!running}
           maxLength={maxSecretLength}
           onChangeText={setCommandSecret}
           secureTextEntry
