@@ -7,7 +7,7 @@ import { buildRelationshipHealthInsight, buildRelationshipHealthInsights } from 
 describe('relationship health and classification contract', () => {
   it('keeps indexed batch insights equivalent to individual contact insights', () => {
     const state = createTestState();
-    const now = new Date('2026-07-09T10:00:00.000Z');
+    const now = new Date('2026-07-10T10:00:00.000Z');
     const insights = buildRelationshipHealthInsights(state, now);
     for (const contact of state.contacts) {
       assert.deepEqual(insights.get(contact.id), buildRelationshipHealthInsight(state, contact.id, now));
@@ -16,7 +16,7 @@ describe('relationship health and classification contract', () => {
 
   it('explains relationship health with actionable non-shaming reasons', () => {
     const state = createTestState();
-    const insight = buildRelationshipHealthInsight(state, 'c-mira', new Date('2026-07-09T10:00:00.000Z'));
+    const insight = buildRelationshipHealthInsight(state, 'c-mira', new Date('2026-10-09T10:00:00.000Z'));
 
     assert.equal(insight?.label, 'Needs attention');
     assert.match(insight?.summary ?? '', /needs attention/i);

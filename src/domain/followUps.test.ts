@@ -46,13 +46,13 @@ describe('post-send follow-up contract', () => {
       type: 'scheduleMessageFollowUp',
       messageId: 'msg-mira-checkin',
       delayDays: 7,
-      nowIso: '2026-07-09T12:00:00.000Z'
+      nowIso: '2026-07-10T12:00:00.000Z'
     });
     const duplicate = relateReducer(scheduled, {
       type: 'scheduleMessageFollowUp',
       messageId: 'msg-mira-checkin',
       delayDays: 7,
-      nowIso: '2026-07-09T12:00:00.000Z'
+      nowIso: '2026-07-10T12:00:00.000Z'
     });
 
     assert.equal(scheduled.events.length, sentState.events.length + 1);
