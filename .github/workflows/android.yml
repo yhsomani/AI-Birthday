@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   dependency-review:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
