@@ -148,7 +148,7 @@ const cleanText = (value: unknown, maxLength = MAX_VARIANT_LENGTH) => {
 };
 
 const routeLeakPattern =
-  /(?:\+?\d[\d\s().-]{7,}\d|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|https?:\/\/|www\.|(?:mailto|tel|sms|smsto|whatsapp):|wa\.me\/)/i;
+  /(?:\+?\d[\d\s().-]{7,32}\d|[A-Z0-9._%+-]{1,254}@[A-Z0-9.-]{1,254}\.[A-Z]{2,63}|https?:\/\/|www\.|(?:mailto|tel|sms|smsto|whatsapp):|wa\.me\/)/i;
 const secretLeakPattern =
   /\b(?:api[- ]?key|app password|authorization bearer|bearer token|client secret|credential|otp|passcode|password|secret token|access token|private key)\b/i;
 const clearlyUnsafeOutputPatterns = [
