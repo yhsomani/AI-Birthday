@@ -1884,7 +1884,7 @@ describe('application command runtime', () => {
     );
     assert.equal(
       followUp.status === 'succeeded' && followUp.value.kind === 'message-action' && followUp.value.outcome,
-      'applied'
+      'blocked'
     );
     assert.doesNotMatch(serialized, /Private custom thank-you|Another private edited/i);
     assert.doesNotMatch(
