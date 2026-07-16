@@ -15,7 +15,7 @@ const assertJava17 = () => {
   const javaExecutable = path.join(javaHome, 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
   const result = spawnSync(javaExecutable, ['-version'], { encoding: 'utf8' });
   const versionOutput = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
-  if (result.status !== 0 || !/version "17(?:\.|\+)/.test(versionOutput)) {
+  if (result.status !== 0 || !/version "(?:17|21)(?:\.|\+)/.test(versionOutput)) {
     throw new Error(`test:native-prebuild requires JDK 17; JAVA_HOME resolved to: ${versionOutput.trim() || javaHome}`);
   }
 };
