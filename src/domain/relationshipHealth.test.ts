@@ -18,8 +18,8 @@ describe('relationship health and classification contract', () => {
     const state = createTestState();
     const insight = buildRelationshipHealthInsight(state, 'c-mira', new Date('2026-07-09T10:00:00.000Z'));
 
-    assert.equal(insight?.label, 'Needs attention');
-    assert.match(insight?.summary ?? '', /needs attention/i);
+    assert.equal(insight?.label, 'Watch');
+    assert.match(insight?.summary ?? '', /follow-up/i);
     assert.ok(insight?.reasons.some(reason => /cadence/i.test(reason)));
     assert.ok(insight?.reasons.some(reason => /upcoming relationship event/i.test(reason)));
   });
