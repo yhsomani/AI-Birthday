@@ -9,14 +9,14 @@ const keepFixture = process.env.RELATEAI_KEEP_NATIVE_FIXTURE === '1';
 const assertJava17 = () => {
   const javaHome = process.env.JAVA_HOME;
   if (!javaHome) {
-    throw new Error('test:native-prebuild requires JAVA_HOME to point to JDK 17.');
+    throw new Error('test:native-prebuild requires JAVA_HOME to point to JDK 17 or 21.');
   }
 
   const javaExecutable = path.join(javaHome, 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
   const result = spawnSync(javaExecutable, ['-version'], { encoding: 'utf8' });
   const versionOutput = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
-  if (result.status !== 0 || !/version "17(?:\.|\+)/.test(versionOutput)) {
-    throw new Error(`test:native-prebuild requires JDK 17; JAVA_HOME resolved to: ${versionOutput.trim() || javaHome}`);
+  if (result.status !== 0 || !/version "(?:17|21)(?:\.|\+)/.test(versionOutput)) {
+    throw new Error(`test:native-prebuild requires JDK 17 or 21; JAVA_HOME resolved to: ${versionOutput.trim() || javaHome}`);
   }
 };
 
