@@ -6,7 +6,7 @@ ruby '3.4.10'
 # CocoaPods 1.16.2 requires xcodeproj >= 1.27. Keeping the older React Native
 # template's xcodeproj < 1.26 workaround would silently force an obsolete pod
 # toolchain, so the lockfile owns the complete compatible transitive graph.
-gem 'cocoapods', '1.16.2'
+gem 'cocoapods', '1.17.0'
 
 # Ruby 3.4.0 has removed some libraries from the standard library.
 gem 'bigdecimal'
