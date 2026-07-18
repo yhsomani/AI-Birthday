@@ -65,7 +65,7 @@ jobs:
         run: npm install --global npm@11.6.0
 
       - name: Set up pinned Ruby and Bundler
-        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1 # v1
+        uses: ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600 # v1
         with:
           bundler-cache: true
 
