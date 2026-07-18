@@ -651,7 +651,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.6.0")
     // Firebase BoM 34.11.0's compatible pair. Auth 24.1.0 is compiled with Kotlin 2.3
     // metadata and cannot be consumed by this RN/AGP stack's pinned Kotlin 2.1.20 compiler.
-    implementation("com.google.firebase:firebase-auth:24.0.1")
+    implementation("com.google.firebase:firebase-auth:24.2.0")
     implementation("com.google.firebase:firebase-appcheck-playintegrity:19.2.0")
     implementation("com.google.firebase:firebase-ai:17.13.0")
     implementation("com.google.firebase:firebase-config:23.1.0")
